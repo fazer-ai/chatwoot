@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_02_07_040150) do
+ActiveRecord::Schema[7.0].define(version: 2025_02_13_190934) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1049,6 +1049,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_07_040150) do
     t.datetime "updated_at", null: false
     t.integer "webhook_type", default: 0
     t.jsonb "subscriptions", default: ["conversation_status_changed", "conversation_updated", "conversation_created", "contact_created", "contact_updated", "message_created", "message_updated", "webwidget_triggered"]
+    t.string "name"
     t.index ["account_id", "url"], name: "index_webhooks_on_account_id_and_url", unique: true
   end
 
