@@ -89,7 +89,7 @@ export default {
   <form class="flex flex-col w-full" @submit.prevent="onSubmit">
     <div class="w-full">
       <label>
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
+        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.LABEL') }}
         <input
           v-model="name"
           type="text"

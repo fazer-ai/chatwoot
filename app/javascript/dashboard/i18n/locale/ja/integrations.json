@@ -29,6 +29,10 @@
             "CONTACT_UPDATED": "連絡先が更新されました"
           }
         },
+        "NAME": {
+          "LABEL": "Webhook Name",
+          "PLACEHOLDER": "例: {webhookExampleName}"
+        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "例: {webhookExampleURL}",

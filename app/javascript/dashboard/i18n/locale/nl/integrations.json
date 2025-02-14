@@ -29,6 +29,10 @@
             "CONTACT_UPDATED": "Contact aangemaakt"
           }
         },
+        "NAME": {
+          "LABEL": "Webhook Name",
+          "PLACEHOLDER": "Example: {webhookExampleName}"
+        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "Example: {webhookExampleURL}",

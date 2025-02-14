@@ -29,6 +29,10 @@
             "CONTACT_UPDATED": "Kontaktpersona atjaunināta"
           }
         },
+        "NAME": {
+          "LABEL": "Webhook Name",
+          "PLACEHOLDER": "Piemēram: {webhookExampleName}"
+        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "Piemēram: {webhookExampleURL}",
