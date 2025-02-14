@@ -4,7 +4,7 @@ import { required, url, minLength } from '@vuelidate/validators';
 import wootConstants from 'dashboard/constants/globals';
 import { getI18nKey } from 'dashboard/routes/dashboard/settings/helper/settingsHelper';
 
-const { EXAMPLE_WEBHOOK_URL } = wootConstants;
+const { EXAMPLE_WEBHOOK_URL, EXAMPLE_WEBHOOK_NAME } = wootConstants;
 
 const SUPPORTED_WEBHOOK_EVENTS = [
   'conversation_created',
@@ -48,6 +48,7 @@ export default {
   },
   data() {
     return {
+      name: this.value.name || '',
       url: this.value.url || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
@@ -62,10 +63,19 @@ export default {
         }
       );
     },
+    webhookNameInputPlaceholder() {
+      return this.$t(
+        'INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.PLACEHOLDER',
+        {
+          webhookExampleURL: EXAMPLE_WEBHOOK_NAME,
+        }
+      );
+    },
   },
   methods: {
     onSubmit() {
       this.$emit('submit', {
+        name: this.name,
         url: this.url,
         subscriptions: this.subscriptions,
       });
@@ -78,6 +88,16 @@ export default {
 <template>
   <form class="flex flex-col w-full" @submit.prevent="onSubmit">
     <div class="w-full">
+      <label>
+        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
+        <input
+          v-model="name"
+          type="text"
+          name="name"
+          :placeholder="webhookNameInputPlaceholder"
+          @input="v$.name.$touch"
+        />
+      </label>
       <label :class="{ error: v$.url.$error }">
         {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
         <input
