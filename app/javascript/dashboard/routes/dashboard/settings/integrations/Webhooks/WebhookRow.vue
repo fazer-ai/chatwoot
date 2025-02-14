@@ -35,7 +35,19 @@ const subscribedEvents = computed(() => {
 <template>
   <tr>
     <td class="py-4 ltr:pr-4 rtl:pl-4">
-      <div class="font-medium break-words text-slate-700 dark:text-slate-100">
+      <div
+        v-if="webhook.name"
+        class="font-medium break-words text-slate-700 dark:text-slate-100"
+      >
+        <span class="font-bold text-indigo-600 dark:text-indigo-400">
+          {{ webhook.name }}
+        </span>
+        {{ webhook.url }}
+      </div>
+      <div
+        v-if="!webhook.name"
+        class="font-medium break-words text-slate-700 dark:text-slate-100"
+      >
         {{ webhook.url }}
       </div>
       <div class="block mt-1 text-sm text-slate-500 dark:text-slate-400">
