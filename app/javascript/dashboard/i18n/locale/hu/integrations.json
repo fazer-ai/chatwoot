@@ -29,10 +29,6 @@
             "CONTACT_UPDATED": "Kontakt frissítve"
           }
         },
-        "NAME": {
-          "LABEL": "Webhook Name",
-          "PLACEHOLDER": "Example: {webhookExampleName}"
-        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "Example: {webhookExampleURL}",

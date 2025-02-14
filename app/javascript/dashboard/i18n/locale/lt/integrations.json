@@ -29,10 +29,6 @@
             "CONTACT_UPDATED": "Kontaktas atnaujintas"
           }
         },
-        "NAME": {
-          "LABEL": "Webhook Name",
-          "PLACEHOLDER": "Example: {webhookExampleName}"
-        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "Example: {webhookExampleURL}",
