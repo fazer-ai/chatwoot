@@ -4,7 +4,7 @@ import { required, url, minLength } from '@vuelidate/validators';
 import wootConstants from 'dashboard/constants/globals';
 import { getI18nKey } from 'dashboard/routes/dashboard/settings/helper/settingsHelper';
 
-const { EXAMPLE_WEBHOOK_URL, EXAMPLE_WEBHOOK_NAME } = wootConstants;
+const { EXAMPLE_WEBHOOK_URL } = wootConstants;
 
 const SUPPORTED_WEBHOOK_EVENTS = [
   'conversation_created',
@@ -48,8 +48,8 @@ export default {
   },
   data() {
     return {
-      name: this.value.name || '',
       url: this.value.url || '',
+      name: this.value.name || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
     };
@@ -64,19 +64,14 @@ export default {
       );
     },
     webhookNameInputPlaceholder() {
-      return this.$t(
-        'INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.PLACEHOLDER',
-        {
-          webhookExampleURL: EXAMPLE_WEBHOOK_NAME,
-        }
-      );
+      return this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.PLACEHOLDER');
     },
   },
   methods: {
     onSubmit() {
       this.$emit('submit', {
-        name: this.name,
         url: this.url,
+        name: this.name,
         subscriptions: this.subscriptions,
       });
     },
@@ -88,15 +83,6 @@ export default {
 <template>
   <form class="flex flex-col w-full" @submit.prevent="onSubmit">
     <div class="w-full">
-      <label>
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.LABEL') }}
-        <input
-          v-model="name"
-          type="text"
-          name="name"
-          :placeholder="webhookNameInputPlaceholder"
-        />
-      </label>
       <label :class="{ error: v$.url.$error }">
         {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
         <input
@@ -109,6 +95,15 @@ export default {
         <span v-if="v$.url.$error" class="message">
           {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.ERROR') }}
         </span>
+      </label>
+      <label>
+        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.LABEL') }}
+        <input
+          v-model="name"
+          type="text"
+          name="name"
+          :placeholder="webhookNameInputPlaceholder"
+        />
       </label>
       <label :class="{ error: v$.url.$error }" class="mb-2">
         {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.LABEL') }}

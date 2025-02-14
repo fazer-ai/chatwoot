@@ -47,7 +47,6 @@ export default {
   },
   EXAMPLE_URL: 'example.com',
   EXAMPLE_WEBHOOK_URL: 'https://example/api/webhook',
-  EXAMPLE_WEBHOOK_NAME: 'My Example Webhook',
   INBOX_SORT_BY: {
     NEWEST: 'desc',
     OLDEST: 'asc',
