@@ -3,6 +3,9 @@ properties:
   id:
     type: number
     description: The ID of the webhook
+  name:
+    type: string
+    description: The name of the webhook
   url:
     type: string
     description: The url to which the events will be send
