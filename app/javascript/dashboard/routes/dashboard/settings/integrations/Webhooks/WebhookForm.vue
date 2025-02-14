@@ -95,7 +95,6 @@ export default {
           type="text"
           name="name"
           :placeholder="webhookNameInputPlaceholder"
-          @input="v$.name.$touch"
         />
       </label>
       <label :class="{ error: v$.url.$error }">
