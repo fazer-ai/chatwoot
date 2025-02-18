@@ -12,7 +12,7 @@ class Api::V1::Accounts::WebhooksController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @webhook.update!(webhook_params)
+    @webhook.update!(webhook_params.except(:inbox_id))
   end
 
   def destroy
