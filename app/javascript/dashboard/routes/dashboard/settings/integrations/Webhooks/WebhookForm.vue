@@ -31,6 +31,11 @@ export default {
       type: String,
       required: true,
     },
+    // eslint-disable-next-line vue/no-unused-properties
+    isEditing: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['submit', 'cancel'],
   setup() {
@@ -50,6 +55,7 @@ export default {
     return {
       url: this.value.url || '',
       name: this.value.name || '',
+      inbox_id: this.value.inbox_id || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
     };
@@ -66,12 +72,16 @@ export default {
     webhookNameInputPlaceholder() {
       return this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.PLACEHOLDER');
     },
+    webhookInboxInputPlaceholder() {
+      return this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER');
+    },
   },
   methods: {
     onSubmit() {
       this.$emit('submit', {
         url: this.url,
         name: this.name,
+        inbox_id: this.inbox.id,
         subscriptions: this.subscriptions,
       });
     },
@@ -103,6 +113,15 @@ export default {
           type="text"
           name="name"
           :placeholder="webhookNameInputPlaceholder"
+        />
+      </label>
+      <label v-if="!isEditing">
+        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
+        <input
+          v-model="inbox_id"
+          type="text"
+          name="inbox_id"
+          :placeholder="webhookInboxInputPlaceholder"
         />
       </label>
       <label :class="{ error: v$.url.$error }" class="mb-2">

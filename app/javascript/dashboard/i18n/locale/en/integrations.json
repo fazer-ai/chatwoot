@@ -33,6 +33,10 @@
           "LABEL": "Webhook Name",
           "PLACEHOLDER": "Enter the name of the webhook"
         },
+        "INBOX": {
+          "LABEL": "Inbox",
+          "PLACEHOLDER": "Select the inbox"
+        },
         "END_POINT": {
           "LABEL": "Webhook URL",
           "PLACEHOLDER": "Example: {webhookExampleURL}",
@@ -187,7 +191,10 @@
       "LIST": {
         "404": "There are no dashboard apps configured on this account yet",
         "LOADING": "Fetching dashboard apps...",
-        "TABLE_HEADER": { "NAME": "Name", "ENDPOINT": "Endpoint" },
+        "TABLE_HEADER": {
+          "NAME": "Name",
+          "ENDPOINT": "Endpoint"
+        },
         "EDIT_TOOLTIP": "Edit app",
         "DELETE_TOOLTIP": "Delete app"
       },
@@ -419,7 +426,6 @@
         "SUCCESS_MESSAGE": "The document has been successfully deleted",
         "ERROR_MESSAGE": "There was an error deleting the document, please try again."
       },
-
       "OPTIONS": {
         "VIEW_RELATED_RESPONSES": "View Related Responses",
         "DELETE_DOCUMENT": "Delete Document"
@@ -470,7 +476,6 @@
           "PLACEHOLDER": "Enter the answer here",
           "ERROR": "Please provide a valid answer."
         },
-
         "ASSISTANT": {
           "LABEL": "Assistant",
           "PLACEHOLDER": "Select an assistant",
