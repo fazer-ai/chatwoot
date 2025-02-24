@@ -12,7 +12,12 @@ class Api::V1::Accounts::WebhooksController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @webhook.update!(webhook_params.except(:inbox_id))
+    if webhook_params.key?(:inbox_id)
+      render json: { message: 'Inbox cannot be updated' }, status: :unprocessable_entity
+      return
+    end
+
+    @webhook.update!(webhook_params)
   end
 
   def destroy

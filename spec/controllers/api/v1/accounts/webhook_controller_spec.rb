@@ -120,6 +120,15 @@ RSpec.describe 'Webhooks API', type: :request do
         expect(response.parsed_body['payload']['webhook']['url']).to eql 'https://hello.com'
         expect(response.parsed_body['payload']['webhook']['name']).to eql 'Another Webhook'
       end
+
+      it 'fails to update inbox_id' do
+        put "/api/v1/accounts/#{account.id}/webhooks/#{webhook.id}",
+            params: { inbox_id: create(:inbox, account: account).id },
+            headers: administrator.create_new_auth_token,
+            as: :json
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to eql 'Inbox cannot be updated'
+      end
     end
   end
 
