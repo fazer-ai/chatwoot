@@ -113,21 +113,21 @@ RSpec.describe 'Webhooks API', type: :request do
     context 'when it is an authenticated admin user' do
       it 'updates webhook' do
         put "/api/v1/accounts/#{account.id}/webhooks/#{webhook.id}",
-            params: { url: 'https://hello.com', name: 'Another Webhook' },
+            params: { name: 'Another Webhook' },
             headers: administrator.create_new_auth_token,
             as: :json
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['payload']['webhook']['url']).to eql 'https://hello.com'
         expect(response.parsed_body['payload']['webhook']['name']).to eql 'Another Webhook'
       end
 
-      it 'fails to update inbox_id' do
+      it 'ignores trying to update inbox_id and url' do
         put "/api/v1/accounts/#{account.id}/webhooks/#{webhook.id}",
-            params: { inbox_id: create(:inbox, account: account).id },
+            params: { url: 'https://other.url.com', inbox_id: create(:inbox, account: account).id },
             headers: administrator.create_new_auth_token,
             as: :json
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(response.parsed_body['message']).to eql 'Inbox cannot be updated'
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload']['webhook']['inbox_id']).not_to eql inbox.id
+        expect(response.parsed_body['payload']['webhook']['url']).not_to eql 'https://other.url.com'
       end
     end
   end
