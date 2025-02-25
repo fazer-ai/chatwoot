@@ -62,6 +62,7 @@ const hasValue = computed(() => {
   <OnClickOutside @trigger="onCloseDropdown">
     <div class="relative w-full mb-2" @keyup.esc="onCloseDropdown">
       <woot-button
+        type="button"
         variant="hollow"
         color-scheme="secondary"
         class="w-full px-2 border border-solid !border-n-weak dark:!border-n-weak hover:!border-n-strong dark:hover:!border-n-strong"
@@ -108,6 +109,7 @@ const hasValue = computed(() => {
             {{ multiselectorTitle }}
           </h4>
           <woot-button
+            type="button"
             icon="dismiss"
             size="tiny"
             color-scheme="secondary"
