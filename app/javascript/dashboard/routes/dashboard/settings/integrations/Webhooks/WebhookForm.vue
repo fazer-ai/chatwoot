@@ -108,6 +108,7 @@ export default {
           v-model="url"
           type="text"
           name="url"
+          :disabled="isEditing"
           :placeholder="webhookURLInputPlaceholder"
           @input="v$.url.$touch"
         />
