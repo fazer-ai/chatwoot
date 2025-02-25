@@ -35,7 +35,10 @@
         },
         "INBOX": {
           "LABEL": "Inbox",
-          "PLACEHOLDER": "Select the inbox"
+          "TITLE": "Select the inbox",
+          "PLACEHOLDER": "All Inboxes",
+          "NO_RESULTS": "No inboxes found",
+          "INPUT_PLACEHOLDER": "Search inbox"
         },
         "END_POINT": {
           "LABEL": "Webhook URL",

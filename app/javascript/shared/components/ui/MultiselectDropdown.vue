@@ -35,6 +35,10 @@ const props = defineProps({
     type: String,
     default: 'Search',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['select']);
@@ -61,6 +65,7 @@ const hasValue = computed(() => {
         variant="hollow"
         color-scheme="secondary"
         class="w-full px-2 border border-solid !border-n-weak dark:!border-n-weak hover:!border-n-strong dark:hover:!border-n-strong"
+        :is-disabled="disabled"
         @click="
           () => toggleDropdown() // ensure that the event is not passed to the button
         "

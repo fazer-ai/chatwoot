@@ -3,6 +3,8 @@ import { useVuelidate } from '@vuelidate/core';
 import { required, url, minLength } from '@vuelidate/validators';
 import wootConstants from 'dashboard/constants/globals';
 import { getI18nKey } from 'dashboard/routes/dashboard/settings/helper/settingsHelper';
+import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
+import { useMapGetter } from 'dashboard/composables/store';
 
 const { EXAMPLE_WEBHOOK_URL } = wootConstants;
 
@@ -18,6 +20,9 @@ const SUPPORTED_WEBHOOK_EVENTS = [
 ];
 
 export default {
+  components: {
+    MultiselectDropdown,
+  },
   props: {
     value: {
       type: Object,
@@ -31,7 +36,6 @@ export default {
       type: String,
       required: true,
     },
-    // eslint-disable-next-line vue/no-unused-properties
     isEditing: {
       type: Boolean,
       default: false,
@@ -39,7 +43,10 @@ export default {
   },
   emits: ['submit', 'cancel'],
   setup() {
-    return { v$: useVuelidate() };
+    return {
+      v$: useVuelidate(),
+      inboxes: useMapGetter('inboxes/getInboxes'),
+    };
   },
   validations: {
     url: {
@@ -58,6 +65,7 @@ export default {
       inbox_id: this.value.inbox_id || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
+      selectedInbox: this.value.inbox || {},
     };
   },
   computed: {
@@ -81,9 +89,13 @@ export default {
       this.$emit('submit', {
         url: this.url,
         name: this.name,
-        inbox_id: this.inbox.id,
+        inbox_id: this.inbox_id,
         subscriptions: this.subscriptions,
       });
+    },
+    onClickAssignInbox(inbox) {
+      this.selectedInbox = inbox;
+      this.inbox_id = inbox.id;
     },
     getI18nKey,
   },
@@ -115,15 +127,29 @@ export default {
           :placeholder="webhookNameInputPlaceholder"
         />
       </label>
-      <label v-if="!isEditing">
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
-        <input
-          v-model="inbox_id"
-          type="text"
-          name="inbox_id"
-          :placeholder="webhookInboxInputPlaceholder"
-        />
-      </label>
+      <div class="multiselect-wrap--small">
+        <label>
+          {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
+          <MultiselectDropdown
+            :options="inboxes"
+            :selected-item="selectedInbox"
+            :multiselector-title="
+              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
+            "
+            :multiselector-placeholder="
+              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER')
+            "
+            :no-search-result="
+              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.NO_RESULTS')
+            "
+            :input-placeholder="
+              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.INPUT_PLACEHOLDER')
+            "
+            :disabled="isEditing"
+            @select="onClickAssignInbox"
+          />
+        </label>
+      </div>
       <label :class="{ error: v$.url.$error }" class="mb-2">
         {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.LABEL') }}
       </label>
