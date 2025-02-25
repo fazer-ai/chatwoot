@@ -80,9 +80,6 @@ export default {
     webhookNameInputPlaceholder() {
       return this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.PLACEHOLDER');
     },
-    webhookInboxInputPlaceholder() {
-      return this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER');
-    },
   },
   methods: {
     onSubmit() {
