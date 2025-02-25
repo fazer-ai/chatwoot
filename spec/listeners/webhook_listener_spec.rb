@@ -75,6 +75,26 @@ describe WebhookListener do
         listener.message_created(api_event)
       end
     end
+
+    context 'when webhook has an inbox and it matches the event inbox' do
+      it 'receives the event' do
+        webhook = create(:webhook, account: account, inbox: inbox)
+        expect(WebhookJob).to receive(:perform_later)
+          .with(webhook.url, message.webhook_data.merge(event: 'message_created')).once
+
+        listener.message_created(message_created_event)
+      end
+    end
+
+    context 'when webhook has an inbox and it does not match the event inbox' do
+      it 'does not receive the event' do
+        another_inbox = create(:inbox, account: account)
+        create(:webhook, account: account, inbox: another_inbox)
+
+        expect(WebhookJob).not_to receive(:perform_later)
+        listener.message_created(message_created_event)
+      end
+    end
   end
 
   describe '#conversation_created' do

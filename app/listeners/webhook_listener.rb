@@ -3,6 +3,7 @@ class WebhookListener < BaseListener
     conversation = extract_conversation_and_account(event)[0]
     changed_attributes = extract_changed_attributes(event)
     inbox = conversation.inbox
+
     payload = conversation.webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
     deliver_webhook_payloads(payload, inbox)
   end
@@ -88,6 +89,7 @@ class WebhookListener < BaseListener
   def deliver_account_webhooks(payload, account)
     account.webhooks.account_type.each do |webhook|
       next unless webhook.subscriptions.include?(payload[:event])
+      next if payload[:inbox].present? && (webhook.inbox_id.present? && webhook.inbox_id != payload[:inbox][:id])
 
       WebhookJob.perform_later(webhook.url, payload)
     end
