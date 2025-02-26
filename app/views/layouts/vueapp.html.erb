@@ -66,6 +66,7 @@
     <% if Rails.env.development? %>
       <%= javascript_include_tag "/packs/js/#{@application_pack}.js", defer: true, type: "module" %>
       <%= stylesheet_link_tag "/packs/js/bundle.css" if File.exist?(Rails.root.join("public/packs/js/bundle.css")) %>
+      <script src="http://localhost:35729/livereload.js?snipver=1"></script>
     <% else %>
       <%= vite_client_tag %>
       <%= vite_javascript_tag @application_pack %>

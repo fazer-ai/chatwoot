@@ -8,6 +8,8 @@ import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
 import json from '@rollup/plugin-json';
 import url from '@rollup/plugin-url';
+import serve from 'rollup-plugin-serve';
+import livereload from 'rollup-plugin-livereload';
 
 const isLibraryMode = process.env.BUILD_MODE === 'library';
 const production = !process.env.ROLLUP_WATCH;
@@ -133,8 +135,22 @@ let plugins = [
     preferBuiltins: false,
     dedupe: ['vue'],
   }),
+  !production &&
+    serve({
+      contentBase: ['public'],
+      port: 3036,
+      historyApiFallback: true,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+    }),
+  !production &&
+    livereload({
+      watch: 'public/packs',
+      verbose: false,
+    }),
   production && terser(),
-];
+].filter(Boolean);
 
 const entrypoints = {
   dashboard: path.resolve(
