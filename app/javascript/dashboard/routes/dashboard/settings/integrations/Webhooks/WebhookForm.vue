@@ -62,7 +62,7 @@ export default {
     return {
       url: this.value.url || '',
       name: this.value.name || '',
-      inbox_id: this.value.inbox_id || '',
+      inboxId: this.value.inboxId || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
       selectedInbox: this.value.inbox || {},
@@ -86,13 +86,13 @@ export default {
       this.$emit('submit', {
         url: this.url,
         name: this.name,
-        inbox_id: this.inbox_id,
+        inbox_id: this.inboxId,
         subscriptions: this.subscriptions,
       });
     },
     onClickAssignInbox(inbox) {
       this.selectedInbox = inbox;
-      this.inbox_id = inbox.id;
+      this.inboxId = inbox.id;
     },
     getI18nKey,
   },
