@@ -35,6 +35,10 @@ const props = defineProps({
     type: String,
     default: 'Search',
   },
+  buttonVariant: {
+    type: String,
+    default: 'hollow',
+  },
   disabled: {
     type: Boolean,
     default: false,
@@ -63,7 +67,7 @@ const hasValue = computed(() => {
     <div class="relative w-full mb-2" @keyup.esc="onCloseDropdown">
       <woot-button
         type="button"
-        variant="hollow"
+        :variant="buttonVariant"
         color-scheme="secondary"
         class="w-full px-2 border border-solid !border-n-weak dark:!border-n-weak hover:!border-n-strong dark:hover:!border-n-strong"
         :is-disabled="disabled"

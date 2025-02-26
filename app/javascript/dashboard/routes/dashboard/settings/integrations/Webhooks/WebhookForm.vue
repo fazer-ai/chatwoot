@@ -125,27 +125,32 @@ export default {
           :placeholder="webhookNameInputPlaceholder"
         />
       </label>
-      <div class="multiselect-wrap--small">
+      <div class="flex flex-col w-full">
         <label>
           {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
-          <MultiselectDropdown
-            :options="inboxes"
-            :selected-item="selectedInbox"
-            :multiselector-title="
-              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
-            "
-            :multiselector-placeholder="
-              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER')
-            "
-            :no-search-result="
-              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.NO_RESULTS')
-            "
-            :input-placeholder="
-              $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.INPUT_PLACEHOLDER')
-            "
-            :disabled="isEditing"
-            @select="onClickAssignInbox"
-          />
+          <div
+            class="multiselect-wrap--small form-container [&>.button]:w-full [&>.button]:px-4 [&>.button]:py-2 [&>.button]:rounded-md [&>.button]:border [&>.button]:border-gray-300 [&>.button]:text-gray-900 [&>.button]:bg-white [&>.button]:focus:outline-none [&>.button]:focus:ring-2 [&>.button]:focus:ring-blue-500 [&>.button]:focus:border-blue-500"
+          >
+            <MultiselectDropdown
+              :options="inboxes"
+              :selected-item="selectedInbox"
+              :multiselector-title="
+                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
+              "
+              :multiselector-placeholder="
+                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER')
+              "
+              :no-search-result="
+                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.NO_RESULTS')
+              "
+              :input-placeholder="
+                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.INPUT_PLACEHOLDER')
+              "
+              :disabled="isEditing"
+              button-variant="secondary"
+              @select="onClickAssignInbox"
+            />
+          </div>
         </label>
       </div>
       <label :class="{ error: v$.url.$error }" class="mb-2">
