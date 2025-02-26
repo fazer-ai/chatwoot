@@ -63,8 +63,13 @@
       }
     </script>
     <% end %>
-    <%= vite_client_tag %>
-    <%= vite_javascript_tag @application_pack %>
+    <% if Rails.env.development? %>
+      <%= javascript_include_tag "/packs/js/#{@application_pack}.js", defer: true, type: "module" %>
+      <%= stylesheet_link_tag "/packs/js/bundle.css" if File.exist?(Rails.root.join("public/packs/js/bundle.css")) %>
+    <% else %>
+      <%= vite_client_tag %>
+      <%= vite_javascript_tag @application_pack %>
+    <% end %>
   </head>
   <body class="text-slate-600">
     <div id="app"></div>

@@ -1,5 +1,7 @@
 <script>
-// Copilot Loader Component
+export default {
+  name: 'CopilotLoader',
+};
 </script>
 
 <template>
