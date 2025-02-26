@@ -3,21 +3,7 @@ import { computed } from 'vue';
 import { getI18nKey } from 'dashboard/routes/dashboard/settings/helper/settingsHelper';
 import ShowMore from 'dashboard/components/widgets/ShowMore.vue';
 import { useI18n } from 'vue-i18n';
-import LabelItem from 'dashboard/components-next/Label/LabelItem.vue';
-import {
-  amber,
-  blue,
-  cyan,
-  jade,
-  lime,
-  mint,
-  olive,
-  orange,
-  ruby,
-  slate,
-  teal,
-  yellow,
-} from '@radix-ui/colors';
+import InboxName from 'components/widgets/InboxName.vue';
 
 const props = defineProps({
   webhook: {
@@ -45,26 +31,14 @@ const subscribedEvents = computed(() => {
     )
     .join(', ');
 });
-
-const COLORS = [
-  jade.jade9,
-  blue.blue9,
-  ruby.ruby9,
-  amber.amber9,
-  slate.slate9,
-  teal.teal9,
-  orange.orange9,
-  yellow.yellow9,
-  lime.lime9,
-  mint.mint9,
-  olive.olive9,
-  cyan.cyan9,
-];
 </script>
 
 <template>
   <tr>
     <td class="py-4 ltr:pr-4 rtl:pl-4">
+      <div v-if="webhook.inbox">
+        <InboxName :inbox="webhook.inbox" class="flex break-words !mx-0" />
+      </div>
       <div
         class="flex gap-2 font-medium break-words text-slate-700 dark:text-slate-100"
       >
@@ -83,18 +57,6 @@ const COLORS = [
           {{ $t('INTEGRATION_SETTINGS.WEBHOOK.SUBSCRIBED_EVENTS') }}:
         </span>
         <ShowMore :text="subscribedEvents" :limit="60" />
-      </div>
-      <div
-        v-if="webhook.inbox"
-        class="flex gap-2 font-medium break-words text-slate-500 dark:text-slate-400"
-      >
-        <LabelItem
-          :label="{
-            id: webhook.inbox.id,
-            title: webhook.inbox.name,
-            color: COLORS[webhook.inbox.id % COLORS.length],
-          }"
-        />
       </div>
     </td>
     <td class="py-4 min-w-xs">
