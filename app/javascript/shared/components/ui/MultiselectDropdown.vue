@@ -35,6 +35,14 @@ const props = defineProps({
     type: String,
     default: 'Search',
   },
+  buttonVariant: {
+    type: String,
+    default: 'hollow',
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['select']);
@@ -58,9 +66,11 @@ const hasValue = computed(() => {
   <OnClickOutside @trigger="onCloseDropdown">
     <div class="relative w-full mb-2" @keyup.esc="onCloseDropdown">
       <woot-button
-        variant="hollow"
+        type="button"
+        :variant="buttonVariant"
         color-scheme="secondary"
         class="w-full px-2 border border-solid !border-n-weak dark:!border-n-weak hover:!border-n-strong dark:hover:!border-n-strong"
+        :is-disabled="disabled"
         @click="
           () => toggleDropdown() // ensure that the event is not passed to the button
         "
@@ -95,6 +105,10 @@ const hasValue = computed(() => {
       <div
         :class="{ 'dropdown-pane--open': showSearchDropdown }"
         class="dropdown-pane"
+        @click="
+          // NOTE: Without this, the dropdown does not behave as expected when used inside a <label> tag.
+          event => event.preventDefault()
+        "
       >
         <div class="flex items-center justify-between mb-1">
           <h4
@@ -103,6 +117,7 @@ const hasValue = computed(() => {
             {{ multiselectorTitle }}
           </h4>
           <woot-button
+            type="button"
             icon="dismiss"
             size="tiny"
             color-scheme="secondary"
