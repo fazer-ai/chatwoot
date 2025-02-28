@@ -70,16 +70,18 @@ export default {
   },
   computed: {
     inboxesList() {
-      if (!this.selectedInbox || !this.selectedInbox.id) {
-        return this.inboxes;
+      if (this.selectedInbox?.id) {
+        return [
+          {
+            id: 0,
+            name: this.$t(
+              'INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER'
+            ),
+          },
+          ...this.inboxes,
+        ];
       }
-      return [
-        {
-          id: 0,
-          name: this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER'),
-        },
-        ...this.inboxes,
-      ];
+      return this.inboxes;
     },
     webhookURLInputPlaceholder() {
       return this.$t(
