@@ -3,7 +3,6 @@ class WebhookListener < BaseListener
     conversation = extract_conversation_and_account(event)[0]
     changed_attributes = extract_changed_attributes(event)
     inbox = conversation.inbox
-
     payload = conversation.webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
     deliver_webhook_payloads(payload, inbox)
   end

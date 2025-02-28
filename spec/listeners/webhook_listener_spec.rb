@@ -15,6 +15,30 @@ describe WebhookListener do
   let!(:conversation_created_event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation) }
   let!(:contact_event) { Events::Base.new(event_name, Time.zone.now, contact: contact) }
 
+  describe 'Filter event trigger by Inbox' do
+    let(:event_name) { :'message.created' }
+
+    context 'when webhook has an inbox and it matches the event inbox' do
+      it 'triggers the webhook event' do
+        webhook = create(:webhook, account: account, inbox: inbox)
+        expect(WebhookJob).to receive(:perform_later)
+          .with(webhook.url, message.webhook_data.merge(event: 'message_created')).once
+
+        listener.message_created(message_created_event)
+      end
+    end
+
+    context 'when webhook has an inbox and it does not match the event inbox' do
+      it 'does not trigger webhook' do
+        another_inbox = create(:inbox, account: account)
+        create(:webhook, account: account, inbox: another_inbox)
+        expect(WebhookJob).to receive(:perform_later).exactly(0).times
+
+        listener.message_created(message_created_event)
+      end
+    end
+  end
+
   describe '#message_created' do
     let(:event_name) { :'message.created' }
 
@@ -73,26 +97,6 @@ describe WebhookListener do
         api_event = Events::Base.new(event_name, Time.zone.now, message: api_message)
         expect(WebhookJob).not_to receive(:perform_later)
         listener.message_created(api_event)
-      end
-    end
-
-    context 'when webhook has an inbox and it matches the event inbox' do
-      it 'receives the event' do
-        webhook = create(:webhook, account: account, inbox: inbox)
-        expect(WebhookJob).to receive(:perform_later)
-          .with(webhook.url, message.webhook_data.merge(event: 'message_created')).once
-
-        listener.message_created(message_created_event)
-      end
-    end
-
-    context 'when webhook has an inbox and it does not match the event inbox' do
-      it 'does not receive the event' do
-        another_inbox = create(:inbox, account: account)
-        create(:webhook, account: account, inbox: another_inbox)
-
-        expect(WebhookJob).not_to receive(:perform_later)
-        listener.message_created(message_created_event)
       end
     end
   end
