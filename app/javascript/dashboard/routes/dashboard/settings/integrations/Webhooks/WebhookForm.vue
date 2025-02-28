@@ -65,7 +65,7 @@ export default {
       inboxId: this.value.inboxId || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
-      selectedInbox: this.value.inbox || {},
+      selectedInbox: this.value.inbox || null,
     };
   },
   computed: {
@@ -101,84 +101,80 @@ export default {
 
 <template>
   <form class="flex flex-col w-full" @submit.prevent="onSubmit">
-    <div class="w-full">
-      <label :class="{ error: v$.url.$error }">
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
-        <input
-          v-model="url"
-          type="text"
-          name="url"
+    <label :class="{ error: v$.url.$error }">
+      {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.LABEL') }}
+      <input
+        v-model="url"
+        type="text"
+        name="url"
+        :disabled="isEditing"
+        :placeholder="webhookURLInputPlaceholder"
+        @input="v$.url.$touch"
+      />
+      <span v-if="v$.url.$error" class="message">
+        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.ERROR') }}
+      </span>
+    </label>
+    <label>
+      {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
+      <div class="multiselect-wrap--small">
+        <MultiselectDropdown
+          :options="inboxes"
+          :selected-item="selectedInbox"
+          :multiselector-title="
+            $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
+          "
+          :multiselector-placeholder="
+            $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER')
+          "
+          :no-search-result="
+            $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.NO_RESULTS')
+          "
+          :input-placeholder="
+            $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.INPUT_PLACEHOLDER')
+          "
           :disabled="isEditing"
-          :placeholder="webhookURLInputPlaceholder"
-          @input="v$.url.$touch"
+          button-variant="secondary"
+          @select="onClickAssignInbox"
         />
-        <span v-if="v$.url.$error" class="message">
-          {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.ERROR') }}
-        </span>
-      </label>
-      <label>
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.LABEL') }}
-        <input
-          v-model="name"
-          type="text"
-          name="name"
-          :placeholder="webhookNameInputPlaceholder"
-        />
-      </label>
-      <div class="flex flex-col w-full">
-        <label>
-          {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
-          <div class="multiselect-wrap--small">
-            <MultiselectDropdown
-              :options="inboxes"
-              :selected-item="selectedInbox"
-              :multiselector-title="
-                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
-              "
-              :multiselector-placeholder="
-                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER')
-              "
-              :no-search-result="
-                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.NO_RESULTS')
-              "
-              :input-placeholder="
-                $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.INPUT_PLACEHOLDER')
-              "
-              :disabled="isEditing"
-              button-variant="secondary"
-              @select="onClickAssignInbox"
-            />
-          </div>
-        </label>
       </div>
-      <label :class="{ error: v$.url.$error }" class="mb-2">
-        {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.LABEL') }}
-      </label>
-      <div class="flex flex-col gap-2.5 mb-4">
-        <div
-          v-for="event in supportedWebhookEvents"
-          :key="event"
-          class="flex items-center"
-        >
-          <input
-            :id="event"
-            v-model="subscriptions"
-            type="checkbox"
-            :value="event"
-            name="subscriptions"
-            class="mr-2"
-          />
-          <label :for="event" class="text-sm">
-            {{
-              `${$t(
-                getI18nKey(
-                  'INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.EVENTS',
-                  event
-                )
-              )} (${event})`
-            }}
-          </label>
-        </div>
+    </label>
+    <label>
+      {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.NAME.LABEL') }}
+      <input
+        v-model="name"
+        type="text"
+        name="name"
+        :placeholder="webhookNameInputPlaceholder"
+      />
+    </label>
+    <label :class="{ error: v$.url.$error }" class="mb-2">
+      {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.LABEL') }}
+    </label>
+    <div class="flex flex-col gap-2.5 mb-4">
+      <div
+        v-for="event in supportedWebhookEvents"
+        :key="event"
+        class="flex items-center"
+      >
+        <input
+          :id="event"
+          v-model="subscriptions"
+          type="checkbox"
+          :value="event"
+          name="subscriptions"
+          class="mr-2"
+        />
+        <label :for="event" class="text-sm">
+          {{
+            `${$t(
+              getI18nKey(
+                'INTEGRATION_SETTINGS.WEBHOOK.FORM.SUBSCRIPTIONS.EVENTS',
+                event
+              )
+            )} (${event})`
+          }}
+        </label>
       </div>
     </div>
 
