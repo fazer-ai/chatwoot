@@ -69,6 +69,18 @@ export default {
     };
   },
   computed: {
+    inboxesList() {
+      if (!this.selectedInbox || !this.selectedInbox.id) {
+        return this.inboxes;
+      }
+      return [
+        {
+          id: 0,
+          name: this.$t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.PLACEHOLDER'),
+        },
+        ...this.inboxes,
+      ];
+    },
     webhookURLInputPlaceholder() {
       return this.$t(
         'INTEGRATION_SETTINGS.WEBHOOK.FORM.END_POINT.PLACEHOLDER',
@@ -86,7 +98,7 @@ export default {
       this.$emit('submit', {
         url: this.url,
         name: this.name,
-        inbox_id: this.inboxId,
+        inbox_id: this.inboxId || null,
         subscriptions: this.subscriptions,
       });
     },
@@ -119,7 +131,7 @@ export default {
       {{ $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.LABEL') }}
       <div class="multiselect-wrap--small">
         <MultiselectDropdown
-          :options="inboxes"
+          :options="inboxesList"
           :selected-item="selectedInbox"
           :multiselector-title="
             $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
