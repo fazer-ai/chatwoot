@@ -1,9 +1,10 @@
 require 'rails_helper'
 
 RSpec.describe 'Webhooks API', type: :request do
+  let(:url) { 'https://hello.com' }
   let(:account) { create(:account) }
   let(:inbox) { create(:inbox, account: account) }
-  let(:webhook) { create(:webhook, account: account, inbox: inbox, url: 'https://hello.com', name: 'My Webhook') }
+  let(:webhook) { create(:webhook, account: account, inbox: inbox, url: url, name: 'My Webhook') }
   let(:administrator) { create(:user, account: account, role: :administrator) }
   let(:agent) { create(:user, account: account, role: :agent) }
 
@@ -121,13 +122,15 @@ RSpec.describe 'Webhooks API', type: :request do
       end
 
       it 'ignores trying to update inbox_id and url' do
+        new_inbox = create(:inbox, account: account)
+
         put "/api/v1/accounts/#{account.id}/webhooks/#{webhook.id}",
-            params: { url: 'https://other.url.com', inbox_id: create(:inbox, account: account).id },
+            params: { url: 'https://other.url.com', inbox_id: new_inbox.id },
             headers: administrator.create_new_auth_token,
             as: :json
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['payload']['webhook']['inbox_id']).not_to eql inbox.id
-        expect(response.parsed_body['payload']['webhook']['url']).not_to eql 'https://other.url.com'
+        expect(response.parsed_body['payload']['webhook']['url']).to eql url
+        expect(response.parsed_body['payload']['webhook']['inbox']['id']).to eql inbox.id
       end
     end
   end
