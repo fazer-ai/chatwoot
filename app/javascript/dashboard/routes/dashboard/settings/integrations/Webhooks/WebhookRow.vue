@@ -36,9 +36,7 @@ const subscribedEvents = computed(() => {
 <template>
   <tr>
     <td class="py-4 ltr:pr-4 rtl:pl-4">
-      <div v-if="webhook.inbox">
-        <InboxName :inbox="webhook.inbox" class="flex break-words !mx-0" />
-      </div>
+      <InboxName v-if="webhook.inbox" class="!mx-0" :inbox="webhook.inbox" />
       <div
         class="flex gap-2 font-medium break-words text-slate-700 dark:text-slate-100"
       >
