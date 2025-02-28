@@ -15,7 +15,7 @@ describe WebhookListener do
   let!(:conversation_created_event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation) }
   let!(:contact_event) { Events::Base.new(event_name, Time.zone.now, contact: contact) }
 
-  describe 'Filter event trigger by Inbox' do
+  describe 'filter events by inbox' do
     let(:event_name) { :'message.created' }
 
     context 'when webhook has an inbox and it matches the event inbox' do
