@@ -189,6 +189,10 @@ button {
     }
   }
 
+  &.dark {
+    @apply bg-n-slate-1;
+  }
+
   // Sizes
   &.tiny {
     @apply h-6;
