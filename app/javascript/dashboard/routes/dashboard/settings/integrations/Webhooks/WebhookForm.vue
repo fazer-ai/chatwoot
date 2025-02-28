@@ -61,16 +61,15 @@ export default {
   data() {
     return {
       url: this.value.url || '',
+      assignedInbox: this.value.inbox || null,
       name: this.value.name || '',
-      inboxId: this.value.inboxId || '',
       subscriptions: this.value.subscriptions || [],
       supportedWebhookEvents: SUPPORTED_WEBHOOK_EVENTS,
-      selectedInbox: this.value.inbox || null,
     };
   },
   computed: {
     inboxesList() {
-      if (this.selectedInbox?.id) {
+      if (this.assignedInbox?.id) {
         return [
           {
             id: 0,
@@ -99,14 +98,13 @@ export default {
     onSubmit() {
       this.$emit('submit', {
         url: this.url,
+        inbox_id: this.assignedInbox?.id || null,
         name: this.name,
-        inbox_id: this.inboxId || null,
         subscriptions: this.subscriptions,
       });
     },
     onClickAssignInbox(inbox) {
-      this.selectedInbox = inbox;
-      this.inboxId = inbox.id;
+      this.assignedInbox = inbox;
     },
     getI18nKey,
   },
@@ -134,7 +132,7 @@ export default {
       <div class="multiselect-wrap--small">
         <MultiselectDropdown
           :options="inboxesList"
-          :selected-item="selectedInbox"
+          :selected-item="assignedInbox"
           :multiselector-title="
             $t('INTEGRATION_SETTINGS.WEBHOOK.FORM.INBOX.TITLE')
           "
