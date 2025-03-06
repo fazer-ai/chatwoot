@@ -102,13 +102,11 @@ const hasValue = computed(() => {
           </div>
         </div>
       </woot-button>
+      <!-- NOTE: Without @click.prevent, the dropdown does not behave as expected when used inside a <label> tag. -->
       <div
         :class="{ 'dropdown-pane--open': showSearchDropdown }"
         class="dropdown-pane"
-        @click="
-          // NOTE: Without this, the dropdown does not behave as expected when used inside a <label> tag.
-          event => event.preventDefault()
-        "
+        @click.prevent
       >
         <div class="flex items-center justify-between mb-1">
           <h4
