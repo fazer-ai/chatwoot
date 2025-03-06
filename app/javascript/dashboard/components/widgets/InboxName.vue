@@ -7,6 +7,10 @@ export default {
       type: Object,
       default: () => {},
     },
+    withPhoneNumber: {
+      type: Boolean,
+      default: false,
+    },
   },
   computed: {
     computedInboxClass() {
@@ -28,5 +32,8 @@ export default {
       size="12"
     />
     {{ inbox.name }}
+    <span v-if="withPhoneNumber" class="ml-2 text-n-slate-12">{{
+      inbox.phone_number
+    }}</span>
   </div>
 </template>

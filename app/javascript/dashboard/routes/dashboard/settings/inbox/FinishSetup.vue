@@ -1,9 +1,16 @@
 <script>
 import EmptyState from '../../../../components/widgets/EmptyState.vue';
+import WhatsappBaileysLinkDeviceModal from './components/WhatsappBaileysLinkDeviceModal.vue';
 
 export default {
   components: {
     EmptyState,
+    WhatsappBaileysLinkDeviceModal,
+  },
+  data() {
+    return {
+      showBaileysLinkDeviceModal: false,
+    };
   },
   computed: {
     currentInbox() {
@@ -27,6 +34,12 @@ export default {
       return (
         this.currentInbox.channel_type === 'Channel::Whatsapp' &&
         this.currentInbox.provider === 'whatsapp_cloud'
+      );
+    },
+    isWhatsAppBaileysInbox() {
+      return (
+        this.currentInbox.channel_type === 'Channel::Whatsapp' &&
+        this.currentInbox.provider === 'baileys'
       );
     },
     message() {
@@ -54,6 +67,12 @@ export default {
         )}`;
       }
 
+      if (this.isWhatsAppBaileysInbox) {
+        return `${this.$t('INBOX_MGMT.FINISH.MESSAGE')}. ${this.$t(
+          'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.SUBTITLE'
+        )}`;
+      }
+
       if (this.isAEmailInbox && !this.currentInbox.provider) {
         return this.$t('INBOX_MGMT.ADD.EMAIL_CHANNEL.FINISH_MESSAGE');
       }
@@ -63,6 +82,14 @@ export default {
       }
 
       return this.$t('INBOX_MGMT.FINISH.MESSAGE');
+    },
+  },
+  methods: {
+    onOpenBaileysLinkDeviceModal() {
+      this.showBaileysLinkDeviceModal = true;
+    },
+    onCloseBaileysLinkDeviceModal() {
+      this.showBaileysLinkDeviceModal = false;
     },
   },
 };
@@ -108,6 +135,11 @@ export default {
             :script="currentInbox.provider_config.webhook_verify_token"
           />
         </div>
+        <div v-if="isWhatsAppBaileysInbox" class="w-[50%] max-w-[50%] ml-[25%]">
+          <woot-button>
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_BUTTON') }}
+          </woot-button>
+        </div>
         <div class="w-[50%] max-w-[50%] ml-[25%]">
           <woot-code
             v-if="isALineInbox"
@@ -150,5 +182,11 @@ export default {
         </div>
       </div>
     </EmptyState>
+    <WhatsappBaileysLinkDeviceModal
+      v-if="showBaileysLinkDeviceModal"
+      v-model:show="showBaileysLinkDeviceModal"
+      :inbox="currentInbox"
+      :on-close="onCloseBaileysLinkDeviceModal"
+    />
   </div>
 </template>

@@ -214,7 +214,8 @@
           "LABEL": "API Provider",
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
-          "360_DIALOG": "360Dialog"
+          "360_DIALOG": "360Dialog",
+          "BAILEYS": "Baileys"
         },
         "INBOX_NAME": {
           "LABEL": "Inbox Name",
@@ -252,6 +253,15 @@
           "SUBTITLE": "You have to configure the webhook URL and the verification token in the Facebook Developer portal with the values shown below.",
           "WEBHOOK_URL": "Webhook URL",
           "WEBHOOK_VERIFICATION_TOKEN": "Webhook Verification Token"
+        },
+        "BAILEYS": {
+          "SUBTITLE": "Click below to setup the WhatsApp channel using Baileys.",
+          "LINK_BUTTON": "Link device",
+          "LINK_DEVICE_MODAL": {
+            "TITLE": "Link your device",
+            "SUBTITLE": "Scan the QR code to link your device. Make sure the phone number is correct before scanning.",
+            "CLOSE": "Close"
+          }
         },
         "SUBMIT_BUTTON": "Create WhatsApp Channel",
         "API": {
