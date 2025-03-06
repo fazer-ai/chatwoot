@@ -187,9 +187,9 @@ export default {
     </EmptyState>
     <WhatsappBaileysLinkDeviceModal
       v-if="showBaileysLinkDeviceModal"
-      v-model:show="showBaileysLinkDeviceModal"
-      :inbox="currentInbox"
+      :show="showBaileysLinkDeviceModal"
       :on-close="onCloseBaileysLinkDeviceModal"
+      :inbox="currentInbox"
     />
   </div>
 </template>

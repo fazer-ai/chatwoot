@@ -1,25 +1,18 @@
 <script setup>
 import InboxName from '../../../../../components/widgets/InboxName.vue';
 
-const props = defineProps({
-  onClose: { type: Function, default: () => {} },
+defineProps({
+  show: { type: Boolean, require: true },
+  onClose: { type: Function, required: true },
   inbox: {
     type: Object,
     required: true,
   },
 });
-const emit = defineEmits(['close']);
-
-const show = defineModel('show', { type: Boolean, default: false });
-const close = () => {
-  show.value = false;
-  emit('close');
-  props.onClose();
-};
 </script>
 
 <template>
-  <woot-modal v-model:show="show" size="small" :on-close="close">
+  <woot-modal :show="show" size="small" :on-close="onClose">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="
@@ -41,7 +34,7 @@ const close = () => {
           />
         </div>
 
-        <woot-button class="button clear w-fit" @click="close">
+        <woot-button class="button clear w-fit" @click="onClose">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CLOSE') }}
         </woot-button>
       </div>
