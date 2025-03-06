@@ -157,9 +157,6 @@ importers:
       opus-recorder:
         specifier: ^8.0.5
         version: 8.0.5
-      qrcode.vue:
-        specifier: ^3.6.0
-        version: 3.6.0(vue@3.5.12(typescript@5.6.2))
       semver:
         specifier: 7.6.3
         version: 7.6.3
@@ -4208,11 +4205,6 @@ packages:
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
-
-  qrcode.vue@3.6.0:
-    resolution: {integrity: sha512-vQcl2fyHYHMjDO1GguCldJxepq2izQjBkDEEu9NENgfVKP6mv/e2SU62WbqYHGwTgWXLhxZ1NCD1dAZKHQq1fg==}
-    peerDependencies:
-      vue: ^3.0.0
 
   querystringify@2.2.0:
     resolution: {integrity: sha512-FIqgj2EUvTa7R50u0rGsyTftzjYmv/a3hO345bZNrqabNqjtgiDMgmo4mkUjd+nzU5oF3dClKqFIPUKybUyqoQ==}
@@ -9580,10 +9572,6 @@ snapshots:
   punycode.js@2.3.1: {}
 
   punycode@2.3.1: {}
-
-  qrcode.vue@3.6.0(vue@3.5.12(typescript@5.6.2)):
-    dependencies:
-      vue: 3.5.12(typescript@5.6.2)
 
   querystringify@2.2.0: {}
 
