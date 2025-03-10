@@ -1,7 +1,12 @@
 <script setup>
+import { onMounted, computed } from 'vue';
+import { useStore } from 'vuex';
+import { useAlert } from 'dashboard/composables';
 import InboxName from '../../../../../components/widgets/InboxName.vue';
+import Spinner from 'shared/components/Spinner.vue';
+import { INBOX_CHANNEL_PROVIDER_CONNECTION_STATUS } from 'dashboard/helper/inbox';
 
-defineProps({
+const props = defineProps({
   show: { type: Boolean, require: true },
   onClose: { type: Function, required: true },
   inbox: {
@@ -9,10 +14,25 @@ defineProps({
     required: true,
   },
 });
+const providerConnection = computed(() => props.inbox.provider_connection);
+const qrcode = computed(() => providerConnection.value?.qrcode);
+const status = computed(() => providerConnection.value?.status);
+const setupNeeded = computed(
+  () => status.value === INBOX_CHANNEL_PROVIDER_CONNECTION_STATUS.SETUP_NEEDED
+);
+
+const store = useStore();
+onMounted(() => {
+  if (setupNeeded.value) {
+    store
+      .dispatch('inboxes/setupChannelProviderConnection', props.inbox.id)
+      .catch(error => useAlert(error.message));
+  }
+});
 </script>
 
 <template>
-  <woot-modal :show="show" size="small" :on-close="onClose">
+  <woot-modal :show="show" size="small" @close="onClose">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="
@@ -27,11 +47,24 @@ defineProps({
         <div class="flex flex-col gap-4 items-center">
           <InboxName :inbox="inbox" class="!text-lg" with-phone-number />
 
-          <img
-            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARQAAAEUCAYAAADqcMl5AAAAAklEQVR4AewaftIAABJbSURBVO3BQY7YypLAQFLo+1+Z42WuChBUbb/5yAj7g7XWuuBhrbUueVhrrUse1lrrkoe11rrkYa21LnlYa61LHtZa65KHtda65GGttS55WGutSx7WWuuSh7XWuuRhrbUueVhrrUse1lrrkh8+UvmbKk5U3qiYVN6o+EJlqjhROal4Q2WqmFROKm5SmSpOVKaKSeWk4guVk4pJ5aRiUvmbKr54WGutSx7WWuuSh7XWuuSHyypuUrmpYlI5qZhUJpWTikllqphUpoqp4g2VN1Smit+kMlWcqEwVk8pUMamcqJxUnFT8poqbVG56WGutSx7WWuuSh7XWuuSHX6byRsUbKlPFicpJxaTyRsVJxaQyVbyh8kbFpHKiclLxhspUMamcVEwqU8VJxRcqb6j8JpU3Kn7Tw1prXfKw1lqXPKy11iU//I9RmSqmiknljYo3VE4qJpWTijcqJpWTiptUTlTeUJkq3lCZKk4qJpUTlZOKSeV/ycNaa13ysNZalzystdYlP/yPqfibVKaKN1TeUJkqTlSmikllUrmp4kTlpOJE5aaKk4o3VCaVqeJ/ycNaa13ysNZalzystdYlP/yyin9J5Q2VL1SmiknljYpJZVI5qZhUTireUJkqJpWp4qTii4pJZaqYVKaKSWWq+KLipor/koe11rrkYa21LnlYa61LfrhM5b+sYlKZKiaVNyomlaliUpkqJpWpYlKZKiaVqWJSOVGZKv4mlaniv0RlqnhDZao4Ufkve1hrrUse1lrrkoe11rrkh48q/ktUpopJZaqYVN6oOKk4qTipmFROVKaKLyq+qDipmFSmit9UMan8JpWp4qTi/5OHtda65GGttS55WGutS+wPPlCZKiaVmyreUHmj4g2VNyomlaliUpkqTlSmiknlN1WcqJxUTConFZPKVDGpTBVvqLxR8YXKTRW/6WGttS55WGutSx7WWuuSHz6qeKPiRGWqmFSmiknlpOINlTcq3qiYVN5QeaPiDZWTiptUpooTlaliUrmp4kTlC5WTihOVqWJSmSpuelhrrUse1lrrkoe11rrkh8tUTlSmihOVLypOVN6oeENlqnij4qRiUjlROan4QuWk4qaKSWWqmFTeUPlNKlPFicpUMVVMKlPF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"
-            alt="QR Code"
-            class="w-[276px] h-[276px]"
-          />
+          <template v-if="setupNeeded">
+            <div v-if="!qrcode" class="flex flex-col gap-4 items-center">
+              <p>
+                {{
+                  $t(
+                    'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.LOADING_QRCODE'
+                  )
+                }}
+              </p>
+              <Spinner />
+            </div>
+            <img
+              v-if="qrcode"
+              :src="qrcode"
+              alt="QR Code"
+              class="w-[276px] h-[276px]"
+            />
+          </template>
         </div>
 
         <woot-button class="button clear w-fit" @click="onClose">

@@ -134,12 +134,9 @@ export default {
             lang="html"
             :script="currentInbox.provider_config.webhook_verify_token"
           />
-          <woot-button @click="onOpenBaileysLinkDeviceModal">
-            {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_BUTTON') }}
-          </woot-button>
         </div>
         <div v-if="isWhatsAppBaileysInbox" class="w-[50%] max-w-[50%] ml-[25%]">
-          <woot-button>
+          <woot-button @click="onOpenBaileysLinkDeviceModal">
             {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_BUTTON') }}
           </woot-button>
         </div>

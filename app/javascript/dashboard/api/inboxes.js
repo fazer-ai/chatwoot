@@ -28,6 +28,12 @@ class Inboxes extends CacheEnabledApiClient {
       agent_bot: botId,
     });
   }
+
+  setupChannelProviderConnection(inboxId) {
+    return axios.post(
+      `${this.url}/${inboxId}/setup_channel_provider_connection`
+    );
+  }
 }
 
 export default new Inboxes();

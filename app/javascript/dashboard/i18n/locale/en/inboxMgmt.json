@@ -260,6 +260,7 @@
           "LINK_DEVICE_MODAL": {
             "TITLE": "Link your device",
             "SUBTITLE": "Scan the QR code to link your device. Make sure the phone number is correct before scanning.",
+            "LOADING_QRCODE": "Loading QR code...",
             "CLOSE": "Close"
           }
         },
