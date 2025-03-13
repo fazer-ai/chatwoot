@@ -62,6 +62,12 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
     head :ok
   end
 
+  # NOTE: Implement baileys connection
+  def setup_channel_provider; end
+
+  # NOTE: Implement baileys disconnection
+  def disconnect_channel_provider; end
+
   def destroy
     ::DeleteObjectJob.perform_later(@inbox, Current.user, request.ip) if @inbox.present?
     render status: :ok, json: { message: I18n.t('messages.inbox_deletetion_response') }
