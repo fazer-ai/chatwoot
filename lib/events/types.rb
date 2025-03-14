@@ -12,7 +12,6 @@ module Events::Types
 
   # channel events
   WEBWIDGET_TRIGGERED = 'webwidget.triggered'
-  CHANNEL_CONNECTION_UPDATE = 'channel.connection_update'
 
   # conversation events
   CONVERSATION_CREATED = 'conversation.created'
