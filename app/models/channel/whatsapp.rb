@@ -8,6 +8,7 @@
 #  phone_number                   :string           not null
 #  provider                       :string           default("default")
 #  provider_config                :jsonb
+#  provider_connection            :jsonb            not null
 #  created_at                     :datetime         not null
 #  updated_at                     :datetime         not null
 #  account_id                     :integer          not null
@@ -22,7 +23,7 @@ class Channel::Whatsapp < ApplicationRecord
   include Reauthorizable
 
   self.table_name = 'channel_whatsapp'
-  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
+  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {}, provider_connection: {} }].freeze
 
   # default at the moment is 360dialog lets change later.
   PROVIDERS = %w[default whatsapp_cloud baileys].freeze
