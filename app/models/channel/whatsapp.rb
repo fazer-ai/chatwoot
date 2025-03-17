@@ -23,7 +23,7 @@ class Channel::Whatsapp < ApplicationRecord
   include Reauthorizable
 
   self.table_name = 'channel_whatsapp'
-  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {}, provider_connection: {} }].freeze
+  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
 
   # default at the moment is 360dialog lets change later.
   PROVIDERS = %w[default whatsapp_cloud baileys].freeze
@@ -42,6 +42,8 @@ class Channel::Whatsapp < ApplicationRecord
   def provider_service
     if provider == 'whatsapp_cloud'
       Whatsapp::Providers::WhatsappCloudService.new(whatsapp_channel: self)
+    elsif provider == 'baileys'
+      Whatsapp::Providers::WhatsappBaileysService.new(whatsapp_channel: self)
     else
       Whatsapp::Providers::Whatsapp360DialogService.new(whatsapp_channel: self)
     end
@@ -57,6 +59,7 @@ class Channel::Whatsapp < ApplicationRecord
     # rubocop:enable Rails/SkipsModelValidations
   end
 
+  delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_template, to: :provider_service
   delegate :sync_templates, to: :provider_service
@@ -66,7 +69,7 @@ class Channel::Whatsapp < ApplicationRecord
   private
 
   def ensure_webhook_verify_token
-    provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider == 'whatsapp_cloud'
+    provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])
   end
 
   def validate_provider_config

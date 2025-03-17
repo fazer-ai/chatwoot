@@ -62,11 +62,11 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
     head :ok
   end
 
-  # NOTE: Implement baileys connection
-  def setup_channel_provider; end
-
-  # NOTE: Implement baileys disconnection
-  def disconnect_channel_provider; end
+  def disconnect_channel_provider
+    channel = @inbox.channel
+    channel.disconnect_channel_provider if channel.respond_to?(:disconnect_channel_provider)
+    head :ok
+  end
 
   def destroy
     ::DeleteObjectJob.perform_later(@inbox, Current.user, request.ip) if @inbox.present?
