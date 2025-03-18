@@ -1,5 +1,10 @@
-class Whatsapp::IncomingMessageBaileysService
+class Whatsapp::IncomingMessageBaileysServic < Whatsapp::IncomingMessageBaseService
   def perform
+    if params[:webhookVerifyToken] != whatsapp_channel.provider_config['webhook_verify_token']
+      #NOTE: Can try log the requested IP address for further investigation
+      Rails.logger.warn "Event with invalid webhook verify token for channel: #{channel.id}"
+      head :unauthorized
+    end
     return if params[:event].blank? || params[:data].blank?
 
     event_prefix = params[:event].split('.').first.underscore
@@ -39,7 +44,9 @@ class Whatsapp::IncomingMessageBaileysService
   def process_label; end
 
   def process_messages
-    nil unless params[:event] == 'messages.upsert'
+    return unless params[:event] == 'messages.upsert'
+
+    process_messages
   end
 
   def default_process_event

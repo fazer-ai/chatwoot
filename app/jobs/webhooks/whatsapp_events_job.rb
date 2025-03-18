@@ -9,14 +9,8 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
     when 'whatsapp_cloud'
       Whatsapp::IncomingMessageWhatsappCloudService.new(inbox: channel.inbox, params: params).perform
     when 'baileys'
-      if params[:webhookVerifyToken] == channel.provider_config['webhook_verify_token']
-        Whatsapp::IncomingMessageBaileysService.new(inbox: channel.inbox,
-                                                    params: params).perform
-      else
-        #NOTE: Can try log the requested IP address for further investigation
-        Rails.logger.warn "Event with invalid webhook verify token for channel: #{channel.id}"
-        head :unauthorized
-      end
+      Whatsapp::IncomingMessageBaileysService.new(inbox: channel.inbox,
+                                                  params: params).perform
     else
       Whatsapp::IncomingMessageService.new(inbox: channel.inbox, params: params).perform
     end
