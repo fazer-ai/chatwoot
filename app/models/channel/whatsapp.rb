@@ -8,7 +8,7 @@
 #  phone_number                   :string           not null
 #  provider                       :string           default("default")
 #  provider_config                :jsonb
-#  provider_connection            :jsonb            not null
+#  provider_connection            :jsonb
 #  created_at                     :datetime         not null
 #  updated_at                     :datetime         not null
 #  account_id                     :integer          not null
@@ -42,9 +42,10 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   def provider_service
-    if provider == 'whatsapp_cloud'
+    case provider
+    when 'whatsapp_cloud'
       Whatsapp::Providers::WhatsappCloudService.new(whatsapp_channel: self)
-    elsif provider == 'baileys'
+    when 'baileys'
       Whatsapp::Providers::WhatsappBaileysService.new(whatsapp_channel: self)
     else
       Whatsapp::Providers::Whatsapp360DialogService.new(whatsapp_channel: self)
@@ -61,6 +62,7 @@ class Channel::Whatsapp < ApplicationRecord
     # rubocop:enable Rails/SkipsModelValidations
   end
 
+  delegate :setup_channel_provider, to: :provider_service
   delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_template, to: :provider_service
