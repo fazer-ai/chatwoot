@@ -43,7 +43,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         clientName: 'CHATWOOT',
-        webhookUrl: "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/#{phone_number}",
+        webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
         webhookVerifyToken: whatsapp_channel.ensure_webhook_verify_token
       }.to_json
     )
