@@ -2,7 +2,7 @@
 import { onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
-import InboxName from '../../../../../components/widgets/InboxName.vue';
+import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Spinner from 'shared/components/Spinner.vue';
 
 const props = defineProps({
