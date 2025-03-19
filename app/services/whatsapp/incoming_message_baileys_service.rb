@@ -10,7 +10,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     if respond_to?(method_name, true)
       send(method_name)
     else
-      Rails.logger.warn "Bailey's unsupported event: #{processed_params[:event]}"
+      Rails.logger.warn "Baileys unsupported event: #{processed_params[:event]}"
     end
   end
 
@@ -28,7 +28,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
     inbox.update_account_cache
 
-    Rails.logger.error "Bailey's connection error: #{data[:error]}" if data[:error].present?
+    Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
 
   def process_credentials_update; end
