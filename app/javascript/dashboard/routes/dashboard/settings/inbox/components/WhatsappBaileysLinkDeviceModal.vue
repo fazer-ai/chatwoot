@@ -4,7 +4,6 @@ import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import InboxName from '../../../../../components/widgets/InboxName.vue';
 import Spinner from 'shared/components/Spinner.vue';
-import { INBOX_CHANNEL_PROVIDER_CONNECTION_STATUS } from 'dashboard/helper/inbox';
 
 const props = defineProps({
   show: { type: Boolean, require: true },
@@ -15,24 +14,38 @@ const props = defineProps({
   },
 });
 const providerConnection = computed(() => props.inbox.provider_connection);
-const qrcode = computed(() => providerConnection.value?.qrcode);
-const status = computed(() => providerConnection.value?.status);
-const setupNeeded = computed(
-  () => status.value === INBOX_CHANNEL_PROVIDER_CONNECTION_STATUS.SETUP_NEEDED
-);
+const connection = computed(() => providerConnection.value?.connection);
+const qrDataUrl = computed(() => providerConnection.value?.qr_data_url);
+const error = computed(() => providerConnection.value?.error);
 
 const store = useStore();
+
+const setup = () => {
+  store
+    .dispatch('inboxes/setupChannelProvider', props.inbox.id)
+    .catch(e => useAlert(e.message));
+};
+const disconnect = () => {
+  store
+    .dispatch('inboxes/disconnectChannelProvider', props.inbox.id)
+    .catch(e => useAlert(e.message));
+};
+const close = () => {
+  props.onClose();
+  if (connection.value !== 'open') {
+    disconnect();
+  }
+};
+
 onMounted(() => {
-  if (setupNeeded.value) {
-    store
-      .dispatch('inboxes/setupChannelProviderConnection', props.inbox.id)
-      .catch(error => useAlert(error.message));
+  if (!connection.value || connection.value === 'close') {
+    setup();
   }
 });
 </script>
 
 <template>
-  <woot-modal :show="show" size="small" @close="onClose">
+  <woot-modal :show="show" size="small" @close="close">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="
@@ -47,8 +60,20 @@ onMounted(() => {
         <div class="flex flex-col gap-4 items-center">
           <InboxName :inbox="inbox" class="!text-lg" with-phone-number />
 
-          <template v-if="setupNeeded">
-            <div v-if="!qrcode" class="flex flex-col gap-4 items-center">
+          <template v-if="error || connection === 'close'">
+            <p v-if="error" class="text-red-500">
+              {{ error }}
+            </p>
+            <woot-button class="button clear w-fit" @click="setup">
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.LINK_DEVICE'
+                )
+              }}
+            </woot-button>
+          </template>
+          <template v-else-if="!connection || connection !== 'open'">
+            <div v-if="!qrDataUrl" class="flex flex-col gap-4 items-center">
               <p>
                 {{
                   $t(
@@ -59,15 +84,24 @@ onMounted(() => {
               <Spinner />
             </div>
             <img
-              v-if="qrcode"
-              :src="qrcode"
+              v-else
+              :src="qrDataUrl"
               alt="QR Code"
               class="w-[276px] h-[276px]"
             />
           </template>
+          <template v-if="connection === 'open'">
+            <woot-button class="button clear w-fit" @click="disconnect">
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.DISCONNECT'
+                )
+              }}
+            </woot-button>
+          </template>
         </div>
 
-        <woot-button class="button clear w-fit" @click="onClose">
+        <woot-button class="button clear w-fit" @click="close">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CLOSE') }}
         </woot-button>
       </div>

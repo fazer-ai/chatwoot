@@ -39,6 +39,7 @@ export default {
               type: 'whatsapp',
               phone_number: this.phoneNumber,
               provider: 'baileys',
+              // TODO: Advanced options in `provider_config` (for now, just baileys API url)
             },
           }
         );

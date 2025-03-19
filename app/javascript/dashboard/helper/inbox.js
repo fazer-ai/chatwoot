@@ -144,9 +144,3 @@ export const getInboxWarningIconClass = (type, reauthorizationRequired) => {
   }
   return '';
 };
-
-export const INBOX_CHANNEL_PROVIDER_CONNECTION_STATUS = {
-  AVAILABLE: 'AVAILABLE',
-  UNAVAILABLE: 'UNAVAILABLE',
-  SETUP_NEEDED: 'SETUP_NEEDED',
-};

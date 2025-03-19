@@ -29,10 +29,12 @@ class Inboxes extends CacheEnabledApiClient {
     });
   }
 
-  setupChannelProviderConnection(inboxId) {
-    return axios.post(
-      `${this.url}/${inboxId}/setup_channel_provider_connection`
-    );
+  setupChannelProvider(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/setup_channel_provider`);
+  }
+
+  disconnectChannelProvider(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/disconnect_channel_provider`);
   }
 }
 

@@ -6,7 +6,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         clientName: client_name,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
-        webhookVerifyToken: whatsapp_channel.ensure_webhook_verify_token
+        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token']
       }.to_json
     )
 
@@ -51,10 +51,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def validate_provider_config?
-    setup_channel_provider
+    true
   end
 
   private
+
+  def phone_number
+    whatsapp_channel.phone_number
+  end
 
   def client_name
     ENV.fetch('DEFAULT_BAILEYS_CLIENT_NAME', 'Chatwoot')

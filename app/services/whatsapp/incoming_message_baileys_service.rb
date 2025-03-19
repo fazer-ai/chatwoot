@@ -2,7 +2,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   class InvalidWebhookVerifyToken < StandardError; end
 
   def perform
-    raise InvalidWebhookVerifyToken if processed_params[:webhookVerifyToken] != whatsapp_channel.provider_config['webhook_verify_token']
+    raise InvalidWebhookVerifyToken if processed_params[:webhookVerifyToken] != inbox.channel.provider_config['webhook_verify_token']
     return if processed_params[:event].blank? || processed_params[:data].blank?
 
     event_prefix = processed_params[:event].gsub(/[\.-]/, '_')
@@ -17,13 +17,18 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   private
 
   def process_connection_update
-    updated_connection = processed_params[:data].slice(:connection, :qrDataUrl, :error)
-    updated_connection.transform_keys! { |key| key.underscore.to_sym }
-    whatsapp_channel.provider_connection.merge!(updated_connection)
+    data = processed_params[:data]
+
+    inbox.channel.update!(
+      provider_connection: {
+        connection: data[:connection] || inbox.channel.provider_connection['connection'],
+        qr_data_url: data[:qrDataUrl],
+        error: data[:error]
+      }.compact
+    )
+    inbox.update_account_cache
 
     Rails.logger.error "Bailey's connection error: #{data[:error]}" if data[:error].present?
-
-    whatsapp_channel.save!
   end
 
   def process_credentials_update; end
@@ -38,7 +43,5 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def process_group_participants; end
   def process_label; end
 
-  def process_messages_upsert
-    process_messages
-  end
+  def process_messages_upsert; end
 end
