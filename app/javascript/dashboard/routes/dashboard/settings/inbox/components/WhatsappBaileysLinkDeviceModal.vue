@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
@@ -30,22 +30,21 @@ const disconnect = () => {
     .dispatch('inboxes/disconnectChannelProvider', props.inbox.id)
     .catch(e => useAlert(e.message));
 };
-const close = () => {
-  props.onClose();
-  if (connection.value !== 'open') {
-    disconnect();
-  }
-};
 
 onMounted(() => {
   if (!connection.value || connection.value === 'close') {
     setup();
   }
 });
+onUnmounted(() => {
+  if (connection.value !== 'open') {
+    disconnect();
+  }
+});
 </script>
 
 <template>
-  <woot-modal :show="show" size="small" @close="close">
+  <woot-modal :show="show" size="small" @close="onClose">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="
@@ -101,7 +100,7 @@ onMounted(() => {
           </template>
         </div>
 
-        <woot-button class="button clear w-fit" @click="close">
+        <woot-button class="button clear w-fit" @click="onClose">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CLOSE') }}
         </woot-button>
       </div>
