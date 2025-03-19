@@ -6,7 +6,7 @@ import InboxName from '../../../../../components/widgets/InboxName.vue';
 import Spinner from 'shared/components/Spinner.vue';
 
 const props = defineProps({
-  show: { type: Boolean, require: true },
+  show: { type: Boolean, required: true },
   onClose: { type: Function, required: true },
   inbox: {
     type: Object,
