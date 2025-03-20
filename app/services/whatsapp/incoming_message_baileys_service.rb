@@ -2,8 +2,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   class InvalidWebhookVerifyToken < StandardError; end
 
   def perform
-    processed_params
-
     raise InvalidWebhookVerifyToken if processed_params[:webhookVerifyToken] != inbox.channel.provider_config['webhook_verify_token']
     return if processed_params[:event].blank? || processed_params[:data].blank?
 
@@ -108,20 +106,20 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @raw_message[:key][:id]
   end
 
-  def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
-    message = @raw_message[:message]
-    return 'text' if message.key?(:conversation)
-    return 'contacts' if message.key?(:contactMessage)
-    return 'image' if message.key?(:imageMessage)
-    return 'audio' if message.key?(:audioMessage)
-    return 'video' if message.key?(:videoMessage)
-    return 'video_note' if message.key?(:ptvMessage)
-    return 'location' if message.key?(:locationMessage)
-    return 'live_location' if message.key?(:liveLocationMessage)
-    return 'document' if message.key?(:documentMessage)
-    return 'poll' if message.key?(:pollCreationMessageV3)
-    return 'event' if message.key?(:eventMessage)
-    return 'sticker' if message.key?(:stickerMessage)
+  def message_type  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+    msg = @raw_message[:message]
+    return 'text' if msg.key?(:conversation)
+    return 'contacts' if msg.key?(:contactMessage)
+    return 'image' if msg.key?(:imageMessage)
+    return 'audio' if msg.key?(:audioMessage)
+    return 'video' if msg.key?(:videoMessage)
+    return 'video_note' if msg.key?(:ptvMessage)
+    return 'location' if msg.key?(:locationMessage)
+    return 'live_location' if msg.key?(:liveLocationMessage)
+    return 'document' if msg.key?(:documentMessage)
+    return 'poll' if msg.key?(:pollCreationMessageV3)
+    return 'event' if msg.key?(:eventMessage)
+    return 'sticker' if msg.key?(:stickerMessage)
 
     'unsupported'
   end
@@ -138,7 +136,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def phone_number_from_jid
-    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@')[0].split(':')[0]
+    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@').first.split(':').first
   end
 
   def message_under_process?
