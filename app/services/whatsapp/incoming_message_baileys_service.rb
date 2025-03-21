@@ -26,8 +26,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
         error: data[:error]
       }.compact
     )
-    # FIXME: Race condition on account cache if multiple connection updates are sent close together
-    inbox.update_account_cache
 
     Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
