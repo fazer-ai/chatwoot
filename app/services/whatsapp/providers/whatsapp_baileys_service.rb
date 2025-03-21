@@ -22,22 +22,19 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     process_response(response)
   end
 
-  def send_message(phone_number, message)
+  def send_message(to_phone_number, message)
     response = HTTParty.post(
       "#{api_base_path}/connections/#{phone_number}/send-message",
       headers: api_headers,
       body: {
         type: 'text',
+        to: to_phone_number,
         text: { body: message.content }
       }.to_json
     )
 
-    if response.success?
-      response['messages'].first['id']
-    else
-      Rails.logger.error response.body
-      nil
-    end
+    Rails.logger.error response.body unless response.success?
+    response.success?
   end
 
   def send_template(phone_number, template_info); end
