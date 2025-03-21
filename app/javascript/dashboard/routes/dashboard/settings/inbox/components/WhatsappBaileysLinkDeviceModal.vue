@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, computed, onUnmounted } from 'vue';
+import { onMounted, computed, onUnmounted, ref, watchEffect } from 'vue';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
@@ -13,6 +13,9 @@ const props = defineProps({
     required: true,
   },
 });
+
+const loading = ref(false);
+
 const providerConnection = computed(() => props.inbox.provider_connection);
 const connection = computed(() => providerConnection.value?.connection);
 const qrDataUrl = computed(() => providerConnection.value?.qr_data_url);
@@ -21,11 +24,13 @@ const error = computed(() => providerConnection.value?.error);
 const store = useStore();
 
 const setup = () => {
+  loading.value = true;
   store
     .dispatch('inboxes/setupChannelProvider', props.inbox.id)
     .catch(e => useAlert(e.message));
 };
 const disconnect = () => {
+  loading.value = true;
   store
     .dispatch('inboxes/disconnectChannelProvider', props.inbox.id)
     .catch(e => useAlert(e.message));
@@ -37,8 +42,13 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
-  if (connection.value !== 'open') {
+  if (connection.value === 'connecting') {
     disconnect();
+  }
+});
+watchEffect(() => {
+  if (connection.value) {
+    loading.value = false;
   }
 });
 </script>
@@ -63,7 +73,11 @@ onUnmounted(() => {
             <p v-if="error" class="text-red-500">
               {{ error }}
             </p>
-            <woot-button class="button clear w-fit" @click="setup">
+            <woot-button
+              class="button clear w-fit"
+              :is-loading="loading"
+              @click="setup"
+            >
               {{
                 $t(
                   'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.LINK_DEVICE'
@@ -90,7 +104,11 @@ onUnmounted(() => {
             />
           </template>
           <template v-if="connection === 'open'">
-            <woot-button class="button clear w-fit" @click="disconnect">
+            <woot-button
+              class="button clear w-fit"
+              :is-loading="loading"
+              @click="disconnect"
+            >
               {{
                 $t(
                   'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.DISCONNECT'
