@@ -774,4 +774,69 @@ RSpec.describe 'Inboxes API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/setup_channel_provider' do
+    let(:inbox) { create(:channel_whatsapp, account: account, provider: 'baileys').inbox }
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider"
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated' do
+      it 'returns unprocessable entity when channel does not support setup' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{create(:inbox, account: account).id}/setup_channel_provider",
+             headers: admin.create_new_auth_token,
+             as: :json
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq('Channel does not support setup')
+      end
+
+      it 'calls setup_channel_provider when supported and returns ok' do
+        stub_request(:post, "http://test.com/connections/#{inbox.channel.phone_number}")
+          .to_return(status: 200)
+        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
+               headers: admin.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:ok)
+        end
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/disconnect_channel_provider' do
+    let(:inbox) { create(:channel_whatsapp, account: account, provider: 'baileys').inbox }
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider"
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated' do
+      it 'returns unprocessable entity when channel does not support disconnect' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{create(:inbox, account: account).id}/disconnect_channel_provider",
+             headers: admin.create_new_auth_token,
+             as: :json
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq('Channel does not support disconnect')
+      end
+
+      it 'calls disconnect_channel_provider when supported and returns ok' do
+        stub_request(:delete, "http://test.com/connections/#{inbox.channel.phone_number}")
+          .to_return(status: 200)
+        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
+               headers: admin.create_new_auth_token,
+               as: :json
+          expect(response).to have_http_status(:ok)
+        end
+      end
+    end
+  end
 end
