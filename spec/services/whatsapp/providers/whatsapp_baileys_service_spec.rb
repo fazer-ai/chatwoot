@@ -3,15 +3,10 @@ require 'rails_helper'
 describe Whatsapp::Providers::WhatsappBaileysService do
   subject(:service) { described_class.new(whatsapp_channel: whatsapp_channel) }
 
-  let(:whatsapp_channel) do
-    create(:channel_whatsapp, provider: 'baileys', provider_config: { 'api_key' => 'test_api_key' }, phone_number: '5511912345678')
-  end
+  let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys') }
+  let(:message) { create(:message) }
 
-  let(:message) do
-    create(:message, content: 'test message')
-  end
-
-  let(:test_send_phone_number) { '5511987654321' }
+  let(:test_send_phone_number) { '+5511987654321' }
 
   describe '#setup_channel_provider' do
     context 'when called' do
@@ -104,7 +99,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   describe '#api_headers' do
     context 'when called' do
       it 'returns the headers' do
-        expect(service.send(:api_headers)).to eq('x-api-key' => 'test_api_key', 'Content-Type' => 'application/json')
+        expect(service.send(:api_headers)).to eq('x-api-key' => 'test_key', 'Content-Type' => 'application/json')
       end
     end
   end
