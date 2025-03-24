@@ -2,9 +2,10 @@
 import { mapGetters } from 'vuex';
 import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
-import { required } from '@vuelidate/validators';
+import { required, requiredIf } from '@vuelidate/validators';
 import router from '../../../../index';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
+import { isValidURL } from '../../../../../helper/URLHelper';
 
 export default {
   setup() {
@@ -14,14 +15,24 @@ export default {
     return {
       inboxName: '',
       phoneNumber: '',
+      apiKey: '',
+      providerUrl: '',
+      showAdvancedOptions: false,
     };
   },
   computed: {
     ...mapGetters({ uiFlags: 'inboxes/getUIFlags' }),
   },
-  validations: {
-    inboxName: { required },
-    phoneNumber: { required, isPhoneE164OrEmpty },
+  validations() {
+    return {
+      inboxName: { required },
+      phoneNumber: { required, isPhoneE164OrEmpty },
+      providerUrl: {
+        isValidURL: value => !value || isValidURL(value),
+        requiredIf: requiredIf(this.apiKey),
+      },
+      apiKey: { requiredIf: requiredIf(this.providerUrl) },
+    };
   },
   methods: {
     async createChannel() {
@@ -39,7 +50,13 @@ export default {
               type: 'whatsapp',
               phone_number: this.phoneNumber,
               provider: 'baileys',
-              // TODO: Advanced options in `provider_config` (for now, just baileys API url)
+              provider_config:
+                this.apiKey || this.providerUrl
+                  ? {
+                      api_key: this.apiKey,
+                      url: this.providerUrl,
+                    }
+                  : {},
             },
           }
         );
@@ -56,6 +73,9 @@ export default {
           error.message || this.$t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE')
         );
       }
+    },
+    toggleAdvancedOptions() {
+      this.showAdvancedOptions = !this.showAdvancedOptions;
     },
   },
 };
@@ -92,6 +112,54 @@ export default {
         </span>
       </label>
     </div>
+
+    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4">
+      <woot-button
+        class="button clear"
+        type="button"
+        @click="toggleAdvancedOptions"
+      >
+        {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
+        <fluent-icon
+          class="ml-2 transition-transform"
+          :class="{ 'rotate-180': showAdvancedOptions }"
+          icon="chevron-up"
+          size="14"
+        />
+      </woot-button>
+    </div>
+
+    <template v-if="showAdvancedOptions">
+      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+        <label :class="{ error: v$.providerUrl.$error }">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDER_URL.LABEL') }}
+          <input
+            v-model="providerUrl"
+            type="text"
+            :placeholder="
+              $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDER_URL.PLACEHOLDER')
+            "
+          />
+          <span v-if="v$.providerUrl.$error" class="message">
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDER_URL.ERROR') }}
+          </span>
+        </label>
+      </div>
+
+      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+        <label :class="{ error: v$.apiKey.$error }">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.LABEL') }}
+          <input
+            v-model="apiKey"
+            type="text"
+            :placeholder="$t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.PLACEHOLDER')"
+          />
+          <span v-if="v$.apiKey.$error" class="message">
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.ERROR') }}
+          </span>
+        </label>
+      </div>
+    </template>
 
     <div class="w-full">
       <woot-submit-button

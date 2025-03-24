@@ -126,23 +126,37 @@ watchEffect(() => {
           </template>
 
           <template v-else-if="connection === 'open'">
-            <woot-button
-              class="button clear w-fit"
-              :is-loading="loading"
-              @click="disconnect"
-            >
+            <p class="text-center">
               {{
                 $t(
-                  'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.DISCONNECT'
+                  'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CONNECTED'
                 )
               }}
-            </woot-button>
+            </p>
+            <div class="flex gap-4">
+              <woot-button
+                class="button clear w-fit"
+                :is-loading="loading"
+                @click="disconnect"
+              >
+                {{
+                  $t(
+                    'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.DISCONNECT'
+                  )
+                }}
+              </woot-button>
+              <router-link
+                class="rounded button success"
+                :to="{
+                  name: 'inbox_dashboard',
+                  params: { inboxId: inbox.id },
+                }"
+              >
+                {{ $t('INBOX_MGMT.FINISH.BUTTON_TEXT') }}
+              </router-link>
+            </div>
           </template>
         </div>
-
-        <woot-button class="button clear w-fit" @click="onClose">
-          {{ $t('INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CLOSE') }}
-        </woot-button>
       </div>
     </div>
   </woot-modal>
