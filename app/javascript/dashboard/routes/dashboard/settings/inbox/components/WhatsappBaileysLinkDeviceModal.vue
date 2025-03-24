@@ -79,7 +79,7 @@ watchEffect(() => {
           />
 
           <template v-if="!connection || connection === 'close' || error">
-            <p v-if="error" class="text-red-500">
+            <p v-if="error" class="text-red-500 text-center">
               {{ error }}
             </p>
             <woot-button
