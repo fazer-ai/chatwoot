@@ -33,8 +33,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       }.to_json
     )
 
-    Rails.logger.error response.body unless response.success?
-    response.success?
+    process_response(response)
   end
 
   def send_template(phone_number, template_info); end
@@ -44,12 +43,32 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def media_url(media_id); end
 
   def api_headers
-    { 'x-api-key' => whatsapp_channel.provider_config['api_key'], 'Content-Type' => 'application/json' }
+    { 'x-api-key' => api_key, 'Content-Type' => 'application/json' }
   end
 
   def validate_provider_config?
-    true
+    response = HTTParty.get(
+      "#{api_base_path}/status",
+      headers: api_headers
+    )
+
+    process_response(response)
   end
+
+  private_class_method def self.with_error_handling(*method_names)
+    method_names.each do |method_name|
+      original_method = instance_method(method_name)
+
+      define_method(method_name) do |*args, &block|
+        original_method.bind_call(self, *args, &block)
+      rescue StandardError => e
+        whatsapp_channel.update!(provider_connection: { connection: 'close' })
+        raise e
+      end
+    end
+  end
+
+  with_error_handling :setup_channel_provider, :disconnect_channel_provider, :send_message
 
   private
 
@@ -58,12 +77,15 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def client_name
-    ENV.fetch('DEFAULT_BAILEYS_CLIENT_NAME', 'Chatwoot')
+    ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   end
 
   def api_base_path
-    # TODO: Remove default and raise error if not set
-    ENV.fetch('DEFAULT_BAILEYS_BASE_URL', 'http://localhost:3025')
+    whatsapp_channel.provider_config['provider_url'].presence || ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL')
+  end
+
+  def api_key
+    whatsapp_channel.provider_config['api_key'].presence || ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY')
   end
 
   def process_response(response)
