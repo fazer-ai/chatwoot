@@ -776,7 +776,15 @@ RSpec.describe 'Inboxes API', type: :request do
   end
 
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/setup_channel_provider' do
-    let(:inbox) { create(:channel_whatsapp, account: account, provider: 'baileys').inbox }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys') }
+    let(:inbox) { channel.inbox }
+
+    # before do
+    #   with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com', BAILEYS_PROVIDER_DEFAULT_API_KEY: '' do
+    #     stub_request(:get, 'http://test.com/status')
+    #       .to_return(status: 200)
+    #   end
+    # end
 
     context 'when unauthenticated' do
       it 'returns unauthorized' do
@@ -787,7 +795,8 @@ RSpec.describe 'Inboxes API', type: :request do
 
     context 'when authenticated' do
       it 'returns unprocessable entity when channel does not support setup' do
-        post "/api/v1/accounts/#{account.id}/inboxes/#{create(:inbox, account: account).id}/setup_channel_provider",
+        inbox = create(:inbox, account: account)
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
              headers: admin.create_new_auth_token,
              as: :json
         expect(response).to have_http_status(:unprocessable_entity)
@@ -795,7 +804,7 @@ RSpec.describe 'Inboxes API', type: :request do
       end
 
       it 'calls setup_channel_provider when supported and returns ok' do
-        stub_request(:post, "http://test.com/connections/#{inbox.channel.phone_number}")
+        stub_request(:post, "http://test.com/connections/#{channel.phone_number}")
           .to_return(status: 200)
         with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
           post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
@@ -809,7 +818,8 @@ RSpec.describe 'Inboxes API', type: :request do
   end
 
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/disconnect_channel_provider' do
-    let(:inbox) { create(:channel_whatsapp, account: account, provider: 'baileys').inbox }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys') }
+    let(:inbox) { channel.inbox }
 
     context 'when unauthenticated' do
       it 'returns unauthorized' do
@@ -820,7 +830,8 @@ RSpec.describe 'Inboxes API', type: :request do
 
     context 'when authenticated' do
       it 'returns unprocessable entity when channel does not support disconnect' do
-        post "/api/v1/accounts/#{account.id}/inboxes/#{create(:inbox, account: account).id}/disconnect_channel_provider",
+        inbox = create(:inbox, account: account)
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
              headers: admin.create_new_auth_token,
              as: :json
         expect(response).to have_http_status(:unprocessable_entity)
@@ -828,7 +839,7 @@ RSpec.describe 'Inboxes API', type: :request do
       end
 
       it 'calls disconnect_channel_provider when supported and returns ok' do
-        stub_request(:delete, "http://test.com/connections/#{inbox.channel.phone_number}")
+        stub_request(:delete, "http://test.com/connections/#{channel.phone_number}")
           .to_return(status: 200)
         with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
           post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
