@@ -11,12 +11,19 @@ export default {
       type: Boolean,
       default: false,
     },
+    withProviderConnectionStatus: {
+      type: Boolean,
+      default: false,
+    },
   },
   computed: {
     computedInboxClass() {
       const { phone_number: phoneNumber, channel_type: type } = this.inbox;
       const classByType = getInboxClassByType(type, phoneNumber);
       return classByType;
+    },
+    connection() {
+      return this.inbox.provider_connection?.connection;
     },
   },
 };
@@ -35,5 +42,12 @@ export default {
     <span v-if="withPhoneNumber" class="ml-2 text-n-slate-12">{{
       inbox.phone_number
     }}</span>
+    <span v-if="withProviderConnectionStatus" class="ml-2">
+      <fluent-icon
+        icon="circle"
+        type="filled"
+        :class="connection === 'open' ? 'text-green-500' : 'text-n-slate-8'"
+      />
+    </span>
   </div>
 </template>

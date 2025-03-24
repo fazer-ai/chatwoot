@@ -14,26 +14,30 @@ const props = defineProps({
   },
 });
 
-const loading = ref(false);
+const store = useStore();
 
 const providerConnection = computed(() => props.inbox.provider_connection);
 const connection = computed(() => providerConnection.value?.connection);
 const qrDataUrl = computed(() => providerConnection.value?.qr_data_url);
 const error = computed(() => providerConnection.value?.error);
 
-const store = useStore();
+const loading = ref(false);
 
+const handleError = e => {
+  useAlert(e.message);
+  loading.value = false;
+};
 const setup = () => {
   loading.value = true;
   store
     .dispatch('inboxes/setupChannelProvider', props.inbox.id)
-    .catch(e => useAlert(e.message));
+    .catch(handleError);
 };
 const disconnect = () => {
   loading.value = true;
   store
     .dispatch('inboxes/disconnectChannelProvider', props.inbox.id)
-    .catch(e => useAlert(e.message));
+    .catch(handleError);
 };
 
 onMounted(() => {
@@ -67,9 +71,14 @@ watchEffect(() => {
 
       <div class="flex flex-col gap-4 p-8 pt-4">
         <div class="flex flex-col gap-4 items-center">
-          <InboxName :inbox="inbox" class="!text-lg" with-phone-number />
+          <InboxName
+            :inbox="inbox"
+            class="!text-lg"
+            with-phone-number
+            with-provider-connection-status
+          />
 
-          <template v-if="error || connection === 'close'">
+          <template v-if="!connection || connection === 'close' || error">
             <p v-if="error" class="text-red-500">
               {{ error }}
             </p>
@@ -85,7 +94,8 @@ watchEffect(() => {
               }}
             </woot-button>
           </template>
-          <template v-else-if="!connection || connection !== 'open'">
+
+          <template v-else-if="connection === 'connecting'">
             <div v-if="!qrDataUrl" class="flex flex-col gap-4 items-center">
               <p>
                 {{
@@ -103,7 +113,19 @@ watchEffect(() => {
               class="w-[276px] h-[276px]"
             />
           </template>
-          <template v-if="connection === 'open'">
+
+          <template v-else-if="connection === 'reconnecting'">
+            <p>
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.RECONNECTING'
+                )
+              }}
+            </p>
+            <Spinner />
+          </template>
+
+          <template v-else-if="connection === 'open'">
             <woot-button
               class="button clear w-fit"
               :is-loading="loading"
