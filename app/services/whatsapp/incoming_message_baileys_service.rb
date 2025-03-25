@@ -35,6 +35,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
 
+  # TODO: Implement the methods for all expected events
   def process_credentials_update; end
   def process_messaging_history; end
   def process_chats; end
