@@ -8,6 +8,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     event_prefix = processed_params[:event].gsub(/[\.-]/, '_')
     method_name = "process_#{event_prefix}"
     if respond_to?(method_name, true)
+      # TODO: Implement the methods for all expected events
       send(method_name)
     else
       Rails.logger.warn "Baileys unsupported event: #{processed_params[:event]}"
@@ -34,19 +35,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
     Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
-
-  # TODO: Implement the methods for all expected events
-  def process_credentials_update; end
-  def process_messaging_history; end
-  def process_chats; end
-  def process_presence; end
-  def process_contacts; end
-  def process_message_receipt; end
-  def process_groups; end
-  def process_blocklist; end
-  def process_call; end
-  def process_group_participants; end
-  def process_label; end
 
   def process_messages_upsert
     messages = processed_params[:data][:messages]
