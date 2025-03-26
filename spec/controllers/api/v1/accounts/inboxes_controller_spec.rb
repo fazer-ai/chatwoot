@@ -779,16 +779,10 @@ RSpec.describe 'Inboxes API', type: :request do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys') }
     let(:inbox) { channel.inbox }
 
-    # before do
-    #   with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com', BAILEYS_PROVIDER_DEFAULT_API_KEY: '' do
-    #     stub_request(:get, 'http://test.com/status')
-    #       .to_return(status: 200)
-    #   end
-    # end
-
     context 'when unauthenticated' do
       it 'returns unauthorized' do
         post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider"
+
         expect(response).to have_http_status(:unauthorized)
       end
     end
@@ -796,23 +790,26 @@ RSpec.describe 'Inboxes API', type: :request do
     context 'when authenticated' do
       it 'returns unprocessable entity when channel does not support setup' do
         inbox = create(:inbox, account: account)
+
         post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
              headers: admin.create_new_auth_token,
              as: :json
+
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['error']).to eq('Channel does not support setup')
       end
 
       it 'calls setup_channel_provider when supported and returns ok' do
-        stub_request(:post, "http://test.com/connections/#{channel.phone_number}")
-          .to_return(status: 200)
-        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
-          post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
-               headers: admin.create_new_auth_token,
-               as: :json
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, setup_channel_provider: true)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
 
-          expect(response).to have_http_status(:ok)
-        end
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
       end
     end
   end
@@ -824,6 +821,7 @@ RSpec.describe 'Inboxes API', type: :request do
     context 'when unauthenticated' do
       it 'returns unauthorized' do
         post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider"
+
         expect(response).to have_http_status(:unauthorized)
       end
     end
@@ -831,22 +829,26 @@ RSpec.describe 'Inboxes API', type: :request do
     context 'when authenticated' do
       it 'returns unprocessable entity when channel does not support disconnect' do
         inbox = create(:inbox, account: account)
+
         post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
              headers: admin.create_new_auth_token,
              as: :json
+
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['error']).to eq('Channel does not support disconnect')
       end
 
       it 'calls disconnect_channel_provider when supported and returns ok' do
-        stub_request(:delete, "http://test.com/connections/#{channel.phone_number}")
-          .to_return(status: 200)
-        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
-          post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
-               headers: admin.create_new_auth_token,
-               as: :json
-          expect(response).to have_http_status(:ok)
-        end
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, disconnect_channel_provider: true)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
       end
     end
   end
