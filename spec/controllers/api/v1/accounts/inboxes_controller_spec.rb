@@ -806,7 +806,7 @@ RSpec.describe 'Inboxes API', type: :request do
       it 'calls setup_channel_provider when supported and returns ok' do
         stub_request(:post, "http://test.com/connections/#{channel.phone_number}")
           .to_return(status: 200)
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/setup_channel_provider",
                headers: admin.create_new_auth_token,
                as: :json
@@ -841,7 +841,7 @@ RSpec.describe 'Inboxes API', type: :request do
       it 'calls disconnect_channel_provider when supported and returns ok' do
         stub_request(:delete, "http://test.com/connections/#{channel.phone_number}")
           .to_return(status: 200)
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
                headers: admin.create_new_auth_token,
                as: :json

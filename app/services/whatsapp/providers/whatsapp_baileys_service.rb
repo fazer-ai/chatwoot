@@ -79,7 +79,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     whatsapp_channel.phone_number
   end
 
-  def client_namea
+  def client_name
     ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   end
 
