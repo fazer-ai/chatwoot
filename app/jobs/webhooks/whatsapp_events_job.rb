@@ -20,7 +20,9 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
   def find_channel(params)
     return find_channel_from_whatsapp_business_payload(params) if params[:object] == 'whatsapp_business_account'
 
-    find_channel_by_phone_number_param(params)
+    return unless params[:phone_number]
+
+    Channel::Whatsapp.find_by(phone_number: params[:phone_number])
   end
 
   def channel_is_inactive?(channel)
@@ -29,12 +31,6 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
     return true unless channel.account.active?
 
     false
-  end
-
-  def find_channel_by_phone_number_param(params)
-    return unless params[:phone_number]
-
-    Channel::Whatsapp.find_by(phone_number: params[:phone_number])
   end
 
   def find_channel_from_whatsapp_business_payload(params)
