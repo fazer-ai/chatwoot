@@ -11,7 +11,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   describe '#setup_channel_provider' do
     context 'when called' do
       it 'calls the connection endpoint' do
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           stub_request(:post, "http://test.com/connections/#{whatsapp_channel.phone_number}")
             .with(
               headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] },
@@ -33,7 +33,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   describe '#disconnect_channel_provider' do
     context 'when called' do
       it 'disconnects the whatsapp connection' do
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           stub_request(:delete, "http://test.com/connections/#{whatsapp_channel.phone_number}")
             .with(headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] })
             .to_return(status: 200)
@@ -47,8 +47,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
   describe '#send_message' do
     context 'when response is successful' do
-      it 'returns the message id' do
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+      it 'returns true' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           stub_request(:post, "http://test.com/connections/#{whatsapp_channel.phone_number}/send-message")
             .with(
               headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] },
@@ -64,14 +64,14 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             )
 
           result = service.send_message(test_send_phone_number, message)
-          expect(result).to be(true)
+          expect(result).to be true
         end
       end
     end
 
     context 'when response is unsuccessful' do
-      it 'logs the error and returns nil' do
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+      it 'logs the error and returns false' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           stub_request(:post, "http://test.com/connections/#{whatsapp_channel.phone_number}/send-message")
             .with(
               headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] },
@@ -90,7 +90,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           expect(Rails.logger).to receive(:error).with('error message')
 
           result = service.send_message(test_send_phone_number, message)
-          expect(result).to be(false)
+          expect(result).to be false
         end
       end
     end
@@ -104,52 +104,80 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     end
   end
 
-  # describe '#send_message' do
-  #   context 'when called' do
-  #     it 'calls message endpoints for text messages' do
-  #       message = create(:message, message_type: :outgoing, content: 'test', inbox: whatsapp_channel.inbox)
-
-  #       stub_request(:post, "#{ENV.fetch('BAILEYS_BASE_URL', 'http://localhost:3025')}/send/#{whatsapp_channel.phone_number}")
-  #         .with(
-  #           body: {
-  #             type: 'text',
-  #             text: { body: message.content }
-  #           }.to_json,
-  #           headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] }
-  #         )
-  #         .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
-
-  #       expect(service.send_message(whatsapp_channel.phone_number, message)).to eq 'message_id'
-  #     end
-  #   end
-  # end
-
-  describe 'Ability to configure Base URL' do
-    context 'when environment variable DEFAULT_BAILEYS_BASE_URL is not set' do
-      it 'uses the default base url' do
-        expect(service.send(:api_base_path)).to eq('http://localhost:3025')
+  describe '#validate_provider_config?' do
+    context 'when running in test environment' do
+      it 'returns true without hitting the external service' do
+        # Rails.env.test? returns true by default in spec.
+        expect(service.validate_provider_config?).to be true
       end
     end
 
-    context 'when environment variable DEFAULT_BAILEYS_BASE_URL is set' do
+    context 'when not running in test environment' do
+      before do
+        # Force non test environment for this test
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new('development'))
+      end
+
+      context 'when external service returns success' do
+        it 'returns true' do
+          with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
+            stub_request(:get, 'http://test.com/status')
+              .with(headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] })
+              .to_return(status: 200, body: '', headers: {})
+
+            expect(service.validate_provider_config?).to be true
+          end
+        end
+      end
+
+      context 'when external service returns unsuccessful response' do
+        it 'logs the error and returns false' do
+          with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
+            stub_request(:get, 'http://test.com/status')
+              .with(headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] })
+              .to_return(status: 400, body: 'error message', headers: {})
+
+            expect(Rails.logger).to receive(:error).with('error message')
+            expect(service.validate_provider_config?).to be false
+          end
+        end
+      end
+    end
+  end
+
+  describe 'Ability to configure Base URL' do
+    context 'when environment variable BAILEYS_PROVIDER_DEFAULT_URL is set' do
       it 'uses the base url from the environment variable' do
-        with_modified_env DEFAULT_BAILEYS_BASE_URL: 'http://test.com' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           expect(service.send(:api_base_path)).to eq('http://test.com')
         end
       end
     end
   end
 
+  describe 'Ability to configure API key' do
+    context 'when environment variable BAILEYS_PROVIDER_DEFAULT_API_KEY is set' do
+      it 'uses the API key from the environment variable' do
+        whatsapp_channel.update!(provider_config: {})
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_API_KEY: 'key' do
+          expect(service.send(:api_key)).to eq('key')
+        end
+      end
+    end
+  end
+
   describe 'Ability to configure Client Name' do
-    context 'when environment variable DEFAULT_BAILEYS_CLIENT_NAME is not set' do
-      it 'uses the default client name' do
-        expect(service.send(:client_name)).to eq('Chatwoot')
+    context 'when environment variable BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME is not set' do
+      it 'will be nil' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME: nil do
+          expect(service.send(:client_name)).to be_nil
+        end
       end
     end
 
-    context 'when environment variable DEFAULT_BAILEYS_CLIENT_NAME is set' do
+    context 'when environment variable BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME is set' do
       it 'uses the client name from the environment variable' do
-        with_modified_env DEFAULT_BAILEYS_CLIENT_NAME: 'Test Client' do
+        with_modified_env BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME: 'Test Client' do
           expect(service.send(:client_name)).to eq('Test Client')
         end
       end
