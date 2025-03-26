@@ -62,6 +62,12 @@ class Channel::Whatsapp < ApplicationRecord
     # rubocop:enable Rails/SkipsModelValidations
   end
 
+  def update_provider_connection!(provider_connection)
+    assign_attributes(provider_connection: provider_connection)
+    # NOTE: Skip `validate_provider_config?` check
+    save!(validate: false)
+  end
+
   delegate :setup_channel_provider, to: :provider_service
   delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service

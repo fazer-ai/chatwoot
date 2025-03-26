@@ -25,13 +25,11 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     #   - `connecting`: In the process of connecting, expecting QR code to be read
     #   - `reconnecting`: Connection has been established, but not open (i.e. device is being linked for the first time, or Baileys server restart)
     #   - `open`: Open and ready to send/receive messages
-    inbox.channel.update!(
-      provider_connection: {
-        connection: data[:connection] || inbox.channel.provider_connection['connection'],
-        qr_data_url: data[:qrDataUrl],
-        error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}") : nil
-      }.compact
-    )
+    inbox.channel.update_provider_connection!({
+      connection: data[:connection] || inbox.channel.provider_connection['connection'],
+      qr_data_url: data[:qrDataUrl],
+      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}") : nil
+    }.compact)
 
     Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
@@ -40,15 +38,11 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     messages = processed_params[:data][:messages]
     messages.each do |message|
       @raw_message = message
-      if processed_params[:data][:type] == 'notify'
-        process_notify_message
-      elsif processed_params[:data][:type] == 'append'
-        process_append_message
-      end
+      handle_message
     end
   end
 
-  def process_notify_message
+  def handle_message
     return if find_message_by_source_id(message_id) || message_under_process?
 
     cache_message_source_id_in_redis
@@ -56,46 +50,17 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     return unless @contact
 
     set_conversation
-    handle_message
+    handle_create_message
     clear_message_source_id_from_redis
   end
 
-  def process_append_message
-    raise 'Not implemented'
-  end
-
-  def handle_message
+  def handle_create_message
     case message_type
     when 'text'
-      create_regular_message
+      create_text_message
     else
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
-  end
-
-  def create_regular_message
-    create_message
-    @message.save!
-  end
-
-  def create_message
-    @message = @conversation.messages.build(
-      content: message_content,
-      account_id: @inbox.account_id,
-      inbox_id: @inbox.id,
-      message_type: :incoming,
-      sender: @contact,
-      source_id: message_id.to_s,
-      in_reply_to_external_id: nil
-    )
-  end
-
-  def message_content
-    @raw_message[:message][:conversation]
-  end
-
-  def message_id
-    @raw_message[:key][:id]
   end
 
   def message_type  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
@@ -116,7 +81,26 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     'unsupported'
   end
 
+  def create_text_message
+    sender_info = if @raw_message[:key][:fromMe]
+                    { sender: @inbox.account.account_users.first.user, sender_type: 'User', message_type: :outgoing }
+                  else
+                    { sender: @contact, message_type: :incoming }
+                  end
+
+    @message = @conversation.messages.create!(
+      content: @raw_message[:message][:conversation],
+      account_id: @inbox.account_id,
+      inbox_id: @inbox.id,
+      source_id: message_id.to_s,
+      in_reply_to_external_id: nil,
+      **sender_info
+    )
+  end
+
   def set_contact
+    phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first
+
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: phone_number_from_jid,
       inbox: inbox,
@@ -127,8 +111,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @contact = contact_inbox.contact
   end
 
-  def phone_number_from_jid
-    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@').first.split(':').first
+  def message_id
+    @raw_message[:key][:id]
   end
 
   def message_under_process?

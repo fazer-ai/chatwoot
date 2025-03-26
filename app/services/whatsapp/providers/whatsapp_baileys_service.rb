@@ -1,10 +1,14 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService
+  DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
+  DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
+  DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
+
   def setup_channel_provider
     response = HTTParty.post(
-      "#{api_base_path}/connections/#{phone_number}",
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       body: {
-        clientName: client_name,
+        clientName: DEFAULT_CLIENT_NAME,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token']
       }.to_json
@@ -15,20 +19,20 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def disconnect_channel_provider
     response = HTTParty.delete(
-      "#{api_base_path}/connections/#{phone_number}",
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers
     )
 
     process_response(response)
   end
 
-  def send_message(to_phone_number, message)
+  def send_message(phone_number, message)
     response = HTTParty.post(
-      "#{api_base_path}/connections/#{phone_number}/send-message",
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
         type: 'text',
-        to: to_phone_number,
+        to: phone_number,
         text: { body: message.content }
       }.to_json
     )
@@ -51,11 +55,26 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return true if Rails.env.test?
 
     response = HTTParty.get(
-      "#{api_base_path}/status",
+      "#{provider_url}/status",
       headers: api_headers
     )
 
     process_response(response)
+  end
+
+  private
+
+  def provider_url
+    whatsapp_channel.provider_config['provider_url'].presence || DEFAULT_URL
+  end
+
+  def api_key
+    whatsapp_channel.provider_config['api_key'].presence || DEFAULT_API_KEY
+  end
+
+  def process_response(response)
+    Rails.logger.error response.body unless response.success?
+    response.success?
   end
 
   private_class_method def self.with_error_handling(*method_names)
@@ -65,34 +84,15 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       define_method(method_name) do |*args, &block|
         original_method.bind_call(self, *args, &block)
       rescue StandardError => e
-        whatsapp_channel.update!(provider_connection: { connection: 'close' })
+        handle_channel_error
         raise e
       end
     end
   end
 
+  def handle_channel_error
+    whatsapp_channel.update_provider_connection!(connection: 'close')
+  end
+
   with_error_handling :setup_channel_provider, :disconnect_channel_provider, :send_message
-
-  private
-
-  def phone_number
-    whatsapp_channel.phone_number
-  end
-
-  def client_name
-    ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
-  end
-
-  def api_base_path
-    whatsapp_channel.provider_config['provider_url'].presence || ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL')
-  end
-
-  def api_key
-    whatsapp_channel.provider_config['api_key'].presence || ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY')
-  end
-
-  def process_response(response)
-    Rails.logger.error response.body unless response.success?
-    response.success?
-  end
 end

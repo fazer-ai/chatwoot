@@ -44,7 +44,8 @@ FactoryBot.define do
       channel_whatsapp.define_singleton_method(:sync_templates) { nil } unless options.sync_templates
       channel_whatsapp.define_singleton_method(:validate_provider_config) { nil } unless options.validate_provider_config
       if channel_whatsapp.provider == 'baileys'
-        channel_whatsapp.provider_config = channel_whatsapp.provider_config.merge({ 'api_key' => 'test_key', 'phone_number_id' => '123456789' })
+        channel_whatsapp.provider_config = channel_whatsapp.provider_config.merge({ 'api_key' => 'test_key', 'provider_url' => 'https://baileys.api',
+                                                                                    'phone_number_id' => '123456789' })
       elsif channel_whatsapp.provider == 'whatsapp_cloud'
         channel_whatsapp.provider_config = channel_whatsapp.provider_config.merge({ 'api_key' => 'test_key', 'phone_number_id' => '123456789',
                                                                                     'business_account_id' => '123456789' })
