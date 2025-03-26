@@ -22,7 +22,7 @@ export default {
       const classByType = getInboxClassByType(type, phoneNumber);
       return classByType;
     },
-    connection() {
+    providerConnection() {
       return this.inbox.provider_connection?.connection;
     },
   },
@@ -46,7 +46,9 @@ export default {
       <fluent-icon
         icon="circle"
         type="filled"
-        :class="connection === 'open' ? 'text-green-500' : 'text-n-slate-8'"
+        :class="
+          providerConnection === 'open' ? 'text-green-500' : 'text-n-slate-8'
+        "
       />
     </span>
   </div>
