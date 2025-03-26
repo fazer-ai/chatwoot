@@ -53,7 +53,7 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   def messaging_window_enabled?
-    true
+    provider != 'baileys'
   end
 
   def mark_message_templates_updated
