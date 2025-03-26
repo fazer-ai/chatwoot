@@ -187,6 +187,7 @@ export default {
       :show="showBaileysLinkDeviceModal"
       :on-close="onCloseBaileysLinkDeviceModal"
       :inbox="currentInbox"
+      is-setup
     />
   </div>
 </template>

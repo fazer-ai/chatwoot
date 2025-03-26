@@ -8,6 +8,7 @@ import Spinner from 'shared/components/Spinner.vue';
 const props = defineProps({
   show: { type: Boolean, required: true },
   onClose: { type: Function, required: true },
+  isSetup: { type: Boolean, required: false },
   inbox: {
     type: Object,
     required: true,
@@ -126,7 +127,7 @@ watchEffect(() => {
           </template>
 
           <template v-else-if="connection === 'open'">
-            <p class="text-center">
+            <p v-if="isSetup" class="text-center">
               {{
                 $t(
                   'INBOX_MGMT.ADD.WHATSAPP.BAILEYS.LINK_DEVICE_MODAL.CONNECTED'
@@ -146,6 +147,7 @@ watchEffect(() => {
                 }}
               </woot-button>
               <router-link
+                v-if="isSetup"
                 class="rounded button success"
                 :to="{
                   name: 'inbox_dashboard',

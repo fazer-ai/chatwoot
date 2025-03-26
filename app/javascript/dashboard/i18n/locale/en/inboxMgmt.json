@@ -268,7 +268,7 @@
             "SUBTITLE": "Scan the QR code to link your device. Make sure the phone number is correct before scanning.",
             "LOADING_QRCODE": "Loading QR code...",
             "RECONNECTING": "Connecting...",
-            "LINK_DEVICE": "Link Device",
+            "LINK_DEVICE": "Link device",
             "DISCONNECT": "Disconnect",
             "CONNECTED": "Your device has been connected successfully. You can now start sending and receiving messages.",
             "CLOSE": "Close"
@@ -543,6 +543,13 @@
       "WHATSAPP_SECTION_UPDATE_BUTTON": "Update",
       "WHATSAPP_WEBHOOK_TITLE": "Webhook Verification Token",
       "WHATSAPP_WEBHOOK_SUBHEADER": "This token is used to verify the authenticity of the webhook endpoint.",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Manage Provider Connection",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Link your device and manage the provider connection.",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Manage connection",
+      "WHATSAPP_PROVIDER_URL_TITLE": "Provider URL",
+      "WHATSAPP_PROVIDER_URL_SUBHEADER": "If the provider is not running locally, please provide the URL.",
+      "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Enter the provider URL",
+      "WHATSAPP_PROVIDER_URL_ERROR": "Please enter a valid URL",
       "UPDATE_PRE_CHAT_FORM_SETTINGS": "Update Pre Chat Form Settings"
     },
     "HELP_CENTER": {
