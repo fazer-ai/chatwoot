@@ -295,7 +295,7 @@ export default {
         <div class="flex flex-col gap-2">
           <InboxName
             :inbox="inbox"
-            class="!text-lg"
+            class="!text-lg !m-0"
             with-phone-number
             with-provider-connection-status
           />
