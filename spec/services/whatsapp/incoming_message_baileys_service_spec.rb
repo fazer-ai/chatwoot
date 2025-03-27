@@ -4,7 +4,10 @@ describe Whatsapp::IncomingMessageBaileysService do
   describe '#perform' do
     let(:webhook_verify_token) { 'valid_token' }
     let!(:whatsapp_channel) do
-      create(:channel_whatsapp, provider: 'baileys', sync_templates: false, provider_config: { webhook_verify_token: webhook_verify_token })
+      create(:channel_whatsapp,
+             provider: 'baileys',
+             provider_config: { webhook_verify_token: webhook_verify_token },
+             validate_provider_config: false)
     end
     let(:inbox) { whatsapp_channel.inbox }
 
