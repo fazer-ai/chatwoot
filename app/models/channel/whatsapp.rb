@@ -68,6 +68,15 @@ class Channel::Whatsapp < ApplicationRecord
     save!(validate: false)
   end
 
+  def provider_connection_data
+    data = { connection: provider_connection['connection'] }
+    if Current.account_user&.administrator?
+      data[:qr_data_url] = provider_connection['qr_data_url']
+      data[:error] = provider_connection['error']
+    end
+    data
+  end
+
   delegate :setup_channel_provider, to: :provider_service
   delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service

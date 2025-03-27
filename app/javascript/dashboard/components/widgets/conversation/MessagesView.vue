@@ -5,6 +5,7 @@ import { useConfig } from 'dashboard/composables/useConfig';
 import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 import { useAI } from 'dashboard/composables/useAI';
 import { useMapGetter } from 'dashboard/composables/store';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 
 // components
 import ReplyBox from './ReplyBox.vue';
@@ -60,6 +61,7 @@ export default {
   },
   emits: ['contactPanelToggle'],
   setup() {
+    const { isAdmin } = useAdmin();
     const isPopOutReplyBox = ref(false);
     const { isEnterprise } = useConfig();
 
@@ -106,6 +108,7 @@ export default {
       fetchIntegrationsIfRequired,
       fetchLabelSuggestions,
       showNextBubbles,
+      isAdmin,
     };
   },
   data() {
@@ -506,11 +509,15 @@ export default {
         color-scheme="alert"
         class="mt-2 mx-2 rounded-lg overflow-hidden"
         :banner-message="
-          $t(
-            'CONVERSATION.INBOX.WHATSAPP_BAILEYS_PROVIDER_CONNECTION.NOT_CONNECTED'
-          )
+          isAdmin
+            ? $t(
+                'CONVERSATION.INBOX.WHATSAPP_BAILEYS_PROVIDER_CONNECTION.NOT_CONNECTED'
+              )
+            : $t(
+                'CONVERSATION.INBOX.WHATSAPP_BAILEYS_PROVIDER_CONNECTION.NOT_CONNECTED_CONTACT_ADMIN'
+              )
         "
-        has-action-button
+        :has-action-button="isAdmin"
         :action-button-label="
           $t(
             'CONVERSATION.INBOX.WHATSAPP_BAILEYS_PROVIDER_CONNECTION.LINK_DEVICE'
