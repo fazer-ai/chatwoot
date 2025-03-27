@@ -71,11 +71,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     ).perform
 
     @contact_inbox = contact_inbox
-    @contact = if @raw_message[:key][:fromMe]
-                 @inbox.account.account_users.first.user
-               else
-                 contact_inbox.contact
-               end
+    @contact = contact_inbox.contact
   end
 
   def handle_create_message
@@ -106,18 +102,20 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def create_text_message
-    sender_type = @raw_message[:key][:fromMe] ? 'User' : 'Contact'
-    message_type = @raw_message[:key][:fromMe] ? :outgoing : :incoming
+    is_outgoing = @raw_message[:key][:fromMe]
+    sender = is_outgoing ? @inbox.account.account_users.first.user : @contact
+    sender_type = is_outgoing ? 'User' : 'Contact'
+    message_type = is_outgoing ? :outgoing : :incoming
 
     @message = @conversation.messages.create!(
       content: @raw_message[:message][:conversation],
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: message_id.to_s,
-      in_reply_to_external_id: nil,
-      sender: @contact,
+      sender: sender,
       sender_type: sender_type,
-      message_type: message_type
+      message_type: message_type,
+      in_reply_to_external_id: nil
     )
   end
 

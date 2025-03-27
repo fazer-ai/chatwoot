@@ -204,22 +204,21 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.sender.name).to eq('John Doe')
         end
 
-        # FIXME
-        # it 'creates an outgoing message' do
-        #   raw_message_outgoing = raw_message.merge(
-        #     key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: true }
-        #   )
-        #   params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
-        #   create(:account_user, account: inbox.account)
+        it 'creates an outgoing message' do
+          raw_message_outgoing = raw_message.merge(
+            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: true }
+          )
+          params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+          create(:account_user, account: inbox.account)
 
-        #   described_class.new(inbox: inbox, params: params_outgoing).perform
+          described_class.new(inbox: inbox, params: params_outgoing).perform
 
-        #   conversation = inbox.conversations.last
-        #   message = conversation.messages.last
-        #   expect(message).to be_present
-        #   expect(message.content).to eq('Hello from Baileys')
-        #   expect(message.message_type).to eq('outgoing')
-        # end
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
+          expect(message.message_type).to eq('outgoing')
+        end
 
         it 'creates a message on an existing conversation' do
           contact = create(:contact, account: inbox.account, name: 'John Doe')
