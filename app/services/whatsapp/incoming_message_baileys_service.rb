@@ -27,7 +27,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     #   - `open`: Open and ready to send/receive messages
     inbox.channel.update_provider_connection!({
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
-      qr_data_url: data[:qrDataUrl],
+      qr_data_url: data[:qrDataUrl] || nil,
       error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}") : nil
     }.compact)
 
@@ -37,6 +37,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def process_messages_upsert
     messages = processed_params[:data][:messages]
     messages.each do |message|
+      @message = nil
+      @contact_inbox = nil
+      @contact = nil
       @raw_message = message
       handle_message
     end
@@ -47,11 +50,32 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
     cache_message_source_id_in_redis
     set_contact
-    return unless @contact
+
+    unless @contact
+      Rails.logger.warn "Contact not found for message: #{message_id}"
+      return
+    end
 
     set_conversation
     handle_create_message
     clear_message_source_id_from_redis
+  end
+
+  def set_contact
+    phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: phone_number_from_jid,
+      inbox: inbox,
+      contact_attributes: { name: @raw_message[:pushName], phone_number: "+#{phone_number_from_jid}" }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = if @raw_message[:key][:fromMe]
+                 @inbox.account.account_users.first.user
+               else
+                 contact_inbox.contact
+               end
   end
 
   def handle_create_message
@@ -63,7 +87,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def message_type  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     msg = @raw_message[:message]
     return 'text' if msg.key?(:conversation)
     return 'contacts' if msg.key?(:contactMessage)
@@ -82,11 +106,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def create_text_message
-    sender_info = if @raw_message[:key][:fromMe]
-                    { sender: @inbox.account.account_users.first.user, sender_type: 'User', message_type: :outgoing }
-                  else
-                    { sender: @contact, message_type: :incoming }
-                  end
+    sender_type = @raw_message[:key][:fromMe] ? 'User' : 'Contact'
+    message_type = @raw_message[:key][:fromMe] ? :outgoing : :incoming
 
     @message = @conversation.messages.create!(
       content: @raw_message[:message][:conversation],
@@ -94,21 +115,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       inbox_id: @inbox.id,
       source_id: message_id.to_s,
       in_reply_to_external_id: nil,
-      **sender_info
+      sender: @contact,
+      sender_type: sender_type,
+      message_type: message_type
     )
-  end
-
-  def set_contact
-    phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first
-
-    contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: phone_number_from_jid,
-      inbox: inbox,
-      contact_attributes: { name: @raw_message[:pushName], phone_number: "+#{phone_number_from_jid}" }
-    ).perform
-
-    @contact_inbox = contact_inbox
-    @contact = contact_inbox.contact
   end
 
   def message_id
