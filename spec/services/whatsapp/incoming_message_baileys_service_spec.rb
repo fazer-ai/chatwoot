@@ -2,19 +2,15 @@ require 'rails_helper'
 
 describe Whatsapp::IncomingMessageBaileysService do
   describe '#perform' do
+    let(:webhook_verify_token) { 'valid_token' }
     let!(:whatsapp_channel) do
-      create(:channel_whatsapp, provider: 'baileys', sync_templates: false, validate_provider_config: false).tap do |channel|
-        channel.provider_config['webhook_verify_token'] = 'valid_token'
-        channel.save!
-      end
+      create(:channel_whatsapp, provider: 'baileys', sync_templates: false, provider_config: { webhook_verify_token: webhook_verify_token })
     end
     let(:inbox) { whatsapp_channel.inbox }
 
     context 'when webhook verify token is invalid' do
       it 'raises an InvalidWebhookVerifyToken error' do
-        params = {
-          webhookVerifyToken: 'invalid_token'
-        }.with_indifferent_access
+        params = { webhookVerifyToken: 'invalid_token' }
 
         expect do
           described_class.new(inbox: inbox, params: params).perform
@@ -22,79 +18,249 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
     end
 
-    context 'when event or data is blank' do
+    context 'when event is blank' do
       it 'returns early and does nothing' do
         params = {
-          webhookVerifyToken: 'valid_token',
+          webhookVerifyToken: webhook_verify_token,
           event: '',
-          data: {}
-        }.with_indifferent_access
-
+          data: { connection: 'open' }
+        }
         service = described_class.new(inbox: inbox, params: params)
-        expect { service.perform }.not_to(change { inbox.channel.reload.provider_connection })
+        allow(service).to receive(:respond_to?)
+
+        service.perform
+
+        expect(service).not_to have_received(:respond_to?)
       end
     end
 
-    context 'when processing a connection update event' do
-      it 'updates the channel provider_connection' do
-        # NOTE: Validates all expected parameters of the "provider_connection" even if there are no event that send them all together
+    context 'when data is blank' do
+      it 'returns early and does nothing' do
         params = {
-          webhookVerifyToken: 'valid_token',
+          webhookVerifyToken: webhook_verify_token,
           event: 'connection.update',
-          data: { connection: 'open', qrDataUrl: 'http://example.com/qr', error: 'wrong_phone_number' }
-        }.with_indifferent_access
+          data: {}
+        }
+        service = described_class.new(inbox: inbox, params: params)
+        allow(service).to receive(:respond_to?)
 
-        expect(Rails.logger).to receive(:error).with('Baileys connection error: wrong_phone_number')
+        service.perform
+
+        expect(service).not_to have_received(:respond_to?)
+      end
+    end
+
+    context 'when event is unsupported' do
+      it 'logs a warning message' do
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'unsupported.event',
+          data: 'some-data'
+        }
+        allow(Rails.logger).to receive(:warn).with('Baileys unsupported event: unsupported.event')
+
         described_class.new(inbox: inbox, params: params).perform
+
+        expect(Rails.logger).to have_received(:warn)
+      end
+    end
+
+    context 'when processing connection.update event' do
+      let(:base_params) { { webhookVerifyToken: webhook_verify_token, event: 'connection.update' } }
+
+      it 'updates the channel provider_connection' do
+        params = base_params.merge(
+          {
+            data: {
+              connection: 'open',
+              qrDataUrl: 'data:image/jpeg;base64,',
+              error: 'wrong_phone_number'
+            }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
         expect(inbox.channel.provider_connection).to include(
           'connection' => 'open',
-          'qr_data_url' => 'http://example.com/qr',
+          'qr_data_url' => 'data:image/jpeg;base64,',
           'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
         )
       end
-    end
 
-    context 'when processing messages upsert event with a notify text message' do
-      let(:raw_message) do
-        {
-          key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-          message: { conversation: 'Hello from Baileys' },
-          pushName: 'John Doe'
-        }
-      end
-
-      let(:params) do
-        {
-          webhookVerifyToken: 'valid_token',
-          event: 'messages.upsert',
-          data: {
-            type: 'notify',
-            messages: [raw_message]
+      it "logs an error message if there's an error" do
+        params = base_params.merge(
+          {
+            data: { error: 'wrong_phone_number' }
           }
-        }.with_indifferent_access
-      end
+        )
+        allow(Rails.logger).to receive(:error).with('Baileys connection error: wrong_phone_number')
 
-      before do
-        allow_any_instance_of(described_class).to receive(:find_message_by_source_id).and_return(nil) # rubocop:disable RSpec/AnyInstance
-        allow_any_instance_of(described_class).to receive(:message_under_process?).and_return(false) # rubocop:disable RSpec/AnyInstance
-        allow_any_instance_of(described_class).to receive(:cache_message_source_id_in_redis).and_return(nil) # rubocop:disable RSpec/AnyInstance
-        allow_any_instance_of(described_class).to receive(:clear_message_source_id_from_redis).and_return(nil) # rubocop:disable RSpec/AnyInstance
-      end
-
-      it 'creates a new incoming text message with the proper content' do
         described_class.new(inbox: inbox, params: params).perform
 
-        conversation = inbox.conversations.last
-        message = conversation.messages.last
+        expect(Rails.logger).to have_received(:error)
+      end
 
-        expect(message).to be_present
-        expect(message.content).to eq('Hello from Baileys')
-        expect(message.message_type).to eq('incoming')
+      it "keeps connection value if it's not present in the data" do
+        inbox.channel.update_provider_connection!(connection: 'connecting')
+        params = base_params.merge(
+          {
+            data: { qrDataUrl: 'data:image/jpeg;base64,' }
+          }
+        )
 
-        contact = message.sender
-        expect(contact).to be_present
-        expect(contact.name).to eq('John Doe')
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection['connection']).to eq('connecting')
+      end
+
+      it "removes qr_data_url value if it's not present in the data" do
+        inbox.channel.update_provider_connection!(qr_data_url: 'data:image/jpeg;base64,')
+        params = base_params.merge(
+          {
+            data: { connection: 'open' }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection['qr_data_url']).to be_nil
+      end
+
+      it "removes error value if it's not present in the data" do
+        inbox.channel.update_provider_connection!(error: 'wrong_phone_number')
+        params = base_params.merge(
+          {
+            data: { connection: 'open' }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection['error']).to be_nil
       end
     end
+
+    context 'when processing messages.upsert event' do
+      context 'when message type is unsupported' do
+        let(:raw_message) do
+          {
+            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+            message: { unsupported: 'message' },
+            pushName: 'John Doe'
+          }
+        end
+        let(:params) do
+          {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: {
+              type: 'notify',
+              messages: [raw_message]
+            }
+          }
+        end
+
+        it 'logs a warning message' do
+          allow(Rails.logger).to receive(:warn).with('Baileys unsupported message type: unsupported')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Rails.logger).to have_received(:warn)
+        end
+      end
+
+      context 'when message type is text' do
+        let(:raw_message) do
+          {
+            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+            message: { conversation: 'Hello from Baileys' },
+            pushName: 'John Doe'
+          }
+        end
+        let(:params) do
+          {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: {
+              type: 'notify',
+              messages: [raw_message]
+            }
+          }
+        end
+
+        it 'creates an incoming message' do
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
+          expect(message.message_type).to eq('incoming')
+          expect(message.sender).to be_present
+          expect(message.sender.name).to eq('John Doe')
+        end
+
+        # FIXME
+        # it 'creates an outgoing message' do
+        #   raw_message_outgoing = raw_message.merge(
+        #     key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: true }
+        #   )
+        #   params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+        #   create(:account_user, account: inbox.account)
+
+        #   described_class.new(inbox: inbox, params: params_outgoing).perform
+
+        #   conversation = inbox.conversations.last
+        #   message = conversation.messages.last
+        #   expect(message).to be_present
+        #   expect(message.content).to eq('Hello from Baileys')
+        #   expect(message.message_type).to eq('outgoing')
+        # end
+
+        it 'creates a message on an existing conversation' do
+          contact = create(:contact, account: inbox.account, name: 'John Doe')
+          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678')
+          existing_conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          message = existing_conversation.messages.last
+          expect(message.sender).to eq(contact)
+        end
+
+        it 'does not create a message if it already exists' do
+          message = create(:message, inbox: inbox, source_id: 'msg_123')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          messages = conversation.messages
+          expect(messages).to eq([message])
+        end
+
+        it 'does not create a message if it is already being processed' do
+          allow(Redis::Alfred).to receive(:get).with(format_message_source_key('msg_123')).and_return(true)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.conversations).to be_empty
+        end
+
+        it 'caches the message source id in Redis and clears it' do
+          allow(Redis::Alfred).to receive(:setex).with(format_message_source_key('msg_123'), true)
+          allow(Redis::Alfred).to receive(:delete).with(format_message_source_key('msg_123'))
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Redis::Alfred).to have_received(:setex)
+          expect(Redis::Alfred).to have_received(:delete)
+        end
+      end
+    end
+  end
+
+  def format_message_source_key(message_id)
+    format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: message_id)
   end
 end
