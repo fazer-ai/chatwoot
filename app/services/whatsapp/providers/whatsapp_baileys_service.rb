@@ -27,15 +27,19 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message(phone_number, message)
+    return unless message.content_type == 'text'
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
         type: 'text',
-        to: phone_number,
-        text: { body: message.content }
+        recipient: phone_number,
+        message: message.content
       }.to_json
     )
+
+    message.update!(source_id: response.body.dig('data', 'key', 'id'))
 
     process_response(response)
   end
