@@ -39,7 +39,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       }.to_json
     )
 
-    message.update!(source_id: response.body.dig('data', 'key', 'id'))
+    message.update!(source_id: response.parsed_response.dig('data', 'key', 'id')) if response.success?
 
     process_response(response)
   end
