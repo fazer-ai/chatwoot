@@ -776,7 +776,7 @@ RSpec.describe 'Inboxes API', type: :request do
   end
 
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/setup_channel_provider' do
-    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys') }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }
 
     context 'when unauthenticated' do
@@ -815,7 +815,7 @@ RSpec.describe 'Inboxes API', type: :request do
   end
 
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/disconnect_channel_provider' do
-    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys') }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }
 
     context 'when unauthenticated' do

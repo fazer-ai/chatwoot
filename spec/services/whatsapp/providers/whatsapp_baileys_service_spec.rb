@@ -98,13 +98,14 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             headers: stub_headers(whatsapp_channel),
             body: {
               type: 'text',
-              to: test_send_phone_number,
-              text: { body: message.content }
+              recipient: test_send_phone_number,
+              message: message.content
             }.to_json
           )
           .to_return(
             status: 200,
-            body: { 'key' => { 'id' => message.id } }.to_json
+            headers: { 'Content-Type' => 'application/json' },
+            body: { 'data' => { 'key' => { 'id' => message.id } } }.to_json
           )
 
         result = service.send_message(test_send_phone_number, message)
@@ -121,8 +122,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               headers: stub_headers(whatsapp_channel),
               body: {
                 type: 'text',
-                to: test_send_phone_number,
-                text: { body: message.content }
+                recipient: test_send_phone_number,
+                message: message.content
               }.to_json
             )
             .to_return(
@@ -181,8 +182,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         headers: stub_headers(whatsapp_channel),
         body: {
           type: 'text',
-          to: test_send_phone_number,
-          text: { body: message.content }
+          recipient: test_send_phone_number,
+          message: message.content
         }.to_json
       ).and_raise(HTTParty::ResponseError.new(OpenStruct.new(status_code: 500)))
 
