@@ -74,8 +74,8 @@ export default {
         );
       }
     },
-    toggleAdvancedOptions() {
-      this.showAdvancedOptions = !this.showAdvancedOptions;
+    setShowAdvancedOptions() {
+      this.showAdvancedOptions = true;
     },
   },
 };
@@ -113,24 +113,24 @@ export default {
       </label>
     </div>
 
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4">
+    <div
+      v-if="!showAdvancedOptions"
+      class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4"
+    >
       <woot-button
-        class="button clear"
-        type="button"
-        @click="toggleAdvancedOptions"
+        icon="add"
+        size="small"
+        variant="link"
+        @click="setShowAdvancedOptions"
       >
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
-        <fluent-icon
-          class="ml-2 transition-transform"
-          :class="{ 'rotate-180': showAdvancedOptions }"
-          icon="chevron-up"
-          size="14"
-        />
       </woot-button>
     </div>
-
-    <template v-if="showAdvancedOptions">
+    <template v-else>
       <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+        <span class="text-sm text-gray-600">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
+        </span>
         <label :class="{ error: v$.providerUrl.$error }">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDER_URL.LABEL') }}
           <input
