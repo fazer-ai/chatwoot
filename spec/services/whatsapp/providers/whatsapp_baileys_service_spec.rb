@@ -140,6 +140,16 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         end
       end
     end
+
+    context 'when message content type is not supported' do
+      it 'raises an error' do
+        message.update!(content_type: 'sticker')
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageContentTypeNotSupported)
+      end
+    end
   end
 
   describe '#api_headers' do

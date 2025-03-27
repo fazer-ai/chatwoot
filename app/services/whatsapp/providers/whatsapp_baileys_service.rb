@@ -3,6 +3,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
 
+  class MessageContentTypeNotSupported < StandardError; end
+
   def setup_channel_provider
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
@@ -27,7 +29,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message(phone_number, message)
-    return unless message.content_type == 'text'
+    raise MessageContentTypeNotSupported unless message.content_type == 'text'
 
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
