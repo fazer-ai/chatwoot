@@ -1,9 +1,9 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService
+  class MessageContentTypeNotSupported < StandardError; end
+
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
-
-  class MessageContentTypeNotSupported < StandardError; end
 
   def setup_channel_provider
     response = HTTParty.post(
