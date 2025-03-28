@@ -41,9 +41,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       }.to_json
     )
 
-    message.update!(source_id: response.parsed_response.dig('data', 'key', 'id')) if response.success?
+    return unless process_response(response)
 
-    process_response(response)
+    response.parsed_response.dig('data', 'key', 'id')
   end
 
   def send_template(phone_number, template_info); end

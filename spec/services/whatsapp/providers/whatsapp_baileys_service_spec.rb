@@ -110,7 +110,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         result = service.send_message(test_send_phone_number, message)
 
-        expect(result).to be true
+        expect(result).to be message.id
       end
     end
 
@@ -135,7 +135,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
           result = service.send_message(test_send_phone_number, message)
 
-          expect(result).to be(false)
+          expect(result).to be_nil
           expect(Rails.logger).to have_received(:error)
         end
       end

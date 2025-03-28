@@ -111,7 +111,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       content: @raw_message[:message][:conversation],
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
-      source_id: message_id.to_s,
+      source_id: message_id,
       sender: sender,
       sender_type: sender_type,
       message_type: message_type,
