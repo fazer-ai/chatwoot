@@ -125,7 +125,7 @@ jobs:
           GIT_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
-          if [ "${{ github.ref_name }}" = "master" ]; then
+          if [ "${{ github.ref_name }}" = "fazer-ai/main" ]; then
             GITHUB_TAG="ghcr.io/${{ github.repository }}:latest"
           else
             GITHUB_TAG="ghcr.io/${{ github.repository }}:${SANITIZED_REF}"
