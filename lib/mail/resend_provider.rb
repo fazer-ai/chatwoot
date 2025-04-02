@@ -2,10 +2,6 @@ module Mail # rubocop:disable Style/ClassAndModuleChildren
   class ResendProvider
     class DeliveryError < StandardError; end
 
-    def initialize(settings)
-      @settings = settings
-    end
-
     def deliver!(mail)
       Resend::Emails.send(
         from: mail.smtp_envelope_from,
