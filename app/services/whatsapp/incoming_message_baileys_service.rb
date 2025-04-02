@@ -63,15 +63,19 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def set_contact
     phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first
-
+    phone_number_formated = "+#{phone_number_from_jid}"
+    name = @raw_message[:key][:fromMe] ? phone_number_formated : @raw_message[:pushName]
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: phone_number_from_jid,
       inbox: inbox,
-      contact_attributes: { name: @raw_message[:pushName], phone_number: "+#{phone_number_from_jid}" }
+      contact_attributes: { name: name, phone_number: phone_number_formated }
     ).perform
 
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
+    return unless @contact[:name] == phone_number_formated && !@raw_message[:key][:fromMe]
+
+    @contact.update(name: @raw_message[:pushName])
   end
 
   def handle_create_message
