@@ -265,9 +265,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           let(:raw_message) do
             {
               key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-              message: { 'extendedTextMessage': {
-                'text': 'Hello from Baileys'
-              } },
+              message: { 'extendedTextMessage': { text: 'Hello from Baileys' } },
               pushName: 'John Doe'
             }
           end
