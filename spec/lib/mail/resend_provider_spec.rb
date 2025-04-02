@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 describe Mail::ResendProvider do
-  let(:provider) { described_class.new({}) }
+  let(:provider) { described_class.new }
   let(:mail) do
     instance_double(Mail::Message,
                     smtp_envelope_from: 'sender@example.com',
