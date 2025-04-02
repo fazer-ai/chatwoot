@@ -39,7 +39,6 @@ Rails.application.configure do
   config.action_mailer.delivery_method = :letter_opener if Rails.env.development? && ENV['LETTER_OPENER']
 
   config.action_mailer.delivery_method = :resend if ENV['RESEND_API_KEY'].present?
-  config.action_mailer.resend_settings = {}
   ActionMailer::Base.add_delivery_method :resend, Mail::ResendProvider
 
   #########################################
