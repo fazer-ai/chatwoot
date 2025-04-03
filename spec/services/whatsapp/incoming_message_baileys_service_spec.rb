@@ -220,7 +220,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message).to be_present
             expect(message.content).to eq('Hello from Baileys')
             expect(message.message_type).to eq('outgoing')
-            expect(conversation.contact[:name]).to eq("+#{number}")
+            expect(conversation.contact.name).to eq("+#{number}")
           end
 
           it 'updates the contact name if the current name is a phone number when a incoming message is received' do
@@ -228,7 +228,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             described_class.new(inbox: inbox, params: params).perform
 
             conversation = inbox.conversations.last
-            expect(conversation.contact[:name]).to eq('John Doe')
+            expect(conversation.contact.name).to eq('John Doe')
           end
 
           it 'creates a message on an existing conversation' do
@@ -275,7 +275,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           let(:raw_message) do
             {
               key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-              message: { 'extendedTextMessage': { text: 'Hello from Baileys' } },
+              message: { extendedTextMessage: { text: 'Hello from Baileys' } },
               pushName: 'John Doe'
             }
           end
