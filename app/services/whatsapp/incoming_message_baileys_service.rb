@@ -91,19 +91,26 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def jid_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def jid_type # rubocop:disable Metrics/CyclomaticComplexity
     jid = @raw_message[:key][:remoteJid]
+    server = jid.split('@').last
 
-    return 'user' if jid.include? '@s.whatsapp.net'
-    return 'user' if jid.include? '@c.us'
-    return 'group' if jid.include? '@g.us'
-    return 'lid' if jid.include? '@lid'
-    return 'broadcast' if jid.include? '@broadcast'
-    return 'status' if jid.include? 'status@broadcast'
-    return 'newsletter' if jid.include? '@newsletter'
-    return 'call' if jid.include? '@call'
-
-    'unknown'
+    case server
+    when 's.whatsapp.net', 'c.us'
+      'user'
+    when 'g.us'
+      'group'
+    when 'lid'
+      'lid'
+    when 'broadcast'
+      jid.start_with?('status@') ? 'status' : 'broadcast'
+    when 'newsletter'
+      'newsletter'
+    when 'call'
+      'call'
+    else
+      'unknown'
+    end
   end
 
   def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
