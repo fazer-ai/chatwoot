@@ -116,7 +116,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     msg = @raw_message[:message]
 
-    return 'text' if msg.key?(:conversation) || msg.key?(:extendedTextMessage)
+    return 'text' if msg.key?(:conversation) || msg.dig(:extendedTextMessage, :text).present?
     return 'contacts' if msg.key?(:contactMessage)
     return 'image' if msg.key?(:imageMessage)
     return 'audio' if msg.key?(:audioMessage)
