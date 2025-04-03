@@ -192,8 +192,9 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'does not create a conversation or message' do
+        it 'does not create a conversation' do
           described_class.new(inbox: inbox, params: params).perform
+
           expect(inbox.conversations).to be_empty
         end
       end
