@@ -64,7 +64,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def set_contact
     phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first
     phone_number_formatted = "+#{phone_number_from_jid}"
-    push_name = @raw_message[:key][:fromMe] ? phone_number_formatted : @raw_message[:pushName]
+    # NOTE: We're assuming `pushName` will always be present when `fromMe: false`.
+    # This assumption might be incorrect, so let's keep an eye out for contacts being created with empty name.
+    push_name = @raw_message[:key][:fromMe] ? phone_number_formatted : @raw_message[:pushName].to_s
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: phone_number_from_jid,
       inbox: inbox,
