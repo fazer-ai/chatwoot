@@ -46,6 +46,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_message
+    return if jid_type != 'user'
     return if find_message_by_source_id(message_id) || message_under_process?
 
     cache_message_source_id_in_redis
@@ -86,6 +87,21 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     else
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
+  end
+
+  def jid_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+    jid = @raw_message[:key][:remoteJid]
+
+    return 'user' if jid.include? '@s.whatsapp.net'
+    return 'user' if jid.include? '@c.us'
+    return 'group' if jid.include? '@g.us'
+    return 'lid' if jid.include? '@lid'
+    return 'broadcast' if jid.include? '@broadcast'
+    return 'status' if jid.include? 'status@broadcast'
+    return 'newsletter' if jid.include? '@newsletter'
+    return 'call' if jid.include? '@call'
+
+    'unknown'
   end
 
   def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
