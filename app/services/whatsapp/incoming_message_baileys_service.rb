@@ -63,8 +63,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def set_contact
-    # NOTE: jid shape is `<user (like phone-number)>_<agent_id>:<device_id>@<server (like s.whatsapp.net)>`
-    # https://github.com/WhiskeySockets/Baileys/blob/d5dc75887493f25877028d43b81101e050a3695b/src/WABinary/jid-utils.ts#L21
+    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
     phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
     phone_number_formatted = "+#{phone_number_from_jid}"
     # NOTE: We're assuming `pushName` will always be present when `fromMe: false`.
