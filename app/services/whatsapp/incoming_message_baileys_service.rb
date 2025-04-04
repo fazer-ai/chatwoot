@@ -95,6 +95,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     jid = @raw_message[:key][:remoteJid]
     server = jid.split('@').last
 
+    # NOTE: Based on Baileys internal functions
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L48-L58
     case server
     when 's.whatsapp.net', 'c.us'
       'user'
@@ -103,8 +105,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     when 'lid'
       'lid'
     when 'broadcast'
-      # NOTE: Baileys includes separate functions `isJidBroadcast` and `isJidStatusBroadcast` to distinguish different types.
-      # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L52
       jid.start_with?('status@') ? 'status' : 'broadcast'
     when 'newsletter'
       'newsletter'
