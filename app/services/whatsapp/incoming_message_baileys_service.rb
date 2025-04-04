@@ -103,6 +103,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     when 'lid'
       'lid'
     when 'broadcast'
+      # NOTE: Baileys includes separate functions `isJidBroadcast` and `isJidStatusBroadcast` to distinguish different types.
+      # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L52
       jid.start_with?('status@') ? 'status' : 'broadcast'
     when 'newsletter'
       'newsletter'
