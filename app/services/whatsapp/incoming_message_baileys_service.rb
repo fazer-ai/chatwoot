@@ -79,7 +79,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    @contact.update(name: push_name) if @contact[:name] == phone_number_formatted && !@raw_message[:key][:fromMe]
+    @contact.update!(name: push_name) if @contact.name == phone_number_formatted && !@raw_message[:key][:fromMe]
   end
 
   def handle_create_message
