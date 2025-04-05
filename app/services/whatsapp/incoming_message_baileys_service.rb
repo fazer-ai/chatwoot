@@ -53,7 +53,48 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def handle_update; end
+  def handle_update
+    return unless valid_update_message?
+
+    update_status
+    update_message_content
+  end
+
+  def valid_update_message?
+    message_id = @raw_update.dig(:key, :id)
+    @message_update = find_message_by_source_id(message_id)
+    @message_update.present?
+  end
+
+  def update_status
+    status = status_handler
+
+    @message_update.update!(status: status) if status.present?
+  end
+
+  def update_message_content
+    message = @raw_update.dig(:update, :message, :editedMessage, :message)
+    content = message[:conversation] || message.dig(:extendedTextMessage, :text)
+
+    @message_update.update!(content: content) if content.present?
+  end
+
+  def status_handler
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
+    status = @raw_update.dig(:update, :status)
+    case status
+    when 0
+      'failed'
+    when 2
+      'sent'
+    when 3
+      'delivered'
+    when 4
+      'read'
+    else
+      Rails.logger.warn "Baileys unsupported message update status: #{status}"
+    end
+  end
 
   def handle_message
     return if jid_type != 'user'
