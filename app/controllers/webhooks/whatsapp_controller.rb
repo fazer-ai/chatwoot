@@ -8,7 +8,24 @@ class Webhooks::WhatsappController < ActionController::API
       return
     end
 
-    Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
+    perform_webhook
+  end
+
+  def perform_webhook
+    if params[:awaitResponse].present?
+      begin
+        Webhooks::WhatsappEventsJob.perform_now(params.to_unsafe_hash)
+      rescue InvalidWebhookVerifyToken
+        head :unauthorized and return
+      rescue MessageNotFoundError
+        head :not_found and return
+      rescue StandardError => e
+        Rails.logger.error("Error processing WhatsApp webhook: #{e.message}")
+        head :bad_request and return
+      end
+    else
+      Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
+    end
     head :ok
   end
 

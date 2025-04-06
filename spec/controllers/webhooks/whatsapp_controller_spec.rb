@@ -23,11 +23,14 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
   end
 
   describe 'POST /webhooks/whatsapp/{:phone_number}' do
-    it 'call the whatsapp events job with the params' do
+    it 'calls the whatsApp events job asynchronously with perform_later when awaitResponse is not present' do
       allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
       expect(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
       post '/webhooks/whatsapp/123221321', params: { content: 'hello' }
-      expect(response).to have_http_status(:success)
+
+      expect(response).to have_http_status(:ok)
     end
 
     context 'when phone number is in inactive list' do
@@ -52,10 +55,53 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
 
       it 'processes the webhook normally' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
         expect(Webhooks::WhatsappEventsJob).to receive(:perform_later)
 
         post '/webhooks/whatsapp/+1234567890', params: { content: 'hello' }
-        expect(response).to have_http_status(:success)
+
+        expect(response).to have_http_status(:ok)
+      end
+    end
+
+    context 'when awaitResponse param is present' do
+      it 'calls the whatsApp events job synchronously' do
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)
+
+        expect(Webhooks::WhatsappEventsJob).to receive(:perform_now)
+
+        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'returns unauthorized when InvalidWebhookVerifyToken is raised' do
+        stub_const('InvalidWebhookVerifyToken', Class.new(StandardError))
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(InvalidWebhookVerifyToken)
+
+        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'returns not_found when MessageNotFoundError is raised' do
+        stub_const('MessageNotFoundError', Class.new(StandardError))
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(MessageNotFoundError)
+
+        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it 'logs error and returns bad_request when StandardError is raised' do
+        error_message = 'Some error occurred'
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(StandardError.new(error_message))
+
+        expect(Rails.logger).to receive(:error).with("Error processing WhatsApp webhook: #{error_message}")
+
+        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+
+        expect(response).to have_http_status(:bad_request)
       end
     end
   end
