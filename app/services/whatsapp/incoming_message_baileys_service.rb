@@ -54,7 +54,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_update
-    return unless valid_update_message?
+    raise MessageNotFoundError unless valid_update_message?
 
     update_status
     update_message_content
