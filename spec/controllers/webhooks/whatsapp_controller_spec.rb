@@ -23,7 +23,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
   end
 
   describe 'POST /webhooks/whatsapp/{:phone_number}' do
-    it 'calls the whatsApp events job asynchronously with perform_later when awaitResponse is not present' do
+    it 'calls the whatsapp events job asynchronously with perform_later when awaitResponse is not present' do
       allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
 
       expect(Webhooks::WhatsappEventsJob).to receive(:perform_later)
@@ -65,7 +65,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
     end
 
     context 'when awaitResponse param is present' do
-      it 'calls the whatsApp events job synchronously' do
+      it 'calls the whatsapp events job synchronously' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)
 
         expect(Webhooks::WhatsappEventsJob).to receive(:perform_now)
