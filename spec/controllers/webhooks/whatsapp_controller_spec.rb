@@ -76,8 +76,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
 
       it 'returns unauthorized when InvalidWebhookVerifyToken is raised' do
-        stub_const('InvalidWebhookVerifyToken', Class.new(StandardError))
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(InvalidWebhookVerifyToken)
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken)
 
         post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
 
@@ -85,8 +84,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
 
       it 'returns not_found when MessageNotFoundError is raised' do
-        stub_const('MessageNotFoundError', Class.new(StandardError))
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(MessageNotFoundError)
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
 
         post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
 
