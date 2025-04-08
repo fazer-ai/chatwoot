@@ -57,8 +57,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def handle_update
     raise MessageNotFoundError unless valid_update_message?
 
-    update_status
-    update_message_content
+    update_status if @raw_update.dig(:update, :status).present?
+    update_message_content if @raw_update.dig(:update, :message).present?
   end
 
   def valid_update_message?
@@ -68,22 +68,21 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def update_status
-    status = status_handler
+    status = status_mapper
 
     @message_update.update!(status: status) if status.present?
   end
 
   def update_message_content
     message = @raw_update.dig(:update, :message, :editedMessage, :message)
-    content = message[:conversation] || message.dig(:extendedTextMessage, :text)
+    content = message[:conversation] || message.dig(:extendedTextMessage, :text) if message.present?
 
     @message_update.update!(content: content) if content.present?
   end
 
-  def status_handler
+  def status_mapper
     # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
-    status = @raw_update.dig(:update, :status)
-    case status
+    case @raw_update.dig(:update, :status)
     when 0
       'failed'
     when 2

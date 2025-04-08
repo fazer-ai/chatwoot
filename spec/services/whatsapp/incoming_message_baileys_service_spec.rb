@@ -320,6 +320,74 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
     end
+
+    context 'when processing messages.update event' do
+      context 'when message is not found' do
+        let(:message_id) { 'msg_123' }
+        let(:update_payload) do
+          {
+            key: { id: message_id },
+            update: {
+              status: 2
+            }
+          }
+        end
+
+        it 'raises MessageNotFoundError' do
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.to raise_error(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
+        end
+      end
+
+      context 'when message is found' do
+        let(:message_id) { 'msg_123' }
+        let(:message) { create(:message) }
+
+        before do
+          message.update!(source_id: message_id, status: 'sent')
+        end
+
+        it 'updates the message status' do
+          update_payload = { key: { id: message_id }, update: { status: 3 } } # delivered
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+          message.reload
+
+          expect(message.status).to eq('delivered')
+        end
+
+        it 'updates the message content' do
+          update_payload = {
+            key: { id: message_id },
+            update: {
+              message: { editedMessage: { message: { conversation: 'New message content' } } }
+            }
+          }
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+          message.reload
+
+          expect(message.content).to eq('New message content')
+        end
+      end
+    end
   end
 
   def format_message_source_key(message_id)
