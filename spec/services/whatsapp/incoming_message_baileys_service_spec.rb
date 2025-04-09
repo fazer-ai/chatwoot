@@ -363,9 +363,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
 
           described_class.new(inbox: inbox, params: params).perform
-          message.reload
 
-          expect(message.status).to eq('delivered')
+          expect(message.reload.status).to eq('delivered')
         end
 
         it 'updates the message content' do
@@ -382,9 +381,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
 
           described_class.new(inbox: inbox, params: params).perform
-          message.reload
 
-          expect(message.content).to eq('New message content')
+          expect(message.reload.content).to eq('New message content')
         end
       end
 
@@ -405,9 +403,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
 
           described_class.new(inbox: inbox, params: params).perform
-          message.reload
 
-          expect(message.status).to eq('read')
+          expect(message.reload.status).to eq('read')
         end
       end
 
