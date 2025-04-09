@@ -208,7 +208,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     #  - (4) READ          → (2) read
     #  - (5) PLAYED        → (unsupported: PLAYED)
     # For details: https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
-    case @raw_message.dig(:update, :status)
+    status = @raw_message.dig(:update, :status)
+    case status
     when 0
       'failed'
     when 1, 2
@@ -220,7 +221,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     when 5
       Rails.logger.warn 'Baileys unsupported message update status: PLAYED(5)'
     else
-      Rails.logger.warn "Baileys unsupported message update status: #{@raw_message.dig(:update, :status)}"
+      Rails.logger.warn "Baileys unsupported message update status: #{status}"
     end
   end
 
