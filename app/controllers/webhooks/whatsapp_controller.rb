@@ -14,12 +14,10 @@ class Webhooks::WhatsappController < ActionController::API
   private
 
   def perform_whatsapp_events_job
-    if params[:awaitResponse].present?
-      perform_sync
-      return if performed?
-    else
-      Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
-    end
+    perform_sync if params[:awaitResponse].present?
+    return if performed?
+
+    Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
     head :ok
   end
 
