@@ -387,6 +387,66 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.content).to eq('New message content')
         end
       end
+
+      context 'when the status transition is not allowed (message already read)' do
+        let(:message_id) { 'msg_123' }
+        let(:message) { create(:message, status: 'read') }
+
+        before do
+          message.update!(source_id: message_id)
+        end
+
+        it 'does not update the status' do
+          update_payload = { key: { id: message_id }, update: { status: 3 } }
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+          message.reload
+
+          expect(message.status).to eq('read')
+        end
+      end
+
+      context 'when update unsupported status' do
+        let(:message_id) { 'msg_123' }
+        let(:message) { create(:message) }
+
+        before do
+          message.update!(source_id: message_id)
+        end
+
+        it 'logs warning for unsupported played status' do
+          update_payload = { key: { id: message_id }, update: { status: 5 } }
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+          allow(Rails.logger).to receive(:warn).with('Baileys unsupported message update status: PLAYED(5)')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Rails.logger).to have_received(:warn)
+        end
+
+        it 'logs warning for unsupported status' do
+          update_payload = { key: { id: message_id }, update: { status: 6 } }
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.update',
+            data: [update_payload]
+          }
+          allow(Rails.logger).to receive(:warn).with('Baileys unsupported message update status: 6')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Rails.logger).to have_received(:warn)
+        end
+      end
     end
   end
 
