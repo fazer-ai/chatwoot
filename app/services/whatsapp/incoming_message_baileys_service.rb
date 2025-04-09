@@ -200,7 +200,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def status_mapper
-    # Baileys status codes vs. Chatwoot support:
+    # NOTE: Baileys status codes vs. Chatwoot support:
     #  - (0) ERROR         → (3) failed
     #  - (1) PENDING       → (0) sent
     #  - (2) SERVER_ACK    → (0) sent
@@ -211,7 +211,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     case @raw_message.dig(:update, :status)
     when 0
       'failed'
-    when 1 || 2
+    when 1, 2
       'sent'
     when 3
       'delivered'
