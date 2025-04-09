@@ -1,4 +1,4 @@
-class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseService
+class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   class InvalidWebhookVerifyToken < StandardError; end
   class MessageNotFoundError < StandardError; end
 
@@ -204,14 +204,18 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     case @raw_message.dig(:update, :status)
     when 0
       'failed'
+    when 1
+      Rails.logger.warn 'Baileys unsupported message update status: PENDING(1)'
     when 2
       'sent'
     when 3
       'delivered'
     when 4
       'read'
+    when 5
+      Rails.logger.warn 'Baileys unsupported message update status: PLAYED(5)'
     else
-      Rails.logger.warn "Baileys unsupported message update status: #{status}"
+      Rails.logger.warn "Baileys unsupported message update status: #{@raw_message.dig(:update, :status)}"
     end
   end
 
