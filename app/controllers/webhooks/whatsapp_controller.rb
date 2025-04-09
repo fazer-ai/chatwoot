@@ -29,9 +29,6 @@ class Webhooks::WhatsappController < ActionController::API
     head :unauthorized
   rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
     head :not_found
-  rescue StandardError => e
-    Rails.logger.error("Error processing WhatsApp webhook: #{e.message}")
-    head :bad_request
   end
 
   def valid_token?(token)
