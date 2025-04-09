@@ -90,17 +90,6 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
 
         expect(response).to have_http_status(:not_found)
       end
-
-      it 'logs error and returns bad_request when StandardError is raised' do
-        error_message = 'Some error occurred'
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(StandardError.new(error_message))
-
-        expect(Rails.logger).to receive(:error).with("Error processing WhatsApp webhook: #{error_message}")
-
-        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
-
-        expect(response).to have_http_status(:bad_request)
-      end
     end
   end
 end

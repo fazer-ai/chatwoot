@@ -1,5 +1,6 @@
 class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseService
   class InvalidWebhookVerifyToken < StandardError; end
+  class MessageNotFoundError < StandardError; end
 
   def perform
     raise InvalidWebhookVerifyToken if processed_params[:webhookVerifyToken] != inbox.channel.provider_config['webhook_verify_token']
