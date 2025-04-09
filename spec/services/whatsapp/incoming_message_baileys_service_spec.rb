@@ -348,11 +348,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
       context 'when message is found' do
         let(:message_id) { 'msg_123' }
-        let(:message) { create(:message) }
-
-        before do
-          message.update!(source_id: message_id, status: 'sent')
-        end
+        let!(:message) { create(:message, source_id: message_id, status: 'sent') }
 
         it 'updates the message status' do
           update_payload = { key: { id: message_id }, update: { status: 3 } }
@@ -388,11 +384,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
       context 'when the status transition is not allowed (message already read)' do
         let(:message_id) { 'msg_123' }
-        let(:message) { create(:message, status: 'read') }
-
-        before do
-          message.update!(source_id: message_id)
-        end
+        let!(:message) { create(:message, source_id: message_id, status: 'read') }
 
         it 'does not update the status' do
           update_payload = { key: { id: message_id }, update: { status: 3 } }
@@ -410,11 +402,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
       context 'when update unsupported status' do
         let(:message_id) { 'msg_123' }
-        let(:message) { create(:message) }
-
-        before do
-          message.update!(source_id: message_id)
-        end
+        let!(:message) { create(:message, source_id: message_id) } # rubocop:disable RSpec/LetSetup
 
         it 'logs warning for unsupported played status' do
           update_payload = { key: { id: message_id }, update: { status: 5 } }
