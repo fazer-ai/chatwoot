@@ -196,7 +196,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def update_status
     status = status_mapper
-    @message.update!(status: status) if status.present? && status_transition_allowed(status)
+    @message.update!(status: status) if status.present? && status_transition_allowed?(status)
   end
 
   def status_mapper
@@ -225,7 +225,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def status_transition_allowed(new_status)
+  def status_transition_allowed?(new_status)
     return false if @message.status == 'read'
     return false if @message.status == 'delivered' && new_status == 'sent'
 
