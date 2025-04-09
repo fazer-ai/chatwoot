@@ -202,7 +202,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def status_mapper
     # Baileys status codes vs. Chatwoot support:
     #  - (0) ERROR         → (3) failed
-    #  - (1) PENDING       → (unsupported: PENDING)
+    #  - (1) PENDING       → (0) sent
     #  - (2) SERVER_ACK    → (0) sent
     #  - (3) DELIVERY_ACK  → (1) delivered
     #  - (4) READ          → (2) read
@@ -211,9 +211,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     case @raw_message.dig(:update, :status)
     when 0
       'failed'
-    when 1
-      Rails.logger.warn 'Baileys unsupported message update status: PENDING(1)'
-    when 2
+    when 1 || 2
       'sent'
     when 3
       'delivered'
