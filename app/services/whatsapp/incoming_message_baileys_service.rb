@@ -196,11 +196,18 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def update_status
     status = status_mapper
-    @message.update!(status: status) if status.present?
+    @message.update!(status: status) if status.present? && status_transition_allowed(status)
   end
 
   def status_mapper
-    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
+    # Baileys status codes vs. Chatwoot support:
+    #  - (0) ERROR         → (3) failed
+    #  - (1) PENDING       → (unsupported: PENDING)
+    #  - (2) SERVER_ACK    → (0) sent
+    #  - (3) DELIVERY_ACK  → (1) delivered
+    #  - (4) READ          → (2) read
+    #  - (5) PLAYED        → (unsupported: PLAYED)
+    # For details: https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
     case @raw_message.dig(:update, :status)
     when 0
       'failed'
@@ -217,6 +224,13 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     else
       Rails.logger.warn "Baileys unsupported message update status: #{@raw_message.dig(:update, :status)}"
     end
+  end
+
+  def status_transition_allowed(new_status)
+    return false if @message.status == 'read'
+    return false if @message.status == 'delivered' && new_status == 'sent'
+
+    true
   end
 
   def update_message_content
