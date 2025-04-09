@@ -355,7 +355,7 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'updates the message status' do
-          update_payload = { key: { id: message_id }, update: { status: 3 } } # delivered
+          update_payload = { key: { id: message_id }, update: { status: 3 } }
           params = {
             webhookVerifyToken: webhook_verify_token,
             event: 'messages.update',
