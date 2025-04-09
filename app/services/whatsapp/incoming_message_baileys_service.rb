@@ -46,56 +46,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def process_messages_update
-    updates = processed_params[:data]
-    updates.each do |update|
-      @raw_update = update
-      handle_update
-    end
-  end
-
-  def handle_update
-    raise MessageNotFoundError unless valid_update_message?
-
-    update_status if @raw_update.dig(:update, :status).present?
-    update_message_content if @raw_update.dig(:update, :message).present?
-  end
-
-  def valid_update_message?
-    message_id = @raw_update.dig(:key, :id)
-    @message_update = find_message_by_source_id(message_id)
-    @message_update.present?
-  end
-
-  def update_status
-    status = status_mapper
-
-    @message_update.update!(status: status) if status.present?
-  end
-
-  def update_message_content
-    message = @raw_update.dig(:update, :message, :editedMessage, :message)
-    content = message[:conversation] || message.dig(:extendedTextMessage, :text) if message.present?
-
-    @message_update.update!(content: content) if content.present?
-  end
-
-  def status_mapper
-    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
-    case @raw_update.dig(:update, :status)
-    when 0
-      'failed'
-    when 2
-      'sent'
-    when 3
-      'delivered'
-    when 4
-      'read'
-    else
-      Rails.logger.warn "Baileys unsupported message update status: #{status}"
-    end
-  end
-
   def handle_message
     return if jid_type != 'user'
     return if find_message_by_source_id(message_id) || message_under_process?
@@ -221,5 +171,56 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def clear_message_source_id_from_redis
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: message_id)
     ::Redis::Alfred.delete(key)
+  end
+
+  def process_messages_update
+    updates = processed_params[:data]
+    updates.each do |update|
+      @message = nil
+      @raw_message = update
+      handle_update
+    end
+  end
+
+  def handle_update
+    raise MessageNotFoundError unless valid_update_message?
+
+    update_status if @raw_message.dig(:update, :status).present?
+    update_message_content if @raw_message.dig(:update, :message).present?
+  end
+
+  def valid_update_message?
+    @message = find_message_by_source_id(message_id)
+    @message.present?
+  end
+
+  def update_status
+    status = status_mapper
+    @message.update!(status: status) if status.present?
+  end
+
+  def status_mapper
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/WAProto/index.d.ts#L36694
+    case @raw_message.dig(:update, :status)
+    when 0
+      'failed'
+    when 2
+      'sent'
+    when 3
+      'delivered'
+    when 4
+      'read'
+    else
+      Rails.logger.warn "Baileys unsupported message update status: #{status}"
+    end
+  end
+
+  def update_message_content
+    message = @raw_message.dig(:update, :message, :editedMessage, :message)
+    Rails.logger.warn "Baileys unsupported message update type: #{message_type}" and return if message.blank?
+
+    content = message[:conversation] || message.dig(:extendedTextMessage, :text)
+
+    @message.update!(content: content) if content.present?
   end
 end
