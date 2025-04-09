@@ -26,7 +26,7 @@ class Webhooks::WhatsappController < ActionController::API
   rescue Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken
     head :unauthorized
   rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
-    head :not_found
+    head :bad_request
   end
 
   def valid_token?(token)

@@ -88,7 +88,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
 
         post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
 
-        expect(response).to have_http_status(:not_found)
+        expect(response).to have_http_status(:bad_request)
       end
     end
   end
