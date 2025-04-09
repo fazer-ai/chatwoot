@@ -233,7 +233,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def update_message_content
     message = @raw_message.dig(:update, :message, :editedMessage, :message)
-    Rails.logger.warn "Baileys unsupported message update type: #{message_type}" and return if message.blank?
+    if message.blank?
+      Rails.logger.warn 'No valid message content found in the update event'
+      return
+    end
 
     content = message[:conversation] || message.dig(:extendedTextMessage, :text)
 
