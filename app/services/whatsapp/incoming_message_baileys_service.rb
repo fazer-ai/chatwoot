@@ -86,6 +86,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     case message_type
     when 'text'
       create_text_message
+    when 'image'
+      create_text_message
+      attach_media
+      @message.save!
     else
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
@@ -139,10 +143,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     sender = is_outgoing ? @inbox.account.account_users.first.user : @contact
     sender_type = is_outgoing ? 'User' : 'Contact'
     message_type = is_outgoing ? :outgoing : :incoming
-    content = @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
 
     @message = @conversation.messages.create!(
-      content: content,
+      content: message_content,
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: message_id,
@@ -153,8 +156,38 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
   end
 
+  def message_content
+    case message_type
+    when 'text'
+      @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
+    when 'image'
+      @raw_message.dig(:message, :imageMessage, :caption)
+    end
+  end
+
   def message_id
     @raw_message[:key][:id]
+  end
+
+  def attach_media
+    media = @processed_params.dig(:extra, :media)
+    return if media.blank?
+
+    attachment_payload = media[message_id]
+    return if attachment_payload.blank?
+
+    decoded_data = Base64.decode64(attachment_payload)
+    io = StringIO.new(decoded_data)
+
+    @message.attachments.new(
+      account_id: @message.account_id,
+      file_type: file_content_type(message_type),
+      file: {
+        io: io,
+        filename: "attachment_#{message_id}",
+        content_type: file_content_type(message_type)
+      }
+    )
   end
 
   def message_under_process?
