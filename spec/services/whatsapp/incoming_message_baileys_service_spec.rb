@@ -319,6 +319,114 @@ describe Whatsapp::IncomingMessageBaileysService do
           end
         end
       end
+
+      context 'when message type is image' do
+        let(:raw_message) do
+          {
+            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+            message: { imageMessage: { caption: 'Hello from Baileys' } },
+            pushName: 'John Doe'
+          }
+        end
+        let(:params) do
+          {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: {
+              type: 'notify',
+              messages: [raw_message]
+            },
+            extra: {
+              media: {
+                'msg_123' => 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+              }
+            }
+          }
+        end
+
+        it 'creates the message with caption' do
+          described_class.new(inbox: inbox, params: params).perform
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
+        end
+
+        it 'attaches the media with expected behavior' do
+          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
+          time_str = fixed_time.strftime('%Y%m%d%H%M%S%s')
+
+          allow(Time).to receive(:current).and_return(fixed_time)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+          attachment = message.attachments.last
+
+          expect(attachment).to be_present
+          expect(attachment.file_type).to eq('image')
+          expect(attachment.file).to be_present
+
+          expect(attachment.file.filename.to_s).to eq("image_#{message.id}#{time_str}")
+          expect(attachment.file.content_type).to eq('image/png')
+        end
+      end
+
+      context 'when message type is video' do
+        let(:raw_message) do
+          {
+            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+            message: { videoMessage: { caption: 'Hello from Baileys' } },
+            pushName: 'John Doe'
+          }
+        end
+        let(:params) do
+          {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: {
+              type: 'notify',
+              messages: [raw_message]
+            },
+            extra: {
+              media: {
+                'msg_123' => 'AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAABL21kYXQAAAGzABAHAAABthGBxgj238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2E4HGCkbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237AAABswAQBwAAAbYVgcYLltyRtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfsAAAGzABAHAAABtheBxhPbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2GYHGJG3JG238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt+/AAADHW1vb3YAAABsbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAJHdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAQAAAAAAAAPoAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAABAAAAAQAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAD6AAAAAAAAQAAAAABv21kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAKAAAACgAVcQAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAWptaW5mAAAAFHZtaGQAAAABAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAEqc3RibAAAAGJzdHNkAAAAAAAAACVhdmMxAAAAAAAAAAAAAAAAAACFc3R0cwAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' # rubocop:disable Layout/LineLength
+              }
+            }
+          }
+        end
+
+        it 'creates the message with caption' do
+          described_class.new(inbox: inbox, params: params).perform
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
+        end
+
+        it 'attaches the media with expected behavior' do
+          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
+          time_str = fixed_time.strftime('%Y%m%d%H%M%S%s')
+
+          allow(Time).to receive(:current).and_return(fixed_time)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+          attachment = message.attachments.last
+
+          expect(attachment).to be_present
+          expect(attachment.file_type).to eq('video')
+          expect(attachment.file).to be_present
+
+          expect(attachment.file.filename.to_s).to eq("video_#{message.id}#{time_str}")
+          expect(attachment.file.content_type).to eq('video/mp4')
+        end
+      end
     end
 
     context 'when processing messages.update event' do

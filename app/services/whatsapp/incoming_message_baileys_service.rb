@@ -85,9 +85,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def handle_create_message
     case message_type
     when 'text'
-      create_text_message
-    when 'image'
-      create_text_message
+      create_message
+    when 'image', 'file', 'video', 'audio', 'sticker'
+      create_message
       attach_media
       @message.save!
     else
@@ -130,7 +130,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     return 'video_note' if msg.key?(:ptvMessage)
     return 'location' if msg.key?(:locationMessage)
     return 'live_location' if msg.key?(:liveLocationMessage)
-    return 'document' if msg.key?(:documentMessage)
+    return 'file' if msg.key?(:documentMessage)
     return 'poll' if msg.key?(:pollCreationMessageV3)
     return 'event' if msg.key?(:eventMessage)
     return 'sticker' if msg.key?(:stickerMessage)
@@ -138,7 +138,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     'unsupported'
   end
 
-  def create_text_message
+  def create_message
     is_outgoing = @raw_message[:key][:fromMe]
     sender = is_outgoing ? @inbox.account.account_users.first.user : @contact
     sender_type = is_outgoing ? 'User' : 'Contact'
@@ -156,19 +156,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
   end
 
-  def message_content
-    case message_type
-    when 'text'
-      @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
-    when 'image'
-      @raw_message.dig(:message, :imageMessage, :caption)
-    end
-  end
-
-  def message_id
-    @raw_message[:key][:id]
-  end
-
   def attach_media
     media = @processed_params.dig(:extra, :media)
     return if media.blank?
@@ -184,10 +171,31 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       file_type: file_content_type(message_type),
       file: {
         io: io,
-        filename: "attachment_#{message_id}",
-        content_type: file_content_type(message_type)
+        filename: filename
       }
     )
+  end
+
+  def filename
+    filename = @raw_message.dig(:message, :documentMessage, :fileName)
+    return filename if filename.present?
+
+    "#{file_content_type(message_type)}_#{@message[:id]}#{Time.current.strftime('%Y%m%d%H%M%S%s')}"
+  end
+
+  def message_content
+    case message_type
+    when 'text'
+      @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
+    when 'image'
+      @raw_message.dig(:message, :imageMessage, :caption)
+    when 'video'
+      @raw_message.dig(:message, :videoMessage, :caption)
+    end
+  end
+
+  def message_id
+    @raw_message[:key][:id]
   end
 
   def message_under_process?
