@@ -89,7 +89,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     when 'image', 'file', 'video', 'audio', 'sticker'
       create_message
       attach_media
-      @message.save!
     else
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
@@ -157,23 +156,28 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def attach_media
-    media = @processed_params.dig(:extra, :media)
+    media = processed_params.dig(:extra, :media)
     return if media.blank?
 
     attachment_payload = media[message_id]
     return if attachment_payload.blank?
 
-    decoded_data = Base64.decode64(attachment_payload)
-    io = StringIO.new(decoded_data)
+    begin
+      decoded_data = Base64.decode64(attachment_payload)
+      io = StringIO.new(decoded_data)
 
-    @message.attachments.new(
-      account_id: @message.account_id,
-      file_type: file_content_type,
-      file: {
-        io: io,
-        filename: filename
-      }
-    )
+      @message.attachments.new(
+        account_id: @message.account_id,
+        file_type: file_content_type,
+        file: {
+          io: io,
+          filename: filename
+        }
+      )
+      @message.save!
+    rescue StandardError => e
+      Rails.logger.error "Failed to attach media for message #{message_id} (#{e.message}) payload: #{attachment_payload}"
+    end
   end
 
   def file_content_type
