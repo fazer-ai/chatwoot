@@ -25,6 +25,8 @@ pt_BR:
   errors:
     messages:
       unsupported: ❌ _Esta mensagem não pode ser exibida aqui. Por favor, abra o WhatsApp em seu telefone para visualizar a mensagem._
+      send:
+        unsupported: ❌ _Esta mensagem não pode ser enviada. Por favor, abra o WhatsApp em seu telefone para enviar corretamente a mensagem._
     validations:
       presence: não pode ficar em branco
     webhook:

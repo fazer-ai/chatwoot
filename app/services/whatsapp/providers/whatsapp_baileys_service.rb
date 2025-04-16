@@ -29,7 +29,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message(phone_number, message)
-    raise MessageContentTypeNotSupported unless message.content_type == 'text'
+    if message.content_type != 'text' || message.content.blank? || message.attachments.present?
+      message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
+      raise MessageContentTypeNotSupported
+    end
+
+    return unless message.status == 'sent'
 
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
