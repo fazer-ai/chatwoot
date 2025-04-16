@@ -168,7 +168,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
     @message.attachments.new(
       account_id: @message.account_id,
-      file_type: file_content_type(message_type),
+      file_type: file_content_type,
       file: {
         io: io,
         filename: filename
@@ -176,11 +176,19 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
   end
 
+  def file_content_type
+    return :image if %w[image sticker].include?(message_type)
+    return :audio if ['audio'].include?(message_type)
+    return :video if ['video'].include?(message_type)
+
+    :file
+  end
+
   def filename
     filename = @raw_message.dig(:message, :documentMessage, :fileName)
     return filename if filename.present?
 
-    "#{file_content_type(message_type)}_#{@message[:id]}#{Time.current.strftime('%Y%m%d%H%M%S%s')}"
+    "#{file_content_type}_#{@message[:id]}#{Time.current.strftime('%Y%m%d%H%M%S%s')}"
   end
 
   def message_content
