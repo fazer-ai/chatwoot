@@ -164,6 +164,18 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
+        it 'create an alert of unsupported message' do
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+
+          expect(message).to be_present
+          expect(message.content).to eq(I18n.t('errors.messages.unsupported'))
+          expect(message.message_type).to eq('template')
+          expect(message.status).to eq('failed')
+        end
+
         it 'logs a warning message' do
           allow(Rails.logger).to receive(:warn).with('Baileys unsupported message type: unsupported')
 

@@ -141,13 +141,17 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
-    context 'when message content type is not supported' do
-      it 'raises an error' do
+    context 'when message type is not supported' do
+      it 'updates the message status to failed and raises an error' do
         message.update!(content_type: 'sticker')
 
         expect do
           service.send_message(test_send_phone_number, message)
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageContentTypeNotSupported)
+
+        message.reload
+        expect(message.status).to eq('failed')
+        expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))
       end
     end
   end
