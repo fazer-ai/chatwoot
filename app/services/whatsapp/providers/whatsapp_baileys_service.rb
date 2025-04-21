@@ -92,7 +92,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         type: 'text',
         recipient: @phone_number,
-        message: @message.content
+        messageContent: { text: @message.content }
       }.to_json
     )
 
