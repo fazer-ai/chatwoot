@@ -30,20 +30,17 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message(phone_number, message)
-    if message.content_type != 'text' || message.content.blank?
-      message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
-      raise MessageContentTypeNotSupported
-    end
-
     return unless message.status == 'sent'
 
     @message = message
     @phone_number = phone_number
     if message.attachments.present?
       send_attachment_message
-    elsif message.content_type == 'input_select'
-      send_interactive_text_message
     else
+      if message.content.blank?
+        message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
+        raise MessageContentTypeNotSupported
+      end
       send_text_message
     end
   end
@@ -78,7 +75,45 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_attachment_message
-    raise NotImplementedError, 'Attachment message sending is not implemented for Baileys provider'
+    @attachment = @message.attachments.first
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
+      headers: api_headers,
+      body: {
+        type: @attachment.file_type == 'file' ? 'document' : @attachment.file_type,
+        recipient: @phone_number,
+        messageContent: message_content
+      }.to_json
+    )
+
+    return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
+
+    @message.update!(status: 'failed')
+    raise MessageSendFailed
+  end
+
+  def message_content
+    buffer = Base64.encode64(@attachment.file.download)
+
+    content = {
+      fileName: @attachment.file.filename,
+      caption: @message.content
+    }
+    case @attachment.file_type
+    when 'image'
+      content[:image] = buffer
+    when 'audio'
+      content[:audio] = buffer
+    when 'file'
+      content[:document] = buffer
+    when 'sticker'
+      content[:sticker] = buffer
+    when 'video'
+      content[:video] = buffer
+    end
+
+    content
   end
 
   def send_interactive_text_message
