@@ -168,12 +168,13 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
       @message.attachments.new(
         account_id: @message.account_id,
-        file_type: file_content_type,
+        file_type: file_content_type.to_s,
         file: {
           io: io,
           filename: filename
         }
       )
+
       @message.save!
     rescue StandardError => e
       Rails.logger.error "Failed to attach media for message #{message_id} (#{e.message}) payload: #{attachment_payload}"
