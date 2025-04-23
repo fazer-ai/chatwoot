@@ -90,7 +90,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       create_message
       attach_media
     else
-      create_unsuported_message
+      create_unsupported_message
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
   end
@@ -156,7 +156,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
   end
 
-  def create_unsuported_message
+  def create_unsupported_message
     create_message
     @message.update!(
       content: I18n.t('errors.messages.unsupported'),
