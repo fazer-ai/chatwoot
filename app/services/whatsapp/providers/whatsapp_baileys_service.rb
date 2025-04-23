@@ -94,7 +94,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def message_content
-    buffer = Base64.encode64(@attachment.file.download)
+    buffer = Base64.strict_encode64(@attachment.file.download)
 
     content = {
       fileName: @attachment.file.filename,
