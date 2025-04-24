@@ -37,6 +37,8 @@ class Channel::Whatsapp < ApplicationRecord
 
   after_create :sync_templates
 
+  before_destroy :disconnect_channel_provider, if: :baileys_provider?
+
   def name
     'Whatsapp'
   end
@@ -86,6 +88,10 @@ class Channel::Whatsapp < ApplicationRecord
   delegate :api_headers, to: :provider_service
 
   private
+
+  def baileys_provider?
+    provider == 'baileys'
+  end
 
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])
