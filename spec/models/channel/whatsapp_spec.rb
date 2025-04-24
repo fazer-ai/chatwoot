@@ -61,4 +61,34 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.provider_config['webhook_verify_token']).to eq '123'
     end
   end
+
+  describe 'callbacks' do
+    describe '#disconnect_channel_provider' do
+      let(:disconnect_url) { "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}" }
+
+      let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+
+      it 'fails condition to call the callback' do
+        channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
+
+        expect(channel).not_to receive(:disconnect_channel_provider)
+
+        channel.destroy!
+      end
+
+      it 'successfully disconnects the channel provider and destroys the channel' do
+        stub_request(:delete, disconnect_url).to_return(status: 200)
+
+        expect { channel.destroy! }.not_to raise_error
+        expect(described_class.find_by(id: channel.id)).to be_nil
+      end
+
+      it 'attempts to disconnect but, on failure, still destroys the channel' do
+        stub_request(:delete, disconnect_url).to_return(status: 404, body: 'error message')
+
+        expect { channel.destroy! }.not_to raise_error
+        expect(described_class.find_by(id: channel.id)).to be_nil
+      end
+    end
+  end
 end
