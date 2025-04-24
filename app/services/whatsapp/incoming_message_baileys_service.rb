@@ -64,12 +64,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def set_contact
-    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
-    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
-    phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
-    # NOTE: We're assuming `pushName` will always be present when `fromMe: false`.
-    # This assumption might be incorrect, so let's keep an eye out for contacts being created with empty name.
-    push_name = @raw_message[:key][:fromMe] ? phone_number_from_jid : @raw_message[:pushName].to_s
+    push_name = contact_name
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: phone_number_from_jid,
       inbox: inbox,
@@ -79,7 +74,23 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    @contact.update!(name: push_name) if @contact.name == phone_number_from_jid && !@raw_message[:key][:fromMe]
+    @contact.update!(name: push_name) if @contact.name != push_name
+  end
+
+  def phone_number_from_jid
+    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
+    @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
+  end
+
+  def contact_name
+    # NOTE: `verifiedBizName` is only available for business accounts and has a higher priority than `pushName`.
+    return @raw_message[:verifiedBizName].to_s if @raw_message[:verifiedBizName].present?
+
+    return @raw_message[:pushName].to_s if @raw_message[:pushName].present?
+
+    # NOTE: If the message don't have a 'verifiedBizName' or 'pushName', we use the phone number as the name.
+    phone_number_from_jid
   end
 
   def handle_create_message
