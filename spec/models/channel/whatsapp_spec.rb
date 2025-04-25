@@ -64,30 +64,35 @@ RSpec.describe Channel::Whatsapp do
 
   describe 'callbacks' do
     describe '#disconnect_channel_provider' do
-      let(:disconnect_url) { "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}" }
+      context 'when provider is baileys' do
+        let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+        let(:disconnect_url) { "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}" }
 
-      let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+        it 'destroys the channel on successful disconnect' do
+          stub_request(:delete, disconnect_url).to_return(status: 200)
 
-      it 'fails condition to call the callback' do
-        channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
+          channel.destroy!
 
-        expect(channel).not_to receive(:disconnect_channel_provider)
+          expect(channel).to be_destroyed
+        end
 
-        channel.destroy!
+        it 'destroys the channel on failure to disconnect' do
+          stub_request(:delete, disconnect_url).to_return(status: 404, body: 'error message')
+
+          channel.destroy!
+
+          expect(channel).to be_destroyed
+        end
       end
 
-      it 'successfully disconnects the channel provider and destroys the channel' do
-        stub_request(:delete, disconnect_url).to_return(status: 200)
+      context 'when provider is not baileys' do
+        let(:channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false) }
 
-        expect { channel.destroy! }.not_to raise_error
-        expect(described_class.find_by(id: channel.id)).to be_nil
-      end
+        it 'does not invoke callback' do
+          expect(channel).not_to receive(:disconnect_channel_provider)
 
-      it 'attempts to disconnect but, on failure, still destroys the channel' do
-        stub_request(:delete, disconnect_url).to_return(status: 404, body: 'error message')
-
-        expect { channel.destroy! }.not_to raise_error
-        expect(described_class.find_by(id: channel.id)).to be_nil
+          channel.destroy!
+        end
       end
     end
   end
