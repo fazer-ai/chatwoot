@@ -164,7 +164,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'create an alert of unsupported message' do
+        it 'creates an alert of unsupported message' do
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
