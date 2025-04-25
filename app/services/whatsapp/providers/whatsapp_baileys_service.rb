@@ -1,6 +1,5 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService
   class MessageContentTypeNotSupported < StandardError; end
-  class MessageSendFailed < StandardError; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
@@ -36,12 +35,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     @phone_number = phone_number
     if message.attachments.present?
       send_attachment_message
-    else
-      if message.content.blank?
-        message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
-        raise MessageContentTypeNotSupported
-      end
+    elsif message.content.present?
       send_text_message
+    else
+      message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
+      raise MessageContentTypeNotSupported
     end
   end
 
@@ -90,7 +88,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
     @message.update!(status: 'failed')
-    raise MessageSendFailed
   end
 
   def message_content
@@ -116,10 +113,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     content
   end
 
-  def send_interactive_text_message
-    raise NotImplementedError, 'Interactive text message sending is not implemented for Baileys provider'
-  end
-
   def send_text_message
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
@@ -134,7 +127,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
     @message.update!(status: 'failed')
-    raise MessageSendFailed
   end
 
   def process_response(response)
