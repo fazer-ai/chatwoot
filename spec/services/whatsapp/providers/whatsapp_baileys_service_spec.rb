@@ -92,12 +92,14 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
   describe '#send_message' do
     context 'when message has attachment' do
+      let(:base64_image) { 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }
+
       before do
         message.attachments.new(
           account_id: message.account_id,
           file_type: 'image',
           file: {
-            io: StringIO.new(Base64.decode64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')),
+            io: StringIO.new(Base64.decode64(base64_image)),
             filename: 'image.png'
           }
         )
@@ -109,9 +111,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           .with(
             headers: stub_headers(whatsapp_channel),
             body: {
-              type: 'text',
               recipient: test_send_phone_number,
-              messageContent: { 'text': message.content }
+              messageContent: { fileName: 'image.png', caption: message.content, image: base64_image }
             }.to_json
           )
           .to_return(
@@ -139,15 +140,15 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
         end
       end
+    end
 
-      context 'when message type is not supported' do
-        it 'updates the message status to failed and raises an error' do
-          message.update!(content_type: 'sticker', content: nil)
+    context 'when message does not have content nor attachments' do
+      it 'updates the message status to failed' do
+        message.update!(content: nil)
 
-          expect do
-            service.send_message(test_send_phone_number, message)
-          end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
-        end
+        service.send_message(test_send_phone_number, message)
+
+        expect(message.status).to eq('failed')
       end
     end
 
@@ -228,7 +229,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message",
             headers: stub_headers(whatsapp_channel),
             body: {
-              type: 'text',
               recipient: test_send_phone_number,
               messageContent: { text: message.content }
             }.to_json
