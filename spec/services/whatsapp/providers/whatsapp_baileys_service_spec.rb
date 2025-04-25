@@ -176,6 +176,27 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(service.validate_provider_config?).to be false
         expect(Rails.logger).to have_received(:error)
       end
+
+      context 'when provider responds with 5XX' do
+        it 'updated provider connection to close' do
+          whatsapp_channel.update!(provider_connection: { 'connection' => 'open' })
+          allow(HTTParty).to receive(:post).with(
+            "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message",
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              type: 'text',
+              recipient: test_send_phone_number,
+              messageContent: { text: message.content }
+            }.to_json
+          ).and_raise(HTTParty::ResponseError.new(OpenStruct.new(status_code: 500)))
+
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(HTTParty::ResponseError)
+
+          expect(whatsapp_channel.provider_connection['connection']).to eq('close')
+        end
+      end
     end
   end
 
