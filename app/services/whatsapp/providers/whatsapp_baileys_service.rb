@@ -79,7 +79,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        type: @attachment.file_type == 'file' ? 'document' : @attachment.file_type,
         recipient: @phone_number,
         messageContent: message_content
       }.to_json
@@ -118,7 +117,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        type: 'text',
         recipient: @phone_number,
         messageContent: { text: @message.content }
       }.to_json
