@@ -92,6 +92,8 @@ RSpec.describe Channel::Whatsapp do
           expect(channel).not_to receive(:disconnect_channel_provider)
 
           channel.destroy!
+
+          expect(channel).to be_destroyed
         end
       end
     end
