@@ -106,6 +106,14 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
       it 'sends the attachment message' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              type: 'text',
+              recipient: test_send_phone_number,
+              messageContent: { 'text': message.content }
+            }.to_json
+          )
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
@@ -117,17 +125,29 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(result).to eq('msg_123')
       end
 
-      it 'raises MessageNotSentError' do
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
-          .to_return(
-            status: 400,
-            headers: { 'Content-Type' => 'application/json' },
-            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
-          )
+      context 'when request is unsuccessful' do
+        it 'raises MessageNotSentError' do
+          stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+            .to_return(
+              status: 400,
+              headers: { 'Content-Type' => 'application/json' },
+              body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
+            )
 
-        expect do
-          service.send_message(test_send_phone_number, message)
-        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
+        end
+      end
+
+      context 'when message type is not supported' do
+        it 'updates the message status to failed and raises an error' do
+          message.update!(content_type: 'sticker', content: nil)
+
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
+        end
       end
     end
 
