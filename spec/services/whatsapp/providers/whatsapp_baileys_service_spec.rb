@@ -91,16 +91,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#send_message' do
-    context 'when message status is not sent' do
-      it 'does not send the message' do
-        message.update!(status: 'failed')
-
-        result = service.send_message(test_send_phone_number, message)
-
-        expect(result).to be_nil
-      end
-    end
-
     context 'when message has attachment' do
       before do
         message.attachments.new(
@@ -127,7 +117,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(result).to eq('msg_123')
       end
 
-      it 'changes the message status to failed' do
+      it 'raises MessageNotSentError' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
           .to_return(
             status: 400,
@@ -135,9 +125,9 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
           )
 
-        service.send_message(test_send_phone_number, message)
-
-        expect(message.status).to eq('failed')
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
       end
     end
 
@@ -155,7 +145,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(result).to eq('msg_123')
       end
 
-      it 'changes the message status to failed' do
+      it 'raises MessageNotSentError' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
           .to_return(
             status: 400,
@@ -163,9 +153,9 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
           )
 
-        service.send_message(test_send_phone_number, message)
-
-        expect(message.status).to eq('failed')
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
       end
     end
 
@@ -173,9 +163,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       it 'does not send the message' do
         message.update!(content: nil)
 
-        expect do
-          service.send_message(test_send_phone_number, message)
-        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageContentTypeNotSupported)
+        service.send_message(test_send_phone_number, message)
 
         expect(message.status).to eq('failed')
         expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))

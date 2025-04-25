@@ -1,5 +1,6 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService
   class MessageContentTypeNotSupported < StandardError; end
+  class MessageNotSentError < StandardError; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
@@ -29,8 +30,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message(phone_number, message)
-    return unless message.status == 'sent'
-
     @message = message
     @phone_number = phone_number
     if message.attachments.present?
@@ -39,7 +38,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       send_text_message
     else
       message.update!(content: I18n.t('errors.messages.send.unsupported'), status: 'failed')
-      raise MessageContentTypeNotSupported
     end
   end
 
@@ -86,7 +84,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
-    @message.update!(status: 'failed')
+    raise MessageNotSentError
   end
 
   def message_content
@@ -124,7 +122,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
-    @message.update!(status: 'failed')
+    raise MessageNotSentError
   end
 
   def process_response(response)
