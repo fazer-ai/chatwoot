@@ -164,7 +164,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'create an alert of unsupported message' do
+        it 'creates an alert of unsupported message' do
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
@@ -212,8 +212,8 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is text' do
-        let(:number) { '5511912345678' }
-        let(:jid) { "#{number}@s.whatsapp.net" }
+        let(:phone_number) { '5511912345678' }
+        let(:jid) { "#{phone_number}@s.whatsapp.net" }
         let(:content_message) { 'Hello from Baileys' }
         let(:raw_message) do
           {
@@ -242,7 +242,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message).to be_present
             expect(message.content).to eq(content_message)
             expect(message.sender).to be_present
-            expect(message.sender.name).to eq(number)
+            expect(message.sender.name).to eq(phone_number)
             expect(message.message_type).to eq('incoming')
           end
 
@@ -258,13 +258,13 @@ describe Whatsapp::IncomingMessageBaileysService do
 
             expect(message).to be_present
             expect(message.content).to eq(content_message)
-            expect(conversation.contact.name).to eq(number)
+            expect(conversation.contact.name).to eq(phone_number)
             expect(message.message_type).to eq('outgoing')
           end
 
-          it 'updates the contact name when name is the number and message has a pushName' do
+          it 'updates the contact name when name is the phone number and message has a pushName' do
             raw_message[:pushName] = 'John Doe'
-            create(:contact, account: inbox.account, name: number)
+            create(:contact, account: inbox.account, name: phone_number)
 
             described_class.new(inbox: inbox, params: params).perform
 
@@ -272,9 +272,9 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(conversation.contact.name).to eq('John Doe')
           end
 
-          it 'updates the contact name when name is the number and message has a verifiedBizName' do
+          it 'updates the contact name when name is the phone number and message has a verifiedBizName' do
             raw_message[:verifiedBizName] = 'Verified John'
-            create(:contact, account: inbox.account, name: number)
+            create(:contact, account: inbox.account, name: phone_number)
 
             described_class.new(inbox: inbox, params: params).perform
 
