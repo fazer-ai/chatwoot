@@ -218,6 +218,7 @@ describe Whatsapp::IncomingMessageBaileysService do
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: jid, fromMe: false },
+            pushName: 'John Doe',
             message: { conversation: content_message }
           }
         end
@@ -242,7 +243,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message).to be_present
             expect(message.content).to eq(content_message)
             expect(message.sender).to be_present
-            expect(message.sender.name).to eq(phone_number)
+            expect(message.sender.name).to eq('John Doe')
             expect(message.message_type).to eq('incoming')
           end
 
@@ -262,8 +263,24 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.message_type).to eq('outgoing')
           end
 
+          it 'creates an outgoing self message' do
+            self_jid = "#{whatsapp_channel.phone_number.delete('+')}@s.whatsapp.net"
+            raw_message_outgoing = raw_message.merge(key: { id: 'msg_123', remoteJid: self_jid, fromMe: true })
+            params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+            create(:account_user, account: inbox.account)
+
+            described_class.new(inbox: inbox, params: params_outgoing).perform
+
+            conversation = inbox.conversations.last
+            message = conversation.messages.last
+
+            expect(message).to be_present
+            expect(message.content).to eq(content_message)
+            expect(conversation.contact.name).to eq('John Doe')
+            expect(message.message_type).to eq('outgoing')
+          end
+
           it 'updates the contact name when name is the phone number and message has a pushName' do
-            raw_message[:pushName] = 'John Doe'
             create(:contact, account: inbox.account, name: phone_number)
 
             described_class.new(inbox: inbox, params: params).perform
@@ -282,15 +299,15 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(conversation.contact.name).to eq('Verified John')
           end
 
-          it 'updates the contact name when name is the pushName and message has a verifiedBizName' do
-            raw_message[:pushName] = 'John Doe'
-            raw_message[:verifiedBizName] = 'Verified John'
-            create(:contact, account: inbox.account, name: 'John Doe')
+          it 'creates contact with phone number as name on outgoing message' do
+            raw_message_outgoing = raw_message.merge(key: { id: 'msg_123', remoteJid: jid, fromMe: true })
+            params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+            create(:account_user, account: inbox.account)
 
-            described_class.new(inbox: inbox, params: params).perform
+            described_class.new(inbox: inbox, params: params_outgoing).perform
 
             conversation = inbox.conversations.last
-            expect(conversation.contact.name).to eq('Verified John')
+            expect(conversation.contact.name).to eq(phone_number)
           end
 
           it 'creates a message on an existing conversation' do
