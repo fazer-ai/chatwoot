@@ -149,7 +149,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           service.send_message(test_send_phone_number, message)
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageContentTypeNotSupported)
 
-        message.reload
         expect(message.status).to eq('failed')
         expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))
       end
