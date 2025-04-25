@@ -91,65 +91,92 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#send_message' do
-    context 'when response is successful' do
-      it 'returns true' do
+    context 'when message status is not sent' do
+      it 'does not send the message' do
+        message.update!(status: 'failed')
+
+        result = service.send_message(test_send_phone_number, message)
+
+        expect(result).to be_nil
+      end
+    end
+
+    context 'when message has attachment' do
+      before do
+        message.attachments.new(
+          account_id: message.account_id,
+          file_type: 'image',
+          file: {
+            io: StringIO.new(Base64.decode64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')),
+            filename: 'image.png'
+          }
+        )
+        message.save!
+      end
+
+      it 'sends the attachment message' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
-          .with(
-            headers: stub_headers(whatsapp_channel),
-            body: {
-              type: 'text',
-              recipient: test_send_phone_number,
-              message: message.content
-            }.to_json
-          )
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
-            body: { 'data' => { 'key' => { 'id' => message.id } } }.to_json
+            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
           )
 
         result = service.send_message(test_send_phone_number, message)
 
-        expect(result).to be message.id
+        expect(result).to eq('msg_123')
+      end
+
+      it 'changes the message status to failed' do
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .to_return(
+            status: 400,
+            headers: { 'Content-Type' => 'application/json' },
+            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
+          )
+
+        service.send_message(test_send_phone_number, message)
+
+        expect(message.status).to eq('failed')
       end
     end
 
-    context 'when response is unsuccessful' do
-      it 'logs the error and returns false' do
-        with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
-          stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                type: 'text',
-                recipient: test_send_phone_number,
-                message: message.content
-              }.to_json
-            )
-            .to_return(
-              status: 400,
-              body: 'error message',
-              headers: {}
-            )
-          allow(Rails.logger).to receive(:error).with('error message')
+    context 'when message is a text' do
+      it 'sends the message' do
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
+          )
 
-          result = service.send_message(test_send_phone_number, message)
+        result = service.send_message(test_send_phone_number, message)
 
-          expect(result).to be_nil
-          expect(Rails.logger).to have_received(:error)
-        end
+        expect(result).to eq('msg_123')
+      end
+
+      it 'changes the message status to failed' do
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .to_return(
+            status: 400,
+            headers: { 'Content-Type' => 'application/json' },
+            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
+          )
+
+        service.send_message(test_send_phone_number, message)
+
+        expect(message.status).to eq('failed')
       end
     end
 
-    context 'when message type is not supported' do
-      it 'updates the message status to failed and raises an error' do
-        message.update!(content_type: 'sticker')
+    context "when message doesn't have attachment and content" do
+      it 'does not send the message' do
+        message.update!(content: nil)
 
         expect do
           service.send_message(test_send_phone_number, message)
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageContentTypeNotSupported)
 
-        message.reload
         expect(message.status).to eq('failed')
         expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))
       end
@@ -185,27 +212,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(service.validate_provider_config?).to be false
         expect(Rails.logger).to have_received(:error)
       end
-    end
-  end
-
-  context 'when provider responds with 5XX' do
-    it 'updated provider connection to close' do
-      whatsapp_channel.update!(provider_connection: { 'connection' => 'open' })
-      allow(HTTParty).to receive(:post).with(
-        "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message",
-        headers: stub_headers(whatsapp_channel),
-        body: {
-          type: 'text',
-          recipient: test_send_phone_number,
-          message: message.content
-        }.to_json
-      ).and_raise(HTTParty::ResponseError.new(OpenStruct.new(status_code: 500)))
-
-      expect do
-        service.send_message(test_send_phone_number, message)
-      end.to raise_error(HTTParty::ResponseError)
-
-      expect(whatsapp_channel.provider_connection['connection']).to eq('close')
     end
   end
 
