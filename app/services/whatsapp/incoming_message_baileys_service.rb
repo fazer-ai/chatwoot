@@ -86,10 +86,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def contact_name
     # NOTE: `verifiedBizName` is only available for business accounts and has a higher priority than `pushName`.
     return @raw_message[:verifiedBizName].to_s if @raw_message[:verifiedBizName].present?
-
     return @raw_message[:pushName].to_s if @raw_message[:pushName].present?
 
-    # NOTE: If the message don't have a 'verifiedBizName' or 'pushName', we use the phone number as the name.
     phone_number_from_jid
   end
 
@@ -101,7 +99,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       create_message
       attach_media
     else
-      create_unsuported_message
+      create_unsupported_message
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
   end
@@ -167,7 +165,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     )
   end
 
-  def create_unsuported_message
+  def create_unsupported_message
     create_message
     @message.update!(
       content: I18n.t('errors.messages.unsupported'),
@@ -204,7 +202,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def file_content_type
     return :image if %w[image sticker].include?(message_type)
     return :audio if ['audio'].include?(message_type)
-    return :video if ['video'].include?(message_type)
+    return :video if %w[video video_note].include?(message_type)
 
     :file
   end
