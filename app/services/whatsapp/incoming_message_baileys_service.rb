@@ -85,7 +85,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def contact_name
     # NOTE: `verifiedBizName` is only available for business accounts and has a higher priority than `pushName`.
-    name = @raw_message[:verifiedBizName] || @raw_message[:pushName]
+    name = @raw_message[:verifiedBizName].presence || @raw_message[:pushName]
     return name if self_message? || incoming?
 
     phone_number_from_jid
