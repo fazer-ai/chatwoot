@@ -183,9 +183,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def file_content_type
-    return :image if %w[image sticker].include?(message_type)
-    return :audio if ['audio'].include?(message_type)
-    return :video if ['video'].include?(message_type)
+    return :image if message_type.in?(%w[image sticker])
+    return :audio if message_type == 'audio'
+    return :video if message_type == 'video'
 
     :file
   end
@@ -194,7 +194,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     filename = @raw_message.dig(:message, :documentMessage, :fileName)
     return filename if filename.present?
 
-    "#{file_content_type}_#{@message[:id]}#{Time.current.strftime('%Y%m%d%H%M%S%s')}"
+    "#{file_content_type}_#{@message[:id]}_#{Time.current.strftime('%Y%m%d')}"
   end
 
   def message_content
