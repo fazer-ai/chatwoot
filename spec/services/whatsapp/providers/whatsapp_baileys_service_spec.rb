@@ -92,12 +92,14 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
   describe '#send_message' do
     context 'when message has attachment' do
+      let(:base64_image) { 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }
+
       before do
         message.attachments.new(
           account_id: message.account_id,
           file_type: 'image',
           file: {
-            io: StringIO.new(Base64.decode64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')),
+            io: StringIO.new(Base64.decode64(base64_image)),
             filename: 'image.png'
           }
         )
@@ -106,6 +108,13 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
       it 'sends the attachment message' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              recipient: test_send_phone_number,
+              messageContent: { fileName: 'image.png', caption: message.content, image: base64_image }
+            }.to_json
+          )
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
@@ -117,17 +126,29 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(result).to eq('msg_123')
       end
 
-      it 'raises MessageNotSentError' do
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
-          .to_return(
-            status: 400,
-            headers: { 'Content-Type' => 'application/json' },
-            body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
-          )
+      context 'when request is unsuccessful' do
+        it 'raises MessageNotSentError' do
+          stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+            .to_return(
+              status: 400,
+              headers: { 'Content-Type' => 'application/json' },
+              body: { 'data' => { 'key' => { 'id' => 'msg_123' } } }.to_json
+            )
 
-        expect do
-          service.send_message(test_send_phone_number, message)
-        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageNotSentError)
+        end
+      end
+    end
+
+    context 'when message does not have content nor attachments' do
+      it 'updates the message status to failed' do
+        message.update!(content: nil)
+
+        service.send_message(test_send_phone_number, message)
+
+        expect(message.status).to eq('failed')
       end
     end
 
@@ -199,6 +220,26 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         expect(service.validate_provider_config?).to be false
         expect(Rails.logger).to have_received(:error)
+      end
+
+      context 'when provider responds with 5XX' do
+        it 'updated provider connection to close' do
+          whatsapp_channel.update!(provider_connection: { 'connection' => 'open' })
+          allow(HTTParty).to receive(:post).with(
+            "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message",
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              recipient: test_send_phone_number,
+              messageContent: { text: message.content }
+            }.to_json
+          ).and_raise(HTTParty::ResponseError.new(OpenStruct.new(status_code: 500)))
+
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(HTTParty::ResponseError)
+
+          expect(whatsapp_channel.provider_connection['connection']).to eq('close')
+        end
       end
     end
   end
