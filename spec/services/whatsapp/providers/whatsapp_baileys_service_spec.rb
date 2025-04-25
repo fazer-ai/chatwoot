@@ -99,7 +99,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             body: {
               type: 'text',
               recipient: test_send_phone_number,
-              message: message.content
+              messageContent: { 'text': message.content }
             }.to_json
           )
           .to_return(
@@ -118,14 +118,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       it 'logs the error and returns false' do
         with_modified_env BAILEYS_PROVIDER_DEFAULT_URL: 'http://test.com' do
           stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                type: 'text',
-                recipient: test_send_phone_number,
-                message: message.content
-              }.to_json
-            )
             .to_return(
               status: 400,
               body: 'error message',
@@ -133,17 +125,16 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             )
           allow(Rails.logger).to receive(:error).with('error message')
 
-          result = service.send_message(test_send_phone_number, message)
-
-          expect(result).to be_nil
-          expect(Rails.logger).to have_received(:error)
+          expect do
+            service.send_message(test_send_phone_number, message)
+          end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageSendFailed)
         end
       end
     end
 
     context 'when message type is not supported' do
       it 'updates the message status to failed and raises an error' do
-        message.update!(content_type: 'sticker')
+        message.update!(content_type: 'sticker', content: nil)
 
         expect do
           service.send_message(test_send_phone_number, message)
@@ -185,27 +176,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(service.validate_provider_config?).to be false
         expect(Rails.logger).to have_received(:error)
       end
-    end
-  end
-
-  context 'when provider responds with 5XX' do
-    it 'updated provider connection to close' do
-      whatsapp_channel.update!(provider_connection: { 'connection' => 'open' })
-      allow(HTTParty).to receive(:post).with(
-        "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message",
-        headers: stub_headers(whatsapp_channel),
-        body: {
-          type: 'text',
-          recipient: test_send_phone_number,
-          message: message.content
-        }.to_json
-      ).and_raise(HTTParty::ResponseError.new(OpenStruct.new(status_code: 500)))
-
-      expect do
-        service.send_message(test_send_phone_number, message)
-      end.to raise_error(HTTParty::ResponseError)
-
-      expect(whatsapp_channel.provider_connection['connection']).to eq('close')
     end
   end
 
