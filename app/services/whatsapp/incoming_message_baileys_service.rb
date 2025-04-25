@@ -74,13 +74,13 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    @contact.update!(name: push_name) if @contact.name != push_name
+    @contact.update!(name: push_name) if @contact.name == phone_number_from_jid
   end
 
   def phone_number_from_jid
     # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
     # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
-    @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
+    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
   end
 
   def contact_name
