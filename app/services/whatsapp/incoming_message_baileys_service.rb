@@ -1,6 +1,7 @@
 class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   class InvalidWebhookVerifyToken < StandardError; end
   class MessageNotFoundError < StandardError; end
+  class AttachmentNotFoundError < StandardError; end
 
   def perform
     raise InvalidWebhookVerifyToken if processed_params[:webhookVerifyToken] != inbox.channel.provider_config['webhook_verify_token']
@@ -160,7 +161,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     return if media.blank?
 
     attachment_payload = media[message_id]
-    return if attachment_payload.blank?
+    if attachment_payload.blank?
+      Rails.logger.error "Attachment not found for message: #{message_id}"
+      raise AttachmentNotFoundError
+    end
 
     begin
       decoded_data = Base64.decode64(attachment_payload)
@@ -169,10 +173,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       @message.attachments.new(
         account_id: @message.account_id,
         file_type: file_content_type.to_s,
-        file: {
-          io: io,
-          filename: filename
-        }
+        file: { io: io, filename: filename }
       )
 
       @message.save!
