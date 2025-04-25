@@ -374,7 +374,6 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is image' do
-        let(:mimetype) { 'image/png' }
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
@@ -407,10 +406,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.content).to eq('Hello from Baileys')
         end
 
-        it 'attaches the media with expected behavior' do
-          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
-
-          allow(Time).to receive(:current).and_return(fixed_time)
+        it 'creates message attachment' do
+          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -418,19 +415,16 @@ describe Whatsapp::IncomingMessageBaileysService do
           message = conversation.messages.last
           attachment = message.attachments.last
 
-          filename = "image_#{message.id}#{fixed_time.strftime('%Y%m%d%H%M%S%s')}"
-
           expect(attachment).to be_present
           expect(attachment.file).to be_present
           expect(attachment.file_type).to eq('image')
 
-          expect(attachment.file.filename.to_s).to eq(filename)
-          expect(attachment.file.content_type).to eq(mimetype)
+          expect(attachment.file.filename.to_s).to eq("image_#{message.id}_#{Time.current.strftime('%Y%m%d')}")
+          expect(attachment.file.content_type).to eq('image/png')
         end
       end
 
       context 'when message type is video' do
-        let(:mimetype) { 'video/mp4' }
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
@@ -463,10 +457,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.content).to eq('Hello from Baileys')
         end
 
-        it 'attaches the media with expected behavior' do
-          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
-
-          allow(Time).to receive(:current).and_return(fixed_time)
+        it 'creates message attachment' do
+          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -474,20 +466,17 @@ describe Whatsapp::IncomingMessageBaileysService do
           message = conversation.messages.last
           attachment = message.attachments.last
 
-          filename = "video_#{message.id}#{fixed_time.strftime('%Y%m%d%H%M%S%s')}"
-
           expect(attachment).to be_present
           expect(attachment.file).to be_present
           expect(attachment.file_type).to eq('video')
 
-          expect(attachment.file.filename.to_s).to eq(filename)
-          expect(attachment.file.content_type).to eq(mimetype)
+          expect(attachment.file.filename.to_s).to eq("video_#{message.id}_#{Time.current.strftime('%Y%m%d')}")
+          expect(attachment.file.content_type).to eq('video/mp4')
         end
       end
 
       context 'when message type is file' do
         let(:filename) { 'file.pdf' }
-        let(:mimetype) { 'application/pdf' }
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
@@ -511,7 +500,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'attaches the media with expected behavior' do
+        it 'creates message attachment' do
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
@@ -523,12 +512,11 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(attachment.file).to be_present
 
           expect(attachment.file.filename.to_s).to eq(filename)
-          expect(attachment.file.content_type).to eq(mimetype)
+          expect(attachment.file.content_type).to eq('application/pdf')
         end
       end
 
       context 'when message type is audio' do
-        let(:mimetype) { 'audio/opus' }
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
@@ -552,10 +540,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'attaches the media with expected behavior' do
-          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
-
-          allow(Time).to receive(:current).and_return(fixed_time)
+        it 'creates message attachment' do
+          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -563,19 +549,16 @@ describe Whatsapp::IncomingMessageBaileysService do
           message = conversation.messages.last
           attachment = message.attachments.last
 
-          filename = "audio_#{message.id}#{fixed_time.strftime('%Y%m%d%H%M%S%s')}"
-
           expect(attachment).to be_present
           expect(attachment.file_type).to eq('audio')
           expect(attachment.file).to be_present
 
-          expect(attachment.file.filename.to_s).to eq(filename)
-          expect(attachment.file.content_type).to eq(mimetype)
+          expect(attachment.file.filename.to_s).to eq("audio_#{message.id}_#{Time.current.strftime('%Y%m%d')}")
+          expect(attachment.file.content_type).to eq('audio/opus')
         end
       end
 
       context 'when message type is sticker' do
-        let(:mimetype) { 'image/png' }
         let(:raw_message) do
           {
             key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
@@ -599,10 +582,8 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'attaches the media with expected behavior' do
-          fixed_time = Time.zone.local(2023, 10, 10, 12, 34, 56)
-
-          allow(Time).to receive(:current).and_return(fixed_time)
+        it 'creates message attachment' do
+          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -610,14 +591,12 @@ describe Whatsapp::IncomingMessageBaileysService do
           message = conversation.messages.last
           attachment = message.attachments.last
 
-          filename = "image_#{message.id}#{fixed_time.strftime('%Y%m%d%H%M%S%s')}"
-
           expect(attachment).to be_present
           expect(attachment.file_type).to eq('image')
           expect(attachment.file).to be_present
 
-          expect(attachment.file.filename.to_s).to eq(filename)
-          expect(attachment.file.content_type).to eq(mimetype)
+          expect(attachment.file.filename.to_s).to eq("image_#{message.id}_#{Time.current.strftime('%Y%m%d')}")
+          expect(attachment.file.content_type).to eq('image/png')
         end
       end
     end
