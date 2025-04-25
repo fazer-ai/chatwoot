@@ -65,12 +65,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def set_contact
-    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
-    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
-    phone_number_from_jid = @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
-    # NOTE: We're assuming `pushName` will always be present when `fromMe: false`.
-    # This assumption might be incorrect, so let's keep an eye out for contacts being created with empty name.
-    push_name = @raw_message[:key][:fromMe] ? phone_number_from_jid : @raw_message[:pushName].to_s
+    push_name = contact_name
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: phone_number_from_jid,
       inbox: inbox,
@@ -80,7 +75,25 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    @contact.update!(name: push_name) if @contact.name == phone_number_from_jid && !@raw_message[:key][:fromMe]
+    @contact.update!(name: push_name) if @contact.name == phone_number_from_jid
+  end
+
+  def phone_number_from_jid
+    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
+    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
+  end
+
+  def contact_name
+    # NOTE: `verifiedBizName` is only available for business accounts and has a higher priority than `pushName`.
+    name = @raw_message[:verifiedBizName].presence || @raw_message[:pushName]
+    return name if self_message? || incoming?
+
+    phone_number_from_jid
+  end
+
+  def self_message?
+    phone_number_from_jid == inbox.channel.phone_number.delete('+')
   end
 
   def handle_create_message
@@ -91,6 +104,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       create_message
       attach_media
     else
+      create_unsupported_message
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
   end
@@ -139,10 +153,9 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def create_message
-    is_outgoing = @raw_message[:key][:fromMe]
-    sender = is_outgoing ? @inbox.account.account_users.first.user : @contact
-    sender_type = is_outgoing ? 'User' : 'Contact'
-    message_type = is_outgoing ? :outgoing : :incoming
+    sender = incoming? ? @contact : @inbox.account.account_users.first.user
+    sender_type = incoming? ? 'Contact' : 'User'
+    message_type = incoming? ? :incoming : :outgoing
 
     @message = @conversation.messages.create!(
       content: message_content,
@@ -153,6 +166,19 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       sender_type: sender_type,
       message_type: message_type,
       in_reply_to_external_id: nil
+    )
+  end
+
+  def incoming?
+    !@raw_message[:key][:fromMe]
+  end
+
+  def create_unsupported_message
+    create_message
+    @message.update!(
+      content: I18n.t('errors.messages.unsupported'),
+      message_type: 'template',
+      status: 'failed'
     )
   end
 
@@ -184,8 +210,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def file_content_type
     return :image if message_type.in?(%w[image sticker])
+    return :video if message_type.in?(%w[video video_note])
     return :audio if message_type == 'audio'
-    return :video if message_type == 'video'
 
     :file
   end
