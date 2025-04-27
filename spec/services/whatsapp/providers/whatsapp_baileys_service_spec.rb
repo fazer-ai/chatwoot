@@ -92,7 +92,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#send_message' do
-    context 'when message does not have content nor attachments' do
+    context 'when message is unsupported' do
       it 'updates the message with content attribute is_unsupported' do
         message.update!(content: nil)
 
