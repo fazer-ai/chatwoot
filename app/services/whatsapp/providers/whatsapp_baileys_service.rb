@@ -33,7 +33,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     @message = message
     @phone_number = phone_number
 
-    if message.attachments.present?
+    if message.is_reaction?
+      @message_content = {
+        react: { key: { id: message_to_reply.source_id, remoteJid: reply_to_jid, fromMe: true },
+                 text: message.content }
+      }
+    elsif message.attachments.present?
       @message_content = attachment_message_content
     elsif message.content.present?
       @message_content = { text: @message.content }
@@ -72,6 +77,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def api_key
     whatsapp_channel.provider_config['api_key'].presence || DEFAULT_API_KEY
+  end
+
+  def message_to_reply
+    @message_to_reply ||= @message.reply_to
   end
 
   def attachment_message_content
@@ -115,6 +124,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def contact_jid
     @contact_jid ||= "#{@phone_number.delete('+')}@s.whatsapp.net"
+  end
+
+  def reply_to_jid
+    @reply_to_jid ||= "#{message_to_reply.conversation.contact.phone_number.delete('+')}@s.whatsapp.net"
   end
 
   def process_response(response)
