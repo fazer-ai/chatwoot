@@ -38,7 +38,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     elsif message.content.present?
       @message_content = { text: @message.content }
     else
-      message.update!(content_attributes: { 'is_unsupported' => true })
+      message.update!(is_unsupported: true)
       return nil
     end
 
