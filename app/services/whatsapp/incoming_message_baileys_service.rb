@@ -49,7 +49,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def handle_message
     return if jid_type != 'user'
-    return if find_message_by_external_source_id_baileys(message_id) || find_message_by_source_id(message_id) || message_under_process?
+    return if find_message_by_source_id(message_id) || message_under_process?
 
     cache_message_source_id_in_redis
     set_contact
@@ -64,8 +64,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     clear_message_source_id_from_redis
   end
 
-  def find_message_by_external_source_id_baileys(id)
-    @message = Message.find_by("external_source_ids ->> 'baileys' = ?", id)
+  def find_message_by_source_id(source_id)
+    Message.find_by(source_id: source_id) if source_id.present?
   end
 
   def set_contact
@@ -102,14 +102,14 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_create_message
+    create_message
     case message_type
     when 'text', 'reaction'
-      create_message
+      nil
     when 'image', 'file', 'video', 'audio', 'sticker'
-      create_message
       attach_media
     else
-      create_unsupported_message
+      @message.update!(is_unsupported: true)
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
   end
@@ -162,7 +162,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     sender = incoming? ? @contact : @inbox.account.account_users.first.user
     sender_type = incoming? ? 'Contact' : 'User'
     message_type = incoming? ? :incoming : :outgoing
-    reply_to_ids
+    replied_message = find_message_by_source_id(@raw_message.dig(:message, :reactionMessage, :key, :id))
 
     @message = @conversation.messages.create!(
       content: message_content,
@@ -172,35 +172,12 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       sender: sender,
       sender_type: sender_type,
       message_type: message_type,
-      external_source_ids: { 'baileys' => message_id },
-      in_reply_to_id: @in_reply_to_id,
-      in_reply_to_external_id: @in_reply_to_external_id
+      in_reply_to: replied_message&.id
     )
   end
 
   def incoming?
     !@raw_message[:key][:fromMe]
-  end
-
-  def reply_to_ids
-    @in_reply_to_id = nil
-    @in_reply_to_external_id = nil
-
-    reply_to_id = @raw_message.dig(:message, :reactionMessage, :key, :id)
-    return unless reply_to_id
-
-    find_message_by_external_source_id_baileys(reply_to_id)
-    @in_reply_to_id = @message.id
-    @in_reply_to_external_id = @message.external_source_id_whatsapp_baileys
-  end
-
-  def create_unsupported_message
-    create_message
-    @message.update!(
-      content: I18n.t('errors.messages.unsupported'),
-      message_type: 'template',
-      status: 'failed'
-    )
   end
 
   def attach_media
