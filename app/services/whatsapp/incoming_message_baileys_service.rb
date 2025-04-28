@@ -71,7 +71,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def set_contact
     push_name = contact_name
     contact_inbox = ::ContactInboxWithContactBuilder.new(
-      # NOTE: update the source_id to complete jid in future
+      # FIXME: update the source_id to complete jid in future
       source_id: phone_number_from_jid,
       inbox: inbox,
       contact_attributes: { name: push_name, phone_number: "+#{phone_number_from_jid}" }
