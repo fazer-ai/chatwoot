@@ -49,7 +49,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def handle_message
     return if jid_type != 'user'
-    return if find_message_by_source_id(message_id) || message_under_process?
+    return if find_message_by_external_source_id_baileys(message_id) || find_message_by_source_id(message_id) || message_under_process?
 
     cache_message_source_id_in_redis
     set_contact
@@ -64,9 +64,14 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     clear_message_source_id_from_redis
   end
 
+  def find_message_by_external_source_id_baileys(id)
+    @message = Message.find_by("external_source_ids ->> 'baileys' = ?", id)
+  end
+
   def set_contact
     push_name = contact_name
     contact_inbox = ::ContactInboxWithContactBuilder.new(
+      # NOTE: update the source_id to complete jid in future
       source_id: phone_number_from_jid,
       inbox: inbox,
       contact_attributes: { name: push_name, phone_number: "+#{phone_number_from_jid}" }
@@ -98,7 +103,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def handle_create_message
     case message_type
-    when 'text'
+    when 'text', 'reaction'
       create_message
     when 'image', 'file', 'video', 'audio', 'sticker'
       create_message
@@ -148,6 +153,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     return 'poll' if msg.key?(:pollCreationMessageV3)
     return 'event' if msg.key?(:eventMessage)
     return 'sticker' if msg.key?(:stickerMessage)
+    return 'reaction' if msg.key?(:reactionMessage)
 
     'unsupported'
   end
@@ -156,6 +162,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     sender = incoming? ? @contact : @inbox.account.account_users.first.user
     sender_type = incoming? ? 'Contact' : 'User'
     message_type = incoming? ? :incoming : :outgoing
+    reply_to_ids
 
     @message = @conversation.messages.create!(
       content: message_content,
@@ -165,12 +172,26 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       sender: sender,
       sender_type: sender_type,
       message_type: message_type,
-      in_reply_to_external_id: nil
+      external_source_ids: { 'baileys' => message_id },
+      in_reply_to_id: @in_reply_to_id,
+      in_reply_to_external_id: @in_reply_to_external_id
     )
   end
 
   def incoming?
     !@raw_message[:key][:fromMe]
+  end
+
+  def reply_to_ids
+    @in_reply_to_id = nil
+    @in_reply_to_external_id = nil
+
+    reply_to_id = @raw_message.dig(:message, :reactionMessage, :key, :id)
+    return unless reply_to_id
+
+    find_message_by_external_source_id_baileys(reply_to_id)
+    @in_reply_to_id = @message.id
+    @in_reply_to_external_id = @message.external_source_id_whatsapp_baileys
   end
 
   def create_unsupported_message
@@ -231,6 +252,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       @raw_message.dig(:message, :imageMessage, :caption)
     when 'video'
       @raw_message.dig(:message, :videoMessage, :caption)
+    when 'reaction'
+      @raw_message.dig(:message, :reactionMessage, :text)
     end
   end
 
