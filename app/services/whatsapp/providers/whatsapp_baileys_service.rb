@@ -103,7 +103,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        jid: contact_jid,
+        jid: "#{@phone_number.delete('+')}@s.whatsapp.net",
         messageContent: @message_content
       }.to_json
     )
@@ -111,10 +111,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
     raise MessageNotSentError
-  end
-
-  def contact_jid
-    @contact_jid ||= "#{@phone_number.delete('+')}@s.whatsapp.net"
   end
 
   def process_response(response)
