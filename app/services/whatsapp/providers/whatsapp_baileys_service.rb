@@ -33,11 +33,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     @message = message
     @phone_number = phone_number
 
-    if message.is_reaction?
-      @message_content = {
-        react: { key: { id: message_to_reply.source_id, remoteJid: reply_to_jid, fromMe: true },
-                 text: message.content }
-      }
+    if message.is_reaction
+      @message_content = reaction_message_content
     elsif message.attachments.present?
       @message_content = attachment_message_content
     elsif message.content.present?
@@ -79,8 +76,16 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     whatsapp_channel.provider_config['api_key'].presence || DEFAULT_API_KEY
   end
 
-  def message_to_reply
-    @message_to_reply ||= @message.reply_to
+  def reaction_message_content
+    replied_message = Message.find(@message.in_reply_to)
+    remote_jid = "#{replied_message.conversation.contact.phone_number.delete('+')}@s.whatsapp.net"
+
+    {
+      react: { key: { id: replied_message.source_id,
+                      remoteJid: remote_jid,
+                      fromMe: true },
+               text: message.content }
+    }
   end
 
   def attachment_message_content
@@ -108,11 +113,13 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message_request
+    jid = "#{@phone_number.delete('+')}@s.whatsapp.net"
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        jid: contact_jid,
+        jid: jid,
         messageContent: @message_content
       }.to_json
     )
@@ -120,14 +127,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
 
     raise MessageNotSentError
-  end
-
-  def contact_jid
-    @contact_jid ||= "#{@phone_number.delete('+')}@s.whatsapp.net"
-  end
-
-  def reply_to_jid
-    @reply_to_jid ||= "#{message_to_reply.conversation.contact.phone_number.delete('+')}@s.whatsapp.net"
   end
 
   def process_response(response)
