@@ -84,7 +84,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       react: { key: { id: replied_message.source_id,
                       remoteJid: remote_jid,
                       fromMe: true },
-               text: message.content }
+               text: @message.content }
     }
   end
 
