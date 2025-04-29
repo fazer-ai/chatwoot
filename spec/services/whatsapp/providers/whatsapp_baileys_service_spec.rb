@@ -96,9 +96,10 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       it 'updates the message with content attribute is_unsupported' do
         message.update!(content: nil)
 
-        expect(service.send_message(test_send_phone_number, message)).to be_nil
+        service.send_message(test_send_phone_number, message)
 
-        expect(message.content_attributes).to eq({ 'is_unsupported' => true })
+        expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))
+        expect(message.status).to eq('failed')
       end
     end
 
