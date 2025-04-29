@@ -393,19 +393,28 @@ describe Whatsapp::IncomingMessageBaileysService do
             }
           }
         end
-
-        it 'creates the reaction' do
+        let!(:message) do
           contact = create(:contact, account: inbox.account, name: phone_number)
           contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone_number)
           conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
-          message = create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123')
+          create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123')
+        end
 
+        it 'creates the reaction' do
           described_class.new(inbox: inbox, params: params).perform
 
-          reaction = conversation.messages.last
+          reaction = message.conversation.messages.last
           expect(reaction.is_reaction).to be(true)
           expect(reaction.in_reply_to).to eq(message.id)
           expect(reaction.in_reply_to_external_id).to eq(message.source_id)
+        end
+
+        it 'does not create the reaction if content is empty' do
+          raw_message[:message][:reactionMessage][:text] = ''
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.conversation.messages.count).to eq(1)
         end
       end
 
