@@ -379,7 +379,7 @@ describe Whatsapp::IncomingMessageBaileysService do
       context 'when message type is reaction' do
         let(:phone_number) { '5511912345678' }
         let(:jid) { "#{phone_number}@s.whatsapp.net" }
-        let!(:raw_message) do
+        let(:raw_message) do
           {
             key: { id: 'reaction_123', remoteJid: jid, fromMe: false },
             message: { reactionMessage: { key: { remoteJid: jid, fromMe: true, id: 'msg_123' }, text: '👍' } },
@@ -405,9 +405,11 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           described_class.new(inbox: inbox, params: params).perform
 
-          conversation = inbox.conversations.last
           reaction = conversation.messages.last
+
+          expect(reaction.is_reaction).to be true
           expect(reaction.in_reply_to).to eq(message.id)
+          expect(reaction.in_reply_to_external_id).to eq(message.source_id)
         end
       end
 

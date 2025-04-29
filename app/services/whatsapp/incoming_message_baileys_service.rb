@@ -103,6 +103,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       create_message
     when 'reaction'
       create_message if message_content.present?
+      @message.update!(is_reaction: true)
     when 'image', 'file', 'video', 'audio', 'sticker'
       create_message
       attach_media
