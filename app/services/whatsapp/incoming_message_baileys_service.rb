@@ -103,7 +103,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       create_message
     when 'reaction'
       create_message if message_content.present?
-      @message.update!(is_reaction: true)
     when 'image', 'file', 'video', 'audio', 'sticker'
       create_message
       attach_media
@@ -161,7 +160,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     sender = incoming? ? @contact : @inbox.account.account_users.first.user
     sender_type = incoming? ? 'Contact' : 'User'
     message_type = incoming? ? :incoming : :outgoing
-    in_reply_to_external_id = @raw_message.dig(:message, :reactionMessage, :key, :id)
 
     @message = @conversation.messages.create!(
       content: message_content,
@@ -171,8 +169,17 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       sender: sender,
       sender_type: sender_type,
       message_type: message_type,
-      in_reply_to_external_id: in_reply_to_external_id
+      content_attributes: message_content_attributes
     )
+  end
+
+  def message_content_attributes
+    return unless message_type == 'reaction'
+
+    {
+      in_reply_to_external_id: @raw_message.dig(:message, :reactionMessage, :key, :id),
+      is_reaction: true
+    }
   end
 
   def incoming?
