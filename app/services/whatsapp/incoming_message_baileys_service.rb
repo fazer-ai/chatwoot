@@ -64,6 +64,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     clear_message_source_id_from_redis
   end
 
+  # NOTE: Overwritten this method to return the message object, rather than assigning it directly to @message
   def find_message_by_source_id(source_id)
     Message.find_by(source_id: source_id) if source_id.present?
   end
