@@ -113,13 +113,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message_request
-    jid = "#{@phone_number.delete('+')}@s.whatsapp.net"
-
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        jid: jid,
+        jid: "#{@phone_number.delete('+')}@s.whatsapp.net",
         messageContent: @message_content
       }.to_json
     )
