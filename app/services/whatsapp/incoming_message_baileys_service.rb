@@ -64,11 +64,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     clear_message_source_id_from_redis
   end
 
-  # NOTE: Overwritten this method to return the message object, rather than assigning it directly to @message
-  def find_message_by_source_id(source_id)
-    Message.find_by(source_id: source_id) if source_id.present?
-  end
-
   def set_contact
     push_name = contact_name
     contact_inbox = ::ContactInboxWithContactBuilder.new(
@@ -264,15 +259,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_update
-    raise MessageNotFoundError unless valid_update_message?
+    raise MessageNotFoundError unless find_message_by_source_id(message_id)
 
     update_status if @raw_message.dig(:update, :status).present?
     update_message_content if @raw_message.dig(:update, :message).present?
-  end
-
-  def valid_update_message?
-    @message = find_message_by_source_id(message_id)
-    @message.present?
   end
 
   def update_status
