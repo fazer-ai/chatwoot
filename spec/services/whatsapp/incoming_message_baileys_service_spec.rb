@@ -164,16 +164,14 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         end
 
-        it 'creates an alert of unsupported message' do
+        it 'creates an unsupported message' do
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
           message = conversation.messages.last
 
           expect(message).to be_present
-          expect(message.content).to eq(I18n.t('errors.messages.unsupported'))
-          expect(message.message_type).to eq('template')
-          expect(message.status).to eq('failed')
+          expect(message.is_unsupported).to be true
         end
 
         it 'logs a warning message' do
@@ -245,6 +243,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.sender).to be_present
             expect(message.sender.name).to eq('John Doe')
             expect(message.message_type).to eq('incoming')
+            expect(message.in_reply_to).to be_nil
           end
 
           it 'creates an outgoing message' do
@@ -261,6 +260,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.content).to eq(content_message)
             expect(conversation.contact.name).to eq(phone_number)
             expect(message.message_type).to eq('outgoing')
+            expect(message.in_reply_to).to be_nil
           end
 
           it 'creates an outgoing self message' do
@@ -278,6 +278,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.content).to eq(content_message)
             expect(conversation.contact.name).to eq('John Doe')
             expect(message.message_type).to eq('outgoing')
+            expect(message.in_reply_to).to be_nil
           end
 
           it 'updates the contact name when name is the phone number and message has a pushName' do
