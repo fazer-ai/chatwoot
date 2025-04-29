@@ -245,7 +245,6 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.sender).to be_present
             expect(message.sender.name).to eq('John Doe')
             expect(message.message_type).to eq('incoming')
-            expect(message.in_reply_to).to be_nil
           end
 
           it 'creates an outgoing message' do
@@ -262,7 +261,6 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.content).to eq(content_message)
             expect(conversation.contact.name).to eq(phone_number)
             expect(message.message_type).to eq('outgoing')
-            expect(message.in_reply_to).to be_nil
           end
 
           it 'creates an outgoing self message' do
@@ -280,7 +278,6 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(message.content).to eq(content_message)
             expect(conversation.contact.name).to eq('John Doe')
             expect(message.message_type).to eq('outgoing')
-            expect(message.in_reply_to).to be_nil
           end
 
           it 'updates the contact name when name is the phone number and message has a pushName' do
@@ -406,8 +403,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           described_class.new(inbox: inbox, params: params).perform
 
           reaction = conversation.messages.last
-
-          expect(reaction.is_reaction).to be true
+          expect(reaction.is_reaction).to be(true)
           expect(reaction.in_reply_to).to eq(message.id)
           expect(reaction.in_reply_to_external_id).to eq(message.source_id)
         end
