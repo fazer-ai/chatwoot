@@ -375,11 +375,12 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is reaction' do
+        let(:phone_number) { '5511912345678' }
+        let(:jid) { "#{phone_number}@s.whatsapp.net" }
         let!(:raw_message) do
           {
-            key: { id: 'reaction_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-            message: { reactionMessage: { key: { remoteJid: '5511987654321@s.whatsapp.net', fromMe: true, id: 'msg_123' },
-                                          text: '👍' } },
+            key: { id: 'reaction_123', remoteJid: jid, fromMe: false },
+            message: { reactionMessage: { key: { remoteJid: jid, fromMe: true, id: 'msg_123' }, text: '👍' } },
             pushName: 'John Doe'
           }
         end
@@ -395,15 +396,16 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'creates the reaction' do
-          message = create(:message, inbox: inbox, source_id: 'msg_123')
+          contact = create(:contact, account: inbox.account, name: phone_number)
+          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone_number)
+          conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+          message = create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123')
 
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
           reaction = conversation.messages.last
-          expect(message.id).to eq(reaction.content_attributes)
-          expect(message.source_id).to eq('msg_123')
-          expect(reaction.in_reply_to_id).to eq(message)
+          expect(reaction.in_reply_to).to eq(message.id)
         end
       end
 

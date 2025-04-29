@@ -158,7 +158,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     sender = incoming? ? @contact : @inbox.account.account_users.first.user
     sender_type = incoming? ? 'Contact' : 'User'
     message_type = incoming? ? :incoming : :outgoing
-    replied_message = find_message_by_source_id(@raw_message.dig(:message, :reactionMessage, :key, :id))
+    in_reply_to_external_id = @raw_message.dig(:message, :reactionMessage, :key, :id)
 
     @message = @conversation.messages.create!(
       content: message_content,
@@ -168,7 +168,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       sender: sender,
       sender_type: sender_type,
       message_type: message_type,
-      in_reply_to: replied_message&.id
+      in_reply_to_external_id: in_reply_to_external_id
     )
   end
 
