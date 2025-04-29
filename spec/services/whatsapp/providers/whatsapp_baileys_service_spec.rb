@@ -92,16 +92,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#send_message' do
-    context 'when message is unsupported' do
-      it 'updates the message with content attribute is_unsupported' do
-        message.update!(content: nil)
-
-        expect(service.send_message(test_send_phone_number, message)).to be_nil
-
-        expect(message.content_attributes).to eq({ 'is_unsupported' => true })
-      end
-    end
-
     context 'when message is a reaction' do
       let(:inbox) { whatsapp_channel.inbox }
       let(:contact) { create(:contact, account: inbox.account, name: 'John Doe', phone_number: "+#{test_send_phone_number}") }
@@ -134,6 +124,15 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         result = service.send_message(test_send_phone_number, reaction)
 
         expect(result).to eq('reaction_123')
+
+    context 'when message does not have content nor attachments' do
+      it 'updates the message with content attribute is_unsupported' do
+        message.update!(content: nil)
+
+        service.send_message(test_send_phone_number, message)
+
+        expect(message.content).to eq(I18n.t('errors.messages.send.unsupported'))
+        expect(message.status).to eq('failed')
       end
     end
 
