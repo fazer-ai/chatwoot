@@ -374,6 +374,39 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message type is reaction' do
+        let!(:raw_message) do
+          {
+            key: { id: 'reaction_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+            message: { reactionMessage: { key: { remoteJid: '5511987654321@s.whatsapp.net', fromMe: true, id: 'msg_123' },
+                                          text: '👍' } },
+            pushName: 'John Doe'
+          }
+        end
+        let(:params) do
+          {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: {
+              type: 'notify',
+              messages: [raw_message]
+            }
+          }
+        end
+
+        it 'creates the reaction' do
+          message = create(:message, inbox: inbox, source_id: 'msg_123')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          reaction = conversation.messages.last
+          expect(message.id).to eq(reaction.content_attributes)
+          expect(message.source_id).to eq('msg_123')
+          expect(reaction.in_reply_to_id).to eq(message)
+        end
+      end
+
       context 'when message type is image' do
         let(:raw_message) do
           {

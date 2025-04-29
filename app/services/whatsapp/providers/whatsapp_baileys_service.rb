@@ -33,7 +33,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     @message = message
     @phone_number = phone_number
 
-    if message.is_reaction
+    if message.content_attributes[:is_reaction]
       @message_content = reaction_message_content
     elsif message.attachments.present?
       @message_content = attachment_message_content

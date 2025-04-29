@@ -102,6 +102,39 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    context 'when message is a reaction' do
+      let(:message) { create(:message, source_id: 'msg_123') }
+      let(:reaction) { create(:message, content: '👍', content_attributes: { is_reaction: true, in_reply_to: message.id }) }
+
+      it 'sends the reaction message' do
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message")
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: { react: { key: { id: message.source_id,
+                                                remoteJid: test_send_jid,
+                                                fromMe: true },
+                                         text: '👍' } }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: { 'data' => { 'key' => { 'id' => 'reaction_123' } } }.to_json
+          )
+
+        expect(reaction.is_reaction).to be true
+        expect(reaction.content_attributes).to be({})
+        # FIXME: Inspect why this is failing
+        expect(reaction.in_reply_to).to eq(message.id)
+
+        result = service.send_message(test_send_phone_number, reaction)
+
+        expect(result).to eq('reaction_123')
+      end
+    end
+
     context 'when message has attachment' do
       let(:base64_image) { 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }
 
