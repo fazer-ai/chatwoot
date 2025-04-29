@@ -98,14 +98,16 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_create_message
-    create_message
     case message_type
-    when 'text', 'reaction'
-      nil
+    when 'text'
+      create_message
+    when 'reaction'
+      create_message if message_content.present?
     when 'image', 'file', 'video', 'audio', 'sticker'
+      create_message
       attach_media
     else
-      @message.update!(is_unsupported: true)
+      create_unsupported_message
       Rails.logger.warn "Baileys unsupported message type: #{message_type}"
     end
   end
@@ -174,6 +176,15 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def incoming?
     !@raw_message[:key][:fromMe]
+  end
+
+  def create_unsupported_message
+    create_message
+    @message.update!(
+      content: I18n.t('errors.messages.unsupported'),
+      message_type: 'template',
+      status: 'failed'
+    )
   end
 
   def attach_media

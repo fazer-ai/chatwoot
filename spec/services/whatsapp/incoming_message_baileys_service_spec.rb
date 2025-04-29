@@ -171,7 +171,9 @@ describe Whatsapp::IncomingMessageBaileysService do
           message = conversation.messages.last
 
           expect(message).to be_present
-          expect(message.is_unsupported).to be true
+          expect(message.content).to eq(I18n.t('errors.messages.unsupported'))
+          expect(message.message_type).to eq('template')
+          expect(message.status).to eq('failed')
         end
 
         it 'logs a warning message' do
