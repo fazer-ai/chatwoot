@@ -104,10 +104,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
     context 'when message is a reaction' do
       let(:inbox) { whatsapp_channel.inbox }
-      let(:contact_inbox) do
-        contact = create(:contact, account: inbox.account, name: 'John Doe', phone_number: test_send_phone_number)
-        create(:contact_inbox, inbox: inbox, contact: contact, source_id: test_send_phone_number)
-      end
+      let(:contact) { create(:contact, account: inbox.account, name: 'John Doe', phone_number: "+#{test_send_phone_number}") }
+      let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: test_send_phone_number) }
       let(:conversation) { create(:conversation, inbox: inbox, contact_inbox: contact_inbox) }
       let!(:message) { create(:message, inbox: inbox, conversation: conversation, sender: contact, source_id: 'msg_123') }
       let(:reaction) do
