@@ -77,11 +77,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def reaction_message_content
-    replied_message = Message.find(@message.in_reply_to)
-    remote_jid = "#{replied_message.conversation.contact.phone_number.delete('+')}@s.whatsapp.net"
-
     {
-      react: { key: { id: replied_message.source_id,
+      react: { key: { id: @message.in_reply_to_external_id,
                       remoteJid: remote_jid,
                       fromMe: true },
                text: @message.content }
@@ -117,7 +114,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
-        jid: "#{@phone_number.delete('+')}@s.whatsapp.net",
+        jid: remote_jid,
         messageContent: @message_content
       }.to_json
     )
@@ -130,6 +127,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def process_response(response)
     Rails.logger.error response.body unless response.success?
     response.success?
+  end
+
+  def remote_jid
+    "#{@phone_number.delete('+')}@s.whatsapp.net"
   end
 
   private_class_method def self.with_error_handling(*method_names)
