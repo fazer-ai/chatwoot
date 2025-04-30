@@ -319,14 +319,21 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def update_message_content
-    message = @raw_message.dig(:update, :message, :editedMessage, :message)
-    if message.blank?
+    @raw_message = @raw_message.dig(:update, :message, :editedMessage)
+    if @raw_message[:message].blank?
       Rails.logger.warn 'No valid message content found in the update event'
       return
     end
 
-    content = message[:conversation] || message.dig(:extendedTextMessage, :text)
+    content = message_content
+    return if content.blank?
 
-    @message.update!(content: content) if content.present?
+    @message.is_edited = true
+    if @message.content_history.blank?
+      @message.content_history = [@message.content]
+    else
+      @message.content_history.push(@message.content)
+    end
+    @message.update!(content: content)
   end
 end
