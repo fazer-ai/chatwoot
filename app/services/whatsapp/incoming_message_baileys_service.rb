@@ -50,6 +50,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   def handle_message
     return if jid_type != 'user'
     return if find_message_by_source_id(message_id) || message_under_process?
+    return if message_type.in?(%w[protocol])
 
     cache_message_source_id_in_redis
     set_contact
