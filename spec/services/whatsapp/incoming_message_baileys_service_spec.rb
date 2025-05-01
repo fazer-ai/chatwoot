@@ -200,7 +200,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             } }
         end
 
-        it 'does not create any contact inbox or message' do
+        it 'does not create contact inbox nor message' do
           described_class.new(inbox: inbox, params: params).perform
 
           expect(inbox.contact_inboxes.count).to be(0)
