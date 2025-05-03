@@ -144,10 +144,10 @@ export default {
       this.resizeTextarea();
     },
     onKeyup() {
-      if (!this.modelValue.length) {
-        this.typingIndicator.stop();
-      } else {
+      if (this.modelValue.length) {
         this.typingIndicator.start();
+      } else {
+        this.typingIndicator.stop();
       }
     },
     onBlur() {

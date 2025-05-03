@@ -576,10 +576,10 @@ function createEditorView() {
     handleDOMEvents: {
       keyup: () => {
         if (!props.disabled) {
-          if (!props.modelValue.length) {
-            typingIndicator.stop();
-          } else {
+          if (props.modelValue.length) {
             typingIndicator.start();
+          } else {
+            typingIndicator.stop();
           }
           updateImgToolbarOnDelete();
         }
