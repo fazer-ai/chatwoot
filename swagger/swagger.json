@@ -989,7 +989,7 @@
             "in": "query",
             "required": true,
             "type": "string",
-            "description": "Typing status, either 'on' or 'off'"
+            "description": "Typing status. 'on', 'recording', or 'off'"
           }
         ],
         "responses": {

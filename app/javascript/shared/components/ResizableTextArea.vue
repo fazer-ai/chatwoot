@@ -144,7 +144,11 @@ export default {
       this.resizeTextarea();
     },
     onKeyup() {
-      this.typingIndicator.start();
+      if (!this.modelValue.length) {
+        this.typingIndicator.stop();
+      } else {
+        this.typingIndicator.start();
+      }
     },
     onBlur() {
       this.typingIndicator.stop();
