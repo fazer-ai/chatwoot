@@ -327,10 +327,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       return
     end
 
-    @message.with_lock do
-      @message.edit_history = Array.wrap(@message.edit_history)
-      @message.edit_history << @message.content
-      @message.update!(content: content, is_edited: true)
-    end
+    @message.update!(content: content, is_edited: true, previous_content: @message.content)
   end
 end

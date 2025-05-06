@@ -729,30 +729,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(message.reload.content).to eq('New message content')
           expect(message.is_edited).to be(true)
-          expect(message.edit_history.last).to eq(original_content)
-        end
-
-        it 'updates the message content and the edit history' do
-          message.update!(content_attributes: { is_edited: true, edit_history: ['Old message content'] })
-          original_content = message.content
-          update_payload = {
-            key: { id: message_id },
-            update: {
-              message: { editedMessage: { message: { conversation: 'New message content' } } }
-            }
-          }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
-
-          expect(message.content_attributes).to eq({ 'is_edited' => true, 'edit_history' => ['Old message content'] })
-
-          described_class.new(inbox: inbox, params: params).perform
-
-          expect(message.reload.is_edited).to be(true)
-          expect(message.edit_history).to eq(['Old message content', original_content])
+          expect(message.previous_content).to eq(original_content)
         end
       end
 
