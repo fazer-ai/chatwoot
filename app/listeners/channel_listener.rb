@@ -22,6 +22,19 @@ class ChannelListener < BaseListener
     end
   end
 
+  def messages_read(event)
+    conversation = event.data.values_at(:conversation).first
+
+    channel = conversation&.inbox&.channel
+    return unless channel.respond_to?(:send_read_messages)
+
+    messages = conversation.messages.where(message_type: :incoming).map do |message|
+      message if message.status != 'read'
+    end
+
+    channel.send_read_messages(event.name, messages: messages) if messages.present?
+  end
+
   private
 
   def handle_typing_event(event)
