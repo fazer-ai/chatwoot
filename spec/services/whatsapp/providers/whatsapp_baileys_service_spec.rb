@@ -29,7 +29,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         response = service.setup_channel_provider
 
-        expect(response).to be true
+        expect(response).to be(true)
       end
     end
 
@@ -68,7 +68,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         response = service.disconnect_channel_provider
 
-        expect(response).to be true
+        expect(response).to be(true)
       end
     end
 
@@ -312,10 +312,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#api_headers' do
-    context 'when called' do
-      it 'returns the headers' do
-        expect(service.api_headers).to eq('x-api-key' => 'test_key', 'Content-Type' => 'application/json')
-      end
+    it 'returns the headers' do
+      expect(service.api_headers).to eq('x-api-key' => 'test_key', 'Content-Type' => 'application/json')
     end
   end
 
@@ -326,7 +324,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           .with(headers: stub_headers(whatsapp_channel))
           .to_return(status: 200, body: '', headers: {})
 
-        expect(service.validate_provider_config?).to be true
+        expect(service.validate_provider_config?).to be(true)
       end
     end
 
@@ -337,7 +335,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           .to_return(status: 400, body: 'error message', headers: {})
         allow(Rails.logger).to receive(:error).with('error message')
 
-        expect(service.validate_provider_config?).to be false
+        expect(service.validate_provider_config?).to be(false)
         expect(Rails.logger).to have_received(:error)
       end
 
@@ -364,14 +362,16 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#send_read_messages' do
-    it 'when called send read status' do
+    it 'send read messages request' do
       stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/read-messages")
         .with(
           headers: stub_headers(whatsapp_channel),
           body: { keys: [{ id: message.source_id, remoteJid: test_send_jid, fromMe: false }] }.to_json
         ).to_return(status: 200, body: '', headers: {})
 
-      expect(service.send_read_messages(test_send_phone_number, [message])).to be true
+      result = service.send_read_messages(test_send_phone_number, [message])
+
+      expect(result).to be(true)
     end
   end
 
