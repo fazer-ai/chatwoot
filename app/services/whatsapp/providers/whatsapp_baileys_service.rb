@@ -1,4 +1,4 @@
-class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService
+class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   class MessageContentTypeNotSupported < StandardError; end
   class MessageNotSentError < StandardError; end
 
@@ -210,5 +210,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     whatsapp_channel.update_provider_connection!(connection: 'close')
   end
 
-  with_error_handling :setup_channel_provider, :disconnect_channel_provider, :send_message
+  with_error_handling :setup_channel_provider,
+                      :disconnect_channel_provider,
+                      :send_message,
+                      :toggle_typing_status,
+                      :update_presence,
+                      :send_read_messages
 end
