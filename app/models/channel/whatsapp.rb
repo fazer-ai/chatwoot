@@ -79,6 +79,12 @@ class Channel::Whatsapp < ApplicationRecord
     data
   end
 
+  def send_read_messages(messages)
+    return unless provider_service.respond_to?(:send_read_messages)
+
+    provider_service.send_read_messages(phone_number, messages)
+  end
+
   def toggle_typing_status(typing_status, conversation:)
     return unless provider_service.respond_to?(:toggle_typing_status)
 

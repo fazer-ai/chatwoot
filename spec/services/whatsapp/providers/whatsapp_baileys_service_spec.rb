@@ -4,7 +4,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   subject(:service) { described_class.new(whatsapp_channel: whatsapp_channel) }
 
   let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false) }
-  let(:message) { create(:message) }
+  let(:message) { create(:message, source_id: 'msg_123') }
 
   let(:test_send_phone_number) { '551187654321' }
   let(:test_send_jid) { '551187654321@s.whatsapp.net' }
@@ -360,6 +360,18 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           expect(whatsapp_channel.provider_connection['connection']).to eq('close')
         end
       end
+    end
+  end
+
+  describe '#send_read_messages' do
+    it 'when called send read status' do
+      stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/read-messages")
+        .with(
+          headers: stub_headers(whatsapp_channel),
+          body: { keys: [{ id: message.source_id, remoteJid: test_send_jid, fromMe: false }] }.to_json
+        ).to_return(status: 200, body: '', headers: {})
+
+      expect(service.send_read_messages(test_send_phone_number, [message])).to be true
     end
   end
 
