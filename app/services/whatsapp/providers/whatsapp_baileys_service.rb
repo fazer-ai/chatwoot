@@ -53,26 +53,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def media_url(media_id); end
 
-  def send_read_messages(phone_number, messages)
-    @phone_number = phone_number
-
-    response = HTTParty.post(
-      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/read-messages",
-      headers: api_headers,
-      body: {
-        keys: messages.map do |message|
-          {
-            id: message.source_id,
-            remoteJid: remote_jid,
-            fromMe: message.message_type == 'outgoing'
-          }
-        end
-      }.to_json
-    )
-
-    process_response(response)
-  end
-
   def api_headers
     { 'x-api-key' => api_key, 'Content-Type' => 'application/json' }
   end
@@ -118,6 +98,26 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         type: status_map[status]
+      }.to_json
+    )
+
+    process_response(response)
+  end
+
+  def send_read_messages(phone_number, messages)
+    @phone_number = phone_number
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/read-messages",
+      headers: api_headers,
+      body: {
+        keys: messages.map do |message|
+          {
+            id: message.source_id,
+            remoteJid: remote_jid,
+            fromMe: message.message_type == 'outgoing'
+          }
+        end
       }.to_json
     )
 
