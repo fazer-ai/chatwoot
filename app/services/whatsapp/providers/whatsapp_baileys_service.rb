@@ -115,7 +115,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
           {
             id: message.source_id,
             remoteJid: remote_jid,
-            fromMe: message.message_type == 'outgoing'
+            # NOTE: It only makes sense to mark received messages as read
+            fromMe: false
           }
         end
       }.to_json
