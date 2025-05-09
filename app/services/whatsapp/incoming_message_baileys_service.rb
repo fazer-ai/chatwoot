@@ -156,8 +156,6 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def create_message(attach_media: false)
     sender = incoming? ? @contact : @inbox.account.account_users.first.user
-    sender_type = incoming? ? 'Contact' : 'User'
-    message_type = incoming? ? :incoming : :outgoing
 
     @message = @conversation.messages.build(
       content: message_content,
@@ -165,8 +163,8 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       inbox_id: @inbox.id,
       source_id: message_id,
       sender: sender,
-      sender_type: sender_type,
-      message_type: message_type,
+      sender_type: incoming? ? 'Contact' : 'User',
+      message_type: incoming? ? :incoming : :outgoing,
       content_attributes: message_content_attributes
     )
 
