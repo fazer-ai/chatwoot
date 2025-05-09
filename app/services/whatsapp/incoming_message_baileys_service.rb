@@ -99,17 +99,21 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_create_message
-    case message_type
-    when 'text'
-      create_message
-    when 'reaction'
-      create_message if message_content.present?
-    when 'image', 'file', 'video', 'audio', 'sticker'
-      create_message(attach_media: true)
-    when 'unsupported'
-      create_unsupported_message
-      Rails.logger.warn "Baileys unsupported message type: #{message_type}"
-    end
+    return if skip_message?
+
+    create_message
+    attach_media if %w[image file video audio sticker].include?(message_type)
+    mark_unsupported_message if message_type == 'unsupported'
+  end
+
+  def skip_message?
+    message_type == 'protocol' ||
+      (message_type == 'reaction' && message_content.blank?)
+  end
+
+  def mark_unsupported_message
+    @message.update!(is_unsupported: true)
+    Rails.logger.warn 'Baileys unsupported message type'
   end
 
   def jid_type # rubocop:disable Metrics/CyclomaticComplexity
@@ -184,16 +188,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     !@raw_message[:key][:fromMe]
   end
 
-  def create_unsupported_message
-    create_message
-    @message.update!(
-      content: I18n.t('errors.messages.unsupported'),
-      message_type: 'template',
-      status: 'failed'
-    )
-  end
-
-  def handle_attach_media
+  def attach_media
     media = processed_params.dig(:extra, :media)
     return if media.blank?
 
