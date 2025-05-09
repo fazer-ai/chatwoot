@@ -140,18 +140,19 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     end
   end
 
-  def message_type
-    @message_type ||= {
-      conversation: 'text',
-      extendedTextMessage: 'text',
-      imageMessage: 'image',
-      audioMessage: 'audio',
-      videoMessage: 'video',
-      documentMessage: 'file',
-      stickerMessage: 'sticker',
-      reactionMessage: 'reaction',
-      protocolMessage: 'protocol'
-    }.find { |key, _| @raw_message[:message].key?(key) }&.last || 'unsupported'
+  def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+    msg = @raw_message[:message]
+
+    return 'text' if msg.key?(:conversation) || msg.dig(:extendedTextMessage, :text).present?
+    return 'image' if msg.key?(:imageMessage)
+    return 'audio' if msg.key?(:audioMessage)
+    return 'video' if msg.key?(:videoMessage)
+    return 'file' if msg.key?(:documentMessage)
+    return 'sticker' if msg.key?(:stickerMessage)
+    return 'reaction' if msg.key?(:reactionMessage)
+    return 'protocol' if msg.key?(:protocolMessage)
+
+    'unsupported'
   end
 
   def create_message(attach_media: false)
