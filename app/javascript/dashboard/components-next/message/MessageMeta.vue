@@ -9,6 +9,11 @@ import { useMessageContext } from './provider.js';
 
 import { MESSAGE_STATUS, MESSAGE_TYPES } from './constants';
 
+import { useI18n } from 'vue-i18n';
+import ptBR from 'date-fns/esm/locale/pt-BR';
+
+const { t } = useI18n();
+
 const {
   isAFacebookInbox,
   isALineChannel,
@@ -32,9 +37,15 @@ const {
 } = useMessageContext();
 
 const readableTime = computed(() => {
+  const timeFormat = t('CONVERSATION.MESSAGE.TIME_FORMAT');
+  const options =
+    t('CONVERSATION.MESSAGE.LOCALE') === 'pt-BR' ? { locale: ptBR } : {};
+  const timeFormatWithYear = t('CONVERSATION.MESSAGE.TIME_FORMAT_WITH_YEAR');
   return messageTimestamp(
-    contentAttributes?.value?.externalCreatedAt || createdAt.value,
-    'LLL d, h:mm a'
+    contentAttributes?.value?.externalCreatedAt ?? createdAt.value,
+    timeFormat,
+    options,
+    timeFormatWithYear
   );
 });
 

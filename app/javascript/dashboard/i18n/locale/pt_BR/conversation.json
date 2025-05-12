@@ -1,5 +1,10 @@
 {
   "CONVERSATION": {
+    "MESSAGE": {
+      "TIME_FORMAT": "d 'de' MMMM, HH:mm",
+      "TIME_FORMAT_WITH_YEAR": "d 'de' MMMM 'de' yyyy, HH:mm",
+      "LOCALE": "pt-BR"
+    },
     "SELECT_A_CONVERSATION": "Por favor, selecione uma conversa no painel da esquerda",
     "CSAT_REPLY_MESSAGE": "Por favor, classifique a conversa",
     "404": "Desculpe, não conseguimos encontrar a conversa. Por favor, tente novamente",
