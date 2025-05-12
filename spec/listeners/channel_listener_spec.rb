@@ -125,9 +125,11 @@ describe ChannelListener do
         sql_queries << details[:sql]
       end
 
-      listener.messages_read(event)
-
-      ActiveSupport::Notifications.unsubscribe('sql.active_record')
+      begin
+        listener.messages_read(event)
+      ensure
+        ActiveSupport::Notifications.unsubscribe('sql.active_record')
+      end
 
       expect(sql_queries.first).to include('updated_at >')
     end
@@ -142,9 +144,11 @@ describe ChannelListener do
         sql_queries << details[:sql]
       end
 
-      listener.messages_read(event)
-
-      ActiveSupport::Notifications.unsubscribe('sql.active_record')
+      begin
+        listener.messages_read(event)
+      ensure
+        ActiveSupport::Notifications.unsubscribe('sql.active_record')
+      end
 
       expect(sql_queries.first).not_to include('updated_at >')
     end
