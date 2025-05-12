@@ -172,7 +172,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def message_content_attributes
     content_attributes = {
-      external_created_at: Time.zone.at(@raw_message[:messageTimestamp])
+      external_created_at: @raw_message[:messageTimestamp]
     }
     if message_type == 'reaction'
       content_attributes[:in_reply_to_external_id] = @raw_message.dig(:message, :reactionMessage, :key, :id)
