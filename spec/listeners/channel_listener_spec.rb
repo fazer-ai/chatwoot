@@ -114,6 +114,40 @@ describe ChannelListener do
         listener.messages_read(Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: last_seen_at))
       end.not_to raise_error
     end
+
+    it 'executes the correct SQL when last_seen_at is present' do
+      create(:message, conversation: conversation, message_type: :incoming, status: :sent)
+      create(:message, conversation: conversation, message_type: :incoming, status: :read)
+      event = Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: last_seen_at)
+
+      sql_queries = []
+      ActiveSupport::Notifications.subscribe('sql.active_record') do |_, _, _, _, details|
+        sql_queries << details[:sql]
+      end
+
+      listener.messages_read(event)
+
+      ActiveSupport::Notifications.unsubscribe('sql.active_record')
+
+      expect(sql_queries.first).to include('updated_at >')
+    end
+
+    it 'executes the correct SQL when last_seen_at is not present' do
+      create(:message, conversation: conversation, message_type: :incoming, status: :sent)
+      create(:message, conversation: conversation, message_type: :incoming, status: :read)
+      event = Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: nil)
+
+      sql_queries = []
+      ActiveSupport::Notifications.subscribe('sql.active_record') do |_, _, _, _, details|
+        sql_queries << details[:sql]
+      end
+
+      listener.messages_read(event)
+
+      ActiveSupport::Notifications.unsubscribe('sql.active_record')
+
+      expect(sql_queries.first).not_to include('updated_at >')
+    end
   end
 
   def build_typing_event(event_name, conversation:, is_private: false)
