@@ -171,6 +171,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def message_content_attributes
+    # NOTE: external_created_at is allways set with the timestamp when the message was created on WhatsApp server.
     content_attributes = {
       external_created_at: @raw_message[:messageTimestamp]
     }
