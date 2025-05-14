@@ -32,10 +32,7 @@ const {
 } = useMessageContext();
 
 const readableTime = computed(() =>
-  messageTimestamp(
-    contentAttributes?.value?.externalCreatedAt ?? createdAt.value,
-    'LLL d, h:mm a'
-  )
+  messageTimestamp(createdAt.value, 'LLL d, h:mm a')
 );
 
 const showStatusIndicator = computed(() => {
