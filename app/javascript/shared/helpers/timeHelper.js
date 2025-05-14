@@ -20,22 +20,16 @@ export const messageStamp = (time, dateFormat = 'h:mm a') => {
  * Provides a formatted timestamp, adjusting the format based on the current year.
  * @param {number} time - Unix timestamp.
  * @param {string} [dateFormat='MMM d, yyyy'] - Desired date format.
- * @param {object} [options] - Additional options for formatting.
- * @param {string} [differentYearDateFormat='MMM d y, h:mm a'] - Alternative date format when is a different year.
  * @returns {string} Formatted date string.
  */
-export const messageTimestamp = (
-  time,
-  dateFormat = 'LLL d, yyyy',
-  options = undefined,
-  differentYearDateFormat = 'LLL d y, h:mm a'
-) => {
+export const messageTimestamp = (time, dateFormat = 'MMM d, yyyy') => {
   const messageTime = fromUnixTime(time);
-  if (isSameYear(messageTime, new Date())) {
-    return format(messageTime, dateFormat, options);
+  const now = new Date();
+  const messageDate = format(messageTime, dateFormat);
+  if (!isSameYear(messageTime, now)) {
+    return format(messageTime, 'LLL d y, h:mm a');
   }
-
-  return format(messageTime, differentYearDateFormat, options);
+  return messageDate;
 };
 
 /**

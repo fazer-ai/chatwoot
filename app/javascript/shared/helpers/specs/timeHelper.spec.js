@@ -5,8 +5,6 @@ import {
   dateFormat,
   shortTimestamp,
 } from 'shared/helpers/timeHelper';
-import { describe } from 'vitest';
-import { it } from 'vitest';
 
 beforeEach(() => {
   process.env.TZ = 'UTC';
@@ -34,22 +32,6 @@ describe('#messageTimestamp', () => {
   });
   it('should return the message date and time in a different format if the message was sent in a different year', () => {
     expect(messageTimestamp(1612971343)).toEqual('Feb 10 2021, 3:35 PM');
-  });
-
-  it('should return the message date in the specified format if the message was sent in the current year', () => {
-    expect(messageTimestamp(1680777464, "d 'de' MMMM, HH:mm")).toEqual(
-      '6 de April, 10:37'
-    );
-  });
-  it('should return the message date and time in a different format if the message was sent in a different year', () => {
-    expect(
-      messageTimestamp(
-        1612971343,
-        undefined,
-        {},
-        "d 'de' MMMM 'de' yyyy, HH:mm"
-      )
-    ).toEqual('10 de February de 2021, 15:35');
   });
 });
 
