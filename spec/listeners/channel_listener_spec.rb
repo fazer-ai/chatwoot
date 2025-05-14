@@ -115,42 +115,36 @@ describe ChannelListener do
       end.not_to raise_error
     end
 
-    it 'executes the correct SQL when last_seen_at is present' do
-      create(:message, conversation: conversation, message_type: :incoming, status: :sent)
+    it 'skips the event if there are no unread messages' do
       create(:message, conversation: conversation, message_type: :incoming, status: :read)
-      event = Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: last_seen_at)
 
-      sql_queries = []
-      ActiveSupport::Notifications.subscribe('sql.active_record') do |_, _, _, _, details|
-        sql_queries << details[:sql]
-      end
+      allow(channel).to receive(:send_read_messages)
 
-      begin
-        listener.messages_read(event)
-      ensure
-        ActiveSupport::Notifications.unsubscribe('sql.active_record')
-      end
+      listener.messages_read(Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: last_seen_at))
 
-      expect(sql_queries.first).to include('updated_at >')
+      expect(channel).not_to have_received(:send_read_messages)
     end
 
-    it 'executes the correct SQL when last_seen_at is not present' do
-      create(:message, conversation: conversation, message_type: :incoming, status: :sent)
-      create(:message, conversation: conversation, message_type: :incoming, status: :read)
-      event = Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: nil)
+    it 'filters messages ignoring last_seen_at' do
+      old_message = create(:message, conversation: conversation, message_type: :incoming, status: :sent, updated_at: 2.days.ago)
+      recent_message = create(:message, conversation: conversation, message_type: :incoming, status: :sent, updated_at: Time.zone.now)
 
-      sql_queries = []
-      ActiveSupport::Notifications.subscribe('sql.active_record') do |_, _, _, _, details|
-        sql_queries << details[:sql]
-      end
+      allow(channel).to receive(:send_read_messages).with([old_message, recent_message], conversation: conversation)
 
-      begin
-        listener.messages_read(event)
-      ensure
-        ActiveSupport::Notifications.unsubscribe('sql.active_record')
-      end
+      listener.messages_read(Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: nil))
 
-      expect(sql_queries.first).not_to include('updated_at >')
+      expect(channel).to have_received(:send_read_messages).with([old_message, recent_message], conversation: conversation)
+    end
+
+    it 'filters messages based on last_seen_at' do
+      create(:message, conversation: conversation, message_type: :incoming, status: :sent, updated_at: 2.days.ago)
+      recent_message = create(:message, conversation: conversation, message_type: :incoming, status: :sent, updated_at: Time.zone.now)
+
+      allow(channel).to receive(:send_read_messages).with([recent_message], conversation: conversation)
+
+      listener.messages_read(Events::Base.new(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: last_seen_at))
+
+      expect(channel).to have_received(:send_read_messages).with([recent_message], conversation: conversation)
     end
   end
 
