@@ -351,12 +351,15 @@ describe Whatsapp::IncomingMessageBaileysService do
           create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123')
         end
 
-        before do
-          raw_message[:key][:id] = 'reaction_123'
-          raw_message[:message] = { reactionMessage: { key: { remoteJid: '5511912345678@s.whatsapp.net', fromMe: true, id: 'msg_123' }, text: '👍' } }
-        end
-
         it 'creates the reaction' do
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '5511912345678@s.whatsapp.net', fromMe: true, id: 'msg_123' },
+              text: '👍'
+            }
+          }
+
           described_class.new(inbox: inbox, params: params).perform
 
           reaction = message.conversation.messages.last
@@ -366,7 +369,13 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'does not create the reaction if content is empty' do
-          raw_message[:message][:reactionMessage][:text] = ''
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '5511912345678@s.whatsapp.net', fromMe: true, id: 'msg_123' },
+              text: ''
+            }
+          }
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -375,16 +384,14 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is image' do
-        before do
+        it 'creates the message with caption' do
           raw_message[:message] = { imageMessage: { caption: 'Hello from Baileys', mimetype: 'image/png' } }
           params[:extra] = {
             media: {
               'msg_123' => 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
             }
           }
-        end
 
-        it 'creates the message with caption' do
           described_class.new(inbox: inbox, params: params).perform
           conversation = inbox.conversations.last
           message = conversation.messages.last
@@ -394,6 +401,13 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'creates message attachment' do
+          raw_message[:message] = { imageMessage: { caption: 'Hello from Baileys', mimetype: 'image/png' } }
+          params[:extra] = {
+            media: {
+              'msg_123' => 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+            }
+          }
+
           freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
@@ -412,17 +426,16 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is video' do
-        before do
+        it 'creates the message with caption' do
           raw_message[:message] = { videoMessage: { caption: 'Hello from Baileys', mimetype: 'video/mp4' } }
           params[:extra] = {
             media: {
               'msg_123' => 'AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAABL21kYXQAAAGzABAHAAABthGBxgj238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2E4HGCkbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237AAABswAQBwAAAbYVgcYLltyRtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfsAAAGzABAHAAABtheBxhPbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2GYHGJG3JG238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt+/AAADHW1vb3YAAABsbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAJHdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAQAAAAAAAAPoAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAABAAAAAQAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAD6AAAAAAAAQAAAAABv21kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAKAAAACgAVcQAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAWptaW5mAAAAFHZtaGQAAAABAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAEqc3RibAAAAGJzdHNkAAAAAAAAACVhdmMxAAAAAAAAAAAAAAAAAACFc3R0cwAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' # rubocop:disable Layout/LineLength
             }
           }
-        end
 
-        it 'creates the message with caption' do
           described_class.new(inbox: inbox, params: params).perform
+
           conversation = inbox.conversations.last
           message = conversation.messages.last
 
@@ -431,6 +444,13 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'creates message attachment' do
+          raw_message[:message] = { videoMessage: { caption: 'Hello from Baileys', mimetype: 'video/mp4' } }
+          params[:extra] = {
+            media: {
+              'msg_123' => 'AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAABL21kYXQAAAGzABAHAAABthGBxgj238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2E4HGCkbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237AAABswAQBwAAAbYVgcYLltyRtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfsAAAGzABAHAAABtheBxhPbckbbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G237wAAAbMAEAcAAAG2GYHGJG3JG238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt/G238bbfxtt+/AAADHW1vb3YAAABsbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAJHdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAQAAAAAAAAPoAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAABAAAAAQAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAD6AAAAAAAAQAAAAABv21kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAKAAAACgAVcQAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAWptaW5mAAAAFHZtaGQAAAABAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAEqc3RibAAAAGJzdHNkAAAAAAAAACVhdmMxAAAAAAAAAAAAAAAAAACFc3R0cwAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' # rubocop:disable Layout/LineLength
+            }
+          }
+
           freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
