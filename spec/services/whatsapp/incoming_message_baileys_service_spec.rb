@@ -145,6 +145,32 @@ describe Whatsapp::IncomingMessageBaileysService do
     end
 
     context 'when processing messages.upsert event' do
+      it 'creates message with external_created_at' do
+        freeze_time
+        raw_message = {
+          key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+          pushName: 'John Doe',
+          messageTimestamp: Time.current.to_i,
+          message: { conversation: 'Hello from Baileys' }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: {
+            type: 'notify',
+            messages: [raw_message]
+          }
+        }
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        conversation = inbox.conversations.last
+        message = conversation.messages.last
+
+        expect(message).to be_present
+        expect(message.content_attributes[:external_created_at]).to eq(Time.current.to_i)
+      end
+
       context 'when message type is unsupported' do
         let(:raw_message) do
           {
@@ -182,12 +208,14 @@ describe Whatsapp::IncomingMessageBaileysService do
             pushName: 'John Doe' }
         end
         let(:params) do
-          { webhookVerifyToken: webhook_verify_token,
+          {
+            webhookVerifyToken: webhook_verify_token,
             event: 'messages.upsert',
             data: {
               type: 'notify',
               messages: [raw_message]
-            } }
+            }
+          }
         end
 
         it 'does not create contact inbox nor message' do
@@ -655,39 +683,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(attachment.file.filename.to_s).to eq("image_msg_123_#{Time.current.strftime('%Y%m%d')}.png")
           expect(attachment.file.content_type).to eq('image/png')
-        end
-      end
-
-      context 'when a new message is created' do
-        let(:raw_message) do
-          {
-            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-            pushName: 'John Doe',
-            messageTimestamp: Time.current.to_i,
-            message: { conversation: 'Hello from Baileys' }
-          }
-        end
-        let(:params) do
-          {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            }
-          }
-        end
-
-        it 'has external_created_at in content_attributes' do
-          freeze_time
-
-          described_class.new(inbox: inbox, params: params).perform
-
-          conversation = inbox.conversations.last
-          message = conversation.messages.last
-
-          expect(message).to be_present
-          expect(message.content_attributes[:external_created_at]).to eq(Time.current.to_i)
         end
       end
     end
