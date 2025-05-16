@@ -145,11 +145,12 @@ describe Whatsapp::IncomingMessageBaileysService do
     end
 
     context 'when processing messages.upsert event' do
+      let(:timestamp) { Time.current.to_i }
       let(:raw_message) do
         {
           key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
           pushName: 'John Doe',
-          messageTimestamp: Time.current.to_i,
+          messageTimestamp: timestamp,
           message: { conversation: 'Hello from Baileys' }
         }
       end
@@ -165,15 +166,13 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       it 'creates message with external_created_at' do
-        freeze_time
-
         described_class.new(inbox: inbox, params: params).perform
 
         conversation = inbox.conversations.last
         message = conversation.messages.last
 
         expect(message).to be_present
-        expect(message.content_attributes[:external_created_at]).to eq(Time.current.to_i)
+        expect(message.content_attributes[:external_created_at]).to eq(timestamp)
       end
 
       context 'when message type is unsupported' do
