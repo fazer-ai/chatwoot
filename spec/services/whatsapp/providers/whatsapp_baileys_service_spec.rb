@@ -312,6 +312,15 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     end
   end
 
+  describe '#media_url' do
+    it 'returns the media url' do
+      media_id = '12345'
+      expected_url = "#{whatsapp_channel.provider_config['provider_url']}/media/#{media_id}"
+
+      expect(service.media_url(media_id)).to eq(expected_url)
+    end
+  end
+
   describe '#api_headers' do
     it 'returns the headers' do
       expect(service.api_headers).to eq('x-api-key' => 'test_key', 'Content-Type' => 'application/json')
