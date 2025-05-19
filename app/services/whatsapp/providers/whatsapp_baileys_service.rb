@@ -129,7 +129,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def get_media(message)
-    HTTParty.get("#{provider_url}/media/#{message.source_id}", headers: api_headers)
+    response = HTTParty.get("#{provider_url}/media/#{message.source_id}", headers: api_headers)
+    response if process_response(response)
   end
 
   private
@@ -223,5 +224,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :send_message,
                       :toggle_typing_status,
                       :update_presence,
-                      :send_read_messages
+                      :send_read_messages,
+                      :get_media
 end
