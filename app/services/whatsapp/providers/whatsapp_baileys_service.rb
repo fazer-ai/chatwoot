@@ -223,5 +223,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :send_message,
                       :toggle_typing_status,
                       :update_presence,
-                      :send_read_messages
+                      :send_read_messages,
+                      :get_media
 end
