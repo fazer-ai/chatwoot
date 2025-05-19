@@ -13,7 +13,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         clientName: DEFAULT_CLIENT_NAME,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
-        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token']
+        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+        includeMedia: false
       }.to_json
     )
 
