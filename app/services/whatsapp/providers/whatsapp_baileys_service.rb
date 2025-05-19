@@ -51,7 +51,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def sync_templates; end
 
-  def media_url(media_id); end
+  def media_url(media_id)
+    "#{provider_url}/media/#{media_id}"
+  end
 
   def api_headers
     { 'x-api-key' => api_key, 'Content-Type' => 'application/json' }

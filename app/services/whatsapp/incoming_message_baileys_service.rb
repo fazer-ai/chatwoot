@@ -188,15 +188,19 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def handle_attach_media
-    response = @conversation.inbox.channel.get_media(@message)
-    return unless response
+    attachment_file = download_attachment_file
+    return unless attachment_file
 
     attachment = @message.attachments.build(
       account_id: @message.account_id,
       file_type: file_content_type.to_s,
-      file: { io: StringIO.new(response), filename: filename, content_type: message_mimetype }
+      file: { io: attachment_file, filename: filename, content_type: message_mimetype }
     )
     attachment.meta = { is_recorded_audio: true } if @raw_message.dig(:message, :audioMessage, :ptt)
+  end
+
+  def download_attachment_file
+    Down.download(@conversation.inbox.channel.media_url(@raw_message.dig(:key, :id)), headers: @conversation.inbox.channel.api_headers)
   end
 
   def file_content_type
