@@ -97,12 +97,6 @@ class Channel::Whatsapp < ApplicationRecord
     provider_service.send_read_messages(conversation.contact.phone_number, messages)
   end
 
-  def get_media(message)
-    return unless provider_service.respond_to?(:get_media)
-
-    provider_service.get_media(message)
-  end
-
   delegate :setup_channel_provider, to: :provider_service
   delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service
