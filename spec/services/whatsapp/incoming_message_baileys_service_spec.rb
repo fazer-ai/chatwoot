@@ -399,6 +399,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
+        end
 
         it 'creates the message with caption' do
           stub_download
@@ -440,6 +441,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
+        end
 
         it 'creates the message with caption' do
           stub_download
@@ -483,6 +485,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
+        end
 
         it 'creates message attachment' do
           stub_download
@@ -514,6 +517,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
+        end
 
         it 'creates message attachment' do
           stub_download
@@ -545,6 +549,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
+        end
 
         it 'creates message attachment' do
           stub_download
