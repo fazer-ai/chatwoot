@@ -127,7 +127,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def send_unread_conversation(phone_number, last_message)
     @phone_number = phone_number
-    return unless last_message
+    Rails.logger.warn("send_unread_conversation: last_message is nil for phone_number #{phone_number}") && return unless last_message
 
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/unread-chat",
