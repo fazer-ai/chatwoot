@@ -60,6 +60,20 @@ describe ChannelListener do
     end
   end
 
+  describe '#conversation_unread' do
+    let(:channel) { create(:channel_whatsapp, sync_templates: false, validate_provider_config: false) }
+    let(:conversation) { create(:conversation, inbox: create(:inbox, channel: channel)) }
+    let(:event) { Events::Base.new(Events::Types::CONVERSATION_UNREAD, Time.zone.now, conversation: conversation) }
+
+    it 'calls send_unread_conversation on the channel' do
+      allow(channel).to receive(:send_unread_conversation).with(conversation)
+
+      listener.conversation_unread(event)
+
+      expect(channel).to have_received(:send_unread_conversation)
+    end
+  end
+
   describe '#account_presence_updated' do
     let(:account_user) { create(:account_user) }
     let(:inbox) { create(:inbox, account: account_user.account) }
