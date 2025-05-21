@@ -97,6 +97,12 @@ class Channel::Whatsapp < ApplicationRecord
     provider_service.send_read_messages(conversation.contact.phone_number, messages)
   end
 
+  def send_unread_conversation(conversation)
+    return unless provider_service.respond_to?(:send_unread_conversation)
+
+    provider_service.send_unread_conversation(conversation.contact.phone_number, conversation.messages.last)
+  end
+
   delegate :setup_channel_provider, to: :provider_service
   delegate :disconnect_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service

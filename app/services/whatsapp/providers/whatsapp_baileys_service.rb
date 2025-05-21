@@ -125,6 +125,29 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     process_response(response)
   end
 
+  def send_unread_conversation(phone_number, last_message)
+    @phone_number = phone_number
+    return unless last_message
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/unread-chat",
+      headers: api_headers,
+      body: {
+        jid: remote_jid,
+        lastMessage: {
+          key: {
+            id: last_message.source_id,
+            remoteJid: remote_jid,
+            fromMe: last_message.message_type == 'outgoing'
+          },
+          messageTimestamp: last_message.content_attributes[:external_created_at]
+        }
+      }.to_json
+    )
+
+    process_response(response)
+  end
+
   private
 
   def provider_url
