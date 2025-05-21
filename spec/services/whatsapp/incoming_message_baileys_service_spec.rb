@@ -145,79 +145,65 @@ describe Whatsapp::IncomingMessageBaileysService do
     end
 
     context 'when processing messages.upsert event' do
-      context 'when message type is unsupported' do
-        let(:raw_message) do
-          {
-            key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-            message: { unsupported: 'message' },
-            pushName: 'John Doe'
+      let(:timestamp) { Time.current.to_i }
+      let(:raw_message) do
+        {
+          key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+          pushName: 'John Doe',
+          messageTimestamp: timestamp,
+          message: { conversation: 'Hello from Baileys' }
+        }
+      end
+      let(:params) do
+        {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: {
+            type: 'notify',
+            messages: [raw_message]
           }
-        end
-        let(:params) do
-          {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            }
-          }
-        end
+        }
+      end
 
-        it 'creates an unsupported message' do
+      it 'creates message with external_created_at' do
+        described_class.new(inbox: inbox, params: params).perform
+
+        conversation = inbox.conversations.last
+        message = conversation.messages.last
+
+        expect(message).to be_present
+        expect(message.content_attributes[:external_created_at]).to eq(timestamp)
+      end
+
+      context 'when message type is unsupported' do
+        it 'creates message with is_unsupported' do
+          raw_message[:message] = { unsupported: 'message' }
+
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
           message = conversation.messages.last
 
           expect(message).to be_present
-          expect(message.is_unsupported).to be(true)
+          expect(message.content_attributes[:is_unsupported]).to be(true)
         end
       end
 
       context 'when message is protocol message' do
-        let(:raw_message) do
-          { key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-            message: { protocolMessage: { type: 1 } },
-            pushName: 'John Doe' }
-        end
-        let(:params) do
-          { webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            } }
-        end
-
         it 'does not create contact inbox nor message' do
+          raw_message[:message] = { protocolMessage: { type: 1 } }
+
           described_class.new(inbox: inbox, params: params).perform
 
-          expect(inbox.contact_inboxes.count).to be(0)
-          expect(inbox.messages.count).to be(0)
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
         end
       end
 
       context 'when message is not from a user' do
-        let(:raw_message) do
-          {
-            key: { id: 'msg_123', remoteJid: 'status@broadcast', participant: '5511912345678@s.whatsapp.net', fromMe: false },
-            message: { extendedTextMessage: { text: 'message' } },
-            pushName: 'John Doe'
-          }
-        end
-        let(:params) do
-          {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            }
-          }
-        end
-
         it 'does not create a conversation' do
+          raw_message[:key][:remoteJid] = 'status@broadcast'
+
           described_class.new(inbox: inbox, params: params).perform
 
           expect(inbox.conversations).to be_empty
@@ -225,27 +211,6 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is text' do
-        let(:phone_number) { '5511912345678' }
-        let(:jid) { "#{phone_number}@s.whatsapp.net" }
-        let(:content_message) { 'Hello from Baileys' }
-        let(:raw_message) do
-          {
-            key: { id: 'msg_123', remoteJid: jid, fromMe: false },
-            pushName: 'John Doe',
-            message: { conversation: content_message }
-          }
-        end
-        let(:params) do
-          {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            }
-          }
-        end
-
         context 'when has key conversation' do # rubocop:disable RSpec/NestedGroups
           it 'creates an incoming message' do
             described_class.new(inbox: inbox, params: params).perform
@@ -254,47 +219,46 @@ describe Whatsapp::IncomingMessageBaileysService do
             message = conversation.messages.last
 
             expect(message).to be_present
-            expect(message.content).to eq(content_message)
+            expect(message.content).to eq('Hello from Baileys')
             expect(message.sender).to be_present
             expect(message.sender.name).to eq('John Doe')
             expect(message.message_type).to eq('incoming')
           end
 
           it 'creates an outgoing message' do
-            raw_message_outgoing = raw_message.merge(key: { id: 'msg_123', remoteJid: jid, fromMe: true })
-            params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+            raw_message[:key][:fromMe] = true
             create(:account_user, account: inbox.account)
 
-            described_class.new(inbox: inbox, params: params_outgoing).perform
+            described_class.new(inbox: inbox, params: params).perform
 
             conversation = inbox.conversations.last
             message = conversation.messages.last
 
             expect(message).to be_present
-            expect(message.content).to eq(content_message)
-            expect(conversation.contact.name).to eq(phone_number)
+            expect(message.content).to eq('Hello from Baileys')
+            expect(conversation.contact.name).to eq('5511912345678')
             expect(message.message_type).to eq('outgoing')
           end
 
           it 'creates an outgoing self message' do
             self_jid = "#{whatsapp_channel.phone_number.delete('+')}@s.whatsapp.net"
-            raw_message_outgoing = raw_message.merge(key: { id: 'msg_123', remoteJid: self_jid, fromMe: true })
-            params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+            raw_message[:key][:remoteJid] = self_jid
+            raw_message[:key][:fromMe] = true
             create(:account_user, account: inbox.account)
 
-            described_class.new(inbox: inbox, params: params_outgoing).perform
+            described_class.new(inbox: inbox, params: params).perform
 
             conversation = inbox.conversations.last
             message = conversation.messages.last
 
             expect(message).to be_present
-            expect(message.content).to eq(content_message)
+            expect(message.content).to eq('Hello from Baileys')
             expect(conversation.contact.name).to eq('John Doe')
             expect(message.message_type).to eq('outgoing')
           end
 
           it 'updates the contact name when name is the phone number and message has a pushName' do
-            create(:contact, account: inbox.account, name: phone_number)
+            create(:contact, account: inbox.account, name: '5511912345678')
 
             described_class.new(inbox: inbox, params: params).perform
 
@@ -304,7 +268,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           it 'updates the contact name when name is the phone number and message has a verifiedBizName' do
             raw_message[:verifiedBizName] = 'Verified John'
-            create(:contact, account: inbox.account, name: phone_number)
+            create(:contact, account: inbox.account, name: '5511912345678')
 
             described_class.new(inbox: inbox, params: params).perform
 
@@ -313,14 +277,13 @@ describe Whatsapp::IncomingMessageBaileysService do
           end
 
           it 'creates contact with phone number as name on outgoing message' do
-            raw_message_outgoing = raw_message.merge(key: { id: 'msg_123', remoteJid: jid, fromMe: true })
-            params_outgoing = params.merge(data: { type: 'notify', messages: [raw_message_outgoing] })
+            raw_message[:key][:fromMe] = true
             create(:account_user, account: inbox.account)
 
-            described_class.new(inbox: inbox, params: params_outgoing).perform
+            described_class.new(inbox: inbox, params: params).perform
 
             conversation = inbox.conversations.last
-            expect(conversation.contact.name).to eq(phone_number)
+            expect(conversation.contact.name).to eq('5511912345678')
           end
 
           it 'creates a message on an existing conversation' do
@@ -364,15 +327,9 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         context 'when is a extendedTextMessage that has key text' do # rubocop:disable RSpec/NestedGroups
-          let(:raw_message) do
-            {
-              key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
-              message: { extendedTextMessage: { text: 'Hello from Baileys' } },
-              pushName: 'John Doe'
-            }
-          end
-
           it 'creates an incoming message' do
+            raw_message[:message] = { extendedTextMessage: { text: 'Hello from Baileys' } }
+
             described_class.new(inbox: inbox, params: params).perform
 
             conversation = inbox.conversations.last
@@ -387,33 +344,22 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message type is reaction' do
-        let(:phone_number) { '5511912345678' }
-        let(:jid) { "#{phone_number}@s.whatsapp.net" }
-        let(:raw_message) do
-          {
-            key: { id: 'reaction_123', remoteJid: jid, fromMe: false },
-            message: { reactionMessage: { key: { remoteJid: jid, fromMe: true, id: 'msg_123' }, text: '👍' } },
-            pushName: 'John Doe'
-          }
-        end
-        let(:params) do
-          {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.upsert',
-            data: {
-              type: 'notify',
-              messages: [raw_message]
-            }
-          }
-        end
         let!(:message) do
-          contact = create(:contact, account: inbox.account, name: phone_number)
-          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone_number)
+          contact = create(:contact, account: inbox.account, name: '5511912345678')
+          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678')
           conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
           create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123')
         end
 
         it 'creates the reaction' do
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '5511912345678@s.whatsapp.net', fromMe: true, id: 'msg_123' },
+              text: '👍'
+            }
+          }
+
           described_class.new(inbox: inbox, params: params).perform
 
           reaction = message.conversation.messages.last
@@ -423,7 +369,13 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'does not create the reaction if content is empty' do
-          raw_message[:message][:reactionMessage][:text] = ''
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '5511912345678@s.whatsapp.net', fromMe: true, id: 'msg_123' },
+              text: ''
+            }
+          }
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -447,7 +399,6 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
-        end
 
         it 'creates the message with caption' do
           stub_download
@@ -489,7 +440,6 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
-        end
 
         it 'creates the message with caption' do
           stub_download
@@ -533,7 +483,6 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
-        end
 
         it 'creates message attachment' do
           stub_download
@@ -565,7 +514,6 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
-        end
 
         it 'creates message attachment' do
           stub_download
@@ -597,7 +545,6 @@ describe Whatsapp::IncomingMessageBaileysService do
               ]
             }
           }
-        end
 
         it 'creates message attachment' do
           stub_download
@@ -615,23 +562,21 @@ describe Whatsapp::IncomingMessageBaileysService do
     end
 
     context 'when processing messages.update event' do
-      context 'when message is not found' do
-        let(:message_id) { 'msg_123' }
-        let(:update_payload) do
-          {
-            key: { id: message_id },
-            update: {
-              status: 2
-            }
-          }
-        end
+      let!(:message) { create(:message, source_id: 'msg_123', status: 'sent') }
+      let(:update_payload) do
+        { key: { id: 'msg_123' }, update: { status: 3 } }
+      end
+      let(:params) do
+        {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.update',
+          data: [update_payload]
+        }
+      end
 
+      context 'when message is not found' do
         it 'raises MessageNotFoundError' do
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
+          update_payload[:key][:id] = 'no_message_id'
 
           expect do
             described_class.new(inbox: inbox, params: params).perform
@@ -640,34 +585,14 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when message is found' do
-        let(:message_id) { 'msg_123' }
-        let!(:message) { create(:message, source_id: message_id, status: 'sent') }
-
         it 'updates the message status' do
-          update_payload = { key: { id: message_id }, update: { status: 3 } }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
-
           described_class.new(inbox: inbox, params: params).perform
 
           expect(message.reload.status).to eq('delivered')
         end
 
         it 'updates the message content' do
-          update_payload = {
-            key: { id: message_id },
-            update: {
-              message: { editedMessage: { message: { conversation: 'New message content' } } }
-            }
-          }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'New message content' } } } }
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -679,16 +604,8 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when the status transition is not allowed (message already read)' do
-        let(:message_id) { 'msg_123' }
-        let!(:message) { create(:message, source_id: message_id, status: 'read') }
-
         it 'does not update the status' do
-          update_payload = { key: { id: message_id }, update: { status: 3 } }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
+          message.update!(status: 'read')
 
           described_class.new(inbox: inbox, params: params).perform
 
@@ -697,16 +614,9 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
 
       context 'when update unsupported status' do
-        let(:message_id) { 'msg_123' }
-        let!(:message) { create(:message, source_id: message_id) } # rubocop:disable RSpec/LetSetup
-
         it 'logs warning for unsupported played status' do
-          update_payload = { key: { id: message_id }, update: { status: 5 } }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
+          update_payload[:update][:status] = 5
+
           allow(Rails.logger).to receive(:warn).with('Baileys unsupported message update status: PLAYED(5)')
 
           described_class.new(inbox: inbox, params: params).perform
@@ -715,12 +625,8 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'logs warning for unsupported status' do
-          update_payload = { key: { id: message_id }, update: { status: 6 } }
-          params = {
-            webhookVerifyToken: webhook_verify_token,
-            event: 'messages.update',
-            data: [update_payload]
-          }
+          update_payload[:update][:status] = 6
+
           allow(Rails.logger).to receive(:warn).with('Baileys unsupported message update status: 6')
 
           described_class.new(inbox: inbox, params: params).perform
