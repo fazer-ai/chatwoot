@@ -150,6 +150,35 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe '#send_unread_conversation' do
+    let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:conversation) { create(:conversation) }
+
+    it 'calls provider service method' do
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, send_unread_conversation: nil)
+      allow(provider_double).to receive(:send_unread_conversation).with(conversation.contact.phone_number, conversation.messages.last)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+        .with(whatsapp_channel: channel)
+        .and_return(provider_double)
+
+      channel.send_unread_conversation(conversation)
+
+      expect(provider_double).to have_received(:send_unread_conversation)
+    end
+
+    it 'does not call method if provider service does not implement it' do
+      channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
+      provider_double = instance_double(Whatsapp::Providers::WhatsappCloudService)
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new)
+        .with(whatsapp_channel: channel)
+        .and_return(provider_double)
+
+      expect do
+        channel.send_unread_conversation(conversation)
+      end.not_to raise_error
+    end
+  end
+
   describe 'callbacks' do
     describe '#disconnect_channel_provider' do
       context 'when provider is baileys' do
