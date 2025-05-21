@@ -31,6 +31,7 @@ module Events::Types
   CONVERSATION_RECORDING = 'conversation.recording'
   CONVERSATION_TYPING_OFF = 'conversation.typing_off'
   CONVERSATION_MENTIONED = 'conversation.mentioned'
+  CONVERSATION_UNREAD = 'conversation.unread'
 
   # message events
   MESSAGE_CREATED = 'message.created'
@@ -38,7 +39,6 @@ module Events::Types
   REPLY_CREATED = 'reply.created'
   MESSAGE_UPDATED = 'message.updated'
   MESSAGES_READ = 'messages.read'
-  MESSAGES_UNREAD = 'messages.unread'
 
   # contact events
   CONTACT_CREATED = 'contact.created'
