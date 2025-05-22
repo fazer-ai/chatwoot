@@ -125,25 +125,29 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     process_response(response)
   end
 
-  def send_unread_conversation(phone_number, last_message) # rubocop:disable Metrics/MethodLength
+  def send_unread_messages(phone_number, messages) # rubocop:disable Metrics/MethodLength
     @phone_number = phone_number
-    if last_message.nil?
-      Rails.logger.warn("send_unread_conversation: last_message is nil for phone_number #{phone_number}")
-      return
-    end
+
+    # NOTE: Order messages in reverse order by external_created_at to ensure the correct order
+    messages = messages.sort_by { |message| message.content_attributes[:external_created_at] }.reverse
 
     response = HTTParty.post(
-      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/unread-chat",
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/chat-modify",
       headers: api_headers,
       body: {
         jid: remote_jid,
-        lastMessage: {
-          key: {
-            id: last_message.source_id,
-            remoteJid: remote_jid,
-            fromMe: last_message.message_type == 'outgoing'
-          },
-          messageTimestamp: last_message.content_attributes[:external_created_at]
+        mod: {
+          markRead: false,
+          lastMessages: messages.map do |message|
+            {
+              key: {
+                id: message.source_id,
+                remoteJid: remote_jid,
+                fromMe: message.message_type == 'outgoing'
+              },
+              messageTimestamp: message.content_attributes[:external_created_at]
+            }
+          end
         }
       }.to_json
     )
@@ -243,5 +247,5 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :toggle_typing_status,
                       :update_presence,
                       :send_read_messages,
-                      :send_unread_conversation
+                      :send_unread_messages
 end

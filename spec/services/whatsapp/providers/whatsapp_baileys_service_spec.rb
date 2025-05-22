@@ -374,18 +374,21 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     end
   end
 
-  describe '#send_unread_conversation' do
-    let(:request_path) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/unread-chat" }
+  describe '#send_unread_messages' do
+    let(:request_path) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/chat-modify" }
     let(:inbox) { whatsapp_channel.inbox }
     let(:conversation) do
       contact = create(:contact, account: inbox.account, name: 'John Doe', phone_number: "+#{test_send_phone_number}")
       contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: test_send_phone_number)
       create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
     end
-    let(:timestamp) { Time.current.to_i }
-    let(:message) do
-      create(:message, conversation: conversation, inbox: whatsapp_channel.inbox, source_id: 'msg_123',
-                       content_attributes: { external_created_at: timestamp })
+    let(:messages) do
+      [
+        create(:message, conversation: conversation, inbox: whatsapp_channel.inbox, source_id: 'msg_123',
+                         content_attributes: { external_created_at: 1.day.ago.to_i }),
+        create(:message, conversation: conversation, inbox: whatsapp_channel.inbox, source_id: 'msg_123',
+                         content_attributes: { external_created_at: 2.days.ago.to_i })
+      ]
     end
 
     it 'sends unread conversation request' do
@@ -394,29 +397,25 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           headers: stub_headers(whatsapp_channel),
           body: {
             jid: test_send_jid,
-            lastMessage: {
-              key: {
-                id: message.source_id,
-                remoteJid: test_send_jid,
-                fromMe: false
-              },
-              messageTimestamp: timestamp
+            mod: {
+              markRead: false,
+              lastMessages: messages.map do |message|
+                {
+                  key: {
+                    id: message.source_id,
+                    remoteJid: test_send_jid,
+                    fromMe: false
+                  },
+                  messageTimestamp: message.content_attributes[:external_created_at]
+                }
+              end
             }
           }.to_json
         ).to_return(status: 200, body: '', headers: {})
 
-      result = service.send_unread_conversation(test_send_phone_number, message)
+      result = service.send_unread_messages(test_send_phone_number, messages)
 
       expect(result).to be(true)
-    end
-
-    it 'logs warning and returns when last_message is nil' do
-      allow(Rails.logger).to receive(:warn).with('send_unread_conversation: last_message is nil for phone_number 551187654321')
-
-      result = service.send_unread_conversation(test_send_phone_number, nil)
-
-      expect(result).to be_nil
-      expect(Rails.logger).to have_received(:warn)
     end
   end
 
