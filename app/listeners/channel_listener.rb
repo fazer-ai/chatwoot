@@ -14,9 +14,9 @@ class ChannelListener < BaseListener
   def conversation_unread(event)
     conversation = event.data[:conversation]
     channel = conversation.inbox.channel
-    return unless channel.respond_to?(:send_unread_conversation)
+    return unless channel.respond_to?(:unread_conversation)
 
-    channel.send_unread_conversation(conversation)
+    channel.unread_conversation(conversation)
   end
 
   def account_presence_updated(event)

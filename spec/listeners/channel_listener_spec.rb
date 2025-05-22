@@ -65,12 +65,12 @@ describe ChannelListener do
     let(:conversation) { create(:conversation, inbox: create(:inbox, channel: channel)) }
     let(:event) { Events::Base.new(Events::Types::CONVERSATION_UNREAD, Time.zone.now, conversation: conversation) }
 
-    it 'calls send_unread_conversation on the channel' do
-      allow(channel).to receive(:send_unread_conversation).with(conversation)
+    it 'calls unread_conversation on the channel' do
+      allow(channel).to receive(:unread_conversation).with(conversation)
 
       listener.conversation_unread(event)
 
-      expect(channel).to have_received(:send_unread_conversation)
+      expect(channel).to have_received(:unread_conversation)
     end
   end
 
