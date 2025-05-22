@@ -150,32 +150,43 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
-  describe '#send_unread_conversation' do
+  describe '#unread_conversation' do
     let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
     let(:conversation) { create(:conversation) }
 
     it 'calls provider service method' do
-      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, send_unread_conversation: nil)
-      allow(provider_double).to receive(:send_unread_conversation).with(conversation.contact.phone_number, conversation.messages.last)
+      message = create(:message, conversation: conversation)
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, send_unread_messages: nil)
+      allow(provider_double).to receive(:send_unread_messages).with(conversation.contact.phone_number, [message])
       allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
         .with(whatsapp_channel: channel)
         .and_return(provider_double)
 
-      channel.send_unread_conversation(conversation)
+      channel.unread_conversation(conversation)
 
-      expect(provider_double).to have_received(:send_unread_conversation)
+      expect(provider_double).to have_received(:send_unread_messages)
     end
 
     it 'does not call method if provider service does not implement it' do
-      channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
-      provider_double = instance_double(Whatsapp::Providers::WhatsappCloudService)
-      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new)
+      # NOTE: This message ensures that there are messages but the provider does not implement the method.
+      create(:message, conversation: conversation)
+
+      expect do
+        channel.unread_conversation(conversation)
+      end
+        .not_to raise_error
+    end
+
+    it 'does not call method if there are no messages' do
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, send_unread_messages: nil)
+      allow(provider_double).to receive(:send_unread_messages)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
         .with(whatsapp_channel: channel)
         .and_return(provider_double)
 
-      expect do
-        channel.send_unread_conversation(conversation)
-      end.not_to raise_error
+      channel.unread_conversation(conversation)
+
+      expect(provider_double).not_to have_received(:send_unread_messages)
     end
   end
 
