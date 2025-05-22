@@ -34,13 +34,13 @@ class ChannelListener < BaseListener
     conversation, last_seen_at = event.data.values_at(:conversation, :last_seen_at)
 
     channel = conversation.inbox.channel
-    return unless channel.respond_to?(:send_read_messages)
+    return unless channel.respond_to?(:read_messages)
 
     messages = conversation.messages.where(message_type: :incoming).where.not(status: :read)
 
     messages = messages.where('updated_at > ?', last_seen_at) if last_seen_at.present?
 
-    channel.send_read_messages(messages, conversation: conversation) if messages.any?
+    channel.read_messages(messages, conversation: conversation) if messages.any?
   end
 
   private
