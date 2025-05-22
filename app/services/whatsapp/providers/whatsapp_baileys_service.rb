@@ -139,14 +139,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         jid: remote_jid,
         mod: {
           markRead: false,
-          lastMessages: {
+          lastMessages: [{
             key: {
               id: message.source_id,
               remoteJid: remote_jid,
               fromMe: message.message_type == 'outgoing'
             },
             messageTimestamp: message.content_attributes[:external_created_at]
-          }
+          }]
         }
       }.to_json
     )
