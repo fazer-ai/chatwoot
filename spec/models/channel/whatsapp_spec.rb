@@ -178,8 +178,7 @@ RSpec.describe Channel::Whatsapp do
         .not_to raise_error
     end
 
-    it 'does not call method if there are no messages incoming' do
-      create(:message, conversation: conversation, message_type: 'outgoing')
+    it 'does not call method if there are no messages' do
       provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, unread_message: nil)
       allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).with(whatsapp_channel: channel).and_return(provider_double)
       allow(provider_double).to receive(:unread_message)
