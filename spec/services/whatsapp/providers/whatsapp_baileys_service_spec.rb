@@ -241,78 +241,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(result).to eq('msg_123')
       end
 
-      context 'when messageTimestamp is a integer' do
-        it 'updates the message external_created_at' do
-          stub_request(:post, request_path)
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                jid: test_send_jid,
-                messageContent: { text: message.content }
-              }.to_json
-            )
-            .to_return(
-              status: 200,
-              headers: { 'Content-Type' => 'application/json' },
-              body: { 'data' => { 'key' => { 'id' => 'msg_123' }, 'messageTimestamp' => 1_748_003_165 } }.to_json
-            )
-
-          service.send_message(test_send_phone_number, message)
-
-          expect(message.reload.content_attributes['external_created_at']).to eq(1_748_003_165)
-        end
-      end
-
-      context 'when messageTimestamp is a string' do
-        it 'updates the message external_created_at' do
-          stub_request(:post, request_path)
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                jid: test_send_jid,
-                messageContent: { text: message.content }
-              }.to_json
-            )
-            .to_return(
-              status: 200,
-              headers: { 'Content-Type' => 'application/json' },
-              body: { 'data' => { 'key' => { 'id' => 'msg_123' }, 'messageTimestamp' => '1748003165' } }.to_json
-            )
-
-          service.send_message(test_send_phone_number, message)
-
-          expect(message.reload.content_attributes['external_created_at']).to eq(1_748_003_165)
-        end
-      end
-
-      context 'when messageTimestamp is a hash' do
-        it 'updates the message external_created_at (high zero)' do
-          stub_request(:post, request_path)
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                jid: test_send_jid,
-                messageContent: { text: message.content }
-              }.to_json
-            )
-            .to_return(
-              status: 200,
-              headers: { 'Content-Type' => 'application/json' },
-              body: {
-                'data' => {
-                  'key' => { 'id' => 'msg_123' },
-                  'messageTimestamp' => { 'low' => 1_748_003_165, 'high' => 0, 'unsigned' => true }
-                }
-              }.to_json
-            )
-
-          service.send_message(test_send_phone_number, message)
-
-          expect(message.reload.content_attributes['external_created_at']).to eq(1_748_003_165)
-        end
-      end
-
-      it 'updates the message external_created_at (high value)' do
+      it 'updates the message external_created_at' do
         stub_request(:post, request_path)
           .with(
             headers: stub_headers(whatsapp_channel),
@@ -324,40 +253,12 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
-            body: {
-              'data' => {
-                'key' => { 'id' => 'msg_123' },
-                'messageTimestamp' => { 'low' => 1_748_003_165, 'high' => 2, 'unsigned' => true }
-              }
-            }.to_json
+            body: { 'data' => { 'key' => { 'id' => 'msg_123' }, 'messageTimestamp' => 1_748_003_165 } }.to_json
           )
 
         service.send_message(test_send_phone_number, message)
 
-        expect(message.reload.content_attributes['external_created_at']).to eq(1_748_003_165 + (2 << 32))
-      end
-
-      context 'when message timestamp is nil' do
-        it 'updates the message external_created_at' do
-          message = create(:message, source_id: 'msg_123')
-          stub_request(:post, request_path)
-            .with(
-              headers: stub_headers(whatsapp_channel),
-              body: {
-                jid: test_send_jid,
-                messageContent: { text: message.content }
-              }.to_json
-            )
-            .to_return(
-              status: 200,
-              headers: { 'Content-Type' => 'application/json' },
-              body: result_body.to_json
-            )
-
-          service.send_message(test_send_phone_number, message)
-
-          expect(message.reload.content_attributes).to be_empty
-        end
+        expect(message.reload.content_attributes['external_created_at']).to eq(1_748_003_165)
       end
     end
 

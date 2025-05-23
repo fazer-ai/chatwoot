@@ -1,4 +1,6 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
+  include BaileysHelper
+
   class MessageContentTypeNotSupported < StandardError; end
   class MessageNotSentError < StandardError; end
 
@@ -225,22 +227,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def update_external_created_at(response)
-    timestamp = extract_message_timestamp(response)
-    @message.update!(external_created_at: timestamp) if timestamp
-  end
-
-  def extract_message_timestamp(response)
     timestamp = response.parsed_response.dig('data', 'messageTimestamp')
     return unless timestamp
 
-    # NOTE: Timestamp might be in this format {"low"=>1748003165, "high"=>0, "unsigned"=>true}
-    return timestamp.to_i unless timestamp.is_a?(Hash) && timestamp.key?('low')
-
-    low = timestamp['low'].to_i
-    high = timestamp.fetch('high', 0).to_i
-
-    # NOTE: Reconstruct the 64-bit timestamp
-    (high << 32) | low
+    external_created_at = extract_baileys_message_timestamp(timestamp)
+    @message.update!(external_created_at: external_created_at)
   end
 
   private_class_method def self.with_error_handling(*method_names)
