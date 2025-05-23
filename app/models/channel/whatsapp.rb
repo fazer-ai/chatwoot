@@ -100,7 +100,7 @@ class Channel::Whatsapp < ApplicationRecord
   def unread_conversation(conversation)
     return unless provider_service.respond_to?(:unread_message)
 
-    last_message = conversation.messages.last
+    last_message = conversation.messages.where(message_type: 'incoming').last
     provider_service.unread_message(conversation.contact.phone_number, last_message) if last_message
   end
 
