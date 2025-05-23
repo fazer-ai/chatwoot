@@ -208,8 +208,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         messageContent: @message_content
       }.to_json
     )
-
-    return response.parsed_response.dig('data', 'key', 'id') if process_response(response)
+    if process_response(response)
+      @message.update!(external_created_at: response.parsed_response.dig('data', 'messageTimestamp'))
+      return response.parsed_response.dig('data', 'key', 'id')
+    end
 
     raise MessageNotSentError
   end
