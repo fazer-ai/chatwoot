@@ -208,13 +208,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         messageContent: @message_content
       }.to_json
     )
-    if process_response(response)
-      timestamp = extract_message_timestamp(response)
-      @message.update!(external_created_at: timestamp) if timestamp
-      return response.parsed_response.dig('data', 'key', 'id')
-    end
 
-    raise MessageNotSentError
+    raise MessageNotSentError unless process_response(response)
+
+    update_external_created_at(response)
+    response.parsed_response.dig('data', 'key', 'id')
   end
 
   def process_response(response)
@@ -226,8 +224,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     "#{@phone_number.delete('+')}@s.whatsapp.net"
   end
 
+  def update_external_created_at(response)
+    timestamp = extract_message_timestamp(response)
+    @message.update!(external_created_at: timestamp) if timestamp
+  end
+
   def extract_message_timestamp(response)
-    return unless (timestamp = response.parsed_response.dig('data', 'messageTimestamp'))
+    timestamp = response.parsed_response.dig('data', 'messageTimestamp')
+    return unless timestamp
 
     # NOTE: Timestamp might be in this format {"low"=>1748003165, "high"=>0, "unsigned"=>true}
     return timestamp.to_i unless timestamp.is_a?(Hash) && timestamp.key?('low')
