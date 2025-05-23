@@ -209,7 +209,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       }.to_json
     )
     if process_response(response)
-      @message.update!(external_created_at: response.parsed_response.dig('data', 'messageTimestamp'))
+      @message.update!(external_created_at: extract_message_timestamp(response))
       return response.parsed_response.dig('data', 'key', 'id')
     end
 
@@ -223,6 +223,21 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def remote_jid
     "#{@phone_number.delete('+')}@s.whatsapp.net"
+  end
+
+  def extract_message_timestamp(response)
+    timestamp = response.parsed_response.dig('data', 'messageTimestamp')
+
+    return timestamp.to_i if timestamp.is_a?(String)
+
+    # NOTE: Timestamp might be in this format {"low"=>1748003165, "high"=>0, "unsigned"=>true}
+    return unless timestamp.is_a?(Hash) && timestamp.key?('low')
+
+    low = timestamp['low'].to_i
+    high = timestamp.fetch('high', 0).to_i
+
+    # NOTE: Reconstruct the 64-bit timestamp
+    (high << 32) | low
   end
 
   private_class_method def self.with_error_handling(*method_names)
