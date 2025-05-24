@@ -589,36 +589,36 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
-      context 'when message is found' do
+      context 'when is a status update' do
         it 'updates the message status' do
           described_class.new(inbox: inbox, params: params).perform
 
           expect(message.reload.status).to eq('delivered')
         end
 
-        it 'updates the message content' do
-          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'New message content' } } } }
+        it 'updates last_seen_at on conversation' do
+          update_payload[:key][:fromMe] = false
+          update_payload[:update][ :status] = 4
+
+          conversation = message.conversation
+          conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
+
+          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
-          original_content = message.content
-          expect(message.reload.content).to eq('New message content')
-          expect(message.is_edited).to be(true)
-          expect(message.previous_content).to eq(original_content)
+          expect(conversation.reload.agent_last_seen_at).to eq(Time.current)
+          expect(conversation.assignee_last_seen_at).to eq(Time.current)
         end
-      end
 
-      context 'when the status transition is not allowed (message already read)' do
-        it 'does not update the status' do
+        it 'does not update the status when the transition is not allowed' do
           message.update!(status: 'read')
 
           described_class.new(inbox: inbox, params: params).perform
 
           expect(message.reload.status).to eq('read')
         end
-      end
 
-      context 'when update unsupported status' do
         it 'logs warning for unsupported played status' do
           update_payload[:update][:status] = 5
 
@@ -637,6 +637,19 @@ describe Whatsapp::IncomingMessageBaileysService do
           described_class.new(inbox: inbox, params: params).perform
 
           expect(Rails.logger).to have_received(:warn)
+        end
+      end
+
+      context 'when is a content update' do
+        it 'updates the message content' do
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'New message content' } } } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          original_content = message.content
+          expect(message.reload.content).to eq('New message content')
+          expect(message.is_edited).to be(true)
+          expect(message.previous_content).to eq(original_content)
         end
       end
     end
