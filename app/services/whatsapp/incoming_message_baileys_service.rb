@@ -277,7 +277,12 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     updates.each do |update|
       @message = nil
       @raw_message = update
-      handle_update
+
+      next handle_update if incoming?
+
+      # NOTE: Shared lock with Whatsapp::SendOnWhatsappService
+      # Avoids race conditions when sending messages.
+      with_baileys_channel_lock_on_outgoing_message(inbox.channel.id) { handle_update }
     end
   end
 
