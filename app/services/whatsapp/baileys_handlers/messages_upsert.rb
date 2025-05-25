@@ -155,7 +155,10 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
 
   def handle_attach_media
     attachment_file = download_attachment_file
-    return unless attachment_file
+    unless attachment_file
+      @message.save!
+      raise AttachmentNotFoundError
+    end
 
     attachment = @message.attachments.build(
       account_id: @message.account_id,
