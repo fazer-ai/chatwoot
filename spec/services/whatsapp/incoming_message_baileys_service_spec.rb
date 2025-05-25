@@ -567,10 +567,13 @@ describe Whatsapp::IncomingMessageBaileysService do
     end
 
     context 'when processing messages.update event' do
-      let!(:message) { create(:message, source_id: 'msg_123', status: 'sent') }
-      let(:update_payload) do
-        { key: { id: 'msg_123' }, update: { status: 3 } }
+      let(:conversation) do
+        contact = create(:contact, account: inbox.account)
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact)
+        create(:conversation, inbox: inbox, contact_inbox: contact_inbox, assignee_id: contact.id)
       end
+      let!(:message) { create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123', status: 'sent') }
+      let(:update_payload) { { key: { id: 'msg_123' }, update: { status: 3 } } }
       let(:params) do
         {
           webhookVerifyToken: webhook_verify_token,
@@ -600,7 +603,6 @@ describe Whatsapp::IncomingMessageBaileysService do
           update_payload[:key][:fromMe] = false
           update_payload[:update][ :status] = 4
 
-          conversation = message.conversation
           conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
 
           freeze_time
@@ -611,7 +613,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(conversation.assignee_last_seen_at).to eq(Time.current)
         end
 
-        it 'does not update the status when the transition is not allowed' do
+        it "does not downgrade a 'read' message to delivered" do
           message.update!(status: 'read')
 
           described_class.new(inbox: inbox, params: params).perform
