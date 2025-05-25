@@ -1,4 +1,6 @@
 module Whatsapp::BaileysHandlers::MessagesUpdate
+  include Whatsapp::IncomingMessageServiceHelpers
+
   class MessageNotFoundError < StandardError; end
 
   def process_messages_update
