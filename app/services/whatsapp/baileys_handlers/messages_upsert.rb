@@ -21,6 +21,8 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     set_contact
 
     unless @contact
+      clear_message_source_id_from_redis
+
       Rails.logger.warn "Contact not found for message: #{message_id}"
       return
     end
