@@ -1,4 +1,6 @@
-module Whatsapp::BaileysHandlers::Helpers
+module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
+  include Whatsapp::IncomingMessageServiceHelpers
+
   def message_id
     @raw_message[:key][:id]
   end
@@ -88,5 +90,39 @@ module Whatsapp::BaileysHandlers::Helpers
     when 'file'
       @raw_message.dig(:message, :documentMessage, :mimetype)
     end
+  end
+
+  def phone_number_from_jid
+    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
+    # https://github.com/WhiskeySockets/Baileys/blob/v6.7.16/src/WABinary/jid-utils.ts#L19
+    @phone_number_from_jid ||= @raw_message[:key][:remoteJid].split('@').first.split(':').first.split('_').first
+  end
+
+  def contact_name
+    # NOTE: `verifiedBizName` is only available for business accounts and has a higher priority than `pushName`.
+    name = @raw_message[:verifiedBizName].presence || @raw_message[:pushName]
+    return name if self_message? || incoming?
+
+    phone_number_from_jid
+  end
+
+  def self_message?
+    # TODO: Handle denormalized Brazilian phone numbers
+    phone_number_from_jid == inbox.channel.phone_number.delete('+')
+  end
+
+  def message_under_process?
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: message_id)
+    Redis::Alfred.get(key)
+  end
+
+  def cache_message_source_id_in_redis
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: message_id)
+    ::Redis::Alfred.setex(key, true)
+  end
+
+  def clear_message_source_id_from_redis
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: message_id)
+    ::Redis::Alfred.delete(key)
   end
 end
