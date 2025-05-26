@@ -89,7 +89,9 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   def handle_attach_media
     attachment_file = download_attachment_file
     unless attachment_file
+      @message.is_unsupportedd = true
       @message.save!
+
       raise AttachmentNotFoundError
     end
 
