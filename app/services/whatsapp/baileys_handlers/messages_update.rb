@@ -60,8 +60,10 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
   end
 
   def handle_edited_content
+    original_message = @message
     @raw_message = @raw_message.dig(:update, :message, :editedMessage)
     content = message_content
+    @message = original_message
 
     unless content
       Rails.logger.warn 'No valid message content found in the edit event'
