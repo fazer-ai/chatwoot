@@ -1,4 +1,4 @@
-module Whatsapp::BaileysHandlers::MessagesUpsert
+module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/ModuleLength
   include Whatsapp::IncomingMessageServiceHelpers
   include Whatsapp::BaileysHandlers::Helpers
   include BaileysHelper
@@ -51,6 +51,19 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
     @contact = contact_inbox.contact
 
     @contact.update!(name: push_name) if @contact.name == phone_number_from_jid
+  end
+
+  def set_conversation
+    # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved
+    @conversation = if @inbox.lock_to_single_conversation
+                      @contact_inbox.conversations.last
+                    else
+                      @contact_inbox.conversations
+                                    .where.not(status: :resolved).last
+                    end
+    return if @conversation
+
+    @conversation = ::Conversation.create!(conversation_params)
   end
 
   def handle_create_message
