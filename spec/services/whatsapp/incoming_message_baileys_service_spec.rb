@@ -643,11 +643,11 @@ describe Whatsapp::IncomingMessageBaileysService do
 
       context 'when is a content update' do
         it 'updates the message content' do
+          original_content = message.content
           update_payload[:update] = { message: { editedMessage: { message: { conversation: 'New message content' } } } }
 
           described_class.new(inbox: inbox, params: params).perform
 
-          original_content = message.content
           expect(message.reload.content).to eq('New message content')
           expect(message.is_edited).to be(true)
           expect(message.previous_content).to eq(original_content)
