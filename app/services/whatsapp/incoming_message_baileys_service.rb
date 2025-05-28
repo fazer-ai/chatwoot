@@ -285,7 +285,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def update_status
     status = status_mapper
-    update_last_seen_at if @raw_message.dig(:key, :fromMe) == false && status == 'read'
+    update_last_seen_at if incoming? && status == 'read'
     @message.update!(status: status) if status.present? && status_transition_allowed?(status)
   end
 
