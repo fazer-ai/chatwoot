@@ -317,11 +317,10 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
 
   def update_last_seen_at
     conversation = @message.conversation
+    to_update = { agent_last_seen_at: Time.current }
+    to_update[:assignee_last_seen_at] = Time.current if conversation.assignee_id.present?
 
-    # rubocop:disable Rails/SkipsModelValidations
-    conversation.update_column(:agent_last_seen_at, Time.current)
-    conversation.update_column(:assignee_last_seen_at, Time.current) if conversation.assignee_id.present?
-    # rubocop:enable Rails/SkipsModelValidations
+    conversation.update_columns(to_update) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def status_transition_allowed?(new_status)
