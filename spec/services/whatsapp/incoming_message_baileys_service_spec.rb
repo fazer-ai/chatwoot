@@ -599,13 +599,12 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.reload.status).to eq('delivered')
         end
 
-        it 'updates last_seen_at on conversation' do
+        it 'updates conversation agent_last_seen_at and assignee_last_seen_at' do
+          freeze_time
           update_payload[:key][:fromMe] = false
-          update_payload[:update][ :status] = 4
+          update_payload[:update][:status] = 4
 
           conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
-
-          freeze_time
 
           described_class.new(inbox: inbox, params: params).perform
 
