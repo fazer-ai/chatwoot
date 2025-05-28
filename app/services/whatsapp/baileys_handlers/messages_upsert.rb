@@ -1,8 +1,11 @@
 module Whatsapp::BaileysHandlers::MessagesUpsert
+  include Whatsapp::IncomingMessageServiceHelpers
   include Whatsapp::BaileysHandlers::Helpers
   include BaileysHelper
 
   class AttachmentNotFoundError < StandardError; end
+
+  private
 
   def process_messages_upsert
     messages = processed_params[:data][:messages]

@@ -1,6 +1,8 @@
 module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   include Whatsapp::IncomingMessageServiceHelpers
 
+  private
+
   def message_id
     @raw_message[:key][:id]
   end
