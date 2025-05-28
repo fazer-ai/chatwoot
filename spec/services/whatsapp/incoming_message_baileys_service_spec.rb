@@ -423,6 +423,19 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(attachment.file.filename.to_s).to eq("image_msg_123_#{Time.current.strftime('%Y%m%d')}.png")
           expect(attachment.file.content_type).to eq('image/png')
         end
+
+        it 'throws an error if attachment download fails' do
+          allow(Down).to receive(:download).with('https://baileys.api/media/msg_123', headers: inbox.channel.api_headers)
+                                           .and_raise(Down::ResponseError.new('Attachment not found'))
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.to raise_error(Whatsapp::IncomingMessageBaileysService::AttachmentNotFoundError)
+
+          message = inbox.conversations.last.messages.last
+          expect(message).to be_present
+          expect(message.is_unsupported).to be(true)
+        end
       end
 
       context 'when message type is video' do
