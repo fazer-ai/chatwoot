@@ -90,11 +90,12 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   end
 
   def handle_attach_media
-    attachment_file = download_attachment_file
-    unless attachment_file
-      @message.is_unsupportedd = true
-      @message.save!
+    begin
+      attachment_file = download_attachment_file
+    rescue Down::Error => e
+      @message.update!(is_unsupported: true)
 
+      Rails.logger.error "Failed to download attachment for message #{message_id}: #{e.message}"
       raise AttachmentNotFoundError
     end
 
