@@ -3,6 +3,8 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
 
   class MessageNotFoundError < StandardError; end
 
+  private
+
   def process_messages_update
     updates = processed_params[:data]
     updates.each do |update|

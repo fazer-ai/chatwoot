@@ -1,6 +1,8 @@
 module Whatsapp::BaileysHandlers::ConnectionUpdate
   include Whatsapp::BaileysHandlers::Helpers
 
+  private
+
   def process_connection_update
     data = processed_params[:data]
 
