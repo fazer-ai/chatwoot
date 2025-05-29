@@ -11,14 +11,19 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
       @contact_inbox = nil
       @contact = nil
       @raw_message = message
-      handle_message
+
+      next handle_message if incoming?
+
+      # NOTE: Shared lock with Whatsapp::SendOnWhatsappService
+      # Avoids race conditions when sending messages.
+      with_baileys_channel_lock_on_outgoing_message(inbox.channel.id) { handle_message }
     end
   end
 
   def handle_message
     return if jid_type != 'user'
-    return if find_message_by_source_id(message_id) || message_under_process?
     return if message_type == 'protocol'
+    return if find_message_by_source_id(raw_message_id) || message_under_process?
 
     cache_message_source_id_in_redis
     set_contact
@@ -26,7 +31,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
     unless @contact
       clear_message_source_id_from_redis
 
-      Rails.logger.warn "Contact not found for message: #{message_id}"
+      Rails.logger.warn "Contact not found for message: #{raw_message_id}"
       return
     end
 
@@ -62,7 +67,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
       content: message_content,
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
-      source_id: message_id,
+      source_id: raw_message_id,
       sender: incoming? ? @contact : @inbox.account.account_users.first.user,
       sender_type: incoming? ? 'Contact' : 'User',
       message_type: incoming? ? :incoming : :outgoing,
@@ -75,7 +80,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   end
 
   def message_content_attributes
-    content_attributes = { external_created_at: extract_baileys_message_timestamp(@raw_message[:messageTimestamp]) }
+    content_attributes = { external_created_at: baileys_extract_message_timestamp(@raw_message[:messageTimestamp]) }
     if message_type == 'reaction'
       content_attributes[:in_reply_to_external_id] = @raw_message.dig(:message, :reactionMessage, :key, :id)
       content_attributes[:is_reaction] = true
@@ -98,7 +103,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   rescue Down::Error => e
     @message.update!(is_unsupported: true)
 
-    Rails.logger.error "Failed to download attachment for message #{message_id}: #{e.message}"
+    Rails.logger.error "Failed to download attachment for message #{raw_message_id}: #{e.message}"
   end
 
   def download_attachment_file
@@ -110,6 +115,6 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
     return filename if filename.present?
 
     ext = ".#{message_mimetype.split(';').first.split('/').last}" if message_mimetype.present?
-    "#{file_content_type}_#{message_id}_#{Time.current.strftime('%Y%m%d')}#{ext}"
+    "#{file_content_type}_#{raw_message_id}_#{Time.current.strftime('%Y%m%d')}#{ext}"
   end
 end
