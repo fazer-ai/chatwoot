@@ -1,9 +1,6 @@
-module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/ModuleLength
-  include Whatsapp::IncomingMessageServiceHelpers
+module Whatsapp::BaileysHandlers::MessagesUpsert
   include Whatsapp::BaileysHandlers::Helpers
   include BaileysHelper
-
-  class AttachmentNotFoundError < StandardError; end
 
   private
 
@@ -53,19 +50,6 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     @contact.update!(name: push_name) if @contact.name == phone_number_from_jid
   end
 
-  def set_conversation
-    # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved
-    @conversation = if @inbox.lock_to_single_conversation
-                      @contact_inbox.conversations.last
-                    else
-                      @contact_inbox.conversations
-                                    .where.not(status: :resolved).last
-                    end
-    return if @conversation
-
-    @conversation = ::Conversation.create!(conversation_params)
-  end
-
   def handle_create_message
     return if message_type == 'protocol' ||
               (message_type == 'reaction' && message_content.blank?)
@@ -103,14 +87,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
   end
 
   def handle_attach_media
-    begin
-      attachment_file = download_attachment_file
-    rescue Down::Error => e
-      @message.update!(is_unsupported: true)
-
-      Rails.logger.error "Failed to download attachment for message #{message_id}: #{e.message}"
-      raise AttachmentNotFoundError
-    end
+    attachment_file = download_attachment_file
 
     attachment = @message.attachments.build(
       account_id: @message.account_id,
@@ -118,6 +95,10 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
       file: { io: attachment_file, filename: filename, content_type: message_mimetype }
     )
     attachment.meta = { is_recorded_audio: true } if @raw_message.dig(:message, :audioMessage, :ptt)
+  rescue Down::Error => e
+    @message.update!(is_unsupported: true)
+
+    Rails.logger.error "Failed to download attachment for message #{message_id}: #{e.message}"
   end
 
   def download_attachment_file
