@@ -642,6 +642,16 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(Rails.logger).to have_received(:warn)
         end
+
+        it 'logs warning for unsupported status' do
+          update_payload[:update][:status] = 6
+
+          allow(Rails.logger).to receive(:warn).with('Baileys unsupported message update status: 6')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Rails.logger).to have_received(:warn)
+        end
       end
 
       context 'when is a content update' do
