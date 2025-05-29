@@ -586,7 +586,6 @@ describe Whatsapp::IncomingMessageBaileysService do
       end
       let!(:message) { create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123', status: 'sent') }
       let(:update_payload) { { key: { id: 'msg_123' }, update: { status: 3 } } }
-
       let(:params) do
         {
           webhookVerifyToken: webhook_verify_token,
