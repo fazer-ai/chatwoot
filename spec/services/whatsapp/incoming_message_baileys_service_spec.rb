@@ -424,14 +424,13 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(attachment.file.content_type).to eq('image/png')
         end
 
-        it 'throws an error if attachment download fails' do
-          allow(Down).to receive(:download).with('https://baileys.api/media/msg_123', headers: inbox.channel.api_headers)
-                                           .and_raise(Down::ResponseError.new('Attachment not found'))
+        it 'sets message as unsupported and logs error if attachment download fails' do
+          allow(Down).to receive(:download).and_raise(Down::ResponseError.new('Attachment not found'))
+          allow(Rails.logger).to receive(:error).with('Failed to download attachment for message msg_123: Attachment not found')
 
-          expect do
-            described_class.new(inbox: inbox, params: params).perform
-          end.to raise_error(Whatsapp::IncomingMessageBaileysService::AttachmentNotFoundError)
+          described_class.new(inbox: inbox, params: params).perform
 
+          expect(Rails.logger).to have_received(:error)
           message = inbox.conversations.last.messages.last
           expect(message).to be_present
           expect(message.is_unsupported).to be(true)
