@@ -51,6 +51,15 @@ export default {
       }
 
       try {
+        const providerConfig = {
+          mark_as_read: this.markAsRead,
+        };
+
+        if (this.apiKey || this.providerUrl) {
+          providerConfig.api_key = this.apiKey;
+          providerConfig.url = this.providerUrl;
+        }
+
         const whatsappChannel = await this.$store.dispatch(
           'inboxes/createChannel',
           {
@@ -59,14 +68,7 @@ export default {
               type: 'whatsapp',
               phone_number: this.phoneNumber,
               provider: 'baileys',
-              provider_config:
-                this.apiKey || this.providerUrl
-                  ? {
-                      api_key: this.apiKey,
-                      url: this.providerUrl,
-                      mark_as_read: this.markAsRead,
-                    }
-                  : { mark_as_read: this.markAsRead },
+              provider_config: providerConfig,
             },
           }
         );
