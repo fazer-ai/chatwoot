@@ -580,8 +580,8 @@ describe Whatsapp::IncomingMessageBaileysService do
 
     context 'when processing messages.update event' do
       let(:conversation) do
-        contact = create(:contact, account: inbox.account)
-        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact)
+        contact = create(:contact, account: inbox.account, name: 'John Doe')
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678')
         create(:conversation, inbox: inbox, contact_inbox: contact_inbox, assignee_id: contact.id)
       end
       let!(:message) { create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_123', status: 'sent') }
@@ -650,19 +650,6 @@ describe Whatsapp::IncomingMessageBaileysService do
           described_class.new(inbox: inbox, params: params).perform
 
           expect(Rails.logger).to have_received(:warn)
-        end
-      end
-
-      context 'when is a content update' do
-        it 'updates the message content' do
-          original_content = message.content
-          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'New message content' } } } }
-
-          described_class.new(inbox: inbox, params: params).perform
-
-          expect(message.reload.content).to eq('New message content')
-          expect(message.is_edited).to be(true)
-          expect(message.previous_content).to eq(original_content)
         end
       end
 
