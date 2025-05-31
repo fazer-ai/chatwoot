@@ -45,12 +45,14 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                         'audio'
                       elsif msg.key?(:videoMessage)
                         'video'
-                      elsif msg.key?(:documentMessage)
+                      elsif msg.key?(:documentMessage) || msg.key?(:documentWithCaptionMessage)
                         'file'
                       elsif msg.key?(:stickerMessage)
                         'sticker'
                       elsif msg.key?(:reactionMessage)
                         'reaction'
+                      elsif msg.key?(:editedMessage)
+                        'edited'
                       elsif msg.key?(:protocolMessage)
                         'protocol'
                       else
@@ -58,7 +60,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                       end
   end
 
-  def message_content
+  def message_content # rubocop:disable Metrics/CyclomaticComplexity
     case message_type
     when 'text'
       @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
@@ -66,6 +68,9 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       @raw_message.dig(:message, :imageMessage, :caption)
     when 'video'
       @raw_message.dig(:message, :videoMessage, :caption)
+    when 'file'
+      @raw_message.dig(:message, :documentMessage, :caption).presence ||
+        @raw_message.dig(:message, :documentWithCaptionMessage, :message, :documentMessage, :caption)
     when 'reaction'
       @raw_message.dig(:message, :reactionMessage, :text)
     end
@@ -90,7 +95,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'audio'
       @raw_message.dig(:message, :audioMessage, :mimetype)
     when 'file'
-      @raw_message.dig(:message, :documentMessage, :mimetype)
+      @raw_message.dig(:message, :documentMessage, :mimetype).presence ||
+        @raw_message.dig(:message, :documentWithCaptionMessage, :message, :documentMessage, :mimetype)
     end
   end
 
@@ -111,6 +117,12 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   def self_message?
     # TODO: Handle denormalized Brazilian phone numbers
     phone_number_from_jid == inbox.channel.phone_number.delete('+')
+  end
+
+  def ignore_message?
+    message_type == 'protocol' ||
+      message_type == 'edited' ||
+      (message_type == 'reaction' && message_content.blank?)
   end
 
   def message_under_process?

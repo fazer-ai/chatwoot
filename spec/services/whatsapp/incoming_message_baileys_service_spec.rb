@@ -200,6 +200,16 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is edited message' do
+        it 'does not create contact inbox nor message' do
+          raw_message[:message] = { editedMessage: { message: { protocolMessage: { editedMessage: { documentMessage: 1 } } } } }
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
+        end
+      end
+
       context 'when message is not from a user' do
         it 'does not create a conversation' do
           raw_message[:key][:remoteJid] = 'status@broadcast'
@@ -510,6 +520,28 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(attachment.file_type).to eq('file')
           expect(attachment.file.filename.to_s).to eq(filename)
           expect(attachment.file.content_type).to eq('application/pdf')
+        end
+
+        it 'creates the message with caption' do
+          params[:data][:messages].first[:message] = {
+            documentWithCaptionMessage: {
+              message: {
+                documentMessage: {
+                  fileName: filename,
+                  caption: 'Hello from Baileys'
+                }
+              }
+            }
+          }
+
+          stub_download
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          message = inbox.conversations.last.messages.last
+
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
         end
       end
 
