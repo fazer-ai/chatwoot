@@ -22,7 +22,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
 
   def handle_message
     return if jid_type != 'user'
-    return if message_type == 'protocol'
+    return if ignore_message?
     return if find_message_by_source_id(raw_message_id) || message_under_process?
 
     cache_message_source_id_in_redis
@@ -56,8 +56,6 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   end
 
   def handle_create_message
-    return if ignore_message?
-
     create_message(attach_media: %w[image file video audio sticker].include?(message_type))
   end
 
