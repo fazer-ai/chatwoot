@@ -119,6 +119,12 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     phone_number_from_jid == inbox.channel.phone_number.delete('+')
   end
 
+  def ignore_message?
+    message_type == 'protocol' ||
+      message_type == 'edited' ||
+      (message_type == 'reaction' && message_content.blank?)
+  end
+
   def message_under_process?
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: raw_message_id)
     Redis::Alfred.get(key)
