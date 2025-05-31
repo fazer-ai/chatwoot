@@ -45,7 +45,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                         'audio'
                       elsif msg.key?(:videoMessage)
                         'video'
-                      elsif msg.key?(:documentMessage)
+                      elsif msg.key?(:documentMessage) || msg.key?(:documentWithCaptionMessage)
                         'file'
                       elsif msg.key?(:stickerMessage)
                         'sticker'
@@ -58,7 +58,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                       end
   end
 
-  def message_content
+  def message_content # rubocop:disable Metrics/CyclomaticComplexity
     case message_type
     when 'text'
       @raw_message.dig(:message, :conversation) || @raw_message.dig(:message, :extendedTextMessage, :text)
@@ -66,6 +66,9 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       @raw_message.dig(:message, :imageMessage, :caption)
     when 'video'
       @raw_message.dig(:message, :videoMessage, :caption)
+    when 'file'
+      @raw_message.dig(:message, :documentMessage, :caption).presence ||
+        @raw_message.dig(:message, :documentWithCaptionMessage, :message, :documentMessage, :caption)
     when 'reaction'
       @raw_message.dig(:message, :reactionMessage, :text)
     end
