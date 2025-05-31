@@ -200,6 +200,16 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is edited message' do
+        it 'does not create contact inbox nor message' do
+          raw_message[:message] = { editedMessage: { message: { protocolMessage: { editedMessage: { documentMessage: 1 } } } } }
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
+        end
+      end
+
       context 'when message is not from a user' do
         it 'does not create a conversation' do
           raw_message[:key][:remoteJid] = 'status@broadcast'
@@ -523,6 +533,7 @@ describe Whatsapp::IncomingMessageBaileysService do
               }
             }
           }
+
           stub_download
 
           described_class.new(inbox: inbox, params: params).perform
