@@ -57,6 +57,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
 
   def handle_create_message
     return if message_type == 'protocol' ||
+              message_type == 'edited' ||
               (message_type == 'reaction' && message_content.blank?)
 
     create_message(attach_media: %w[image file video audio sticker].include?(message_type))

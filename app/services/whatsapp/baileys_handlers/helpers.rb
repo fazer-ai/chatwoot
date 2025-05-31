@@ -51,6 +51,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                         'sticker'
                       elsif msg.key?(:reactionMessage)
                         'reaction'
+                      elsif msg.key?(:editedMessage)
+                        'edited'
                       elsif msg.key?(:protocolMessage)
                         'protocol'
                       else
@@ -93,7 +95,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'audio'
       @raw_message.dig(:message, :audioMessage, :mimetype)
     when 'file'
-      @raw_message.dig(:message, :documentMessage, :mimetype)
+      @raw_message.dig(:message, :documentMessage, :mimetype).presence ||
+        @raw_message.dig(:message, :documentWithCaptionMessage, :message, :documentMessage, :mimetype)
     end
   end
 
