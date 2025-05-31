@@ -511,6 +511,27 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(attachment.file.filename.to_s).to eq(filename)
           expect(attachment.file.content_type).to eq('application/pdf')
         end
+
+        it 'creates the message with caption' do
+          params[:data][:messages].first[:message] = {
+            documentWithCaptionMessage: {
+              message: {
+                documentMessage: {
+                  fileName: filename,
+                  caption: 'Hello from Baileys'
+                }
+              }
+            }
+          }
+          stub_download
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          message = inbox.conversations.last.messages.last
+
+          expect(message).to be_present
+          expect(message.content).to eq('Hello from Baileys')
+        end
       end
 
       context 'when message type is audio' do
