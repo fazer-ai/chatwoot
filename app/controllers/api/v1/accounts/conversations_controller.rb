@@ -110,7 +110,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def update_last_seen
-    mark_messages_as_read
+    send_whatsapp_read_receipt if @conversation.inbox.channel.is_a?(Channel::Whatsapp)
 
     update_last_seen_on_conversation(DateTime.now.utc, assignee?)
   end
@@ -205,7 +205,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversation.assignee_id? && Current.user == @conversation.assignee
   end
 
-  def mark_messages_as_read
+  def send_whatsapp_read_receipt
     # NOTE: This is the default behavior, so `mark_as_read` being `nil` is the same as `true`.
     return if @conversation.inbox.channel.provider_config&.dig('mark_as_read') == false
     return unless assignee?
