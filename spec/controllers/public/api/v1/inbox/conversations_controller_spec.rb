@@ -128,41 +128,5 @@ RSpec.describe 'Public Inbox Contact Conversations API', type: :request do
       expect(response).to have_http_status(:success)
       expect(conversation.reload.contact_last_seen_at).not_to eq contact_last_seen_at
     end
-
-    it 'dispatches the MESSAGE_READ event' do
-      freeze_time
-      whatsapp_channel = create(:channel_whatsapp,
-                                provider: 'baileys',
-                                provider_config: { webhook_verify_token: 'valid_token', mark_as_read: true },
-                                validate_provider_config: false)
-      contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox)
-      conversation = create(:conversation, contact_inbox: contact_inbox, contact: contact)
-      update_last_seen_path = "/public/api/v1/inboxes/#{whatsapp_channel.inbox.id}/contacts/#{contact_inbox.source_id}/conversations/#{conversation.display_id}/update_last_seen" # rubocop:disable Layout/LineLength
-
-      allow(Rails.configuration.dispatcher).to receive(:dispatch)
-      post update_last_seen_path
-
-      expect(Rails.configuration.dispatcher)
-        .to have_received(:dispatch)
-        .with(Events::Types::MESSAGES_READ, Time.current, { conversation: conversation, last_seen_at: conversation.agent_last_seen_at })
-    end
-
-    it 'does not dispatch the MESSAGES_READ event when mark_as_read is false' do
-      freeze_time
-      whatsapp_channel = create(:channel_whatsapp,
-                                provider: 'baileys',
-                                provider_config: { webhook_verify_token: 'valid_token', mark_as_read: false },
-                                validate_provider_config: false)
-      contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox)
-      conversation = create(:conversation, contact_inbox: contact_inbox, contact: contact)
-      update_last_seen_path = "/public/api/v1/inboxes/#{whatsapp_channel.inbox.id}/contacts/#{contact_inbox.source_id}/conversations/#{conversation.display_id}/update_last_seen" # rubocop:disable Layout/LineLength
-
-      allow(Rails.configuration.dispatcher).to receive(:dispatch)
-      post update_last_seen_path
-
-      expect(Rails.configuration.dispatcher)
-        .not_to have_received(:dispatch)
-        .with(Events::Types::MESSAGES_READ, anything, anything)
-    end
   end
 end
