@@ -206,7 +206,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def mark_messages_as_read
-    return unless @conversation.inbox.channel.provider_config&.[]('mark_as_read')
+    # NOTE: This is the default behavior, so `mark_as_read` being `nil` is the same as `true`.
+    return if @conversation.inbox.channel.provider_config&.dig('mark_as_read') == false
     return unless assignee?
 
     # NOTE: Use old `agent_last_seen_at`, so we reference messages received after that
