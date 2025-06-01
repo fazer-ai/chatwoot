@@ -270,7 +270,7 @@
           "ERROR": "Por favor, insira uma URL válida"
         },
         "MARK_AS_READ": {
-          "LABEL": "Confirmações de leitura"
+          "LABEL": "Enviar confirmações de leitura"
         },
         "ADVANCED_OPTIONS": "Opções avançadas",
         "BAILEYS": {

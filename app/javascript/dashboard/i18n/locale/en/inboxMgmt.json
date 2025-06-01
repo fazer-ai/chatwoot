@@ -270,7 +270,7 @@
           "ERROR": "Please enter a valid URL"
         },
         "MARK_AS_READ": {
-          "LABEL": "Read receipts"
+          "LABEL": "Send read receipts"
         },
         "ADVANCED_OPTIONS": "Advanced options",
         "BAILEYS": {
