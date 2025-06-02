@@ -92,9 +92,9 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   def read_messages(messages, conversation:)
+    return unless provider_service.respond_to?(:read_messages)
     # NOTE: This is the default behavior, so `mark_as_read` being `nil` is the same as `true`.
     return if provider_config&.dig('mark_as_read') == false
-    return unless provider_service.respond_to?(:read_messages)
 
     provider_service.read_messages(conversation.contact.phone_number, messages)
   end
