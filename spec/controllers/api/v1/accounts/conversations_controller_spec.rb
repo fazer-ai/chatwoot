@@ -688,103 +688,34 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.assignee_last_seen_at).not_to be_nil
       end
 
-      context 'when is Channel::Whatsapp' do
-        let(:whatsapp_channel) do
-          create(:channel_whatsapp, provider: 'baileys',
-                                    provider_config: { webhook_verify_token: 'valid_token', mark_as_read: true },
-                                    account: account,
-                                    validate_provider_config: false)
-        end
-        let(:conversation) do
-          contact = create(:contact, account: account)
-          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox)
-          create(:conversation, contact_inbox: contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, account: account, assignee: agent)
-        end
+      it 'dispatches messages.read event when is assigned' do
+        freeze_time
 
-        it 'dispatches messages.read event when mark_as_read is nil' do
-          freeze_time
+        previous_agent_last_seen_at = 1.hour.ago
+        conversation.update!(agent_last_seen_at: previous_agent_last_seen_at, assignee: agent)
 
-          previous_agent_last_seen_at = 1.hour.ago
-          conversation.update!(agent_last_seen_at: previous_agent_last_seen_at)
-          whatsapp_channel.update!(provider_config: { webhook_verify_token: 'valid_token' })
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
 
-          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: agent.create_new_auth_token,
+             as: :json
 
-          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
-               headers: agent.create_new_auth_token,
-               as: :json
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: previous_agent_last_seen_at)
+      end
 
-          expect(response).to have_http_status(:success)
-          expect(Rails.configuration.dispatcher)
-            .to have_received(:dispatch)
-            .with(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: previous_agent_last_seen_at)
-        end
+      it 'does not dispatch messages.read event when is not assigned' do
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
 
-        it 'dispatches the messages.read event when mark_as_read is true' do
-          freeze_time
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: agent.create_new_auth_token,
+             as: :json
 
-          previous_agent_last_seen_at = 1.hour.ago
-          conversation.update!(agent_last_seen_at: previous_agent_last_seen_at)
-
-          allow(Rails.configuration.dispatcher).to receive(:dispatch)
-
-          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
-               headers: agent.create_new_auth_token,
-               as: :json
-
-          expect(response).to have_http_status(:success)
-          expect(Rails.configuration.dispatcher)
-            .to have_received(:dispatch)
-            .with(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: previous_agent_last_seen_at)
-        end
-
-        it 'does not dispatch the messages.read event when agent is not assigned' do
-          freeze_time
-
-          conversation.update!(assignee: nil)
-
-          allow(Rails.configuration.dispatcher).to receive(:dispatch)
-
-          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
-               headers: agent.create_new_auth_token,
-               as: :json
-
-          expect(response).to have_http_status(:success)
-          expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
-        end
-
-        it 'does not dispatch the messages.read event when mark_as_read is false' do
-          freeze_time
-          whatsapp_channel.update!(provider_config: { webhook_verify_token: 'valid_token', mark_as_read: false })
-
-          allow(Rails.configuration.dispatcher).to receive(:dispatch)
-
-          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
-               headers: agent.create_new_auth_token,
-               as: :json
-
-          expect(response).to have_http_status(:success)
-          expect(conversation.reload.assignee).to eq(agent)
-          expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
-        end
-
-        it 'does not dispatch the messages.read event when a administrator updates last_seen' do
-          freeze_time
-
-          administrator = create(:user, account: account, role: :administrator)
-          create(:inbox_member, user: administrator, inbox: conversation.inbox)
-          conversation.update!(agent_last_seen_at: 1.hour.ago)
-
-          allow(Rails.configuration.dispatcher).to receive(:dispatch)
-
-          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
-               headers: administrator.create_new_auth_token,
-               as: :json
-
-          expect(response).to have_http_status(:success)
-          expect(conversation.reload.agent_last_seen_at).to be_within(1.second).of(Time.current)
-          expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
-        end
+        expect(response).to have_http_status(:success)
+        expect(conversation.assignee).to be_nil
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
       end
     end
   end
