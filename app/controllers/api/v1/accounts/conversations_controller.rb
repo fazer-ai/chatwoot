@@ -110,7 +110,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def update_last_seen
-    send_whatsapp_read_receipt if @conversation.inbox.channel.is_a?(Channel::Whatsapp)
+    dispatch_messages_read_event if assignee?
 
     update_last_seen_on_conversation(DateTime.now.utc, assignee?)
   end
@@ -205,11 +205,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversation.assignee_id? && Current.user == @conversation.assignee
   end
 
-  def send_whatsapp_read_receipt
-    # NOTE: This is the default behavior, so `mark_as_read` being `nil` is the same as `true`.
-    return if @conversation.inbox.channel.provider_config&.dig('mark_as_read') == false
-    return unless assignee?
-
+  def dispatch_messages_read_event
     # NOTE: Use old `agent_last_seen_at`, so we reference messages received after that
     Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGES_READ, Time.zone.now, conversation: @conversation,
                                                                                          last_seen_at: @conversation.agent_last_seen_at)
