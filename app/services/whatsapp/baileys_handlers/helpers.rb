@@ -55,6 +55,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                         'edited'
                       elsif msg.key?(:protocolMessage)
                         'protocol'
+                      elsif msg.key?(:messageContextInfo)
+                        'context'
                       else
                         'unsupported'
                       end
@@ -120,8 +122,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   end
 
   def ignore_message?
-    message_type == 'protocol' ||
-      message_type == 'edited' ||
+    message_type.in?(%w[protocol context edited]) ||
       (message_type == 'reaction' && message_content.blank?)
   end
 

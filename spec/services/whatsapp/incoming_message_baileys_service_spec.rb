@@ -200,6 +200,18 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is context message' do
+        it 'does not create contact inbox nor message' do
+          raw_message[:message] = { 'messageContextInfo': { 'deviceListMetadata': {},
+                                                            'deviceListMetadataVersion': 2,
+                                                            'messageSecret': '********' } }
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
+        end
+      end
+
       context 'when message is edited message' do
         it 'does not create contact inbox nor message' do
           raw_message[:message] = { editedMessage: { message: { protocolMessage: { editedMessage: { documentMessage: 1 } } } } }
