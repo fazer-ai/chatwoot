@@ -688,7 +688,7 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.assignee_last_seen_at).not_to be_nil
       end
 
-      it 'dispatches messages.read event when is assigned' do
+      it 'dispatches messages.read event when user is assignee' do
         freeze_time
 
         previous_agent_last_seen_at = 1.hour.ago
@@ -706,7 +706,7 @@ RSpec.describe 'Conversations API', type: :request do
           .with(Events::Types::MESSAGES_READ, Time.zone.now, conversation: conversation, last_seen_at: previous_agent_last_seen_at)
       end
 
-      it 'does not dispatch messages.read event when is not assigned' do
+      it 'does not dispatch messages.read event when user is not assignee' do
         allow(Rails.configuration.dispatcher).to receive(:dispatch)
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
@@ -714,7 +714,6 @@ RSpec.describe 'Conversations API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:success)
-        expect(conversation.assignee).to be_nil
         expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
       end
     end
