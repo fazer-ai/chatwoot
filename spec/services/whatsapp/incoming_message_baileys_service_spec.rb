@@ -215,6 +215,7 @@ describe Whatsapp::IncomingMessageBaileysService do
       context 'when message is edited message' do
         it 'does not create contact inbox nor message' do
           raw_message[:message] = { editedMessage: { message: { protocolMessage: { editedMessage: { documentMessage: 1 } } } } }
+
           described_class.new(inbox: inbox, params: params).perform
 
           expect(inbox.messages).to be_empty
@@ -429,7 +430,6 @@ describe Whatsapp::IncomingMessageBaileysService do
           described_class.new(inbox: inbox, params: params).perform
 
           message = inbox.conversations.last.messages.last
-
           expect(message.content).to eq('Hello from Baileys')
         end
 
@@ -440,7 +440,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           message = inbox.conversations.last.messages.last
           attachment = message.attachments.last
-
           expect(attachment.file_type).to eq('image')
           expect(attachment.file.filename.to_s).to eq("image_msg_123_#{Time.current.strftime('%Y%m%d')}.png")
           expect(attachment.file.content_type).to eq('image/png')
@@ -495,7 +494,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           message = inbox.conversations.last.messages.last
           attachment = message.attachments.last
-
           expect(attachment.file_type).to eq('video')
           expect(attachment.file.filename.to_s).to eq("video_msg_123_#{Time.current.strftime('%Y%m%d')}.mp4")
           expect(attachment.file.content_type).to eq('video/mp4')
@@ -528,7 +526,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           message = inbox.conversations.last.messages.last
           attachment = message.attachments.last
-
           expect(attachment.file_type).to eq('file')
           expect(attachment.file.filename.to_s).to eq(filename)
           expect(attachment.file.content_type).to eq('application/pdf')
@@ -545,13 +542,11 @@ describe Whatsapp::IncomingMessageBaileysService do
               }
             }
           }
-
           stub_download
 
           described_class.new(inbox: inbox, params: params).perform
 
           message = inbox.conversations.last.messages.last
-
           expect(message).to be_present
           expect(message.content).to eq('Hello from Baileys')
         end
@@ -582,7 +577,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           message = inbox.conversations.last.messages.last
           attachment = message.attachments.last
-
           expect(attachment.file_type).to eq('audio')
           expect(attachment.file.filename.to_s).to eq("audio_msg_123_#{Time.current.strftime('%Y%m%d')}.opus")
           expect(attachment.file.content_type).to eq('audio/opus')
@@ -614,7 +608,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           message = inbox.conversations.last.messages.last
           attachment = message.attachments.last
-
           expect(attachment.file_type).to eq('image')
           expect(attachment.file.filename.to_s).to eq("image_msg_123_#{Time.current.strftime('%Y%m%d')}.png")
           expect(attachment.file.content_type).to eq('image/png')
