@@ -980,6 +980,21 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:ok)
       end
+
+      it 'ensures provider connection is updated when relevant' do
+        channel.update_provider_connection!(connection: 'open')
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, disconnect_channel_provider: true)
+        allow(service_double).to receive(:disconnect_channel_provider).and_raise(StandardError)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/disconnect_channel_provider",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:internal_server_error)
+      end
     end
   end
 end
