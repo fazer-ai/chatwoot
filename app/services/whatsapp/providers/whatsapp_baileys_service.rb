@@ -156,6 +156,27 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     process_response(response)
   end
 
+  def received_messages(phone_number, messages)
+    @phone_number = phone_number
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-receipts",
+      headers: api_headers,
+      body: {
+        keys: messages.map do |message|
+          {
+            id: message.source_id,
+            remoteJid: remote_jid,
+            # NOTE: It only makes sense to receipt received messages
+            fromMe: false
+          }
+        end
+      }.to_json
+    )
+
+    process_response(response)
+  end
+
   private
 
   def provider_url
