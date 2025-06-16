@@ -233,6 +233,19 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is saved' do
+        it 'calls channel received_messages method' do
+          allow(inbox.channel).to receive(:received_messages)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          conversation = inbox.conversations.last
+          message = conversation.messages.last
+
+          expect(inbox.channel).to have_received(:received_messages).with([message], conversation)
+        end
+      end
+
       context 'when message type is text' do
         context 'when has key conversation' do # rubocop:disable RSpec/NestedGroups
           it 'creates an incoming message' do
