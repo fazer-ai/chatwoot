@@ -244,6 +244,17 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(inbox.channel).to have_received(:received_messages).with([message], conversation)
         end
+
+        it 'does not call channel received_messages method if message is outgoing' do
+          raw_message[:key][:fromMe] = true
+          create(:account_user, account: inbox.account)
+
+          allow(inbox.channel).to receive(:received_messages)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel).not_to have_received(:received_messages)
+        end
       end
 
       context 'when message type is text' do
