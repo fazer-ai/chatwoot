@@ -278,5 +278,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :toggle_typing_status,
                       :update_presence,
                       :read_messages,
-                      :unread_message
+                      :unread_message,
+                      :received_messages
 end
