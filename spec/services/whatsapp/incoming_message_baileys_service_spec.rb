@@ -4,10 +4,12 @@ describe Whatsapp::IncomingMessageBaileysService do
   describe '#perform' do
     let(:webhook_verify_token) { 'valid_token' }
     let!(:whatsapp_channel) do
-      create(:channel_whatsapp,
-             provider: 'baileys',
-             provider_config: { webhook_verify_token: webhook_verify_token },
-             validate_provider_config: false)
+      channel = create(:channel_whatsapp,
+                       provider: 'baileys',
+                       provider_config: { webhook_verify_token: webhook_verify_token },
+                       validate_provider_config: false)
+      allow(channel).to receive(:received_messages).and_return(true)
+      channel
     end
     let(:inbox) { whatsapp_channel.inbox }
 
@@ -198,6 +200,16 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(inbox.messages).to be_empty
           expect(inbox.contact_inboxes).to be_empty
         end
+
+        it 'does not call channel received_messages method' do
+          raw_message[:message] = { protocolMessage: { type: 1 } }
+
+          allow(inbox.channel).to receive(:received_messages)
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel).not_to have_received(:received_messages)
+        end
       end
 
       context 'when message is context message' do
@@ -235,8 +247,6 @@ describe Whatsapp::IncomingMessageBaileysService do
 
       context 'when message is saved' do
         it 'calls channel received_messages method' do
-          allow(inbox.channel).to receive(:received_messages)
-
           described_class.new(inbox: inbox, params: params).perform
 
           conversation = inbox.conversations.last
