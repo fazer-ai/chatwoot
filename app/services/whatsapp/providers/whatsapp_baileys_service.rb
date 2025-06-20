@@ -8,16 +8,32 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
 
-  def setup_channel_provider
+  def setup_channel_provider # rubocop:disable Metrics/MethodLength
+    provider_config = whatsapp_channel.provider_config
+    sync_contacts = provider_config['sync_contacts'].presence
+    sync_history = provider_config['sync_full_history'].presence
+    perform_initial_sync = sync_contacts || sync_history
+
+    # NOTE: After the initial setup on inbox creation, reset the flags and set the sync type for messages_history.set incoming event.
+    if perform_initial_sync
+      sync_type = sync_contacts ? 'contacts' : 'full_history'
+      config_updates = {
+        'sync_contacts' => false,
+        'sync_full_history' => false,
+        'sync_type' => sync_type
+      }
+      whatsapp_channel.update!(provider_config: provider_config.merge(config_updates))
+    end
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       body: {
         clientName: DEFAULT_CLIENT_NAME,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
-        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+        webhookVerifyToken: provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
-        includeMedia: false
+        includeMedia: false,
+        syncFullHistory: perform_initial_sync
       }.compact.to_json
     )
 
@@ -150,6 +166,22 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
           }]
         }
       }.to_json
+    )
+
+    process_response(response)
+  end
+
+  def fetch_message_history(oldest_message)
+    @phone_number = phone_number
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/fetch-message-history",
+      headers: api_headers,
+      body: {
+        count: 50,
+        oldestMsgKey: { id: oldest_message.source_id, remoteJid: remote_jid, fromMe: oldest_message.message_type == 'outgoing' },
+        oldestMsgTimestamp: oldest_message.content_attributes[:external_created_at]
+      }
     )
 
     process_response(response)

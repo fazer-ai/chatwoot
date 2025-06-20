@@ -272,6 +272,10 @@
         "MARK_AS_READ": {
           "LABEL": "Enviar confirmações de leitura"
         },
+        "SYNC_FULL_HISTORY": {
+          "ONLY_CONTACTS_LABEL": "Sincronizar apenas contatos",
+          "LABEL": "Sincronizar mensagens e contatos"
+        },
         "ADVANCED_OPTIONS": "Opções avançadas",
         "BAILEYS": {
           "SUBTITLE": "Clique abaixo para configurar o canal do WhatsApp usando o Baileys.",
@@ -564,7 +568,13 @@
       "UPDATE_PRE_CHAT_FORM_SETTINGS": "Atualizar configurações do Formulário Pre Chat",
       "WHATSAPP_MARK_AS_READ_TITLE": "Confirmações de leitura",
       "WHATSAPP_MARK_AS_READ_SUBHEADER": "Se essa opção estiver desativada, ao visualizar uma mensagem pelo Chatwoot, não será enviada uma confirmação de leitura para o remetente. As suas mensagens ainda poderão receber confirmações de leitura.",
-      "WHATSAPP_MARK_AS_READ_LABEL": "Enviar confirmações de leitura"
+      "WHATSAPP_MARK_AS_READ_LABEL": "Enviar confirmações de leitura",
+      "WHATSAPP_FETCH_MESSAGES_AND_CONTACTS_TITLE": "Sincronizar mensagens e contatos",
+      "WHATSAPP_FETCH_MESSAGES_AND_CONTACTS_SUBHEADER": "Isso irá restaurar suas mensagens e contatos do WhatsApp.",
+      "WHATSAPP_FETCH_MESSAGES_AND_CONTACTS_LABEL": "Sincronizar mensagens e contatos",
+      "WHATSAPP_FETCH_CONTACTS_TITLE": "Sincronizar contatos",
+      "WHATSAPP_FETCH_CONTACTS_SUBHEADER": "Isso irá restaurar seus contatos do WhatsApp.",
+      "WHATSAPP_FETCH_CONTACTS_LABEL": "Sincronizar contatos"
     },
     "HELP_CENTER": {
       "LABEL": "Centro de Ajuda",
