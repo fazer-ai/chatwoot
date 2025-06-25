@@ -248,6 +248,13 @@ const onBack = () => {
   clearSearchResult();
 };
 
+const goToProfileSettings = () => {
+  router.push({
+    name: 'profile_settings_index',
+    params: { accountId: store.getters.getCurrentAccountId },
+  });
+};
+
 const loadMore = () => {
   const SEARCH_ACTIONS = {
     contacts: 'conversationSearch/contactSearch',
@@ -285,6 +292,15 @@ onUnmounted(() => {
         primary
         sm
         @click="onBack"
+      />
+      <NextButton
+        label="Profile Settings"
+        icon="i-lucide-user-cog"
+        slate
+        sm
+        outline
+        class="ml-2"
+        @click="goToProfileSettings"
       />
     </div>
     <section class="flex flex-col flex-grow w-full h-full overflow-hidden">
