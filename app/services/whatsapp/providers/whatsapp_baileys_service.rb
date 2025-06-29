@@ -9,15 +9,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
 
   def setup_channel_provider
+    provider_config = whatsapp_channel.provider_config
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       body: {
         clientName: DEFAULT_CLIENT_NAME,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
-        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+        webhookVerifyToken: provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
-        includeMedia: false
+        includeMedia: false,
+        syncFullHistory: provider_config['sync_contacts'].presence || provider_config['sync_full_history'].presence
       }.compact.to_json
     )
 
@@ -150,6 +153,22 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
           }]
         }
       }.to_json
+    )
+
+    process_response(response)
+  end
+
+  def fetch_message_history(oldest_message)
+    @phone_number = oldest_message.conversation.contact.phone_number
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/fetch-message-history",
+      headers: api_headers,
+      body: {
+        count: ENV.fetch('BAILEYS_MESSAGE_HISTORY_COUNT', 5).to_i,
+        oldestMsgKey: { id: oldest_message.source_id, remoteJid: remote_jid, fromMe: oldest_message.message_type == 'outgoing' },
+        oldestMsgTimestamp: oldest_message.content_attributes[:external_created_at].to_i
+      }
     )
 
     process_response(response)

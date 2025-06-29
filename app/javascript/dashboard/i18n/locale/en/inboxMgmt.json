@@ -272,6 +272,10 @@
         "MARK_AS_READ": {
           "LABEL": "Send read receipts"
         },
+        "SYNC_FULL_HISTORY": {
+          "ONLY_CONTACTS_LABEL": "Sync only contacts",
+          "LABEL": "Sync messages and contacts"
+        },
         "ADVANCED_OPTIONS": "Advanced options",
         "BAILEYS": {
           "SUBTITLE": "Click below to setup the WhatsApp channel using Baileys.",
