@@ -117,6 +117,12 @@ class Channel::Whatsapp < ApplicationRecord
     provider_service.received_messages(conversation.contact.phone_number, messages)
   end
 
+  def fetch_message_history(oldest_message)
+    return unless provider_service.respond_to?(:fetch_message_history)
+
+    provider_service.fetch_message_history(oldest_message)
+  end
+
   delegate :setup_channel_provider, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_template, to: :provider_service

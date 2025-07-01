@@ -27,6 +27,8 @@ export default {
       providerUrl: '',
       showAdvancedOptions: false,
       markAsRead: true,
+      syncContacts: false,
+      syncFullHistory: false,
     };
   },
   computed: {
@@ -53,6 +55,8 @@ export default {
       try {
         const providerConfig = {
           mark_as_read: this.markAsRead,
+          sync_contacts: this.syncContacts,
+          sync_full_history: this.syncFullHistory,
         };
 
         if (this.apiKey || this.providerUrl) {
@@ -174,6 +178,34 @@ export default {
               {{ $t('INBOX_MGMT.ADD.WHATSAPP.MARK_AS_READ.LABEL') }}
             </span>
             <Switch id="markAsRead" v-model="markAsRead" />
+          </div>
+        </label>
+      </div>
+
+      <div
+        v-if="!syncFullHistory"
+        class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]"
+      >
+        <label>
+          <div class="flex mb-2 items-center">
+            <span class="mr-2 text-sm">
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.SYNC_FULL_HISTORY.ONLY_CONTACTS_LABEL'
+                )
+              }}
+            </span>
+            <Switch id="syncContacts" v-model="syncContacts" />
+          </div>
+        </label>
+      </div>
+      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+        <label>
+          <div class="flex mb-2 items-center">
+            <span class="mr-2 text-sm">
+              {{ $t('INBOX_MGMT.ADD.WHATSAPP.SYNC_FULL_HISTORY.LABEL') }}
+            </span>
+            <Switch id="syncFullHistory" v-model="syncFullHistory" />
           </div>
         </label>
       </div>

@@ -9,15 +9,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
 
   def setup_channel_provider
+    provider_config = whatsapp_channel.provider_config
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       body: {
         clientName: DEFAULT_CLIENT_NAME,
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
-        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+        webhookVerifyToken: provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
-        includeMedia: false
+        includeMedia: false,
+        syncFullHistory: provider_config['sync_contacts'].presence || provider_config['sync_full_history'].presence
       }.compact.to_json
     )
 
@@ -155,6 +158,24 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     process_response(response)
   end
 
+  def fetch_message_history(oldest_message)
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/fetch-message-history",
+      headers: api_headers,
+      body: {
+        count: ENV.fetch('BAILEYS_MESSAGE_HISTORY_COUNT', 50).to_i,
+        oldestMsgKey: {
+          id: oldest_message[:key][:id],
+          remoteJid: oldest_message[:key][:remoteJid],
+          fromMe: oldest_message[:key][:fromMe]
+        },
+        oldestMsgTimestamp: oldest_message[:messageTimestamp]
+      }.to_json
+    )
+
+    process_response(response)
+  end
+
   def received_messages(phone_number, messages)
     @phone_number = phone_number
 
@@ -277,5 +298,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :update_presence,
                       :read_messages,
                       :unread_message,
-                      :received_messages
+                      :received_messages,
+                      :fetch_message_history
 end

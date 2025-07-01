@@ -781,6 +781,198 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
     end
+
+    context 'when processing messaging-history.set event' do
+      let(:timestamp) { Time.current.to_i }
+      let(:contact_payload) { { id: '5511912345678@s.whatsapp.net', name: 'John Doe' } }
+      let(:message_payload) do
+        {
+          key: { id: 'msg_123', remoteJid: '5511912345678@s.whatsapp.net', fromMe: false },
+          message: { conversation: 'History message' },
+          messageTimestamp: timestamp
+        }
+      end
+      let(:base_params) do
+        {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messaging-history.set',
+          data: {
+            chats: [],
+            contacts: [contact_payload],
+            messages: [message_payload]
+          }
+        }
+      end
+
+      context 'when sync_contacts is disabled' do
+        it 'does not create contacts' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_contacts' => false }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Contact, :count)
+        end
+      end
+
+      context 'when sync_contacts is enabled' do
+        it 'creates contacts' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_contacts' => true }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.to change(Contact, :count).by(1)
+          expect(Contact.last.name).to eq('John Doe')
+        end
+
+        it 'does not create contact if jid is not a user' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_contacts' => true }))
+          contact_payload[:id] = 'status@broadcast'
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Contact, :count)
+        end
+
+        it 'does not creat contact if do not have id' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_contacts' => true }))
+          base_params[:data][:contacts] = [{ name: 'John Doe' }]
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Contact, :count)
+        end
+      end
+
+      context 'when sync_full_history is disabled' do
+        it 'does not create contacts' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => false }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Contact, :count)
+        end
+
+        it 'does not create messages' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => false }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Message, :count)
+        end
+      end
+
+      context 'when full history sync is enabled' do
+        it 'creates contacts' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.to change(Contact, :count).by(1)
+          expect(Contact.last.name).to eq('John Doe')
+        end
+
+        it 'creates messages from history' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.to change(Message, :count).by(1)
+
+          message = Message.last
+          expect(message).to have_attributes(
+            inbox_id: inbox.id,
+            conversation_id: inbox.conversations.last.id,
+            content: 'History message',
+            source_id: 'msg_123',
+            status: 'read',
+            sender_type: 'Contact',
+            message_type: 'incoming',
+            content_attributes: { external_created_at: timestamp }
+          )
+        end
+
+        it 'creates outgoing messages from history' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          message_payload[:key][:fromMe] = true
+          create(:account_user, account: inbox.account)
+
+          described_class.new(inbox: inbox, params: base_params).perform
+
+          message = Message.last
+          expect(message).to have_attributes(
+            inbox_id: inbox.id,
+            conversation_id: inbox.conversations.last.id,
+            content: 'History message',
+            source_id: 'msg_123',
+            status: 'read',
+            sender_type: 'User',
+            message_type: 'outgoing',
+            content_attributes: { external_created_at: timestamp }
+          )
+        end
+
+        it 'creates unsupported message if message type is some media' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          message_payload[:message] = { imageMessage: { caption: 'Unsupported media' } }
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.to change(Message, :count).by(1)
+
+          message = Message.last
+          expect(message).to have_attributes(
+            inbox_id: inbox.id,
+            conversation_id: inbox.conversations.last.id,
+            source_id: 'msg_123',
+            content_attributes: { is_unsupported: true, external_created_at: timestamp }
+          )
+        end
+
+        it 'creates unsupported message if message type is unsupported' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          message_payload[:message] = { unsupported: 'message' }
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.to change(Message, :count).by(1)
+
+          message = Message.last
+          expect(message).to have_attributes(
+            inbox_id: inbox.id,
+            conversation_id: inbox.conversations.last.id,
+            source_id: 'msg_123',
+            content_attributes: { is_unsupported: true, external_created_at: timestamp }
+          )
+        end
+
+        it 'does not create message if it already exists' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          create(:message, inbox: inbox, source_id: 'msg_123')
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Message, :count)
+        end
+
+        it 'does not create message for protocol messages' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          message_payload[:message] = { protocolMessage: { type: 1 } }
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Message, :count)
+        end
+
+        it 'does not create message for context messages' do
+          whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge({ 'sync_full_history' => true }))
+          message_payload[:message] = { 'messageContextInfo': { 'messageSecret': '********' } }
+
+          expect do
+            described_class.new(inbox: inbox, params: base_params).perform
+          end.not_to change(Message, :count)
+        end
+      end
+    end
   end
 
   def format_message_source_key(message_id)

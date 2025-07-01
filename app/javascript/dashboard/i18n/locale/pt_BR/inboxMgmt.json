@@ -272,6 +272,10 @@
         "MARK_AS_READ": {
           "LABEL": "Enviar confirmações de leitura"
         },
+        "SYNC_FULL_HISTORY": {
+          "ONLY_CONTACTS_LABEL": "Sincronizar apenas contatos",
+          "LABEL": "Sincronizar contatos e mensagens"
+        },
         "ADVANCED_OPTIONS": "Opções avançadas",
         "BAILEYS": {
           "SUBTITLE": "Clique abaixo para configurar o canal do WhatsApp usando o Baileys.",

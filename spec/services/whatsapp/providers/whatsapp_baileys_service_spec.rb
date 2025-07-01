@@ -34,6 +34,52 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    context 'when sync_full_history is true' do
+      it 'includes syncFullHistory in the request body' do
+        whatsapp_channel.provider_config['sync_full_history'] = true
+
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              clientName: 'chatwoot-test',
+              webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
+              webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+              includeMedia: false,
+              syncFullHistory: true
+            }.to_json
+          )
+          .to_return(status: 200)
+
+        response = service.setup_channel_provider
+
+        expect(response).to be(true)
+      end
+    end
+
+    context 'when sync_contacts is true' do
+      it 'includes syncFullHistory in the request body' do
+        whatsapp_channel.provider_config['sync_contacts'] = true
+
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              clientName: 'chatwoot-test',
+              webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
+              webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+              includeMedia: false,
+              syncFullHistory: true
+            }.to_json
+          )
+          .to_return(status: 200)
+
+        response = service.setup_channel_provider
+
+        expect(response).to be(true)
+      end
+    end
+
     context 'when response is unsuccessful' do
       it 'logs the error and returns false' do
         stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
@@ -433,6 +479,34 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         ).to_return(status: 200)
 
       result = service.unread_message(test_send_phone_number, message)
+
+      expect(result).to be(true)
+    end
+  end
+
+  describe '#fetch_message_history' do
+    it 'send fetch message history request' do
+      message = {
+        key: { id: 'msg_123',  remoteJid: test_send_jid,  fromMe: false },
+        messageTimestamp: 123
+      }
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with('BAILEYS_MESSAGE_HISTORY_COUNT', 50).and_return(50)
+      stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/fetch-message-history")
+        .with(
+          headers: stub_headers(whatsapp_channel),
+          body: {
+            count: 50,
+            oldestMsgKey: {
+              id: 'msg_123',
+              remoteJid: test_send_jid,
+              fromMe: false
+            },
+            oldestMsgTimestamp: 123
+          }.to_json
+        ).to_return(status: 200)
+
+      result = service.fetch_message_history(message)
 
       expect(result).to be(true)
     end

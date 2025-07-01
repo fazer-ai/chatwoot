@@ -38,6 +38,16 @@ RSpec.describe Message do
           expect(conv_new_message.errors[:base]).to eq(['Too many messages'])
         end
       end
+
+      it 'skips message flooding validation if skip_prevent_message_flooding is true' do
+        with_modified_env 'CONVERSATION_MESSAGE_PER_MINUTE_LIMIT': '2' do
+          conversation = message.conversation
+          create(:message, conversation: conversation)
+          conv_new_message = build(:message, conversation: message.conversation, skip_prevent_message_flooding: true)
+
+          expect(conv_new_message.valid?).to be true
+        end
+      end
     end
   end
 

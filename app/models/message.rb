@@ -60,7 +60,7 @@ class Message < ApplicationRecord
   }.to_json.freeze
 
   before_validation :ensure_content_type
-  before_validation :prevent_message_flooding
+  before_validation :prevent_message_flooding, unless: :skip_prevent_message_flooding
   before_save :ensure_processed_message_content
   before_save :ensure_in_reply_to
 
@@ -78,6 +78,7 @@ class Message < ApplicationRecord
 
   # when you have a temperory id in your frontend and want it echoed back via action cable
   attr_accessor :echo_id
+  attr_accessor :skip_prevent_message_flooding
 
   enum message_type: { incoming: 0, outgoing: 1, activity: 2, template: 3 }
   enum content_type: {
