@@ -11,7 +11,6 @@ class SendReplyJob < ApplicationJob
       'Channel::TwilioSms' => ::Twilio::SendOnTwilioService,
       'Channel::Line' => ::Line::SendOnLineService,
       'Channel::Telegram' => ::Telegram::SendOnTelegramService,
-      'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
       'Channel::Sms' => ::Sms::SendOnSmsService,
       'Channel::Instagram' => ::Instagram::SendOnInstagramService
     }
@@ -19,6 +18,8 @@ class SendReplyJob < ApplicationJob
     case channel_name
     when 'Channel::FacebookPage'
       send_on_facebook_page(message)
+    when 'Channel::Whatsapp'
+      handle_whatsapp_message(message)
     else
       services[channel_name].new(message: message).perform if services[channel_name].present?
     end
@@ -31,6 +32,16 @@ class SendReplyJob < ApplicationJob
       ::Instagram::Messenger::SendOnInstagramService.new(message: message).perform
     else
       ::Facebook::SendOnFacebookService.new(message: message).perform
+    end
+  end
+
+  def handle_whatsapp_message(message)
+    channel = message.conversation.inbox.channel
+
+    if channel.provider == 'baileys'
+      Channels::Whatsapp::BaileysMessageRetryJob.perform_later(message.id, is_retry: false)
+    else
+      ::Whatsapp::SendOnWhatsappService.new(message: message).perform
     end
   end
 end

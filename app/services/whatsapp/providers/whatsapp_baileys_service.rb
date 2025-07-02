@@ -230,10 +230,16 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       }.to_json
     )
 
-    raise MessageNotSentError unless process_response(response)
+    raise MessageNotSentError, "Failed to send message: #{response.body}" unless process_response(response)
 
     update_external_created_at(response)
     response.parsed_response.dig('data', 'key', 'id')
+  rescue HTTParty::Error, Net::TimeoutError => e
+    Rails.logger.error "Baileys API connection error: #{e.message}"
+    raise MessageNotSentError, "Baileys API connection failed: #{e.message}"
+  rescue StandardError => e
+    Rails.logger.error "Unexpected error in Baileys message sending: #{e.message}"
+    raise MessageNotSentError, "Unexpected error: #{e.message}"
   end
 
   def process_response(response)
