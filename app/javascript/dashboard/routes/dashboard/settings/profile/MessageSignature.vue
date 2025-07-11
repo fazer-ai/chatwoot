@@ -17,7 +17,7 @@ const props = defineProps({
   },
   signatureSeparator: {
     type: String,
-    default: 'blank', // NOTE: 'blank' or 'new_line'
+    default: 'blank', // NOTE: 'blank' or '--'
   },
 });
 
@@ -27,8 +27,22 @@ const { t } = useI18n();
 
 const customEditorMenuList = MESSAGE_SIGNATURE_EDITOR_MENU_OPTIONS;
 const signature = ref(props.messageSignature);
-const signaturePosition = props.signaturePosition === 'top';
-const signatureSeparator = props.signatureSeparator === 'blank';
+const signaturePosition = ref(props.signaturePosition === 'top');
+const signatureSeparator = ref(props.signatureSeparator === 'blank');
+
+watch(
+  () => props.signaturePosition,
+  newValue => {
+    signaturePosition.value = newValue;
+  }
+);
+
+watch(
+  () => props.signatureSeparator,
+  newValue => {
+    signatureSeparator.value = newValue;
+  }
+);
 
 watch(
   () => props.messageSignature ?? '',
@@ -38,8 +52,8 @@ watch(
 );
 
 const updateSignature = () => {
-  const position = signaturePosition ? 'top' : 'bottom';
-  const separator = signatureSeparator ? 'blank' : '--';
+  const position = signaturePosition.value ? 'top' : 'bottom';
+  const separator = signatureSeparator.value ? 'blank' : '--';
   emit('updateSignature', signature.value, position, separator);
 };
 </script>
