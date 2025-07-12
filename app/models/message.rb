@@ -260,9 +260,9 @@ class Message < ApplicationRecord
   end
 
   def fix_signature_separator_markdown(content)
-    # Escape signature separators to prevent markdown setext heading interpretation
-    # Replace standalone "--" lines that could be interpreted as setext headings
-    content.gsub(/^--$/m, '\\--')
+    # Fix signature separators to prevent markdown setext heading interpretation
+    # The separators are already in \n--\n format from frontend, no changes needed
+    content
   end
 
   # fetch the in_reply_to message and set the external id
