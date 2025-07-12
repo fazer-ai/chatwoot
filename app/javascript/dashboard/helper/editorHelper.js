@@ -81,7 +81,7 @@ export function appendSignature(body, signature, settings = {}) {
   if (separator === 'blank') {
     delimiter = '';
   } else if (separator === '--') {
-    delimiter = '\n--\n';
+    delimiter = '\n\n--\n\n';
   } else {
     delimiter = separator;
   }
