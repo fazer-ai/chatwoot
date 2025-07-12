@@ -77,7 +77,14 @@ export function appendSignature(body, signature, settings = {}) {
     return body;
   }
 
-  const delimiter = separator === 'blank' ? '' : separator;
+  let delimiter = '';
+  if (separator === 'blank') {
+    delimiter = '';
+  } else if (separator === '--') {
+    delimiter = '\\--';
+  } else {
+    delimiter = separator;
+  }
   if (position === 'top') {
     return `${cleanedSignature}\n${delimiter}\n${body.trimStart()}`;
   }
@@ -102,7 +109,9 @@ export function removeSignature(body, signature, separator = 'blank') {
   }
 
   let newBody = body;
-  const delimiterLength = separator === 'blank' ? 0 : separator.length + 2;
+  const actualSeparator = separator === '--' ? '\\--' : separator;
+  const delimiterLength =
+    separator === 'blank' ? 0 : actualSeparator.length + 2;
   if (signatureFound.position === 'top') {
     // NOTE: Remove delimiter after signature: `<cleanedSignature>\n<separator>\n<messageContent>`
     const signatureEndIndex = signatureFound.index + delimiterLength;
