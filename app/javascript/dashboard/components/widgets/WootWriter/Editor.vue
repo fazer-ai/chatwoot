@@ -46,12 +46,10 @@ import {
 } from '@chatwoot/prosemirror-schema/src/mentions/plugin';
 
 import {
-  appendSignature,
   findNodeToInsertImage,
   getContentNode,
   cleanSignature,
   insertAtCursor,
-  removeSignature as removeSignatureHelper,
   scrollCursorIntoView,
   setURLWithQueryAndSize,
 } from 'dashboard/helper/editorHelper';
@@ -300,11 +298,8 @@ function isBodyEmpty(content) {
   // if content is undefined, we assume that the body is empty
   if (!content) return true;
 
-  // if the signature is present, we need to remove it before checking
-  // note that we don't update the editorView, so this is safe
-  const bodyWithoutSignature = props.signature
-    ? removeSignatureHelper(content, props.signature)
-    : content;
+  // Check if content is empty without signature manipulation
+  const bodyWithoutSignature = content;
 
   // trimming should remove all the whitespaces, so we can check the length
   return bodyWithoutSignature.trim().length === 0;
@@ -355,39 +350,6 @@ function reloadState(content = props.modelValue) {
 
   editorView.updateState(state);
   focusEditor(unrefContent);
-}
-
-function addSignature() {
-  let content = props.modelValue;
-  // see if the content is empty, if it is before appending the signature
-  // we need to add a paragraph node and move the cursor at the start of the editor
-  const contentWasEmpty = isBodyEmpty(content);
-  content = appendSignature(content, props.signature);
-  // need to reload first, ensuring that the editorView is updated
-  reloadState(content);
-
-  if (contentWasEmpty) {
-    handleEmptyBodyWithSignature();
-  }
-}
-
-function removeSignature() {
-  if (!props.signature) return;
-  let content = props.modelValue;
-  content = removeSignatureHelper(content, props.signature);
-  // reload the state, ensuring that the editorView is updated
-  reloadState(content);
-}
-
-function toggleSignatureInEditor(signatureEnabled) {
-  // The toggleSignatureInEditor gets the new value from the
-  // watcher, this means that if the value is true, the signature
-  // is supposed to be added, else we remove it.
-  if (signatureEnabled) {
-    addSignature();
-  } else {
-    removeSignature();
-  }
 }
 
 function setToolbarPosition() {
@@ -672,13 +634,6 @@ watch(
     }
   }
 );
-
-watch(sendWithSignature, newValue => {
-  // see if the allowSignature flag is true
-  if (props.allowSignature) {
-    toggleSignatureInEditor(newValue);
-  }
-});
 
 onMounted(() => {
   // [VITE] state assignment was done in created before

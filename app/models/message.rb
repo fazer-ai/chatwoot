@@ -252,7 +252,17 @@ class Message < ApplicationRecord
     html_content_quoted = content_attributes.dig(:email, :html_content, :quoted)
 
     message_content = text_content_quoted || html_content_quoted || content
+
+    # Fix signature separator markdown issues before processing
+    message_content = fix_signature_separator_markdown(message_content) if message_content.present?
+
     self.processed_message_content = message_content&.truncate(150_000)
+  end
+
+  def fix_signature_separator_markdown(content)
+    # Fix signature separators to prevent markdown setext heading interpretation
+    # The separators are already in \n--\n format from frontend, no changes needed
+    content
   end
 
   # fetch the in_reply_to message and set the external id

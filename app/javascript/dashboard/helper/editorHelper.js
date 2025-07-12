@@ -77,11 +77,22 @@ export function appendSignature(body, signature, settings = {}) {
     return body;
   }
 
-  const delimiter = separator === 'blank' ? '' : separator;
-  if (position === 'top') {
-    return `${cleanedSignature}\n${delimiter}\n${body.trimStart()}`;
+  let delimiter = '';
+  if (separator === 'blank') {
+    delimiter = '';
+  } else if (separator === '--') {
+    delimiter = '\n\n--\n\n';
+  } else {
+    delimiter = separator;
   }
-  return `${body.trimEnd()}\n${delimiter}\n${cleanedSignature}`;
+  if (position === 'top') {
+    return separator === '--'
+      ? `${cleanedSignature}${delimiter}${body.trimStart()}`
+      : `${cleanedSignature}\n${delimiter}\n${body.trimStart()}`;
+  }
+  return separator === '--'
+    ? `${body.trimEnd()}${delimiter}${cleanedSignature}`
+    : `${body.trimEnd()}\n${delimiter}\n${cleanedSignature}`;
 }
 
 /**
@@ -102,7 +113,15 @@ export function removeSignature(body, signature, separator = 'blank') {
   }
 
   let newBody = body;
-  const delimiterLength = separator === 'blank' ? 0 : separator.length + 2;
+  const actualSeparator = separator === '--' ? '\n--\n' : separator;
+  let delimiterLength;
+  if (separator === 'blank') {
+    delimiterLength = 0;
+  } else if (separator === '--') {
+    delimiterLength = actualSeparator.length;
+  } else {
+    delimiterLength = actualSeparator.length + 2;
+  }
   if (signatureFound.position === 'top') {
     // NOTE: Remove delimiter after signature: `<cleanedSignature>\n<separator>\n<messageContent>`
     const signatureEndIndex = signatureFound.index + delimiterLength;
