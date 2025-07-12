@@ -111,9 +111,26 @@ export default {
     // watcher, this means that if the value is true, the signature
     // is supposed to be added, else we remove it.
     toggleSignatureInEditor(signatureEnabled) {
+      const signatureSettings = {
+        position:
+          this.$store.getters.getCurrentUser?.ui_settings?.signature_position ||
+          'top',
+        separator:
+          this.$store.getters.getCurrentUser?.ui_settings
+            ?.signature_separator || 'blank',
+      };
+
       const valueWithSignature = signatureEnabled
-        ? appendSignature(this.modelValue, this.cleanedSignature)
-        : removeSignature(this.modelValue, this.cleanedSignature);
+        ? appendSignature(
+            this.modelValue,
+            this.cleanedSignature,
+            signatureSettings
+          )
+        : removeSignature(
+            this.modelValue,
+            this.cleanedSignature,
+            signatureSettings
+          );
 
       this.$emit('update:modelValue', valueWithSignature);
       this.$emit('input', valueWithSignature);
@@ -124,19 +141,36 @@ export default {
       });
     },
     setCursor() {
-      const bodyWithoutSignature = removeSignature(
-        this.modelValue,
-        this.cleanedSignature
-      );
+      const signatureSettings = {
+        position:
+          this.$store.getters.getCurrentUser?.ui_settings?.signature_position ||
+          'top',
+        separator:
+          this.$store.getters.getCurrentUser?.ui_settings
+            ?.signature_separator || 'blank',
+      };
 
-      // only trim at end, so if there are spaces at the start, those are not removed
-      const bodyEndsAt = bodyWithoutSignature.trimEnd().length;
       const textarea = this.$refs.textarea;
+      if (!textarea) return;
 
-      if (textarea) {
-        textarea.focus();
-        textarea.setSelectionRange(bodyEndsAt, bodyEndsAt);
+      let cursorPosition;
+      if (signatureSettings.position === 'top' && this.cleanedSignature) {
+        // Position cursor after signature when signature is at start
+        // const signatureLength = this.cleanedSignature.length;
+        // const separatorLength = signatureSettings.separator === '--' ? 4 : 2; // "\n--\n" vs "\n\n"
+        cursorPosition = this.modelValue.trimEnd().length; // signatureLength + separatorLength;
+      } else {
+        // Default behavior: position at end of body without signature
+        const bodyWithoutSignature = removeSignature(
+          this.modelValue,
+          this.cleanedSignature,
+          signatureSettings
+        );
+        cursorPosition = bodyWithoutSignature.trimEnd().length;
       }
+
+      textarea.focus();
+      textarea.setSelectionRange(cursorPosition, cursorPosition);
     },
     onInput(event) {
       this.$emit('update:modelValue', event.target.value);

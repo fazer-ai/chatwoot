@@ -22,6 +22,7 @@ import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 import { useTrack } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useAlert } from 'dashboard/composables';
+import { useMapGetter } from 'dashboard/composables/store';
 
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { CONVERSATION_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
@@ -48,6 +49,7 @@ import {
   appendSignature,
   findNodeToInsertImage,
   getContentNode,
+  cleanSignature,
   insertAtCursor,
   removeSignature as removeSignatureHelper,
   scrollCursorIntoView,
@@ -122,6 +124,8 @@ const createState = (
 
 const { isEditorHotKeyEnabled, fetchSignatureFlagFromUISettings } =
   useUISettings();
+
+const currentUser = useMapGetter('getCurrentUser');
 
 const typingIndicator = createTypingIndicator(
   () => emit('typingOn'),
@@ -266,8 +270,27 @@ watch(showVariables, updatedValue => {
 function focusEditorInputField(pos = 'end') {
   const { tr } = editorView.state;
 
-  const selection =
-    pos === 'end' ? Selection.atEnd(tr.doc) : Selection.atStart(tr.doc);
+  // Check if signature is at start and adjust cursor position accordingly
+  const signaturePosition =
+    currentUser.value?.ui_settings?.signature_position || 'top';
+  const hasSignature = sendWithSignature.value && props.signature;
+
+  let selection;
+  if (pos === 'end' || !hasSignature || signaturePosition !== 'top') {
+    selection =
+      pos === 'end' ? Selection.atEnd(tr.doc) : Selection.atStart(tr.doc);
+  } else {
+    // Position cursor after signature when signature is at start
+    const signatureLength = props.signature
+      ? cleanSignature(props.signature).length
+      : 0;
+    const separatorLength =
+      currentUser.value?.ui_settings?.signature_separator === '--' ? 6 : 2; // "\n--\n" vs "\n\n"
+    const cursorPos = signatureLength + separatorLength;
+    selection = Selection.near(
+      tr.doc.resolve(Math.min(cursorPos, tr.doc.content.size))
+    );
+  }
 
   editorView.dispatch(tr.setSelection(selection));
   editorView.focus();

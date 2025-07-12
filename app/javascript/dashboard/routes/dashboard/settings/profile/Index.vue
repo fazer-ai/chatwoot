@@ -57,6 +57,8 @@ export default {
       displayName: '',
       email: '',
       messageSignature: '',
+      signaturePosition: '',
+      signatureSeparator: '',
       hotKeys: [
         {
           key: 'enter',
@@ -105,10 +107,15 @@ export default {
       this.avatarUrl = this.currentUser.avatar_url;
       this.displayName = this.currentUser.display_name;
       this.messageSignature = this.currentUser.message_signature;
+      this.signaturePosition =
+        this.currentUser.ui_settings?.signature_position || 'top';
+      this.signatureSeparator =
+        this.currentUser.ui_settings?.signature_separator || 'blank';
     },
     async dispatchUpdate(payload, successMessage, errorMessage) {
       let alertMessage = '';
       try {
+        // Dispatch the update action
         await this.$store.dispatch('updateProfile', payload);
         alertMessage = successMessage;
 
@@ -145,16 +152,28 @@ export default {
 
       if (hasEmailChanged && success) clearCookiesOnLogout();
     },
-    async updateSignature(signature) {
-      const payload = { message_signature: signature };
-      let successMessage = this.$t(
-        'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_SUCCESS'
-      );
-      let errorMessage = this.$t(
-        'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_ERROR'
-      );
+    async updateSignature(signature, signaturePosition, signatureSeparator) {
+      try {
+        const signaturePayload = { message_signature: signature };
+        await this.dispatchUpdate(
+          signaturePayload,
+          this.$t(
+            'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_SUCCESS'
+          ),
+          this.$t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_ERROR')
+        );
 
-      await this.dispatchUpdate(payload, successMessage, errorMessage);
+        await this.updateUISettings({
+          signature_position: signaturePosition,
+          signature_separator: signatureSeparator,
+        });
+
+        this.signaturePosition = signaturePosition;
+        this.signatureSeparator = signatureSeparator;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error updating signature:', error);
+      }
     },
     updateProfilePicture({ file, url }) {
       this.avatarFile = file;
@@ -232,6 +251,8 @@ export default {
     >
       <MessageSignature
         :message-signature="messageSignature"
+        :signature-position="signaturePosition"
+        :signature-separator="signatureSeparator"
         @update-signature="updateSignature"
       />
     </FormSection>

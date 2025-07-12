@@ -156,6 +156,21 @@ class User < ApplicationRecord
     find_by(email: email&.downcase)
   end
 
+  def signature_position
+    ui_settings.fetch('signature_position', 'top')
+  end
+
+  def signature_separator
+    ui_settings.fetch('signature_separator', 'blank')
+  end
+
+  def signature_settings_with_defaults
+    {
+      'position' => signature_position,
+      'separator' => signature_separator
+    }
+  end
+
   private
 
   def remove_macros
