@@ -153,18 +153,6 @@ export default {
       if (hasEmailChanged && success) clearCookiesOnLogout();
     },
     async updateSignature(signature, signaturePosition, signatureSeparator) {
-      // eslint-disable-next-line no-console
-      console.log('updateSignature called with:', {
-        signature,
-        signaturePosition,
-        signatureSeparator,
-      });
-      // eslint-disable-next-line no-console
-      console.log(
-        'Current user ui_settings before:',
-        this.currentUser.ui_settings
-      );
-
       try {
         const signaturePayload = { message_signature: signature };
         await this.dispatchUpdate(
@@ -183,12 +171,6 @@ export default {
 
         this.signaturePosition = signaturePosition;
         this.signatureSeparator = signatureSeparator;
-
-        // eslint-disable-next-line no-console
-        console.log(
-          'After updates, user ui_settings:',
-          this.currentUser.ui_settings
-        );
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error updating signature:', error);
