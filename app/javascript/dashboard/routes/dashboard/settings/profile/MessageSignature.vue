@@ -33,14 +33,14 @@ const signatureSeparator = ref(props.signatureSeparator === 'blank');
 watch(
   () => props.signaturePosition,
   newValue => {
-    signaturePosition.value = newValue;
+    signaturePosition.value = newValue === 'top';
   }
 );
 
 watch(
   () => props.signatureSeparator,
   newValue => {
-    signatureSeparator.value = newValue;
+    signatureSeparator.value = newValue === 'blank';
   }
 );
 
@@ -54,6 +54,20 @@ watch(
 const updateSignature = () => {
   const position = signaturePosition.value ? 'top' : 'bottom';
   const separator = signatureSeparator.value ? 'blank' : '--';
+  emit('updateSignature', signature.value, position, separator);
+};
+
+const handlePositionChange = value => {
+  signaturePosition.value = value;
+  const position = value ? 'top' : 'bottom';
+  const separator = signatureSeparator.value ? 'blank' : '--';
+  emit('updateSignature', signature.value, position, separator);
+};
+
+const handleSeparatorChange = value => {
+  signatureSeparator.value = value;
+  const position = signaturePosition.value ? 'top' : 'bottom';
+  const separator = value ? 'blank' : '--';
   emit('updateSignature', signature.value, position, separator);
 };
 </script>
@@ -86,7 +100,11 @@ const updateSignature = () => {
               )
             }}
           </span>
-          <Switch v-model="signaturePosition" class="w-1/5" />
+          <Switch
+            v-model="signaturePosition"
+            class="w-1/5"
+            @update:model-value="handlePositionChange"
+          />
           <span class="w-2/5 text-sm">
             {{
               t(
@@ -103,7 +121,11 @@ const updateSignature = () => {
               )
             }}
           </span>
-          <Switch v-model="signatureSeparator" class="w-1/5" />
+          <Switch
+            v-model="signatureSeparator"
+            class="w-1/5"
+            @update:model-value="handleSeparatorChange"
+          />
           <span class="w-2/5 text-sm">
             {{
               t(
