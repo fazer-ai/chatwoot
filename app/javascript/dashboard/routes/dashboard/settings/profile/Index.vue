@@ -153,22 +153,46 @@ export default {
       if (hasEmailChanged && success) clearCookiesOnLogout();
     },
     async updateSignature(signature, signaturePosition, signatureSeparator) {
-      const payload = {
-        message_signature: signature,
-        ui_settings: {
-          ...this.currentUser.ui_settings,
-          signature_position: signaturePosition,
-          signature_separator: signatureSeparator,
-        },
-      };
-      let successMessage = this.$t(
-        'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_SUCCESS'
-      );
-      let errorMessage = this.$t(
-        'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_ERROR'
+      // eslint-disable-next-line no-console
+      console.log('updateSignature called with:', {
+        signature,
+        signaturePosition,
+        signatureSeparator,
+      });
+      // eslint-disable-next-line no-console
+      console.log(
+        'Current user ui_settings before:',
+        this.currentUser.ui_settings
       );
 
-      await this.dispatchUpdate(payload, successMessage, errorMessage);
+      try {
+        const signaturePayload = { message_signature: signature };
+        await this.dispatchUpdate(
+          signaturePayload,
+          this.$t(
+            'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_SUCCESS'
+          ),
+          this.$t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_ERROR')
+        );
+
+        const uiSettings = {
+          signature_position: signaturePosition,
+          signature_separator: signatureSeparator,
+        };
+        await this.updateUISettings({ uiSettings });
+
+        this.signaturePosition = signaturePosition;
+        this.signatureSeparator = signatureSeparator;
+
+        // eslint-disable-next-line no-console
+        console.log(
+          'After updates, user ui_settings:',
+          this.currentUser.ui_settings
+        );
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error updating signature:', error);
+      }
     },
     updateProfilePicture({ file, url }) {
       this.avatarFile = file;
