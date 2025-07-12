@@ -163,11 +163,10 @@ export default {
           this.$t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.API_ERROR')
         );
 
-        const uiSettings = {
+        await this.updateUISettings({
           signature_position: signaturePosition,
           signature_separator: signatureSeparator,
-        };
-        await this.updateUISettings({ uiSettings });
+        });
 
         this.signaturePosition = signaturePosition;
         this.signatureSeparator = signatureSeparator;
