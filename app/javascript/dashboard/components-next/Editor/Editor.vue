@@ -22,6 +22,10 @@ const props = defineProps({
   enabledMenuOptions: { type: Array, default: () => [] },
   enableCaptainTools: { type: Boolean, default: false },
   enableLineBreaks: { type: Boolean, default: false },
+  signature: { type: String, default: '' },
+  allowSignature: { type: Boolean, default: false },
+  sendWithSignature: { type: Boolean, default: false },
+  channelType: { type: String, default: '' },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -102,6 +106,10 @@ watch(
         :enabled-menu-options="enabledMenuOptions"
         :enable-captain-tools="enableCaptainTools"
         :override-line-breaks="enableLineBreaks"
+        :signature="signature"
+        :allow-signature="allowSignature"
+        :send-with-signature="sendWithSignature"
+        :channel-type="channelType"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"

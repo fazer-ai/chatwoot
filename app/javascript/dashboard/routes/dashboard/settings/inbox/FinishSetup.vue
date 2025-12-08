@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import EmptyState from '../../../../components/widgets/EmptyState.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import DuplicateInboxBanner from './channels/instagram/DuplicateInboxBanner.vue';
+import EmailInboxFinish from './channels/emailChannels/EmailInboxFinish.vue';
 import WhatsappLinkDeviceModal from './components/WhatsappLinkDeviceModal.vue';
 import { useInbox } from 'dashboard/composables/useInbox';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
@@ -197,7 +198,7 @@ onMounted(() => {
     />
     <EmptyState
       :title="$t('INBOX_MGMT.FINISH.TITLE')"
-      :message="message"
+      :message="isAnEmailChannel && !currentInbox.provider ? '' : message"
       :button-text="$t('INBOX_MGMT.FINISH.BUTTON_TEXT')"
     >
       <div class="w-full text-center">
@@ -218,7 +219,7 @@ onMounted(() => {
           v-if="shouldShowWhatsAppWebhookDetails"
           class="w-[50%] max-w-[50%] ml-[25%]"
         >
-          <p class="mt-8 font-medium text-slate-700 dark:text-slate-200">
+          <p class="mt-8 font-medium text-n-slate-11">
             {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_CALLBACK.WEBHOOK_URL') }}
           </p>
           <woot-code lang="html" :script="currentInbox.callback_webhook_url" />
@@ -256,12 +257,11 @@ onMounted(() => {
             :script="currentInbox.callback_webhook_url"
           />
         </div>
-        <div
+        <EmailInboxFinish
           v-if="isAnEmailChannel && !currentInbox.provider"
-          class="w-[50%] max-w-[50%] ml-[25%]"
-        >
-          <woot-code lang="html" :script="currentInbox.forward_to_email" />
-        </div>
+          :inbox="currentInbox"
+          :inbox-id="$route.params.inbox_id"
+        />
         <div
           v-if="
             isAWhatsAppChannel &&

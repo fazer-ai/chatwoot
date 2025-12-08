@@ -59,12 +59,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     @message = message
     @recipient_id = recipient_id
 
-    if message.content_attributes[:is_reaction]
+    if @message.content_attributes[:is_reaction]
       @message_content = reaction_message_content
-    elsif message.attachments.present?
+    elsif @message.attachments.present?
       @message_content = attachment_message_content
-    elsif message.content.present?
-      @message_content = { text: @message.content }
+    elsif @message.outgoing_content.present?
+      @message_content = { text: @message.outgoing_content }
     else
       @message.update!(is_unsupported: true)
       return
@@ -252,7 +252,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       react: { key: { id: reply_to.source_id,
                       remoteJid: remote_jid,
                       fromMe: reply_to.message_type == 'outgoing' },
-               text: @message.content }
+               text: @message.outgoing_content }
     }
   end
 
@@ -262,7 +262,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     content = {
       fileName: attachment.file.filename,
-      caption: @message.content
+      caption: @message.outgoing_content
     }
     case attachment.file_type
     when 'image'

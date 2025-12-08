@@ -193,6 +193,33 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    context 'when message is input_csat' do
+      before do
+        allow(message).to receive(:outgoing_content).and_return('Please rate us http://example.com/survey')
+        message.content_type = :input_csat
+      end
+
+      it 'sends the message with survey url' do
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: { text: 'Please rate us http://example.com/survey' }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: result_body.to_json
+          )
+
+        result = service.send_message(test_send_phone_number, message)
+
+        expect(result).to eq('msg_123')
+      end
+    end
+
     context 'when message has attachment' do
       let(:base64_image) { 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }
 

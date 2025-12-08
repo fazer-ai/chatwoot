@@ -151,7 +151,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
 
   def filename
     msg = unwrap_ephemeral_message(@raw_message[:message])
-    filename = msg.dig(:documentMessage, :fileName)
+    filename = msg.dig(:documentMessage, :fileName) || msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :fileName)
     return filename if filename.present?
 
     ext = ".#{message_mimetype.split(';').first.split('/').last}" if message_mimetype.present?
