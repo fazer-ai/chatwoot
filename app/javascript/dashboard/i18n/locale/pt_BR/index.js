@@ -26,6 +26,8 @@ import integrations from './integrations.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
+import kanban from './kanban.json';
+import kanbanTemplates from './kanbanTemplates.json';
 import report from './report.json';
 import resetPassword from './resetPassword.json';
 import search from './search.json';
@@ -34,6 +36,7 @@ import settings from './settings.json';
 import signup from './signup.json';
 import sla from './sla.json';
 import teamsSettings from './teamsSettings.json';
+import time from './time.json';
 import whatsappTemplates from './whatsappTemplates.json';
 
 export default {
@@ -65,6 +68,8 @@ export default {
   ...labelsMgmt,
   ...login,
   ...macros,
+  ...kanban,
+  ...kanbanTemplates,
   ...report,
   ...resetPassword,
   ...search,
@@ -73,5 +78,6 @@ export default {
   ...signup,
   ...sla,
   ...teamsSettings,
+  ...time,
   ...whatsappTemplates,
 };

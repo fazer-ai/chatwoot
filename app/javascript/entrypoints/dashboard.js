@@ -85,6 +85,27 @@ app.use(FloatingVue, {
   instantMove: true,
   arrowOverflow: false,
   disposeTimeout: 5000000,
+  themes: {
+    tooltip: {
+      triggers: ['hover', 'focus', 'touch'],
+      autoHide: true,
+      handleResize: true,
+      hideOnTargetClick: true,
+    },
+  },
+  boundary: document.body,
+});
+
+// Hide all tooltips when any scroll occurs to prevent them getting stuck
+const hideAllTooltips = () => {
+  document.querySelectorAll('.v-popper__popper').forEach(popper => {
+    popper.remove();
+  });
+};
+
+document.addEventListener('scroll', hideAllTooltips, {
+  passive: true,
+  capture: true,
 });
 app.use(hljsVuePlugin);
 

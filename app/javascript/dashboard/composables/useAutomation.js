@@ -8,6 +8,7 @@ import {
   getDefaultConditions,
   getDefaultActions,
   generateCustomAttributes,
+  KANBAN_EVENTS,
 } from 'dashboard/helper/automationHelper';
 import useAutomationValues from './useAutomationValues';
 
@@ -55,7 +56,26 @@ export function useAutomation(startValue = null) {
    * Appends a new condition to the automation.value.
    */
   const appendNewCondition = () => {
-    const defaultCondition = getDefaultConditions(eventName.value);
+    let defaultCondition = getDefaultConditions(eventName.value);
+
+    const isKanbanEvent = KANBAN_EVENTS.includes(eventName.value);
+    if (isKanbanEvent) {
+      const hasBoardCondition = automation.value.conditions.some(
+        c => c.attribute_key === 'kanban_board_id'
+      );
+      if (hasBoardCondition) {
+        defaultCondition = [
+          {
+            attribute_key: 'kanban_step_id',
+            filter_operator: 'equal_to',
+            values: '',
+            query_operator: 'and',
+            custom_attribute_type: '',
+          },
+        ];
+      }
+    }
+
     automation.value.conditions = [
       ...automation.value.conditions,
       ...defaultCondition,

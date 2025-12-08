@@ -46,6 +46,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  customAvatarBg: {
+    type: String,
+    default: null,
+  },
+  customAvatarColor: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['upload', 'delete']);
@@ -115,13 +123,15 @@ const containerStyles = computed(() => ({
 const avatarStyles = computed(() => ({
   ...containerStyles.value,
   backgroundColor:
-    !showDefaultAvatar.value && (!props.src || !isImageValid.value)
+    props.customAvatarBg ||
+    (!showDefaultAvatar.value && (!props.src || !isImageValid.value)
       ? getColorsByNameLength.value.bg
-      : undefined,
+      : undefined),
   color:
-    !showDefaultAvatar.value && (!props.src || !isImageValid.value)
+    props.customAvatarColor ||
+    (!showDefaultAvatar.value && (!props.src || !isImageValid.value)
       ? getColorsByNameLength.value.text
-      : undefined,
+      : undefined),
   '--dark-bg': getColorsByNameLength.value.darkBg,
   '--dark-text': getColorsByNameLength.value.darkText,
 }));
@@ -221,7 +231,9 @@ watch(
         roundedFull ? 'rounded-full' : 'rounded-xl',
         {
           'dark:!bg-[var(--dark-bg)] dark:!text-[var(--dark-text)]':
-            !showDefaultAvatar && (!src || !isImageValid),
+            !showDefaultAvatar &&
+            (!src || !isImageValid) &&
+            !props.customAvatarBg,
           'bg-n-slate-3 dark:bg-n-slate-4': showDefaultAvatar,
         },
       ]"

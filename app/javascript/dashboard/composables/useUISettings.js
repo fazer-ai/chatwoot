@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { useStore, useStoreGetters } from 'dashboard/composables/store';
 
 export const DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER = Object.freeze([
+  { name: 'conversation_kanban_actions' },
   { name: 'conversation_actions' },
   { name: 'macros' },
   { name: 'conversation_info' },
@@ -45,7 +46,11 @@ const useConversationSidebarItemsOrder = uiSettings => {
     // If the sidebar order doesn't have the new elements, then add them to the list.
     DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER.forEach(item => {
       if (!itemsOrderCopy.find(i => i.name === item.name)) {
-        itemsOrderCopy.push(item);
+        if (item.name === 'conversation_kanban_actions') {
+          itemsOrderCopy.unshift(item);
+        } else {
+          itemsOrderCopy.push(item);
+        }
       }
     });
     return itemsOrderCopy;

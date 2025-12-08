@@ -65,3 +65,224 @@ describe('ActionCableConnector - Copilot Tests', () => {
     });
   });
 });
+
+describe('ActionCableConnector - Kanban Tests', () => {
+  let store;
+  let actionCable;
+  let mockDispatch;
+  let mockHasModule;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDispatch = vi.fn();
+    mockHasModule = vi.fn(() => true);
+    store = {
+      $store: {
+        dispatch: mockDispatch,
+        hasModule: mockHasModule,
+        getters: {
+          getCurrentAccountId: 1,
+        },
+      },
+    };
+
+    actionCable = ActionCableConnector.init(store.$store, 'test-token');
+  });
+
+  describe('kanban event handlers', () => {
+    it('should register the kanban.task.created event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.task.created');
+      expect(actionCable.events['kanban.task.created']).toBe(
+        actionCable.onKanbanTaskCreated
+      );
+    });
+
+    it('should register the kanban.task.updated event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.task.updated');
+      expect(actionCable.events['kanban.task.updated']).toBe(
+        actionCable.onKanbanTaskUpdated
+      );
+    });
+
+    it('should register the kanban.task.deleted event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.task.deleted');
+      expect(actionCable.events['kanban.task.deleted']).toBe(
+        actionCable.onKanbanTaskDeleted
+      );
+    });
+
+    it('should register the kanban.step.created event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.step.created');
+      expect(actionCable.events['kanban.step.created']).toBe(
+        actionCable.onKanbanStepCreated
+      );
+    });
+
+    it('should register the kanban.step.updated event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.step.updated');
+      expect(actionCable.events['kanban.step.updated']).toBe(
+        actionCable.onKanbanStepUpdated
+      );
+    });
+
+    it('should register the kanban.board.updated event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain('kanban.board.updated');
+      expect(actionCable.events['kanban.board.updated']).toBe(
+        actionCable.onKanbanBoardUpdated
+      );
+    });
+
+    it('should handle the kanban.task.created event', () => {
+      const taskData = {
+        id: 1,
+        title: 'Test Task',
+        board_id: 1,
+        board_step_id: 1,
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.task.created',
+        data: taskData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/addTaskFromEvent',
+        taskData
+      );
+    });
+
+    it('should handle the kanban.task.updated event', () => {
+      const taskData = {
+        id: 1,
+        title: 'Updated Task',
+        board_id: 1,
+        board_step_id: 2,
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.task.updated',
+        data: taskData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/updateTaskFromEvent',
+        taskData
+      );
+    });
+
+    it('should handle the kanban.task.deleted event', () => {
+      const taskData = {
+        id: 1,
+        board_id: 1,
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.task.deleted',
+        data: taskData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/deleteTaskFromEvent',
+        1
+      );
+    });
+
+    it('should handle the kanban.step.created event', () => {
+      const stepData = {
+        id: 1,
+        name: 'New Step',
+        board_id: 1,
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.step.created',
+        data: stepData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/addStepFromEvent',
+        stepData
+      );
+    });
+
+    it('should handle the kanban.step.updated event', () => {
+      const stepData = {
+        id: 1,
+        name: 'Updated Step',
+        board_id: 1,
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.step.updated',
+        data: stepData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/updateStepFromEvent',
+        stepData
+      );
+    });
+
+    it('should handle the kanban.board.updated event', () => {
+      const boardData = {
+        id: 1,
+        name: 'Updated Board',
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.board.updated',
+        data: boardData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'kanban/updateBoardFromEvent',
+        boardData
+      );
+    });
+
+    it('should not dispatch kanban events when module is not registered', () => {
+      mockHasModule.mockReturnValue(false);
+
+      const taskData = {
+        id: 1,
+        title: 'Test Task',
+        account_id: 1,
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.task.created',
+        data: taskData,
+      });
+
+      expect(mockHasModule).toHaveBeenCalledWith('kanban');
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it('should not dispatch kanban events for different account', () => {
+      const taskData = {
+        id: 1,
+        title: 'Test Task',
+        account_id: 999, // Different account
+      };
+
+      actionCable.onReceived({
+        event: 'kanban.task.created',
+        data: taskData,
+      });
+
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+  });
+});

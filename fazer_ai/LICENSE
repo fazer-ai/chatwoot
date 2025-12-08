@@ -1,0 +1,34 @@
+The Chatwoot fazer.ai license (the "fazer.ai License")
+Copyright (c) 2017-2025 Chatwoot Inc
+
+With regard to the software, code, documentation, tests, and other assets that
+reside inside the "fazer_ai/" directory of this repository (collectively, the
+"fazer.ai Software"):
+
+This fazer.ai Software may only be used in production if you (and any entity
+that you represent) have agreed to, and are in compliance with, a valid
+Chatwoot fazer.ai subscription agreement, the Chatwoot Terms of Service, or
+another written agreement with Chatwoot that governs access to fazer.ai
+functionality (collectively, the "fazer.ai Terms"). Subject to that agreement,
+you may modify the fazer.ai Software and publish patches to the fazer.ai
+Software. You agree that Chatwoot and/or its licensors retain all right, title,
+and interest in and to all such modifications and/or patches, and all such
+modifications and/or patches may only be used, copied, modified, displayed,
+distributed, or otherwise exploited while you maintain a valid fazer.ai license
+for the correct number of user seats. Notwithstanding the foregoing, you may
+copy and modify the fazer.ai Software for development and testing purposes
+without requiring a subscription. You are not granted any other rights beyond
+what is expressly stated herein. Subject to the foregoing, it is forbidden to
+copy, merge, publish, distribute, sublicense, and/or sell the fazer.ai Software.
+
+THE FAZER.AI SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE FAZER.AI SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE FAZER.AI SOFTWARE.
+
+For all third party components incorporated into the fazer.ai Software, those
+components are licensed under the original license provided by the owner of the
+applicable component.

@@ -11,6 +11,7 @@ import chatlist from './chatlist.json';
 import components from './components.json';
 import contact from './contact.json';
 import contactFilters from './contactFilters.json';
+import contentTemplates from './contentTemplates.json';
 import conversation from './conversation.json';
 import csatMgmt from './csatMgmt.json';
 import customRole from './customRole.json';
@@ -23,6 +24,8 @@ import inbox from './inbox.json';
 import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
+import kanban from './kanban.json';
+import kanbanTemplates from './kanbanTemplates.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
@@ -34,8 +37,8 @@ import settings from './settings.json';
 import signup from './signup.json';
 import sla from './sla.json';
 import teamsSettings from './teamsSettings.json';
+import time from './time.json';
 import whatsappTemplates from './whatsappTemplates.json';
-import contentTemplates from './contentTemplates.json';
 import mfa from './mfa.json';
 
 export default {
@@ -52,6 +55,7 @@ export default {
   ...components,
   ...contact,
   ...contactFilters,
+  ...contentTemplates,
   ...conversation,
   ...csatMgmt,
   ...customRole,
@@ -64,6 +68,8 @@ export default {
   ...inboxMgmt,
   ...integrationApps,
   ...integrations,
+  ...kanban,
+  ...kanbanTemplates,
   ...labelsMgmt,
   ...login,
   ...macros,
@@ -75,7 +81,7 @@ export default {
   ...signup,
   ...sla,
   ...teamsSettings,
+  ...time,
   ...whatsappTemplates,
-  ...contentTemplates,
   ...mfa,
 };

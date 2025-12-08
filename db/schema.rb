@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_10_03_091242) do
+ActiveRecord::Schema[7.1].define(version: 2025_11_17_090000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -669,6 +669,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_03_091242) do
     t.bigint "sla_policy_id"
     t.datetime "waiting_since"
     t.text "cached_label_list"
+    t.bigint "kanban_task_id"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"
     t.index ["account_id", "inbox_id", "status", "assignee_id"], name: "conv_acid_inbid_stat_asgnid_idx"
@@ -679,6 +680,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_03_091242) do
     t.index ["contact_inbox_id"], name: "index_conversations_on_contact_inbox_id"
     t.index ["first_reply_created_at"], name: "index_conversations_on_first_reply_created_at"
     t.index ["inbox_id"], name: "index_conversations_on_inbox_id"
+    t.index ["kanban_task_id"], name: "index_conversations_on_kanban_task_id"
     t.index ["priority"], name: "index_conversations_on_priority"
     t.index ["status", "account_id"], name: "index_conversations_on_status_and_account_id"
     t.index ["status", "priority"], name: "index_conversations_on_status_and_priority"
@@ -886,6 +888,117 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_03_091242) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.jsonb "settings", default: {}
+  end
+
+  create_table "kanban_account_user_preferences", force: :cascade do |t|
+    t.bigint "account_user_id", null: false
+    t.jsonb "preferences", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_user_id"], name: "index_kanban_account_user_preferences_on_account_user_id", unique: true
+  end
+
+  create_table "kanban_audit_events", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "task_id", null: false
+    t.bigint "performed_by_id"
+    t.string "action", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_kanban_audit_events_on_account_id_and_created_at"
+    t.index ["account_id"], name: "index_kanban_audit_events_on_account_id"
+    t.index ["performed_by_id"], name: "index_kanban_audit_events_on_performed_by_id"
+    t.index ["task_id"], name: "index_kanban_audit_events_on_task_id"
+  end
+
+  create_table "kanban_board_agents", force: :cascade do |t|
+    t.bigint "board_id", null: false
+    t.bigint "agent_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["agent_id"], name: "index_kanban_board_agents_on_agent_id"
+    t.index ["board_id", "agent_id"], name: "index_kanban_board_agents_on_board_id_and_agent_id", unique: true
+    t.index ["board_id"], name: "index_kanban_board_agents_on_board_id"
+  end
+
+  create_table "kanban_board_inboxes", force: :cascade do |t|
+    t.bigint "board_id", null: false
+    t.bigint "inbox_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["board_id", "inbox_id"], name: "index_kanban_board_inboxes_on_board_id_and_inbox_id", unique: true
+    t.index ["board_id"], name: "index_kanban_board_inboxes_on_board_id"
+    t.index ["inbox_id"], name: "index_kanban_board_inboxes_on_inbox_id"
+  end
+
+  create_table "kanban_board_steps", force: :cascade do |t|
+    t.bigint "board_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.string "color", default: "#475569", null: false
+    t.integer "tasks_count", default: 0, null: false
+    t.boolean "cancelled", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["board_id"], name: "index_kanban_board_steps_on_board_id"
+  end
+
+  create_table "kanban_boards", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.jsonb "settings", default: {}, null: false
+    t.integer "steps_order", default: [], array: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_kanban_boards_on_account_id_and_created_at"
+    t.index ["account_id", "name"], name: "index_kanban_boards_on_account_id_and_name", unique: true
+    t.index ["account_id", "updated_at"], name: "index_kanban_boards_on_account_id_and_updated_at"
+    t.index ["account_id"], name: "index_kanban_boards_on_account_id"
+  end
+
+  create_table "kanban_task_agents", force: :cascade do |t|
+    t.bigint "task_id", null: false
+    t.bigint "agent_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["agent_id"], name: "index_kanban_task_agents_on_agent_id"
+    t.index ["task_id", "agent_id"], name: "index_kanban_task_agents_on_task_id_and_agent_id", unique: true
+    t.index ["task_id"], name: "index_kanban_task_agents_on_task_id"
+  end
+
+  create_table "kanban_task_contacts", force: :cascade do |t|
+    t.bigint "task_id", null: false
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_kanban_task_contacts_on_contact_id"
+    t.index ["task_id", "contact_id"], name: "index_kanban_task_contacts_on_task_id_and_contact_id", unique: true
+    t.index ["task_id"], name: "index_kanban_task_contacts_on_task_id"
+  end
+
+  create_table "kanban_tasks", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "board_id", null: false
+    t.bigint "board_step_id", null: false
+    t.bigint "created_by_id"
+    t.string "title", null: false
+    t.text "description"
+    t.string "priority", default: "normal", null: false
+    t.datetime "start_date"
+    t.datetime "end_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_kanban_tasks_on_account_id_and_created_at"
+    t.index ["account_id"], name: "index_kanban_tasks_on_account_id"
+    t.index ["board_id", "board_step_id"], name: "index_kanban_tasks_on_board_id_and_board_step_id"
+    t.index ["board_id", "priority"], name: "index_kanban_tasks_on_board_id_and_priority"
+    t.index ["board_id"], name: "index_kanban_tasks_on_board_id"
+    t.index ["board_step_id", "priority"], name: "index_kanban_tasks_on_board_step_id_and_priority"
+    t.index ["board_step_id"], name: "index_kanban_tasks_on_board_step_id"
+    t.index ["created_by_id"], name: "index_kanban_tasks_on_created_by_id"
+    t.index ["priority"], name: "index_kanban_tasks_on_priority"
   end
 
   create_table "labels", force: :cascade do |t|
@@ -1253,7 +1366,26 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_03_091242) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "conversations", "kanban_tasks"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "kanban_account_user_preferences", "account_users"
+  add_foreign_key "kanban_audit_events", "accounts"
+  add_foreign_key "kanban_audit_events", "kanban_tasks", column: "task_id"
+  add_foreign_key "kanban_audit_events", "users", column: "performed_by_id"
+  add_foreign_key "kanban_board_agents", "kanban_boards", column: "board_id"
+  add_foreign_key "kanban_board_agents", "users", column: "agent_id"
+  add_foreign_key "kanban_board_inboxes", "inboxes"
+  add_foreign_key "kanban_board_inboxes", "kanban_boards", column: "board_id"
+  add_foreign_key "kanban_board_steps", "kanban_boards", column: "board_id"
+  add_foreign_key "kanban_boards", "accounts"
+  add_foreign_key "kanban_task_agents", "kanban_tasks", column: "task_id"
+  add_foreign_key "kanban_task_agents", "users", column: "agent_id"
+  add_foreign_key "kanban_task_contacts", "contacts"
+  add_foreign_key "kanban_task_contacts", "kanban_tasks", column: "task_id"
+  add_foreign_key "kanban_tasks", "accounts"
+  add_foreign_key "kanban_tasks", "kanban_board_steps", column: "board_step_id"
+  add_foreign_key "kanban_tasks", "kanban_boards", column: "board_id"
+  add_foreign_key "kanban_tasks", "users", column: "created_by_id", on_delete: :nullify
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").
       after(:insert).

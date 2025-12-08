@@ -49,9 +49,12 @@ export function useEditableAutomation() {
       return {
         ...condition,
         query_operator: condition.query_operator || 'and',
-        values: [...getConditionDropdownValues(condition.attribute_key)].filter(
-          item => [...condition.values].includes(item.id)
-        ),
+        values: [
+          ...getConditionDropdownValues(
+            condition.attribute_key,
+            automation.conditions
+          ),
+        ].filter(item => [...condition.values].includes(item.id)),
       };
     });
   };
@@ -60,17 +63,24 @@ export function useEditableAutomation() {
    * Generates an array of actions for the automation.
    * @param {Object} action - The action object.
    * @param {Array} automationActionTypes - List of available automation action types.
+   * @param {Array} conditions - The current automation conditions.
+   * @param {Array} actions - The current automation actions.
    * @returns {Array|Object} Generated actions array or object based on input type.
    */
-  const generateActionsArray = (action, automationActionTypes) => {
+  const generateActionsArray = (
+    action,
+    automationActionTypes,
+    conditions,
+    actions
+  ) => {
     const params = action.action_params;
     const inputType = automationActionTypes.find(
       item => item.key === action.action_name
     ).inputType;
     if (inputType === 'multi_select' || inputType === 'search_select') {
-      return [...getActionDropdownValues(action.action_name)].filter(item =>
-        [...params].includes(item.id)
-      );
+      return [
+        ...getActionDropdownValues(action.action_name, conditions, actions),
+      ].filter(item => [...params].includes(item.id));
     }
     if (inputType === 'team_message') {
       return {
@@ -94,7 +104,12 @@ export function useEditableAutomation() {
     return automation.actions.map(action => ({
       ...action,
       action_params: action.action_params.length
-        ? generateActionsArray(action, automationActionTypes)
+        ? generateActionsArray(
+            action,
+            automationActionTypes,
+            automation.conditions,
+            automation.actions
+          )
         : [],
     }));
   };

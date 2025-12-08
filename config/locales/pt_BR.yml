@@ -18,6 +18,28 @@
 #available at https://guides.rubyonrails.org/i18n.html.
 pt_BR:
   hello: 'Olá, mundo'
+  kanban:
+    tasks:
+      auto_create:
+        title: "Conversa #%{display_id} - %{contact_name}"
+        unknown_contact: "Contato desconhecido"
+      errors:
+        invalid_conversations: 'devem pertencer a uma das caixas de entrada do quadro'
+        invalid_conversation_inbox: 'devem pertencer a uma das caixas de entrada do quadro'
+        invalid_end_date: 'deve ser igual ou posterior à data de início'
+        invalid_board_step: 'deve pertencer ao mesmo quadro'
+        invalid_assignee: 'deve pertencer à mesma conta'
+        invalid_assignees: 'devem pertencer aos agentes do quadro'
+        invalid_contact_account: 'deve pertencer à mesma conta'
+    agents:
+      errors:
+        invalid_agent: 'deve pertencer à mesma conta do quadro'
+    inboxes:
+      errors:
+        mismatched_account: 'deve pertencer à mesma conta do quadro'
+    board_steps:
+      errors:
+        cannot_delete_last_step: "Não é possível excluir a última etapa do quadro"
   inbox:
     reauthorization:
       success: 'Canal reautenticado com sucesso'
@@ -197,6 +219,7 @@ pt_BR:
         auto_resolved_days: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} dias de inatividade'
         auto_resolved_hours: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} horas de inatividade'
         auto_resolved_minutes: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} minutos de inatividade'
+        kanban_task_resolved: 'A conversa foi marcada como resolvida porque a tarefa vinculada "%{task_title}" no quadro "%{board_name}" foi concluída'
         system_auto_open: O sistema reabriu a conversa devido a uma nova mensagem recebida.
       priority:
         added: '%{user_name} definiu a prioridade para %{new_priority}'
@@ -418,3 +441,48 @@ pt_BR:
       subject: 'Termine de configurar %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Domínio personalizado não está configurado'
+  activerecord:
+    attributes:
+      fazer_ai/kanban/board:
+        name: "Nome"
+        description: "Descrição"
+      fazer_ai/kanban/board_step:
+        name: "Nome"
+        description: "Descrição"
+        color: "Cor"
+      fazer_ai/kanban/task:
+        title: "Título"
+        description: "Descrição"
+    errors:
+      models:
+        fazer_ai/kanban/board:
+          attributes:
+            name:
+              blank: "não pode ficar em branco"
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+              taken: "já está em uso"
+            description:
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+        fazer_ai/kanban/board_step:
+          attributes:
+            name:
+              blank: "não pode ficar em branco"
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+            description:
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+            color:
+              blank: "não pode ficar em branco"
+            cancelled:
+              cannot_be_first_step: "não pode ser definido na primeira etapa"
+              cannot_be_last_step: "não pode ser definido na última etapa"
+        fazer_ai/kanban/task:
+          attributes:
+            title:
+              blank: "não pode ficar em branco"
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+            description:
+              too_long: "é muito longo (máximo: %{count} caracteres)"
+            priority:
+              inclusion: "não é uma prioridade válida"
+            status:
+              inclusion: "não é um status válido"

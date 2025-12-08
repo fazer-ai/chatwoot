@@ -30,5 +30,10 @@ RSpec.describe Agents::DestroyJob do
       expect(user.notification_settings.length).to eq 0
       expect(user.assigned_conversations.where(account: account).length).to eq 0
     end
+
+    it 'returns early when account or user is missing' do
+      expect { described_class.perform_now(nil, user) }.not_to raise_error
+      expect { described_class.perform_now(account, nil) }.not_to raise_error
+    end
   end
 end

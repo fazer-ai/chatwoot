@@ -53,6 +53,7 @@ const moreThumbnailsClass = computed(() => {
       :title="user.name"
       :src="user.thumbnail"
       :name="user.name"
+      :status="user.availability_status"
       :size="size"
       class="[&>span]:outline [&>span]:outline-1 [&>span]:outline-n-background [&>span]:shadow"
       :class="gapClass"

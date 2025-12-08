@@ -40,6 +40,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  hideSearch: {
+    type: Boolean,
+    default: false,
+  },
+  hideCloseButton: {
+    type: Boolean,
+    default: false,
+  },
+  maxHeight: {
+    type: String,
+    default: '10rem',
+  },
 });
 
 const emit = defineEmits(['select']);
@@ -80,22 +92,31 @@ const hasValue = computed(() => {
           <h4 v-if="!hasValue" class="text-sm text-ellipsis text-n-slate-12">
             {{ multiselectorPlaceholder }}
           </h4>
-          <h4
-            v-else
-            class="items-center overflow-hidden text-sm leading-tight whitespace-nowrap text-ellipsis text-n-slate-12"
-            :title="selectedItem.name"
-          >
-            {{ selectedItem.name }}
-          </h4>
+          <div v-else class="flex items-center gap-2 overflow-hidden">
+            <span
+              v-if="selectedItem.color && !selectedItem.icon"
+              class="w-2 h-2 rounded-full flex-shrink-0"
+              :style="{ backgroundColor: selectedItem.color }"
+            />
+            <h4
+              class="items-center overflow-hidden text-sm leading-tight whitespace-nowrap text-ellipsis text-n-slate-12"
+              :title="selectedItem.name"
+            >
+              {{ selectedItem.name }}
+            </h4>
+          </div>
         </div>
         <Avatar
           v-if="hasValue && hasThumbnail"
           :src="selectedItem.thumbnail"
+          :icon-name="selectedItem.icon"
           :status="selectedItem.availability_status"
           :name="selectedItem.name"
           :size="24"
           hide-offline-status
           rounded-full
+          :custom-avatar-color="selectedItem.icon ? selectedItem.color : null"
+          :custom-avatar-bg="selectedItem.icon ? 'transparent' : null"
         />
       </Button>
       <!-- NOTE: Without @click.prevent, the dropdown does not behave as expected when used inside a <label> tag. -->
@@ -113,7 +134,14 @@ const hasValue = computed(() => {
           >
             {{ multiselectorTitle }}
           </h4>
-          <Button ghost slate xs icon="i-lucide-x" @click="onCloseDropdown" />
+          <Button
+            v-if="!hideCloseButton"
+            ghost
+            slate
+            xs
+            icon="i-lucide-x"
+            @click="onCloseDropdown"
+          />
         </div>
         <MultiselectDropdownItems
           v-if="showSearchDropdown"
@@ -122,6 +150,8 @@ const hasValue = computed(() => {
           :has-thumbnail="hasThumbnail"
           :input-placeholder="inputPlaceholder"
           :no-search-result="noSearchResult"
+          :hide-search="hideSearch"
+          :max-height="maxHeight"
           @select="onClickSelectItem"
         />
       </div>

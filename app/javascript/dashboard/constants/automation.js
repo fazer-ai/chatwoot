@@ -28,6 +28,16 @@ export const DEFAULT_OTHER_CONDITION = [
   },
 ];
 
+export const DEFAULT_KANBAN_CONDITION = [
+  {
+    attribute_key: 'kanban_board_id',
+    filter_operator: 'equal_to',
+    values: '',
+    query_operator: 'and',
+    custom_attribute_type: '',
+  },
+];
+
 export const DEFAULT_ACTIONS = [
   {
     action_name: 'assign_agent',

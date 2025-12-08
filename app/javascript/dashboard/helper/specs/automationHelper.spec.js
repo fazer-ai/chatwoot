@@ -14,6 +14,100 @@ import {
 } from './fixtures/automationFixtures';
 import { AUTOMATIONS } from 'dashboard/routes/dashboard/settings/automation/constants';
 
+describe('KANBAN_EVENTS', () => {
+  it('contains all kanban task events', () => {
+    expect(helpers.KANBAN_EVENTS).toContain('kanban_task_created');
+    expect(helpers.KANBAN_EVENTS).toContain('kanban_task_updated');
+    expect(helpers.KANBAN_EVENTS).toContain('kanban_task_completed');
+    expect(helpers.KANBAN_EVENTS).toContain('kanban_task_cancelled');
+    expect(helpers.KANBAN_EVENTS).toHaveLength(4);
+  });
+});
+
+describe('extractBoardIdFromValues', () => {
+  it('returns null for null/undefined values', () => {
+    expect(helpers.extractBoardIdFromValues(null)).toBeNull();
+    expect(helpers.extractBoardIdFromValues(undefined)).toBeNull();
+  });
+
+  it('returns id from object with id property', () => {
+    expect(helpers.extractBoardIdFromValues({ id: 123, name: 'Board' })).toBe(
+      123
+    );
+  });
+
+  it('returns id from array of objects', () => {
+    expect(helpers.extractBoardIdFromValues([{ id: 456, name: 'Board' }])).toBe(
+      456
+    );
+  });
+
+  it('returns first value from array of primitives', () => {
+    expect(helpers.extractBoardIdFromValues([789])).toBe(789);
+  });
+
+  it('returns primitive value directly', () => {
+    expect(helpers.extractBoardIdFromValues(999)).toBe(999);
+    expect(helpers.extractBoardIdFromValues('board-id')).toBe('board-id');
+  });
+
+  it('returns null for empty array', () => {
+    expect(helpers.extractBoardIdFromValues([])).toBeNull();
+  });
+});
+
+describe('getBoardSteps', () => {
+  it('returns steps array when available', () => {
+    const board = { steps: [{ id: 1, name: 'Step 1' }] };
+    expect(helpers.getBoardSteps(board)).toEqual([{ id: 1, name: 'Step 1' }]);
+  });
+
+  it('returns steps_summary when steps is not available', () => {
+    const board = { steps_summary: [{ id: 2, name: 'Step 2' }] };
+    expect(helpers.getBoardSteps(board)).toEqual([{ id: 2, name: 'Step 2' }]);
+  });
+
+  it('returns empty array when board is null/undefined', () => {
+    expect(helpers.getBoardSteps(null)).toEqual([]);
+    expect(helpers.getBoardSteps(undefined)).toEqual([]);
+  });
+
+  it('returns empty array when board has no steps', () => {
+    expect(helpers.getBoardSteps({})).toEqual([]);
+  });
+});
+
+describe('getSelectedBoardId', () => {
+  it('returns null when conditions is null/undefined', () => {
+    expect(helpers.getSelectedBoardId(null)).toBeNull();
+    expect(helpers.getSelectedBoardId(undefined)).toBeNull();
+  });
+
+  it('returns null when no board condition exists', () => {
+    const conditions = [{ attribute_key: 'status', values: 'open' }];
+    expect(helpers.getSelectedBoardId(conditions)).toBeNull();
+  });
+
+  it('extracts board id from object value', () => {
+    const conditions = [
+      { attribute_key: 'kanban_board_id', values: { id: 123, name: 'Board' } },
+    ];
+    expect(helpers.getSelectedBoardId(conditions)).toBe(123);
+  });
+
+  it('extracts board id from array value', () => {
+    const conditions = [
+      { attribute_key: 'kanban_board_id', values: [{ id: 456 }] },
+    ];
+    expect(helpers.getSelectedBoardId(conditions)).toBe(456);
+  });
+
+  it('extracts board id from primitive value', () => {
+    const conditions = [{ attribute_key: 'kanban_board_id', values: 789 }];
+    expect(helpers.getSelectedBoardId(conditions)).toBe(789);
+  });
+});
+
 describe('getCustomAttributeInputType', () => {
   it('returns the attribute input type', () => {
     expect(helpers.getCustomAttributeInputType('date')).toEqual('date');
@@ -391,6 +485,17 @@ describe('getInputType', () => {
     );
     expect(result).toEqual('search_select');
   });
+
+  it('returns empty string when attribute key is not found', () => {
+    const mockAutomation = { event_name: 'message_created' };
+    const result = helpers.getInputType(
+      customAttributes,
+      AUTOMATIONS,
+      mockAutomation,
+      'non_existent_key'
+    );
+    expect(result).toEqual('');
+  });
 });
 
 describe('getOperators', () => {
@@ -420,6 +525,18 @@ describe('getOperators', () => {
         .filterOperators
     );
   });
+
+  it('returns empty array when attribute key is not found', () => {
+    const mockAutomation = { event_name: 'message_created' };
+    const result = helpers.getOperators(
+      customAttributes,
+      AUTOMATIONS,
+      mockAutomation,
+      'create',
+      'non_existent_key'
+    );
+    expect(result).toEqual([]);
+  });
 });
 
 describe('getCustomAttributeType', () => {
@@ -430,10 +547,18 @@ describe('getCustomAttributeType', () => {
       mockAutomation,
       'message_type'
     );
-    expect(result).toEqual(
-      AUTOMATIONS.message_created.conditions.find(c => c.key === 'message_type')
-        .customAttributeType
+    // message_type condition doesn't have customAttributeType defined, so it returns empty string
+    expect(result).toEqual('');
+  });
+
+  it('returns empty string when attribute key is not found', () => {
+    const mockAutomation = { event_name: 'message_created' };
+    const result = helpers.getCustomAttributeType(
+      AUTOMATIONS,
+      mockAutomation,
+      'non_existent_key'
     );
+    expect(result).toEqual('');
   });
 });
 
@@ -451,5 +576,12 @@ describe('showActionInput', () => {
   it('returns false if the action does not have an input type', () => {
     const mockActionTypes = [{ key: 'some_action', inputType: null }];
     expect(helpers.showActionInput(mockActionTypes, 'some_action')).toBe(false);
+  });
+
+  it('returns false when action key is not found in action types', () => {
+    const mockActionTypes = [{ key: 'add_label', inputType: 'select' }];
+    expect(
+      helpers.showActionInput(mockActionTypes, 'non_existent_action')
+    ).toBe(false);
   });
 });

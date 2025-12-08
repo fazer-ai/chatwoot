@@ -23,7 +23,15 @@ defineProps({
   <div class="flex flex-col w-full h-full gap-8 font-inter">
     <slot name="header" />
     <!-- Added to render any templates that should be rendered before body -->
-    <main>
+    <main
+      v-if="
+        isLoading ||
+        noRecordsFound ||
+        $slots.body ||
+        $slots.default ||
+        $slots.preBody
+      "
+    >
       <slot name="preBody" />
       <slot v-if="isLoading" name="loading">
         <woot-loading-state :message="loadingMessage" />

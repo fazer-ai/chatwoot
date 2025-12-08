@@ -53,9 +53,17 @@ const props = defineProps({
     default: 'lg',
     validator: value => ['3xl', '2xl', 'xl', 'lg', 'md', 'sm'].includes(value),
   },
+  ignoreClickOutside: {
+    type: Boolean,
+    default: false,
+  },
+  id: {
+    type: String,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['confirm', 'close']);
+const emit = defineEmits(['confirm', 'close', 'clickOutside']);
 
 const { t } = useI18n();
 
@@ -84,25 +92,38 @@ const close = () => {
   dialogRef.value?.close();
 };
 
+const onClickOutside = () => {
+  if (props.ignoreClickOutside) {
+    emit('clickOutside');
+    return;
+  }
+  close();
+};
+
 const confirm = () => {
   emit('confirm');
 };
 
-defineExpose({ open, close });
+defineExpose({ open, close, dialogRef });
 </script>
 
 <template>
   <TeleportWithDirection to="body">
     <dialog
+      :id="id"
       ref="dialogRef"
-      class="w-full transition-all duration-300 ease-in-out shadow-xl rounded-xl"
+      class="transition-all duration-300 ease-in-out"
       :class="[
-        maxWidthClass,
-        overflowYAuto ? 'overflow-y-auto' : 'overflow-visible',
+        overflowYAuto
+          ? 'dialog-fullscreen-scroll fixed inset-0 w-full h-full max-w-none max-h-none bg-transparent shadow-none p-4 overflow-y-auto'
+          : ['w-full shadow-xl rounded-xl overflow-visible', maxWidthClass],
       ]"
       @close="close"
     >
-      <OnClickOutside @trigger="close">
+      <OnClickOutside
+        :class="[overflowYAuto ? ['w-full', maxWidthClass] : '']"
+        @trigger="onClickOutside"
+      >
         <form
           ref="dialogContentRef"
           class="flex flex-col w-full h-auto gap-6 p-6 overflow-visible text-left align-middle transition-all duration-300 ease-in-out transform bg-n-alpha-3 backdrop-blur-[100px] shadow-xl rounded-xl"
@@ -110,11 +131,19 @@ defineExpose({ open, close });
           @click.stop
         >
           <div v-if="title || description" class="flex flex-col gap-2">
-            <h3 class="text-base font-medium leading-6 text-n-slate-12">
-              {{ title }}
-            </h3>
+            <div class="flex items-start justify-between gap-4">
+              <h3
+                class="text-base font-medium leading-6 text-n-slate-12 break-words min-w-0 flex-1"
+              >
+                {{ title }}
+              </h3>
+              <slot name="header-actions" />
+            </div>
             <slot name="description">
-              <p v-if="description" class="mb-0 text-sm text-n-slate-11">
+              <p
+                v-if="description"
+                class="mb-0 text-sm text-n-slate-11 break-words"
+              >
                 {{ description }}
               </p>
             </slot>
@@ -155,5 +184,10 @@ defineExpose({ open, close });
 <style scoped>
 dialog::backdrop {
   @apply bg-n-alpha-black1 backdrop-blur-[4px];
+}
+
+dialog.dialog-fullscreen-scroll[open] {
+  display: grid;
+  place-items: center;
 }
 </style>

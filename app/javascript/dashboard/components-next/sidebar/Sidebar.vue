@@ -17,6 +17,7 @@ import ChannelLeaf from './ChannelLeaf.vue';
 import SidebarAccountSwitcher from './SidebarAccountSwitcher.vue';
 import Logo from 'next/icon/Logo.vue';
 import ComposeConversation from 'dashboard/components-next/NewConversation/ComposeConversation.vue';
+import kanbanModule from 'kanban/store/modules/kanban';
 
 const props = defineProps({
   isMobileSidebarOpen: {
@@ -36,6 +37,11 @@ const { accountScopedRoute } = useAccount();
 const store = useStore();
 const searchShortcut = useKbd([`$mod`, 'k']);
 const { t } = useI18n();
+const boards = computed(() => store.state.kanban?.boards || []);
+const preferences = computed(() => store.state.kanban?.preferences);
+const favoriteBoardIds = computed(
+  () => preferences.value?.favorite_board_ids || []
+);
 
 const toggleShortcutModalFn = show => {
   if (show) {
@@ -73,6 +79,10 @@ const conversationCustomViews = useMapGetter(
 );
 
 onMounted(() => {
+  if (!store.hasModule('kanban')) {
+    store.registerModule('kanban', kanbanModule);
+  }
+  store.dispatch('kanban/fetchBoards');
   store.dispatch('labels/get');
   store.dispatch('inboxes/get');
   store.dispatch('notifications/unReadCount');
@@ -118,6 +128,44 @@ const newReportRoutes = () => [
 ];
 
 const reportRoutes = computed(() => newReportRoutes());
+
+const kanbanMenuChildren = computed(() => {
+  const items = [
+    {
+      name: 'kanban-overview',
+      label: t('KANBAN.SIDEBAR.OVERVIEW'),
+      to: accountScopedRoute('kanban_list'),
+      activeOn: ['kanban_list'],
+    },
+  ];
+
+  if (boards.value.length > 0) {
+    const sortedBoards = [...boards.value].sort((a, b) => {
+      const aFav = favoriteBoardIds.value.includes(a.id);
+      const bFav = favoriteBoardIds.value.includes(b.id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    });
+
+    items.push({
+      name: 'Boards',
+      label: t('KANBAN.BOARDS.SIDEBAR_HEADER'),
+      icon: 'i-lucide-kanban',
+      activeOn: ['kanban_board_show'],
+      children: sortedBoards.map(board => ({
+        name: `kanban-${board.id}`,
+        label: board.name,
+        to: accountScopedRoute('kanban_board_show', { boardId: board.id }),
+        icon: favoriteBoardIds.value.includes(board.id)
+          ? 'i-ri-star-fill text-yellow-500'
+          : null,
+      })),
+    });
+  }
+
+  return items;
+});
 
 const menuItems = computed(() => {
   return [
@@ -211,6 +259,12 @@ const menuItems = computed(() => {
           })),
         },
       ],
+    },
+    {
+      name: 'Kanban',
+      label: t('SIDEBAR.KANBAN'),
+      icon: 'i-lucide-columns-3',
+      children: kanbanMenuChildren.value,
     },
     {
       name: 'Captain',

@@ -4,9 +4,18 @@ import {
   dynamicTime,
   dateFormat,
   shortTimestamp,
+  shortTimestampFromDate,
   getDayDifferenceFromNow,
   hasOneDayPassed,
 } from 'shared/helpers/timeHelper';
+import {
+  getUnixTime,
+  subMinutes,
+  subHours,
+  subDays,
+  subMonths,
+  subYears,
+} from 'date-fns';
 
 beforeEach(() => {
   process.env.TZ = 'UTC';
@@ -235,5 +244,109 @@ describe('#hasOneDayPassed', () => {
     const crossYearTimestamp = 1672401600;
 
     expect(hasOneDayPassed(crossYearTimestamp)).toBe(true);
+  });
+});
+
+describe('#shortTimestampFromDate', () => {
+  it('returns correct value without ago', () => {
+    const now = new Date();
+    expect(shortTimestampFromDate({ time: getUnixTime(now) })).toEqual('now');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subMinutes(now, 1)) })
+    ).toEqual('1m');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subMinutes(now, 12)) })
+    ).toEqual('12m');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subHours(now, 1)) })
+    ).toEqual('1h');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subHours(now, 2)) })
+    ).toEqual('2h');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subDays(now, 1)) })
+    ).toEqual('1d');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subDays(now, 3)) })
+    ).toEqual('3d');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subMonths(now, 1)) })
+    ).toEqual('1mo');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subMonths(now, 2)) })
+    ).toEqual('2mo');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subYears(now, 1)) })
+    ).toEqual('1y');
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(subYears(now, 4)) })
+    ).toEqual('4y');
+  });
+
+  it('returns correct value with ago', () => {
+    const now = new Date();
+    expect(
+      shortTimestampFromDate({ time: getUnixTime(now), withAgo: true })
+    ).toEqual('now');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subMinutes(now, 1)),
+        withAgo: true,
+      })
+    ).toEqual('1m ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subMinutes(now, 12)),
+        withAgo: true,
+      })
+    ).toEqual('12m ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subHours(now, 1)),
+        withAgo: true,
+      })
+    ).toEqual('1h ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subHours(now, 2)),
+        withAgo: true,
+      })
+    ).toEqual('2h ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subDays(now, 1)),
+        withAgo: true,
+      })
+    ).toEqual('1d ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subDays(now, 3)),
+        withAgo: true,
+      })
+    ).toEqual('3d ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subMonths(now, 1)),
+        withAgo: true,
+      })
+    ).toEqual('1mo ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subMonths(now, 2)),
+        withAgo: true,
+      })
+    ).toEqual('2mo ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subYears(now, 1)),
+        withAgo: true,
+      })
+    ).toEqual('1y ago');
+    expect(
+      shortTimestampFromDate({
+        time: getUnixTime(subYears(now, 4)),
+        withAgo: true,
+      })
+    ).toEqual('4y ago');
   });
 });

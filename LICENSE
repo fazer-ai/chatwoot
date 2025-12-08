@@ -3,6 +3,7 @@ Copyright (c) 2017-2024 Chatwoot Inc.
 Portions of this software are licensed as follows:
 
 * All content that resides under the "enterprise/" directory of this repository, if that directory exists, is licensed under the license defined in "enterprise/LICENSE".
+* All content that resides under the "fazer_ai/" directory of this repository, if that directory exists, is licensed under the license defined in "fazer_ai/LICENSE".
 * All third party components incorporated into the Chatwoot Software are licensed under the original license provided by the owner of the applicable component.
 * Content outside of the above mentioned directories or restrictions above is available under the "MIT Expat" license as defined below.
 

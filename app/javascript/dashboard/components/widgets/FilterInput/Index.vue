@@ -51,6 +51,10 @@ export default {
       type: String,
       default: '',
     },
+    showSelectBoardWarning: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['update:modelValue', 'removeFilter', 'resetFilter'],
   computed: {
@@ -221,7 +225,13 @@ export default {
             v-else-if="inputType === 'search_select'"
             class="multiselect-wrap--small"
           >
+            <div v-if="showSelectBoardWarning" class="select-board-warning">
+              <span class="text-n-slate-11 text-sm">
+                {{ $t('AUTOMATION.KANBAN.SELECT_BOARD_FIRST') }}
+              </span>
+            </div>
             <multiselect
+              v-else
               v-model="values"
               track-by="id"
               label="name"
@@ -301,5 +311,9 @@ export default {
 
 .multiselect {
   @apply mb-0;
+}
+
+.select-board-warning {
+  @apply flex items-center px-3 py-2 bg-n-amber-3 dark:bg-n-amber-3 border border-solid border-n-amber-6 dark:border-n-amber-6 rounded;
 }
 </style>

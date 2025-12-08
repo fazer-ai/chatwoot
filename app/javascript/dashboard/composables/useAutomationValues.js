@@ -27,6 +27,7 @@ export default function useAutomationValues() {
   const labels = useMapGetter('labels/getLabels');
   const teams = useMapGetter('teams/getTeams');
   const slaPolicies = useMapGetter('sla/getSLA');
+  const kanbanBoards = useMapGetter('kanban/getBoards');
 
   const booleanFilterOptions = computed(() => [
     { id: true, name: t('FILTER.ATTRIBUTE_LABELS.TRUE') },
@@ -94,9 +95,10 @@ export default function useAutomationValues() {
   /**
    * Gets the condition dropdown values for a given type.
    * @param {string} type - The type of condition.
+   * @param {Array} conditions - The current automation conditions (optional).
    * @returns {Array} An array of condition dropdown values.
    */
-  const getConditionDropdownValues = type => {
+  const getConditionDropdownValues = (type, conditions = []) => {
     return getConditionOptions({
       agents: agents.value,
       booleanFilterOptions: booleanFilterOptions.value,
@@ -109,27 +111,34 @@ export default function useAutomationValues() {
       priorityOptions: priorityOptions.value,
       messageTypeOptions: messageTypeOptions.value,
       teams: teams.value,
+      kanbanBoards: kanbanBoards.value,
       languages,
       countries,
       type,
+      conditions,
     });
   };
 
   /**
    * Gets the action dropdown values for a given type.
    * @param {string} type - The type of action.
+   * @param {Array} conditions - The current automation conditions (optional).
+   * @param {Array} actions - The current automation actions (optional).
    * @returns {Array} An array of action dropdown values.
    */
-  const getActionDropdownValues = type => {
+  const getActionDropdownValues = (type, conditions = [], actions = []) => {
     return getActionOptions({
       agents: agents.value,
       labels: labels.value,
       teams: teams.value,
       slaPolicies: slaPolicies.value,
+      kanbanBoards: kanbanBoards.value,
       languages,
       type,
       addNoneToListFn: addNoneToList,
       priorityOptions: priorityOptions.value,
+      conditions,
+      actions,
     });
   };
 
@@ -148,5 +157,6 @@ export default function useAutomationValues() {
     labels,
     teams,
     slaPolicies,
+    kanbanBoards,
   };
 }

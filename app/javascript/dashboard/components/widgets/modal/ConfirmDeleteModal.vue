@@ -18,6 +18,7 @@ export default {
     rejectText: { type: String, default: '' },
     confirmValue: { type: String, default: '' },
     confirmPlaceHolderText: { type: String, default: '' },
+    isLoading: { type: Boolean, default: false },
   },
   emits: ['onClose', 'onConfirm', 'update:show'],
   setup() {
@@ -84,7 +85,8 @@ export default {
           ruby
           type="submit"
           :label="confirmText"
-          :disabled="v$.value.$invalid"
+          :disabled="v$.value.$invalid || isLoading"
+          :loading="isLoading"
         />
       </div>
     </form>

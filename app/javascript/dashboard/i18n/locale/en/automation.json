@@ -132,7 +132,11 @@
       "CONVERSATION_UPDATED": "Conversation Updated",
       "MESSAGE_CREATED": "Message Created",
       "CONVERSATION_RESOLVED": "Conversation Resolved",
-      "CONVERSATION_OPENED": "Conversation Opened"
+      "CONVERSATION_OPENED": "Conversation Opened",
+      "KANBAN_TASK_CREATED": "Task Created",
+      "KANBAN_TASK_UPDATED": "Task Updated",
+      "KANBAN_TASK_COMPLETED": "Task Completed",
+      "KANBAN_TASK_CANCELLED": "Task Cancelled"
     },
     "ACTIONS": {
       "ASSIGN_AGENT": "Assign to Agent",
@@ -150,7 +154,12 @@
       "ADD_PRIVATE_NOTE": "Add a Private Note",
       "CHANGE_PRIORITY": "Change Priority",
       "ADD_SLA": "Add SLA",
-      "OPEN_CONVERSATION": "Open conversation"
+      "OPEN_CONVERSATION": "Open conversation",
+      "KANBAN_TASK_MOVE_TO_STEP": "Move Task to Step",
+      "KANBAN_TASK_MARK_COMPLETED": "Mark Task as Completed",
+      "KANBAN_TASK_MARK_CANCELLED": "Mark Task as Cancelled",
+      "ASSIGN_TO_BOARD": "Assign to Board",
+      "MOVE_TO_STEP": "Move to Step"
     },
     "MESSAGE_TYPES": {
       "INCOMING": "Incoming Message",
@@ -178,7 +187,13 @@
       "ASSIGNEE_NAME": "Assignee",
       "TEAM_NAME": "Team",
       "PRIORITY": "Priority",
-      "LABELS": "Labels"
+      "LABELS": "Labels",
+      "KANBAN_BOARD": "Board",
+      "KANBAN_STEP": "Step"
+    },
+    "KANBAN": {
+      "SELECT_BOARD_FIRST": "Please add a Board condition first to select steps",
+      "SELECT_BOARD_ACTION_FIRST": "Please add an Assign to Board action first to select steps"
     }
   }
 }

@@ -1,0 +1,13 @@
+{
+  "TIME": {
+    "NOW": "agora",
+    "AGO": "atrás",
+    "UNITS": {
+      "MINUTE": "m",
+      "HOUR": "h",
+      "DAY": "d",
+      "MONTH": "mês",
+      "YEAR": "a"
+    }
+  }
+}

@@ -4,6 +4,11 @@ import {
   fromUnixTime,
   formatDistanceToNow,
   differenceInDays,
+  differenceInMinutes,
+  differenceInHours,
+  differenceInMonths,
+  differenceInYears,
+  differenceInSeconds,
 } from 'date-fns';
 
 /**
@@ -91,6 +96,50 @@ export const shortTimestamp = (time, withAgo = false) => {
     .replace(' year ago', `y${suffix}`)
     .replace(' years ago', `y${suffix}`);
   return convertToShortTime;
+};
+
+/**
+ * Converts a Unix timestamp into a shorter format, optionally appending 'ago'.
+ * Uses date-fns difference functions for accurate calculation.
+ * @param {object} params - Parameters object.
+ * @param {number} params.time - Unix timestamp.
+ * @param {boolean} [params.withAgo=false] - Whether to append 'ago' to the result.
+ * @param {Function} [params.t] - Translation function.
+ * @returns {string} Shortened time description.
+ */
+export const shortTimestampFromDate = ({ time, withAgo = false, t }) => {
+  const unixTime = fromUnixTime(time);
+  const now = new Date();
+
+  const nowLabel = t ? t('TIME.NOW') : 'now';
+  const agoLabel = t ? t('TIME.AGO') : 'ago';
+  const units = {
+    m: t ? t('TIME.UNITS.MINUTE') : 'm',
+    h: t ? t('TIME.UNITS.HOUR') : 'h',
+    d: t ? t('TIME.UNITS.DAY') : 'd',
+    mo: t ? t('TIME.UNITS.MONTH') : 'mo',
+    y: t ? t('TIME.UNITS.YEAR') : 'y',
+  };
+
+  const suffix = withAgo ? ` ${agoLabel}` : '';
+
+  const seconds = differenceInSeconds(now, unixTime);
+  if (seconds < 60) return nowLabel;
+
+  const minutes = differenceInMinutes(now, unixTime);
+  if (minutes < 60) return `${minutes}${units.m}${suffix}`;
+
+  const hours = differenceInHours(now, unixTime);
+  if (hours < 24) return `${hours}${units.h}${suffix}`;
+
+  const days = differenceInDays(now, unixTime);
+  if (days < 30) return `${days}${units.d}${suffix}`;
+
+  const months = differenceInMonths(now, unixTime);
+  if (months < 12) return `${months}${units.mo}${suffix}`;
+
+  const years = differenceInYears(now, unixTime);
+  return `${years}${units.y}${suffix}`;
 };
 
 /**

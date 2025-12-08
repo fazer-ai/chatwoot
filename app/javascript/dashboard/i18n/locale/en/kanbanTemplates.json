@@ -1,0 +1,126 @@
+{
+  "KANBAN_TEMPLATES": {
+    "SALES": {
+      "NAME": "Sales Pipeline",
+      "DESCRIPTION": "Track your sales leads from initial contact to closing the deal.",
+      "STEPS": {
+        "LEAD_IN": "Lead In",
+        "CONTACTED": "Contacted",
+        "DEMO_SCHEDULED": "Demo Scheduled",
+        "PROPOSAL_SENT": "Proposal Sent",
+        "NEGOTIATION": "Negotiation"
+      },
+      "TASKS": {
+        "NEW_LEAD": "New Lead: Acme Corp",
+        "NEW_LEAD_DESC": "Initial contact made via website.",
+        "FOLLOW_UP": "Follow up with John Doe",
+        "FOLLOW_UP_DESC": "Send product brochure.",
+        "DEMO": "Demo for TechStart",
+        "DEMO_DESC": "Prepare custom demo environment.",
+        "CONTRACT_DRAFT": "Draft Contract for MegaCorp",
+        "CONTRACT_DRAFT_DESC": "Review terms with legal team.",
+        "PRICING_REVIEW": "Pricing Review: Global Systems",
+        "PRICING_REVIEW_DESC": "Discuss volume discounts."
+      }
+    },
+    "RECRUITMENT": {
+      "NAME": "Recruitment Pipeline",
+      "DESCRIPTION": "Manage your hiring process from application to offer.",
+      "STEPS": {
+        "APPLIED": "Applied",
+        "SCREENING": "Screening",
+        "INTERVIEW": "Interview",
+        "OFFER": "Offer",
+        "HIRED": "Hired"
+      },
+      "TASKS": {
+        "REVIEW_RESUME": "Review Resume: Jane Smith",
+        "REVIEW_RESUME_DESC": "Check for relevant experience in SaaS.",
+        "PHONE_SCREEN": "Phone Screen: Mike Johnson",
+        "PHONE_SCREEN_DESC": "Assess communication skills and cultural fit.",
+        "ONSITE": "Onsite: Sarah Williams",
+        "ONSITE_DESC": "Technical interview with the team.",
+        "CHECK_REFS": "Check References: David Brown",
+        "CHECK_REFS_DESC": "Contact previous employers.",
+        "DRAFT_OFFER": "Draft Offer Letter: Emily Davis",
+        "DRAFT_OFFER_DESC": "Include stock options details.",
+        "SOURCING": "Source Candidates for Senior Dev",
+        "SOURCING_DESC": "Look on LinkedIn and GitHub."
+      }
+    },
+    "ROADMAP": {
+      "NAME": "Product Roadmap",
+      "DESCRIPTION": "Plan and track product features and releases.",
+      "STEPS": {
+        "BACKLOG": "Backlog",
+        "NEXT_UP": "Next Up",
+        "IN_PROGRESS": "In Progress",
+        "TESTING": "Testing",
+        "RELEASED": "Released"
+      },
+      "TASKS": {
+        "DARK_MODE": "Feature: Dark Mode",
+        "DARK_MODE_DESC": "Implement system-wide dark theme.",
+        "API_V2": "Feature: API V2",
+        "API_V2_DESC": "Design new RESTful endpoints.",
+        "LOGIN_BUG": "Bugfix: Login Issue",
+        "LOGIN_BUG_DESC": "Fix intermittent failure on Safari.",
+        "PERF_OPT": "Performance Optimization",
+        "PERF_OPT_DESC": "Reduce initial load time by 20%.",
+        "USER_ROLES": "Feature: Custom User Roles",
+        "USER_ROLES_DESC": "Allow admins to define granular permissions.",
+        "MOBILE_APP": "Mobile App Beta",
+        "MOBILE_APP_DESC": "Launch beta for iOS and Android."
+      }
+    },
+    "CONTENT": {
+      "NAME": "Content Calendar",
+      "DESCRIPTION": "Organize your content creation and publishing schedule.",
+      "STEPS": {
+        "IDEAS": "Ideas",
+        "DRAFTING": "Drafting",
+        "REVIEW": "Review",
+        "SCHEDULED": "Scheduled",
+        "PUBLISHED": "Published"
+      },
+      "TASKS": {
+        "BLOG_TIPS": "Blog: Top 10 Tips",
+        "BLOG_TIPS_DESC": "Focus on productivity hacks.",
+        "NEWSLETTER": "Newsletter: June Edition",
+        "NEWSLETTER_DESC": "Highlight new feature releases.",
+        "SOCIAL_LAUNCH": "Social Media: Product Launch",
+        "SOCIAL_LAUNCH_DESC": "Prepare assets for Twitter and LinkedIn.",
+        "CASE_STUDY": "Case Study: Success Story",
+        "CASE_STUDY_DESC": "Interview the customer and draft the story.",
+        "VIDEO_TUTORIAL": "Video: Getting Started",
+        "VIDEO_TUTORIAL_DESC": "Record screen capture and voiceover.",
+        "WEBINAR": "Webinar: Q3 Roadmap",
+        "WEBINAR_DESC": "Prepare slides and invite speakers."
+      }
+    },
+    "PROJECT": {
+      "NAME": "Project Management",
+      "DESCRIPTION": "Track tasks and milestones for any project.",
+      "STEPS": {
+        "TO_DO": "To Do",
+        "IN_PROGRESS": "In Progress",
+        "BLOCKED": "Blocked",
+        "DONE": "Done"
+      },
+      "TASKS": {
+        "SETUP_ENV": "Setup Environment",
+        "SETUP_ENV_DESC": "Configure local development environment.",
+        "DEV_CORE": "Develop Core Module",
+        "DEV_CORE_DESC": "Implement main business logic.",
+        "API_KEYS": "Waiting for API Keys",
+        "API_KEYS_DESC": "Requested from the DevOps team.",
+        "WRITE_DOCS": "Write Documentation",
+        "WRITE_DOCS_DESC": "Document API endpoints and usage.",
+        "DEPLOY_STAGING": "Deploy to Staging",
+        "DEPLOY_STAGING_DESC": "Push latest build to staging server.",
+        "TEAM_MEETING": "Weekly Team Meeting",
+        "TEAM_MEETING_DESC": "Discuss progress and blockers."
+      }
+    }
+  }
+}

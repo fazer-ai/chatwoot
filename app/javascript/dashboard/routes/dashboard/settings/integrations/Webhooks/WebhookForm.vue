@@ -21,6 +21,9 @@ const SUPPORTED_WEBHOOK_EVENTS = [
   'conversation_typing_on',
   'conversation_typing_off',
   'provider_event_received',
+  'kanban_task_created',
+  'kanban_task_updated',
+  'kanban_task_deleted',
 ];
 
 const localhostUrl = value => {

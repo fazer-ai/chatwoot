@@ -21,7 +21,7 @@ const contentDirection = computed(() => (isRTL.value ? 'rtl' : 'ltr'));
 
 <template>
   <Teleport :to="to">
-    <div :dir="contentDirection">
+    <div :dir="contentDirection" class="contents">
       <slot />
     </div>
   </Teleport>

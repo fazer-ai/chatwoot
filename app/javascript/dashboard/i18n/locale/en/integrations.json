@@ -44,7 +44,10 @@
             "CONTACT_UPDATED": "Contact updated",
             "CONVERSATION_TYPING_ON": "Conversation Typing On",
             "CONVERSATION_TYPING_OFF": "Conversation Typing Off",
-            "PROVIDER_EVENT_RECEIVED": "Provider Event Received"
+            "PROVIDER_EVENT_RECEIVED": "Provider Event Received",
+            "KANBAN_TASK_CREATED": "Kanban task created",
+            "KANBAN_TASK_UPDATED": "Kanban task updated",
+            "KANBAN_TASK_DELETED": "Kanban task deleted"
           }
         },
         "NAME": {

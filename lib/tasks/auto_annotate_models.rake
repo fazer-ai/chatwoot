@@ -23,6 +23,7 @@ if Rails.env.development?
       'model_dir' => [
         'app/models',
         'enterprise/app/models',
+        'fazer_ai/app/models',
       ],
       'root_dir' => '',
       'include_version' => 'false',

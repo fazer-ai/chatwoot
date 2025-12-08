@@ -40,6 +40,14 @@ export default {
       type: Boolean,
       default: false,
     },
+    showSelectBoardWarning: {
+      type: Boolean,
+      default: false,
+    },
+    isKanbanEvent: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['update:modelValue', 'input', 'removeAction', 'resetAction'],
   computed: {
@@ -121,7 +129,17 @@ export default {
             v-if="inputType === 'search_select'"
             class="multiselect-wrap--small"
           >
+            <div v-if="showSelectBoardWarning" class="select-board-warning">
+              <span class="text-n-slate-11 text-sm">
+                {{
+                  isKanbanEvent
+                    ? $t('AUTOMATION.KANBAN.SELECT_BOARD_FIRST')
+                    : $t('AUTOMATION.KANBAN.SELECT_BOARD_ACTION_FIRST')
+                }}
+              </span>
+            </div>
             <multiselect
+              v-else
               v-model="action_params"
               track-by="id"
               label="name"
@@ -288,6 +306,9 @@ export default {
 }
 .action-message {
   @apply mt-2 mx-0 mb-0;
+}
+.select-board-warning {
+  @apply flex items-center px-3 py-2 bg-n-amber-3 dark:bg-n-amber-3 border border-solid border-n-amber-6 dark:border-n-amber-6 rounded;
 }
 // Prosemirror does not have a native way of hiding the menu bar, hence
 ::v-deep .ProseMirror-menubar {

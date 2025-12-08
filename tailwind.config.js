@@ -34,6 +34,8 @@ const tailwindConfig = {
     './app/javascript/dashboard/components-next/**/*.js',
     './app/javascript/dashboard/routes/dashboard/**/**/*.js',
     './app/views/**/*.html.erb',
+    './fazer_ai/app/javascript/**/*.vue',
+    './fazer_ai/app/javascript/**/*.js',
   ],
   theme: {
     extend: {
@@ -261,6 +263,26 @@ const tailwindConfig = {
         ]),
       },
     }),
+    ({ addUtilities }) => {
+      addUtilities({
+        '.scrollbar-custom': {
+          '&::-webkit-scrollbar': {
+            height: '8px',
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            'background-color': 'rgb(var(--slate-5))',
+            'border-radius': '4px',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            'background-color': 'rgb(var(--slate-7))',
+          },
+        },
+      });
+    },
   ],
 };
 

@@ -136,7 +136,8 @@
       "ENTER_TO_REMOVE": "Digite enter para remover",
       "NO_OPTIONS": "Lista vazia",
       "SELECT_ONE": "Selecione um",
-      "SELECT": "Selecionar"
+      "SELECT": "Selecionar",
+      "SELECTED": "Selecionado"
     }
   },
   "NOTIFICATIONS_PAGE": {

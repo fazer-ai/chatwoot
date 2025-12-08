@@ -104,6 +104,39 @@ class WebhookListener < BaseListener
     deliver_account_webhooks(payload, account)
   end
 
+  def kanban_task_created(event)
+    task_payload, account = extract_kanban_task_payload_and_account(event)
+    payload = task_payload.merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, account)
+  end
+
+  def kanban_task_updated(event)
+    task_payload, account = extract_kanban_task_payload_and_account(event)
+    changed_attributes = extract_changed_attributes(event)
+    changed_attributes&.delete_if { |item| item.key?('updated_at') }
+
+    if changed_attributes
+      changed_attributes = changed_attributes.map do |change|
+        if change.key?('board_id')
+          enrich_kanban_relation(change['board_id'], 'board', FazerAi::Kanban::Board)
+        elsif change.key?('board_step_id')
+          enrich_kanban_relation(change['board_step_id'], 'board_step', FazerAi::Kanban::BoardStep)
+        else
+          change
+        end
+      end
+    end
+
+    payload = task_payload.merge(event: __method__.to_s, changed_attributes: changed_attributes)
+    deliver_account_webhooks(payload, account)
+  end
+
+  def kanban_task_deleted(event)
+    task_payload, account = extract_kanban_task_payload_and_account(event)
+    payload = task_payload.merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, account)
+  end
+
   private
 
   def handle_typing_status(event_name, event)
@@ -139,5 +172,24 @@ class WebhookListener < BaseListener
   def deliver_webhook_payloads(payload, inbox)
     deliver_account_webhooks(payload, inbox.account)
     deliver_api_inbox_webhooks(payload, inbox)
+  end
+
+  def enrich_kanban_relation(change_data, key, model)
+    prev_val = model.find_by(id: change_data[:previous_value])
+    curr_val = model.find_by(id: change_data[:current_value])
+
+    {
+      key => {
+        previous_value: ({ id: prev_val.id, name: prev_val.name } if prev_val),
+        current_value: ({ id: curr_val.id, name: curr_val.name } if curr_val)
+      }
+    }
+  end
+
+  def extract_kanban_task_payload_and_account(event)
+    task = event.data[:task]
+    return [task.push_event_data, task.account] if task.respond_to?(:push_event_data)
+
+    [task, Account.find(task[:account_id] || task['account_id'])]
   end
 end

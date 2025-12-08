@@ -17,16 +17,21 @@ unless Rails.env.production?
   installation_config.save!
   GlobalConfig.clear_cache
 
+  seed_suffix = Time.current.strftime('%Y%m%d%H%M%S')
+
   account = Account.create!(
-    name: 'Acme Inc'
+    name: "Acme Inc #{seed_suffix}"
   )
 
   secondary_account = Account.create!(
-    name: 'Acme Org'
+    name: "Acme Org #{seed_suffix}"
   )
 
-  user = User.new(name: 'John', email: 'john@acme.inc', password: 'Password1!', type: 'SuperAdmin')
-  user.skip_confirmation!
+  user = User.find_or_initialize_by(email: 'john@acme.inc') do |record|
+    record.name = 'John'
+  end
+  user.assign_attributes(name: 'John', password: 'Password1!', type: 'SuperAdmin')
+  user.skip_confirmation! if user.new_record?
   user.save!
 
   AccountUser.create!(
@@ -35,15 +40,16 @@ unless Rails.env.production?
     role: :administrator
   )
 
-  AccountUser.create!(
+  AccountUser.find_or_create_by!(
     account_id: secondary_account.id,
-    user_id: user.id,
-    role: :administrator
-  )
+    user_id: user.id
+  ) do |membership|
+    membership.role = :administrator
+  end
 
-  web_widget = Channel::WebWidget.create!(account: account, website_url: 'https://acme.inc')
+  web_widget = Channel::WebWidget.create!(account: account, website_url: "https://acme.inc/#{seed_suffix}")
 
-  inbox = Inbox.create!(channel: web_widget, account: account, name: 'Acme Support')
+  inbox = Inbox.create!(channel: web_widget, account: account, name: "Acme Support #{seed_suffix}")
   InboxMember.create!(user: user, inbox: inbox)
 
   contact_inbox = ContactInboxWithContactBuilder.new(
@@ -94,4 +100,74 @@ unless Rails.env.production?
   Seeders::MessageSeeder.create_sample_csat_collect_message conversation
 
   CannedResponse.create!(account: account, short_code: 'start', content: 'Hello welcome to chatwoot.')
+
+  account.enable_features('kanban_module')
+
+  agent_user = User.find_or_initialize_by(email: 'agent@acme.inc') do |record|
+    record.name = 'Mia Agent'
+    record.password = 'Password1!'
+  end
+  if agent_user.new_record?
+    agent_user.skip_confirmation!
+    agent_user.save!
+  end
+
+  AccountUser.create!(account: account, user: agent_user, role: :agent)
+
+  kanban_board = account.kanban_boards.create!(
+    name: 'Sample Sales Board',
+    description: 'Demo pipeline used by seeds to exercise Kanban APIs',
+    settings: { 'default_view' => 'kanban' }
+  )
+
+  step_definitions = [
+    { name: 'New Lead', description: 'Inbound leads waiting for first touch', color: '#0ea5e9' },
+    { name: 'Qualification', description: 'Active discovery', color: '#14b8a6' },
+    { name: 'Proposal', description: 'Proposal sent to prospect', color: '#f59e0b' }
+  ]
+
+  steps = step_definitions.each_with_index.to_h do |attrs, index|
+    step = kanban_board.steps.create!(attrs.merge(position: index))
+    [attrs[:name], step]
+  end
+
+  kanban_board.board_inboxes.create!(inbox: inbox)
+  kanban_board.board_agents.create!(agent: agent_user)
+
+  demo_tasks = [
+    {
+      title: 'Follow up with Jane',
+      description: 'Send intro email and schedule qualification call.',
+      priority: 'high',
+      board_step: steps['Qualification'],
+      start_date: 1.day.ago,
+      end_date: 2.days.from_now
+    },
+    {
+      title: 'Share pricing proposal',
+      description: 'Prepare proposal deck and share with contact prior to Friday.',
+      priority: 'urgent',
+      board_step: steps['Proposal'],
+      start_date: Time.current,
+      end_date: 5.days.from_now
+    }
+  ]
+
+  demo_tasks.each do |attributes|
+    task = kanban_board.tasks.create!(
+      account: account,
+      board_step: attributes[:board_step] || steps['New Lead'],
+      creator: user,
+      assigned_agent: agent_user,
+      title: attributes[:title],
+      description: attributes[:description],
+      priority: attributes[:priority],
+      start_date: attributes[:start_date],
+      end_date: attributes[:end_date]
+    )
+
+    contact = contact_inbox.contact
+    task.contacts << contact unless task.contacts.exists?(contact.id)
+    task.conversations << conversation unless task.conversations.exists?(conversation.id)
+  end
 end

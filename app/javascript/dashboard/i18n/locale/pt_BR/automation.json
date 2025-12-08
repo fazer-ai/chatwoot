@@ -132,7 +132,11 @@
       "CONVERSATION_UPDATED": "Conversa Atualizada",
       "MESSAGE_CREATED": "Mensagem Criada",
       "CONVERSATION_RESOLVED": "Conversa Resolvida",
-      "CONVERSATION_OPENED": "Conversa Aberta"
+      "CONVERSATION_OPENED": "Conversa Aberta",
+      "KANBAN_TASK_CREATED": "Tarefa Criada",
+      "KANBAN_TASK_UPDATED": "Tarefa Atualizada",
+      "KANBAN_TASK_COMPLETED": "Tarefa Concluída",
+      "KANBAN_TASK_CANCELLED": "Tarefa Cancelada"
     },
     "ACTIONS": {
       "ASSIGN_AGENT": "Atribuir ao Agente",
@@ -150,7 +154,12 @@
       "ADD_PRIVATE_NOTE": "Adicionar uma Nota Privada",
       "CHANGE_PRIORITY": "Alterar Prioridade",
       "ADD_SLA": "Adicionar SLA",
-      "OPEN_CONVERSATION": "Abrir conversa"
+      "OPEN_CONVERSATION": "Abrir conversa",
+      "KANBAN_TASK_MOVE_TO_STEP": "Mover Tarefa para Etapa",
+      "KANBAN_TASK_MARK_COMPLETED": "Marcar Tarefa como Concluída",
+      "KANBAN_TASK_MARK_CANCELLED": "Marcar Tarefa como Cancelada",
+      "ASSIGN_TO_BOARD": "Atribuir ao Quadro",
+      "MOVE_TO_STEP": "Mover para Etapa"
     },
     "MESSAGE_TYPES": {
       "INCOMING": "Mensagem Recebida",
@@ -178,7 +187,13 @@
       "ASSIGNEE_NAME": "Agente atribuído",
       "TEAM_NAME": "Time",
       "PRIORITY": "Prioridade",
-      "LABELS": "Etiquetas"
+      "LABELS": "Etiquetas",
+      "KANBAN_BOARD": "Quadro",
+      "KANBAN_STEP": "Etapa"
+    },
+    "KANBAN": {
+      "SELECT_BOARD_FIRST": "Por favor, adicione uma condição de Quadro primeiro para selecionar etapas",
+      "SELECT_BOARD_ACTION_FIRST": "Por favor, adicione uma ação de Atribuir ao Quadro primeiro para selecionar etapas"
     }
   }
 }

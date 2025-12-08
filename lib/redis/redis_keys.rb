@@ -3,6 +3,9 @@ module Redis::RedisKeys
   # Array storing the ordered ids for agent round robin assignment
   ROUND_ROBIN_AGENTS = 'ROUND_ROBIN_AGENTS:%<inbox_id>d'.freeze
 
+  ## Kanban Keys
+  KANBAN_BOARD_ROUND_ROBIN_AGENTS = 'KANBAN_BOARD_ROUND_ROBIN_AGENTS:%<board_id>d'.freeze
+
   ## Conversation keys
   # Detect whether to send an email reply to the conversation
   CONVERSATION_MAILER_KEY = 'CONVERSATION::%<conversation_id>d'.freeze

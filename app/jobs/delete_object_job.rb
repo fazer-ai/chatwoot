@@ -3,7 +3,7 @@ class DeleteObjectJob < ApplicationJob
 
   BATCH_SIZE = 5_000
   HEAVY_ASSOCIATIONS = {
-    Account => %i[conversations contacts inboxes reporting_events],
+    Account => %i[conversations contacts inboxes reporting_events kanban_tasks kanban_boards],
     Inbox => %i[conversations contact_inboxes reporting_events]
   }.freeze
 

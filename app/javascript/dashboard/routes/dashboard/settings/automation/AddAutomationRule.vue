@@ -12,6 +12,9 @@ import {
   getOperators,
   getCustomAttributeType,
   showActionInput,
+  getSelectedBoardId,
+  getSelectedBoardIdFromActions,
+  KANBAN_EVENTS,
 } from 'dashboard/helper/automationHelper';
 import { AUTOMATION_RULE_EVENTS, AUTOMATION_ACTION_TYPES } from './constants';
 
@@ -101,6 +104,18 @@ export default {
         value: this.$t(`AUTOMATION.EVENTS.${event.value}`),
       }));
     },
+    selectedBoardId() {
+      return getSelectedBoardId(this.automation.conditions);
+    },
+    selectedBoardIdFromActions() {
+      return getSelectedBoardIdFromActions(this.automation.actions);
+    },
+    hasBoardSelected() {
+      return !!(this.selectedBoardId || this.selectedBoardIdFromActions);
+    },
+    isKanbanEvent() {
+      return KANBAN_EVENTS.includes(this.automation.event_name);
+    },
     hasAutomationMutated() {
       if (
         this.automation.conditions[0].values ||
@@ -127,6 +142,9 @@ export default {
     this.$store.dispatch('teams/get');
     this.$store.dispatch('labels/get');
     this.$store.dispatch('campaigns/get');
+    if (this.$store.hasModule('kanban')) {
+      this.$store.dispatch('kanban/fetchBoards');
+    }
     this.allCustomAttributes = this.$store.getters['attributes/getAttributes'];
     this.manifestCustomAttributes();
   },
@@ -146,25 +164,36 @@ export default {
         this.$emit('saveAutomation', automation, this.mode);
       }
     },
-    getTranslatedAttributes(type, event) {
-      return getAttributes(type, event).map(attribute => {
-        // Skip translation
-        // 1. If customAttributeType key is present then its rendering attributes from API
-        // 2. If contact_custom_attribute or conversation_custom_attribute is present then its rendering section title
-        const skipTranslation =
-          attribute.customAttributeType ||
-          [
-            'contact_custom_attribute',
-            'conversation_custom_attribute',
-          ].includes(attribute.key);
+    getTranslatedAttributes(type, event, currentAttributeKey) {
+      const hasBoardCondition = this.automation.conditions.some(
+        c => c.attribute_key === 'kanban_board_id'
+      );
 
-        return {
-          ...attribute,
-          name: skipTranslation
-            ? attribute.name
-            : this.$t(`AUTOMATION.ATTRIBUTES.${attribute.name}`),
-        };
-      });
+      return getAttributes(type, event)
+        .filter(attribute => {
+          if (attribute.key === currentAttributeKey) return true;
+          if (attribute.key === 'kanban_board_id' && hasBoardCondition)
+            return false;
+          return true;
+        })
+        .map(attribute => {
+          // Skip translation
+          // 1. If customAttributeType key is present then its rendering attributes from API
+          // 2. If contact_custom_attribute or conversation_custom_attribute is present then its rendering section title
+          const skipTranslation =
+            attribute.customAttributeType ||
+            [
+              'contact_custom_attribute',
+              'conversation_custom_attribute',
+            ].includes(attribute.key);
+
+          return {
+            ...attribute,
+            name: skipTranslation
+              ? attribute.name
+              : this.$t(`AUTOMATION.ATTRIBUTES.${attribute.name}`),
+          };
+        });
     },
   },
 };
@@ -230,10 +259,14 @@ export default {
           >
             <FilterInputBox
               v-for="(condition, i) in automation.conditions"
-              :key="i"
+              :key="`${i}-${selectedBoardId}`"
               v-model="automation.conditions[i]"
               :filter-attributes="
-                getTranslatedAttributes(automationTypes, automation.event_name)
+                getTranslatedAttributes(
+                  automationTypes,
+                  automation.event_name,
+                  automation.conditions[i].attribute_key
+                )
               "
               :input-type="
                 getInputType(
@@ -254,10 +287,17 @@ export default {
               "
               :dropdown-values="
                 getConditionDropdownValues(
-                  automation.conditions[i].attribute_key
+                  automation.conditions[i].attribute_key,
+                  automation.conditions
                 )
               "
               :show-query-operator="i !== automation.conditions.length - 1"
+              :show-select-board-warning="
+                automation.conditions[i].attribute_key === 'kanban_step_id' &&
+                !automation.conditions.some(
+                  c => c.attribute_key === 'kanban_board_id' && c.values
+                )
+              "
               :custom-attribute-type="
                 getCustomAttributeType(
                   automationTypes,
@@ -296,11 +336,15 @@ export default {
           >
             <AutomationActionInput
               v-for="(action, i) in automation.actions"
-              :key="i"
+              :key="`${i}-${selectedBoardId}-${selectedBoardIdFromActions}`"
               v-model="automation.actions[i]"
               :action-types="automationActionTypes"
               :dropdown-values="
-                getActionDropdownValues(automation.actions[i].action_name)
+                getActionDropdownValues(
+                  automation.actions[i].action_name,
+                  automation.conditions,
+                  automation.actions
+                )
               "
               :show-action-input="
                 showActionInput(
@@ -308,6 +352,11 @@ export default {
                   automation.actions[i].action_name
                 )
               "
+              :show-select-board-warning="
+                automation.actions[i].action_name === 'move_to_step' &&
+                !hasBoardSelected
+              "
+              :is-kanban-event="isKanbanEvent"
               :error-message="
                 errors[`action_${i}`]
                   ? $t(`AUTOMATION.ERRORS.${errors[`action_${i}`]}`)

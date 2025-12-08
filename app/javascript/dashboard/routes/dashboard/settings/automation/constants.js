@@ -128,6 +128,14 @@ export const AUTOMATIONS = {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
       },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
+      },
+      {
+        key: 'move_to_step',
+        name: 'MOVE_TO_STEP',
+      },
     ],
   },
   conversation_created: {
@@ -243,6 +251,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
+      },
+      {
+        key: 'move_to_step',
+        name: 'MOVE_TO_STEP',
       },
     ],
   },
@@ -372,6 +388,14 @@ export const AUTOMATIONS = {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
       },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
+      },
+      {
+        key: 'move_to_step',
+        name: 'MOVE_TO_STEP',
+      },
     ],
   },
   conversation_opened: {
@@ -490,6 +514,14 @@ export const AUTOMATIONS = {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
       },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
+      },
+      {
+        key: 'move_to_step',
+        name: 'MOVE_TO_STEP',
+      },
     ],
   },
   conversation_resolved: {
@@ -590,6 +622,226 @@ export const AUTOMATIONS = {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
       },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
+      },
+      {
+        key: 'move_to_step',
+        name: 'MOVE_TO_STEP',
+      },
+    ],
+  },
+  kanban_task_created: {
+    conditions: [
+      {
+        key: 'kanban_board_id',
+        name: 'KANBAN_BOARD',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'kanban_step_id',
+        name: 'KANBAN_STEP',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'assignee_id',
+        name: 'ASSIGNEE_NAME',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_3,
+      },
+      {
+        key: 'inbox_id',
+        name: 'INBOX',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'priority',
+        name: 'PRIORITY',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+    ],
+    actions: [
+      {
+        key: 'assign_agent',
+        name: 'ASSIGN_AGENT',
+      },
+      {
+        key: 'move_to_step',
+        name: 'KANBAN_TASK_MOVE_TO_STEP',
+      },
+      {
+        key: 'change_priority',
+        name: 'CHANGE_PRIORITY',
+      },
+      {
+        key: 'send_webhook_event',
+        name: 'SEND_WEBHOOK_EVENT',
+      },
+      {
+        key: 'send_message',
+        name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'add_private_note',
+        name: 'ADD_PRIVATE_NOTE',
+      },
+    ],
+  },
+  kanban_task_updated: {
+    conditions: [
+      {
+        key: 'kanban_board_id',
+        name: 'KANBAN_BOARD',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'kanban_step_id',
+        name: 'KANBAN_STEP',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'assignee_id',
+        name: 'ASSIGNEE_NAME',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_3,
+      },
+      {
+        key: 'inbox_id',
+        name: 'INBOX',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'priority',
+        name: 'PRIORITY',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+    ],
+    actions: [
+      {
+        key: 'assign_agent',
+        name: 'ASSIGN_AGENT',
+      },
+      {
+        key: 'move_to_step',
+        name: 'KANBAN_TASK_MOVE_TO_STEP',
+      },
+      {
+        key: 'mark_completed',
+        name: 'KANBAN_TASK_MARK_COMPLETED',
+      },
+      {
+        key: 'mark_cancelled',
+        name: 'KANBAN_TASK_MARK_CANCELLED',
+      },
+      {
+        key: 'change_priority',
+        name: 'CHANGE_PRIORITY',
+      },
+      {
+        key: 'send_webhook_event',
+        name: 'SEND_WEBHOOK_EVENT',
+      },
+      {
+        key: 'send_message',
+        name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'add_private_note',
+        name: 'ADD_PRIVATE_NOTE',
+      },
+    ],
+  },
+  kanban_task_completed: {
+    conditions: [
+      {
+        key: 'kanban_board_id',
+        name: 'KANBAN_BOARD',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'assignee_id',
+        name: 'ASSIGNEE_NAME',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_3,
+      },
+      {
+        key: 'inbox_id',
+        name: 'INBOX',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'priority',
+        name: 'PRIORITY',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+    ],
+    actions: [
+      {
+        key: 'send_webhook_event',
+        name: 'SEND_WEBHOOK_EVENT',
+      },
+      {
+        key: 'send_message',
+        name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'add_private_note',
+        name: 'ADD_PRIVATE_NOTE',
+      },
+    ],
+  },
+  kanban_task_cancelled: {
+    conditions: [
+      {
+        key: 'kanban_board_id',
+        name: 'KANBAN_BOARD',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'assignee_id',
+        name: 'ASSIGNEE_NAME',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_3,
+      },
+      {
+        key: 'inbox_id',
+        name: 'INBOX',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
+        key: 'priority',
+        name: 'PRIORITY',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+    ],
+    actions: [
+      {
+        key: 'send_webhook_event',
+        name: 'SEND_WEBHOOK_EVENT',
+      },
+      {
+        key: 'send_message',
+        name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'add_private_note',
+        name: 'ADD_PRIVATE_NOTE',
+      },
     ],
   },
 };
@@ -614,6 +866,22 @@ export const AUTOMATION_RULE_EVENTS = [
   {
     key: 'conversation_opened',
     value: 'CONVERSATION_OPENED',
+  },
+  {
+    key: 'kanban_task_created',
+    value: 'KANBAN_TASK_CREATED',
+  },
+  {
+    key: 'kanban_task_updated',
+    value: 'KANBAN_TASK_UPDATED',
+  },
+  {
+    key: 'kanban_task_completed',
+    value: 'KANBAN_TASK_COMPLETED',
+  },
+  {
+    key: 'kanban_task_cancelled',
+    value: 'KANBAN_TASK_CANCELLED',
   },
 ];
 
@@ -696,6 +964,26 @@ export const AUTOMATION_ACTION_TYPES = [
   {
     key: 'add_sla',
     label: 'ADD_SLA',
+    inputType: 'search_select',
+  },
+  {
+    key: 'move_to_step',
+    label: 'KANBAN_TASK_MOVE_TO_STEP',
+    inputType: 'search_select',
+  },
+  {
+    key: 'mark_completed',
+    label: 'KANBAN_TASK_MARK_COMPLETED',
+    inputType: null,
+  },
+  {
+    key: 'mark_cancelled',
+    label: 'KANBAN_TASK_MARK_CANCELLED',
+    inputType: null,
+  },
+  {
+    key: 'assign_to_board',
+    label: 'ASSIGN_TO_BOARD',
     inputType: 'search_select',
   },
 ];

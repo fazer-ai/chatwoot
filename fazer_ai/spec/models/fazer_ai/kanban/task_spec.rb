@@ -1,0 +1,426 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+RSpec.describe FazerAi::Kanban::Task, type: :model do
+  let(:account) { create(:account) }
+  let(:board) { create(:kanban_board, account: account) }
+  let(:board_step) { create(:kanban_board_step, board: board) }
+  let(:task) { build(:kanban_task, board: board, board_step: board_step) }
+
+  describe 'validations' do
+    it { is_expected.to validate_presence_of(:account) }
+    it { is_expected.to validate_presence_of(:board) }
+    it { is_expected.to validate_presence_of(:board_step) }
+    it { is_expected.to validate_presence_of(:title) }
+    it { is_expected.to validate_length_of(:title).is_at_most(255) }
+    it { is_expected.to validate_length_of(:description).is_at_most(5000) }
+    it { is_expected.to validate_inclusion_of(:priority).in_array(described_class::PRIORITIES) }
+
+    it 'rejects an end date that is before the start date' do
+      task.start_date = 2.days.from_now
+      task.end_date = 1.day.from_now
+
+      expect(task).not_to be_valid
+      expect(task.errors[:end_date]).to include(I18n.t('kanban.tasks.errors.invalid_end_date'))
+    end
+
+    it 'rejects an assigned agent not assigned to the board' do
+      agent = create(:user, account: account)
+      task.assigned_agents << agent
+
+      expect(task).not_to be_valid
+      expect(task.errors[:assigned_agents]).to include(I18n.t('kanban.tasks.errors.invalid_assignees'))
+    end
+
+    it 'allows an assigned agent assigned to the board' do
+      agent = create(:user, account: account)
+      create(:kanban_board_agent, board: board, agent: agent)
+      task.assigned_agents << agent
+
+      expect(task).to be_valid
+    end
+
+    it 'rejects a conversation not from board inbox' do
+      other_inbox = create(:inbox, account: account)
+      conversation = create(:conversation, account: account, inbox: other_inbox)
+      task.conversations << conversation
+
+      expect(task).not_to be_valid
+      expect(task.errors[:conversations]).to include(I18n.t('kanban.tasks.errors.invalid_conversations'))
+    end
+
+    it 'allows a conversation from board inbox' do
+      inbox = create(:inbox, account: account)
+      create(:kanban_board_inbox, board: board, inbox: inbox)
+      conversation = create(:conversation, account: account, inbox: inbox)
+      task.conversations << conversation
+
+      expect(task).to be_valid
+    end
+
+    it 'rejects a board step not belonging to the board' do
+      other_board = create(:kanban_board, account: account)
+      other_step = create(:kanban_board_step, board: other_board)
+      task.board_step = other_step
+
+      expect(task).not_to be_valid
+      expect(task.errors[:board_step]).to include(I18n.t('kanban.tasks.errors.invalid_board_step'))
+    end
+
+    it 'allows a board step belonging to the board' do
+      step = create(:kanban_board_step, board: board)
+      task.board_step = step
+
+      expect(task).to be_valid
+    end
+
+    it 'rejects a contact not belonging to the account' do
+      other_account = create(:account)
+      contact = create(:contact, account: other_account)
+      task.contacts << contact
+
+      expect(task).not_to be_valid
+      expect(task.errors[:contacts]).to include(I18n.t('kanban.tasks.errors.invalid_contact_account'))
+    end
+
+    it 'allows a contact belonging to the account' do
+      contact = create(:contact, account: account)
+      task.contacts << contact
+
+      expect(task).to be_valid
+    end
+  end
+
+  describe 'associations' do
+    it { is_expected.to belong_to(:account) }
+    it { is_expected.to belong_to(:board) }
+    it { is_expected.to belong_to(:board_step) }
+    it { is_expected.to have_many(:task_agents).dependent(:destroy) }
+    it { is_expected.to have_many(:assigned_agents).through(:task_agents) }
+    it { is_expected.to belong_to(:creator).optional }
+    it { is_expected.to have_many(:task_contacts).dependent(:destroy) }
+    it { is_expected.to have_many(:contacts).through(:task_contacts) }
+    it { is_expected.to have_many(:conversations).dependent(:nullify) }
+    it { is_expected.to have_many(:audit_events).dependent(:destroy) }
+  end
+
+  describe 'scopes' do
+    describe '.ordered' do
+      it 'returns tasks ordered by created_at asc' do
+        task1 = create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account),
+                                     created_at: 2.days.ago)
+        task2 = create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account),
+                                     created_at: 1.day.ago)
+        task3 = create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account),
+                                     created_at: 3.days.ago)
+
+        expect(described_class.ordered).to eq([task3, task1, task2])
+      end
+    end
+  end
+
+  describe 'callbacks' do
+    describe 'contact-conversation consistency' do
+      let(:inbox) { create(:inbox, account: account) }
+      let(:contact) { create(:contact, account: account) }
+      let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+      let!(:task) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account)) }
+
+      before do
+        create(:kanban_board_inbox, board: board, inbox: inbox)
+      end
+
+      it 'automatically adds contact when conversation is added' do
+        task.conversation_ids = [conversation.id]
+        task.save!
+
+        expect(task.contacts).to include(contact)
+      end
+
+      it 'does not duplicate contact if already present' do
+        task.contacts << contact
+        task.conversation_ids = [conversation.id]
+        task.save!
+
+        expect(task.contacts.count).to eq(1)
+      end
+    end
+  end
+
+  describe '#overdue?' do
+    it 'returns true if end_date is in the past' do
+      task.end_date = 1.day.ago
+      expect(task).to be_overdue
+    end
+
+    it 'returns false if end_date is in the future' do
+      task.end_date = 1.day.from_now
+      expect(task).not_to be_overdue
+    end
+
+    it 'returns false if end_date is blank' do
+      task.end_date = nil
+      expect(task).not_to be_overdue
+    end
+  end
+
+  describe '#status' do
+    let!(:first_step) { create(:kanban_board_step, board: board) }
+    let!(:middle_step) { create(:kanban_board_step, board: board) }
+    let!(:last_step) { create(:kanban_board_step, board: board) }
+
+    before do
+      board.update!(steps_order: [first_step.id, middle_step.id, last_step.id])
+    end
+
+    it 'returns open for tasks in the first step' do
+      task = create(:kanban_task, board: board, board_step: first_step, account: account)
+      expect(task.status).to eq('open')
+    end
+
+    it 'returns open for tasks in a regular middle step' do
+      task = create(:kanban_task, board: board, board_step: middle_step, account: account)
+      expect(task.status).to eq('open')
+    end
+
+    it 'returns completed for tasks in the last step' do
+      task = create(:kanban_task, board: board, board_step: last_step, account: account)
+      expect(task.status).to eq('completed')
+    end
+
+    it 'returns cancelled for tasks in a cancelled step' do
+      middle_step.update!(cancelled: true)
+      task = create(:kanban_task, board: board, board_step: middle_step, account: account)
+      expect(task.status).to eq('cancelled')
+    end
+
+    context 'when board has only one step' do
+      let(:single_board) { create(:kanban_board, account: account) }
+      let!(:single_step) { create(:kanban_board_step, board: single_board) }
+
+      before { single_board.update!(steps_order: [single_step.id]) }
+
+      it 'returns open even for the only step' do
+        task = create(:kanban_task, board: single_board, board_step: single_step, account: account)
+        expect(task.status).to eq('open')
+      end
+    end
+  end
+
+  describe '#creator_display_name' do
+    it 'returns creator name when creator is present' do
+      user = create(:user, account: account, name: 'John Doe')
+      task.creator = user
+      expect(task.creator_display_name).to eq('John Doe')
+    end
+
+    it 'returns Automation System when creator is nil' do
+      task.creator = nil
+      expect(task.creator_display_name).to eq('Automation System')
+    end
+  end
+
+  describe '#reorder_for_user!' do
+    let(:user) { create(:user, account: account) }
+    let!(:task1) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: user) }
+    let!(:task2) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: user) }
+    let!(:task3) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: user) }
+
+    before do
+      account_user = user.account_users.find_by(account_id: account.id)
+      preference = account_user.kanban_preference || account_user.build_kanban_preference
+      preference.update_tasks_order!(board_step.id, [task1.id, task2.id, task3.id])
+    end
+
+    it 'moves the task to the specified position' do
+      task1.insert_before_task_id = task3.id
+      task1.reorder_for_user!(user)
+
+      account_user = user.account_users.find_by(account_id: account.id)
+      preference = account_user.kanban_preference
+      expect(preference.tasks_order_for(board_step.id)).to eq([task2.id, task1.id, task3.id])
+    end
+
+    it 'moves the task to the end if insert_before_task_id is nil' do
+      task1.insert_before_task_id = nil
+      task1.reorder_for_user!(user)
+
+      account_user = user.account_users.find_by(account_id: account.id)
+      preference = account_user.kanban_preference
+      expect(preference.tasks_order_for(board_step.id)).to eq([task2.id, task3.id, task1.id])
+    end
+
+    it 'moves task to the end if insert_before_task_id is invalid' do
+      task1.insert_before_task_id = 0
+      task1.reorder_for_user!(user)
+
+      account_user = user.account_users.find_by(account_id: account.id)
+      preference = account_user.kanban_preference
+      expect(preference.tasks_order_for(board_step.id)).to eq([task2.id, task3.id, task1.id])
+    end
+  end
+
+  describe 'event dispatching' do
+    before do
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+    end
+
+    context 'when task is created' do
+      it 'dispatches kanban.task.created event' do
+        task.save!
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::KANBAN_TASK_CREATED, anything, hash_including(task: task))
+      end
+    end
+
+    context 'when task is updated' do
+      it 'dispatches kanban.task.updated event' do
+        task.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.update!(title: 'Updated Title')
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::KANBAN_TASK_UPDATED, anything, hash_including(task: task))
+      end
+
+      it 'dispatches conversation.updated event for assigned conversations' do
+        inbox = create(:inbox, account: account)
+        create(:kanban_board_inbox, board: board, inbox: inbox)
+        conversation = create(:conversation, account: account, inbox: inbox)
+
+        task.conversation_ids = [conversation.id]
+        task.save!
+
+        RSpec::Mocks.space.proxy_for(Rails.configuration.dispatcher).reset
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.update!(title: 'Updated Title')
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation))
+      end
+    end
+
+    context 'when conversations are updated' do
+      let(:inbox) { create(:inbox, account: account) }
+      let!(:board_inbox) { create(:kanban_board_inbox, board: board, inbox: inbox) } # rubocop:disable RSpec/LetSetup
+      let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+
+      it 'dispatches conversation.updated when conversation is assigned to task' do
+        task.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.update!(conversation_ids: [conversation.id])
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, satisfy { |data| data[:conversation].kanban_task == task })
+      end
+
+      it 'dispatches conversation.updated when conversation is unassigned from task' do
+        task.save!
+        task.update!(conversation_ids: [conversation.id])
+
+        RSpec::Mocks.space.proxy_for(Rails.configuration.dispatcher).reset
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.update!(conversation_ids: [])
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, satisfy { |data| data[:conversation].kanban_task.nil? })
+      end
+    end
+
+    context 'when task is created with conversations' do
+      let(:inbox) { create(:inbox, account: account) }
+      let!(:board_inbox) { create(:kanban_board_inbox, board: board, inbox: inbox) } # rubocop:disable RSpec/LetSetup
+      let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+
+      it 'dispatches conversation.updated event with kanban_task' do
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        new_task = build(:kanban_task, account: account, board: board, board_step: board_step, creator: task.creator)
+        new_task.conversation_ids = [conversation.id]
+        new_task.save!
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, satisfy { |data| data[:conversation].kanban_task == new_task })
+      end
+    end
+
+    context 'when task is destroyed' do
+      it 'dispatches kanban.task.deleted event' do
+        task.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.destroy!
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::KANBAN_TASK_DELETED, anything, hash_including(task: hash_including(id: task.id)))
+      end
+
+      it 'dispatches conversation.updated event for assigned conversations' do
+        inbox = create(:inbox, account: account)
+        create(:kanban_board_inbox, board: board, inbox: inbox)
+        conversation1 = create(:conversation, account: account, inbox: inbox)
+        conversation2 = create(:conversation, account: account, inbox: inbox)
+
+        task.save!
+        task.update!(conversation_ids: [conversation1.id, conversation2.id])
+        task.reload
+
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.destroy!
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation1)).at_least(:once)
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation2)).at_least(:once)
+      end
+    end
+  end
+
+  describe '#push_event_data' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:contact) { create(:contact, account: account) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+
+    before do
+      create(:kanban_board_inbox, board: board, inbox: inbox)
+    end
+
+    it 'returns correct conversations after removing conversation' do
+      task.conversation_ids = [conversation.id]
+      task.save!
+      task.reload
+
+      expect(task.conversations.count).to eq(1)
+      expect(task.push_event_data[:conversations].count).to eq(1)
+
+      task.conversation_ids = []
+      task.save!
+
+      event_data = task.push_event_data
+
+      expect(event_data[:conversation_ids]).to be_empty
+      expect(event_data[:conversations]).to be_empty
+    end
+
+    it 'returns correct conversations after creating task with conversations' do
+      new_task = build(:kanban_task, account: account, board: board, board_step: board_step, creator: task.creator)
+      new_task.conversation_ids = [conversation.id]
+
+      expect(new_task.conversations).to be_empty
+
+      new_task.save!
+
+      event_data = new_task.push_event_data
+
+      expect(event_data[:conversation_ids]).to contain_exactly(conversation.id)
+      expect(event_data[:conversations].map { |c| c[:id] }).to contain_exactly(conversation.id)
+    end
+  end
+end

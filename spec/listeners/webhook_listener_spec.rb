@@ -2,7 +2,6 @@ require 'rails_helper'
 describe WebhookListener do
   let(:listener) { described_class.instance }
   let!(:account) { create(:account) }
-  let(:report_identity) { Reports::UpdateAccountIdentity.new(account, Time.zone.now) }
   let!(:user) { create(:user, account: account) }
   let!(:inbox) { create(:inbox, account: account) }
   let!(:contact) { create(:contact, account: account) }
@@ -12,8 +11,6 @@ describe WebhookListener do
                      account: account, inbox: inbox, conversation: conversation)
   end
   let!(:message_created_event) { Events::Base.new(event_name, Time.zone.now, message: message) }
-  let!(:conversation_created_event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation) }
-  let!(:contact_event) { Events::Base.new(event_name, Time.zone.now, contact: contact) }
 
   describe 'filter events by inbox' do
     let(:event_name) { :'message.created' }
@@ -103,6 +100,7 @@ describe WebhookListener do
 
   describe '#conversation_created' do
     let(:event_name) { :'conversation.created' }
+    let!(:conversation_created_event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation) }
 
     context 'when webhook is not configured' do
       it 'does not trigger webhook' do
@@ -190,6 +188,7 @@ describe WebhookListener do
 
   describe '#contact_created' do
     let(:event_name) { :'contact.created' }
+    let!(:contact_event) { Events::Base.new(event_name, Time.zone.now, contact: contact) }
 
     context 'when webhook is not configured' do
       it 'does not trigger webhook' do
@@ -441,6 +440,64 @@ describe WebhookListener do
         create(:webhook, account: account, inbox: another_inbox, subscriptions: ['provider_event_received'])
         expect(WebhookJob).not_to receive(:perform_later)
         listener.provider_event_received(provider_event)
+      end
+    end
+  end
+
+  describe 'kanban events' do
+    let!(:kanban_task) { create(:kanban_task, account: account) }
+    let(:kanban_event) { Events::Base.new(event_name, Time.zone.now, task: kanban_task) }
+
+    describe '#kanban_task_created' do
+      let(:event_name) { :'kanban.task.created' }
+
+      it 'triggers the webhook event' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_created'])
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_created')).once
+        listener.kanban_task_created(kanban_event)
+      end
+    end
+
+    describe '#kanban_task_updated' do
+      let(:event_name) { :'kanban.task.updated' }
+      let(:old_board) { create(:kanban_board, account: account, name: 'Old Board') }
+      let(:new_board) { create(:kanban_board, account: account, name: 'New Board') }
+      let(:changed_attributes) do
+        {
+          'title' => ['Old Title', 'New Title'],
+          'updated_at' => [1.hour.ago, Time.zone.now],
+          'board_id' => [old_board.id, new_board.id]
+        }
+      end
+      let(:kanban_event) { Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: changed_attributes) }
+
+      it 'triggers the webhook event' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
+        expected_changed_attributes = [
+          { 'title' => { previous_value: 'Old Title', current_value: 'New Title' } },
+          { 'board' => {
+            previous_value: { id: old_board.id, name: old_board.name },
+            current_value: { id: new_board.id, name: new_board.name }
+          } }
+        ]
+        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+          expect(url).to eq(webhook.url)
+          expect(payload[:event]).to eq('kanban_task_updated')
+          expect(payload[:changed_attributes]).to include(*expected_changed_attributes)
+          expect(payload[:changed_attributes].size).to eq(2)
+        end
+        listener.kanban_task_updated(kanban_event)
+      end
+    end
+
+    describe '#kanban_task_deleted' do
+      let(:event_name) { :'kanban.task.deleted' }
+      let(:kanban_event) { Events::Base.new(event_name, Time.zone.now, task: kanban_task.push_event_data) }
+
+      it 'triggers the webhook event' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_deleted'])
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_deleted')).once
+        listener.kanban_task_deleted(kanban_event)
       end
     end
   end

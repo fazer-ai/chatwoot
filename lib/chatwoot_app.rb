@@ -17,6 +17,12 @@ module ChatwootApp
     @enterprise ||= root.join('enterprise').exist?
   end
 
+  def self.fazer_ai?
+    return false if ENV.fetch('DISABLE_FAZER_AI', false)
+
+    @fazer_ai ||= root.join('fazer_ai').exist?
+  end
+
   def self.chatwoot_cloud?
     enterprise? && GlobalConfig.get_value('DEPLOYMENT_ENV') == 'cloud'
   end
@@ -30,13 +36,15 @@ module ChatwootApp
   end
 
   def self.extensions
-    if custom?
-      %w[enterprise custom]
-    elsif enterprise?
-      %w[enterprise]
-    else
-      %w[]
-    end
+    extensions = if custom?
+                   %w[enterprise custom]
+                 elsif enterprise?
+                   %w[enterprise]
+                 else
+                   %w[]
+                 end
+    extensions << 'fazer_ai' if fazer_ai?
+    extensions
   end
 
   def self.advanced_search_allowed?

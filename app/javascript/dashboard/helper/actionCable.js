@@ -34,6 +34,12 @@ class ActionCableConnector extends BaseActionCableConnector {
       'conversation.updated': this.onConversationUpdated,
       'account.cache_invalidated': this.onCacheInvalidate,
       'copilot.message.created': this.onCopilotMessageCreated,
+      'kanban.task.created': this.onKanbanTaskCreated,
+      'kanban.task.updated': this.onKanbanTaskUpdated,
+      'kanban.task.deleted': this.onKanbanTaskDeleted,
+      'kanban.step.created': this.onKanbanStepCreated,
+      'kanban.step.updated': this.onKanbanStepUpdated,
+      'kanban.board.updated': this.onKanbanBoardUpdated,
     };
   }
 
@@ -192,6 +198,42 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onCopilotMessageCreated = data => {
     this.app.$store.dispatch('copilotMessages/upsert', data);
+  };
+
+  onKanbanTaskCreated = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/addTaskFromEvent', data);
+    }
+  };
+
+  onKanbanTaskUpdated = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/updateTaskFromEvent', data);
+    }
+  };
+
+  onKanbanTaskDeleted = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/deleteTaskFromEvent', data.id);
+    }
+  };
+
+  onKanbanStepCreated = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/addStepFromEvent', data);
+    }
+  };
+
+  onKanbanStepUpdated = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/updateStepFromEvent', data);
+    }
+  };
+
+  onKanbanBoardUpdated = data => {
+    if (this.app.$store.hasModule?.('kanban')) {
+      this.app.$store.dispatch('kanban/updateBoardFromEvent', data);
+    }
   };
 
   onCacheInvalidate = data => {

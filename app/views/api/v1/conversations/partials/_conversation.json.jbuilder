@@ -21,6 +21,7 @@ json.meta do
 end
 
 json.id conversation.display_id
+json.database_id conversation.id
 if conversation.messages.where(account_id: conversation.account_id).last.blank?
   json.messages []
 else
@@ -48,6 +49,29 @@ json.updated_at conversation.updated_at.to_f
 json.timestamp conversation.last_activity_at.to_i
 json.first_reply_created_at conversation.first_reply_created_at.to_i
 json.unread_count conversation.unread_incoming_messages.count
+
+if defined?(FazerAi) && conversation.respond_to?(:kanban_task) && (task = conversation.kanban_task)
+  json.kanban_task do
+    json.partial! 'api/v1/accounts/kanban/tasks/task', task: task
+
+    json.board do
+      json.id task.board.id
+      json.name task.board.name
+      json.steps task.board.ordered_steps do |step|
+        json.id step.id
+        json.name step.name
+        json.color step.color
+      end
+      json.assigned_agents task.board.assigned_agents do |agent|
+        json.id agent.id
+        json.name agent.name
+        json.avatar_url agent.avatar_url
+        json.availability_status agent.availability_status
+      end
+    end
+  end
+end
+
 json.last_non_activity_message conversation.messages.where(account_id: conversation.account_id).non_activity_messages.first.try(:push_event_data)
 json.last_activity_at conversation.last_activity_at.to_i
 json.priority conversation.priority

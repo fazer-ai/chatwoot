@@ -197,6 +197,10 @@ describe('useAutomation', () => {
     automationTypes.conversation_updated = { conditions: [] };
     automationTypes.conversation_opened = { conditions: [] };
     automationTypes.conversation_resolved = { conditions: [] };
+    automationTypes.kanban_task_created = { conditions: [] };
+    automationTypes.kanban_task_updated = { conditions: [] };
+    automationTypes.kanban_task_completed = { conditions: [] };
+    automationTypes.kanban_task_cancelled = { conditions: [] };
 
     automationHelper.generateCustomAttributeTypes.mockReturnValue([]);
     automationHelper.generateCustomAttributes.mockReturnValue([]);

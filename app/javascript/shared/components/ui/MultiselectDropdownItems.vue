@@ -33,6 +33,14 @@ export default {
       type: String,
       default: 'No results found',
     },
+    hideSearch: {
+      type: Boolean,
+      default: false,
+    },
+    maxHeight: {
+      type: String,
+      default: '10rem',
+    },
   },
   emits: ['select'],
 
@@ -44,6 +52,9 @@ export default {
 
   computed: {
     filteredOptions() {
+      if (this.hideSearch) {
+        return this.options;
+      }
       return this.options.filter(option => {
         return option.name.toLowerCase().includes(this.search.toLowerCase());
       });
@@ -54,7 +65,9 @@ export default {
   },
 
   mounted() {
-    this.focusInput();
+    if (!this.hideSearch) {
+      this.focusInput();
+    }
   },
 
   methods: {
@@ -62,7 +75,7 @@ export default {
       this.$emit('select', option);
     },
     focusInput() {
-      this.$refs.searchbar.focus();
+      this.$refs.searchbar?.focus();
     },
     isActive(option) {
       return this.selectedItems.some(item => item && option.id === item.id);
@@ -73,7 +86,10 @@ export default {
 
 <template>
   <div class="dropdown-wrap">
-    <div class="flex-auto flex-grow-0 flex-shrink-0 mb-2 max-h-8">
+    <div
+      v-if="!hideSearch"
+      class="flex-auto flex-grow-0 flex-shrink-0 mb-2 max-h-8"
+    >
       <input
         ref="searchbar"
         v-model="search"
@@ -84,7 +100,7 @@ export default {
       />
     </div>
     <div class="flex items-start justify-start flex-auto overflow-auto mt-2">
-      <div class="w-full max-h-[10rem]">
+      <div class="w-full" :style="{ maxHeight: maxHeight }">
         <WootDropdownMenu>
           <WootDropdownItem v-for="option in filteredOptions" :key="option.id">
             <NextButton
@@ -98,21 +114,31 @@ export default {
               <div
                 class="flex items-center justify-between w-full min-w-0 gap-2"
               >
-                <span
-                  class="my-0 overflow-hidden text-sm leading-4 whitespace-nowrap text-ellipsis"
-                  :title="option.name"
-                >
-                  {{ option.name }}
-                </span>
+                <div class="flex items-center gap-2 overflow-hidden">
+                  <span
+                    v-if="option.color && !option.icon"
+                    class="w-2 h-2 rounded-full flex-shrink-0"
+                    :style="{ backgroundColor: option.color }"
+                  />
+                  <span
+                    class="my-0 overflow-hidden text-sm leading-4 whitespace-nowrap text-ellipsis"
+                    :title="option.name"
+                  >
+                    {{ option.name }}
+                  </span>
+                </div>
               </div>
               <Avatar
                 v-if="hasThumbnail"
                 :src="option.thumbnail"
+                :icon-name="option.icon"
                 :name="option.name"
                 :status="option.availability_status"
                 :size="24"
                 hide-offline-status
                 rounded-full
+                :custom-avatar-color="option.icon ? option.color : null"
+                :custom-avatar-bg="option.icon ? 'transparent' : null"
               />
             </NextButton>
           </WootDropdownItem>

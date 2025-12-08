@@ -83,14 +83,23 @@ export default defineConfig({
       survey: path.resolve('./app/javascript/survey'),
       widget: path.resolve('./app/javascript/widget'),
       assets: path.resolve('./app/javascript/dashboard/assets'),
+      kanban: path.resolve('./fazer_ai/app/javascript/kanban'),
     },
   },
   test: {
     environment: 'jsdom',
-    include: ['app/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+    include: [
+      'app/**/*.{test,spec}.?(c|m)[jt]s?(x)',
+      'fazer_ai/app/javascript/**/*.{test,spec}.?(c|m)[jt]s?(x)',
+    ],
     coverage: {
       reporter: ['lcov', 'text'],
-      include: ['app/**/*.js', 'app/**/*.vue'],
+      include: [
+        'app/**/*.js',
+        'app/**/*.vue',
+        'fazer_ai/app/javascript/**/*.js',
+        'fazer_ai/app/javascript/**/*.vue',
+      ],
       exclude: [
         'app/**/*.@(spec|stories|routes).js',
         '**/specs/**/*',

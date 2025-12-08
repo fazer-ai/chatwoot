@@ -7,6 +7,7 @@ import {
   computed,
   watch,
   onMounted,
+  onUnmounted,
   useTemplateRef,
   nextTick,
 } from 'vue';
@@ -148,6 +149,7 @@ const showEmojiMenu = ref(false);
 const showToolsMenu = ref(false);
 const mentionSearchKey = ref('');
 const toolSearchKey = ref('');
+let observer = null;
 const cannedSearchTerm = ref('');
 const variableSearchTerm = ref('');
 const emojiSearchTerm = ref('');
@@ -156,6 +158,7 @@ const isImageNodeSelected = ref(false);
 const toolbarPosition = ref({ top: 0, left: 0 });
 const selectedImageNode = ref(null);
 const sizes = MESSAGE_EDITOR_IMAGE_RESIZES;
+const linkTooltip = ref({ show: false, top: 0, left: 0, text: '' });
 
 // element ref
 const editorRoot = useTemplateRef('editorRoot');
@@ -557,6 +560,17 @@ function onKeydown(event) {
   if (isCmdPlusEnterToSendEnabled()) {
     handleLineBreakWhenCmdAndEnterToSendEnabled(event);
   }
+
+  if (event.shiftKey && event.key === 'Enter') {
+    event.preventDefault();
+    const { schema, tr } = editorView.state;
+    const hardBreak = schema.nodes.hard_break;
+    if (hardBreak) {
+      editorView.dispatch(
+        tr.replaceSelectionWith(hardBreak.create()).scrollIntoView()
+      );
+    }
+  }
 }
 
 function createEditorView() {
@@ -569,6 +583,15 @@ function createEditorView() {
       if (tx.docChanged) {
         emitOnChange();
       }
+    },
+    transformPasted: slice => {
+      if (
+        slice.content.childCount === 1 &&
+        slice.content.firstChild.type.name === 'paragraph'
+      ) {
+        return new slice.constructor(slice.content.firstChild.content, 0, 0);
+      }
+      return slice;
     },
     handleDOMEvents: {
       keyup: () => {
@@ -584,6 +607,27 @@ function createEditorView() {
       keydown: (view, event) => !props.disabled && onKeydown(event),
       focus: () => !props.disabled && emit('focus'),
       click: () => !props.disabled && isEditorMouseFocusedOnAnImage(),
+      mouseover: (view, event) => {
+        if (event.target.tagName === 'A' && event.target.href) {
+          const rect = event.target.getBoundingClientRect();
+          const rootRect = editorRoot.value.getBoundingClientRect();
+          linkTooltip.value = {
+            show: true,
+            top: rect.bottom - rootRect.top + 5,
+            left: rect.left - rootRect.left,
+            text: event.target.href,
+          };
+        } else {
+          linkTooltip.value.show = false;
+        }
+        return false;
+      },
+      mouseout: (view, event) => {
+        if (event.target.tagName === 'A') {
+          linkTooltip.value.show = false;
+        }
+        return false;
+      },
       blur: () => {
         if (props.disabled) return;
         typingIndicator.stop();
@@ -662,6 +706,59 @@ onMounted(() => {
   if (props.focusOnMount) {
     focusEditorInputField();
   }
+
+  // Fix for link modal appearing behind other modals
+  observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        if (
+          node.nodeType === 1 &&
+          node.classList.contains('ProseMirror-prompt')
+        ) {
+          if (editorRoot.value) {
+            const nodeRect = node.getBoundingClientRect();
+            const rootRect = editorRoot.value.getBoundingClientRect();
+
+            node.style.top = `${nodeRect.top - rootRect.top}px`;
+            node.style.left = `${nodeRect.left - rootRect.left}px`;
+            node.style.position = 'absolute';
+
+            // Show selected text in the modal
+            if (editorView && !editorView.state.selection.empty) {
+              const { from, to } = editorView.state.selection;
+              const text = editorView.state.doc.textBetween(from, to, ' ');
+              if (text) {
+                const textDisplay = document.createElement('div');
+                textDisplay.className =
+                  'mb-4 text-xs text-n-slate-11 flex flex-col gap-1.5';
+                textDisplay.innerHTML = `
+                  <span class="font-medium text-n-slate-12 tracking-wider text-[10px]">Selected Text</span>
+                  <span class="p-2 rounded-md bg-n-slate-3 border border-n-strong text-n-slate-12 text-sm">${text}</span>
+                `;
+
+                const title = node.querySelector('h5');
+                if (title) {
+                  title.insertAdjacentElement('afterend', textDisplay);
+                } else {
+                  node.prepend(textDisplay);
+                }
+              }
+            }
+
+            editorRoot.value.appendChild(node);
+          }
+        }
+      });
+    });
+  });
+
+  observer.observe(document.body, { childList: true });
+});
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect();
+  }
 });
 
 // BUS Event to insert text or markdown into the editor at the
@@ -698,6 +795,13 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       :search-key="toolSearchKey"
       @select-tool="content => insertSpecialContent('tool', content)"
     />
+    <div
+      v-if="linkTooltip.show"
+      class="absolute z-50 px-2 py-1 text-xs rounded shadow-sm pointer-events-none bg-n-slate-12 text-n-slate-1 max-w-xs truncate"
+      :style="{ top: `${linkTooltip.top}px`, left: `${linkTooltip.left}px` }"
+    >
+      {{ linkTooltip.text }}
+    </div>
     <input
       ref="imageUpload"
       type="file"
@@ -774,15 +878,17 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
 }
 
 .ProseMirror-prompt {
-  @apply z-[9999] bg-n-alpha-3 backdrop-blur-[100px] border border-n-strong p-6 shadow-xl rounded-xl;
+  @apply z-[9999] bg-n-alpha-3 backdrop-blur-[100px] border border-n-strong p-6 shadow-xl rounded-xl min-w-[20rem];
 
   h5 {
     @apply text-n-slate-12 mb-1.5;
   }
 
   .ProseMirror-prompt-buttons {
+    @apply flex gap-2 mt-4;
+
     button {
-      @apply h-8 px-3;
+      @apply h-8 px-3 rounded-md text-sm font-medium transition-colors;
 
       &[type='submit'] {
         @apply bg-n-brand text-white hover:bg-n-brand/90;

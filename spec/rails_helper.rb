@@ -28,6 +28,7 @@ require 'test_prof/recipes/rspec/let_it_be'
 #
 # rubocop:disable  Rails/FilePath
 Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
+Dir[Rails.root.join('fazer_ai', 'spec', 'support', '**', '*.rb')].each { |f| require f }
 # rubocop:enable  Rails/FilePath
 
 # Checks for pending migrations and applies them before tests are run.

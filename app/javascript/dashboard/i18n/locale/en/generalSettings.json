@@ -136,7 +136,8 @@
       "ENTER_TO_REMOVE": "Press enter to remove",
       "NO_OPTIONS": "List is empty",
       "SELECT_ONE": "Select one",
-      "SELECT": "Select"
+      "SELECT": "Select",
+      "SELECTED": "Selected"
     }
   },
   "NOTIFICATIONS_PAGE": {

@@ -1,3 +1,4 @@
+require 'pathname'
 require 'webmock/rspec'
 
 WebMock.disable_net_connect!(allow_localhost: true)
@@ -17,3 +18,13 @@ RSpec.configure do |config|
     ClimateControl.modify(options, &)
   end
 end
+
+fazer_ai_spec_root = Pathname.new(__dir__).join('..', 'fazer_ai', 'spec')
+explicit_targets_requested = ARGV.any? do |arg|
+  next false if arg.start_with?('-')
+
+  path = arg.sub(/:\d+$/, '')
+  File.exist?(path)
+end
+
+Dir[fazer_ai_spec_root.join('**', '*_spec.rb')].each { |path| require path } if fazer_ai_spec_root.exist? && !explicit_targets_requested

@@ -36,6 +36,8 @@ const props = defineProps({
   icon: { type: [String, Object, Function], default: '' },
   trailingIcon: { type: Boolean, default: false },
   isLoading: { type: Boolean, default: false },
+  hideLabel: { type: Boolean, default: false },
+  type: { type: String, default: 'button' },
 });
 
 const slots = useSlots();
@@ -199,7 +201,9 @@ const variantClasses = computed(() => {
   return variantMap[computedVariant.value];
 });
 
-const isIconOnly = computed(() => !props.label && !slots.default);
+const isIconOnly = computed(
+  () => (!props.label || props.hideLabel) && !slots.default
+);
 const isLink = computed(() => computedVariant.value === 'link');
 
 const buttonClasses = computed(() => {
@@ -226,6 +230,7 @@ const linkButtonClasses = computed(() => {
 <template>
   <button
     v-bind="filteredAttrs"
+    :type="type"
     :class="{
       [STYLE_CONFIG.base]: true,
       [isLink ? linkButtonClasses : buttonClasses]: true,
@@ -240,8 +245,10 @@ const linkButtonClasses = computed(() => {
 
     <Spinner v-if="isLoading" class="!w-5 !h-5 flex-shrink-0" />
 
-    <slot v-if="label || $slots.default" name="default">
-      <span v-if="label" class="min-w-0 truncate">{{ label }}</span>
+    <slot v-if="(label && !hideLabel) || $slots.default" name="default">
+      <span v-if="label && !hideLabel" class="min-w-0 truncate">{{
+        label
+      }}</span>
     </slot>
   </button>
 </template>

@@ -7,13 +7,20 @@ import {
   useTemplateRef,
   inject,
 } from 'vue';
-import { useWindowSize, useElementBounding, useScrollLock } from '@vueuse/core';
+import {
+  useWindowSize,
+  useElementBounding,
+  useScrollLock,
+  onClickOutside,
+} from '@vueuse/core';
 
 import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirection.vue';
 
 const props = defineProps({
   x: { type: Number, default: 0 },
   y: { type: Number, default: 0 },
+  ignoreElement: { type: Object, default: null },
+  to: { type: String, default: 'body' },
 });
 
 const emit = defineEmits(['close']);
@@ -72,10 +79,14 @@ onMounted(() => {
   nextTick(() => menuRef.value?.focus());
 });
 
-const handleClose = () => {
-  isLocked.value = false;
-  emit('close');
-};
+onClickOutside(
+  menuRef,
+  () => {
+    isLocked.value = false;
+    emit('close');
+  },
+  { ignore: [computed(() => props.ignoreElement)] }
+);
 
 onUnmounted(() => {
   isLocked.value = false;
@@ -83,13 +94,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <TeleportWithDirection to="body">
+  <TeleportWithDirection :to="to">
     <div
       ref="menuRef"
       class="fixed outline-none z-[9999] cursor-pointer"
       :style="position"
       tabindex="0"
-      @blur="handleClose"
     >
       <slot />
     </div>

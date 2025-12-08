@@ -116,6 +116,13 @@ export const mutations = {
     chat.priority = priority;
   },
 
+  [types.UPDATE_CONVERSATION_KANBAN_TASK](_state, { task, conversationId }) {
+    const [chat] = _state.allConversations.filter(c => c.id === conversationId);
+    if (chat) {
+      chat.kanban_task = task;
+    }
+  },
+
   [types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES](_state, custom_attributes) {
     const [chat] = getSelectedChatConversation(_state);
     chat.custom_attributes = custom_attributes;

@@ -7,10 +7,75 @@ import {
   DEFAULT_MESSAGE_CREATED_CONDITION,
   DEFAULT_CONVERSATION_CONDITION,
   DEFAULT_OTHER_CONDITION,
+  DEFAULT_KANBAN_CONDITION,
   DEFAULT_ACTIONS,
 } from 'dashboard/constants/automation';
 import filterQueryGenerator from './filterQueryGenerator';
 import actionQueryGenerator from './actionQueryGenerator';
+
+export const KANBAN_EVENTS = [
+  'kanban_task_created',
+  'kanban_task_updated',
+  'kanban_task_completed',
+  'kanban_task_cancelled',
+];
+
+/**
+ * Extracts board ID from various value formats used in automation conditions.
+ * Values can be: object with id, array of objects/ids, or primitive.
+ * @param {*} values - The values from a condition
+ * @returns {string|number|null} The extracted board ID or null
+ */
+export const extractBoardIdFromValues = values => {
+  if (!values) return null;
+  if (typeof values === 'object' && values !== null && !Array.isArray(values)) {
+    return values.id;
+  }
+  if (Array.isArray(values)) {
+    if (values.length === 0) return null;
+    return values[0]?.id ?? values[0];
+  }
+  return values;
+};
+
+/**
+ * Gets steps from a board, handling both API response formats.
+ * @param {Object} board - The board object
+ * @returns {Array} The steps array or empty array
+ */
+export const getBoardSteps = board => {
+  return board?.steps || board?.steps_summary || [];
+};
+
+/**
+ * Finds the selected board ID from automation conditions.
+ * @param {Array} conditions - The automation conditions
+ * @returns {string|number|null} The board ID or null
+ */
+export const getSelectedBoardId = conditions => {
+  const boardCondition = (conditions || []).find(
+    c => c.attribute_key === 'kanban_board_id'
+  );
+  return extractBoardIdFromValues(boardCondition?.values);
+};
+
+/**
+ * Finds the selected board ID from automation actions (assign_to_board action).
+ * @param {Array} actions - The automation actions
+ * @returns {string|number|null} The board ID or null
+ */
+export const getSelectedBoardIdFromActions = actions => {
+  const boardAction = (actions || []).find(
+    a => a.action_name === 'assign_to_board'
+  );
+  if (!boardAction?.action_params) return null;
+
+  const param = Array.isArray(boardAction.action_params)
+    ? boardAction.action_params[0]
+    : boardAction.action_params;
+
+  return extractBoardIdFromValues(param);
+};
 
 export const getCustomAttributeInputType = key => {
   const customAttributeMap = {
@@ -94,23 +159,107 @@ export const generateConditionOptions = (options, key = 'id') => {
   });
 };
 
+/**
+ * Finds the selected board object from conditions.
+ * @param {Array} kanbanBoards - List of kanban boards
+ * @param {Array} conditions - Automation conditions
+ * @returns {Object|null} The selected board or null
+ */
+const findSelectedBoardFromConditions = (kanbanBoards, conditions) => {
+  const selectedBoardId = getSelectedBoardId(conditions);
+  if (!selectedBoardId) return null;
+
+  return (kanbanBoards || []).find(
+    b => b.id === Number(selectedBoardId) || b.id === selectedBoardId
+  );
+};
+
+/**
+ * Finds the selected board object from actions (assign_to_board action).
+ * @param {Array} kanbanBoards - List of kanban boards
+ * @param {Array} actions - Automation actions
+ * @returns {Object|null} The selected board or null
+ */
+const findSelectedBoardFromActions = (kanbanBoards, actions) => {
+  const selectedBoardId = getSelectedBoardIdFromActions(actions);
+  if (!selectedBoardId) return null;
+
+  return (kanbanBoards || []).find(
+    b => b.id === Number(selectedBoardId) || b.id === selectedBoardId
+  );
+};
+
+/**
+ * Finds the selected board - checks conditions first (for kanban events),
+ * then falls back to actions (for conversation events with assign_to_board).
+ * @param {Array} kanbanBoards - List of kanban boards
+ * @param {Array} conditions - Automation conditions
+ * @param {Array} actions - Automation actions
+ * @returns {Object|null} The selected board or null
+ */
+const findSelectedBoard = (kanbanBoards, conditions, actions) => {
+  const boardFromConditions = findSelectedBoardFromConditions(
+    kanbanBoards,
+    conditions
+  );
+  if (boardFromConditions) return boardFromConditions;
+
+  return findSelectedBoardFromActions(kanbanBoards, actions);
+};
+
+/**
+ * Gets step options from a board for dropdowns.
+ * @param {Array} kanbanBoards - List of kanban boards
+ * @param {Array} conditions - Automation conditions to find selected board
+ * @param {Array} actions - Automation actions to find selected board
+ * @returns {Array} Formatted step options for dropdown
+ */
+const getKanbanStepOptions = (kanbanBoards, conditions, actions) => {
+  const board = findSelectedBoard(kanbanBoards, conditions, actions);
+  if (!board) return [];
+
+  const steps = getBoardSteps(board);
+
+  return steps
+    .filter(step => !step.cancelled)
+    .map(step => ({ id: step.id, name: step.name }));
+};
+
 export const getActionOptions = ({
   agents,
   teams,
   labels,
   slaPolicies,
+  kanbanBoards,
   type,
   addNoneToListFn,
   priorityOptions,
+  conditions,
+  actions,
 }) => {
+  const kanbanStepOptions =
+    type === 'move_to_step'
+      ? getKanbanStepOptions(kanbanBoards, conditions, actions)
+      : [];
+
+  const kanbanBoardOptions = (kanbanBoards || []).map(board => ({
+    id: board.id,
+    name: board.name,
+  }));
+
+  const selectedBoard = findSelectedBoard(kanbanBoards, conditions, actions);
+  const boardAgents = selectedBoard?.assigned_agents || agents;
+
   const actionsMap = {
-    assign_agent: addNoneToListFn ? addNoneToListFn(agents) : agents,
+    assign_agent: addNoneToListFn ? addNoneToListFn(boardAgents) : boardAgents,
     assign_team: addNoneToListFn ? addNoneToListFn(teams) : teams,
     send_email_to_team: teams,
     add_label: generateConditionOptions(labels, 'title'),
     remove_label: generateConditionOptions(labels, 'title'),
     change_priority: priorityOptions,
     add_sla: slaPolicies,
+    move_to_step: kanbanStepOptions,
+    assign_to_board: kanbanBoardOptions,
   };
   return actionsMap[type];
 };
@@ -127,9 +276,11 @@ export const getConditionOptions = ({
   labels,
   statusFilterOptions,
   teams,
+  kanbanBoards,
   type,
   priorityOptions,
   messageTypeOptions,
+  conditions,
 }) => {
   if (isCustomAttributeCheckbox(customAttributes, type)) {
     return booleanFilterOptions;
@@ -139,11 +290,28 @@ export const getConditionOptions = ({
     return getCustomAttributeListDropdownValues(customAttributes, type);
   }
 
+  const kanbanBoardOptions = (kanbanBoards || []).map(board => ({
+    id: board.id,
+    name: board.name,
+  }));
+
+  const kanbanStepOptions =
+    type === 'kanban_step_id'
+      ? getKanbanStepOptions(kanbanBoards, conditions, [])
+      : [];
+
+  const selectedBoard = findSelectedBoardFromConditions(
+    kanbanBoards,
+    conditions
+  );
+  const boardAgents = selectedBoard?.assigned_agents || agents;
+  const boardInboxes = selectedBoard?.assigned_inboxes || inboxes;
+
   const conditionFilterMaps = {
     status: statusFilterOptions,
-    assignee_id: agents,
+    assignee_id: boardAgents,
     contact: contacts,
-    inbox_id: inboxes,
+    inbox_id: boardInboxes,
     team_id: teams,
     campaigns: generateConditionOptions(campaigns),
     browser_language: languages,
@@ -152,6 +320,8 @@ export const getConditionOptions = ({
     message_type: messageTypeOptions,
     priority: priorityOptions,
     labels: generateConditionOptions(labels, 'title'),
+    kanban_board_id: kanbanBoardOptions,
+    kanban_step_id: kanbanStepOptions,
   };
 
   return conditionFilterMaps[type];
@@ -176,6 +346,9 @@ export const getDefaultConditions = eventName => {
     eventName === 'conversation_resolved'
   ) {
     return DEFAULT_CONVERSATION_CONDITION;
+  }
+  if (KANBAN_EVENTS.includes(eventName)) {
+    return DEFAULT_KANBAN_CONDITION;
   }
   return DEFAULT_OTHER_CONDITION;
 };
@@ -285,7 +458,7 @@ export const getInputType = (
     return getCustomAttributeInputType(customAttribute.attribute_display_type);
   }
   const type = getAutomationType(automationTypes, automation, key);
-  return type.inputType;
+  return type?.inputType ?? '';
 };
 
 /**
@@ -311,7 +484,7 @@ export const getOperators = (
     }
   }
   const type = getAutomationType(automationTypes, automation, key);
-  return type.filterOperators;
+  return type?.filterOperators ?? [];
 };
 
 /**
@@ -322,9 +495,10 @@ export const getOperators = (
  * @returns {string} The custom attribute type.
  */
 export const getCustomAttributeType = (automationTypes, automation, key) => {
-  return automationTypes[automation.event_name].conditions.find(
-    i => i.key === key
-  ).customAttributeType;
+  return (
+    automationTypes[automation.event_name].conditions.find(i => i.key === key)
+      ?.customAttributeType ?? ''
+  );
 };
 
 /**
@@ -336,6 +510,6 @@ export const getCustomAttributeType = (automationTypes, automation, key) => {
 export const showActionInput = (automationActionTypes, action) => {
   if (action === 'send_email_to_team' || action === 'send_message')
     return false;
-  const type = automationActionTypes.find(i => i.key === action).inputType;
+  const type = automationActionTypes.find(i => i.key === action)?.inputType;
   return !!type;
 };

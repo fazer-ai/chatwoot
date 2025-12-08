@@ -219,6 +219,31 @@ Rails.application.routes.draw do
               post :unread
             end
           end
+
+          namespace :kanban do
+            resource :account_user_preferences, only: [:update]
+            resources :boards do
+              resources :steps, controller: 'board_steps', only: [:index, :show, :create, :update, :destroy]
+              resources :agents,
+                        controller: 'board_agents',
+                        only: [:index, :create, :update, :destroy]
+              resources :inboxes,
+                        controller: 'board_inboxes',
+                        only: [:index, :create, :destroy]
+              resources :conversations,
+                        controller: 'board_conversations',
+                        only: [:index]
+              post :update_agents, on: :member
+              post :update_inboxes, on: :member
+              post :toggle_favorite, on: :member
+            end
+            resources :tasks do
+              post :move, on: :member
+              resources :audit_events,
+                        controller: 'audit_events',
+                        only: [:index, :show]
+            end
+          end
           resource :notification_settings, only: [:show, :update]
 
           resources :teams do

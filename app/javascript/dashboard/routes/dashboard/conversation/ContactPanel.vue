@@ -21,6 +21,7 @@ import ShopifyOrdersList from 'dashboard/components/widgets/conversation/Shopify
 import SidebarActionsHeader from 'dashboard/components-next/SidebarActionsHeader.vue';
 import LinearIssuesList from 'dashboard/components/widgets/conversation/linear/IssuesList.vue';
 import LinearSetupCTA from 'dashboard/components/widgets/conversation/linear/LinearSetupCTA.vue';
+import KanbanConversationPanel from 'kanban/components/KanbanConversationPanel.vue';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
 const props = defineProps({
@@ -149,8 +150,24 @@ onMounted(() => {
         @end="onDragEnd"
       >
         <template #item="{ element }">
+          <div v-if="element.name === 'conversation_kanban_actions'">
+            <AccordionItem
+              :title="$t('KANBAN.TITLE')"
+              :is-open="isContactSidebarItemOpen('is_kanban_open')"
+              compact
+              @toggle="value => toggleSidebarUIState('is_kanban_open', value)"
+            >
+              <KanbanConversationPanel
+                :conversation-id="currentChat.id"
+                :conversation-database-id="currentChat.database_id"
+                :contact-name="contact.name"
+                :kanban-task="currentChat.kanban_task"
+                :inbox-id="currentChat.inbox_id"
+              />
+            </AccordionItem>
+          </div>
           <div
-            v-if="element.name === 'conversation_actions'"
+            v-else-if="element.name === 'conversation_actions'"
             class="conversation--actions"
           >
             <AccordionItem
