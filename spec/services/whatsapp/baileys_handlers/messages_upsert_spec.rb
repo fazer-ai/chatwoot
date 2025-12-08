@@ -316,4 +316,137 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
   end
+
+  describe 'filename extraction' do
+    let(:phone) { '5511912345678' }
+
+    before do
+      %w[msg_doc_1 msg_doc_2 msg_image_1 msg_audio_1].each do |message_id|
+        stub_request(:get, whatsapp_channel.media_url(message_id))
+          .to_return(status: 200, body: 'fake content')
+      end
+    end
+
+    context 'when receiving a document message with filename' do
+      it 'extracts the filename correctly' do
+        raw_message = {
+          key: { id: 'msg_doc_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+          pushName: 'User',
+          messageTimestamp: timestamp,
+          message: {
+            documentMessage: {
+              url: 'https://example.com/doc.pdf',
+              mimetype: 'application/pdf',
+              fileName: 'contract.pdf'
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        attachment = message.attachments.first
+        expect(attachment.file.filename.to_s).to eq('contract.pdf')
+      end
+    end
+
+    context 'when receiving a document with caption message with filename' do
+      it 'extracts the filename correctly' do
+        raw_message = {
+          key: { id: 'msg_doc_2', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+          pushName: 'User',
+          messageTimestamp: timestamp,
+          message: {
+            documentWithCaptionMessage: {
+              message: {
+                documentMessage: {
+                  url: 'https://example.com/doc.pdf',
+                  mimetype: 'application/pdf',
+                  fileName: 'report.pdf'
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        attachment = message.attachments.first
+        expect(attachment.file.filename.to_s).to eq('report.pdf')
+      end
+    end
+
+    context 'when filename is missing' do
+      it 'generates a filename based on mimetype' do
+        raw_message = {
+          key: { id: 'msg_image_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+          pushName: 'User',
+          messageTimestamp: timestamp,
+          message: {
+            imageMessage: {
+              url: 'https://example.com/image.jpg',
+              mimetype: 'image/jpeg'
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        attachment = message.attachments.first
+        expect(attachment.file.filename.to_s).to match(/image_msg_image_1_\d{8}\.jpeg/)
+      end
+    end
+
+    context 'when filename is missing and mimetype has extra parameters' do
+      it 'generates a filename based on mimetype correctly' do
+        raw_message = {
+          key: { id: 'msg_audio_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+          pushName: 'User',
+          messageTimestamp: timestamp,
+          message: {
+            audioMessage: {
+              url: 'https://example.com/audio.ogg',
+              mimetype: 'audio/ogg; codecs=opus'
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        attachment = message.attachments.first
+        expect(attachment.file.filename.to_s).to match(/audio_msg_audio_1_\d{8}\.ogg/)
+      end
+    end
+  end
 end

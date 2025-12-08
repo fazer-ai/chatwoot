@@ -16,15 +16,17 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
     return handle_edited_message if @raw_message[:isEdit]
 
-    set_contact
+    with_zapi_contact_lock(@raw_message[:phone]) do
+      set_contact
 
-    unless @contact
-      Rails.logger.warn "Contact not found for message: #{raw_message_id}"
-      return
+      unless @contact
+        Rails.logger.warn "Contact not found for message: #{raw_message_id}"
+        return
+      end
+
+      set_conversation
+      handle_create_message
     end
-
-    set_conversation
-    handle_create_message
   ensure
     clear_message_source_id_from_redis
   end
@@ -100,12 +102,14 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   def update_existing_contact_inbox(phone, source_id, identifier)
     # NOTE: This is useful when we create a new contact manually, so we don't have information about contact LID;
     # With this, when we receive a message from that contact, we can link it properly.
-    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: phone)
-    return unless existing_contact_inbox
+    existing_contact = inbox.account.contacts.find_by(phone_number: "+#{phone}")
+    return unless existing_contact
+
+    existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox_id: inbox.id)
 
     ActiveRecord::Base.transaction do
-      existing_contact_inbox.update!(source_id: source_id)
-      existing_contact_inbox.contact.update!(identifier: identifier)
+      existing_contact.update!(identifier: identifier)
+      existing_contact_inbox&.update!(source_id: source_id)
     end
   end
 

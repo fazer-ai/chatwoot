@@ -365,14 +365,13 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         end.not_to change(Contact, :count)
       end
 
-      it 'creates new contact_inbox with new source_id for same contact' do
+      it 'updates existing contact_inbox with new source_id' do
         expect do
           service.perform
-        end.to change(ContactInbox, :count).by(1)
+        end.not_to change(ContactInbox, :count)
 
-        new_contact_inbox = ContactInbox.last
-        expect(new_contact_inbox.source_id).to eq('123456789')
-        expect(new_contact_inbox.contact).to eq(existing_contact)
+        existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox: inbox)
+        expect(existing_contact_inbox.source_id).to eq('123456789')
       end
     end
 
@@ -1211,6 +1210,42 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
           expect(message.attachments.first.file_type).to eq('contact')
         end
       end
+    end
+  end
+
+  describe '#process_received_callback with locking' do
+    let(:params) do
+      {
+        type: 'ReceivedCallback',
+        messageId: 'msg_123',
+        momment: Time.current.to_i * 1000,
+        fromMe: false,
+        chatName: 'John Doe',
+        text: { message: 'Hello' },
+        phone: '5511987654321',
+        chatLid: '123456789@lid'
+      }
+    end
+
+    it 'acquires a lock on the contact phone number' do
+      allow(Redis::Alfred).to receive(:set).and_return(true)
+      allow(Redis::Alfred).to receive(:delete)
+
+      service.perform
+
+      expect(Redis::Alfred).to have_received(:set).with('ZAPI::CONTACT_LOCK::5511987654321', 1, nx: true, ex: 5.seconds)
+      expect(Redis::Alfred).to have_received(:delete).with('ZAPI::CONTACT_LOCK::5511987654321')
+    end
+
+    it 'waits for the lock if it is already acquired' do
+      allow(Redis::Alfred).to receive(:set).with('ZAPI::CONTACT_LOCK::5511987654321', 1, nx: true, ex: 5.seconds).and_return(false, true)
+      allow(Redis::Alfred).to receive(:delete)
+
+      allow(service).to receive(:sleep).with(0.1)
+
+      service.perform
+
+      expect(service).to have_received(:sleep).with(0.1).once
     end
   end
 

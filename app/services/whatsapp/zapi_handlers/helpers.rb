@@ -25,4 +25,21 @@ module Whatsapp::ZapiHandlers::Helpers
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{raw_message_id}")
     Redis::Alfred.get(key)
   end
+
+  def with_zapi_contact_lock(phone, timeout: 5.seconds)
+    raise ArgumentError, 'A block is required for with_zapi_contact_lock' unless block_given?
+
+    start_time = Time.now.to_i
+    key = "ZAPI::CONTACT_LOCK::#{phone}"
+
+    while (Time.now.to_i - start_time) < timeout
+      break if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
+
+      sleep(0.1)
+    end
+
+    yield
+  ensure
+    Redis::Alfred.delete(key)
+  end
 end

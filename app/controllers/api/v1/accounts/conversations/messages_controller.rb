@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
+  include Events::Types
+
   before_action :ensure_api_inbox, only: :update
 
   def index
@@ -9,6 +11,8 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     user = Current.user || @resource
     mb = Messages::MessageBuilder.new(user, @conversation, params)
     @message = mb.perform
+
+    trigger_typing_event(CONVERSATION_TYPING_OFF)
   rescue StandardError => e
     render_could_not_create_error(e.message)
   end
@@ -76,5 +80,12 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   def ensure_api_inbox
     # Only API inboxes can update messages
     render json: { error: 'Message status update is only allowed for API inboxes' }, status: :forbidden unless @conversation.inbox.api?
+  end
+
+  def trigger_typing_event(event)
+    user = Current.user || @resource
+    return unless user.is_a?(User)
+
+    Rails.configuration.dispatcher.dispatch(event, Time.zone.now, conversation: @conversation, user: user, is_private: params[:private])
   end
 end

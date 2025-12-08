@@ -285,6 +285,29 @@ describe Whatsapp::Providers::WhatsappZapiService do
       end
     end
 
+    context 'when message is input_csat' do
+      before do
+        allow(message).to receive(:outgoing_content).and_return('Please rate us http://example.com/survey')
+        message.content_type = :input_csat
+      end
+
+      it 'sends the message with survey url' do
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers,
+            body: {
+              phone: test_send_phone_number,
+              message: 'Please rate us http://example.com/survey'
+            }.to_json
+          )
+          .to_return(status: 200, body: result_body.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        result = service.send_message("+#{test_send_phone_number}", message)
+
+        expect(result).to eq('msg_123')
+      end
+    end
+
     context 'when message is a text' do
       it 'sends the text message' do
         stub_request(:post, request_path)

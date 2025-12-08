@@ -98,7 +98,6 @@ const setSignature = () => {
 
 const toggleMessageSignature = () => {
   setSignatureFlagForInbox(props.channelType, !sendWithSignature.value);
-  setSignature();
 };
 
 // Added this watch to dynamically set signature on target inbox change.

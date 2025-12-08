@@ -17,7 +17,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       send_reaction_message(phone, message, **params)
     elsif message.attachments.present?
       handle_message_with_attachment(message, phone, **params)
-    elsif message.content.present?
+    elsif message.outgoing_content.present?
       send_text_message(phone, message, **params)
     else
       message.update!(is_unsupported: true)
@@ -134,7 +134,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       headers: api_headers,
       body: {
         phone: phone,
-        message: message.content,
+        message: message.outgoing_content,
         **params
       }.compact.to_json
     )
@@ -188,7 +188,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       body: {
         phone: phone,
         image: buffer,
-        caption: message.content,
+        caption: message.outgoing_content,
         **params
       }.compact.to_json
     )
@@ -229,7 +229,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
         phone: phone,
         document: buffer,
         fileName: attachment.file.filename.to_s,
-        caption: message.content,
+        caption: message.outgoing_content,
         **params
       }.compact.to_json
     )
@@ -246,7 +246,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       body: {
         phone: phone,
         video: buffer,
-        caption: message.content,
+        caption: message.outgoing_content,
         **params
       }.compact.to_json
     )
@@ -262,7 +262,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       headers: api_headers,
       body: {
         phone: phone,
-        reaction: message.content,
+        reaction: message.outgoing_content,
         messageId: message.in_reply_to_external_id,
         **params
       }.compact.to_json

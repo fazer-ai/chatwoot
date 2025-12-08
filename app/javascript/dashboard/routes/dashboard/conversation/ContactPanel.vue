@@ -22,7 +22,6 @@ import SidebarActionsHeader from 'dashboard/components-next/SidebarActionsHeader
 import LinearIssuesList from 'dashboard/components/widgets/conversation/linear/IssuesList.vue';
 import LinearSetupCTA from 'dashboard/components/widgets/conversation/linear/LinearSetupCTA.vue';
 import KanbanConversationPanel from 'kanban/components/KanbanConversationPanel.vue';
-import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
 const props = defineProps({
   conversationId: {
@@ -45,12 +44,6 @@ const {
 const dragging = ref(false);
 const conversationSidebarItems = ref([]);
 
-const currentAccountId = useMapGetter('getCurrentAccountId');
-
-const isFeatureEnabledonAccount = useMapGetter(
-  'accounts/isFeatureEnabledonAccount'
-);
-
 const shopifyIntegration = useFunctionGetter(
   'integrations/getIntegration',
   'shopify'
@@ -67,11 +60,6 @@ const linearIntegration = useFunctionGetter(
 
 const isLinearIntegrationEnabled = computed(
   () => linearIntegration.value?.enabled || false
-);
-
-const isLinearFeatureEnabled = isFeatureEnabledonAccount.value(
-  currentAccountId.value,
-  FEATURE_FLAGS.LINEAR
 );
 
 const store = useStore();
@@ -138,7 +126,7 @@ onMounted(() => {
       @close="closeContactPanel"
     />
     <ContactInfo :contact="contact" :channel-type="channelType" />
-    <div class="pb-8 list-group px-2">
+    <div class="px-2 pb-8 list-group">
       <Draggable
         :list="conversationSidebarItems"
         animation="200"
@@ -267,11 +255,7 @@ onMounted(() => {
               <MacrosList :conversation-id="conversationId" />
             </AccordionItem>
           </woot-feature-toggle>
-          <div
-            v-else-if="
-              element.name === 'linear_issues' && isLinearFeatureEnabled
-            "
-          >
+          <div v-else-if="element.name === 'linear_issues'">
             <AccordionItem
               :title="$t('CONVERSATION_SIDEBAR.ACCORDION.LINEAR_ISSUES')"
               :is-open="isContactSidebarItemOpen('is_linear_issues_open')"
