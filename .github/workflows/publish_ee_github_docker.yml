@@ -78,8 +78,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
           tags: |
-            ${{ env.GITHUB_REPO }}:${{ env.SANITIZED_REF }}-ee
-            ${{ env.GITHUB_REPO }}:latest-ee
+            ${{ env.GITHUB_REPO }}:${{ env.SANITIZED_REF }}
+            ${{ env.GITHUB_REPO }}:latest
 
       - name: Export digest
         run: |
@@ -124,8 +124,8 @@ jobs:
         run: |
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
           docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:${SANITIZED_REF}-ee \
-            -t ghcr.io/${{ github.repository }}:latest-ee \
+            -t ghcr.io/${{ github.repository }}:${SANITIZED_REF} \
+            -t ghcr.io/${{ github.repository }}:latest \
             $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
 
       - name: Inspect image
@@ -134,5 +134,5 @@ jobs:
         run: |
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
           REPO="ghcr.io/${{ github.repository }}"
-          docker buildx imagetools inspect ${REPO}:${SANITIZED_REF}-ee
-          docker buildx imagetools inspect ${REPO}:latest-ee
+          docker buildx imagetools inspect ${REPO}:${SANITIZED_REF}
+          docker buildx imagetools inspect ${REPO}:latest
