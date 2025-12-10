@@ -20,8 +20,8 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-latest
-          - platform: linux/arm64
-            runner: ubuntu-22.04-arm
+          # - platform: linux/arm64
+          #   runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     env:
       GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
