@@ -194,37 +194,55 @@ describe Whatsapp::Providers::WhatsappZapiService do
   end
 
   describe '#read_messages' do
-    let(:messages) { [create(:message), message] }
+    let(:first_message) { create(:message, source_id: 'msg_first') }
+    let(:second_message) { create(:message, source_id: 'msg_second') }
+    let(:messages) { [first_message, second_message] }
+
+    it 'enqueues a job for each message' do
+      service.read_messages(messages, recipient_id: "+#{test_send_phone_number}")
+
+      expect(Channels::Whatsapp::ZapiReadMessageJob).to have_been_enqueued.with(whatsapp_channel, test_send_phone_number, first_message.source_id)
+      expect(Channels::Whatsapp::ZapiReadMessageJob).to have_been_enqueued.with(whatsapp_channel, test_send_phone_number, second_message.source_id)
+    end
+
+    it 'returns true' do
+      result = service.read_messages(messages, recipient_id: "+#{test_send_phone_number}")
+
+      expect(result).to be(true)
+    end
+  end
+
+  describe '#send_read_message' do
+    let(:phone) { test_send_phone_number }
+    let(:message_source_id) { 'msg_123' }
 
     context 'when response is successful' do
-      it 'marks messages as read by referencing last message id' do
+      it 'sends a read message request to Z-API' do
         stub_request(:post, "#{api_instance_path_with_token}/read-message")
           .with(
             headers: stub_headers,
-            body: {
-              phone: test_send_phone_number,
-              messageId: message.source_id
-            }.to_json
+            body: { phone: phone, messageId: message_source_id }.to_json
           )
           .to_return(status: 200)
 
-        result = service.read_messages(messages, recipient_id: "+#{test_send_phone_number}")
+        result = service.send_read_message(phone, message_source_id)
 
         expect(result).to be(true)
       end
     end
 
     context 'when response is unsuccessful' do
-      it 'raises ProviderUnavailableError' do
+      it 'logs the error and returns false' do
         stub_request(:post, "#{api_instance_path_with_token}/read-message")
           .with(headers: stub_headers)
-          .to_return(status: 400, body: 'error message', headers: {})
+          .to_return(status: 400, body: 'error message')
 
         allow(Rails.logger).to receive(:error)
 
-        expect do
-          service.read_messages(messages, recipient_id: "+#{test_send_phone_number}")
-        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+        result = service.send_read_message(phone, message_source_id)
+
+        expect(result).to be(false)
+        expect(Rails.logger).to have_received(:error).with('error message')
       end
     end
   end
