@@ -79,7 +79,19 @@ class DashboardController < ActionController::Base
       IS_ENTERPRISE: ChatwootApp.enterprise?,
       AZURE_APP_ID: GlobalConfigService.load('AZURE_APP_ID', ''),
       GIT_SHA: GIT_HASH,
-      ALLOWED_LOGIN_METHODS: allowed_login_methods
+      ALLOWED_LOGIN_METHODS: allowed_login_methods,
+      FAZER_AI_SUBSCRIPTION: fazer_ai_subscription_info
+    }
+  end
+
+  def fazer_ai_subscription_info
+    return {} unless ChatwootApp.fazer_ai?
+
+    {
+      status: FazerAiHub.subscription_status,
+      billing_url: FazerAiHub.billing_url,
+      cancel_at_period_end: FazerAiHub.subscription_canceling?,
+      current_period_end: FazerAiHub.subscription_period_end
     }
   end
 

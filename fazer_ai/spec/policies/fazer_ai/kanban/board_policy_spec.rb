@@ -13,7 +13,7 @@ RSpec.describe FazerAi::Kanban::BoardPolicy, type: :policy do
   let(:agent_context) { { user: agent, account: account, account_user: account.account_users.find_by!(user: agent) } }
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
     create(:kanban_board_agent, board: board, agent: agent)
   end
 

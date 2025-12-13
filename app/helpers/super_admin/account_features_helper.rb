@@ -7,6 +7,10 @@ module SuperAdmin::AccountFeaturesHelper
     account_features.filter { |feature| feature['premium'] }.pluck('name')
   end
 
+  def self.account_fazer_ai_features
+    account_features.filter { |feature| feature['fazer_ai'] }.pluck('name')
+  end
+
   # Returns a hash mapping feature names to their display names
   def self.feature_display_names
     account_features.each_with_object({}) do |feature, hash|
@@ -26,6 +30,13 @@ module SuperAdmin::AccountFeaturesHelper
     features.except(*deprecated_features)
   end
 
+  def self.filter_fazer_ai_features(features)
+    return features if ChatwootApp.fazer_ai?
+
+    fazer_ai_features = account_features.select { |f| f['fazer_ai'] }.pluck('name')
+    features.except(*fazer_ai_features)
+  end
+
   def self.sort_and_transform_features(features, display_names)
     features.sort_by { |key, _| display_names[key] || key }
             .to_h
@@ -35,6 +46,7 @@ module SuperAdmin::AccountFeaturesHelper
   def self.partition_features(features)
     filtered = filter_internal_features(features)
     filtered = filter_deprecated_features(filtered)
+    filtered = filter_fazer_ai_features(filtered)
     display_names = feature_display_names
 
     regular, premium = filtered.partition { |key, _value| account_premium_features.exclude?(key) }
@@ -42,6 +54,24 @@ module SuperAdmin::AccountFeaturesHelper
     [
       sort_and_transform_features(regular, display_names),
       sort_and_transform_features(premium, display_names)
+    ]
+  end
+
+  def self.partition_features_with_fazer_ai(features)
+    filtered = filter_internal_features(features)
+    filtered = filter_deprecated_features(filtered)
+    display_names = feature_display_names
+
+    fazer_ai_feature_names = account_fazer_ai_features
+    premium_feature_names = account_premium_features
+
+    fazer_ai, rest = filtered.partition { |key, _value| fazer_ai_feature_names.include?(key) }
+    regular, premium = rest.partition { |key, _value| premium_feature_names.exclude?(key) }
+
+    [
+      sort_and_transform_features(regular, display_names),
+      sort_and_transform_features(premium, display_names),
+      sort_and_transform_features(fazer_ai, display_names)
     ]
   end
 

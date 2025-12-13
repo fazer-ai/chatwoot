@@ -101,7 +101,7 @@ unless Rails.env.production?
 
   CannedResponse.create!(account: account, short_code: 'start', content: 'Hello welcome to chatwoot.')
 
-  account.enable_features('kanban_module')
+  account.enable_features('kanban')
 
   agent_user = User.find_or_initialize_by(email: 'agent@acme.inc') do |record|
     record.name = 'Mia Agent'

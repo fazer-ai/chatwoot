@@ -248,5 +248,17 @@
   "COMMON": {
     "OR": "Ou",
     "CLICK_HERE": "clique aqui"
+  },
+  "FAZER_AI": {
+    "SUBSCRIPTION_PAST_DUE": {
+      "ADMIN_MESSAGE": "O pagamento da sua assinatura fazer.ai está atrasado. Os recursos podem ser desativados em breve. Entre em contato com seu gerente de conta.",
+      "SUPERADMIN_MESSAGE": "O pagamento da sua assinatura fazer.ai está atrasado. Os recursos podem ser desativados em breve.",
+      "OPEN_BILLING": "Gerenciar Assinatura"
+    },
+    "SUBSCRIPTION_CANCELING": {
+      "ADMIN_MESSAGE": "Sua assinatura fazer.ai está programada para cancelamento em {date}. Os recursos deixarão de funcionar após essa data. Entre em contato com seu gerente de conta.",
+      "SUPERADMIN_MESSAGE": "Sua assinatura fazer.ai está programada para cancelamento em {date}. Os recursos deixarão de funcionar após essa data.",
+      "OPEN_BILLING": "Gerenciar Assinatura"
+    }
   }
 }

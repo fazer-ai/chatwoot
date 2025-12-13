@@ -24,6 +24,7 @@ const {
   WIDGET_BRAND_URL: widgetBrandURL,
   DISABLE_USER_PROFILE_UPDATE: disableUserProfileUpdate,
   DEPLOYMENT_ENV: deploymentEnv,
+  FAZER_AI_SUBSCRIPTION: fazerAiSubscription,
 } = window.globalConfig || {};
 
 const state = {
@@ -49,6 +50,7 @@ const state = {
   termsURL,
   widgetBrandURL,
   isEnterprise: parseBoolean(isEnterprise),
+  fazerAiSubscription: fazerAiSubscription || {},
 };
 
 export const getters = {
@@ -56,6 +58,11 @@ export const getters = {
   isOnChatwootCloud: $state => $state.deploymentEnv === 'cloud',
   isACustomBrandedInstance: $state => $state.installationName !== 'Chatwoot',
   isAChatwootInstance: $state => $state.installationName === 'Chatwoot',
+  getFazerAiSubscription: $state => $state.fazerAiSubscription,
+  isFazerAiSubscriptionPastDue: $state =>
+    $state.fazerAiSubscription?.status === 'past_due',
+  isFazerAiSubscriptionCanceling: $state =>
+    $state.fazerAiSubscription?.cancel_at_period_end === true,
 };
 
 export const actions = {};

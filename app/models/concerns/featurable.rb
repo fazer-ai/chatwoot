@@ -12,6 +12,13 @@ module Featurable
     result[result.keys.size + 1] = "feature_#{feature['name']}".to_sym
   end
 
+  def self.feature_flag_value(feature_name)
+    feature_index = FEATURE_LIST.index { |f| f['name'] == feature_name }
+    return 0 if feature_index.nil?
+
+    2**feature_index
+  end
+
   included do
     include FlagShihTzu
     has_flags FEATURES.merge(column: 'feature_flags').merge(QUERY_MODE)

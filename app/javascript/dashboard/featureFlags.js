@@ -42,7 +42,7 @@ export const FEATURE_FLAGS = {
   SAML: 'saml',
   QUOTED_EMAIL_REPLY: 'quoted_email_reply',
   COMPANIES: 'companies',
-  KANBAN_MODULE: 'kanban_module',
+  KANBAN: 'kanban',
 };
 
 export const PREMIUM_FEATURES = [

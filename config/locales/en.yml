@@ -84,6 +84,9 @@ en:
       failed: Signup failed
     assignment_policy:
       not_found: Assignment policy not found
+    fazer_ai:
+      hub_not_synced: 'fazer.ai subscription data has not been synced. Please ensure the instance is registered and the hub is accessible.'
+      kanban_account_limit_reached: 'Kanban account limit reached (%{limit} accounts). Please upgrade your subscription to enable this feature for more accounts.'
     saml:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation

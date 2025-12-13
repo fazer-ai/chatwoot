@@ -12,6 +12,11 @@ class SuperAdmin::ApplicationController < Administrate::ApplicationController
   helper_method :render_vue_component, :settings_open?, :settings_pages
   # authenticiation done via devise : SuperAdmin Model
   before_action :authenticate_super_admin!
+  before_action :reset_current_thread_variables
+
+  def reset_current_thread_variables
+    Current.reset
+  end
 
   # Override this value to specify the number of elements to display at a time
   # on index pages. Defaults to 20.

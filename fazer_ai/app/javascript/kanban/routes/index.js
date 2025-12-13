@@ -11,7 +11,7 @@ export const routes = [
     name: 'kanban_list',
     meta: {
       permissions: ['administrator', 'agent'],
-      featureFlag: FEATURE_FLAGS.KANBAN_MODULE,
+      featureFlag: FEATURE_FLAGS.KANBAN,
     },
   },
   {
@@ -20,7 +20,7 @@ export const routes = [
     name: 'kanban_board_settings',
     meta: {
       permissions: ['administrator', 'agent'],
-      featureFlag: FEATURE_FLAGS.KANBAN_MODULE,
+      featureFlag: FEATURE_FLAGS.KANBAN,
     },
   },
   {
@@ -29,7 +29,7 @@ export const routes = [
     name: 'kanban_board_show',
     meta: {
       permissions: ['administrator', 'agent'],
-      featureFlag: FEATURE_FLAGS.KANBAN_MODULE,
+      featureFlag: FEATURE_FLAGS.KANBAN,
     },
     children: [
       {
@@ -38,7 +38,7 @@ export const routes = [
         component: KanbanBoardPage,
         meta: {
           permissions: ['administrator', 'agent'],
-          featureFlag: FEATURE_FLAGS.KANBAN_MODULE,
+          featureFlag: FEATURE_FLAGS.KANBAN,
         },
       },
       {
@@ -47,7 +47,7 @@ export const routes = [
         component: KanbanBoardPage,
         meta: {
           permissions: ['administrator', 'agent'],
-          featureFlag: FEATURE_FLAGS.KANBAN_MODULE,
+          featureFlag: FEATURE_FLAGS.KANBAN,
         },
       },
     ],

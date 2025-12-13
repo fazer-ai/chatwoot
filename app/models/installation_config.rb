@@ -15,6 +15,11 @@
 #  index_installation_configs_on_name_and_created_at  (name,created_at) UNIQUE
 #
 class InstallationConfig < ApplicationRecord
+  PROTECTED_SUBSCRIPTION_KEYS = %w[
+    FAZER_AI_SUBSCRIPTION_TOKEN
+    FAZER_AI_SUBSCRIPTION_VERIFIED_AT
+  ].freeze
+
   # https://stackoverflow.com/questions/72970170/upgrading-to-rails-6-1-6-1-causes-psychdisallowedclass-tried-to-load-unspecif
   # https://discuss.rubyonrails.org/t/cve-2022-32224-possible-rce-escalation-bug-with-serialized-columns-in-active-record/81017
   # FIX ME : fixes breakage of installation config. we need to migrate.
@@ -24,6 +29,7 @@ class InstallationConfig < ApplicationRecord
   before_validation :set_lock
   validates :name, presence: true
   validate :saml_sso_users_check, if: -> { name == 'ENABLE_SAML_SSO_LOGIN' }
+  validate :protected_subscription_key_check
 
   # TODO: Get rid of default scope
   # https://stackoverflow.com/a/1834250/939299
@@ -46,6 +52,10 @@ class InstallationConfig < ApplicationRecord
     }.with_indifferent_access
   end
 
+  def self.protected_subscription_key?(key_name)
+    PROTECTED_SUBSCRIPTION_KEYS.include?(key_name)
+  end
+
   private
 
   def set_lock
@@ -61,5 +71,13 @@ class InstallationConfig < ApplicationRecord
     return unless User.exists?(provider: 'saml')
 
     errors.add(:base, 'Cannot disable SAML SSO login while users are using SAML authentication')
+  end
+
+  def protected_subscription_key_check
+    return unless PROTECTED_SUBSCRIPTION_KEYS.include?(name)
+    return if Current.fazer_ai_trusted_subscription_update
+
+    errors.add(:base, 'Protected subscription configuration cannot be modified directly')
+    Rails.logger.warn("[SECURITY] Blocked modification of protected config '#{name}'")
   end
 end

@@ -14,7 +14,7 @@ RSpec.describe FazerAi::Kanban::AccountUserPreferencePolicy, type: :policy do
   let(:other_agent_context) { { user: other_agent, account: account, account_user: account.account_users.find_by!(user: other_agent) } }
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
   end
 
   permissions :update? do
@@ -66,7 +66,7 @@ RSpec.describe FazerAi::Kanban::AccountUserPreferencePolicy, type: :policy do
 
     context 'when feature is disabled' do
       before do
-        account.disable_features('kanban_module')
+        account.disable_features('kanban')
       end
 
       it 'denies admin' do

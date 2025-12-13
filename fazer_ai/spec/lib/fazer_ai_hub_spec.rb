@@ -1,0 +1,307 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+RSpec.describe FazerAiHub do
+  include FazerAi::SubscriptionTokenTestHelper
+
+  after do
+    Current.fazer_ai_subscription_data = nil
+  end
+
+  def setup_valid_subscription(status: 'active', feature_list: ['chatwoot_kanban'], kanban_limit: 5)
+    Current.fazer_ai_subscription_data = nil
+
+    features = feature_list.index_with { {} }
+    features['chatwoot_kanban'] = { 'account_limit' => kanban_limit } if feature_list.include?('chatwoot_kanban')
+
+    token = generate_test_subscription_token(
+      status: status,
+      features: features
+    )
+    Current.set(fazer_ai_trusted_subscription_update: true) do
+      create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: token)
+      create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: Time.current.iso8601)
+    end
+  end
+
+  describe '.installation_identifier' do
+    it 'delegates to ChatwootHub' do
+      expect(described_class.installation_identifier).to eq(ChatwootHub.installation_identifier)
+    end
+  end
+
+  describe '.billing_url' do
+    it 'returns the billing URL with installation identifier' do
+      identifier = described_class.installation_identifier
+      expect(described_class.billing_url).to eq("#{described_class::BILLING_URL}?installation_identifier=#{identifier}")
+    end
+  end
+
+  describe '.subscription_status' do
+    context 'when valid token exists and is recently verified' do
+      before { setup_valid_subscription(status: 'active') }
+
+      it 'returns the status from token' do
+        expect(described_class.subscription_status).to eq('active')
+      end
+    end
+
+    context 'when no token exists' do
+      it 'returns inactive as default' do
+        expect(described_class.subscription_status).to eq('inactive')
+      end
+    end
+
+    context 'when token exists but verification is stale' do
+      before do
+        token = generate_test_subscription_token(status: 'active')
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: token)
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
+        end
+      end
+
+      it 'returns inactive' do
+        expect(described_class.subscription_status).to eq('inactive')
+      end
+    end
+  end
+
+  describe '.kanban_account_limit' do
+    context 'when valid token exists' do
+      before { setup_valid_subscription(kanban_limit: 5) }
+
+      it 'returns the limit as integer' do
+        expect(described_class.kanban_account_limit).to eq(5)
+      end
+    end
+
+    context 'when no valid token exists' do
+      it 'returns 0' do
+        expect(described_class.kanban_account_limit).to eq(0)
+      end
+    end
+  end
+
+  describe '.enabled_features' do
+    context 'when valid token exists with features' do
+      before { setup_valid_subscription(feature_list: %w[chatwoot_kanban other_feature]) }
+
+      it 'returns the features array' do
+        expect(described_class.enabled_features).to contain_exactly('chatwoot_kanban', 'other_feature')
+      end
+    end
+
+    context 'when no valid token exists' do
+      it 'returns empty array' do
+        expect(described_class.enabled_features).to eq([])
+      end
+    end
+  end
+
+  describe '.feature_enabled?' do
+    before { setup_valid_subscription(feature_list: %w[chatwoot_kanban]) }
+
+    it 'returns true for enabled feature' do
+      expect(described_class.feature_enabled?('chatwoot_kanban')).to be(true)
+    end
+
+    it 'returns false for disabled feature' do
+      expect(described_class.feature_enabled?('other_feature')).to be(false)
+    end
+  end
+
+  describe '.subscription_active?' do
+    it 'returns true for active status with valid token' do
+      setup_valid_subscription(status: 'active')
+      expect(described_class.subscription_active?).to be(true)
+    end
+
+    it 'returns true for past_due status with valid token' do
+      setup_valid_subscription(status: 'past_due')
+      expect(described_class.subscription_active?).to be(true)
+    end
+
+    it 'returns true for trialing status with valid token' do
+      setup_valid_subscription(status: 'trialing')
+      expect(described_class.subscription_active?).to be(true)
+    end
+
+    it 'returns false for inactive status' do
+      setup_valid_subscription(status: 'inactive')
+      expect(described_class.subscription_active?).to be(false)
+    end
+
+    it 'returns false for canceled status' do
+      setup_valid_subscription(status: 'canceled')
+      expect(described_class.subscription_active?).to be(false)
+    end
+
+    it 'returns false when no valid token exists' do
+      expect(described_class.subscription_active?).to be(false)
+    end
+  end
+
+  describe '.subscription_past_due?' do
+    it 'returns true when status is past_due' do
+      setup_valid_subscription(status: 'past_due')
+      expect(described_class.subscription_past_due?).to be(true)
+    end
+
+    it 'returns false when status is not past_due' do
+      setup_valid_subscription(status: 'active')
+      expect(described_class.subscription_past_due?).to be(false)
+    end
+  end
+
+  describe '.instance_config' do
+    it 'returns instance configuration hash' do
+      config = described_class.instance_config
+
+      expect(config).to include(
+        installation_identifier: described_class.installation_identifier,
+        installation_version: Chatwoot.config[:version]
+      )
+      expect(config).to have_key(:installation_host)
+      expect(config).to have_key(:feature_usage)
+    end
+  end
+
+  describe '.feature_usage' do
+    it 'returns feature usage with kanban account count' do
+      usage = described_class.feature_usage
+
+      expect(usage).to eq({
+                            chatwoot_kanban: {
+                              account_limit: 0
+                            }
+                          })
+    end
+
+    context 'when accounts have kanban enabled' do
+      before do
+        setup_valid_subscription
+        create(:account).enable_features!('kanban')
+        create(:account).enable_features!('kanban')
+        create(:account) # no kanban
+      end
+
+      it 'returns the correct count' do
+        usage = described_class.feature_usage
+
+        expect(usage[:chatwoot_kanban][:account_limit]).to eq(2)
+      end
+    end
+  end
+
+  describe '.kanban_enabled_accounts_count' do
+    it 'returns 0 when no accounts have kanban enabled' do
+      expect(described_class.kanban_enabled_accounts_count).to eq(0)
+    end
+
+    context 'when accounts have kanban enabled' do
+      before do
+        setup_valid_subscription
+        create(:account).enable_features!('kanban')
+        create(:account).enable_features!('kanban')
+        create(:account) # no kanban
+      end
+
+      it 'returns the count of accounts with kanban enabled' do
+        expect(described_class.kanban_enabled_accounts_count).to eq(2)
+      end
+    end
+  end
+
+  describe '.sync_subscription' do
+    let(:hub_response) do
+      {
+        'version' => '4.0.0',
+        'subscription_token' => generate_test_subscription_token
+      }
+    end
+
+    context 'when request is successful' do
+      before do
+        stub_request(:post, described_class::PING_URL)
+          .to_return(
+            status: 200,
+            body: hub_response.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+      end
+
+      it 'returns parsed response' do
+        result = described_class.sync_subscription
+
+        expect(result).to include('version' => '4.0.0')
+        expect(result).to have_key('subscription_token')
+      end
+    end
+
+    context 'when request fails' do
+      before do
+        stub_request(:post, described_class::PING_URL)
+          .to_return(status: 500)
+      end
+
+      it 'returns nil' do
+        expect(described_class.sync_subscription).to be_nil
+      end
+    end
+
+    context 'when request raises error' do
+      before do
+        stub_request(:post, described_class::PING_URL)
+          .to_raise(StandardError.new('Connection failed'))
+        allow(Rails.logger).to receive(:error)
+      end
+
+      it 'returns nil and logs error' do
+        expect(described_class.sync_subscription).to be_nil
+        expect(Rails.logger).to have_received(:error).with('[fazer.ai] Hub sync error: Connection failed')
+      end
+    end
+  end
+
+  describe '.synced?' do
+    it 'returns true when token exists and was recently verified' do
+      setup_valid_subscription
+      expect(described_class.synced?).to be(true)
+    end
+
+    it 'returns false when no token exists' do
+      expect(described_class.synced?).to be(false)
+    end
+
+    it 'returns false when verification is stale' do
+      token = generate_test_subscription_token
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: token)
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
+      end
+      expect(described_class.synced?).to be(false)
+    end
+  end
+
+  describe '.subscription_verified_recently?' do
+    it 'returns true when verified within token validity window' do
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 1.hour.ago.iso8601)
+      end
+      expect(described_class.subscription_verified_recently?).to be(true)
+    end
+
+    it 'returns false when verification is stale' do
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
+      end
+      expect(described_class.subscription_verified_recently?).to be(false)
+    end
+
+    it 'returns false when no verification timestamp exists' do
+      expect(described_class.subscription_verified_recently?).to be(false)
+    end
+  end
+end

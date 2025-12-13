@@ -22,7 +22,7 @@ RSpec.describe FazerAi::Kanban::AuditLogger do
   let(:occurred_at) { Time.zone.parse('2024-10-01 09:15:00 UTC') }
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
   end
 
   it 'persists an audit event with sanitized metadata and actor' do # rubocop:disable RSpec/MultipleExpectations
@@ -39,7 +39,7 @@ RSpec.describe FazerAi::Kanban::AuditLogger do
   end
 
   it 'skips logging when the kanban feature is disabled' do
-    account.disable_features('kanban_module')
+    account.disable_features('kanban')
 
     expect { log_event }.not_to change(FazerAi::Kanban::AuditEvent, :count)
   end

@@ -8,7 +8,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::AccountUserPreferences' do
   let(:agent) { create(:user, account: account) }
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
   end
 
   describe 'PUT /api/v1/accounts/{account.id}/kanban/account_user_preferences' do
@@ -115,7 +115,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::AccountUserPreferences' do
 
     context 'when feature is disabled' do
       before do
-        account.disable_features('kanban_module')
+        account.disable_features('kanban')
       end
 
       it 'returns not found' do

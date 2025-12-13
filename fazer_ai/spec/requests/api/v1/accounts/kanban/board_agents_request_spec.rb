@@ -11,7 +11,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::BoardAgents' do
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/boards/#{board.id}/agents" }
   let(:json_headers) { headers.merge('Content-Type' => 'application/json') }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   describe 'GET /api/v1/accounts/:account_id/kanban/boards/:board_id/agents' do
     it 'returns agents scoped to the board' do

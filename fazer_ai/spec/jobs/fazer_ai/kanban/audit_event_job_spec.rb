@@ -24,7 +24,7 @@ RSpec.describe FazerAi::Kanban::AuditEventJob do
   let(:performed_by_id) { actor.id }
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
   end
 
   it 'delegates to the audit logger with resolved records' do
@@ -59,7 +59,7 @@ RSpec.describe FazerAi::Kanban::AuditEventJob do
   end
 
   it 'skips logging when the kanban feature is disabled for the account' do
-    account.disable_features('kanban_module')
+    account.disable_features('kanban')
 
     expect(FazerAi::Kanban::AuditLogger).not_to receive(:log)
 
@@ -68,7 +68,7 @@ RSpec.describe FazerAi::Kanban::AuditEventJob do
 
   it 'silently drops the job if the task is not in the account' do
     other_account = create(:account)
-    other_account.enable_features('kanban_module')
+    other_account.enable_features('kanban')
 
     expect(FazerAi::Kanban::AuditLogger).not_to receive(:log)
 

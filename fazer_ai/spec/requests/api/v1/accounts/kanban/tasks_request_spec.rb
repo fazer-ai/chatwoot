@@ -12,7 +12,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
   let(:board_step) { create(:kanban_board_step, board: board) }
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/tasks" }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   def admin_preference
     admin.account_users.find_by(account_id: account.id).kanban_preference

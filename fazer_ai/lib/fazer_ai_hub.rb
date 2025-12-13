@@ -1,0 +1,172 @@
+# frozen_string_literal: true
+
+class FazerAiHub
+  BASE_URL = ENV.fetch('FAZER_AI_HUB_URL', 'https://app.fazer.ai')
+  PING_URL = "#{BASE_URL}/ping".freeze
+  BILLING_URL = "#{BASE_URL}/billing".freeze
+
+  class << self
+    def installation_identifier
+      ChatwootHub.installation_identifier
+    end
+
+    def billing_url
+      "#{BILLING_URL}?installation_identifier=#{installation_identifier}"
+    end
+
+    def subscription_status
+      return 'inactive' unless subscription_token_valid?
+
+      cached_subscription_data[:status] || 'inactive'
+    end
+
+    def kanban_account_limit
+      return 0 unless subscription_token_valid?
+
+      feature_limit('chatwoot_kanban', 'account_limit')
+    end
+
+    def feature_limit(feature_name, limit_key)
+      feature_config = features.with_indifferent_access[feature_name]
+      return 0 unless feature_config.is_a?(Hash)
+
+      feature_config.with_indifferent_access[limit_key].to_i
+    end
+
+    def instance_type
+      return nil unless subscription_token_valid?
+
+      cached_subscription_data[:instance_type]
+    end
+
+    def enabled_features
+      return [] unless subscription_token_valid?
+
+      features.keys
+    end
+
+    def features
+      return {} unless subscription_token_valid?
+
+      cached_subscription_data[:features] || {}
+    end
+
+    def feature_enabled?(feature_name)
+      enabled_features.include?(feature_name)
+    end
+
+    def synced?
+      subscription_token.present? && subscription_verified_recently?
+    end
+
+    def subscription_active?
+      return false unless subscription_token_valid?
+
+      %w[active past_due trialing].include?(subscription_status)
+    end
+
+    def subscription_past_due?
+      subscription_status == 'past_due'
+    end
+
+    def subscription_canceling?
+      return false unless subscription_token_valid?
+
+      cached_subscription_data[:cancel_at_period_end] == true
+    end
+
+    def subscription_period_end
+      return nil unless subscription_token_valid?
+
+      cached_subscription_data[:current_period_end]
+    end
+
+    def instance_config
+      {
+        installation_identifier: installation_identifier,
+        installation_version: Chatwoot.config[:version],
+        installation_host: URI.parse(ENV.fetch('FRONTEND_URL', '')).host,
+        instance_type: 'chatwoot',
+        feature_usage: feature_usage
+      }
+    end
+
+    def feature_usage
+      {
+        chatwoot_kanban: {
+          account_limit: kanban_enabled_accounts_count
+        }
+      }
+    end
+
+    def kanban_enabled_accounts_count
+      Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).count
+    end
+
+    def sync_subscription
+      response = HTTParty.post(
+        PING_URL,
+        body: instance_config.to_json,
+        headers: { 'Content-Type' => 'application/json', 'Accept' => 'application/json' },
+        timeout: 10
+      )
+
+      return nil unless response.success?
+
+      JSON.parse(response.body)
+    rescue StandardError => e
+      Rails.logger.error "[fazer.ai] Hub sync error: #{e.message}"
+      nil
+    end
+
+    def subscription_verified_recently?
+      verified_at = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT')&.value
+      FazerAi::SubscriptionToken.verified_recently?(verified_at)
+    end
+
+    def subscription_token
+      InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN')&.value
+    end
+
+    def subscription_token_valid?
+      return false unless subscription_verified_recently?
+
+      token = subscription_token
+      return false if token.blank?
+
+      verify_subscription_token(token).present?
+    end
+
+    def verify_subscription_token(token)
+      FazerAi::SubscriptionToken.verify(token)
+    end
+
+    def clear_cache!
+      Current.fazer_ai_subscription_data = nil
+    end
+
+    private
+
+    def cached_subscription_data
+      return Current.fazer_ai_subscription_data if Current.fazer_ai_subscription_data.present?
+
+      Current.fazer_ai_subscription_data = build_subscription_data
+    end
+
+    def build_subscription_data
+      token = subscription_token
+      return {} if token.blank?
+
+      payload = verify_subscription_token(token)
+      return {} if payload.blank?
+
+      {
+        status: payload['status'],
+        instance_type: payload['instance_type'],
+        features: payload['features'] || {},
+        cancel_at_period_end: payload['cancel_at_period_end'] || false,
+        current_period_end: payload['current_period_end']
+      }
+    end
+  end
+end

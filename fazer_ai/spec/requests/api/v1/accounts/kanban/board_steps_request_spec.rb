@@ -9,7 +9,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::BoardSteps' do
   let(:board) { create(:kanban_board, account: account) }
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/boards/#{board.id}/steps" }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   describe 'GET /api/v1/accounts/:account_id/kanban/boards/:board_id/steps' do
     it 'returns ordered steps for the board' do

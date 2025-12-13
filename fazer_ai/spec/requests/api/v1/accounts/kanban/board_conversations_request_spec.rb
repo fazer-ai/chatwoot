@@ -10,7 +10,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::BoardConversations' do
   let(:inbox) { create(:inbox, account: account) }
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/boards/#{board.id}/conversations" }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   describe 'GET /api/v1/accounts/:account_id/kanban/boards/:board_id/conversations' do
     context 'when board has no assigned inboxes' do

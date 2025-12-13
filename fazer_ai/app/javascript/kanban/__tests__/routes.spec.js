@@ -9,10 +9,10 @@ describe('Kanban routes', () => {
     const boardRoute = routes.find(r => r.name === 'kanban_board_show');
 
     expect(overviewRoute).toBeDefined();
-    expect(overviewRoute.meta.featureFlag).toBe(FEATURE_FLAGS.KANBAN_MODULE);
+    expect(overviewRoute.meta.featureFlag).toBe(FEATURE_FLAGS.KANBAN);
 
     expect(boardRoute).toBeDefined();
-    expect(boardRoute.meta.featureFlag).toBe(FEATURE_FLAGS.KANBAN_MODULE);
+    expect(boardRoute.meta.featureFlag).toBe(FEATURE_FLAGS.KANBAN);
     expect(boardRoute.path).toBe(
       frontendURL('accounts/:accountId/kanban/:boardId?')
     );

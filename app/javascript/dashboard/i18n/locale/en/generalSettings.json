@@ -248,5 +248,17 @@
   "COMMON": {
     "OR": "Or",
     "CLICK_HERE": "click here"
+  },
+  "FAZER_AI": {
+    "SUBSCRIPTION_PAST_DUE": {
+      "ADMIN_MESSAGE": "Your fazer.ai subscription payment is past due. Features may be disabled soon. Please contact your account manager.",
+      "SUPERADMIN_MESSAGE": "Your fazer.ai subscription payment is past due. Features may be disabled soon.",
+      "OPEN_BILLING": "Manage Subscription"
+    },
+    "SUBSCRIPTION_CANCELING": {
+      "ADMIN_MESSAGE": "Your fazer.ai subscription is set to cancel on {date}. Features will stop working after this date. Please contact your account manager.",
+      "SUPERADMIN_MESSAGE": "Your fazer.ai subscription is set to cancel on {date}. Features will stop working after this date.",
+      "OPEN_BILLING": "Manage Subscription"
+    }
   }
 }

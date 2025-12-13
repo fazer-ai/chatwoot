@@ -8,7 +8,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Boards' do
   let(:headers) { admin.create_new_auth_token }
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/boards" }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   describe 'GET /api/v1/accounts/:account_id/kanban/boards' do
     it 'returns boards scoped to the account' do
@@ -21,7 +21,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Boards' do
     end
 
     it 'returns 404 when the feature flag is disabled' do
-      account.disable_features('kanban_module')
+      account.disable_features('kanban')
 
       get base_path, headers: headers
 

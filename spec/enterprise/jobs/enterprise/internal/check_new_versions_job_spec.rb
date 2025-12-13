@@ -8,13 +8,23 @@ RSpec.describe Internal::CheckNewVersionsJob do
   before do
     allow(Internal::ReconcilePlanConfigService).to receive(:new).and_return(reconsile_premium_config_service)
     allow(reconsile_premium_config_service).to receive(:perform)
-    allow(Rails.env).to receive(:production?).and_return(true)
+
+    if ChatwootApp.fazer_ai?
+      allow(FazerAiHub).to receive(:sync_subscription).and_return(nil)
+      reconcile_service = instance_double(FazerAi::ReconcileSubscriptionService)
+      allow(FazerAi::ReconcileSubscriptionService).to receive(:new).and_return(reconcile_service)
+      allow(reconcile_service).to receive(:perform)
+    end
   end
 
   it 'updates the plan info' do
     data = { 'version' => '1.2.3', 'plan' => 'enterprise', 'plan_quantity' => 1, 'chatwoot_support_website_token' => '123',
              'chatwoot_support_identifier_hash' => '123', 'chatwoot_support_script_url' => '123' }
-    allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
+    if ChatwootApp.fazer_ai?
+      allow(FazerAiHub).to receive(:sync_subscription).and_return(data)
+    else
+      allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
+    end
     job
     expect(InstallationConfig.find_by(name: 'INSTALLATION_PRICING_PLAN').value).to eq 'enterprise'
     expect(InstallationConfig.find_by(name: 'INSTALLATION_PRICING_PLAN_QUANTITY').value).to eq 1
@@ -25,7 +35,11 @@ RSpec.describe Internal::CheckNewVersionsJob do
 
   it 'calls Internal::ReconcilePlanConfigService' do
     data = { 'version' => '1.2.3' }
-    allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
+    if ChatwootApp.fazer_ai?
+      allow(FazerAiHub).to receive(:sync_subscription).and_return(data)
+    else
+      allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
+    end
     job
     expect(reconsile_premium_config_service).to have_received(:perform)
   end

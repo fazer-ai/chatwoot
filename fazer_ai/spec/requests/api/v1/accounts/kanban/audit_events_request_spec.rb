@@ -11,7 +11,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::AuditEvents' do
   let(:task) { create(:kanban_task, account: account, board: board, board_step: board_step, creator: admin) }
   let(:base_path) { "/api/v1/accounts/#{account.id}/kanban/tasks/#{task.id}/audit_events" }
 
-  before { account.enable_features('kanban_module') }
+  before { account.enable_features('kanban') }
 
   describe 'GET /api/v1/accounts/:account_id/kanban/tasks/:task_id/audit_events' do
     it 'returns audit events ordered by recency' do

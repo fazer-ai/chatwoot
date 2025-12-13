@@ -20,7 +20,7 @@ RSpec.describe FazerAi::Kanban::TaskPolicy, type: :policy do
   end
 
   before do
-    account.enable_features('kanban_module')
+    account.enable_features('kanban')
     create(:kanban_board_agent, board: board, agent: agent)
   end
 
