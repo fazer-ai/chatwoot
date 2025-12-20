@@ -162,7 +162,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       return
     end
 
-    base64_data = Base64.strict_encode64(attachment.file.download)
+    base64_data = attachment_to_base64(attachment)
     buffer = "data:#{attachment.file.content_type};base64,#{base64_data}"
 
     case attachment.file_type

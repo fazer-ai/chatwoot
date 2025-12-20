@@ -3,7 +3,6 @@ import { ref, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vue';
-import { MESSAGE_SIGNATURE_EDITOR_MENU_OPTIONS } from 'dashboard/constants/editor';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 const props = defineProps({
@@ -28,7 +27,6 @@ const emit = defineEmits(['updateSignature']);
 const { t } = useI18n();
 const { formatMessage } = useMessageFormatter();
 
-const customEditorMenuList = MESSAGE_SIGNATURE_EDITOR_MENU_OPTIONS;
 const signature = ref(props.messageSignature);
 const signaturePosition = ref(props.signaturePosition);
 const signatureSeparator = ref(props.signatureSeparator);
@@ -195,7 +193,7 @@ const handleSeparatorChange = value => {
       class="message-editor h-[10rem] !px-3"
       is-format-mode
       :placeholder="$t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE.PLACEHOLDER')"
-      :enabled-menu-options="customEditorMenuList"
+      channel-type="Context::MessageSignature"
       :enable-suggestions="false"
       show-image-resize-toolbar
     />

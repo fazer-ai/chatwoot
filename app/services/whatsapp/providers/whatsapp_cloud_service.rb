@@ -64,10 +64,67 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     { 'Authorization' => "Bearer #{whatsapp_channel.provider_config['api_key']}", 'Content-Type' => 'application/json' }
   end
 
+  def create_csat_template(template_config)
+    csat_template_service.create_template(template_config)
+  end
+
+  def delete_csat_template(template_name = nil)
+    template_name ||= Whatsapp::CsatTemplateNameService.csat_template_name(whatsapp_channel.inbox.id)
+    csat_template_service.delete_template(template_name)
+  end
+
+  def get_template_status(template_name)
+    csat_template_service.get_template_status(template_name)
+  end
+
   def media_url(media_id, phone_number_id = nil)
     url = "#{api_base_path}/v13.0/#{media_id}"
     url += "?phone_number_id=#{phone_number_id}" if phone_number_id
     url
+  end
+
+  def toggle_typing_status(typing_status, last_message:, **)
+    return false unless [Events::Types::CONVERSATION_TYPING_ON, Events::Types::CONVERSATION_RECORDING].include?(typing_status)
+
+    response = HTTParty.post(
+      "#{phone_id_path('v23.0')}/messages",
+      headers: api_headers,
+      body: {
+        messaging_product: 'whatsapp',
+        message_id: last_message.source_id,
+        status: 'read',
+        # NOTE: API currently only supports "typing", no "recording" status.
+        typing_indicator: { type: 'text' }
+      }.to_json
+    )
+
+    Rails.logger.error(response.parsed_response) unless response.success?
+
+    response.success?
+  end
+
+  def read_messages(messages, **)
+    # NOTE: Marking the last message as read automatically applies to all previous ones.
+    message = messages.last
+    response = HTTParty.post(
+      "#{phone_id_path('v23.0')}/messages",
+      headers: api_headers,
+      body: {
+        messaging_product: 'whatsapp',
+        message_id: message.source_id,
+        status: 'read'
+      }.to_json
+    )
+
+    Rails.logger.error(response.parsed_response) unless response.success?
+
+    response.success?
+  end
+
+  private
+
+  def csat_template_service
+    @csat_template_service ||= Whatsapp::CsatTemplateService.new(whatsapp_channel)
   end
 
   def api_base_path
@@ -188,44 +245,6 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     )
 
     process_response(response, message)
-  end
-
-  def toggle_typing_status(typing_status, last_message:, **)
-    return false unless [Events::Types::CONVERSATION_TYPING_ON, Events::Types::CONVERSATION_RECORDING].include?(typing_status)
-
-    response = HTTParty.post(
-      "#{phone_id_path('v23.0')}/messages",
-      headers: api_headers,
-      body: {
-        messaging_product: 'whatsapp',
-        message_id: last_message.source_id,
-        status: 'read',
-        # NOTE: API currently only supports "typing", no "recording" status.
-        typing_indicator: { type: 'text' }
-      }.to_json
-    )
-
-    Rails.logger.error(response.parsed_response) unless response.success?
-
-    response.success?
-  end
-
-  def read_messages(messages, **)
-    # NOTE: Marking the last message as read automatically applies to all previous ones.
-    message = messages.last
-    response = HTTParty.post(
-      "#{phone_id_path('v23.0')}/messages",
-      headers: api_headers,
-      body: {
-        messaging_product: 'whatsapp',
-        message_id: message.source_id,
-        status: 'read'
-      }.to_json
-    )
-
-    Rails.logger.error(response.parsed_response) unless response.success?
-
-    response.success?
   end
 
   def send_reaction_message(phone_number, message)

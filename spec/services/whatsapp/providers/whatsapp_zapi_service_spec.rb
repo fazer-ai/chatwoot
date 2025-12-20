@@ -13,7 +13,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
       channel.save!
     end
   end
-  let(:message) { create(:message, source_id: 'msg_123', content_attributes: { external_created_at: 123 }) }
+  let(:message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_123', content_attributes: { external_created_at: 123 }) }
 
   let(:test_send_phone_number) { '551187654321' }
   let(:api_instance_path) { "#{described_class::API_BASE_PATH}/instances/#{whatsapp_channel.provider_config['instance_id']}" }
@@ -537,10 +537,11 @@ describe Whatsapp::Providers::WhatsappZapiService do
     end
 
     context 'when message is a reply' do
-      let(:conversation) { create(:conversation) }
-      let(:original_message) { create(:message, source_id: 'original_msg_123', conversation: conversation) }
+      let(:conversation) { create(:conversation, inbox: whatsapp_channel.inbox) }
+      let(:original_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'original_msg_123', conversation: conversation) }
       let(:reply_message) do
         create(:message,
+               inbox: whatsapp_channel.inbox,
                content: 'This is a reply',
                source_id: 'reply_msg_123',
                conversation: conversation,
@@ -569,10 +570,11 @@ describe Whatsapp::Providers::WhatsappZapiService do
     end
 
     context 'when message is a reaction' do
-      let(:conversation) { create(:conversation) }
-      let(:original_message) { create(:message, source_id: 'original_msg_456', conversation: conversation) }
+      let(:conversation) { create(:conversation, inbox: whatsapp_channel.inbox) }
+      let(:original_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'original_msg_456', conversation: conversation) }
       let(:reaction_message) do
         create(:message,
+               inbox: whatsapp_channel.inbox,
                content: '👍',
                source_id: 'reaction_msg_789',
                conversation: conversation,

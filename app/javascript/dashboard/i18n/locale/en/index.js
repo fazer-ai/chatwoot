@@ -41,6 +41,7 @@ import teamsSettings from './teamsSettings.json';
 import time from './time.json';
 import whatsappTemplates from './whatsappTemplates.json';
 import mfa from './mfa.json';
+import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
@@ -86,4 +87,5 @@ export default {
   ...time,
   ...whatsappTemplates,
   ...mfa,
+  ...yearInReview,
 };

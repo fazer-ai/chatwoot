@@ -263,7 +263,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def attachment_message_content # rubocop:disable Metrics/MethodLength
     attachment = @message.attachments.first
-    buffer = Base64.strict_encode64(attachment.file.download)
+    buffer = attachment_to_base64(attachment)
 
     content = {
       fileName: attachment.file.filename,
