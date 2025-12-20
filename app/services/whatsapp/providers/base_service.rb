@@ -103,4 +103,14 @@ class Whatsapp::Providers::BaseService
     json_hash = { :button => I18n.t('conversations.messages.whatsapp.list_button_label'), 'sections' => sections }
     create_payload('list', message.outgoing_content, JSON.generate(json_hash))
   end
+
+  def attachment_to_base64(attachment)
+    buffer = +''
+    attachment.file.blob.open do |file|
+      while (chunk = file.read(64.kilobytes))
+        buffer << chunk
+      end
+    end
+    Base64.strict_encode64(buffer)
+  end
 end

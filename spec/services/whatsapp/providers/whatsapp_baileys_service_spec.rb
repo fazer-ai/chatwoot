@@ -4,7 +4,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   subject(:service) { described_class.new(whatsapp_channel: whatsapp_channel) }
 
   let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false) }
-  let(:message) { create(:message, source_id: 'msg_123', content_attributes: { external_created_at: 123 }) }
+  let(:message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_123', content_attributes: { external_created_at: 123 }) }
 
   let(:test_send_phone_number) { '551187654321' }
   let(:test_send_jid) { '551187654321@s.whatsapp.net' }

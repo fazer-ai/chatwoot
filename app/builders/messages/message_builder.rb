@@ -161,6 +161,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       private: @private,
       sender: sender,
       content_type: @params[:content_type],
+      content_attributes: content_attributes.presence,
       items: @items,
       in_reply_to: @in_reply_to,
       is_reaction: @is_reaction,
@@ -246,3 +247,5 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
                                        })
   end
 end
+
+Messages::MessageBuilder.prepend_mod_with('Messages::MessageBuilder')

@@ -14,7 +14,7 @@ class Conversations::MessageWindowService
 
   private
 
-  def messaging_window
+  def messaging_window # rubocop:disable Metrics/CyclomaticComplexity
     case @conversation.inbox.channel_type
     when 'Channel::Api'
       api_messaging_window
@@ -22,6 +22,8 @@ class Conversations::MessageWindowService
       messenger_messaging_window
     when 'Channel::Instagram'
       instagram_messaging_window
+    when 'Channel::Tiktok'
+      tiktok_messaging_window
     when 'Channel::Whatsapp'
       return if %w[baileys zapi].include?(@conversation.inbox.channel.provider)
 
@@ -54,6 +56,10 @@ class Conversations::MessageWindowService
 
   def instagram_messaging_window
     meta_messaging_window('ENABLE_INSTAGRAM_CHANNEL_HUMAN_AGENT')
+  end
+
+  def tiktok_messaging_window
+    48.hours
   end
 
   def meta_messaging_window(config_key)
