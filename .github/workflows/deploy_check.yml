@@ -14,7 +14,7 @@ concurrency:
 jobs:
   deployment_check:
     name: Check Deployment
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Install jq
         run: sudo apt-get install -y jq

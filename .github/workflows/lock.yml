@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   action:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     if: ${{ github.repository == 'chatwoot/chatwoot' }}
     steps:
       - uses: dessant/lock-threads@v3

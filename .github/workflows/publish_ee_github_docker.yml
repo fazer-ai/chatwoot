@@ -19,9 +19,9 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: blacksmith-2vcpu-ubuntu-2404
-          # - platform: linux/arm64
-          #   runner: ubuntu-22.04-arm
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - platform: linux/arm64
+            runner: blacksmith-4vcpu-ubuntu-2404
     runs-on: ${{ matrix.runner }}
     env:
       GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
@@ -96,7 +96,7 @@ jobs:
           retention-days: 1
 
   merge:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - build
     steps:
