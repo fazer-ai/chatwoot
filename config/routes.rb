@@ -125,6 +125,7 @@ Rails.application.routes.draw do
                   post :translate
                   post :retry
                 end
+                resources :attachments, only: [:update]
               end
               resources :assignments, only: [:create]
               resources :labels, only: [:create, :index]

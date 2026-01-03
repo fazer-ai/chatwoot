@@ -30,6 +30,29 @@ class WebhookListener < BaseListener
 
     payload = message.webhook_data.merge(event: __method__.to_s)
     deliver_webhook_payloads(payload, inbox)
+
+    message_incoming(event)
+    message_outgoing(event)
+  end
+
+  def message_incoming(event)
+    message = extract_message_and_account(event)[0]
+
+    return unless message.webhook_sendable?
+    return unless message.incoming?
+
+    payload = message.webhook_data.merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, message.account)
+  end
+
+  def message_outgoing(event)
+    message = extract_message_and_account(event)[0]
+
+    return unless message.webhook_sendable?
+    return unless message.outgoing?
+
+    payload = message.webhook_data.merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, message.account)
   end
 
   def message_updated(event)

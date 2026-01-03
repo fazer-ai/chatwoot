@@ -38,6 +38,8 @@
             "CONVERSATION_STATUS_CHANGED": "Status de conversa alterado",
             "CONVERSATION_UPDATED": "Conversa Atualizada",
             "MESSAGE_CREATED": "Mensagem criada",
+            "MESSAGE_INCOMING": "Mensagem recebida",
+            "MESSAGE_OUTGOING": "Mensagem enviada",
             "MESSAGE_UPDATED": "Mensagem atualizada",
             "WEBWIDGET_TRIGGERED": "Widget de chat aberto pelo usuário",
             "CONTACT_CREATED": "Contato criado",
