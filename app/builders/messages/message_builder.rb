@@ -14,6 +14,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @message_type = params[:message_type] || 'outgoing'
     @attachments = params[:attachments]
     @is_recorded_audio = params[:is_recorded_audio]
+    @attachments_metadata = normalize_attachments_metadata(params[:attachments_metadata])
     @automation_rule = content_attributes&.dig(:automation_rule_id)
     return unless params.instance_of?(ActionController::Parameters)
 
@@ -69,7 +70,14 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def process_metadata(attachment) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def process_metadata(attachment)
+    meta = {}
+    meta.merge!(recorded_audio_metadata(attachment) || {})
+    meta.merge!(custom_attachment_metadata(attachment) || {})
+    meta.presence
+  end
+
+  def recorded_audio_metadata(attachment) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     # NOTE: `is_recorded_audio` can be either a boolean or an array of file names.
     return unless @is_recorded_audio
     return { is_recorded_audio: true } if @is_recorded_audio == true
@@ -83,6 +91,23 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     end
   rescue JSON::ParserError
     nil
+  end
+
+  def custom_attachment_metadata(attachment)
+    return unless @attachments_metadata.is_a?(Hash)
+
+    filename = attachment.respond_to?(:original_filename) ? attachment.original_filename : nil
+    return unless filename
+
+    metadata = @attachments_metadata[filename]
+    metadata.to_h if metadata.present?
+  end
+
+  def normalize_attachments_metadata(metadata)
+    return if metadata.blank?
+
+    metadata = metadata.to_unsafe_h if metadata.respond_to?(:to_unsafe_h)
+    metadata.deep_stringify_keys
   end
 
   def process_emails
