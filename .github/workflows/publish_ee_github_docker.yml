@@ -19,9 +19,9 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
-          # - platform: linux/arm64
-          #   runner: ubuntu-22.04-arm
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - platform: linux/arm64
+            runner: blacksmith-4vcpu-ubuntu-2404
     runs-on: ${{ matrix.runner }}
     env:
       GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
@@ -58,8 +58,8 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
       - name: Login to GitHub Container Registry
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
@@ -71,7 +71,7 @@ jobs:
 
       - name: Build and push to GitHub Container Registry
         id: build-ghcr
-        uses: docker/build-push-action@v6
+        uses: useblacksmith/build-push-action@v2
         with:
           context: .
           file: docker/Dockerfile
@@ -96,7 +96,7 @@ jobs:
           retention-days: 1
 
   merge:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - build
     steps:
@@ -114,8 +114,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
