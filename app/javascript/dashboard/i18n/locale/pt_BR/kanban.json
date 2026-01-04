@@ -77,7 +77,8 @@
         "NAME": "Nome",
         "LAST_ACTIVITY": "Última atividade",
         "CREATED_AT": "Criado em",
-        "PRIORITY": "Prioridade"
+        "PRIORITY": "Prioridade",
+        "DUE_DATE": "Data de vencimento"
       }
     },
     "COLUMN": {
@@ -117,6 +118,10 @@
       "RESOLVED_CONVERSATION": "Resolvida",
       "ASSIGNED_CONVERSATION": "Já atribuída a uma tarefa",
       "CONVERSATION_REASSIGNMENT_WARNING": "Algumas conversas já estão atribuídas a outras tarefas. Salvar irá movê-las para esta tarefa.",
+      "START_DATE_LABEL": "Data de início",
+      "START_DATE_PLACEHOLDER": "Início",
+      "DUE_DATE_LABEL": "Data de vencimento",
+      "DUE_DATE_PLACEHOLDER": "Vencimento",
       "CREATE": "Criar",
       "UPDATE": "Atualizar",
       "DELETE": "Excluir",
@@ -159,6 +164,22 @@
       "COMPLETED": "Completada",
       "CANCELLED": "Cancelada",
       "TOOLTIP_PREFIX": "Status: {status}"
+    },
+    "DATE": {
+      "OVERDUE": "Atrasada",
+      "DUE_SOON": "Vence em breve",
+      "DUE": "Vence",
+      "STARTS": "Inicia",
+      "STARTED": "Iniciou",
+      "STARTING_SOON": "Iniciando em breve",
+      "DUE_AT": "Vence {date}",
+      "STARTS_AT": "Inicia {date}",
+      "CLEAR_START_DATE": "Limpar data de início",
+      "CLEAR_DUE_DATE": "Limpar data de vencimento",
+      "TODAY": "Hoje",
+      "YESTERDAY": "Ontem",
+      "TOMORROW": "Amanhã",
+      "TIME_PLACEHOLDER": "Hora"
     },
     "CREATED_AT_TOOLTIP": "Criado em {date}",
     "SHOW_MORE": "Ver mais",

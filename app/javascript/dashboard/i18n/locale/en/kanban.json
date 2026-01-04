@@ -77,7 +77,8 @@
         "NAME": "Name",
         "LAST_ACTIVITY": "Last activity",
         "CREATED_AT": "Created at",
-        "PRIORITY": "Priority"
+        "PRIORITY": "Priority",
+        "DUE_DATE": "Due date"
       }
     },
     "COLUMN": {
@@ -117,6 +118,10 @@
       "RESOLVED_CONVERSATION": "Resolved",
       "ASSIGNED_CONVERSATION": "Already assigned to a task",
       "CONVERSATION_REASSIGNMENT_WARNING": "Some conversations are already assigned to other tasks. Saving will move them to this task.",
+      "START_DATE_LABEL": "Start date",
+      "START_DATE_PLACEHOLDER": "Start date",
+      "DUE_DATE_LABEL": "Due date",
+      "DUE_DATE_PLACEHOLDER": "Due date",
       "CREATE": "Create",
       "UPDATE": "Update",
       "DELETE": "Delete",
@@ -159,6 +164,22 @@
       "COMPLETED": "Completed",
       "CANCELLED": "Cancelled",
       "TOOLTIP_PREFIX": "Status: {status}"
+    },
+    "DATE": {
+      "OVERDUE": "Overdue",
+      "DUE_SOON": "Due soon",
+      "DUE": "Due",
+      "STARTS": "Starts",
+      "STARTED": "Started",
+      "STARTING_SOON": "Starting soon",
+      "DUE_AT": "Due {date}",
+      "STARTS_AT": "Starts {date}",
+      "CLEAR_START_DATE": "Clear start date",
+      "CLEAR_DUE_DATE": "Clear due date",
+      "TODAY": "Today",
+      "YESTERDAY": "Yesterday",
+      "TOMORROW": "Tomorrow",
+      "TIME_PLACEHOLDER": "Time"
     },
     "CREATED_AT_TOOLTIP": "Created at {date}",
     "SHOW_MORE": "Show more",

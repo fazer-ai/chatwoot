@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::BaseController # rubocop:disable Metrics/ClassLength
-  ALLOWED_SORT_COLUMNS = %w[title updated_at created_at priority].freeze
+  ALLOWED_SORT_COLUMNS = %w[title updated_at created_at priority due_date].freeze
 
   before_action :set_task, only: [:show, :update, :destroy, :move]
   before_action :ensure_actor_present!, only: [:create, :update, :destroy, :move]
@@ -183,7 +183,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       :description,
       :priority,
       :start_date,
-      :end_date,
+      :due_date,
       :board_step_id,
       contact_ids: [],
       conversation_ids: [],
@@ -197,7 +197,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       :description,
       :priority,
       :start_date,
-      :end_date,
+      :due_date,
       :board_id,
       :board_step_id,
       contact_ids: [],

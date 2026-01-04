@@ -6,7 +6,7 @@
 #
 #  id            :bigint           not null, primary key
 #  description   :text
-#  end_date      :datetime
+#  due_date      :datetime
 #  priority      :string           default("normal"), not null
 #  start_date    :datetime
 #  title         :string           not null
@@ -107,8 +107,34 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   after_commit :dispatch_destroy_event, on: :destroy
   after_commit :dispatch_conversation_events
 
+  # Hours threshold for considering a task "due soon"
+  DUE_SOON_THRESHOLD_HOURS = 24
+
   def overdue?
-    end_date.present? && end_date < Time.current
+    due_date.present? && due_date < Time.current
+  end
+
+  def due_soon?
+    return false if due_date.blank? || overdue?
+
+    due_date <= DUE_SOON_THRESHOLD_HOURS.hours.from_now
+  end
+
+  def started?
+    start_date.present? && start_date <= Time.current
+  end
+
+  def starting_soon?
+    return false if start_date.blank? || started?
+
+    start_date <= DUE_SOON_THRESHOLD_HOURS.hours.from_now
+  end
+
+  def date_status
+    return 'overdue' if overdue?
+    return 'due_soon' if due_soon?
+
+    nil
   end
 
   def status
@@ -138,8 +164,9 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       description: description,
       priority: priority,
       status: status,
+      date_status: date_status,
       start_date: start_date,
-      end_date: end_date,
+      due_date: due_date,
       created_at: created_at,
       updated_at: updated_at,
       contact_ids: contact_ids,
@@ -206,10 +233,10 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   def scheduled_dates_are_coherent
-    return if start_date.blank? || end_date.blank?
-    return if start_date <= end_date
+    return if start_date.blank? || due_date.blank?
+    return if start_date <= due_date
 
-    errors.add(:end_date, I18n.t('kanban.tasks.errors.invalid_end_date'))
+    errors.add(:due_date, I18n.t('kanban.tasks.errors.invalid_due_date'))
   end
 
   def assigned_agents_belong_to_board

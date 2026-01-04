@@ -38,7 +38,7 @@ en:
       errors:
         invalid_conversations: "must belong to one of the board inboxes"
         invalid_conversation_inbox: "must belong to one of the board inboxes"
-        invalid_end_date: "must be on or after the start date"
+        invalid_due_date: "must be on or after the start date"
         invalid_board_step: "must belong to the same board"
         invalid_assignee: "must belong to the same account"
         invalid_assignees: "must belong to the board agents"

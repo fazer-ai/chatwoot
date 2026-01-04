@@ -50,6 +50,84 @@ const isNormalPriority = computed(() => {
   return props.task.priority === 'normal';
 });
 
+const hasDueDate = computed(() => !!props.task.due_date);
+
+const isOverdue = computed(() => props.task.date_status === 'overdue');
+const isDueSoon = computed(() => props.task.date_status === 'due_soon');
+
+const isSameDay = (date1, date2) =>
+  date1.getFullYear() === date2.getFullYear() &&
+  date1.getMonth() === date2.getMonth() &&
+  date1.getDate() === date2.getDate();
+
+const getRelativeDay = dateStr => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const today = new Date();
+
+  if (isSameDay(date, today)) return 'today';
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameDay(date, yesterday)) return 'yesterday';
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (isSameDay(date, tomorrow)) return 'tomorrow';
+
+  return null;
+};
+
+const formatDate = dateStr => {
+  if (!dateStr) return '';
+
+  const relativeDay = getRelativeDay(dateStr);
+  if (relativeDay === 'today') return t('KANBAN.DATE.TODAY');
+  if (relativeDay === 'yesterday') return t('KANBAN.DATE.YESTERDAY');
+  if (relativeDay === 'tomorrow') return t('KANBAN.DATE.TOMORROW');
+
+  const date = new Date(dateStr);
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatDateWithTime = dateStr => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const dueDateDisplay = computed(() => {
+  if (!hasDueDate.value) return '';
+  return formatDate(props.task.due_date);
+});
+
+const dueDateTooltip = computed(() => {
+  if (!hasDueDate.value) return '';
+  return t('KANBAN.DATE.DUE_AT', {
+    date: formatDateWithTime(props.task.due_date),
+  });
+});
+
+const dateStatusClasses = computed(() => {
+  if (isOverdue.value) return 'text-n-ruby-11 bg-n-ruby-3';
+  if (isDueSoon.value) return 'text-n-amber-11 bg-n-amber-3';
+  return 'text-n-slate-11 bg-n-slate-3';
+});
+
+const dateStatusIcon = computed(() => {
+  if (isOverdue.value) return 'i-lucide-alert-circle';
+  if (isDueSoon.value) return 'i-lucide-clock';
+  return 'i-lucide-calendar';
+});
+
 const timeAgo = computed(() => {
   const date = props.task.created_at;
   const unixTime = new Date(date).getTime() / 1000;
@@ -552,6 +630,16 @@ const handleDescriptionClick = event => {
             @click.stop.prevent="onMarkComplete"
           >
             <span class="i-lucide-check w-3 h-3 text-n-teal-11" />
+          </div>
+          <!-- Due date badge -->
+          <div
+            v-if="hasDueDate"
+            v-tooltip="dueDateTooltip"
+            class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
+            :class="dateStatusClasses"
+          >
+            <span :class="dateStatusIcon" class="h-3 w-3" />
+            <span>{{ dueDateDisplay }}</span>
           </div>
           <div
             v-if="timeAgo"

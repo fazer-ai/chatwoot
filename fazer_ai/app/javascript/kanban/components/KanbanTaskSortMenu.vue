@@ -48,6 +48,11 @@ const sortMenus = computed(() => [
     value: 'priority',
     icon: 'i-lucide-flag',
   },
+  {
+    label: t('KANBAN.SORT.OPTIONS.DUE_DATE'),
+    value: 'due_date',
+    icon: 'i-lucide-calendar-clock',
+  },
 ]);
 
 const orderingMenus = computed(() => [

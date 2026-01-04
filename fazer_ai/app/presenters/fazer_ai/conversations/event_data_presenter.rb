@@ -20,7 +20,7 @@ module FazerAi::Conversations::EventDataPresenter
       description: kanban_task.description,
       priority: kanban_task.priority,
       start_date: kanban_task.start_date,
-      end_date: kanban_task.end_date,
+      due_date: kanban_task.due_date,
       created_at: kanban_task.created_at,
       updated_at: kanban_task.updated_at,
       contact_ids: kanban_task.contact_ids,

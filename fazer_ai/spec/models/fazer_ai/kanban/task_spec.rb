@@ -17,12 +17,12 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
     it { is_expected.to validate_length_of(:description).is_at_most(5000) }
     it { is_expected.to validate_inclusion_of(:priority).in_array(described_class::PRIORITIES) }
 
-    it 'rejects an end date that is before the start date' do
+    it 'rejects a due date that is before the start date' do
       task.start_date = 2.days.from_now
-      task.end_date = 1.day.from_now
+      task.due_date = 1.day.from_now
 
       expect(task).not_to be_valid
-      expect(task.errors[:end_date]).to include(I18n.t('kanban.tasks.errors.invalid_end_date'))
+      expect(task.errors[:due_date]).to include(I18n.t('kanban.tasks.errors.invalid_due_date'))
     end
 
     it 'rejects an assigned agent not assigned to the board' do
@@ -149,19 +149,122 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
   end
 
   describe '#overdue?' do
-    it 'returns true if end_date is in the past' do
-      task.end_date = 1.day.ago
+    it 'returns true if due_date is in the past' do
+      task.due_date = 1.day.ago
       expect(task).to be_overdue
     end
 
-    it 'returns false if end_date is in the future' do
-      task.end_date = 1.day.from_now
+    it 'returns false if due_date is in the future' do
+      task.due_date = 1.day.from_now
       expect(task).not_to be_overdue
     end
 
-    it 'returns false if end_date is blank' do
-      task.end_date = nil
+    it 'returns false if due_date is blank' do
+      task.due_date = nil
       expect(task).not_to be_overdue
+    end
+  end
+
+  describe '#due_soon?' do
+    it 'returns true if due_date is within 24 hours from now' do
+      task.due_date = 12.hours.from_now
+      expect(task).to be_due_soon
+    end
+
+    it 'returns true if due_date is exactly 24 hours from now' do
+      task.due_date = 24.hours.from_now
+      expect(task).to be_due_soon
+    end
+
+    it 'returns false if due_date is more than 24 hours from now' do
+      task.due_date = 25.hours.from_now
+      expect(task).not_to be_due_soon
+    end
+
+    it 'returns false if due_date is in the past (overdue)' do
+      task.due_date = 1.hour.ago
+      expect(task).not_to be_due_soon
+    end
+
+    it 'returns false if due_date is blank' do
+      task.due_date = nil
+      expect(task).not_to be_due_soon
+    end
+  end
+
+  describe '#started?' do
+    it 'returns true if start_date is in the past' do
+      task.start_date = 1.day.ago
+      expect(task).to be_started
+    end
+
+    it 'returns true if start_date is now' do
+      task.start_date = Time.current
+      expect(task).to be_started
+    end
+
+    it 'returns false if start_date is in the future' do
+      task.start_date = 1.day.from_now
+      expect(task).not_to be_started
+    end
+
+    it 'returns false if start_date is blank' do
+      task.start_date = nil
+      expect(task).not_to be_started
+    end
+  end
+
+  describe '#starting_soon?' do
+    it 'returns true if start_date is within 24 hours from now' do
+      task.start_date = 12.hours.from_now
+      expect(task).to be_starting_soon
+    end
+
+    it 'returns true if start_date is exactly 24 hours from now' do
+      task.start_date = 24.hours.from_now
+      expect(task).to be_starting_soon
+    end
+
+    it 'returns false if start_date is more than 24 hours from now' do
+      task.start_date = 25.hours.from_now
+      expect(task).not_to be_starting_soon
+    end
+
+    it 'returns false if start_date is in the past (already started)' do
+      task.start_date = 1.hour.ago
+      expect(task).not_to be_starting_soon
+    end
+
+    it 'returns false if start_date is blank' do
+      task.start_date = nil
+      expect(task).not_to be_starting_soon
+    end
+  end
+
+  describe '#date_status' do
+    it 'returns overdue when task is overdue' do
+      task.due_date = 1.day.ago
+      expect(task.date_status).to eq('overdue')
+    end
+
+    it 'returns due_soon when task is due soon but not overdue' do
+      task.due_date = 12.hours.from_now
+      expect(task.date_status).to eq('due_soon')
+    end
+
+    it 'returns nil when task has no urgent date status' do
+      task.due_date = 2.days.from_now
+      expect(task.date_status).to be_nil
+    end
+
+    it 'returns nil when due_date is blank' do
+      task.due_date = nil
+      expect(task.date_status).to be_nil
+    end
+
+    it 'prioritizes overdue over due_soon' do
+      task.due_date = 1.minute.ago
+      expect(task.date_status).to eq('overdue')
     end
   end
 

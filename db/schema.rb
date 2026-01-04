@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
+ActiveRecord::Schema[7.1].define(version: 2026_01_03_192932) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1003,7 +1003,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
     t.text "description"
     t.string "priority", default: "normal", null: false
     t.datetime "start_date"
-    t.datetime "end_date"
+    t.datetime "due_date"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id", "created_at"], name: "index_kanban_tasks_on_account_id_and_created_at"

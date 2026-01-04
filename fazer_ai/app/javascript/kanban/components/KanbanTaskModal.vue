@@ -15,6 +15,7 @@ import ContactAPI from 'dashboard/api/contacts';
 import BoardsAPI from 'kanban/api/boards';
 import KanbanDeleteTaskDialog from './KanbanDeleteTaskDialog.vue';
 import KanbanContextDropdown from './KanbanContextDropdown.vue';
+import KanbanTaskDatePicker from './KanbanTaskDatePicker.vue';
 import { useKanban } from '../composables/useKanban';
 
 const props = defineProps({
@@ -82,6 +83,8 @@ const showDeleteDialog = ref(false);
 const showDiscardDialog = ref(false);
 const isDropdownOpen = ref(false);
 const isPriorityDropdownOpen = ref(false);
+const startDate = ref(null);
+const dueDate = ref(null);
 
 const stepOptions = computed(() =>
   props.steps.map(step => ({
@@ -196,6 +199,12 @@ const modalTitle = computed(() => {
 const dialogRef = ref(null);
 const discardDialogRef = ref(null);
 
+const parseDate = dateStr => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const openModal = () => {
   dialogRef.value?.open();
   if (props.task) {
@@ -208,6 +217,8 @@ const openModal = () => {
     selectedConversations.value = [...(props.task.conversations || [])];
     contactOptions.value = [...selectedContacts.value];
     conversationOptions.value = [...selectedConversations.value];
+    startDate.value = parseDate(props.task.start_date);
+    dueDate.value = parseDate(props.task.due_date);
   } else if (props.duplicateTask) {
     title.value = `${props.duplicateTask.title} ${t(
       'KANBAN.MODAL.COPY_SUFFIX'
@@ -222,6 +233,8 @@ const openModal = () => {
     ];
     contactOptions.value = [...selectedContacts.value];
     conversationOptions.value = [...selectedConversations.value];
+    startDate.value = parseDate(props.duplicateTask.start_date);
+    dueDate.value = parseDate(props.duplicateTask.due_date);
   } else {
     title.value = '';
     description.value = '';
@@ -232,6 +245,8 @@ const openModal = () => {
     selectedConversations.value = [];
     contactOptions.value = [];
     conversationOptions.value = [];
+    startDate.value = null;
+    dueDate.value = null;
   }
 };
 
@@ -321,6 +336,12 @@ watch(
   { deep: true }
 );
 
+// Normalizes date for API submission
+const normalizeDate = date => {
+  if (!date) return null;
+  return new Date(date).toISOString();
+};
+
 const onSave = () => {
   const taskPayload = {
     title: title.value.trim().replace(/ +/g, ' '),
@@ -331,6 +352,8 @@ const onSave = () => {
     contact_ids: selectedContacts.value.map(c => c.id),
     conversation_ids: selectedConversations.value.map(c => c.id),
     board_id: props.boardId,
+    start_date: normalizeDate(startDate.value),
+    due_date: normalizeDate(dueDate.value),
   };
 
   const payload = {
@@ -354,6 +377,12 @@ const confirmDelete = () => {
 
 const onDeleteDialogClose = () => {
   showDeleteDialog.value = false;
+};
+
+const datesEqual = (date1, date2) => {
+  if (!date1 && !date2) return true;
+  if (!date1 || !date2) return false;
+  return new Date(date1).getTime() === new Date(date2).getTime();
 };
 
 const hasChanges = computed(() => {
@@ -390,7 +419,9 @@ const hasChanges = computed(() => {
       String(selectedStepId.value) !== String(props.task.board_step_id) ||
       currentAgentIds !== newAgentIds ||
       currentContactIds !== newContactIds ||
-      currentConversationIds !== newConversationIds
+      currentConversationIds !== newConversationIds ||
+      !datesEqual(startDate.value, props.task.start_date) ||
+      !datesEqual(dueDate.value, props.task.due_date)
     );
   }
   return (
@@ -401,7 +432,9 @@ const hasChanges = computed(() => {
       (props.stepId ? String(props.stepId) : '') ||
     selectedAgents.value.length > 0 ||
     selectedContacts.value.length > 0 ||
-    selectedConversations.value.length > 0
+    selectedConversations.value.length > 0 ||
+    startDate.value !== null ||
+    dueDate.value !== null
   );
 });
 
@@ -766,6 +799,14 @@ const handleClickOutside = () => {
             </template>
           </multiselect>
         </label>
+
+        <!-- Date Pickers -->
+        <KanbanTaskDatePicker
+          :start-date="startDate"
+          :due-date="dueDate"
+          @update:start-date="startDate = $event"
+          @update:due-date="dueDate = $event"
+        />
       </div>
     </div>
 

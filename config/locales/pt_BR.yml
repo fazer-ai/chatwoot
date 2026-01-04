@@ -26,7 +26,7 @@ pt_BR:
       errors:
         invalid_conversations: 'devem pertencer a uma das caixas de entrada do quadro'
         invalid_conversation_inbox: 'devem pertencer a uma das caixas de entrada do quadro'
-        invalid_end_date: 'deve ser igual ou posterior à data de início'
+        invalid_due_date: 'deve ser igual ou posterior à data de início'
         invalid_board_step: 'deve pertencer ao mesmo quadro'
         invalid_assignee: 'deve pertencer à mesma conta'
         invalid_assignees: 'devem pertencer aos agentes do quadro'
