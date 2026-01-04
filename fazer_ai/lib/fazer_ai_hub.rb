@@ -2,8 +2,8 @@
 
 class FazerAiHub
   BASE_URL = ENV.fetch('FAZER_AI_HUB_URL', 'https://app.fazer.ai')
-  PING_URL = "#{BASE_URL}/ping".freeze
-  BILLING_URL = "#{BASE_URL}/billing".freeze
+  PING_URL = "#{BASE_URL}/api/ping".freeze
+  BILLING_URL = "#{BASE_URL}/api/billing".freeze
 
   class << self
     def installation_identifier

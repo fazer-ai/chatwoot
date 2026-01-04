@@ -24,6 +24,7 @@ module FazerAi::Conversations::EventDataPresenter
       created_at: kanban_task.created_at,
       updated_at: kanban_task.updated_at,
       contact_ids: kanban_task.contact_ids,
+      labels: kanban_task.cached_label_list_array,
       assigned_agents: kanban_task.assigned_agents.map do |agent|
         {
           id: agent.id,

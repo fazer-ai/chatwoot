@@ -81,6 +81,23 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
       expect(FazerAi::Kanban::AuditEventJob).to have_been_enqueued
     end
 
+    context 'with labels' do
+      before do
+        create(:label, account: account, title: 'priority')
+        create(:label, account: account, title: 'bug')
+      end
+
+      it 'creates a task with labels' do
+        post base_path, params: { task: params[:task].merge(labels: %w[priority bug]) }, headers: headers
+
+        expect(response).to have_http_status(:created)
+        expect(response.parsed_body['labels']).to contain_exactly('priority', 'bug')
+
+        task = FazerAi::Kanban::Task.find(response.parsed_body['id'])
+        expect(task.label_list).to contain_exactly('priority', 'bug')
+      end
+    end
+
     context 'when attaching conversations respecting board inboxes' do
       let(:inbox) { create(:inbox, account: account) }
       let(:other_inbox) { create(:inbox, account: account) }
@@ -164,6 +181,31 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
           )
         )
       )
+    end
+
+    context 'with labels' do
+      before do
+        create(:label, account: account, title: 'priority')
+        create(:label, account: account, title: 'bug')
+      end
+
+      it 'updates task labels' do
+        patch "#{base_path}/#{task.id}", params: { task: { labels: %w[priority bug] } }, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body['labels']).to contain_exactly('priority', 'bug')
+        expect(task.reload.label_list).to contain_exactly('priority', 'bug')
+      end
+
+      it 'clears labels when given empty array' do
+        task.update_labels(%w[priority])
+
+        patch "#{base_path}/#{task.id}", params: { task: { labels: [] } }, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body['labels']).to eq([])
+        expect(task.reload.label_list).to be_empty
+      end
     end
   end
 

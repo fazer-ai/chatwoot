@@ -4,18 +4,19 @@
 #
 # Table name: kanban_tasks
 #
-#  id            :bigint           not null, primary key
-#  description   :text
-#  due_date      :datetime
-#  priority      :string           default("normal"), not null
-#  start_date    :datetime
-#  title         :string           not null
-#  created_at    :datetime         not null
-#  updated_at    :datetime         not null
-#  account_id    :bigint           not null
-#  board_id      :bigint           not null
-#  board_step_id :bigint           not null
-#  created_by_id :bigint
+#  id                :bigint           not null, primary key
+#  cached_label_list :text
+#  description       :text
+#  due_date          :datetime
+#  priority          :string           default("normal"), not null
+#  start_date        :datetime
+#  title             :string           not null
+#  created_at        :datetime         not null
+#  updated_at        :datetime         not null
+#  account_id        :bigint           not null
+#  board_id          :bigint           not null
+#  board_step_id     :bigint           not null
+#  created_by_id     :bigint
 #
 # Indexes
 #
@@ -37,6 +38,8 @@
 #  fk_rails_...  (created_by_id => users.id) ON DELETE => nullify
 #
 class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassLength
+  include Labelable
+
   self.table_name = 'kanban_tasks'
 
   PRIORITIES = %w[urgent high normal low].freeze
@@ -145,6 +148,10 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
     creator&.name || I18n.t('automation.system_name')
   end
 
+  def cached_label_list_array
+    (cached_label_list || '').split(',').map(&:strip)
+  end
+
   def push_event_data # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
     {
       id: id,
@@ -176,6 +183,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       assigned_agents: assigned_agents.reload.map do |a|
         { id: a.id, name: a.name, avatar_url: a.avatar_url, availability_status: a.availability_status }
       end,
+      labels: cached_label_list_array,
       creator: creator&.push_event_data,
       creator_display_name: creator_display_name
     }

@@ -105,6 +105,97 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
     it { is_expected.to have_many(:audit_events).dependent(:destroy) }
   end
 
+  describe 'labels' do
+    let!(:persisted_task) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account)) }
+
+    before do
+      create(:label, account: account, title: 'priority')
+      create(:label, account: account, title: 'bug')
+      create(:label, account: account, title: 'feature')
+    end
+
+    describe '#update_labels' do
+      it 'assigns labels to the task' do
+        persisted_task.update_labels(%w[priority bug])
+
+        expect(persisted_task.label_list).to contain_exactly('priority', 'bug')
+      end
+
+      it 'replaces existing labels when updating' do
+        persisted_task.update_labels(%w[priority])
+        persisted_task.update_labels(%w[bug feature])
+
+        expect(persisted_task.label_list).to contain_exactly('bug', 'feature')
+      end
+
+      it 'clears labels when given empty array' do
+        persisted_task.update_labels(%w[priority bug])
+        persisted_task.update_labels([])
+
+        expect(persisted_task.label_list).to be_empty
+      end
+    end
+
+    describe '#add_labels' do
+      it 'adds labels to existing labels' do
+        persisted_task.update_labels(%w[priority])
+        persisted_task.add_labels(%w[bug])
+
+        expect(persisted_task.label_list).to contain_exactly('priority', 'bug')
+      end
+
+      it 'does not duplicate existing labels' do
+        persisted_task.update_labels(%w[priority bug])
+        persisted_task.add_labels(%w[bug feature])
+
+        expect(persisted_task.label_list).to contain_exactly('priority', 'bug', 'feature')
+      end
+    end
+
+    describe '#cached_label_list_array' do
+      it 'returns an empty array when cached_label_list is nil' do
+        persisted_task.cached_label_list = nil
+
+        expect(persisted_task.cached_label_list_array).to eq([])
+      end
+
+      it 'returns an empty array when cached_label_list is empty' do
+        persisted_task.cached_label_list = ''
+
+        expect(persisted_task.cached_label_list_array).to eq([])
+      end
+
+      it 'returns labels as an array' do
+        persisted_task.cached_label_list = 'priority, bug, feature'
+
+        expect(persisted_task.cached_label_list_array).to eq(%w[priority bug feature])
+      end
+
+      it 'strips whitespace from labels' do
+        persisted_task.cached_label_list = '  priority  ,  bug  '
+
+        expect(persisted_task.cached_label_list_array).to eq(%w[priority bug])
+      end
+    end
+
+    describe '#push_event_data with labels' do
+      it 'includes labels in push event data' do
+        persisted_task.update_labels(%w[priority bug])
+        persisted_task.reload
+
+        event_data = persisted_task.push_event_data
+
+        expect(event_data[:labels]).to contain_exactly('priority', 'bug')
+      end
+
+      it 'returns empty array when no labels' do
+        event_data = persisted_task.push_event_data
+
+        expect(event_data[:labels]).to eq([])
+      end
+    end
+  end
+
   describe 'scopes' do
     describe '.ordered' do
       it 'returns tasks ordered by created_at asc' do

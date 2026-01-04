@@ -16,6 +16,7 @@ json.status task.status
 json.date_status task.date_status
 json.contact_ids task.contact_ids
 json.conversation_ids task.conversation_ids
+json.labels task.cached_label_list_array
 
 json.contacts task.contacts do |contact|
   json.id contact.id

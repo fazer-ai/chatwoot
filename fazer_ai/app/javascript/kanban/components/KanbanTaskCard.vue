@@ -9,6 +9,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import ThumbnailGroup from 'dashboard/components/widgets/ThumbnailGroup.vue';
 import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import KanbanContextDropdown from './KanbanContextDropdown.vue';
+import TaskCardLabels from './TaskCardLabels.vue';
 import { useKanban } from '../composables/useKanban';
 import { KANBAN_PRIORITIES } from '../constants';
 
@@ -566,6 +567,8 @@ const handleDescriptionClick = event => {
       >
         {{ isExpanded ? t('KANBAN.SHOW_LESS') : t('KANBAN.SHOW_MORE') }}
       </button>
+
+      <TaskCardLabels v-if="task.labels?.length" :task-labels="task.labels" />
 
       <div class="flex items-center justify-between mt-1">
         <div class="flex items-center gap-2 min-w-0">

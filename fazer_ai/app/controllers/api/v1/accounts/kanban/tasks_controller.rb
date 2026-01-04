@@ -15,8 +15,8 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     authorize @task
   end
 
-  def create
-    @task = Current.account.kanban_tasks.new(task_create_params)
+  def create # rubocop:disable Metrics/AbcSize
+    @task = Current.account.kanban_tasks.new(task_create_params.except(:labels))
     authorize @task
 
     ActiveRecord::Base.transaction do
@@ -24,6 +24,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       @task.creator = current_actor
       @task.insert_before_task_id = params[:insert_before_task_id]
       @task.save!
+      update_task_labels if task_create_params[:labels].present?
       @task.reorder_for_user!(current_actor)
     end
 
@@ -38,7 +39,8 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     authorize @task
 
     ActiveRecord::Base.transaction do
-      @task.update!(task_params)
+      @task.update!(task_params.except(:labels))
+      update_task_labels if params[:task].key?(:labels)
     end
 
     changes = @task.previous_changes.except('updated_at')
@@ -187,7 +189,8 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       :board_step_id,
       contact_ids: [],
       conversation_ids: [],
-      assigned_agent_ids: []
+      assigned_agent_ids: [],
+      labels: []
     ).merge(account: Current.account)
   end
 
@@ -202,8 +205,14 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       :board_step_id,
       contact_ids: [],
       conversation_ids: [],
-      assigned_agent_ids: []
+      assigned_agent_ids: [],
+      labels: []
     ).merge(account: Current.account)
+  end
+
+  def update_task_labels
+    labels = params[:task][:labels] || []
+    @task.update_labels(labels)
   end
 
   def enqueue_audit_event(task, action, metadata: {})

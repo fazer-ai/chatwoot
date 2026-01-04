@@ -10,6 +10,7 @@ import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import KanbanContextDropdown from './KanbanContextDropdown.vue';
+import KanbanTaskDatePicker from './KanbanTaskDatePicker.vue';
 import ContactDetailsItem from 'dashboard/routes/dashboard/conversation/ContactDetailsItem.vue';
 import { useAlert } from 'dashboard/composables';
 import { useKanban } from '../composables/useKanban';
@@ -45,6 +46,7 @@ const route = useRoute();
 const { priorities } = useKanban();
 
 const currentUser = useMapGetter('getCurrentUser');
+const accountLabels = useMapGetter('labels/getLabels');
 
 if (!store.hasModule('kanban')) {
   store.registerModule('kanban', kanbanModule);
@@ -56,6 +58,9 @@ const isCreating = ref(false);
 const isUpdating = ref(false);
 const steps = ref([]);
 const boardAgents = ref([]);
+const selectedLabels = ref([]);
+const startDate = ref(null);
+const dueDate = ref(null);
 
 const boards = computed(() => store.state.kanban.boards);
 const preferences = computed(() => store.state.kanban.preferences);
@@ -150,6 +155,14 @@ const agentOptions = computed(() => {
   }));
 });
 
+const labelOptions = computed(() =>
+  accountLabels.value.map(label => ({
+    id: label.id,
+    title: label.title,
+    color: label.color,
+  }))
+);
+
 const taskUrl = computed(() => {
   if (!existingTask.value) return null;
   return `/app/accounts/${accountId.value}/kanban/${existingTask.value.board_id}/task/${existingTask.value.id}`;
@@ -172,6 +185,17 @@ const showSelfAssign = computed(() => {
   return !isAssignedToSelf && isInAgentsList;
 });
 
+const parseDate = dateStr => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const normalizeDate = date => {
+  if (!date) return null;
+  return new Date(date).toISOString();
+};
+
 watch(
   () => props.kanbanTask,
   newTask => {
@@ -184,8 +208,35 @@ watch(
       boardAgents.value = [];
       selectedBoard.value = null;
     }
+    if (!isUpdating.value && labelOptions.value.length > 0) {
+      const taskLabelTitles = newTask?.labels || [];
+      selectedLabels.value = labelOptions.value
+        .filter(label => taskLabelTitles.includes(label.title))
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }
+    if (!isUpdating.value) {
+      startDate.value = parseDate(newTask?.start_date);
+      dueDate.value = parseDate(newTask?.due_date);
+    }
   },
   { immediate: true }
+);
+
+watch(
+  () => labelOptions.value,
+  newOptions => {
+    if (
+      !isUpdating.value &&
+      newOptions.length > 0 &&
+      existingTask.value?.labels?.length > 0 &&
+      selectedLabels.value.length === 0
+    ) {
+      const taskLabelTitles = existingTask.value.labels || [];
+      selectedLabels.value = newOptions
+        .filter(label => taskLabelTitles.includes(label.title))
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }
+  }
 );
 
 const createTask = async () => {
@@ -227,6 +278,7 @@ const updateTask = async updates => {
   if (!existingTask.value || isUpdating.value) return;
 
   const originalTask = { ...existingTask.value };
+  const originalLabels = [...selectedLabels.value];
 
   existingTask.value = { ...existingTask.value, ...updates };
   store.commit(types.UPDATE_CONVERSATION_KANBAN_TASK, {
@@ -242,8 +294,13 @@ const updateTask = async updates => {
       conversationId: props.conversationId,
       task: response.data,
     });
+    const responseLabelTitles = response.data.labels || [];
+    selectedLabels.value = labelOptions.value
+      .filter(label => responseLabelTitles.includes(label.title))
+      .sort((a, b) => a.title.localeCompare(b.title));
   } catch (error) {
     existingTask.value = originalTask;
+    selectedLabels.value = originalLabels;
     store.commit(types.UPDATE_CONVERSATION_KANBAN_TASK, {
       conversationId: props.conversationId,
       task: originalTask,
@@ -266,6 +323,16 @@ const handleAgentsChange = agents => {
   updateTask({
     assigned_agent_ids: agents.map(a => a.id),
     assigned_agents: agents,
+  });
+};
+
+const handleLabelsChange = labels => {
+  const sortedLabels = [...labels].sort((a, b) =>
+    a.title.localeCompare(b.title)
+  );
+  selectedLabels.value = sortedLabels;
+  updateTask({
+    labels: sortedLabels.map(l => l.title),
   });
 };
 
@@ -292,6 +359,16 @@ const assignToMe = () => {
   };
   currentAgents.push(selfAgent);
   handleAgentsChange(currentAgents);
+};
+
+const handleStartDateChange = date => {
+  startDate.value = date;
+  updateTask({ start_date: normalizeDate(date) });
+};
+
+const handleDueDateChange = date => {
+  dueDate.value = date;
+  updateTask({ due_date: normalizeDate(date) });
 };
 </script>
 
@@ -550,28 +627,96 @@ const assignToMe = () => {
           </template>
         </KanbanContextDropdown>
       </div>
+
+      <!-- Labels -->
+      <div v-if="labelOptions.length" class="multiselect-wrap--small">
+        <ContactDetailsItem compact :title="$t('KANBAN.MODAL.LABELS_LABEL')" />
+        <multiselect
+          :model-value="selectedLabels"
+          :options="labelOptions"
+          track-by="id"
+          label="title"
+          multiple
+          :close-on-select="false"
+          :clear-on-select="false"
+          :placeholder="$t('KANBAN.MODAL.LABELS_PLACEHOLDER')"
+          :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+          :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
+          :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
+          class="!mb-0 kanban-labels-multiselect"
+          @update:model-value="handleLabelsChange"
+        >
+          <template #tag="{ option, remove }">
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 mr-0.5 mb-1 text-xs font-medium rounded bg-n-slate-3 border border-solid border-n-strong"
+            >
+              <span
+                class="size-2 rounded-full flex-shrink-0"
+                :style="{ backgroundColor: option.color }"
+              />
+              <span class="truncate max-w-24">{{ option.title }}</span>
+              <button
+                type="button"
+                class="flex items-center justify-center p-0 ml-0.5 text-n-slate-10 hover:text-n-slate-12"
+                @mousedown.prevent.stop="remove(option)"
+              >
+                <span class="i-lucide-x size-3" />
+              </button>
+            </span>
+          </template>
+          <template #option="{ option }">
+            <div class="flex items-center gap-2 min-w-0">
+              <div
+                class="w-2 h-2 rounded-full flex-shrink-0"
+                :style="{ backgroundColor: option.color }"
+              />
+              <span class="truncate">{{ option.title }}</span>
+            </div>
+          </template>
+          <template #noResult>
+            {{ $t('KANBAN.MODAL.NO_LABELS_FOUND') }}
+          </template>
+          <template #noOptions>
+            {{ $t('KANBAN.MODAL.NO_LABELS_AVAILABLE') }}
+          </template>
+        </multiselect>
+      </div>
+
+      <!-- Dates -->
+      <KanbanTaskDatePicker
+        :start-date="startDate"
+        :due-date="dueDate"
+        stacked
+        @update:start-date="handleStartDateChange"
+        @update:due-date="handleDueDateChange"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
-.kanban-agents-multiselect :deep(.multiselect__tags) {
+.kanban-agents-multiselect :deep(.multiselect__tags),
+.kanban-labels-multiselect :deep(.multiselect__tags) {
   @apply w-full px-3 py-2 text-sm rounded-lg outline outline-1 outline-n-strong min-w-0 bg-transparent;
 }
 
-.kanban-agents-multiselect :deep(.multiselect__tags:hover) {
+.kanban-agents-multiselect :deep(.multiselect__tags:hover),
+.kanban-labels-multiselect :deep(.multiselect__tags:hover) {
   @apply bg-slate-50 dark:bg-slate-800;
 }
 
-.kanban-agents-multiselect :deep(.multiselect__placeholder) {
+.kanban-agents-multiselect :deep(.multiselect__placeholder),
+.kanban-labels-multiselect :deep(.multiselect__placeholder) {
   @apply pt-0 pb-0 mb-0;
 }
 
-.kanban-agents-multiselect :deep(.multiselect__tags-wrap) {
+.kanban-agents-multiselect :deep(.multiselect__tags-wrap),
+.kanban-labels-multiselect :deep(.multiselect__tags-wrap) {
   @apply mt-0;
 }
 
-.kanban-agents-multiselect :deep(.multiselect__input) {
+.kanban-agents-multiselect :deep(.multiselect__input),
+.kanban-labels-multiselect :deep(.multiselect__input) {
   @apply mb-0 pb-0;
 }
 </style>

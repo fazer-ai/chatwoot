@@ -12,6 +12,10 @@ const props = defineProps({
     type: Date,
     default: null,
   },
+  stacked: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['update:startDate', 'update:dueDate']);
@@ -217,7 +221,9 @@ const datePickerLang = {
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-4">
+  <div
+    :class="props.stacked ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'"
+  >
     <!-- Start Date -->
     <div class="flex flex-col gap-2 min-w-0">
       <span class="text-sm font-medium text-n-slate-12 select-none">

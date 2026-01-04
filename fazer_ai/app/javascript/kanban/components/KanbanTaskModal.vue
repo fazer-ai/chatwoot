@@ -63,6 +63,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'delete']);
 
+const accountLabels = useMapGetter('labels/getLabels');
+
 const dialogId = `kanban-task-modal-${Math.random().toString(36).substr(2, 9)}`;
 
 const { t } = useI18n();
@@ -85,6 +87,15 @@ const isDropdownOpen = ref(false);
 const isPriorityDropdownOpen = ref(false);
 const startDate = ref(null);
 const dueDate = ref(null);
+const selectedLabels = ref([]);
+
+const labelOptions = computed(() =>
+  accountLabels.value.map(label => ({
+    id: label.id,
+    title: label.title,
+    color: label.color,
+  }))
+);
 
 const stepOptions = computed(() =>
   props.steps.map(step => ({
@@ -219,6 +230,10 @@ const openModal = () => {
     conversationOptions.value = [...selectedConversations.value];
     startDate.value = parseDate(props.task.start_date);
     dueDate.value = parseDate(props.task.due_date);
+    const taskLabelTitles = props.task.labels || [];
+    selectedLabels.value = labelOptions.value.filter(label =>
+      taskLabelTitles.includes(label.title)
+    );
   } else if (props.duplicateTask) {
     title.value = `${props.duplicateTask.title} ${t(
       'KANBAN.MODAL.COPY_SUFFIX'
@@ -235,6 +250,10 @@ const openModal = () => {
     conversationOptions.value = [...selectedConversations.value];
     startDate.value = parseDate(props.duplicateTask.start_date);
     dueDate.value = parseDate(props.duplicateTask.due_date);
+    const taskLabelTitles = props.duplicateTask.labels || [];
+    selectedLabels.value = labelOptions.value.filter(label =>
+      taskLabelTitles.includes(label.title)
+    );
   } else {
     title.value = '';
     description.value = '';
@@ -247,6 +266,7 @@ const openModal = () => {
     conversationOptions.value = [];
     startDate.value = null;
     dueDate.value = null;
+    selectedLabels.value = [];
   }
 };
 
@@ -354,6 +374,7 @@ const onSave = () => {
     board_id: props.boardId,
     start_date: normalizeDate(startDate.value),
     due_date: normalizeDate(dueDate.value),
+    labels: selectedLabels.value.map(l => l.title),
   };
 
   const payload = {
@@ -411,6 +432,11 @@ const hasChanges = computed(() => {
       .map(c => c.id)
       .sort((a, b) => a - b)
       .join(',');
+    const currentLabelTitles = [...(props.task.labels || [])].sort().join(',');
+    const newLabelTitles = selectedLabels.value
+      .map(l => l.title)
+      .sort()
+      .join(',');
 
     return (
       title.value !== props.task.title ||
@@ -420,6 +446,7 @@ const hasChanges = computed(() => {
       currentAgentIds !== newAgentIds ||
       currentContactIds !== newContactIds ||
       currentConversationIds !== newConversationIds ||
+      currentLabelTitles !== newLabelTitles ||
       !datesEqual(startDate.value, props.task.start_date) ||
       !datesEqual(dueDate.value, props.task.due_date)
     );
@@ -433,6 +460,7 @@ const hasChanges = computed(() => {
     selectedAgents.value.length > 0 ||
     selectedContacts.value.length > 0 ||
     selectedConversations.value.length > 0 ||
+    selectedLabels.value.length > 0 ||
     startDate.value !== null ||
     dueDate.value !== null
   );
@@ -610,6 +638,60 @@ const handleClickOutside = () => {
             </template>
             <template #noOptions>
               {{ t('KANBAN.MODAL.NO_AGENTS_AVAILABLE') }}
+            </template>
+          </multiselect>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-medium text-n-slate-12 select-none">
+            {{ t('KANBAN.MODAL.LABELS_LABEL') }}
+          </span>
+          <multiselect
+            v-model="selectedLabels"
+            :options="labelOptions"
+            track-by="id"
+            label="title"
+            multiple
+            :close-on-select="false"
+            :clear-on-select="false"
+            :placeholder="t('KANBAN.MODAL.LABELS_PLACEHOLDER')"
+            select-label=""
+            deselect-label=""
+            :selected-label="t('FORMS.MULTISELECT.SELECTED')"
+            class="!mb-0"
+          >
+            <template #tag="{ option, remove }">
+              <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 mr-0.5 mb-1 text-xs font-medium rounded bg-n-slate-3 border border-solid border-n-strong"
+              >
+                <span
+                  class="size-2 rounded-full flex-shrink-0"
+                  :style="{ backgroundColor: option.color }"
+                />
+                <span class="truncate max-w-24">{{ option.title }}</span>
+                <button
+                  type="button"
+                  class="flex items-center justify-center p-0 ml-0.5 text-n-slate-10 hover:text-n-slate-12"
+                  @mousedown.prevent.stop="remove(option)"
+                >
+                  <span class="i-lucide-x size-3" />
+                </button>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <div class="flex items-center gap-2 min-w-0">
+                <div
+                  class="w-2 h-2 rounded-full flex-shrink-0"
+                  :style="{ backgroundColor: option.color }"
+                />
+                <span class="truncate">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #noResult>
+              {{ t('KANBAN.MODAL.NO_LABELS_FOUND') }}
+            </template>
+            <template #noOptions>
+              {{ t('KANBAN.MODAL.NO_LABELS_AVAILABLE') }}
             </template>
           </multiselect>
         </div>
