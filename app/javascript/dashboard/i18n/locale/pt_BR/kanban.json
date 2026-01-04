@@ -47,6 +47,12 @@
     "SIDEBAR": {
       "OVERVIEW": "Visão geral"
     },
+    "FEATURE_DISABLED": {
+      "TITLE": "Kanban não está habilitado",
+      "DESCRIPTION": "Entre em contato com seu administrador para habilitar este recurso.",
+      "SUPERADMIN_DESCRIPTION": "Habilite o recurso Kanban nas configurações do Super Admin para começar a usar os quadros.",
+      "SUPERADMIN_ACTION": "Ir para Super Admin"
+    },
     "OVERVIEW": {
       "TITLE": "Quadros",
       "VIEW_BOARD": "Ver Quadro",

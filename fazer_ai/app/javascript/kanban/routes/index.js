@@ -11,7 +11,7 @@ export const routes = [
     name: 'kanban_list',
     meta: {
       permissions: ['administrator', 'agent'],
-      featureFlag: FEATURE_FLAGS.KANBAN,
+      // Note: No featureFlag here - the page handles displaying a disabled state
     },
   },
   {

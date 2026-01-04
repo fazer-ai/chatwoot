@@ -47,6 +47,12 @@
     "SIDEBAR": {
       "OVERVIEW": "Overview"
     },
+    "FEATURE_DISABLED": {
+      "TITLE": "Kanban is not enabled",
+      "DESCRIPTION": "Please contact your administrator to enable this feature.",
+      "SUPERADMIN_DESCRIPTION": "Enable the Kanban feature in the Super Admin settings to start using boards.",
+      "SUPERADMIN_ACTION": "Go to Super Admin"
+    },
     "OVERVIEW": {
       "TITLE": "Boards",
       "VIEW_BOARD": "View Board",

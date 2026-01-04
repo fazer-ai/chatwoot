@@ -5,6 +5,9 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useAlert } from 'dashboard/composables';
 import { useAdmin } from 'dashboard/composables/useAdmin';
+import { useAccount } from 'dashboard/composables/useAccount';
+import { useMapGetter } from 'dashboard/composables/store';
+import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import SettingsLayout from 'dashboard/routes/dashboard/settings/SettingsLayout.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
@@ -18,6 +21,13 @@ const store = useStore();
 const router = useRouter();
 const { t } = useI18n();
 const { isAdmin } = useAdmin();
+const { isCloudFeatureEnabled } = useAccount();
+const currentUser = useMapGetter('getCurrentUser');
+
+const isKanbanEnabled = computed(() =>
+  isCloudFeatureEnabled(FEATURE_FLAGS.KANBAN)
+);
+const isSuperAdmin = computed(() => currentUser.value?.type === 'SuperAdmin');
 
 if (!store.hasModule('kanban')) {
   store.registerModule('kanban', kanbanModule);
@@ -154,25 +164,57 @@ const getAssignedInboxes = inboxIds => {
   <div
     class="flex h-full w-full flex-col overflow-hidden bg-n-background font-inter"
   >
-    <div
-      class="w-full flex justify-center px-6 sm:py-8 lg:px-16 pt-6 sm:pt-8 pb-4"
-    >
-      <div class="w-full max-w-7xl">
-        <SettingsLayout :is-loading="false">
-          <template #header>
-            <div class="flex items-center justify-between w-full">
-              <h1 class="text-xl font-medium tracking-tight text-n-slate-12">
-                {{ t('KANBAN.OVERVIEW.TITLE') }}
-              </h1>
-              <div class="flex items-center gap-2">
-                <KanbanSortMenu
-                  :active-sort="activeSort"
-                  :active-ordering="activeOrdering"
-                  @update:sort="onSortChange"
-                />
-                <Button
-                  v-if="isAdmin"
-                  icon="i-lucide-plus"
+    <!-- Feature Disabled State -->
+    <template v-if="!isKanbanEnabled">
+      <div class="flex items-center justify-center h-full min-h-[400px] px-6">
+        <div class="flex flex-col items-center gap-4 max-w-md text-center">
+          <div
+            class="flex h-16 w-16 items-center justify-center rounded-2xl bg-n-slate-3"
+          >
+            <i class="i-lucide-lock w-8 h-8 text-n-slate-11" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <h3 class="text-lg font-medium text-n-slate-12">
+              {{ t('KANBAN.FEATURE_DISABLED.TITLE') }}
+            </h3>
+            <p class="text-sm text-n-slate-11">
+              {{
+                isSuperAdmin
+                  ? t('KANBAN.FEATURE_DISABLED.SUPERADMIN_DESCRIPTION')
+                  : t('KANBAN.FEATURE_DISABLED.DESCRIPTION')
+              }}
+            </p>
+          </div>
+          <a v-if="isSuperAdmin" href="/super_admin" class="block">
+            <Button icon="i-lucide-settings" size="sm">
+              {{ t('KANBAN.FEATURE_DISABLED.SUPERADMIN_ACTION') }}
+            </Button>
+          </a>
+        </div>
+      </div>
+    </template>
+
+    <!-- Normal Content (when feature is enabled) -->
+    <template v-else>
+      <div
+        class="w-full flex justify-center px-6 sm:py-8 lg:px-16 pt-6 sm:pt-8 pb-4"
+      >
+        <div class="w-full max-w-7xl">
+          <SettingsLayout :is-loading="false">
+            <template #header>
+              <div class="flex items-center justify-between w-full">
+                <h1 class="text-xl font-medium tracking-tight text-n-slate-12">
+                  {{ t('KANBAN.OVERVIEW.TITLE') }}
+                </h1>
+                <div class="flex items-center gap-2">
+                  <KanbanSortMenu
+                    :active-sort="activeSort"
+                    :active-ordering="activeOrdering"
+                    @update:sort="onSortChange"
+                  />
+                  <Button
+                    v-if="isAdmin"
+                    icon="i-lucide-plus"
                   size="sm"
                   class="whitespace-nowrap"
                   @click="openBoardModal"
@@ -472,6 +514,7 @@ const getAssignedInboxes = inboxIds => {
         @save="saveBoard"
       />
     </div>
+    </template>
   </div>
 </template>
 
