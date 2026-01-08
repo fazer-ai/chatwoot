@@ -166,6 +166,15 @@ RSpec.describe FazerAiHub do
       expect(config).to have_key(:installation_host)
       expect(config).to have_key(:feature_usage)
     end
+
+    it 'includes session_id from FazerAi::Session' do
+      session_id = 'test-session-uuid'
+      allow(FazerAi::Session).to receive(:session_id).and_return(session_id)
+
+      config = described_class.instance_config
+
+      expect(config[:session_id]).to eq(session_id)
+    end
   end
 
   describe '.feature_usage' do

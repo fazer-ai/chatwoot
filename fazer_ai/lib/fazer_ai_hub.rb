@@ -112,6 +112,7 @@ class FazerAiHub
         installation_version: Chatwoot.config[:version],
         installation_host: URI.parse(ENV.fetch('FRONTEND_URL', '')).host,
         instance_type: 'chatwoot',
+        session_id: FazerAi::Session.session_id,
         feature_usage: feature_usage
       }
     end
