@@ -101,9 +101,11 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
         expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN')).to be_nil
       end
 
-      it 'logs a warning' do
-        expect(Rails.logger).to receive(:warn).with(/\[fazer\.ai\].*subscription token/i).at_least(:once)
+      it 'sets sync error timestamp' do
         job.perform
+
+        config = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR')
+        expect(config).to be_present
       end
     end
 
@@ -119,7 +121,65 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
         expect(Redis::Alfred.get(Redis::Alfred::LATEST_CHATWOOT_VERSION)).to be_nil
       end
 
-      it 'does not create subscription configs' do
+      it 'sets sync error timestamp' do
+        job.perform
+
+        config = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR')
+        expect(config).to be_present
+        expect(Time.zone.parse(config.value)).to be_within(1.minute).of(Time.current)
+      end
+
+      it 'preserves existing subscription token' do
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: 'existing-token')
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 1.hour.ago.iso8601)
+        end
+
+        job.perform
+
+        expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN').value).to eq('existing-token')
+      end
+    end
+
+    context 'when hub returns 403 (no subscription)' do
+      before do
+        stub_request(:post, FazerAiHub::PING_URL)
+          .to_return(status: 403, body: { error: 'No subscription' }.to_json)
+      end
+
+      it 'clears subscription token' do
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: 'existing-token')
+        end
+
+        job.perform
+
+        expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN')).to be_nil
+      end
+
+      it 'clears verified_at timestamp' do
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 1.hour.ago.iso8601)
+        end
+
+        job.perform
+
+        expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT')).to be_nil
+      end
+    end
+
+    context 'when out of sync for more than threshold' do
+      before do
+        stub_request(:post, FazerAiHub::PING_URL)
+          .to_return(status: 500)
+
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: 'old-token')
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
+        end
+      end
+
+      it 'auto-deactivates the subscription' do
         job.perform
 
         expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN')).to be_nil

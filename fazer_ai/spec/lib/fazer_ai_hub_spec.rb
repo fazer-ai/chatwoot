@@ -251,6 +251,17 @@ RSpec.describe FazerAiHub do
       end
     end
 
+    context 'when request returns 403 (no subscription)' do
+      before do
+        stub_request(:post, described_class::PING_URL)
+          .to_return(status: 403, body: { error: 'No subscription' }.to_json)
+      end
+
+      it 'returns inactive hash' do
+        expect(described_class.sync_subscription).to eq({ 'inactive' => true })
+      end
+    end
+
     context 'when request raises error' do
       before do
         stub_request(:post, described_class::PING_URL)
@@ -282,6 +293,98 @@ RSpec.describe FazerAiHub do
         create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
       end
       expect(described_class.synced?).to be(false)
+    end
+  end
+
+  describe '.out_of_sync?' do
+    it 'returns false when no sync error exists' do
+      expect(described_class.out_of_sync?).to be(false)
+    end
+
+    it 'returns true when sync error config exists' do
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR', value: Time.current.iso8601)
+      end
+      expect(described_class.out_of_sync?).to be(true)
+    end
+  end
+
+  describe '.sync_error_at' do
+    it 'returns nil when no sync error exists' do
+      expect(described_class.sync_error_at).to be_nil
+    end
+
+    it 'returns parsed time when sync error exists' do
+      error_time = 2.hours.ago
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR', value: error_time.iso8601)
+      end
+      expect(described_class.sync_error_at).to be_within(1.second).of(error_time)
+    end
+  end
+
+  describe '.last_synced_at' do
+    it 'returns nil when no verification exists' do
+      expect(described_class.last_synced_at).to be_nil
+    end
+
+    it 'returns parsed time when verification exists' do
+      verified_time = 1.hour.ago
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: verified_time.iso8601)
+      end
+      expect(described_class.last_synced_at).to be_within(1.second).of(verified_time)
+    end
+  end
+
+  describe '.last_known_subscription_status' do
+    it 'returns nil when no token exists' do
+      expect(described_class.last_known_subscription_status).to be_nil
+    end
+
+    it 'returns status from token without verifying signature' do
+      token = generate_test_subscription_token(status: 'active')
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: token)
+      end
+      expect(described_class.last_known_subscription_status).to eq('active')
+    end
+  end
+
+  describe 'out of sync behavior' do
+    context 'when out of sync with existing token' do
+      before do
+        token = generate_test_subscription_token(status: 'active')
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_TOKEN', value: token)
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 1.hour.ago.iso8601)
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR', value: 30.minutes.ago.iso8601)
+        end
+      end
+
+      it 'returns last known status for subscription_status' do
+        expect(described_class.subscription_status).to eq('active')
+      end
+
+      it 'returns true for subscription_active?' do
+        expect(described_class.subscription_active?).to be(true)
+      end
+    end
+
+    context 'when out of sync without token' do
+      before do
+        Current.set(fazer_ai_trusted_subscription_update: true) do
+          create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR', value: 30.minutes.ago.iso8601)
+        end
+      end
+
+      it 'returns inactive for subscription_status' do
+        expect(described_class.subscription_status).to eq('inactive')
+      end
+
+      it 'returns false for subscription_active?' do
+        expect(described_class.subscription_active?).to be(false)
+      end
     end
   end
 

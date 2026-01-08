@@ -15,6 +15,11 @@ class FazerAiHub
     end
 
     def subscription_status
+      if out_of_sync? && subscription_token.present?
+        last_status = last_known_subscription_status
+        return last_status if last_status.present?
+      end
+
       return 'inactive' unless subscription_token_valid?
 
       cached_subscription_data[:status] || 'inactive'
@@ -59,9 +64,29 @@ class FazerAiHub
       subscription_token.present? && subscription_verified_recently?
     end
 
-    def subscription_active?
-      return false unless subscription_token_valid?
+    def out_of_sync?
+      sync_error_at.present?
+    end
 
+    def sync_error_at
+      error_at = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_SYNC_ERROR')&.value
+      return nil if error_at.blank?
+
+      Time.zone.parse(error_at)
+    rescue ArgumentError
+      nil
+    end
+
+    def last_synced_at
+      verified_at = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT')&.value
+      return nil if verified_at.blank?
+
+      Time.zone.parse(verified_at)
+    rescue ArgumentError
+      nil
+    end
+
+    def subscription_active?
       %w[active past_due trialing].include?(subscription_status)
     end
 
@@ -111,6 +136,8 @@ class FazerAiHub
         timeout: 10
       )
 
+      return { 'inactive' => true } if response.code == 403
+
       return nil unless response.success?
 
       JSON.parse(response.body)
@@ -139,6 +166,16 @@ class FazerAiHub
 
     def verify_subscription_token(token)
       FazerAi::SubscriptionToken.verify(token)
+    end
+
+    def last_known_subscription_status
+      token = subscription_token
+      return nil if token.blank?
+
+      payload = JWT.decode(token, nil, false).first
+      payload['status']
+    rescue JWT::DecodeError
+      nil
     end
 
     def clear_cache!

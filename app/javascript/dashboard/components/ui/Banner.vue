@@ -57,7 +57,7 @@ export default {
     // the button color and variant names
     getButtonColor() {
       const colorMap = {
-        primary: 'blue',
+        primary: 'slate',
         secondary: 'blue',
         alert: 'ruby',
         warning: 'amber',
@@ -139,6 +139,10 @@ export default {
   &.warning {
     @apply bg-n-amber-5 text-n-amber-12;
     a {
+      @apply text-n-amber-12;
+    }
+
+    .actions :deep(button) {
       @apply text-n-amber-12;
     }
   }

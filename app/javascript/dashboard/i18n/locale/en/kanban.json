@@ -47,6 +47,18 @@
     "SIDEBAR": {
       "OVERVIEW": "Overview"
     },
+    "PAYWALL": {
+      "TITLE": "Upgrade to use Kanban",
+      "AVAILABLE_ON": "The Kanban feature is only available with a fazer.ai subscription.",
+      "UPGRADE_PROMPT": "Upgrade to get access to Kanban boards, task management, and workflow automation.",
+      "UPGRADE_NOW": "Upgrade now",
+      "CANCEL_ANYTIME": "You can change or cancel your plan anytime"
+    },
+    "ENTERPRISE_PAYWALL": {
+      "AVAILABLE_ON": "The Kanban feature requires a fazer.ai subscription.",
+      "UPGRADE_PROMPT": "Subscribe to fazer.ai to access Kanban boards, task management, and workflow automation.",
+      "ASK_ADMIN": "Please reach out to your administrator for the upgrade."
+    },
     "FEATURE_DISABLED": {
       "TITLE": "Kanban is not enabled",
       "DESCRIPTION": "Please contact your administrator to enable this feature.",

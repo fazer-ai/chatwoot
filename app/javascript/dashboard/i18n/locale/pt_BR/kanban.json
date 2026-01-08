@@ -47,6 +47,18 @@
     "SIDEBAR": {
       "OVERVIEW": "Visão geral"
     },
+    "PAYWALL": {
+      "TITLE": "Faça upgrade para usar o Kanban",
+      "AVAILABLE_ON": "O recurso Kanban está disponível apenas com uma assinatura fazer.ai.",
+      "UPGRADE_PROMPT": "Faça upgrade para ter acesso a quadros Kanban, gerenciamento de tarefas e automação de fluxo de trabalho.",
+      "UPGRADE_NOW": "Fazer upgrade agora",
+      "CANCEL_ANYTIME": "Você pode alterar ou cancelar seu plano a qualquer momento"
+    },
+    "ENTERPRISE_PAYWALL": {
+      "AVAILABLE_ON": "O recurso Kanban requer uma assinatura fazer.ai.",
+      "UPGRADE_PROMPT": "Assine o fazer.ai para acessar quadros Kanban, gerenciamento de tarefas e automação de fluxo de trabalho.",
+      "ASK_ADMIN": "Entre em contato com seu administrador para fazer o upgrade."
+    },
     "FEATURE_DISABLED": {
       "TITLE": "Kanban não está habilitado",
       "DESCRIPTION": "Entre em contato com seu administrador para habilitar este recurso.",

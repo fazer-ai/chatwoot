@@ -61,6 +61,8 @@ export const getters = {
   getFazerAiSubscription: $state => $state.fazerAiSubscription,
   isFazerAiSubscriptionPastDue: $state =>
     $state.fazerAiSubscription?.status === 'past_due',
+  isFazerAiSubscriptionTrialing: $state =>
+    $state.fazerAiSubscription?.status === 'trialing',
   isFazerAiSubscriptionCanceling: $state =>
     $state.fazerAiSubscription?.cancel_at_period_end === true,
 };

@@ -21,6 +21,9 @@ const fazerAiSubscription = computed(
 const isFazerAiSubscriptionPastDue = computed(
   () => store.getters['globalConfig/isFazerAiSubscriptionPastDue']
 );
+const isFazerAiSubscriptionTrialing = computed(
+  () => store.getters['globalConfig/isFazerAiSubscriptionTrialing']
+);
 const isFazerAiSubscriptionCanceling = computed(
   () => store.getters['globalConfig/isFazerAiSubscriptionCanceling']
 );
@@ -44,23 +47,73 @@ const formattedPeriodEnd = computed(() => {
   }).format(date);
 });
 
+const daysUntilTrialEnd = computed(() => {
+  const periodEnd = fazerAiSubscription.value?.current_period_end;
+  if (!periodEnd) return null;
+  const endDate = new Date(periodEnd * 1000);
+  const now = new Date();
+  const diffTime = endDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+});
+
 const shouldShowBanner = computed(() => {
   if (
     !isFazerAiSubscriptionPastDue.value &&
-    !isFazerAiSubscriptionCanceling.value
+    !isFazerAiSubscriptionCanceling.value &&
+    !isFazerAiSubscriptionTrialing.value
   )
     return false;
-  if (!isAdmin.value) return false;
   if (isDismissed.value) return false;
   return true;
 });
 
+const bannerColorScheme = computed(() => {
+  if (isFazerAiSubscriptionTrialing.value) {
+    const days = daysUntilTrialEnd.value;
+    if (days !== null && days <= 3) return 'warning';
+    return 'primary';
+  }
+  return 'warning';
+});
+
 const bannerMessage = computed(() => {
+  if (isFazerAiSubscriptionTrialing.value) {
+    const days = daysUntilTrialEnd.value;
+    if (!isAdmin.value) {
+      if (days === 0) {
+        return t('FAZER_AI.SUBSCRIPTION_TRIALING.USER_MESSAGE_LAST_DAY');
+      }
+      if (days !== null && days <= 7) {
+        return t('FAZER_AI.SUBSCRIPTION_TRIALING.USER_MESSAGE_DAYS', { days });
+      }
+      return t('FAZER_AI.SUBSCRIPTION_TRIALING.USER_MESSAGE', {
+        date: formattedPeriodEnd.value,
+      });
+    }
+    if (days === 0) {
+      return t('FAZER_AI.SUBSCRIPTION_TRIALING.MESSAGE_LAST_DAY');
+    }
+    if (days !== null && days <= 7) {
+      return t('FAZER_AI.SUBSCRIPTION_TRIALING.MESSAGE_DAYS', { days });
+    }
+    return t('FAZER_AI.SUBSCRIPTION_TRIALING.MESSAGE', {
+      date: formattedPeriodEnd.value,
+    });
+  }
   if (isFazerAiSubscriptionCanceling.value) {
+    if (!isAdmin.value) {
+      return t('FAZER_AI.SUBSCRIPTION_CANCELING.USER_MESSAGE', {
+        date: formattedPeriodEnd.value,
+      });
+    }
     const key = isSuperAdmin.value
       ? 'FAZER_AI.SUBSCRIPTION_CANCELING.SUPERADMIN_MESSAGE'
       : 'FAZER_AI.SUBSCRIPTION_CANCELING.ADMIN_MESSAGE';
     return t(key, { date: formattedPeriodEnd.value });
+  }
+  if (!isAdmin.value) {
+    return t('FAZER_AI.SUBSCRIPTION_PAST_DUE.USER_MESSAGE');
   }
   const key = isSuperAdmin.value
     ? 'FAZER_AI.SUBSCRIPTION_PAST_DUE.SUPERADMIN_MESSAGE'
@@ -69,13 +122,14 @@ const bannerMessage = computed(() => {
 });
 
 const actionButtonLabel = computed(() => {
+  if (isFazerAiSubscriptionTrialing.value) {
+    return t('FAZER_AI.SUBSCRIPTION_TRIALING.UPGRADE');
+  }
   if (isFazerAiSubscriptionCanceling.value) {
     return t('FAZER_AI.SUBSCRIPTION_CANCELING.OPEN_BILLING');
   }
   return t('FAZER_AI.SUBSCRIPTION_PAST_DUE.OPEN_BILLING');
 });
-
-const billingUrl = computed(() => fazerAiSubscription.value?.billing_url || '');
 
 function checkDismissedState() {
   const dismissedAt = LocalStorage.get(
@@ -100,10 +154,8 @@ function onDismiss() {
   );
 }
 
-function openBilling() {
-  if (billingUrl.value) {
-    window.open(billingUrl.value, '_blank');
-  }
+function openSubscriptionSettings() {
+  window.location.href = '/super_admin/settings';
 }
 
 onMounted(() => {
@@ -115,12 +167,12 @@ onMounted(() => {
 <template>
   <Banner
     v-if="shouldShowBanner"
-    color-scheme="warning"
+    :color-scheme="bannerColorScheme"
     :banner-message="bannerMessage"
     :action-button-label="isSuperAdmin ? actionButtonLabel : ''"
     :has-action-button="isSuperAdmin"
     has-close-button
-    @primary-action="openBilling"
+    @primary-action="openSubscriptionSettings"
     @close="onDismiss"
   />
 </template>

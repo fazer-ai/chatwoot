@@ -17,7 +17,9 @@ module SuperAdmin::FeaturesHelper
   def self.fazer_ai_subscription_details
     parts = [subscription_status_label, subscription_features_text]
     parts << kanban_accounts_text if FazerAiHub.subscription_active?
-    parts.join(' · ')
+    result = parts.compact.join(' · ')
+    result += "<br>#{sync_warning_text}" if FazerAiHub.out_of_sync?
+    result.html_safe # rubocop:disable Rails/OutputSafety
   end
 
   def self.subscription_status_label
@@ -29,8 +31,41 @@ module SuperAdmin::FeaturesHelper
             else "<span class='text-slate-500 font-semibold'>Inactive</span>"
             end
     result = "Status: #{label}"
+    result += " · #{subscription_trialing_text}" if status == 'trialing'
     result += " · #{subscription_canceling_text}" if FazerAiHub.subscription_canceling?
     result
+  end
+
+  def self.sync_warning_text
+    last_synced = FazerAiHub.last_synced_at
+    warning_badge = "<span class='text-yellow-600 font-semibold'>⚠️ Out of sync</span>"
+    support_link = "<a href='mailto:support@fazer.ai' class='text-blue-600 underline'>support@fazer.ai</a>"
+
+    message = if last_synced.present?
+                days = ((Time.current - last_synced) / 1.day).ceil
+                "#{warning_badge} (last synced #{days} #{'day'.pluralize(days)} ago)"
+              else
+                warning_badge
+              end
+
+    "#{message} — contact support at #{support_link}"
+  end
+
+  def self.subscription_trialing_text
+    period_end = FazerAiHub.subscription_period_end
+    return nil if period_end.blank?
+
+    end_date = Time.zone.at(period_end)
+    days_remaining = ((end_date - Time.current) / 1.day).ceil
+
+    if days_remaining <= 0
+      "<span class='text-red-600 font-semibold'>Trial ends today</span>"
+    elsif days_remaining <= 3
+      "<span class='text-yellow-600 font-semibold'>#{days_remaining} #{'day'.pluralize(days_remaining)} remaining</span>"
+    else
+      formatted_date = end_date.strftime('%B %d, %Y')
+      "<span class='text-blue-600'>Ends #{formatted_date}</span>"
+    end
   end
 
   def self.subscription_features_text

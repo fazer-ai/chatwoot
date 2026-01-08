@@ -15,6 +15,19 @@ module FazerAi::SubscriptionToken
     -----END PUBLIC KEY-----
   PEM
 
+  # Enable by setting FAZER_AI_HUB_URL to a localhost URL
+  TEST_PUBLIC_KEY = <<~PEM
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr9ICjCbXqQxIS7jmSaeG
+    5ifkpEzM0dc9/YCmTW/wVClVDpgRCUpNgCeXG45PX8/LDa1JLgoyeBjCdaHMgLpb
+    1I9ssWCMKBXOfHd9HsswCosWacbwiM7ZiLhByAh1KgUAYV5KTbGgJM9Bf/JPv6L4
+    b08FRb67OO4gdQxRQljY5ibj8MfF1NeB9c6PKWa41CAhkVGr+bktoL8lfQ357a2F
+    N8o2wr/TzlH/SvTK7GZp61ZBJQ9hsKuxvQ0IBib2kem2aHEvRtMZ2AIrTCkmspAJ
+    ReAtw7sC/gVAheqw0qGcYBQsF4gK06L60oj8NAra1diA+WPlCE3wD5365iaZLmIf
+    TQIDAQAB
+    -----END PUBLIC KEY-----
+  PEM
+
   class << self
     def verify(token)
       return nil if token.blank?
@@ -67,7 +80,17 @@ module FazerAi::SubscriptionToken
     end
 
     def public_key
-      @public_key ||= OpenSSL::PKey::RSA.new(PUBLIC_KEY)
+      @public_key ||= OpenSSL::PKey::RSA.new(use_test_key? ? TEST_PUBLIC_KEY : PUBLIC_KEY)
+    end
+
+    def use_test_key?
+      hub_url = ENV.fetch('FAZER_AI_HUB_URL', nil)
+      return false if hub_url.blank?
+
+      uri = URI.parse(hub_url)
+      uri.host == 'localhost' || uri.host == '127.0.0.1'
+    rescue URI::InvalidURIError
+      false
     end
 
     def validate_payload(payload)

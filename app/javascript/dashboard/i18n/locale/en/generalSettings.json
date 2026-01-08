@@ -253,12 +253,23 @@
     "SUBSCRIPTION_PAST_DUE": {
       "ADMIN_MESSAGE": "Your fazer.ai subscription payment is past due. Features may be disabled soon. Please contact your account manager.",
       "SUPERADMIN_MESSAGE": "Your fazer.ai subscription payment is past due. Features may be disabled soon.",
+      "USER_MESSAGE": "Some features may be temporarily unavailable. Your administrator has been notified.",
       "OPEN_BILLING": "Manage Subscription"
     },
     "SUBSCRIPTION_CANCELING": {
       "ADMIN_MESSAGE": "Your fazer.ai subscription is set to cancel on {date}. Features will stop working after this date. Please contact your account manager.",
       "SUPERADMIN_MESSAGE": "Your fazer.ai subscription is set to cancel on {date}. Features will stop working after this date.",
+      "USER_MESSAGE": "Some features will be unavailable after {date}. Contact your administrator for details.",
       "OPEN_BILLING": "Manage Subscription"
+    },
+    "SUBSCRIPTION_TRIALING": {
+      "MESSAGE": "Your fazer.ai trial ends on {date}. Upgrade to keep using premium features.",
+      "MESSAGE_DAYS": "Your fazer.ai trial ends in {days} days. Upgrade to keep using premium features.",
+      "MESSAGE_LAST_DAY": "Your fazer.ai trial ends today. Upgrade now to keep using premium features.",
+      "USER_MESSAGE": "You're using fazer.ai trial features. Trial ends on {date}.",
+      "USER_MESSAGE_DAYS": "You're using fazer.ai trial features. Trial ends in {days} days.",
+      "USER_MESSAGE_LAST_DAY": "You're using fazer.ai trial features. Trial ends today.",
+      "UPGRADE": "Upgrade Now"
     }
   }
 }
