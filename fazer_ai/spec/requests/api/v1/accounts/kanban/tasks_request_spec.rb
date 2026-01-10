@@ -42,6 +42,18 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
         expect(response).to have_http_status(:ok)
         expect(admin_preference.preferences['task_sorting'][board.id.to_s]).to eq({ 'sort' => 'priority', 'order' => 'desc' })
       end
+
+      it 'sorts tasks with null priority at the end' do
+        task_urgent = create(:kanban_task, account: account, board: board, board_step: board_step, priority: 'urgent')
+        task_nil = create(:kanban_task, account: account, board: board, board_step: board_step, priority: nil)
+        task_low = create(:kanban_task, account: account, board: board, board_step: board_step, priority: 'low')
+
+        get base_path, params: { sort: 'priority', order: 'desc', board_id: board.id }, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        task_ids = response.parsed_body['tasks'].pluck('id')
+        expect(task_ids).to eq([task_urgent.id, task_low.id, task_nil.id])
+      end
     end
   end
 
@@ -64,7 +76,7 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
         task: {
           title: 'Follow up',
           description: 'Check in with the lead',
-          priority: 'normal',
+          priority: 'medium',
           board_id: board.id,
           board_step_id: board_step.id
         }

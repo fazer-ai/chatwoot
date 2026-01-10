@@ -155,7 +155,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
 
   def sort_by_priority(scope, order_by)
     priorities = FazerAi::Kanban::Task::PRIORITIES
-    priority_order_sql = "array_position(ARRAY['#{priorities.join("','")}']::text[], priority)"
+    priority_order_sql = "COALESCE(array_position(ARRAY['#{priorities.join("','")}']::text[], priority), #{priorities.length + 1})"
     inverted_order = order_by == :desc ? :asc : :desc
     scope.reorder(Arel.sql(priority_order_sql) => inverted_order)
   end

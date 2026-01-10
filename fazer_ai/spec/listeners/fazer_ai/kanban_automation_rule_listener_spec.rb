@@ -72,7 +72,7 @@ RSpec.describe FazerAi::KanbanAutomationRuleListener do
     end
 
     let(:event) do
-      Events::Base.new('kanban_task_updated', Time.zone.now, { task: task, changed_attributes: { priority: %w[normal urgent] } })
+      Events::Base.new('kanban_task_updated', Time.zone.now, { task: task, changed_attributes: { priority: [nil, 'urgent'] } })
     end
 
     context 'when matching rules are present' do

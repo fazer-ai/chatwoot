@@ -8,7 +8,7 @@
 #  cached_label_list :text
 #  description       :text
 #  due_date          :datetime
-#  priority          :string           default("normal"), not null
+#  priority          :string
 #  start_date        :datetime
 #  title             :string           not null
 #  created_at        :datetime         not null
@@ -42,7 +42,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
 
   self.table_name = 'kanban_tasks'
 
-  PRIORITIES = %w[urgent high normal low].freeze
+  PRIORITIES = %w[urgent high medium low].freeze
 
   belongs_to :account
   belongs_to :board
@@ -88,7 +88,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   validates :account, :board, :board_step, presence: true
   validates :title, presence: true, length: { maximum: 255 }
   validates :description, length: { maximum: 5000 }
-  validates :priority, inclusion: { in: PRIORITIES }
+  validates :priority, inclusion: { in: PRIORITIES }, allow_nil: true
   validate :scheduled_dates_are_coherent
   validate :assigned_agents_belong_to_board
   validate :contacts_belong_to_account

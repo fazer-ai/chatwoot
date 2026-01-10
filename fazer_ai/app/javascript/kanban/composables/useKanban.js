@@ -8,7 +8,9 @@ export function useKanban() {
   const priorities = computed(() =>
     KANBAN_PRIORITIES.map(priority => ({
       ...priority,
-      name: t(`KANBAN.PRIORITY.${priority.id.toUpperCase()}`),
+      name: t(
+        `KANBAN.PRIORITY.${priority.id ? priority.id.toUpperCase() : 'NONE'}`
+      ),
     }))
   );
 

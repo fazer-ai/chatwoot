@@ -177,8 +177,9 @@
     "PRIORITY": {
       "URGENT": "Urgente",
       "HIGH": "Alta",
-      "NORMAL": "Normal",
+      "MEDIUM": "Média",
       "LOW": "Baixa",
+      "NONE": "Nenhuma",
       "TOOLTIP_PREFIX": "Prioridade {priority}"
     },
     "STATUS": {

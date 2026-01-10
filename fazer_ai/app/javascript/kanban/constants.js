@@ -10,7 +10,7 @@ export const KANBAN_PRIORITIES = [
     color: '#F59E0B',
   },
   {
-    id: 'normal',
+    id: 'medium',
     icon: 'i-lucide-equal',
     color: '#3B82F6',
   },
@@ -18,6 +18,11 @@ export const KANBAN_PRIORITIES = [
     id: 'low',
     icon: 'i-lucide-chevron-down',
     color: '#64748B',
+  },
+  {
+    id: null,
+    icon: 'i-lucide-minus',
+    color: '#94A3B8',
   },
 ];
 
@@ -45,7 +50,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.SALES.TASKS.FOLLOW_UP',
-            priority: 'normal',
+            priority: 'medium',
             descriptionKey: 'KANBAN_TEMPLATES.SALES.TASKS.FOLLOW_UP_DESC',
           },
         ],
@@ -77,7 +82,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.SALES.TASKS.PRICING_REVIEW',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.SALES.TASKS.PRICING_REVIEW_DESC',
           },
         ],
@@ -101,12 +106,12 @@ export const BOARD_TEMPLATES = [
         tasks_attributes: [
           {
             titleKey: 'KANBAN_TEMPLATES.RECRUITMENT.TASKS.SOURCING',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.RECRUITMENT.TASKS.SOURCING_DESC',
           },
           {
             titleKey: 'KANBAN_TEMPLATES.RECRUITMENT.TASKS.REVIEW_RESUME',
-            priority: 'normal',
+            priority: null,
             descriptionKey:
               'KANBAN_TEMPLATES.RECRUITMENT.TASKS.REVIEW_RESUME_DESC',
           },
@@ -135,7 +140,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.RECRUITMENT.TASKS.CHECK_REFS',
-            priority: 'normal',
+            priority: 'medium',
             descriptionKey:
               'KANBAN_TEMPLATES.RECRUITMENT.TASKS.CHECK_REFS_DESC',
           },
@@ -182,7 +187,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.ROADMAP.TASKS.MOBILE_APP',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.ROADMAP.TASKS.MOBILE_APP_DESC',
           },
         ],
@@ -215,7 +220,7 @@ export const BOARD_TEMPLATES = [
         tasks_attributes: [
           {
             titleKey: 'KANBAN_TEMPLATES.ROADMAP.TASKS.PERF_OPT',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.ROADMAP.TASKS.PERF_OPT_DESC',
           },
         ],
@@ -244,7 +249,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.WEBINAR',
-            priority: 'normal',
+            priority: 'medium',
             descriptionKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.WEBINAR_DESC',
           },
         ],
@@ -255,7 +260,7 @@ export const BOARD_TEMPLATES = [
         tasks_attributes: [
           {
             titleKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.NEWSLETTER',
-            priority: 'normal',
+            priority: 'medium',
             descriptionKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.NEWSLETTER_DESC',
           },
         ],
@@ -271,7 +276,7 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.CASE_STUDY',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.CONTENT.TASKS.CASE_STUDY_DESC',
           },
         ],
@@ -312,12 +317,12 @@ export const BOARD_TEMPLATES = [
           },
           {
             titleKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.WRITE_DOCS',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.WRITE_DOCS_DESC',
           },
           {
             titleKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.TEAM_MEETING',
-            priority: 'normal',
+            priority: 'medium',
             descriptionKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.TEAM_MEETING_DESC',
           },
         ],
@@ -328,7 +333,7 @@ export const BOARD_TEMPLATES = [
         tasks_attributes: [
           {
             titleKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.DEV_CORE',
-            priority: 'normal',
+            priority: null,
             descriptionKey: 'KANBAN_TEMPLATES.PROJECT.TASKS.DEV_CORE_DESC',
           },
         ],

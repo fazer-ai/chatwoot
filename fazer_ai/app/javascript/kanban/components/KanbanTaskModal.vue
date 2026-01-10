@@ -72,7 +72,7 @@ const { priorities } = useKanban();
 
 const title = ref('');
 const description = ref('');
-const priority = ref('normal');
+const priority = ref(null);
 const selectedStepId = ref('');
 const selectedAgents = ref([]);
 const selectedContacts = ref([]);
@@ -257,7 +257,7 @@ const openModal = () => {
   } else {
     title.value = '';
     description.value = '';
-    priority.value = 'normal';
+    priority.value = null;
     selectedStepId.value = props.stepId ? String(props.stepId) : '';
     selectedAgents.value = [];
     selectedContacts.value = [];
@@ -454,7 +454,7 @@ const hasChanges = computed(() => {
   return (
     title.value !== '' ||
     description.value !== '' ||
-    priority.value !== 'normal' ||
+    priority.value !== null ||
     String(selectedStepId.value) !==
       (props.stepId ? String(props.stepId) : '') ||
     selectedAgents.value.length > 0 ||

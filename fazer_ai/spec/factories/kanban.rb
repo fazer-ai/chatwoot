@@ -19,7 +19,7 @@ FactoryBot.define do
     association :board, factory: :kanban_board
     title { "Task #{SecureRandom.hex(4)}" }
     description { 'Follow up with the lead' }
-    priority { 'normal' }
+    priority { nil }
 
     after(:build) do |task|
       task.account ||= task.board.account
@@ -31,7 +31,7 @@ FactoryBot.define do
   factory :kanban_audit_event, class: 'FazerAi::Kanban::AuditEvent' do
     association :task, factory: :kanban_task
     action { 'task.updated' }
-    metadata { { field: 'priority', from: 'normal', to: 'high' } }
+    metadata { { field: 'priority', from: nil, to: 'high' } }
 
     after(:build) do |event|
       event.account ||= event.task.account

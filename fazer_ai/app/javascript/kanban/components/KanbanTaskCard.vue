@@ -45,10 +45,10 @@ const getConversationUrl = conversation => {
 
 const getPriority = priority =>
   KANBAN_PRIORITIES.find(p => p.id === priority) ||
-  KANBAN_PRIORITIES.find(p => p.id === 'normal');
+  KANBAN_PRIORITIES.find(p => p.id === null);
 
-const isNormalPriority = computed(() => {
-  return props.task.priority === 'normal';
+const isNoPriority = computed(() => {
+  return props.task.priority === null || props.task.priority === undefined;
 });
 
 const hasDueDate = computed(() => !!props.task.due_date);
@@ -184,9 +184,7 @@ const getRemainingAgentsCount = agents => {
 };
 
 const priorityLabel = computed(() => {
-  const key = props.task.priority
-    ? props.task.priority.toUpperCase()
-    : 'NORMAL';
+  const key = props.task.priority ? props.task.priority.toUpperCase() : 'NONE';
   const priorityName = t(`KANBAN.PRIORITY.${key}`);
   return t('KANBAN.PRIORITY.TOOLTIP_PREFIX', { priority: priorityName });
 });
@@ -585,7 +583,7 @@ const handleDescriptionClick = event => {
                 v-tooltip="priorityLabel"
                 :class="[
                   priorityIcon,
-                  isNormalPriority && !isOpen
+                  isNoPriority && !isOpen
                     ? 'opacity-0 group-hover:opacity-100'
                     : '',
                 ]"

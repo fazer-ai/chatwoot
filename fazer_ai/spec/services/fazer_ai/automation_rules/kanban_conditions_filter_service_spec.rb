@@ -19,7 +19,6 @@ RSpec.describe FazerAi::AutomationRules::KanbanConditionsFilterService do
            account: account,
            board: board,
            board_step: step1,
-           priority: 'normal',
            conversation_ids: [conversation.id])
   end
 
@@ -147,7 +146,7 @@ RSpec.describe FazerAi::AutomationRules::KanbanConditionsFilterService do
 
     context 'with priority condition' do
       let(:conditions) do
-        [{ attribute_key: 'priority', filter_operator: 'equal_to', values: ['normal'], query_operator: nil }]
+        [{ attribute_key: 'priority', filter_operator: 'equal_to', values: [nil], query_operator: nil }]
       end
 
       it 'returns true when priority matches' do
@@ -169,7 +168,7 @@ RSpec.describe FazerAi::AutomationRules::KanbanConditionsFilterService do
       let(:conditions) do
         [
           { attribute_key: 'kanban_board_id', filter_operator: 'equal_to', values: [board.id], query_operator: 'and' },
-          { attribute_key: 'priority', filter_operator: 'equal_to', values: ['normal'], query_operator: nil }
+          { attribute_key: 'priority', filter_operator: 'equal_to', values: [nil], query_operator: nil }
         ]
       end
 

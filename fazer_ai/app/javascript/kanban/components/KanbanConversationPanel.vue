@@ -118,7 +118,7 @@ const currentPriority = computed(() => {
   if (!existingTask.value) return null;
   return (
     priorities.value.find(p => p.id === existingTask.value.priority) ||
-    priorities.value.find(p => p.id === 'normal')
+    priorities.value.find(p => p.id === null)
   );
 });
 

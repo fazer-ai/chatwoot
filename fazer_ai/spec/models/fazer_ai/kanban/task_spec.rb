@@ -15,7 +15,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
     it { is_expected.to validate_presence_of(:title) }
     it { is_expected.to validate_length_of(:title).is_at_most(255) }
     it { is_expected.to validate_length_of(:description).is_at_most(5000) }
-    it { is_expected.to validate_inclusion_of(:priority).in_array(described_class::PRIORITIES) }
+    it { is_expected.to validate_inclusion_of(:priority).in_array(described_class::PRIORITIES).allow_nil }
 
     it 'rejects a due date that is before the start date' do
       task.start_date = 2.days.from_now
