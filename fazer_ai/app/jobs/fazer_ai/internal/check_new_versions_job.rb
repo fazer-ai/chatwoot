@@ -55,7 +55,9 @@ module FazerAi::Internal::CheckNewVersionsJob
 
   def handle_inactive_subscription
     Rails.logger.info('[fazer.ai] Subscription is inactive - deactivating')
-    clear_subscription_configs
+    clear_subscription_token
+    update_protected_config('FAZER_AI_SUBSCRIPTION_VERIFIED_AT', Time.current.iso8601)
+    clear_protected_config('FAZER_AI_SUBSCRIPTION_SYNC_ERROR')
     FazerAiHub.clear_cache!
   end
 
@@ -64,6 +66,10 @@ module FazerAi::Internal::CheckNewVersionsJob
     update_protected_config('FAZER_AI_SUBSCRIPTION_VERIFIED_AT', Time.current.iso8601)
     clear_protected_config('FAZER_AI_SUBSCRIPTION_SYNC_ERROR')
     FazerAiHub.clear_cache!
+  end
+
+  def clear_subscription_token
+    clear_protected_config('FAZER_AI_SUBSCRIPTION_TOKEN')
   end
 
   def clear_subscription_configs

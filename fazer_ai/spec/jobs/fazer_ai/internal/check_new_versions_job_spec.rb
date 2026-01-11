@@ -157,14 +157,16 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
         expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_TOKEN')).to be_nil
       end
 
-      it 'clears verified_at timestamp' do
+      it 'updates verified_at timestamp to indicate successful sync' do
         Current.set(fazer_ai_trusted_subscription_update: true) do
           create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 1.hour.ago.iso8601)
         end
 
         job.perform
 
-        expect(InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT')).to be_nil
+        config = InstallationConfig.find_by(name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT')
+        expect(config).to be_present
+        expect(Time.zone.parse(config.value)).to be_within(1.minute).of(Time.current)
       end
     end
 

@@ -305,6 +305,26 @@ RSpec.describe FazerAiHub do
     end
   end
 
+  describe '.never_synced?' do
+    it 'returns true when no verification timestamp exists' do
+      expect(described_class.never_synced?).to be(true)
+    end
+
+    it 'returns false when verification timestamp exists' do
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: Time.current.iso8601)
+      end
+      expect(described_class.never_synced?).to be(false)
+    end
+
+    it 'returns false even when verification is stale' do
+      Current.set(fazer_ai_trusted_subscription_update: true) do
+        create(:installation_config, name: 'FAZER_AI_SUBSCRIPTION_VERIFIED_AT', value: 4.days.ago.iso8601)
+      end
+      expect(described_class.never_synced?).to be(false)
+    end
+  end
+
   describe '.out_of_sync?' do
     it 'returns false when no sync error exists' do
       expect(described_class.out_of_sync?).to be(false)

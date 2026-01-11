@@ -64,6 +64,10 @@ class FazerAiHub
       subscription_token.present? && subscription_verified_recently?
     end
 
+    def never_synced?
+      last_synced_at.nil?
+    end
+
     def out_of_sync?
       sync_error_at.present?
     end

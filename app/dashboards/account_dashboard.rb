@@ -103,7 +103,9 @@ class AccountDashboard < Administrate::BaseDashboard
     active: ->(resources) { resources.where(status: :active) },
     suspended: ->(resources) { resources.where(status: :suspended) },
     recent: ->(resources) { resources.where('created_at > ?', 30.days.ago) },
-    marked_for_deletion: ->(resources) { resources.where("custom_attributes->>'marked_for_deletion_at' IS NOT NULL") }
+    marked_for_deletion: ->(resources) { resources.where("custom_attributes->>'marked_for_deletion_at' IS NOT NULL") },
+    kanban_enabled: ->(resources) { resources.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')) },
+    kanban_disabled: ->(resources) { resources.where.not('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')) }
   }.freeze
 
   # Overwrite this method to customize how accounts are displayed

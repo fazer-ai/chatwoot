@@ -50,6 +50,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
     context 'when subscription is inactive' do
       before do
         allow(FazerAiHub).to receive(:subscription_status).and_return('inactive')
+        allow(FazerAiHub).to receive(:never_synced?).and_return(false)
         allow(FazerAiHub).to receive(:enabled_features).and_return([])
       end
 
@@ -58,6 +59,22 @@ RSpec.describe SuperAdmin::FeaturesHelper do
 
         expect(result).to include('text-slate-500')
         expect(result).to include('Inactive')
+      end
+    end
+
+    context 'when hub has never been synced' do
+      before do
+        allow(FazerAiHub).to receive(:subscription_status).and_return('inactive')
+        allow(FazerAiHub).to receive(:never_synced?).and_return(true)
+        allow(FazerAiHub).to receive(:enabled_features).and_return([])
+      end
+
+      it 'returns never synced status with slate styling' do
+        result = described_class.fazer_ai_subscription_details
+
+        expect(result).to include('text-slate-500')
+        expect(result).to include('Never Synced')
+        expect(result).not_to include('Inactive')
       end
     end
 
@@ -85,6 +102,60 @@ RSpec.describe SuperAdmin::FeaturesHelper do
         result = described_class.fazer_ai_subscription_details
 
         expect(result).to include('Kanban, Other Feature')
+      end
+    end
+  end
+
+  describe '.accounts_with_fazer_ai_features' do
+    context 'when no fazer.ai features are enabled' do
+      before do
+        allow(FazerAiHub).to receive(:enabled_features).and_return([])
+      end
+
+      it 'returns empty array' do
+        expect(described_class.accounts_with_fazer_ai_features).to eq([])
+      end
+    end
+
+    context 'when fazer.ai features are enabled and accounts have features' do
+      let!(:account1) { create(:account, name: 'Alpha Account') }
+      let!(:account2) { create(:account, name: 'Beta Account') }
+
+      before do
+        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
+        account1.enable_features!('kanban')
+        account2.enable_features!('kanban')
+      end
+
+      it 'returns accounts with their enabled features' do
+        result = described_class.accounts_with_fazer_ai_features
+
+        expect(result.length).to eq(2)
+        expect(result.first[:name]).to eq('Alpha Account')
+        expect(result.first[:features]).to include('Chatwoot Kanban')
+      end
+
+      it 'sorts accounts alphabetically by name' do
+        result = described_class.accounts_with_fazer_ai_features
+
+        expect(result.first[:name]).to eq('Alpha Account')
+        expect(result.last[:name]).to eq('Beta Account')
+      end
+    end
+
+    context 'when account has multiple fazer.ai features enabled' do
+      let!(:account) { create(:account, name: 'Test Account') }
+
+      before do
+        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
+        account.enable_features!('kanban')
+      end
+
+      it 'includes all features for the account' do
+        result = described_class.accounts_with_fazer_ai_features
+
+        expect(result.length).to eq(1)
+        expect(result.first[:features]).to include('Chatwoot Kanban')
       end
     end
   end

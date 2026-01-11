@@ -28,7 +28,12 @@ module SuperAdmin::FeaturesHelper
             when 'active' then "<span class='text-green-600 font-semibold'>Active</span>"
             when 'past_due' then "<span class='text-yellow-600 font-semibold'>Past Due</span>"
             when 'trialing' then "<span class='text-blue-600 font-semibold'>Trialing</span>"
-            else "<span class='text-slate-500 font-semibold'>Inactive</span>"
+            else
+              if FazerAiHub.never_synced?
+                "<span class='text-slate-500 font-semibold'>Never Synced</span>"
+              else
+                "<span class='text-slate-500 font-semibold'>Inactive</span>"
+              end
             end
     result = "Status: #{label}"
     result += " · #{subscription_trialing_text}" if status == 'trialing'
@@ -87,5 +92,26 @@ module SuperAdmin::FeaturesHelper
 
     formatted_date = Time.zone.at(period_end).strftime('%B %d, %Y')
     "<span class='text-yellow-600 font-semibold'>Cancels on #{formatted_date}</span>"
+  end
+
+  def self.accounts_with_fazer_ai_features
+    fazer_ai_features = FazerAiHub.enabled_features
+    return [] if fazer_ai_features.empty?
+
+    accounts_data = []
+    fazer_ai_features.each do |feature|
+      flag_value = Featurable.feature_flag_value(feature.gsub('chatwoot_', ''))
+      next if flag_value.zero?
+
+      Account.where('feature_flags & ? > 0', flag_value).find_each do |account|
+        existing = accounts_data.find { |a| a[:id] == account.id }
+        if existing
+          existing[:features] << feature.titleize
+        else
+          accounts_data << { id: account.id, name: account.name, features: [feature.titleize] }
+        end
+      end
+    end
+    accounts_data.sort_by { |a| a[:name].downcase }
   end
 end
