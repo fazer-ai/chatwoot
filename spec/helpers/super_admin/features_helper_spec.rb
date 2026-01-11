@@ -122,6 +122,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
       let!(:account2) { create(:account, name: 'Beta Account') }
 
       before do
+        allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
         allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
         account1.enable_features!('kanban')
         account2.enable_features!('kanban')
@@ -147,6 +148,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
       let!(:account) { create(:account, name: 'Test Account') }
 
       before do
+        allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
         allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
         account.enable_features!('kanban')
       end
