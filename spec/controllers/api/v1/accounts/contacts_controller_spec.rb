@@ -80,7 +80,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(contact_emails).to include(contact.email)
         first_inbox = contact_inboxes[0]['inbox']
         expect(first_inbox).to be_a(Hash)
-        expect(first_inbox).to include('id', 'channel_id', 'channel_type', 'name', 'avatar_url', 'provider')
+        expect(first_inbox).to include('id', 'channel_id', 'channel_type', 'account_id', 'name', 'avatar_url', 'provider')
 
         expect(first_inbox).not_to include('imap_login',
                                            'imap_password',

@@ -3,6 +3,7 @@ json.avatar_url resource.try(:avatar_url)
 json.channel_id resource.channel_id
 json.name resource.name
 json.channel_type resource.channel_type
+json.account_id resource.account_id
 json.greeting_enabled resource.greeting_enabled
 json.greeting_message resource.greeting_message
 json.working_hours_enabled resource.working_hours_enabled
