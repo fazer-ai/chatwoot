@@ -123,6 +123,11 @@ const statusIconColor = computed(() => {
   return '';
 });
 
+const statusIconBgColor = computed(() => {
+  const contrastColor = getContrastingTextColor(props.step.color);
+  return `color-mix(in srgb, ${props.step.color}, ${contrastColor} 30%)`;
+});
+
 const statusTooltip = computed(() => {
   if (props.step.inferred_task_status === 'completed')
     return t('KANBAN.STATUS.COMPLETED');
@@ -254,10 +259,15 @@ const onEditStep = () => {
       <span
         v-if="statusIcon"
         v-tooltip="statusTooltip"
-        :class="[statusIcon, statusIconColor || '']"
-        class="h-4 w-4 flex-shrink-0 mb-2"
-        :style="statusIconColor ? {} : { color: headerTextColor }"
-      />
+        class="flex-shrink-0 mb-2 size-5 flex items-center justify-center rounded-full"
+        :style="{ backgroundColor: statusIconBgColor }"
+      >
+        <span
+          :class="[statusIcon, statusIconColor || '']"
+          class="size-3.5"
+          :style="statusIconColor ? {} : { color: headerTextColor }"
+        />
+      </span>
       <span
         class="flex h-5 min-w-[1.25rem] flex-shrink-0 items-center justify-center rounded-full px-1 text-xs font-medium mb-3"
         :style="{ ...badgeStyles, color: headerTextColor }"
@@ -301,10 +311,15 @@ const onEditStep = () => {
           <span
             v-if="statusIcon"
             v-tooltip="statusTooltip"
-            :class="[statusIcon, statusIconColor || '']"
-            class="h-4 w-4 flex-shrink-0"
-            :style="statusIconColor ? {} : { color: headerTextColor }"
-          />
+            class="flex-shrink-0 size-5 flex items-center justify-center rounded-full"
+            :style="{ backgroundColor: statusIconBgColor }"
+          >
+            <span
+              :class="[statusIcon, statusIconColor || '']"
+              class="size-3.5"
+              :style="statusIconColor ? {} : { color: headerTextColor }"
+            />
+          </span>
           <h3
             class="text-sm font-semibold break-words min-w-0"
             :style="{ color: headerTextColor }"
@@ -324,7 +339,7 @@ const onEditStep = () => {
             variant="ghost"
             size="xs"
             icon="i-lucide-settings"
-            class="h-6 w-6 rounded hover:bg-white/20"
+            class="h-6 w-6 rounded hover:bg-white/20 [&_span]:size-4"
             :style="{ color: headerTextColor }"
             @click="onEditStep"
           />
@@ -332,7 +347,7 @@ const onEditStep = () => {
             variant="ghost"
             size="xs"
             icon="i-lucide-plus"
-            class="h-6 w-6 rounded hover:bg-white/20"
+            class="h-6 w-6 rounded hover:bg-white/20 [&_span]:size-4"
             :style="{ color: headerTextColor }"
             @click="onAddTask"
           />

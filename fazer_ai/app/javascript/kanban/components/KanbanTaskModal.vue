@@ -83,6 +83,7 @@ const isSearchingContacts = ref(false);
 const isSearchingConversations = ref(false);
 const showDeleteDialog = ref(false);
 const showDiscardDialog = ref(false);
+const titleError = ref('');
 const isDropdownOpen = ref(false);
 const isPriorityDropdownOpen = ref(false);
 const startDate = ref(null);
@@ -216,8 +217,15 @@ const parseDate = dateStr => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+watch(title, () => {
+  if (titleError.value) {
+    titleError.value = '';
+  }
+});
+
 const openModal = () => {
   dialogRef.value?.open();
+  titleError.value = '';
   if (props.task) {
     title.value = props.task.title;
     description.value = props.task.description || '';
@@ -235,9 +243,14 @@ const openModal = () => {
       taskLabelTitles.includes(label.title)
     );
   } else if (props.duplicateTask) {
-    title.value = `${props.duplicateTask.title} ${t(
-      'KANBAN.MODAL.COPY_SUFFIX'
-    )}`;
+    const copySuffix = ` ${t('KANBAN.MODAL.COPY_SUFFIX')}`;
+    const maxTitleLength = 255;
+    const originalTitle = props.duplicateTask.title;
+    const truncatedTitle = originalTitle.slice(
+      0,
+      maxTitleLength - copySuffix.length
+    );
+    title.value = `${truncatedTitle}${copySuffix}`;
     description.value = props.duplicateTask.description || '';
     priority.value = props.duplicateTask.priority;
     selectedStepId.value = String(props.duplicateTask.board_step_id);
@@ -363,6 +376,11 @@ const normalizeDate = date => {
 };
 
 const onSave = () => {
+  if (!title.value.trim()) {
+    titleError.value = t('KANBAN.MODAL.TITLE_REQUIRED');
+    return;
+  }
+
   const taskPayload = {
     title: title.value.trim().replace(/ +/g, ' '),
     description: description.value.trim().replace(/ +/g, ' '),
@@ -548,14 +566,20 @@ const handleClickOutside = () => {
     </template>
     <div class="grid grid-cols-2 gap-6">
       <div class="flex flex-col gap-4 h-full">
-        <label class="flex flex-col gap-2 text-sm font-medium text-n-slate-12">
-          {{ t('KANBAN.MODAL.TITLE_LABEL') }}
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-n-slate-12">
+            {{ t('KANBAN.MODAL.TITLE_LABEL') }}
+          </label>
           <Input
             v-model="title"
             :placeholder="t('KANBAN.MODAL.TITLE_PLACEHOLDER')"
             maxlength="255"
+            :class="{ '!outline-n-ruby-7': titleError }"
           />
-        </label>
+          <span v-if="titleError" class="text-xs text-n-ruby-11">
+            {{ titleError }}
+          </span>
+        </div>
 
         <Editor
           v-model="description"
@@ -564,7 +588,7 @@ const handleClickOutside = () => {
           :max-length="5000"
           show-character-count
           enable-line-breaks
-          class="w-full flex-1 [&>.editor-wrapper]:flex-1 [&>.editor-wrapper>div:first-child]:flex-1 [&_.ProseMirror-menubar-wrapper]:flex-1 [&_.ProseMirror]:flex-1 [&_.ProseMirror]:min-h-[89px] [&_.ProseMirror-woot-style]:!max-h-none [&_.ProseMirror-woot-style]:!min-h-[67px]"
+          class="w-full [&_.ProseMirror-woot-style]:!min-h-[300px] [&_.ProseMirror-woot-style]:!max-h-[300px] [&_.ProseMirror-woot-style]:!overflow-y-auto"
         />
       </div>
 
@@ -995,7 +1019,7 @@ const handleClickOutside = () => {
             {{ t('KANBAN.MODAL.CANCEL') }}
           </Button>
           <Button
-            :disabled="!title.trim() || isSaving || isDeleting"
+            :disabled="isSaving || isDeleting"
             :is-loading="isSaving"
             type="submit"
             @click="onSave"

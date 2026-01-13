@@ -225,6 +225,41 @@ RSpec.describe FazerAi::Kanban::Board, type: :model do
     end
   end
 
+  describe '#reset_cancelled_on_first_or_last_step' do
+    let!(:first_step) { create(:kanban_board_step, board: board) }
+    let!(:middle_step) { create(:kanban_board_step, board: board) }
+    let!(:last_step) { create(:kanban_board_step, board: board) }
+
+    before do
+      board.update!(steps_order: [first_step.id, middle_step.id, last_step.id])
+      middle_step.update!(cancelled: true)
+    end
+
+    it 'clears cancelled flag when a cancelled step is moved to first position' do
+      board.update!(steps_order: [middle_step.id, first_step.id, last_step.id])
+
+      expect(middle_step.reload.cancelled).to be(false)
+    end
+
+    it 'clears cancelled flag when a cancelled step is moved to last position' do
+      board.update!(steps_order: [first_step.id, last_step.id, middle_step.id])
+
+      expect(middle_step.reload.cancelled).to be(false)
+    end
+
+    it 'keeps cancelled flag when step remains in the middle' do
+      board.update!(steps_order: [last_step.id, middle_step.id, first_step.id])
+
+      expect(middle_step.reload.cancelled).to be(true)
+    end
+
+    it 'does nothing when steps_order is blank' do
+      board.update!(steps_order: [])
+
+      expect(middle_step.reload.cancelled).to be(true)
+    end
+  end
+
   describe 'deletion' do
     context 'when board has tasks' do
       it 'successfully deletes board and all associated records' do

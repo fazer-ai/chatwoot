@@ -15,6 +15,7 @@ import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
 import KanbanStepModal from 'kanban/components/KanbanStepModal.vue';
+import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import kanbanModule from 'kanban/store/modules/kanban';
 
 const router = useRouter();
@@ -100,12 +101,7 @@ const saveBoardInfo = async () => {
     headerBoardName.value = boardName.value;
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
-    const message =
-      error?.response?.data?.errors?.[0] ||
-      error?.response?.data?.message ||
-      error?.message ||
-      t('KANBAN.SETTINGS.UPDATE_ERROR');
-    useAlert(message);
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   } finally {
     isSaving.value = false;
   }
@@ -119,7 +115,7 @@ const saveAgents = async () => {
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   }
 };
 
@@ -131,7 +127,7 @@ const saveInboxes = async () => {
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   }
 };
 
@@ -157,7 +153,7 @@ const saveAutomationSettings = async () => {
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   } finally {
     isSavingAutomation.value = false;
   }
@@ -306,7 +302,7 @@ const updateStepsOrder = async newSteps => {
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
     store.commit('kanban/UPDATE_BOARD', originalBoard);
-    useAlert(t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   }
 };
 
@@ -352,7 +348,7 @@ const toggleStepCancelled = async (step, value) => {
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   }
 };
 
@@ -388,7 +384,7 @@ const saveStep = async data => {
     }
     closeStepModal();
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   } finally {
     isSavingStep.value = false;
   }
@@ -403,7 +399,7 @@ const deleteStep = async id => {
     });
     closeStepModal();
   } catch (error) {
-    useAlert(error?.message || t('KANBAN.SETTINGS.UPDATE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   } finally {
     isDeletingStep.value = false;
   }
@@ -438,7 +434,7 @@ const confirmDeleteBoard = async () => {
       params: { accountId: route.params.accountId },
     });
   } catch (error) {
-    useAlert(t('KANBAN.SETTINGS.DELETE_ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.DELETE_ERROR'));
   } finally {
     isDeletingBoard.value = false;
     closeDeleteBoardDialog();
@@ -602,6 +598,7 @@ const confirmDeleteBoard = async () => {
                 :placeholder="t('KANBAN.SETTINGS.DESCRIPTION_PLACEHOLDER')"
                 :max-length="2000"
                 enable-line-breaks
+                class="[&_.ProseMirror-woot-style]:!min-h-[120px] [&_.ProseMirror-woot-style]:!max-h-[450px] [&_.ProseMirror-woot-style]:!resize-y [&_.ProseMirror-woot-style]:!overflow-y-auto"
               />
             </div>
           </section>

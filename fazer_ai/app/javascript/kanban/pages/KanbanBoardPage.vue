@@ -19,6 +19,7 @@ import KanbanTaskModal from 'kanban/components/KanbanTaskModal.vue';
 import KanbanStepModal from 'kanban/components/KanbanStepModal.vue';
 import KanbanDeleteTaskDialog from 'kanban/components/KanbanDeleteTaskDialog.vue';
 import SettingsLayout from 'dashboard/routes/dashboard/settings/SettingsLayout.vue';
+import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import kanbanModule from 'kanban/store/modules/kanban';
 import { useBoardModal } from 'kanban/composables/useBoardModal';
 
@@ -589,11 +590,7 @@ const saveTask = async data => {
     }
     closeModal();
   } catch (error) {
-    useAlert(
-      error?.response?.data?.message ||
-        error?.message ||
-        t('KANBAN.MODAL.SAVE_ERROR')
-    );
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.MODAL.SAVE_ERROR'));
   } finally {
     isSaving.value = false;
   }
@@ -616,11 +613,7 @@ const saveStep = async data => {
     }
     closeStepModal();
   } catch (error) {
-    useAlert(
-      error?.response?.data?.message ||
-        error?.message ||
-        t('KANBAN.MODAL.SAVE_ERROR')
-    );
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.MODAL.SAVE_ERROR'));
   } finally {
     isSavingStep.value = false;
   }
@@ -635,11 +628,7 @@ const deleteStep = async id => {
     });
     closeStepModal();
   } catch (error) {
-    useAlert(
-      error?.response?.data?.message ||
-        error?.message ||
-        t('KANBAN.MODAL.DELETE_ERROR')
-    );
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.MODAL.DELETE_ERROR'));
   } finally {
     isDeletingStep.value = false;
   }
@@ -651,11 +640,7 @@ const deleteTask = async id => {
     await removeTask(id);
     closeModal();
   } catch (error) {
-    useAlert(
-      error?.response?.data?.message ||
-        error?.message ||
-        t('KANBAN.MODAL.DELETE_ERROR')
-    );
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.MODAL.DELETE_ERROR'));
   } finally {
     isDeleting.value = false;
   }
@@ -710,12 +695,9 @@ const {
     }
   },
   onError: error => {
-    const message =
-      error?.response?.data?.errors?.[0] ||
-      error?.response?.data?.message ||
-      error?.message ||
-      t('KANBAN.BOARD_MODAL.CREATE_ERROR');
-    useAlert(message);
+    useAlert(
+      parseAPIErrorResponse(error) || t('KANBAN.BOARD_MODAL.CREATE_ERROR')
+    );
   },
 });
 

@@ -108,23 +108,15 @@ export default {
   },
 
   async createBoard({ commit }, boardData) {
-    try {
-      const response = await BoardsAPI.create(boardData);
-      commit(types.ADD_BOARD, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await BoardsAPI.create(boardData);
+    commit(types.ADD_BOARD, response.data);
+    return response.data;
   },
 
   async createTask({ commit }, taskData) {
-    try {
-      const response = await TasksAPI.create(taskData);
-      commit(types.ADD_TASK, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await TasksAPI.create(taskData);
+    commit(types.ADD_TASK, response.data);
+    return response.data;
   },
 
   async updateTask({ commit, state }, { id, task }) {
@@ -145,7 +137,7 @@ export default {
       if (originalTask) {
         commit(types.UPDATE_TASK, originalTask);
       }
-      throw new Error(error);
+      throw error;
     }
   },
 
@@ -212,12 +204,8 @@ export default {
   },
 
   async deleteTask({ commit }, id) {
-    try {
-      await TasksAPI.delete(id);
-      commit(types.DELETE_TASK, id);
-    } catch (error) {
-      throw new Error(error);
-    }
+    await TasksAPI.delete(id);
+    commit(types.DELETE_TASK, id);
   },
 
   async updateStep({ commit, state }, { boardId, stepId, ...data }) {
@@ -235,69 +223,45 @@ export default {
       if (originalStep) {
         commit(types.UPDATE_STEP, originalStep);
       }
-      throw new Error(error);
+      throw error;
     }
   },
 
   async deleteStep({ dispatch }, { boardId, stepId }) {
-    try {
-      await BoardsAPI.deleteStep(boardId, stepId);
-      await Promise.all([
-        dispatch('fetchTasks', { boardId }),
-        dispatch('fetchSteps', boardId),
-      ]);
-    } catch (error) {
-      throw new Error(error);
-    }
+    await BoardsAPI.deleteStep(boardId, stepId);
+    await Promise.all([
+      dispatch('fetchTasks', { boardId }),
+      dispatch('fetchSteps', boardId),
+    ]);
   },
 
   async createStep({ commit }, { boardId, ...stepData }) {
-    try {
-      const response = await BoardsAPI.createStep(boardId, stepData);
-      commit(types.ADD_STEP, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await BoardsAPI.createStep(boardId, stepData);
+    commit(types.ADD_STEP, response.data);
+    return response.data;
   },
 
   async updateBoard({ commit }, { id, board }) {
-    try {
-      const response = await BoardsAPI.update(id, { board });
-      commit(types.UPDATE_BOARD, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await BoardsAPI.update(id, { board });
+    commit(types.UPDATE_BOARD, response.data);
+    return response.data;
   },
 
   async updateBoardAgents({ commit }, { boardId, agentIds }) {
-    try {
-      const response = await BoardsAPI.updateAgents(boardId, agentIds);
-      commit(types.UPDATE_BOARD, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await BoardsAPI.updateAgents(boardId, agentIds);
+    commit(types.UPDATE_BOARD, response.data);
+    return response.data;
   },
 
   async updateBoardInboxes({ commit }, { boardId, inboxIds }) {
-    try {
-      const response = await BoardsAPI.updateInboxes(boardId, inboxIds);
-      commit(types.UPDATE_BOARD, response.data);
-      return response.data;
-    } catch (error) {
-      throw new Error(error);
-    }
+    const response = await BoardsAPI.updateInboxes(boardId, inboxIds);
+    commit(types.UPDATE_BOARD, response.data);
+    return response.data;
   },
 
   async deleteBoard({ commit }, boardId) {
-    try {
-      await BoardsAPI.delete(boardId);
-      commit(types.DELETE_BOARD, boardId);
-    } catch (error) {
-      throw new Error(error);
-    }
+    await BoardsAPI.delete(boardId);
+    commit(types.DELETE_BOARD, boardId);
   },
 
   async updateBoardFilters(

@@ -113,6 +113,7 @@
       "ID_LABEL": "ID:",
       "TITLE_LABEL": "Título",
       "TITLE_PLACEHOLDER": "Digite o título da tarefa",
+      "TITLE_REQUIRED": "O título é obrigatório",
       "DESCRIPTION_LABEL": "Descrição",
       "DESCRIPTION_PLACEHOLDER": "Digite a descrição da tarefa",
       "STEP_LABEL": "Etapa",

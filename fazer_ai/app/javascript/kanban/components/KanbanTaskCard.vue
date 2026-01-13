@@ -88,21 +88,39 @@ const formatDate = dateStr => {
   if (relativeDay === 'tomorrow') return t('KANBAN.DATE.TOMORROW');
 
   const date = new Date(dateStr);
-  return date.toLocaleDateString(undefined, {
+  const currentYear = new Date().getFullYear();
+  const dateYear = date.getFullYear();
+
+  const options = {
     month: 'short',
     day: 'numeric',
-  });
+  };
+
+  if (dateYear !== currentYear) {
+    options.year = 'numeric';
+  }
+
+  return date.toLocaleDateString(undefined, options);
 };
 
 const formatDateWithTime = dateStr => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  return date.toLocaleString(undefined, {
+  const currentYear = new Date().getFullYear();
+  const dateYear = date.getFullYear();
+
+  const options = {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  };
+
+  if (dateYear !== currentYear) {
+    options.year = 'numeric';
+  }
+
+  return date.toLocaleString(undefined, options);
 };
 
 const dueDateDisplay = computed(() => {
@@ -410,11 +428,11 @@ const handleDescriptionClick = event => {
     class="flex flex-col rounded-lg bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-lg dark:hover:bg-slate-700/50 group relative cursor-pointer"
   >
     <header class="relative flex items-center gap-2 px-2.5 py-1.5">
-      <div class="flex items-center gap-2 min-w-0 flex-1">
+      <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
         <h4
           ref="titleInputRef"
           :contenteditable="isRenaming"
-          class="text-sm font-medium break-words outline-none rounded -ml-1 px-1 border border-transparent w-full"
+          class="text-sm font-medium break-words outline-none rounded -ml-1 px-1 border border-transparent min-w-0 flex-1"
           :class="{
             'cursor-text bg-n-slate-2 dark:bg-slate-900 border-n-brand/50':
               isRenaming,

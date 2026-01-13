@@ -13,6 +13,7 @@ import KanbanContextDropdown from './KanbanContextDropdown.vue';
 import KanbanTaskDatePicker from './KanbanTaskDatePicker.vue';
 import ContactDetailsItem from 'dashboard/routes/dashboard/conversation/ContactDetailsItem.vue';
 import { useAlert } from 'dashboard/composables';
+import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import { useKanban } from '../composables/useKanban';
 import types from 'dashboard/store/mutation-types';
 import { useMapGetter } from 'dashboard/composables/store';
@@ -268,7 +269,7 @@ const createTask = async () => {
     });
     selectedBoard.value = null;
   } catch (error) {
-    useAlert(t('KANBAN.ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.ERROR'));
   } finally {
     isCreating.value = false;
   }
@@ -305,7 +306,7 @@ const updateTask = async updates => {
       conversationId: props.conversationId,
       task: originalTask,
     });
-    useAlert(t('KANBAN.ERROR'));
+    useAlert(parseAPIErrorResponse(error) || t('KANBAN.ERROR'));
   } finally {
     isUpdating.value = false;
   }

@@ -15,6 +15,7 @@ import ThumbnailGroup from 'dashboard/components/widgets/ThumbnailGroup.vue';
 import KanbanBoardModal from 'kanban/components/KanbanBoardModal.vue';
 import KanbanSortMenu from 'kanban/components/KanbanSortMenu.vue';
 import BasePaywallModal from 'dashboard/routes/dashboard/settings/components/BasePaywallModal.vue';
+import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import kanbanModule from 'kanban/store/modules/kanban';
 import { useBoardModal } from 'kanban/composables/useBoardModal';
 
@@ -125,12 +126,9 @@ const {
     }
   },
   onError: error => {
-    const message =
-      error?.response?.data?.errors?.[0] ||
-      error?.response?.data?.message ||
-      error?.message ||
-      t('KANBAN.BOARD_MODAL.CREATE_ERROR');
-    useAlert(message);
+    useAlert(
+      parseAPIErrorResponse(error) || t('KANBAN.BOARD_MODAL.CREATE_ERROR')
+    );
   },
 });
 

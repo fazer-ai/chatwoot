@@ -59,7 +59,7 @@ class FazerAi::Kanban::Board < ApplicationRecord
   scope :ordered, -> { order(created_at: :asc) }
 
   after_destroy :clear_round_robin_queue
-  after_save :reset_cancelled_on_last_step, if: :saved_change_to_steps_order?
+  after_save :reset_cancelled_on_first_or_last_step, if: :saved_change_to_steps_order?
   after_commit :dispatch_update_event, on: :update
 
   def auto_assign_agent_to_conversation?
@@ -168,12 +168,11 @@ class FazerAi::Kanban::Board < ApplicationRecord
     FazerAi::Kanban::BoardRoundRobinService.new(board: self).clear_queue
   end
 
-  def reset_cancelled_on_last_step
+  def reset_cancelled_on_first_or_last_step
     return if steps_order.blank?
 
-    last_step = steps.find_by(id: steps_order.last, cancelled: true)
-    return unless last_step
-
-    last_step.update!(cancelled: false)
+    steps.where(id: [steps_order.first, steps_order.last], cancelled: true).find_each do |step|
+      step.update!(cancelled: false)
+    end
   end
 end

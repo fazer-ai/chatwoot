@@ -97,7 +97,10 @@ export const parseAPIErrorResponse = error => {
   if (error?.response?.data?.errors) {
     return error?.response?.data?.errors[0];
   }
-  return error;
+  if (error?.message) {
+    return error.message;
+  }
+  return null;
 };
 
 export const throwErrorMessage = error => {

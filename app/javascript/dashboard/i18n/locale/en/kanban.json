@@ -113,6 +113,7 @@
       "ID_LABEL": "ID:",
       "TITLE_LABEL": "Title",
       "TITLE_PLACEHOLDER": "Enter task title",
+      "TITLE_REQUIRED": "Title is required",
       "DESCRIPTION_LABEL": "Description",
       "DESCRIPTION_PLACEHOLDER": "Enter task description",
       "STEP_LABEL": "Step",

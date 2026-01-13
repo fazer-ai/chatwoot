@@ -47,10 +47,25 @@ export default {
     const orderMap = new Map(
       activeBoard.steps_order.map((id, index) => [id, index])
     );
-    return [...state.steps].sort((a, b) => {
+    const sorted = [...state.steps].sort((a, b) => {
       const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : Infinity;
       const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : Infinity;
       return indexA - indexB;
+    });
+
+    // Recalculate inferred_task_status based on current order
+    const lastStepId =
+      activeBoard.steps_order[activeBoard.steps_order.length - 1];
+    return sorted.map(step => {
+      let inferredStatus = 'open';
+      if (sorted.length <= 1) {
+        inferredStatus = 'open';
+      } else if (step.cancelled) {
+        inferredStatus = 'cancelled';
+      } else if (step.id === lastStepId) {
+        inferredStatus = 'completed';
+      }
+      return { ...step, inferred_task_status: inferredStatus };
     });
   },
 };
