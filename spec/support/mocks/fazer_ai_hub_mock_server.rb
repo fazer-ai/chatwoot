@@ -22,8 +22,8 @@
 #       curl -X POST http://localhost:3099/set_state -d 'state=network_error'
 #
 # After changing state, you MUST trigger a sync:
-#   - In Rails console: FazerAi::Internal::CheckNewVersionsJob.perform_now
-#   - Then refresh the browser
+#   - Navigate to Super Admin > Settings
+#   - Click "Refresh" on the fazer.ai subscription section
 #
 # NOTE: This file is a STANDALONE Ruby script that runs OUTSIDE of Rails.
 # It does not load ActiveSupport, so we use plain Ruby methods (Time.now, etc.)
@@ -111,11 +111,7 @@ class FazerAiHubMockServer
       <div class="warning">
         <strong>⚠️ Important:</strong> After changing the state, you must trigger a sync!
         <br><br>
-        Run in Rails console: <code>FazerAi::Internal::CheckNewVersionsJob.perform_now</code>
-        <br><br>
-        Then refresh your Chatwoot browser page.
-        <br><br>
-        <button class="btn sync-btn" onclick="triggerSync()">📋 Copy Sync Command</button>
+        Navigate to <strong>Super Admin &gt; Settings</strong> and click "Refresh" on the fazer.ai subscription section.
       </div>
 
       <h3>📋 Setup Instructions</h3>
@@ -123,8 +119,7 @@ class FazerAiHubMockServer
         <li>Set <code>FAZER_AI_HUB_URL=http://localhost:3099</code> in your .env</li>
         <li>Restart Chatwoot</li>
         <li>Change state using buttons above</li>
-        <li>Run sync command in Rails console</li>
-        <li>Refresh the Chatwoot page</li>
+        <li>Go to Super Admin > Settings, click "Refresh" on fazer.ai subscription</li>
       </ol>
 
       <script>
@@ -140,11 +135,6 @@ class FazerAiHubMockServer
           const data = await res.json();
           document.getElementById('status').textContent =
             'Current State: ' + JSON.stringify(data.current_state, null, 2);
-        }
-
-        function triggerSync() {
-          navigator.clipboard.writeText('FazerAi::Internal::CheckNewVersionsJob.perform_now');
-          alert('Sync command copied to clipboard! Paste it in your Rails console.');
         }
 
         loadStatus();
@@ -320,10 +310,9 @@ class FazerAiHubMockServer
       ║  Change state via:                                         ║
       ║  - Browser UI: http://localhost:#{PORT}                       ║
       ║  - curl: curl -X POST localhost:#{PORT}/set_state -d 'state=trialing&days=7'
-      ║                                                            ║
-      ║  ⚠️  After changing state, sync in Rails console:          ║
-      ║      FazerAi::Internal::CheckNewVersionsJob.perform_now    ║
-      ║      Then refresh the browser.                             ║
+      ║  ⚠️  After changing state:                                  ║
+      ║      Go to Super Admin > Settings, click "Refresh" on      ║
+      ║      fazer.ai subscription section.                        ║
       ╚════════════════════════════════════════════════════════════╝
 
     BANNER
