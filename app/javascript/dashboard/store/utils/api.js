@@ -100,6 +100,9 @@ export const parseAPIErrorResponse = error => {
   if (error?.message) {
     return error.message;
   }
+  if (typeof error === 'string') {
+    return error;
+  }
   return null;
 };
 
