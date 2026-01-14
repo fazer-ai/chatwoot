@@ -586,7 +586,7 @@ const handleDescriptionClick = event => {
 
       <TaskCardLabels v-if="task.labels?.length" :task-labels="task.labels" />
 
-      <div class="flex items-center justify-between mt-1">
+      <div class="flex items-center justify-between gap-2 mt-1">
         <div class="flex items-center gap-2 min-w-0">
           <KanbanContextDropdown
             :options="priorities"

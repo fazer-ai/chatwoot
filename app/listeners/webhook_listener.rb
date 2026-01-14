@@ -135,20 +135,7 @@ class WebhookListener < BaseListener
 
   def kanban_task_updated(event)
     task_payload, account = extract_kanban_task_payload_and_account(event)
-    changed_attributes = extract_changed_attributes(event)
-    changed_attributes&.delete_if { |item| item.key?('updated_at') }
-
-    if changed_attributes
-      changed_attributes = changed_attributes.map do |change|
-        if change.key?('board_id')
-          enrich_kanban_relation(change['board_id'], 'board', FazerAi::Kanban::Board)
-        elsif change.key?('board_step_id')
-          enrich_kanban_relation(change['board_step_id'], 'board_step', FazerAi::Kanban::BoardStep)
-        else
-          change
-        end
-      end
-    end
+    changed_attributes = extract_kanban_changed_attributes(event)
 
     payload = task_payload.merge(event: __method__.to_s, changed_attributes: changed_attributes)
     deliver_account_webhooks(payload, account)
@@ -197,22 +184,42 @@ class WebhookListener < BaseListener
     deliver_api_inbox_webhooks(payload, inbox)
   end
 
-  def enrich_kanban_relation(change_data, key, model)
-    prev_val = model.find_by(id: change_data[:previous_value])
-    curr_val = model.find_by(id: change_data[:current_value])
-
-    {
-      key => {
-        previous_value: ({ id: prev_val.id, name: prev_val.name } if prev_val),
-        current_value: ({ id: curr_val.id, name: curr_val.name } if curr_val)
-      }
-    }
-  end
-
   def extract_kanban_task_payload_and_account(event)
     task = event.data[:task]
     return [task.push_event_data, task.account] if task.respond_to?(:push_event_data)
 
     [task, Account.find(task[:account_id] || task['account_id'])]
+  end
+
+  def extract_kanban_changed_attributes(event)
+    raw_changes = event.data[:changed_attributes]
+    return if raw_changes.blank?
+
+    excluded_keys = %w[updated_at cached_label_list]
+
+    raw_changes.each_with_object({}) do |(key, values), result|
+      next if excluded_keys.include?(key)
+
+      previous_value, current_value = values
+
+      case key
+      when 'board_id'
+        result['board'] = build_kanban_relation_change(previous_value, current_value, FazerAi::Kanban::Board)
+      when 'board_step_id'
+        result['board_step'] = build_kanban_relation_change(previous_value, current_value, FazerAi::Kanban::BoardStep)
+      else
+        result[key] = { previous_value: previous_value, current_value: current_value }
+      end
+    end.presence
+  end
+
+  def build_kanban_relation_change(previous_id, current_id, model)
+    prev_record = model.find_by(id: previous_id)
+    curr_record = model.find_by(id: current_id)
+
+    {
+      previous_value: (prev_record ? { id: prev_record.id, name: prev_record.name } : nil),
+      current_value: (curr_record ? { id: curr_record.id, name: curr_record.name } : nil)
+    }
   end
 end

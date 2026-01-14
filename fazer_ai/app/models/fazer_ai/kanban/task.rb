@@ -103,12 +103,14 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   after_create :sync_contacts_from_conversations
   after_update :assign_conversations_on_update
   after_update :sync_contacts_from_conversations
+  after_update :accumulate_changes_for_dispatch
   before_destroy :capture_conversations_for_dispatch, prepend: true
   before_destroy :capture_event_data, prepend: true
   after_commit :dispatch_create_event, on: :create
   after_commit :dispatch_update_event, on: :update
   after_commit :dispatch_destroy_event, on: :destroy
   after_commit :dispatch_conversation_events
+  after_rollback :clear_accumulated_changes
 
   # Hours threshold for considering a task "due soon"
   DUE_SOON_THRESHOLD_HOURS = 24
@@ -345,23 +347,35 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   def dispatch_update_event
-    Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_UPDATED, Time.zone.now, task: self, changed_attributes: previous_changes)
-    dispatch_status_change_events
+    changes = @accumulated_changes || previous_changes
+    Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_UPDATED, Time.zone.now, task: self, changed_attributes: changes)
+    dispatch_status_change_events(changes)
+    @accumulated_changes = nil
   end
 
-  def dispatch_status_change_events
-    return unless previous_changes['board_step_id']
+  def dispatch_status_change_events(changes = nil)
+    changes ||= previous_changes
+    return unless changes['board_step_id']
 
     case status
     when 'completed'
-      Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_COMPLETED, Time.zone.now, task: self, changed_attributes: previous_changes)
+      Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_COMPLETED, Time.zone.now, task: self, changed_attributes: changes)
     when 'cancelled'
-      Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_CANCELLED, Time.zone.now, task: self, changed_attributes: previous_changes)
+      Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_CANCELLED, Time.zone.now, task: self, changed_attributes: changes)
     end
   end
 
   def dispatch_destroy_event
     Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_DELETED, Time.zone.now, task: @push_event_data)
+  end
+
+  def accumulate_changes_for_dispatch
+    @accumulated_changes ||= {}
+    @accumulated_changes.merge!(previous_changes)
+  end
+
+  def clear_accumulated_changes
+    @accumulated_changes = nil
   end
 
   def capture_event_data

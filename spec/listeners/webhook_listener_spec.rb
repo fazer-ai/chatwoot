@@ -551,22 +551,82 @@ describe WebhookListener do
       end
       let(:kanban_event) { Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: changed_attributes) }
 
-      it 'triggers the webhook event' do
+      it 'triggers the webhook event with object format' do
         webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
-        expected_changed_attributes = [
-          { 'title' => { previous_value: 'Old Title', current_value: 'New Title' } },
-          { 'board' => {
-            previous_value: { id: old_board.id, name: old_board.name },
-            current_value: { id: new_board.id, name: new_board.name }
-          } }
-        ]
         expect(WebhookJob).to receive(:perform_later) do |url, payload|
           expect(url).to eq(webhook.url)
           expect(payload[:event]).to eq('kanban_task_updated')
-          expect(payload[:changed_attributes]).to include(*expected_changed_attributes)
-          expect(payload[:changed_attributes].size).to eq(2)
+          expect(payload[:changed_attributes]).to eq({
+                                                       'title' => { previous_value: 'Old Title', current_value: 'New Title' },
+                                                       'board' => {
+                                                         previous_value: { id: old_board.id, name: old_board.name },
+                                                         current_value: { id: new_board.id, name: new_board.name }
+                                                       }
+                                                     })
         end
         listener.kanban_task_updated(kanban_event)
+      end
+
+      it 'includes priority changes in the payload' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
+        priority_changed_attributes = {
+          'priority' => [nil, 'high'],
+          'updated_at' => [1.hour.ago, Time.zone.now]
+        }
+        priority_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: priority_changed_attributes)
+
+        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+          expect(url).to eq(webhook.url)
+          expect(payload[:event]).to eq('kanban_task_updated')
+          expect(payload[:changed_attributes]).to eq({
+                                                       'priority' => { previous_value: nil, current_value: 'high' }
+                                                     })
+        end
+        listener.kanban_task_updated(priority_event)
+      end
+
+      it 'includes step changes with enriched data in the payload' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
+        old_step = kanban_task.board.ordered_steps.first
+        new_step = create(:kanban_board_step, board: kanban_task.board, name: 'New Step')
+
+        step_changed_attributes = {
+          'board_step_id' => [old_step.id, new_step.id],
+          'updated_at' => [1.hour.ago, Time.zone.now]
+        }
+        step_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: step_changed_attributes)
+
+        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+          expect(url).to eq(webhook.url)
+          expect(payload[:event]).to eq('kanban_task_updated')
+          expect(payload[:changed_attributes]).to eq({
+                                                       'board_step' => {
+                                                         previous_value: { id: old_step.id, name: old_step.name },
+                                                         current_value: { id: new_step.id, name: new_step.name }
+                                                       }
+                                                     })
+        end
+        listener.kanban_task_updated(step_event)
+      end
+
+      it 'excludes cached_label_list from changed_attributes' do
+        webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
+        label_changed_attributes = {
+          'label_list' => [[], ['urgent']],
+          'cached_label_list' => ['', 'urgent'],
+          'updated_at' => [1.hour.ago, Time.zone.now]
+        }
+        label_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: label_changed_attributes)
+
+        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+          expect(url).to eq(webhook.url)
+          expect(payload[:changed_attributes]).to eq({
+                                                       'label_list' => { previous_value: [], current_value: ['urgent'] }
+                                                     })
+          expect(payload[:changed_attributes]).not_to have_key('cached_label_list')
+          expect(payload[:changed_attributes]).not_to have_key('updated_at')
+        end
+        listener.kanban_task_updated(label_event)
       end
     end
 

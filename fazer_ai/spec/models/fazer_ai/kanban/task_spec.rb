@@ -480,6 +480,46 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
           .with(Events::Types::KANBAN_TASK_UPDATED, anything, hash_including(task: task))
       end
 
+      it 'includes priority in changed_attributes when priority is updated' do
+        task.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        task.update!(priority: 'high')
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(
+            Events::Types::KANBAN_TASK_UPDATED,
+            anything,
+            hash_including(
+              task: task,
+              changed_attributes: hash_including('priority' => [nil, 'high'])
+            )
+          )
+      end
+
+      it 'accumulates all changes when multiple updates occur in same transaction' do
+        task.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        ActiveRecord::Base.transaction do
+          task.update!(priority: 'urgent')
+          task.update!(title: 'New Title')
+        end
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(
+            Events::Types::KANBAN_TASK_UPDATED,
+            anything,
+            hash_including(
+              task: task,
+              changed_attributes: hash_including(
+                'priority' => [nil, 'urgent'],
+                'title' => [task.title_before_last_save, 'New Title']
+              )
+            )
+          ).once
+      end
+
       it 'dispatches conversation.updated event for assigned conversations' do
         inbox = create(:inbox, account: account)
         create(:kanban_board_inbox, board: board, inbox: inbox)
