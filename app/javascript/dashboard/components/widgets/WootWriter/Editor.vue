@@ -25,6 +25,7 @@ import { useTrack } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useAlert } from 'dashboard/composables';
 import { useMapGetter } from 'dashboard/composables/store';
+import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { CONVERSATION_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
@@ -48,7 +49,6 @@ import {
 import {
   findNodeToInsertImage,
   getContentNode,
-  cleanSignature,
   insertAtCursor,
   scrollCursorIntoView,
   setURLWithQueryAndSize,
@@ -146,6 +146,8 @@ const createState = (content, placeholder, plugins = [], methods = {}) => {
 
 const { isEditorHotKeyEnabled, fetchSignatureFlagFromUISettings } =
   useUISettings();
+
+const { formatMessage } = useMessageFormatter();
 
 const currentUser = useMapGetter('getCurrentUser');
 
@@ -276,13 +278,29 @@ const plugins = computed(() => {
 });
 
 const sendWithSignature = computed(() => {
-  // this is considered the source of truth, we watch this property
-  // on change, we toggle the signature in the editor
+  // this is considered the source of truth for signature display
   if (props.allowSignature && !props.isPrivate && props.channelType) {
     return fetchSignatureFlagFromUISettings(props.channelType);
   }
 
   return false;
+});
+
+const signaturePosition = computed(() => {
+  return currentUser.value?.ui_settings?.signature_position || 'top';
+});
+
+const signatureSeparator = computed(() => {
+  return currentUser.value?.ui_settings?.signature_separator || 'blank';
+});
+
+const shouldShowSignaturePreview = computed(() => {
+  return sendWithSignature.value && props.signature;
+});
+
+const formattedSignature = computed(() => {
+  if (!props.signature) return '';
+  return formatMessage(props.signature, false, false);
 });
 
 watch(showUserMentions, updatedValue => {
@@ -301,27 +319,10 @@ watch(showToolsMenu, updatedValue => {
 function focusEditorInputField(pos = 'end') {
   const { tr } = editorView.state;
 
-  // Check if signature is at start and adjust cursor position accordingly
-  const signaturePosition =
-    currentUser.value?.ui_settings?.signature_position || 'top';
-  const hasSignature = sendWithSignature.value && props.signature;
-
-  let selection;
-  if (pos === 'end' || !hasSignature || signaturePosition !== 'top') {
-    selection =
-      pos === 'end' ? Selection.atEnd(tr.doc) : Selection.atStart(tr.doc);
-  } else {
-    // Position cursor after signature when signature is at start
-    const signatureLength = props.signature
-      ? cleanSignature(props.signature).length
-      : 0;
-    const separatorLength =
-      currentUser.value?.ui_settings?.signature_separator === '--' ? 6 : 2; // "\n--\n" vs "\n\n"
-    const cursorPos = signatureLength + separatorLength;
-    selection = Selection.near(
-      tr.doc.resolve(Math.min(cursorPos, tr.doc.content.size))
-    );
-  }
+  // Signature is now displayed as read-only preview outside the editor,
+  // so cursor positioning is straightforward
+  const selection =
+    pos === 'end' ? Selection.atEnd(tr.doc) : Selection.atStart(tr.doc);
 
   editorView.dispatch(tr.setSelection(selection));
   editorView.focus();
@@ -869,7 +870,33 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       hidden
       @change="onFileChange"
     />
+    <!-- Signature preview at top -->
+    <div
+      v-if="shouldShowSignaturePreview && signaturePosition === 'top'"
+      class="signature-preview signature-preview--top"
+    >
+      <div class="signature-label">
+        {{ t('CONVERSATION.FOOTER.SIGNATURE_LABEL_TOP') }}
+      </div>
+      <div v-dompurify-html="formattedSignature" class="signature-content" />
+      <div v-if="signatureSeparator === '--'" class="signature-separator">
+        {{ signatureSeparator }}
+      </div>
+    </div>
     <div ref="editor" />
+    <!-- Signature preview at bottom -->
+    <div
+      v-if="shouldShowSignaturePreview && signaturePosition === 'bottom'"
+      class="signature-preview signature-preview--bottom"
+    >
+      <div class="signature-label">
+        {{ t('CONVERSATION.FOOTER.SIGNATURE_LABEL_BOTTOM') }}
+      </div>
+      <div v-if="signatureSeparator === '--'" class="signature-separator">
+        {{ signatureSeparator }}
+      </div>
+      <div v-dompurify-html="formattedSignature" class="signature-content" />
+    </div>
     <div
       v-show="isImageNodeSelected && showImageResizeToolbar"
       class="absolute shadow-md rounded-[6px] flex gap-1 py-1 px-1 bg-n-solid-3 outline outline-1 outline-n-weak text-n-slate-12"
@@ -893,6 +920,42 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
 
 <style lang="scss">
 @import '@chatwoot/prosemirror-schema/src/styles/base.scss';
+
+.signature-preview {
+  @apply px-1 py-1 text-n-slate-10 text-sm pointer-events-none select-none opacity-70;
+
+  &--top {
+    @apply border-b border-n-weak pb-1;
+
+    .signature-separator {
+      @apply text-n-slate-9 mt-1 mb-0;
+    }
+  }
+
+  &--bottom {
+    @apply border-t border-n-weak pt-1 mt-2;
+
+    .signature-separator {
+      @apply text-n-slate-9 mb-1 mt-0;
+    }
+  }
+
+  .signature-label {
+    @apply text-xs text-n-slate-9 mb-1;
+  }
+
+  .signature-content {
+    @apply break-words;
+
+    :deep(p) {
+      @apply m-0 text-n-slate-10;
+    }
+
+    :deep(a) {
+      @apply text-n-slate-10 no-underline;
+    }
+  }
+}
 
 .ProseMirror-menubar-wrapper {
   @apply flex flex-col gap-3;
