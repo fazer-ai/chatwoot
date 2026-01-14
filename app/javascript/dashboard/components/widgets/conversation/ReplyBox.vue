@@ -4,6 +4,7 @@ import { mapGetters } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useTrack } from 'dashboard/composables';
+import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import keyboardEventListenerMixins from 'shared/mixins/keyboardEventListenerMixins';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
@@ -42,12 +43,7 @@ import {
 } from 'dashboard/helper/quotedEmailHelper';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
 import fileUploadMixin from 'dashboard/mixins/fileUploadMixin';
-import {
-  appendSignature,
-  removeSignature,
-  getEffectiveChannelType,
-  extractTextFromMarkdown,
-} from 'dashboard/helper/editorHelper';
+import { appendSignature } from 'dashboard/helper/editorHelper';
 
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { LocalStorage } from 'shared/helpers/localStorage';
@@ -92,6 +88,8 @@ export default {
       fetchQuotedReplyFlagFromUISettings,
     } = useUISettings();
 
+    const { formatMessage } = useMessageFormatter();
+
     const replyEditor = useTemplateRef('replyEditor');
 
     return {
@@ -101,6 +99,7 @@ export default {
       setQuotedReplyFlagForInbox,
       fetchQuotedReplyFlagFromUISettings,
       replyEditor,
+      formatMessage,
     };
   },
   data() {
@@ -418,11 +417,24 @@ export default {
 
       return false;
     },
-    // ensure that the signature is plain text depending on `showRichContentEditor`
-    signatureToApply() {
-      return this.showRichContentEditor
-        ? this.messageSignature
-        : extractTextFromMarkdown(this.messageSignature);
+    // Signature preview for non-rich editor (WhatsApp, etc.)
+    shouldShowSignaturePreview() {
+      return (
+        this.sendWithSignature &&
+        this.messageSignature &&
+        !this.isPrivate &&
+        !this.showRichContentEditor
+      );
+    },
+    signaturePosition() {
+      return this.currentUser?.ui_settings?.signature_position || 'top';
+    },
+    signatureSeparator() {
+      return this.currentUser?.ui_settings?.signature_separator || 'blank';
+    },
+    formattedSignature() {
+      if (!this.messageSignature) return '';
+      return this.formatMessage(this.messageSignature, false, false);
     },
   },
   watch: {
@@ -606,31 +618,6 @@ export default {
         this.message = messageFromStore;
       }
     },
-    toggleSignatureForDraft(message) {
-      if (this.isPrivate) {
-        return message;
-      }
-      if (this.showRichContentEditor) {
-        const effectiveChannelType = getEffectiveChannelType(
-          this.channelType,
-          this.inbox?.medium || ''
-        );
-        return this.sendWithSignature
-          ? appendSignature(
-              message,
-              this.messageSignature,
-              effectiveChannelType
-            )
-          : removeSignature(
-              message,
-              this.messageSignature,
-              effectiveChannelType
-            );
-      }
-      return this.sendWithSignature
-        ? appendSignature(message, this.signatureToApply)
-        : removeSignature(message, this.signatureToApply);
-    },
     removeFromDraft() {
       if (this.conversationIdByRoute) {
         const key = `draft-${this.conversationIdByRoute}-${this.replyType}`;
@@ -685,6 +672,18 @@ export default {
         this.isFocused &&
         this.isEditorHotKeyEnabled(selectedKey)
       );
+    },
+    applySignatureToMessage(message) {
+      if (!this.sendWithSignature || !this.messageSignature) {
+        return message;
+      }
+      const { signature_position, signature_separator } =
+        this.currentUser?.ui_settings || {};
+      const signatureSettings = {
+        position: signature_position || 'top',
+        separator: signature_separator || 'blank',
+      };
+      return appendSignature(message, this.messageSignature, signatureSettings);
     },
     onPaste(e) {
       // Don't handle paste if compose new conversation modal is open
@@ -999,8 +998,10 @@ export default {
     getMultipleMessagesPayload(message) {
       const multipleMessagePayload = [];
 
-      if (this.attachedFiles && this.attachedFiles.length) {
-        let caption = this.isAnInstagramChannel ? '' : message;
+      const messageWithSignature = this.applySignatureToMessage(message);
+
+      if (this.attachedFiles?.length) {
+        let caption = this.isAnInstagramChannel ? '' : messageWithSignature;
         this.attachedFiles.forEach(attachment => {
           const attachedFile = this.globalConfig.directUploadsEnabled
             ? attachment.blobSignedId
@@ -1020,8 +1021,7 @@ export default {
         });
       }
 
-      const hasNoAttachments =
-        !this.attachedFiles || !this.attachedFiles.length;
+      const hasNoAttachments = !this.attachedFiles?.length;
       // For Instagram, we need a separate text message
       // For WhatsApp, we only need a text message if there are no attachments
       if (
@@ -1030,7 +1030,7 @@ export default {
       ) {
         let messagePayload = {
           conversationId: this.currentChat.id,
-          message,
+          message: messageWithSignature,
           private: false,
           sender: this.sender,
         };
@@ -1044,18 +1044,8 @@ export default {
     },
     getMessagePayload(message) {
       let finalMessage = this.getMessageWithQuotedEmailText(message);
-      if (this.sendWithSignature && !this.isPrivate && this.messageSignature) {
-        const { signature_position, signature_separator } =
-          this.currentUser?.ui_settings || {};
-        const signatureSettings = {
-          position: signature_position || 'top',
-          separator: signature_separator || 'blank',
-        };
-        finalMessage = appendSignature(
-          message,
-          this.messageSignature,
-          signatureSettings
-        );
+      if (!this.isPrivate) {
+        finalMessage = this.applySignatureToMessage(finalMessage);
       }
 
       let messagePayload = {
@@ -1066,7 +1056,7 @@ export default {
       };
       messagePayload = this.setReplyToInPayload(messagePayload);
 
-      if (this.attachedFiles && this.attachedFiles.length) {
+      if (this.attachedFiles?.length) {
         messagePayload.files = [];
         messagePayload.isRecordedAudio = [];
         this.attachedFiles.forEach(attachment => {
@@ -1222,18 +1212,51 @@ export default {
         @play="recordingAudioState = 'playing'"
         @pause="recordingAudioState = 'paused'"
       />
-      <ResizableTextArea
-        v-else-if="!showRichContentEditor"
-        ref="messageInput"
-        v-model="message"
-        class="rounded-none input"
-        :placeholder="messagePlaceHolder"
-        :min-height="4"
-        @typing-off="onTypingOff"
-        @typing-on="onTypingOn"
-        @focus="onFocus"
-        @blur="onBlur"
-      />
+      <div v-else-if="!showRichContentEditor" class="w-full">
+        <!-- Signature preview at top for non-rich editor -->
+        <div
+          v-if="shouldShowSignaturePreview && signaturePosition === 'top'"
+          class="signature-preview px-2 py-1 text-slate-500 dark:text-slate-400 text-sm opacity-70 select-none border-b border-slate-100 dark:border-slate-700"
+        >
+          <div class="text-xs text-slate-400 dark:text-slate-500 mb-1">
+            {{ $t('CONVERSATION.FOOTER.SIGNATURE_LABEL_TOP') }}
+          </div>
+          <div v-dompurify-html="formattedSignature" />
+          <div
+            v-if="signatureSeparator === '--'"
+            class="text-slate-400 dark:text-slate-500 mt-1"
+          >
+            {{ signatureSeparator }}
+          </div>
+        </div>
+        <ResizableTextArea
+          ref="messageInput"
+          v-model="message"
+          class="rounded-none input"
+          :placeholder="messagePlaceHolder"
+          :min-height="4"
+          @typing-off="onTypingOff"
+          @typing-on="onTypingOn"
+          @focus="onFocus"
+          @blur="onBlur"
+        />
+        <!-- Signature preview at bottom for non-rich editor -->
+        <div
+          v-if="shouldShowSignaturePreview && signaturePosition === 'bottom'"
+          class="signature-preview px-2 py-1 mt-2 text-slate-500 dark:text-slate-400 text-sm opacity-70 select-none border-t border-slate-100 dark:border-slate-700"
+        >
+          <div class="text-xs text-slate-400 dark:text-slate-500 mb-1">
+            {{ $t('CONVERSATION.FOOTER.SIGNATURE_LABEL_BOTTOM') }}
+          </div>
+          <div
+            v-if="signatureSeparator === '--'"
+            class="text-slate-400 dark:text-slate-500 mb-1"
+          >
+            {{ signatureSeparator }}
+          </div>
+          <div v-dompurify-html="formattedSignature" />
+        </div>
+      </div>
       <WootMessageEditor
         v-else
         v-model="message"
@@ -1245,6 +1268,8 @@ export default {
         :min-height="4"
         enable-variables
         :variables="messageVariables"
+        :signature="messageSignature"
+        allow-signature
         :channel-type="channelType"
         :medium="inbox.medium"
         @typing-off="onTypingOff"
