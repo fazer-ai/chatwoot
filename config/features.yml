@@ -230,6 +230,10 @@
 - name: channel_tiktok
   display_name: TikTok Channel
   enabled: true
+- name: csat_review_notes
+  display_name: CSAT Review Notes
+  enabled: false
+  premium: true
 - name: kanban
   display_name: Kanban
   enabled: false

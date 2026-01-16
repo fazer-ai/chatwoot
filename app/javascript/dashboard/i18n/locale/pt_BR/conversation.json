@@ -279,6 +279,16 @@
       "CONTACT": "Contatos",
       "COPILOT": "Copiloto"
     },
+    "VOICE_WIDGET": {
+      "INCOMING_CALL": "Chamada recebida",
+      "OUTGOING_CALL": "Chamada realizada",
+      "CALL_IN_PROGRESS": "Chamada em andamento",
+      "NOT_ANSWERED_YET": "Ainda não respondido",
+      "HANDLED_IN_ANOTHER_TAB": "Sendo atendida em outra aba",
+      "REJECT_CALL": "Recusar",
+      "JOIN_CALL": "Entrar na chamada",
+      "END_CALL": "Encerrar chamada"
+    },
     "INBOX": {
       "WHATSAPP_PROVIDER_CONNECTION": {
         "NOT_CONNECTED": "O WhatsApp não está conectado. Por favor conecte o seu dispositivo novamente.",

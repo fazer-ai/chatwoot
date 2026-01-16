@@ -46,6 +46,12 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
+const attachmentId = ref(0);
+const generateUid = () => {
+  attachmentId.value += 1;
+  return `attachment-${attachmentId.value}`;
+};
+
 const uploadAttachment = ref(null);
 const isEmojiPickerOpen = ref(false);
 
@@ -177,10 +183,14 @@ const onPaste = e => {
   const files = e.clipboardData?.files;
   if (!files?.length) return;
 
-  Array.from(files).forEach(file => {
-    const { name, type, size } = file;
-    onFileUpload({ file, name, type, size });
-  });
+  // Filter valid files (non-zero size)
+  Array.from(files)
+    .filter(file => file.size > 0)
+    .forEach(file => {
+      const { name, type, size } = file;
+      // Add unique ID for clipboard-pasted files
+      onFileUpload({ file, name, type, size, id: generateUid() });
+    });
 };
 
 useEventListener(document, 'paste', onPaste);
