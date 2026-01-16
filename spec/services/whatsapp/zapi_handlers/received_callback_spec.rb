@@ -825,9 +825,10 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
 
       it 'does not create message if it is already being processed' do
-        allow(Redis::Alfred).to receive(:get)
-          .with(format_message_source_key('duplicate_123'))
-          .and_return(true)
+        # Simulate lock already acquired by returning false from SETNX
+        allow(Redis::Alfred).to receive(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
+          .and_return(false)
 
         expect do
           service.perform
@@ -835,14 +836,26 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
 
       it 'caches and clears message source id in Redis' do
-        allow(Redis::Alfred).to receive(:setex)
+        allow(Redis::Alfred).to receive(:set).and_return(true)
         allow(Redis::Alfred).to receive(:delete)
 
         service.perform
 
-        expect(Redis::Alfred).to have_received(:setex)
-          .with(format_message_source_key('duplicate_123'), true)
+        expect(Redis::Alfred).to have_received(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
         expect(Redis::Alfred).to have_received(:delete)
+          .with(format_message_source_key('duplicate_123'))
+      end
+
+      it 'does not clear lock when acquisition fails' do
+        allow(Redis::Alfred).to receive(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
+          .and_return(false)
+        allow(Redis::Alfred).to receive(:delete)
+
+        service.perform
+
+        expect(Redis::Alfred).not_to have_received(:delete)
           .with(format_message_source_key('duplicate_123'))
       end
     end
@@ -1238,6 +1251,10 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
     end
 
     it 'waits for the lock if it is already acquired' do
+      # Stub the message processing lock to always succeed
+      allow(Redis::Alfred).to receive(:set)
+        .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+        .and_return(true)
       allow(Redis::Alfred).to receive(:set).with('ZAPI::CONTACT_LOCK::5511987654321', 1, nx: true, ex: 5.seconds).and_return(false, true)
       allow(Redis::Alfred).to receive(:delete)
 
