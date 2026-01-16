@@ -452,20 +452,25 @@ describe Whatsapp::IncomingMessageBaileysService do
           end
 
           it 'does not create a message if it is already being processed' do
-            allow(Redis::Alfred).to receive(:get).with(format_message_source_key('msg_123')).and_return(true)
+            # Simulate lock already acquired by returning false from SETNX
+            allow(Redis::Alfred).to receive(:set)
+              .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+              .and_return(false)
 
             described_class.new(inbox: inbox, params: params).perform
 
             expect(inbox.conversations).to be_empty
           end
 
-          it 'caches the message source id in Redis and clears it' do
-            allow(Redis::Alfred).to receive(:setex).with(format_message_source_key('msg_123'), true)
+          it 'caches and clears message source id in Redis' do
+            allow(Redis::Alfred).to receive(:set)
+              .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+              .and_return(true)
             allow(Redis::Alfred).to receive(:delete).with(format_message_source_key('msg_123'))
 
             described_class.new(inbox: inbox, params: params).perform
 
-            expect(Redis::Alfred).to have_received(:setex)
+            expect(Redis::Alfred).to have_received(:set)
             expect(Redis::Alfred).to have_received(:delete)
           end
         end

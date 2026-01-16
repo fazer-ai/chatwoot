@@ -24,9 +24,10 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     return unless %w[lid user].include?(jid_type)
     return unless extract_from_jid(type: 'lid')
     return if ignore_message?
-    return if find_message_by_source_id(raw_message_id) || message_under_process?
+    return if find_message_by_source_id(raw_message_id)
 
-    cache_message_source_id_in_redis
+    return unless acquire_message_processing_lock
+
     set_contact
 
     unless @contact

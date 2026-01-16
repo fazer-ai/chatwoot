@@ -3,16 +3,19 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback
+  def process_received_callback # rubocop:disable Metrics/MethodLength
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
     @contact = nil
+    @lock_acquired = false
 
     return unless should_process_message?
-    return if find_message_by_source_id(raw_message_id) || message_under_process?
+    return if find_message_by_source_id(raw_message_id)
 
-    cache_message_source_id_in_redis
+    # Atomically acquire lock to prevent race conditions with concurrent webhook deliveries
+    @lock_acquired = acquire_message_processing_lock
+    return unless @lock_acquired
 
     return handle_edited_message if @raw_message[:isEdit]
 
@@ -28,7 +31,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
       handle_create_message
     end
   ensure
-    clear_message_source_id_from_redis
+    clear_message_source_id_from_redis if @lock_acquired
   end
 
   def should_process_message?

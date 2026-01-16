@@ -11,9 +11,9 @@ module Whatsapp::ZapiHandlers::Helpers
     !@raw_message[:fromMe]
   end
 
-  def cache_message_source_id_in_redis
+  def acquire_message_processing_lock
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{raw_message_id}")
-    Redis::Alfred.setex(key, true)
+    Redis::Alfred.set(key, true, nx: true, ex: 1.day)
   end
 
   def clear_message_source_id_from_redis
