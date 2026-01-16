@@ -156,7 +156,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     process_response(response, message)
   end
 
-  def send_attachment_message(phone_number, message)
+  def send_attachment_message(phone_number, message) # rubocop:disable Metrics/MethodLength
     attachment = message.attachments.first
     type = %w[image audio video].include?(attachment.file_type) ? attachment.file_type : 'document'
     type_content = {
@@ -164,8 +164,9 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     }
     type_content['caption'] = message.outgoing_content unless %w[audio sticker].include?(type)
     type_content['filename'] = attachment.file.filename if type == 'document'
+    type_content['voice'] = true if type == 'audio' && attachment.meta&.dig('is_recorded_audio')
     response = HTTParty.post(
-      "#{phone_id_path}/messages",
+      "#{phone_id_path('v24.0')}/messages",
       headers: api_headers,
       body: {
         :messaging_product => 'whatsapp',
