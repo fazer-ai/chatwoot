@@ -1,5 +1,6 @@
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
+import { appendSignature } from 'dashboard/helper/editorHelper';
 import camelcaseKeys from 'camelcase-keys';
 import ContactAPI from 'dashboard/api/contacts';
 
@@ -129,12 +130,29 @@ export const prepareNewMessagePayload = ({
   currentUser,
   attachedFiles = [],
   directUploadsEnabled = false,
+  sendWithSignature = false,
+  messageSignature = '',
 }) => {
+  let finalMessage = message;
+  if (sendWithSignature && messageSignature) {
+    const { signature_position, signature_separator } =
+      currentUser?.ui_settings || {};
+    const signatureSettings = {
+      position: signature_position || 'top',
+      separator: signature_separator || 'blank',
+    };
+    finalMessage = appendSignature(
+      message,
+      messageSignature,
+      signatureSettings
+    );
+  }
+
   const payload = {
     inboxId: targetInbox.id,
     sourceId: targetInbox.sourceId,
     contactId: Number(selectedContact.id),
-    message: { content: message },
+    message: { content: finalMessage },
     assigneeId: currentUser.id,
   };
 
