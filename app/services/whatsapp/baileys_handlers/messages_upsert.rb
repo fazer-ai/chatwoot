@@ -20,26 +20,33 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     end
   end
 
-  def handle_message
+  def handle_message # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+    @lock_acquired = false
+
     return unless %w[lid user].include?(jid_type)
     return unless extract_from_jid(type: 'lid')
     return if ignore_message?
     return if find_message_by_source_id(raw_message_id)
 
-    return unless acquire_message_processing_lock
+    @lock_acquired = acquire_message_processing_lock
+    return unless @lock_acquired
 
-    set_contact
+    # Lock by contact phone to prevent race conditions when multiple messages
+    # from the same contact arrive simultaneously (e.g., WhatsApp albums).
+    contact_phone = extract_from_jid(type: 'pn') || extract_from_jid(type: 'lid')
+    with_contact_lock(contact_phone) do
+      set_contact
 
-    unless @contact
-      clear_message_source_id_from_redis
+      unless @contact
+        Rails.logger.warn "Contact not found for message: #{raw_message_id}"
+        return
+      end
 
-      Rails.logger.warn "Contact not found for message: #{raw_message_id}"
-      return
+      set_conversation
+      handle_create_message
     end
-
-    set_conversation
-    handle_create_message
-    clear_message_source_id_from_redis
+  ensure
+    clear_message_source_id_from_redis if @lock_acquired
   end
 
   def set_contact

@@ -18,7 +18,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
         expect do
           described_class.new(inbox: inbox, params: params).perform
-        end.to raise_error(Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken)
+        end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken') })
       end
     end
 
@@ -463,6 +463,11 @@ describe Whatsapp::IncomingMessageBaileysService do
           end
 
           it 'caches and clears message source id in Redis' do
+            # Allow all Redis::Alfred calls (contact lock uses different keys)
+            allow(Redis::Alfred).to receive(:set).and_call_original
+            allow(Redis::Alfred).to receive(:delete).and_call_original
+
+            # Stub message lock specifically
             allow(Redis::Alfred).to receive(:set)
               .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
               .and_return(true)
@@ -470,8 +475,29 @@ describe Whatsapp::IncomingMessageBaileysService do
 
             described_class.new(inbox: inbox, params: params).perform
 
-            expect(Redis::Alfred).to have_received(:set)
-            expect(Redis::Alfred).to have_received(:delete)
+            expect(Redis::Alfred).to have_received(:set).with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+            expect(Redis::Alfred).to have_received(:delete).with(format_message_source_key('msg_123'))
+          end
+
+          it 'clears lock even when an exception occurs after acquiring it' do
+            # Bug: no ensure block meant exceptions left lock stuck forever
+            # Fix: use ensure block to always clear lock when acquired
+            # Allow all Redis::Alfred calls (contact lock uses different keys)
+            allow(Redis::Alfred).to receive(:set).and_call_original
+            allow(Redis::Alfred).to receive(:delete).and_call_original
+
+            # Stub message lock specifically
+            allow(Redis::Alfred).to receive(:set)
+              .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+              .and_return(true)
+            allow(Redis::Alfred).to receive(:delete).with(format_message_source_key('msg_123'))
+
+            service = described_class.new(inbox: inbox, params: params)
+            allow(service).to receive(:handle_create_message).and_raise(StandardError, 'simulated error')
+
+            expect { service.perform }.to raise_error(StandardError, 'simulated error')
+
+            expect(Redis::Alfred).to have_received(:delete).with(format_message_source_key('msg_123'))
           end
         end
 
@@ -918,7 +944,7 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect do
             described_class.new(inbox: inbox, params: params).perform
-          end.to raise_error(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
+          end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError') })
         end
       end
 
