@@ -8,6 +8,7 @@ class Api::V1::Accounts::Kanban::BoardStepsController < Api::V1::Accounts::Kanba
   def index
     authorize(@board, :show?)
     @steps = @board.ordered_steps
+    @filtered_counts = calculate_filtered_counts if filter_params_present?
   end
 
   def show
@@ -81,5 +82,23 @@ class Api::V1::Accounts::Kanban::BoardStepsController < Api::V1::Accounts::Kanba
       :color,
       :cancelled
     )
+  end
+
+  def filter_params_present?
+    params[:agent_id].present? || params[:inbox_id].present?
+  end
+
+  def calculate_filtered_counts
+    counts = {}
+
+    @steps.each do |step|
+      scope = step.tasks
+      scope = scope.joins(:task_agents).where(kanban_task_agents: { agent_id: params[:agent_id] }) if params[:agent_id].present?
+      scope = scope.joins(conversations: :inbox).where(inboxes: { id: params[:inbox_id] }) if params[:inbox_id].present?
+
+      counts[step.id] = scope.distinct.count
+    end
+
+    counts
   end
 end

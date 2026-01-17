@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getContrastingTextColor } from '@chatwoot/utils';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
@@ -34,6 +34,22 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
+  hasMore: {
+    type: Boolean,
+    default: false,
+  },
+  isFetched: {
+    type: Boolean,
+    default: false,
+  },
+  isCountLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -45,13 +61,20 @@ const emit = defineEmits([
   'updateTask',
   'moveTask',
   'enableFilter',
+  'loadMore',
 ]);
+// Computed to differentiate initial loading vs loading more
+const isInitialLoading = computed(() => props.isLoading && !props.isFetched);
+const isLoadingMore = computed(() => props.isLoading && props.isFetched);
 
 const { t } = useI18n();
 const { formatMessage } = useMessageFormatter();
 const { isAdmin } = useAdmin();
 
 const internalTasks = ref([...props.tasks]);
+const scrollSentinelRef = ref(null);
+const scrollContainerRef = ref(null);
+let intersectionObserver = null;
 
 watch(
   () => props.tasks,
@@ -59,6 +82,59 @@ watch(
     internalTasks.value = [...value];
   }
 );
+
+// Set up IntersectionObserver for infinite scroll
+const setupIntersectionObserver = () => {
+  if (intersectionObserver) {
+    intersectionObserver.disconnect();
+  }
+
+  intersectionObserver = new IntersectionObserver(
+    entries => {
+      const [entry] = entries;
+      // Only load more if we have tasks (prevents double-fetch on empty columns)
+      if (
+        entry.isIntersecting &&
+        props.hasMore &&
+        !props.isLoading &&
+        props.tasks.length > 0
+      ) {
+        emit('loadMore', props.step.id);
+      }
+    },
+    {
+      root: scrollContainerRef.value,
+      threshold: 0.1,
+      // Start loading 300px before sentinel is visible for smoother scrolling
+      rootMargin: '0px 0px 300px 0px',
+    }
+  );
+
+  if (scrollSentinelRef.value) {
+    intersectionObserver.observe(scrollSentinelRef.value);
+  }
+};
+
+watch(
+  () => scrollSentinelRef.value,
+  newVal => {
+    if (newVal) {
+      setupIntersectionObserver();
+    }
+  }
+);
+
+onMounted(() => {
+  if (scrollSentinelRef.value) {
+    setupIntersectionObserver();
+  }
+});
+
+onUnmounted(() => {
+  if (intersectionObserver) {
+    intersectionObserver.disconnect();
+  }
+});
 
 const localTasks = computed({
   get: () => internalTasks.value,
@@ -137,10 +213,7 @@ const statusTooltip = computed(() => {
 });
 
 const displayedTaskCount = computed(() => {
-  if (props.isCollapsed) {
-    return props.totalTaskCount;
-  }
-  return props.tasks.length;
+  return props.totalTaskCount;
 });
 
 const containerStyles = computed(() => {
@@ -168,6 +241,11 @@ const bodyStyles = {
 
 const badgeStyles = computed(() => ({
   backgroundColor: `color-mix(in srgb, ${props.step.color}, black 20%)`,
+}));
+
+const skeletonStyles = computed(() => ({
+  backgroundColor: headerTextColor.value,
+  opacity: 0.5,
 }));
 
 const collapsedStyles = computed(() => ({
@@ -272,7 +350,12 @@ const onEditStep = () => {
         class="flex h-5 min-w-[1.25rem] flex-shrink-0 items-center justify-center rounded-full px-1 text-xs font-medium mb-3"
         :style="{ ...badgeStyles, color: headerTextColor }"
       >
-        {{ totalTaskCount }}
+        <span
+          v-if="isCountLoading"
+          class="w-3 h-3 rounded-full animate-pulse"
+          :style="skeletonStyles"
+        />
+        <template v-else>{{ totalTaskCount }}</template>
       </span>
       <h3
         class="text-sm font-semibold whitespace-nowrap py-2 flex-1"
@@ -330,7 +413,12 @@ const onEditStep = () => {
             class="flex h-5 min-w-[1.25rem] flex-shrink-0 items-center justify-center rounded-full px-1 text-xs font-medium"
             :style="{ ...badgeStyles, color: headerTextColor }"
           >
-            {{ displayedTaskCount }}
+            <span
+              v-if="isCountLoading"
+              class="w-3 h-3 rounded-full animate-pulse"
+              :style="skeletonStyles"
+            />
+            <template v-else>{{ displayedTaskCount }}</template>
           </span>
         </div>
         <div class="flex flex-shrink-0 items-center gap-1">
@@ -362,10 +450,28 @@ const onEditStep = () => {
     </header>
 
     <div
+      ref="scrollContainerRef"
       class="kanban-column-body flex flex-col flex-1 overflow-y-auto px-2 py-2 scrollbar-custom"
       :style="bodyStyles"
     >
+      <!-- Card skeletons during initial loading -->
+      <div v-if="isInitialLoading" class="space-y-2 flex-1 animate-pulse">
+        <div
+          v-for="i in 10"
+          :key="i"
+          class="p-3 bg-n-background border border-n-slate-3 rounded-lg flex flex-col gap-3 shadow-sm"
+        >
+          <div class="h-5 w-3/4 bg-n-slate-3 rounded" />
+          <div class="flex justify-between items-center">
+            <div class="h-4 w-16 bg-n-slate-3 rounded" />
+            <div class="h-6 w-6 rounded-full bg-n-slate-3" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Actual task list when loaded -->
       <Draggable
+        v-else
         v-model="localTasks"
         animation="200"
         group="tasks"
@@ -387,6 +493,33 @@ const onEditStep = () => {
           />
         </template>
         <template #footer>
+          <!-- Scroll sentinel for infinite scroll - only show when we have tasks and more to load -->
+          <div
+            v-if="(hasMore || isLoadingMore) && tasks.length > 0"
+            ref="scrollSentinelRef"
+            class="py-2"
+          >
+            <!-- Skeleton cards while loading more -->
+            <div v-if="isLoadingMore" class="space-y-2 animate-pulse">
+              <div
+                v-for="i in 5"
+                :key="i"
+                class="p-3 bg-n-background border border-n-slate-3 rounded-lg flex flex-col gap-3 shadow-sm"
+              >
+                <div class="h-5 w-3/4 bg-n-slate-3 rounded" />
+                <div class="flex justify-between items-center">
+                  <div class="h-4 w-16 bg-n-slate-3 rounded" />
+                  <div class="h-6 w-6 rounded-full bg-n-slate-3" />
+                </div>
+              </div>
+            </div>
+            <span
+              v-else-if="hasMore"
+              class="text-xs text-n-slate-10 flex items-center justify-center py-1"
+            >
+              {{ t('KANBAN.COLUMN.SCROLL_FOR_MORE') }}
+            </span>
+          </div>
           <div class="mt-2">
             <Button
               variant="ghost"

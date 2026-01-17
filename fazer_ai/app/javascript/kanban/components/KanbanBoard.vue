@@ -14,10 +14,6 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
-  allTasksByStep: {
-    type: Object,
-    default: () => ({}),
-  },
   collapsedStepIds: {
     type: Array,
     default: () => [],
@@ -25,6 +21,22 @@ const props = defineProps({
   isDragEnabled: {
     type: Boolean,
     default: true,
+  },
+  stepLoadingMap: {
+    type: Object,
+    default: () => ({}),
+  },
+  stepMetaMap: {
+    type: Object,
+    default: () => ({}),
+  },
+  stepFetchedMap: {
+    type: Object,
+    default: () => ({}),
+  },
+  isCountsLoading: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -38,14 +50,18 @@ const emit = defineEmits([
   'updateTask',
   'moveTask',
   'enableFilter',
+  'loadMore',
+  'expandStep',
 ]);
 
 const { t } = useI18n();
 const { isAdmin } = useAdmin();
 
 const resolveTasks = stepId => props.tasksByStep[stepId] || [];
-const resolveAllTasks = stepId => props.allTasksByStep[stepId] || [];
 const isStepCollapsed = stepId => props.collapsedStepIds.includes(stepId);
+const isStepLoading = stepId => props.stepLoadingMap[stepId] || false;
+const isStepFetched = stepId => props.stepFetchedMap[stepId] || false;
+const stepHasMore = stepId => props.stepMetaMap[stepId]?.hasMore || false;
 
 const onEnableFilter = status => {
   emit('enableFilter', status);
@@ -79,6 +95,14 @@ const onEditStep = step => {
   emit('editStep', step);
 };
 
+const onLoadMore = stepId => {
+  emit('loadMore', stepId);
+};
+
+const onExpandStep = stepId => {
+  emit('expandStep', stepId);
+};
+
 const ghostStepStyles = {
   ...KANBAN_COLUMN_WIDTH_STYLES,
   flexShrink: 0,
@@ -95,7 +119,11 @@ const ghostStepStyles = {
       :tasks="resolveTasks(step.id)"
       :is-drag-enabled="isDragEnabled"
       :is-collapsed="isStepCollapsed(step.id)"
-      :total-task-count="resolveAllTasks(step.id).length"
+      :is-loading="isStepLoading(step.id)"
+      :is-fetched="isStepFetched(step.id)"
+      :has-more="stepHasMore(step.id)"
+      :total-task-count="step.filtered_tasks_count ?? step.tasks_count"
+      :is-count-loading="isCountsLoading"
       @add-task="onAddTask"
       @edit-task="onEditTask"
       @duplicate-task="onDuplicateTask"
@@ -104,6 +132,8 @@ const ghostStepStyles = {
       @update-task="onUpdateTask"
       @move-task="onMoveTask"
       @enable-filter="onEnableFilter"
+      @load-more="onLoadMore"
+      @expand="onExpandStep"
     />
     <div
       v-if="isAdmin"

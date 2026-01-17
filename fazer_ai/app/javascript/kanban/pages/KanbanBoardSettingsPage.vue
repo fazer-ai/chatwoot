@@ -41,7 +41,6 @@ const activeBoard = computed(() => store.getters['kanban/activeBoard']);
 const steps = computed(() => store.getters['kanban/orderedSteps']);
 const agents = computed(() => store.state.agents.records);
 const inboxes = computed(() => store.getters['inboxes/getInboxes']);
-const tasksByStep = computed(() => store.getters['kanban/tasksByStep']);
 
 const agentOptions = computed(() =>
   agents.value.map(agent => ({
@@ -281,8 +280,7 @@ onMounted(async () => {
 
 const getStepTaskCount = stepId => {
   const step = steps.value.find(s => s.id === stepId);
-  const count = tasksByStep.value[stepId]?.length;
-  return typeof count === 'number' ? count : step?.tasks_count || 0;
+  return step?.tasks_count ?? 0;
 };
 
 const updateStepsOrder = async newSteps => {

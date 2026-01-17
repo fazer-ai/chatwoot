@@ -9,10 +9,10 @@ export default {
     try {
       const response = await BoardsAPI.get(params);
       const { boards, preferences } = response.data;
-      commit(types.SET_BOARDS, boards);
       if (preferences) {
         commit(types.SET_KANBAN_PREFERENCES, preferences);
       }
+      commit(types.SET_BOARDS, boards);
     } catch {
       // Ignore error
     } finally {
@@ -20,11 +20,15 @@ export default {
     }
   },
 
-  async fetchSteps({ commit, state }, boardId) {
-    if (!boardId) return;
+  async fetchSteps({ commit, state }, { boardId, agentId, inboxId } = {}) {
+    const targetBoardId = boardId || state.selectedBoardId;
+    if (!targetBoardId) return;
     try {
-      const response = await BoardsAPI.getSteps(boardId);
-      if (state.selectedBoardId === boardId) {
+      const response = await BoardsAPI.getSteps(targetBoardId, {
+        agentId,
+        inboxId,
+      });
+      if (state.selectedBoardId === targetBoardId) {
         commit(types.SET_STEPS, response.data.steps);
       }
     } catch {
@@ -32,45 +36,14 @@ export default {
     }
   },
 
-  async fetchTasks({ commit, state }, { boardId, sort, order }) {
-    if (!boardId) return;
-
-    if (sort) {
-      const newPreferences = {
-        ...state.preferences,
-        task_sorting: {
-          ...(state.preferences.task_sorting || {}),
-          [boardId]: { sort, order },
-        },
-      };
-      commit(types.SET_KANBAN_PREFERENCES, newPreferences);
-    }
-
-    try {
-      const response = await TasksAPI.get({
-        board_id: boardId,
-        sort,
-        order,
-      });
-      if (state.selectedBoardId === boardId) {
-        commit(types.SET_TASKS, response.data.tasks);
-        if (response.data.preferences) {
-          commit(types.SET_KANBAN_PREFERENCES, response.data.preferences);
-        }
-      }
-    } catch {
-      // Ignore error
-    }
-  },
-
-  async setActiveBoard({ commit, dispatch }, { boardId, sort, order }) {
+  async setActiveBoard({ commit, dispatch }, { boardId, agentId, inboxId }) {
     commit(types.SET_KANBAN_LOADING, true);
     commit(types.SET_SELECTED_BOARD_ID, boardId);
+    // Clear steps immediately to prevent stale data triggering task fetches
+    commit(types.SET_STEPS, []);
     try {
-      await Promise.all([
-        dispatch('fetchSteps', boardId),
-        dispatch('fetchTasks', { boardId, sort, order }),
-      ]);
+      // Only fetch steps - tasks will be fetched per step by the component
+      await dispatch('fetchSteps', { boardId, agentId, inboxId });
     } finally {
       commit(types.SET_KANBAN_LOADING, false);
     }
@@ -120,7 +93,13 @@ export default {
   },
 
   async updateTask({ commit, state }, { id, task }) {
-    const originalTask = state.tasks.find(t => t.id === id);
+    // Find task in stepTasks
+    let originalTask = null;
+    const stepIds = Object.keys(state.stepTasks);
+    stepIds.some(stepId => {
+      originalTask = state.stepTasks[stepId]?.find(t => t.id === id);
+      return !!originalTask;
+    });
 
     if (originalTask) {
       const updates = task ? { ...task } : {};
@@ -145,7 +124,13 @@ export default {
     { commit, state },
     { taskId, destinationStepId, insertBeforeTaskId }
   ) {
-    const task = state.tasks.find(t => t.id === taskId);
+    // Find task in stepTasks
+    let task = null;
+    const stepIds = Object.keys(state.stepTasks);
+    stepIds.some(stepId => {
+      task = state.stepTasks[stepId]?.find(t => t.id === taskId);
+      return !!task;
+    });
     if (!task) return;
 
     const sourceStepId = task.board_step_id;
@@ -178,7 +163,12 @@ export default {
       destinationStepTasksOrder.push(taskId);
     }
 
-    commit(types.UPDATE_TASK, { ...task, board_step_id: destinationStepId });
+    commit(types.MOVE_TASK, {
+      task: { ...task, board_step_id: destinationStepId },
+      sourceStepId,
+      destinationStepId,
+      insertBeforeTaskId,
+    });
 
     const newPreferences = {
       ...state.preferences,
@@ -198,6 +188,9 @@ export default {
         insert_before_task_id: insertBeforeTaskId,
       });
     } catch {
+      // Revert based on original task state
+      // We don't have the original insertBeforeTaskId easily available to restore exact position
+      // but UPDATE_TASK will at least put it back in the correct step list
       commit(types.UPDATE_TASK, task);
       commit(types.SET_KANBAN_PREFERENCES, originalPreferences);
     }
@@ -227,12 +220,11 @@ export default {
     }
   },
 
-  async deleteStep({ dispatch }, { boardId, stepId }) {
+  async deleteStep({ dispatch, commit }, { boardId, stepId }) {
     await BoardsAPI.deleteStep(boardId, stepId);
-    await Promise.all([
-      dispatch('fetchTasks', { boardId }),
-      dispatch('fetchSteps', boardId),
-    ]);
+    // Reset step tasks and re-fetch steps
+    commit(types.RESET_STEP_TASKS);
+    await dispatch('fetchSteps', { boardId });
   },
 
   async createStep({ commit }, { boardId, ...stepData }) {
@@ -304,8 +296,49 @@ export default {
     commit(types.ADD_TASK, task);
   },
 
-  updateTaskFromEvent({ commit }, task) {
-    commit(types.UPDATE_TASK, task);
+  updateTaskFromEvent({ commit, state }, task) {
+    // Check if task moved to a different step
+    let currentStepId = null;
+    const stepIds = Object.keys(state.stepTasks);
+    stepIds.some(stepId => {
+      const found = state.stepTasks[stepId]?.find(t => t.id === task.id);
+      if (found) {
+        currentStepId = stepId;
+        return true;
+      }
+      return false;
+    });
+
+    const newStepId = task.board_step_id;
+    const stepChanged =
+      currentStepId &&
+      String(currentStepId) !== String(newStepId) &&
+      currentStepId !== newStepId;
+
+    // Check if this is a move operation (has explicit position info)
+    // insert_before_task_id key is only present during move operations
+    const hasMovePositionInfo = Object.hasOwn(task, 'insert_before_task_id');
+
+    // If we have position info, use MOVE_TASK (works for both between-step and within-step moves)
+    if (hasMovePositionInfo && currentStepId) {
+      commit(types.MOVE_TASK, {
+        task: { ...task, board_step_id: newStepId },
+        sourceStepId: currentStepId,
+        destinationStepId: newStepId,
+        insertBeforeTaskId: task.insert_before_task_id,
+      });
+    } else if (stepChanged) {
+      // Step changed but no position info - use MOVE_TASK, will append to end
+      commit(types.MOVE_TASK, {
+        task: { ...task, board_step_id: newStepId },
+        sourceStepId: currentStepId,
+        destinationStepId: newStepId,
+        insertBeforeTaskId: null,
+      });
+    } else {
+      // Same step, no position info - just update properties in place
+      commit(types.UPDATE_TASK, task);
+    }
   },
 
   deleteTaskFromEvent({ commit }, taskId) {
@@ -322,5 +355,125 @@ export default {
 
   updateBoardFromEvent({ commit }, board) {
     commit(types.UPDATE_BOARD, board);
+  },
+
+  // Step-based task loading actions
+  async fetchTasksForStep(
+    { commit, state },
+    { stepId, page = 1, perPage = 10, append = false }
+  ) {
+    // Block all concurrent requests while loading (prevents rapid scroll from queueing multiple requests)
+    if (state.stepLoading[stepId]) return;
+
+    // Increment request version to invalidate any pending requests
+    commit(types.INCREMENT_STEP_REQUEST_VERSION, stepId);
+    const requestVersion = state.stepRequestVersion[stepId];
+
+    commit(types.SET_STEP_LOADING, { stepId, isLoading: true });
+
+    try {
+      const activeBoardId = state.selectedBoardId;
+      const savedSort = state.preferences.task_sorting?.[activeBoardId] || {};
+      const sort = savedSort.sort || 'position';
+      const order = savedSort.order || 'asc';
+
+      const boardFilters =
+        state.preferences.board_filters?.[activeBoardId] || {};
+      const agentId = boardFilters.agent_id;
+      const inboxId = boardFilters.inbox_id;
+
+      const response = await TasksAPI.getByStep(stepId, {
+        page,
+        perPage,
+        sort: sort === 'position' ? undefined : sort,
+        order: sort === 'position' ? undefined : order,
+        agentId: agentId !== 'all' ? agentId : undefined,
+        inboxId: inboxId !== 'all' ? inboxId : undefined,
+      });
+
+      // Discard response if a newer request was made
+      if (state.stepRequestVersion[stepId] !== requestVersion) {
+        return;
+      }
+
+      const { tasks, meta } = response.data;
+
+      if (append) {
+        commit(types.APPEND_STEP_TASKS, { stepId, tasks });
+      } else {
+        commit(types.SET_STEP_TASKS, { stepId, tasks });
+      }
+
+      if (meta) {
+        // Transform snake_case keys to camelCase
+        // Safety: if API returns empty tasks but claims hasMore, force hasMore to false
+        // This prevents infinite scroll loops when filters cause count mismatches
+        const actualHasMore = meta.has_more && tasks.length > 0;
+        const transformedMeta = {
+          totalCount: meta.total_count,
+          page: meta.page,
+          perPage: meta.per_page,
+          hasMore: actualHasMore,
+        };
+        commit(types.SET_STEP_META, { stepId, meta: transformedMeta });
+      }
+    } catch {
+      // On error, set hasMore to false to prevent stuck infinite scroll
+      commit(types.SET_STEP_META, {
+        stepId,
+        meta: { ...state.stepMeta[stepId], hasMore: false },
+      });
+    } finally {
+      // Always clear loading state to prevent stuck states
+      commit(types.SET_STEP_LOADING, { stepId, isLoading: false });
+    }
+  },
+
+  async fetchMoreTasksForStep({ dispatch, state }, stepId) {
+    const meta = state.stepMeta[stepId];
+    if (!meta || !meta.hasMore) return;
+
+    const nextPage = meta.page + 1;
+    await dispatch('fetchTasksForStep', {
+      stepId,
+      page: nextPage,
+      perPage: meta.perPage,
+      append: true,
+    });
+  },
+
+  async initializeStepTasks({ commit, dispatch }, { stepIds }) {
+    commit(types.RESET_STEP_TASKS);
+
+    // Fetch first page for each step in parallel
+    await Promise.all(
+      stepIds.map(stepId =>
+        dispatch('fetchTasksForStep', { stepId, page: 1, perPage: 10 })
+      )
+    );
+  },
+
+  resetStepTasks({ commit }) {
+    commit(types.RESET_STEP_TASKS);
+  },
+
+  async updateTaskSorting({ commit, state }, { boardId, sort, order }) {
+    const previousPreferences = { ...state.preferences };
+    const newPreferences = {
+      ...state.preferences,
+      task_sorting: {
+        ...(state.preferences.task_sorting || {}),
+        [boardId]: { sort, order },
+      },
+    };
+    commit(types.SET_KANBAN_PREFERENCES, newPreferences);
+
+    try {
+      await PreferencesAPI.update({
+        task_sorting: newPreferences.task_sorting,
+      });
+    } catch {
+      commit(types.SET_KANBAN_PREFERENCES, previousPreferences);
+    }
   },
 };

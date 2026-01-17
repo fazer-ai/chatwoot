@@ -10,8 +10,11 @@ class BoardsAPI extends ApiClient {
     return axios.get(this.url, { params });
   }
 
-  getSteps(boardId) {
-    return axios.get(`${this.url}/${boardId}/steps`);
+  getSteps(boardId, { agentId, inboxId } = {}) {
+    const params = {};
+    if (agentId && agentId !== 'all') params.agent_id = agentId;
+    if (inboxId && inboxId !== 'all') params.inbox_id = inboxId;
+    return axios.get(`${this.url}/${boardId}/steps`, { params });
   }
 
   updateStep(boardId, stepId, data) {

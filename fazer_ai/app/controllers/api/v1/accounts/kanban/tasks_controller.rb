@@ -2,13 +2,16 @@
 
 class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::BaseController # rubocop:disable Metrics/ClassLength
   ALLOWED_SORT_COLUMNS = %w[title updated_at created_at priority due_date].freeze
+  DEFAULT_PER_PAGE = 25
+  MAX_PER_PAGE = 100
 
   before_action :set_task, only: [:show, :update, :destroy, :move]
   before_action :ensure_actor_present!, only: [:create, :update, :destroy, :move]
 
   def index
     authorize(FazerAi::Kanban::Task)
-    @tasks = filtered_tasks
+    @paginated = paginated_request?
+    @tasks = @paginated ? paginated_tasks : filtered_tasks
   end
 
   def show
@@ -52,7 +55,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     render_unprocessable_entity(@task)
   end
 
-  def move
+  def move # rubocop:disable Metrics/AbcSize
     authorize @task, :update?
 
     target_step_id = params[:board_step_id]
@@ -62,6 +65,8 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     @task.insert_before_task_id = insert_before_task_id
     if target_step_id.blank? || target_step_id.to_i == @task.board_step_id
       @task.reorder_for_user!(current_actor, preference: preference)
+      # Dispatch event for within-step reorder (no update! was called, so no after_commit)
+      dispatch_task_reorder_event(@task)
     else
       old_step_id = @task.board_step_id
       @task.update!(board_step_id: target_step_id)
@@ -87,11 +92,37 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
 
   private
 
+  def dispatch_task_reorder_event(task)
+    Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_UPDATED, Time.zone.now, task: task, changed_attributes: {})
+  end
+
   def current_kanban_preference
     @current_kanban_preference ||= begin
       account_user = current_actor.account_users.find_by(account_id: Current.account.id)
       account_user.kanban_preference || account_user.build_kanban_preference
     end
+  end
+
+  def paginated_request?
+    params[:board_step_id].present? && params[:page].present?
+  end
+
+  def paginated_tasks
+    scope = initial_task_scope
+    scope = apply_filters(scope)
+    scope = apply_sorting(scope)
+
+    page = [params[:page].to_i, 1].max
+    per_page_param = params[:per_page].to_i
+    per_page = per_page_param.positive? ? [per_page_param, MAX_PER_PAGE].min : DEFAULT_PER_PAGE
+    offset = (page - 1) * per_page
+
+    @total_count = scope.count
+    @page = page
+    @per_page = per_page
+    @has_more = offset + per_page < @total_count
+
+    scope.limit(per_page).offset(offset)
   end
 
   def filtered_tasks
@@ -107,7 +138,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
         assigned_agents: [:account_users, { avatar_attachment: :blob }],
         creator: [:account_users, { avatar_attachment: :blob }],
         contacts: { avatar_attachment: :blob },
-        conversations: [:inbox, { inbox: :channel }, { contact: { avatar_attachment: :blob } }],
+        conversations: [:inbox, { contact: { avatar_attachment: :blob } }],
         board: [
           :steps,
           { assigned_agents: [:account_users, { avatar_attachment: :blob }] }
@@ -115,11 +146,14 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
       )
   end
 
-  def apply_filters(scope)
+  def apply_filters(scope) # rubocop:disable Metrics/AbcSize
     if params[:assigned_agent_ids].present?
       agent_ids = Array(params[:assigned_agent_ids]).map(&:to_i)
       scope = scope.joins(:task_agents).where(kanban_task_agents: { agent_id: agent_ids })
     end
+
+    scope = scope.joins(:task_agents).where(kanban_task_agents: { agent_id: params[:agent_id] }) if params[:agent_id].present?
+    scope = scope.joins(conversations: :inbox).where(inboxes: { id: params[:inbox_id] }) if params[:inbox_id].present?
 
     direct_filter_columns.each do |column|
       value = params[column]
@@ -130,7 +164,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
   end
 
   def apply_sorting(scope)
-    return scope if params[:sort].blank?
+    return sort_by_position(scope) if params[:sort].blank?
 
     sort_by = params[:sort]
     order_by = params[:order].to_sym
@@ -144,6 +178,18 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     else
       scope.reorder(sort_by => order_by)
     end
+  end
+
+  def sort_by_position(scope)
+    return scope if params[:board_step_id].blank?
+
+    step_id = params[:board_step_id].to_s
+    tasks_order = current_kanban_preference.tasks_order_for(step_id)
+
+    return scope if tasks_order.blank?
+
+    position_sql = "COALESCE(array_position(ARRAY[#{tasks_order.join(',')}]::bigint[], kanban_tasks.id), #{tasks_order.length + 1})"
+    scope.reorder(Arel.sql(position_sql) => :asc)
   end
 
   def save_sort_preference(sort_by, order_by)
@@ -170,7 +216,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
         assigned_agents: [:account_users, { avatar_attachment: :blob }],
         creator: [:account_users, { avatar_attachment: :blob }],
         contacts: { avatar_attachment: :blob },
-        conversations: [:inbox, { inbox: :channel }, { contact: { avatar_attachment: :blob } }],
+        conversations: [:inbox, { contact: { avatar_attachment: :blob } }],
         board: [
           :steps,
           { assigned_agents: [:account_users, { avatar_attachment: :blob }] }

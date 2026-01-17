@@ -102,7 +102,10 @@
     "COLUMN": {
       "TASK_COUNT": "{count} tarefa | {count} tarefas",
       "NO_TASKS": "Nenhuma tarefa ainda",
-      "ADD_TASK": "Adicionar tarefa"
+      "ADD_TASK": "Adicionar tarefa",
+      "SCROLL_FOR_MORE": "Role para carregar mais",
+      "LOADING_MORE": "Carregando mais tarefas...",
+      "ALL_TASKS_LOADED": "Todas as tarefas carregadas"
     },
     "MODAL": {
       "CREATE_TITLE": "Criar tarefa",

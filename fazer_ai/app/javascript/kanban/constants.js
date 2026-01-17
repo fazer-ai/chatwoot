@@ -29,7 +29,7 @@ export const KANBAN_PRIORITIES = [
 export const KANBAN_COLUMN_WIDTH_STYLES = {
   width: 'calc((100% - 4rem) / 4)',
   maxWidth: '350px',
-  minWidth: '300px',
+  minWidth: '280px',
 };
 
 export const BOARD_TEMPLATES = [

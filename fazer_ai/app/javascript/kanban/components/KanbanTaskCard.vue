@@ -654,10 +654,10 @@ const handleDescriptionClick = event => {
           <div
             v-if="hasDueDate"
             v-tooltip="dueDateTooltip"
-            class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
+            class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"
             :class="dateStatusClasses"
           >
-            <span :class="dateStatusIcon" class="h-3 w-3" />
+            <span :class="dateStatusIcon" class="h-3 w-3 flex-shrink-0" />
             <span>{{ dueDateDisplay }}</span>
           </div>
           <div

@@ -44,17 +44,64 @@ if (!store.hasModule('kanban')) {
 
 const preferences = computed(() => store.state.kanban.preferences);
 const steps = computed(() => store.getters['kanban/orderedSteps']);
-const tasksByStep = computed(() => store.getters['kanban/tasksByStep']);
-const tasks = computed(() => store.state.kanban.tasks);
 const boards = computed(() => store.state.kanban.boards);
 const activeBoard = computed(() => store.getters['kanban/activeBoard']);
 const selectedBoardId = computed(() => store.state.kanban.selectedBoardId);
 const isLoading = computed(() => store.state.kanban.isLoading);
 
+// Step-based loading state
+const stepTasksMap = computed(() => store.getters['kanban/stepTasksMap']);
+const stepMetaMap = computed(() => store.getters['kanban/stepMetaMap']);
+const stepLoadingMap = computed(() => store.getters['kanban/stepLoadingMap']);
+const stepFetchedMap = computed(() => store.getters['kanban/stepFetchedMap']);
+// Derive all fetched tasks from stepTasksMap for filter counts
+const allFetchedTasks = computed(() => {
+  const allTasks = stepTasksMap.value || {};
+  return Object.values(allTasks).flat();
+});
+
 const activeSort = ref('position');
 const activeOrdering = ref('asc');
 
-const setActiveBoard = id => {
+const showCompleted = ref(false);
+const showCancelled = ref(false);
+
+const collapsedStepIds = computed(() => {
+  return steps.value
+    .filter(step => {
+      if (step.inferred_task_status === 'completed' && !showCompleted.value) {
+        return true;
+      }
+      if (step.inferred_task_status === 'cancelled' && !showCancelled.value) {
+        return true;
+      }
+      return false;
+    })
+    .map(step => step.id);
+});
+
+const fetchTasksForStep = (stepId, options = {}) =>
+  store.dispatch('kanban/fetchTasksForStep', { stepId, ...options });
+const fetchMoreTasksForStep = stepId =>
+  store.dispatch('kanban/fetchMoreTasksForStep', stepId);
+
+// Fetch tasks for visible (non-collapsed) steps when they become available
+const fetchVisibleStepTasks = async () => {
+  const visibleSteps = steps.value.filter(
+    step => !collapsedStepIds.value.includes(step.id)
+  );
+
+  await Promise.all(
+    visibleSteps.map(step => {
+      if (!stepFetchedMap.value[step.id]) {
+        return fetchTasksForStep(step.id, { page: 1, perPage: 10 });
+      }
+      return Promise.resolve();
+    })
+  );
+};
+
+const setActiveBoard = (id, filters = {}) => {
   const savedSort = preferences.value.task_sorting?.[id] || {};
   const sort = savedSort.sort || 'position';
   const order = savedSort.order || 'asc';
@@ -63,11 +110,30 @@ const setActiveBoard = id => {
     boardId: id,
     sort,
     order,
+    agentId: filters.agentId,
+    inboxId: filters.inboxId,
   });
 };
 const fetchBoards = () => store.dispatch('kanban/fetchBoards');
 const createTask = data => store.dispatch('kanban/createTask', data);
 const updateTask = data => store.dispatch('kanban/updateTask', data);
+
+const isCountsLoading = ref(false);
+const selectedAgentId = ref('all');
+const selectedInboxId = ref('all');
+
+const fetchStepsWithFilters = async () => {
+  isCountsLoading.value = true;
+  try {
+    await store.dispatch('kanban/fetchSteps', {
+      boardId: selectedBoardId.value,
+      agentId: selectedAgentId.value,
+      inboxId: selectedInboxId.value,
+    });
+  } finally {
+    isCountsLoading.value = false;
+  }
+};
 
 const moveTask = ({ task, destinationStepId, insertBeforeTaskId }) =>
   store.dispatch('kanban/moveTask', {
@@ -96,33 +162,23 @@ const showDeleteDialog = ref(false);
 const taskToDelete = ref(null);
 const isDataLoaded = ref(false);
 
-const onSortChange = ({ sort, order }) => {
+const onSortChange = async ({ sort, order }) => {
   activeSort.value = sort;
   activeOrdering.value = order;
-  store.dispatch('kanban/fetchTasks', {
+
+  // Save sort preferences
+  await store.dispatch('kanban/updateTaskSorting', {
     boardId: selectedBoardId.value,
     sort,
     order,
   });
+
+  // Reset step tasks and re-fetch with new sort
+  await store.dispatch('kanban/resetStepTasks');
+  await fetchVisibleStepTasks();
 };
 
 const isDragEnabled = computed(() => activeSort.value === 'position');
-
-const getSavedFilters = () => {
-  const boardFilters = preferences.value.board_filters || {};
-  const filters = boardFilters[selectedBoardId.value] || {};
-  return {
-    agentId: filters.agent_id || 'all',
-    inboxId: filters.inbox_id || 'all',
-    showCompleted: filters.show_completed || false,
-    showCancelled: filters.show_cancelled || false,
-  };
-};
-
-const selectedAgentId = ref('all');
-const selectedInboxId = ref('all');
-const showCompleted = ref(false);
-const showCancelled = ref(false);
 
 const agents = computed(() => activeBoard.value?.assigned_agents || []);
 const inboxes = computed(() => activeBoard.value?.assigned_inboxes || []);
@@ -133,19 +189,6 @@ const agentOptions = computed(() => {
     label: t('KANBAN.FILTERS.ALL_AGENTS'),
     value: 'all',
     icon: 'i-lucide-user',
-    count: tasks.value.filter(task => {
-      if (selectedInboxId.value !== 'all') {
-        const hasInbox = task.conversations.some(
-          c => String(c.inbox.id) === selectedInboxId.value
-        );
-        if (!hasInbox) return false;
-      }
-
-      if (task.status === 'completed' && !showCompleted.value) return false;
-      if (task.status === 'cancelled' && !showCancelled.value) return false;
-
-      return true;
-    }).length,
   };
   const sortedAgents = [...agents.value].sort((a, b) => {
     if (a.id === currentUserId.value) return -1;
@@ -154,25 +197,6 @@ const agentOptions = computed(() => {
   });
 
   const options = sortedAgents.map(agent => {
-    const count = tasks.value.filter(task => {
-      const hasAgent = task.assigned_agents.some(
-        a => String(a.id) === String(agent.id)
-      );
-      if (!hasAgent) return false;
-
-      if (selectedInboxId.value !== 'all') {
-        const hasInbox = task.conversations.some(
-          c => String(c.inbox.id) === selectedInboxId.value
-        );
-        if (!hasInbox) return false;
-      }
-
-      if (task.status === 'completed' && !showCompleted.value) return false;
-      if (task.status === 'cancelled' && !showCancelled.value) return false;
-
-      return true;
-    }).length;
-
     const isCurrentUser = agent.id === currentUserId.value;
     const label = isCurrentUser
       ? `${agent.name} (${t('KANBAN.FILTERS.ME')})`
@@ -182,7 +206,6 @@ const agentOptions = computed(() => {
       label,
       value: String(agent.id),
       thumbnail: agent.avatar_url,
-      count,
     };
   });
   const result = [allOption, ...options];
@@ -203,46 +226,13 @@ const inboxOptions = computed(() => {
     label: t('KANBAN.FILTERS.ALL_INBOXES'),
     value: 'all',
     icon: 'i-lucide-inbox',
-    count: tasks.value.filter(task => {
-      if (selectedAgentId.value !== 'all') {
-        const hasAgent = task.assigned_agents.some(
-          a => String(a.id) === selectedAgentId.value
-        );
-        if (!hasAgent) return false;
-      }
-
-      if (task.status === 'completed' && !showCompleted.value) return false;
-      if (task.status === 'cancelled' && !showCancelled.value) return false;
-
-      return true;
-    }).length,
   };
 
   const options = inboxes.value.map(inbox => {
-    const count = tasks.value.filter(task => {
-      const hasInbox = task.conversations.some(
-        c => String(c.inbox.id) === String(inbox.id)
-      );
-      if (!hasInbox) return false;
-
-      if (selectedAgentId.value !== 'all') {
-        const hasAgent = task.assigned_agents.some(
-          a => String(a.id) === selectedAgentId.value
-        );
-        if (!hasAgent) return false;
-      }
-
-      if (task.status === 'completed' && !showCompleted.value) return false;
-      if (task.status === 'cancelled' && !showCancelled.value) return false;
-
-      return true;
-    }).length;
-
     return {
       label: inbox.name,
       value: String(inbox.id),
       icon: useChannelIcon(inbox).value,
-      count,
     };
   });
   const result = [allOption, ...options];
@@ -259,12 +249,10 @@ const inboxOptions = computed(() => {
 });
 
 const filteredTasksByStep = computed(() => {
-  const allTasks = tasksByStep.value;
-  if (!allTasks) return {};
-
+  const allTasks = stepTasksMap.value || {};
   const filtered = {};
   Object.keys(allTasks).forEach(stepId => {
-    filtered[stepId] = allTasks[stepId].filter(task => {
+    filtered[stepId] = (allTasks[stepId] || []).filter(task => {
       if (selectedAgentId.value !== 'all') {
         const hasAgent = task.assigned_agents.some(
           a => String(a.id) === selectedAgentId.value
@@ -289,22 +277,26 @@ const filteredTasksByStep = computed(() => {
 });
 
 const filteredTotalTasks = computed(() => {
-  return Object.values(filteredTasksByStep.value).flat().length;
+  // Use filtered count from API when available, otherwise use tasks_count
+  return steps.value
+    .filter(step => !collapsedStepIds.value.includes(step.id))
+    .reduce(
+      (sum, step) => sum + (step.filtered_tasks_count ?? step.tasks_count ?? 0),
+      0
+    );
 });
 
-const collapsedStepIds = computed(() => {
-  return steps.value
-    .filter(step => {
-      if (step.inferred_task_status === 'completed' && !showCompleted.value) {
-        return true;
-      }
-      if (step.inferred_task_status === 'cancelled' && !showCancelled.value) {
-        return true;
-      }
-      return false;
-    })
-    .map(step => step.id);
-});
+// Handle loading more tasks for a step
+const onLoadMore = stepId => {
+  fetchMoreTasksForStep(stepId);
+};
+
+// Handle step expansion - fetch tasks if not yet fetched
+const onExpandStep = stepId => {
+  if (!stepFetchedMap.value[stepId]) {
+    fetchTasksForStep(stepId, { page: 1, perPage: 10 });
+  }
+};
 
 // const openComplexFilters = () => {
 //   // TODO: Implement complex filters
@@ -313,21 +305,40 @@ const collapsedStepIds = computed(() => {
 onMounted(() => {
   store.dispatch('agents/get');
   store.dispatch('inboxes/get');
+  // Reset so watcher doesn't fire until syncBoardFromRoute completes
+  isDataLoaded.value = false;
 });
+
+// Watch for steps to be loaded and fetch visible step tasks
+watch(
+  () => steps.value,
+  async newSteps => {
+    if (isDataLoaded.value && newSteps.length > 0) {
+      await fetchVisibleStepTasks();
+    }
+  }
+);
+
+// When collapsed steps change (user shows completed/cancelled), fetch newly visible steps
+watch(
+  () => [showCompleted.value, showCancelled.value],
+  async () => {
+    if (isDataLoaded.value && steps.value.length > 0) {
+      await fetchVisibleStepTasks();
+    }
+  }
+);
 
 watch(
   selectedBoardId,
   newBoardId => {
     if (newBoardId) {
-      const savedFilters = getSavedFilters();
-      selectedAgentId.value = savedFilters.agentId;
-      selectedInboxId.value = savedFilters.inboxId;
-      showCompleted.value = savedFilters.showCompleted;
-      showCancelled.value = savedFilters.showCancelled;
-
       const savedSort = preferences.value.task_sorting?.[newBoardId] || {};
       activeSort.value = savedSort.sort || 'position';
       activeOrdering.value = savedSort.order || 'asc';
+
+      // Reset step tasks when switching boards
+      store.dispatch('kanban/resetStepTasks');
     }
   },
   { immediate: true }
@@ -355,8 +366,11 @@ watch(inboxes, () => {
 
 watch(
   [selectedAgentId, selectedInboxId, showCompleted, showCancelled],
-  ([newAgentId, newInboxId, newShowCompleted, newShowCancelled]) => {
-    if (!selectedBoardId.value) return;
+  async (
+    [newAgentId, newInboxId, newShowCompleted, newShowCancelled],
+    [oldAgentId, oldInboxId]
+  ) => {
+    if (!selectedBoardId.value || !isDataLoaded.value) return;
 
     store.dispatch('kanban/updateBoardFilters', {
       boardId: selectedBoardId.value,
@@ -365,6 +379,15 @@ watch(
       showCompleted: newShowCompleted,
       showCancelled: newShowCancelled,
     });
+
+    // Re-fetch steps and tasks when agent/inbox filter changes
+    if (newAgentId !== oldAgentId || newInboxId !== oldInboxId) {
+      // Reset tasks first so skeletons appear immediately
+      await store.dispatch('kanban/resetStepTasks');
+      // Then fetch steps (for counts) and tasks
+      await fetchStepsWithFilters();
+      await fetchVisibleStepTasks();
+    }
   }
 );
 
@@ -393,7 +416,15 @@ const navigateToBoard = boardId => {
       },
     });
   } else if (selectedBoardId.value !== id) {
-    setActiveBoard(id);
+    const boardFilters = preferences.value.board_filters || {};
+    const savedFilters = boardFilters[id] || {};
+    const agentId = savedFilters.agent_id || 'all';
+    const inboxId = savedFilters.inbox_id || 'all';
+    selectedAgentId.value = agentId;
+    selectedInboxId.value = inboxId;
+    showCompleted.value = savedFilters.show_completed || false;
+    showCancelled.value = savedFilters.show_cancelled || false;
+    setActiveBoard(id, { agentId, inboxId });
   }
 
   closeBoardSwitcher();
@@ -526,8 +557,19 @@ const syncBoardFromRoute = async () => {
       selectedBoardId.value !== boardId || !isDataLoaded.value;
     if (needsDataLoad) {
       isDataLoaded.value = false;
-      await setActiveBoard(boardId);
+
+      const boardFilters = preferences.value.board_filters || {};
+      const savedFilters = boardFilters[boardId] || {};
+      const agentId = savedFilters.agent_id || 'all';
+      const inboxId = savedFilters.inbox_id || 'all';
+      selectedAgentId.value = agentId;
+      selectedInboxId.value = inboxId;
+      showCompleted.value = savedFilters.show_completed || false;
+      showCancelled.value = savedFilters.show_cancelled || false;
+
+      await setActiveBoard(boardId, { agentId, inboxId });
       isDataLoaded.value = true;
+      await fetchVisibleStepTasks();
     }
 
     const taskId = route.params.taskId ? Number(route.params.taskId) : null;
@@ -536,7 +578,7 @@ const syncBoardFromRoute = async () => {
         openCreateModal();
       }
     } else if (taskId && route.name === 'kanban_task_show') {
-      const task = tasks.value.find(tt => tt.id === taskId);
+      const task = allFetchedTasks.value.find(tt => tt.id === taskId);
       if (task) {
         if (!showTaskModal.value || selectedTask.value?.id !== taskId) {
           selectedTask.value = task;
@@ -712,6 +754,7 @@ watch(
 watch(
   () => boards.value.length,
   async () => {
+    if (!isDataLoaded.value) return;
     closeBoardSwitcher();
     await syncBoardFromRoute();
   }
@@ -801,7 +844,11 @@ const selectedInboxIcon = computed(() => {
                     v-if="!isLoading"
                     class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-n-slate-3 px-2 text-xs font-medium text-n-slate-11"
                   >
-                    {{ filteredTotalTasks }}
+                    <span
+                      v-if="isCountsLoading"
+                      class="w-3 h-3 rounded-full bg-n-slate-5 animate-pulse"
+                    />
+                    <template v-else>{{ filteredTotalTasks }}</template>
                   </span>
                 </div>
               </div>
@@ -948,9 +995,12 @@ const selectedInboxIcon = computed(() => {
             v-else
             :steps="steps"
             :tasks-by-step="filteredTasksByStep"
-            :all-tasks-by-step="tasksByStep"
             :collapsed-step-ids="collapsedStepIds"
             :is-drag-enabled="isDragEnabled"
+            :step-loading-map="stepLoadingMap"
+            :step-meta-map="stepMetaMap"
+            :step-fetched-map="stepFetchedMap"
+            :is-counts-loading="isCountsLoading"
             @add-task="openCreateModal"
             @edit-task="openEditModal"
             @duplicate-task="openDuplicateModal"
@@ -960,6 +1010,8 @@ const selectedInboxIcon = computed(() => {
             @update-task="saveTask"
             @move-task="moveTask"
             @enable-filter="onEnableFilter"
+            @load-more="onLoadMore"
+            @expand-step="onExpandStep"
           />
         </div>
       </div>

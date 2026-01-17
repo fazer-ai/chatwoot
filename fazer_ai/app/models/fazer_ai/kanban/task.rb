@@ -29,6 +29,7 @@
 #  index_kanban_tasks_on_board_step_id_and_priority  (board_step_id,priority)
 #  index_kanban_tasks_on_created_by_id               (created_by_id)
 #  index_kanban_tasks_on_priority                    (priority)
+#  index_kanban_tasks_on_step_and_created_at         (board_step_id,created_at)
 #
 # Foreign Keys
 #
@@ -73,7 +74,16 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
            dependent: :destroy,
            inverse_of: :task
 
-  attr_accessor :insert_before_task_id
+  attr_reader :insert_before_task_id
+
+  def insert_before_task_id=(value)
+    @insert_before_task_id = value
+    @insert_before_task_id_set = true
+  end
+
+  def insert_before_task_id_set?
+    @insert_before_task_id_set == true
+  end
 
   def conversation_ids=(ids)
     @conversation_ids_to_assign = ids
@@ -188,7 +198,10 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       labels: cached_label_list_array,
       creator: creator&.push_event_data,
       creator_display_name: creator_display_name
-    }
+    }.tap do |data|
+      # Only include insert_before_task_id when explicitly set (during move operations)
+      data[:insert_before_task_id] = @insert_before_task_id if insert_before_task_id_set?
+    end
   end
 
   def conversation_push_data(conversation)

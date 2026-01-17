@@ -102,7 +102,10 @@
     "COLUMN": {
       "TASK_COUNT": "{count} task | {count} tasks",
       "NO_TASKS": "No tasks yet",
-      "ADD_TASK": "Add task"
+      "ADD_TASK": "Add task",
+      "SCROLL_FOR_MORE": "Scroll for more",
+      "LOADING_MORE": "Loading more tasks...",
+      "ALL_TASKS_LOADED": "All tasks loaded"
     },
     "MODAL": {
       "CREATE_TITLE": "Create task",

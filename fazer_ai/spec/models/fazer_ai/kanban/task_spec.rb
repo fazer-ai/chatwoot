@@ -656,5 +656,48 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
       expect(event_data[:conversation_ids]).to contain_exactly(conversation.id)
       expect(event_data[:conversations].map { |c| c[:id] }).to contain_exactly(conversation.id)
     end
+
+    context 'with insert_before_task_id' do
+      it 'does not include insert_before_task_id when not explicitly set' do
+        task.save!
+        event_data = task.push_event_data
+
+        expect(event_data).not_to have_key(:insert_before_task_id)
+      end
+
+      it 'includes insert_before_task_id when explicitly set to a value' do
+        task.save!
+        task.insert_before_task_id = 123
+        event_data = task.push_event_data
+
+        expect(event_data).to have_key(:insert_before_task_id)
+        expect(event_data[:insert_before_task_id]).to eq(123)
+      end
+
+      it 'includes insert_before_task_id when explicitly set to nil' do
+        task.save!
+        task.insert_before_task_id = nil
+        event_data = task.push_event_data
+
+        expect(event_data).to have_key(:insert_before_task_id)
+        expect(event_data[:insert_before_task_id]).to be_nil
+      end
+    end
+  end
+
+  describe '#insert_before_task_id_set?' do
+    it 'returns false when insert_before_task_id was never set' do
+      expect(task.insert_before_task_id_set?).to be false
+    end
+
+    it 'returns true when insert_before_task_id is set to a value' do
+      task.insert_before_task_id = 123
+      expect(task.insert_before_task_id_set?).to be true
+    end
+
+    it 'returns true when insert_before_task_id is set to nil' do
+      task.insert_before_task_id = nil
+      expect(task.insert_before_task_id_set?).to be true
+    end
   end
 end

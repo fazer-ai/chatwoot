@@ -3,36 +3,22 @@ export default {
 
   activeBoard: state => state.boards.find(f => f.id === state.selectedBoardId),
 
-  tasksByStep: state => {
-    const grouped = {};
+  // Returns tasks as-is from BE - sorting is handled server-side
+  stepTasksMap: state => {
+    const result = {};
     state.steps.forEach(step => {
-      grouped[step.id] = [];
+      result[step.id] = state.stepTasks[step.id] || [];
     });
-
-    state.tasks.forEach(task => {
-      if (grouped[task.board_step_id]) {
-        grouped[task.board_step_id].push(task);
-      }
-    });
-
-    const activeBoardId = state.selectedBoardId;
-    const currentSort = state.preferences.task_sorting?.[activeBoardId]?.sort;
-    const isManualSort = !currentSort || currentSort === 'position';
-
-    state.steps.forEach(step => {
-      const tasksOrder = state.preferences.tasks_order?.[step.id];
-      if (isManualSort && tasksOrder && tasksOrder.length > 0) {
-        const orderMap = new Map(tasksOrder.map((id, index) => [id, index]));
-        grouped[step.id].sort((a, b) => {
-          const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : Infinity;
-          const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : Infinity;
-          return indexA - indexB;
-        });
-      }
-    });
-
-    return grouped;
+    return result;
   },
+
+  stepMetaMap: state => state.stepMeta,
+  stepLoadingMap: state => state.stepLoading,
+  stepFetchedMap: state => state.stepFetched,
+
+  isStepLoading: state => stepId => state.stepLoading[stepId] || false,
+  isStepFetched: state => stepId => state.stepFetched[stepId] || false,
+  stepHasMore: state => stepId => state.stepMeta[stepId]?.hasMore || false,
 
   orderedSteps: state => {
     const activeBoard = state.boards.find(f => f.id === state.selectedBoardId);
@@ -53,7 +39,6 @@ export default {
       return indexA - indexB;
     });
 
-    // Recalculate inferred_task_status based on current order
     const lastStepId =
       activeBoard.steps_order[activeBoard.steps_order.length - 1];
     return sorted.map(step => {

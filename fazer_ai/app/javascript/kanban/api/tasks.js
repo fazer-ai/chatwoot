@@ -10,6 +10,23 @@ class TasksAPI extends ApiClient {
     return axios.get(this.url, { params });
   }
 
+  getByStep(
+    stepId,
+    { page = 1, perPage = 25, sort, order, agentId, inboxId } = {}
+  ) {
+    return axios.get(this.url, {
+      params: {
+        board_step_id: stepId,
+        page,
+        per_page: perPage,
+        sort,
+        order,
+        agent_id: agentId,
+        inbox_id: inboxId,
+      },
+    });
+  }
+
   create(data) {
     return axios.post(this.url, data);
   }
