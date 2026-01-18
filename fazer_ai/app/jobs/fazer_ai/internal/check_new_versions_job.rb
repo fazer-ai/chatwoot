@@ -3,8 +3,10 @@
 module FazerAi::Internal::CheckNewVersionsJob
   OUT_OF_SYNC_THRESHOLD = 3.days
 
-  def perform
+  def perform(jitter_applied: false)
     super
+    return unless jitter_applied || Rails.env.test?
+
     sync_subscription_with_hub
     reconcile_subscription
   end

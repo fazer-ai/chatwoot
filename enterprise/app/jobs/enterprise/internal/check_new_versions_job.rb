@@ -1,6 +1,8 @@
 module Enterprise::Internal::CheckNewVersionsJob
-  def perform
+  def perform(jitter_applied: false)
     super
+    return unless jitter_applied || Rails.env.test?
+
     update_plan_info
     reconcile_premium_config_and_features
   end
