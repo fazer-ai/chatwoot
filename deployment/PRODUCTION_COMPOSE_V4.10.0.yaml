@@ -133,7 +133,7 @@ services:
     environment:
       - 'POSTGRES_DB=${POSTGRES_DB:-chatwoot_production}'
       - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
-      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
     healthcheck:
       test:
         - CMD-SHELL
