@@ -7,8 +7,7 @@ permissions:
 on:
   push:
     tags:
-      - 'v*.*.*-fazer-ai.*-ee'
-      - 'v*.*.*-fazer-ai.*'
+      - 'v*-ee'
   workflow_dispatch:
     inputs:
       version_tag:
