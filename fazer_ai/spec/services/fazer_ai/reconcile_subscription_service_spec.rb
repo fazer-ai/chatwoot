@@ -44,18 +44,21 @@ RSpec.describe FazerAi::ReconcileSubscriptionService do
         allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
       end
 
-      it 'does not disable accounts when limit is 0 (unlimited)' do
-        stub_fazer_ai_hub(kanban_limit: 0)
+      it 'does not touch accounts when limit is 0 (feature not available)' do
+        stub_fazer_ai_hub(kanban_limit: 100)
         account = create(:account)
         account.enable_features!('kanban')
 
+        # Limit becomes 0 - accounts keep their flag but can't use feature
+        stub_fazer_ai_hub(kanban_limit: 0)
         service.perform
 
+        # Flag stays enabled, but kanban_feature_enabled? returns false
         expect(account.reload.feature_enabled?('kanban')).to be(true)
       end
 
       it 'disables feature for accounts with highest IDs when limit exceeded' do
-        stub_fazer_ai_hub(kanban_limit: 0)
+        stub_fazer_ai_hub(kanban_limit: 100)
         account1 = create(:account)
         account2 = create(:account)
         account3 = create(:account)

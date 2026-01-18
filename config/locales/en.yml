@@ -87,6 +87,7 @@ en:
     fazer_ai:
       hub_not_synced: 'fazer.ai subscription data has not been synced. Please ensure the instance is registered and the hub is accessible.'
       kanban_account_limit_reached: 'Kanban account limit reached (%{limit} accounts). Please upgrade your subscription to enable this feature for more accounts.'
+      kanban_feature_not_available: 'Kanban feature is not available. Please upgrade your subscription to enable this feature.'
     attachments:
       invalid: Invalid attachment
     saml:

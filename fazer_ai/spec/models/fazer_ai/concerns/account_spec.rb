@@ -19,7 +19,7 @@ RSpec.describe FazerAi::Concerns::Account do
     context 'when feature flag is enabled' do
       before do
         allow(FazerAiHub).to receive(:synced?).and_return(true)
-        allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
+        allow(FazerAiHub).to receive(:kanban_account_limit).and_return(100)
         account.enable_features!('kanban')
       end
 
@@ -31,6 +31,18 @@ RSpec.describe FazerAi::Concerns::Account do
 
         it 'returns true' do
           expect(account.kanban_feature_enabled?).to be(true)
+        end
+      end
+
+      context 'when subscription is active but account limit is 0' do
+        before do
+          allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
+          allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
+          allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
+        end
+
+        it 'returns false' do
+          expect(account.kanban_feature_enabled?).to be(false)
         end
       end
 
@@ -116,7 +128,7 @@ RSpec.describe FazerAi::Concerns::Account do
       context 'when enabling kanban feature' do
         before do
           allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
-          allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
+          allow(FazerAiHub).to receive(:kanban_account_limit).and_return(100)
         end
 
         it 'forces a sync before validation' do
@@ -139,14 +151,16 @@ RSpec.describe FazerAi::Concerns::Account do
         allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
       end
 
-      context 'when limit is 0 (unlimited)' do
+      context 'when limit is 0 (feature not available)' do
         before do
           allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
         end
 
-        it 'allows enabling the feature' do
-          expect { account.enable_features!('kanban') }.not_to raise_error
-          expect(account.feature_enabled?('kanban')).to be(true)
+        it 'blocks enabling the feature' do
+          expect { account.enable_features!('kanban') }.to raise_error(
+            ActiveRecord::RecordInvalid,
+            /Kanban feature is not available/
+          )
         end
       end
 
@@ -194,7 +208,7 @@ RSpec.describe FazerAi::Concerns::Account do
 
   describe '#sync_fazer_ai_feature_usage' do
     before do
-      allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
+      allow(FazerAiHub).to receive(:kanban_account_limit).and_return(100)
       allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
       allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
       allow(Internal::CheckNewVersionsJob).to receive(:perform_later)

@@ -18,7 +18,13 @@ module FazerAi::Concerns::Account
   end
 
   def kanban_feature_enabled?
-    feature_enabled?('kanban') && fazer_ai_subscription_feature_accessible?('kanban')
+    feature_enabled?('kanban') && kanban_subscription_feature_accessible?
+  end
+
+  def kanban_subscription_feature_accessible?
+    FazerAiHub.subscription_active? &&
+      FazerAiHub.feature_enabled?('kanban') &&
+      FazerAiHub.kanban_account_limit.positive?
   end
 
   def fazer_ai_subscription_feature_accessible?(subscription_feature_name)
@@ -58,7 +64,10 @@ module FazerAi::Concerns::Account
     return unless FazerAiHub.feature_enabled?('kanban')
 
     limit = FazerAiHub.kanban_account_limit
-    return if limit.zero?
+    if limit.zero?
+      errors.add(:base, I18n.t('errors.fazer_ai.kanban_feature_not_available'))
+      return
+    end
 
     current_count = Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).where.not(id: id).count
     return if current_count < limit

@@ -86,7 +86,7 @@ module SuperAdmin::FeaturesHelper # rubocop:disable Metrics/ModuleLength
   def self.kanban_accounts_text
     kanban_limit = FazerAiHub.kanban_account_limit
     current_count = Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).count
-    limit_display = kanban_limit.zero? ? '∞' : kanban_limit
+    limit_display = kanban_limit.zero? ? '-' : kanban_limit
     "Kanban Accounts: <span class='font-semibold'>#{current_count}/#{limit_display}</span>"
   end
 
