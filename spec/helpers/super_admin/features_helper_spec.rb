@@ -124,6 +124,8 @@ RSpec.describe SuperAdmin::FeaturesHelper do
       before do
         allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
         allow(FazerAiHub).to receive(:enabled_features).and_return(%w[kanban])
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
+        allow(FazerAiHub).to receive(:kanban_account_limit).and_return(100)
         account1.enable_features!('kanban')
         account2.enable_features!('kanban')
       end
@@ -150,6 +152,8 @@ RSpec.describe SuperAdmin::FeaturesHelper do
       before do
         allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
         allow(FazerAiHub).to receive(:enabled_features).and_return(%w[kanban])
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
+        allow(FazerAiHub).to receive(:kanban_account_limit).and_return(100)
         account.enable_features!('kanban')
       end
 
