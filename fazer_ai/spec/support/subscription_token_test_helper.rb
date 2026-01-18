@@ -75,7 +75,7 @@ module FazerAi::SubscriptionTokenTestHelper
   def generate_hub_response_with_token(
     status: 'active',
     instance_type: 'chatwoot',
-    features: { 'chatwoot_kanban' => { 'account_limit' => 5 } },
+    features: { 'kanban' => { 'account_limit' => 5 } },
     version: '4.0.0'
   )
     token = generate_test_subscription_token(

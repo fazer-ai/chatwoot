@@ -14,7 +14,7 @@ class FazerAi::ReconcileSubscriptionService
   end
 
   def reconcile_kanban_limit
-    return unless FazerAiHub.feature_enabled?('chatwoot_kanban')
+    return unless FazerAiHub.feature_enabled?('kanban')
 
     limit = FazerAiHub.kanban_account_limit
     return if limit.zero?

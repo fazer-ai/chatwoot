@@ -9,11 +9,11 @@ RSpec.describe FazerAiHub do
     Current.fazer_ai_subscription_data = nil
   end
 
-  def setup_valid_subscription(status: 'active', feature_list: ['chatwoot_kanban'], kanban_limit: 5)
+  def setup_valid_subscription(status: 'active', feature_list: ['kanban'], kanban_limit: 5)
     Current.fazer_ai_subscription_data = nil
 
     features = feature_list.index_with { {} }
-    features['chatwoot_kanban'] = { 'account_limit' => kanban_limit } if feature_list.include?('chatwoot_kanban')
+    features['kanban'] = { 'account_limit' => kanban_limit } if feature_list.include?('kanban')
 
     token = generate_test_subscription_token(
       status: status,
@@ -86,10 +86,10 @@ RSpec.describe FazerAiHub do
 
   describe '.enabled_features' do
     context 'when valid token exists with features' do
-      before { setup_valid_subscription(feature_list: %w[chatwoot_kanban other_feature]) }
+      before { setup_valid_subscription(feature_list: %w[kanban other_feature]) }
 
       it 'returns the features array' do
-        expect(described_class.enabled_features).to contain_exactly('chatwoot_kanban', 'other_feature')
+        expect(described_class.enabled_features).to contain_exactly('kanban', 'other_feature')
       end
     end
 
@@ -101,10 +101,10 @@ RSpec.describe FazerAiHub do
   end
 
   describe '.feature_enabled?' do
-    before { setup_valid_subscription(feature_list: %w[chatwoot_kanban]) }
+    before { setup_valid_subscription(feature_list: %w[kanban]) }
 
     it 'returns true for enabled feature' do
-      expect(described_class.feature_enabled?('chatwoot_kanban')).to be(true)
+      expect(described_class.feature_enabled?('kanban')).to be(true)
     end
 
     it 'returns false for disabled feature' do
@@ -182,7 +182,7 @@ RSpec.describe FazerAiHub do
       usage = described_class.feature_usage
 
       expect(usage).to eq({
-                            chatwoot_kanban: {
+                            kanban: {
                               account_limit: 0
                             }
                           })
@@ -199,7 +199,7 @@ RSpec.describe FazerAiHub do
       it 'returns the correct count' do
         usage = described_class.feature_usage
 
-        expect(usage[:chatwoot_kanban][:account_limit]).to eq(2)
+        expect(usage[:kanban][:account_limit]).to eq(2)
       end
     end
   end

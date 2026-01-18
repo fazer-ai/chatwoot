@@ -123,7 +123,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
 
       before do
         allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
-        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
+        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[kanban])
         account1.enable_features!('kanban')
         account2.enable_features!('kanban')
       end
@@ -133,7 +133,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
 
         expect(result.length).to eq(2)
         expect(result.first[:name]).to eq('Alpha Account')
-        expect(result.first[:features]).to include('Chatwoot Kanban')
+        expect(result.first[:features]).to include('Kanban')
       end
 
       it 'sorts accounts alphabetically by name' do
@@ -149,7 +149,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
 
       before do
         allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
-        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[chatwoot_kanban])
+        allow(FazerAiHub).to receive(:enabled_features).and_return(%w[kanban])
         account.enable_features!('kanban')
       end
 
@@ -157,7 +157,7 @@ RSpec.describe SuperAdmin::FeaturesHelper do
         result = described_class.accounts_with_fazer_ai_features
 
         expect(result.length).to eq(1)
-        expect(result.first[:features]).to include('Chatwoot Kanban')
+        expect(result.first[:features]).to include('Kanban')
       end
     end
   end

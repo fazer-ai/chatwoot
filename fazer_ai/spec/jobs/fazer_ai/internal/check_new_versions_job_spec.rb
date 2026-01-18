@@ -17,7 +17,7 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
       before do
         hub_response = generate_hub_response_with_token(
           status: 'active',
-          features: { 'chatwoot_kanban' => { 'account_limit' => 5 } },
+          features: { 'kanban' => { 'account_limit' => 5 } },
           version: '4.0.0'
         )
 

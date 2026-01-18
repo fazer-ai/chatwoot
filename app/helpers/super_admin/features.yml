@@ -1,6 +1,14 @@
 # TODO: Move this values to features.yml itself
 # No need to replicate the same values in two places
 
+# ------- fazer.ai Features ------- #
+kanban:
+  name: 'Kanban'
+  description: 'Organize conversations in a visual board with customizable columns.'
+  enabled: <%= FazerAiHub.feature_enabled?('kanban') %>
+  icon: 'icon-columns-3'
+  fazer_ai: true
+
 # ------- Premium Features ------- #
 captain:
   name: 'Captain'

@@ -26,7 +26,7 @@ RSpec.describe FazerAi::Concerns::Account do
       context 'when subscription is active and feature is enabled in subscription' do
         before do
           allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
-          allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+          allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
         end
 
         it 'returns true' do
@@ -37,7 +37,7 @@ RSpec.describe FazerAi::Concerns::Account do
       context 'when subscription is not active' do
         before do
           allow(FazerAiHub).to receive(:subscription_active?).and_return(false)
-          allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+          allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
         end
 
         it 'returns false' do
@@ -48,7 +48,7 @@ RSpec.describe FazerAi::Concerns::Account do
       context 'when feature is not enabled in subscription' do
         before do
           allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
-          allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(false)
+          allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(false)
         end
 
         it 'returns false' do
@@ -62,11 +62,11 @@ RSpec.describe FazerAi::Concerns::Account do
     context 'when subscription is active and feature is enabled' do
       before do
         allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
-        allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
       end
 
       it 'returns true' do
-        expect(account.fazer_ai_subscription_feature_accessible?('chatwoot_kanban')).to be(true)
+        expect(account.fazer_ai_subscription_feature_accessible?('kanban')).to be(true)
       end
     end
 
@@ -76,18 +76,18 @@ RSpec.describe FazerAi::Concerns::Account do
       end
 
       it 'returns false' do
-        expect(account.fazer_ai_subscription_feature_accessible?('chatwoot_kanban')).to be(false)
+        expect(account.fazer_ai_subscription_feature_accessible?('kanban')).to be(false)
       end
     end
 
     context 'when feature is not enabled in subscription' do
       before do
         allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
-        allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(false)
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(false)
       end
 
       it 'returns false' do
-        expect(account.fazer_ai_subscription_feature_accessible?('chatwoot_kanban')).to be(false)
+        expect(account.fazer_ai_subscription_feature_accessible?('kanban')).to be(false)
       end
     end
   end
@@ -115,7 +115,7 @@ RSpec.describe FazerAi::Concerns::Account do
 
       context 'when enabling kanban feature' do
         before do
-          allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+          allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
           allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
         end
 
@@ -136,7 +136,7 @@ RSpec.describe FazerAi::Concerns::Account do
       before do
         allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
         allow(Internal::CheckNewVersionsJob).to receive(:perform_later)
-        allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
       end
 
       context 'when limit is 0 (unlimited)' do
@@ -195,7 +195,7 @@ RSpec.describe FazerAi::Concerns::Account do
   describe '#sync_fazer_ai_feature_usage' do
     before do
       allow(FazerAiHub).to receive(:kanban_account_limit).and_return(0)
-      allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(true)
+      allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(true)
       allow(Internal::CheckNewVersionsJob).to receive(:perform_now)
       allow(Internal::CheckNewVersionsJob).to receive(:perform_later)
     end

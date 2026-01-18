@@ -10,7 +10,7 @@ RSpec.describe FazerAi::SubscriptionToken do
       let(:token) do
         generate_test_subscription_token(
           status: 'active',
-          features: { 'chatwoot_kanban' => { 'account_limit' => 5 } }
+          features: { 'kanban' => { 'account_limit' => 5 } }
         )
       end
 
@@ -19,7 +19,7 @@ RSpec.describe FazerAi::SubscriptionToken do
 
         expect(payload).to be_present
         expect(payload['status']).to eq('active')
-        expect(payload['features']).to eq({ 'chatwoot_kanban' => { 'account_limit' => 5 } })
+        expect(payload['features']).to eq({ 'kanban' => { 'account_limit' => 5 } })
       end
 
       it 'returns payload with indifferent access' do

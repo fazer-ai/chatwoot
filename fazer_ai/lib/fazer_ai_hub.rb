@@ -28,7 +28,7 @@ class FazerAiHub
     def kanban_account_limit
       return 0 unless subscription_token_valid?
 
-      feature_limit('chatwoot_kanban', 'account_limit')
+      feature_limit('kanban', 'account_limit')
     end
 
     def feature_limit(feature_name, limit_key)
@@ -123,7 +123,7 @@ class FazerAiHub
 
     def feature_usage
       {
-        chatwoot_kanban: {
+        kanban: {
           account_limit: kanban_enabled_accounts_count
         }
       }

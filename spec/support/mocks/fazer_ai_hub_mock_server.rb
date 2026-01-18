@@ -172,7 +172,7 @@ class FazerAiHubMockServer
       status: @current_state[:status],
       instance_type: 'chatwoot',
       installation_identifier: installation_identifier,
-      features: { 'chatwoot_kanban' => { 'account_limit' => 5 } },
+      features: { 'kanban' => { 'account_limit' => 5 } },
       cancel_at_period_end: @current_state[:cancel_at_period_end],
       current_period_end: @current_state[:current_period_end],
       iat: Time.now.to_i,

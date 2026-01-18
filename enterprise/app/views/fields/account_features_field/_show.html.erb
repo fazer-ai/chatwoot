@@ -1,6 +1,28 @@
 <div class="w-full">
   <% regular_features, premium_features, fazer_ai_features = SuperAdmin::AccountFeaturesHelper.partition_features_with_fazer_ai(field.data) %>
 
+  <% if ChatwootApp.fazer_ai? && fazer_ai_features.any? %>
+    <h4 class="text-sm font-medium text-slate-700 mb-4">fazer.ai Features</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <% fazer_ai_features.each do |key_array, val| %>
+        <% feature_key, display_name = key_array %>
+        <div class="flex items-center justify-between p-3 bg-white rounded-md outline outline-n-container outline-1 shadow-sm">
+          <div class="flex items-center gap-2">
+            <span class="bg-violet-100 text-violet-600 rounded-full p-1 inline-flex right-4 top-5">
+              <svg width="12" height="12"><use xlink:href="#icon-lock-line" /></svg>
+            </span>
+            <span class="text-sm text-n-slate-12"><%= display_name %></span>
+          </div>
+          <span class="<%= val.present? ? 'bg-green-400 text-white': 'bg-slate-50 text-slate-800' %> rounded-full p-1 inline-flex right-4 top-5">
+            <svg width="12" height="12"><use xlink:href="#icon-tick-line" /></svg>
+          </span>
+        </div>
+      <% end %>
+    </div>
+
+    <hr class="my-8 border-t border-n-weak">
+  <% end %>
+
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     <% regular_features.each do |key_array, val| %>
       <% feature_key, display_name = key_array %>
@@ -31,26 +53,4 @@
       </div>
     <% end %>
   </div>
-
-  <% if ChatwootApp.fazer_ai? && fazer_ai_features.any? %>
-    <hr class="my-8 border-t border-n-weak">
-
-    <h4 class="text-sm font-medium text-slate-700 mb-4">fazer.ai Features</h4>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <% fazer_ai_features.each do |key_array, val| %>
-        <% feature_key, display_name = key_array %>
-        <div class="flex items-center justify-between p-3 bg-white rounded-md outline outline-n-container outline-1 shadow-sm">
-          <div class="flex items-center gap-2">
-            <span class="bg-violet-100 text-violet-600 rounded-full p-1 inline-flex right-4 top-5">
-              <svg width="12" height="12"><use xlink:href="#icon-lock-line" /></svg>
-            </span>
-            <span class="text-sm text-n-slate-12"><%= display_name %></span>
-          </div>
-          <span class="<%= val.present? ? 'bg-green-400 text-white': 'bg-slate-50 text-slate-800' %> rounded-full p-1 inline-flex right-4 top-5">
-            <svg width="12" height="12"><use xlink:href="#icon-tick-line" /></svg>
-          </span>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
 </div>

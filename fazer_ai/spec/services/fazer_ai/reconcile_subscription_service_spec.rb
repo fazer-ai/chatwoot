@@ -88,7 +88,7 @@ RSpec.describe FazerAi::ReconcileSubscriptionService do
     context 'when kanban feature is not enabled in subscription' do
       before do
         allow(FazerAiHub).to receive(:subscription_active?).and_return(true)
-        allow(FazerAiHub).to receive(:feature_enabled?).with('chatwoot_kanban').and_return(false)
+        allow(FazerAiHub).to receive(:feature_enabled?).with('kanban').and_return(false)
       end
 
       it 'does not reconcile kanban limits' do

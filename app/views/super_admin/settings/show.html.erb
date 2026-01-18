@@ -148,6 +148,42 @@
         </button>
       <% end %>
     </div>
+
+    <% if ChatwootApp.fazer_ai? %>
+      <div class="mt-10 py-4">
+        <h3 class="h-5 leading-5 text-n-slate-12 font-medium text-base">fazer.ai Features</h3>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-2 gap-y-3">
+        <% SuperAdmin::FeaturesHelper.fazer_ai_features.each do |feature, attrs| %>
+          <div class="group outline outline-1 outline-n-container p-4 rounded-lg relative shadow-sm">
+            <span class="<%= attrs[:enabled] ? 'bg-green-400 text-white': 'bg-slate-300 text-slate-800' %> absolute rounded-full p-1 inline-flex right-4 top-5">
+              <svg width="14" height="14"><use xlink:href="<%= attrs[:enabled] ? '#icon-tick-line': '#icon-lock-line' %>" /></svg>
+            </span>
+            <div class="visible <% if !attrs[:enabled] %> group-hover:invisible <% end %> flex items-center justify-center w-10 h-10 mb-2 border border-slate-100 border-solid text-slate-800 rounded-full">
+              <svg width="20" height="20"><use xlink:href="#<%= attrs[:icon] %>" /></svg>
+            </div>
+            <% if !attrs[:enabled] %>
+            <div class="flex h-9 absolute top-5 items-center invisible group-hover:visible">
+              <%= render 'upgrade_button_fazer_ai' %>
+            </div>
+            <% end %>
+            <div class="flex items-center justify-between mb-1.5 mt-4">
+              <div class="flex items-center gap-2">
+                <h3 class="text-n-slate-12 font-medium"><%= attrs[:name] %></h3>
+                <span class="px-2 h-4 leading-4 rounded-xl text-violet-800 font-medium bg-violet-100/70 text-xxs">fazer.ai</span>
+                <% if attrs[:enabled] %>
+                  <a class="inline-flex items-center justify-center h-5 w-5 hover:bg-slate-50 rounded-sm" href="<%= FazerAiHub.billing_url %>" target="_blank" rel="noopener noreferrer">
+                    <svg width="18" height="18"><use xlink:href="#icon-gear" /></svg>
+                  </a>
+                <% end %>
+              </div>
+            </div>
+            <p class="text-n-slate-11 mb-0"><%= attrs[:description] %></p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
     <div class="mt-10 py-4">
       <h3 class="h-5 leading-5 text-n-slate-12 font-medium text-base">Features</h3>
     </div>

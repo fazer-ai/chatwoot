@@ -1,6 +1,10 @@
-module SuperAdmin::FeaturesHelper
-  def self.available_features
+module SuperAdmin::FeaturesHelper # rubocop:disable Metrics/ModuleLength
+  def self.all_features
     YAML.load(ERB.new(Rails.root.join('app/helpers/super_admin/features.yml').read).result).with_indifferent_access
+  end
+
+  def self.available_features
+    all_features.reject { |_, attrs| attrs[:fazer_ai] }
   end
 
   def self.plan_details
@@ -100,7 +104,7 @@ module SuperAdmin::FeaturesHelper
 
     accounts_data = []
     fazer_ai_features.each do |feature|
-      flag_value = Featurable.feature_flag_value(feature.gsub('chatwoot_', ''))
+      flag_value = Featurable.feature_flag_value(feature)
       next if flag_value.zero?
 
       Account.where('feature_flags & ? > 0', flag_value).find_each do |account|
@@ -113,5 +117,9 @@ module SuperAdmin::FeaturesHelper
       end
     end
     accounts_data.sort_by { |a| a[:name].downcase }
+  end
+
+  def self.fazer_ai_features
+    all_features.select { |_, attrs| attrs[:fazer_ai] }
   end
 end

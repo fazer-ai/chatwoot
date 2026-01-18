@@ -18,7 +18,7 @@ module FazerAi::Concerns::Account
   end
 
   def kanban_feature_enabled?
-    feature_enabled?('kanban') && fazer_ai_subscription_feature_accessible?('chatwoot_kanban')
+    feature_enabled?('kanban') && fazer_ai_subscription_feature_accessible?('kanban')
   end
 
   def fazer_ai_subscription_feature_accessible?(subscription_feature_name)
@@ -55,7 +55,7 @@ module FazerAi::Concerns::Account
   end
 
   def validate_kanban_limit
-    return unless FazerAiHub.feature_enabled?('chatwoot_kanban')
+    return unless FazerAiHub.feature_enabled?('kanban')
 
     limit = FazerAiHub.kanban_account_limit
     return if limit.zero?
