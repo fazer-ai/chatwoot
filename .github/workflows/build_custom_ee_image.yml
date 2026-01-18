@@ -47,38 +47,8 @@ jobs:
       - name: Set Chatwoot edition
         run: |
           echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
-      
-      - name: Patch Dockerfile for better bundle install reliability
-        run: |
-          echo "Patching Dockerfile to add retry logic for bundle install..."
-          
-          # Use Python for reliable multi-line replacement
-          python3 << 'PYTHON_SCRIPT'
-          import re
-          
-          with open('docker/Dockerfile', 'r') as f:
-              lines = f.readlines()
-          
-          # Replace bundle install commands
-          for i, line in enumerate(lines):
-              if 'bundle install -j 4 -r 3' in line:
-                  lines[i] = line.replace(
-                      'bundle install -j 4 -r 3',
-                      'bundle install -j 4 -r 5 --verbose || (sleep 10 && bundle install -j 4 -r 5 --verbose) || (sleep 20 && bundle install -j 4 -r 5 --verbose || exit 1)'
-                  )
-          
-          with open('docker/Dockerfile', 'w') as f:
-              f.writelines(lines)
-          
-          print("✅ Dockerfile patched successfully")
-          PYTHON_SCRIPT
-          
-          echo ""
-          echo "Verifying patch - checking for bundle install commands:"
-          grep -n "bundle install" docker/Dockerfile
-          echo ""
-          echo "Checking for retry logic (should see 'sleep'):"
-          grep -n "sleep" docker/Dockerfile || echo "⚠️ Warning: retry logic not found!"
+          echo "✅ Set CW_EDITION=ee"
+          echo "Note: Dockerfile already has bundle install retry logic (fixed directly in source)"
 
       - name: Update version in app.yml
         run: |
