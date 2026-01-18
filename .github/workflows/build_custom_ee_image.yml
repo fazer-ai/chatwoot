@@ -47,6 +47,15 @@ jobs:
       - name: Set Chatwoot edition
         run: |
           echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
+      
+      - name: Patch Dockerfile for better bundle install reliability
+        run: |
+          # Replace bundle install commands with retry logic to handle network timeouts
+          # Using perl for multi-line replacement
+          perl -i -0pe "s/bundle install -j 4 -r 3/bundle install -j 4 -r 5 --verbose || (sleep 10 \&\& bundle install -j 4 -r 5 --verbose) || (sleep 20 \&\& bundle install -j 4 -r 5 --verbose || exit 1)/g" docker/Dockerfile
+          echo "✅ Dockerfile patched with retry logic for bundle install"
+          echo "Verifying patch:"
+          grep -A 2 "bundle install" docker/Dockerfile | head -5
 
       - name: Update version in app.yml
         run: |
