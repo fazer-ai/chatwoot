@@ -66,6 +66,10 @@ class Channel::Whatsapp < ApplicationRecord
     prompt_reauthorization!
   end
 
+  def use_internal_host?
+    false
+  end
+
   private
 
   def ensure_webhook_verify_token
