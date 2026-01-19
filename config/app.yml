@@ -1,5 +1,5 @@
 shared: &shared
-  version: '4.10.0-fazer-ai.15'
+  version: '4.10.0-fazer-ai.16'
 
 development:
   <<: *shared
