@@ -14,7 +14,10 @@ module FazerAi::Internal::CheckNewVersionsJob
   private
 
   def sync_with_hub
-    FazerAiHub.sync_subscription || {}
+    chatwoot_response = ChatwootHub.sync_with_hub || {}
+    fazer_ai_response = FazerAiHub.sync_subscription || {}
+    # NOTE: FazerAiHub takes precedence for overlapping keys
+    chatwoot_response.merge(fazer_ai_response)
   end
 
   def sync_subscription_with_hub

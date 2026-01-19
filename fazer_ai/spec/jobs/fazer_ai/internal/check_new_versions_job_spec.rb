@@ -10,6 +10,8 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
   before do
     allow(ChatwootApp).to receive(:fazer_ai?).and_return(true)
     Redis::Alfred.delete(Redis::Alfred::LATEST_CHATWOOT_VERSION)
+    stub_request(:post, ChatwootHub::PING_URL)
+      .to_return(status: 200, body: { 'version' => '4.0.0' }.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
   describe '#perform' do
@@ -112,6 +114,8 @@ RSpec.describe FazerAi::Internal::CheckNewVersionsJob do
     context 'when hub request fails' do
       before do
         stub_request(:post, FazerAiHub::PING_URL)
+          .to_return(status: 500)
+        stub_request(:post, ChatwootHub::PING_URL)
           .to_return(status: 500)
       end
 
