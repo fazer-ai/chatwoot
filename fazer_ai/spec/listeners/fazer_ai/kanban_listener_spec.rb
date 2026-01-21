@@ -12,11 +12,25 @@ RSpec.describe FazerAi::KanbanListener do
   let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
 
   before do
+    allow(account).to receive(:kanban_feature_enabled?).and_return(true)
     create(:kanban_board_inbox, board: board, inbox: inbox)
   end
 
   describe '#conversation_created' do
     let(:event) { Events::Base.new('conversation.created', Time.zone.now, { conversation: conversation }) }
+
+    context 'when kanban feature is disabled' do
+      before do
+        allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+        board.update!(settings: { 'auto_create_task_for_conversation' => true })
+      end
+
+      it 'does not create a task' do
+        expect do
+          listener.conversation_created(event)
+        end.not_to change(FazerAi::Kanban::Task, :count)
+      end
+    end
 
     context 'when auto_create_task_for_conversation is enabled' do
       before { board.update!(settings: { 'auto_create_task_for_conversation' => true }) }
@@ -204,6 +218,23 @@ RSpec.describe FazerAi::KanbanListener do
       create(:kanban_board_agent, board: board, agent: agent)
     end
 
+    context 'when kanban feature is disabled' do
+      before do
+        allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+        board.update!(settings: { 'auto_assign_task_to_agent' => true })
+      end
+
+      it 'does not auto-assign agents' do
+        allow(OnlineStatusTracker).to receive(:get_available_users).with(account.id).and_return(
+          { agent.id.to_s => 'online' }
+        )
+
+        listener.kanban_task_created(event)
+
+        expect(task.reload.assigned_agents).to be_empty
+      end
+    end
+
     context 'when auto_assign_task_to_agent is enabled' do
       before { board.update!(settings: { 'auto_assign_task_to_agent' => true }) }
 
@@ -264,7 +295,7 @@ RSpec.describe FazerAi::KanbanListener do
   describe '#kanban_task_updated' do
     let!(:first_step) { board.first_step }
     let!(:completed_step) { create(:kanban_board_step, board: board) }
-    let(:task) { create(:kanban_task, board: board, board_step: first_step) }
+    let(:task) { create(:kanban_task, account: account, board: board, board_step: first_step) }
 
     let(:event) do
       Events::Base.new(
@@ -272,6 +303,23 @@ RSpec.describe FazerAi::KanbanListener do
         Time.zone.now,
         { task: task, changed_attributes: { 'board_step_id' => [first_step.id, completed_step.id] } }
       )
+    end
+
+    context 'when kanban feature is disabled' do
+      let(:open_conversation) { create(:conversation, account: account, inbox: inbox, contact: contact, status: 'open') }
+
+      before do
+        allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+        board.update!(settings: { 'auto_resolve_conversation_on_task_end' => true })
+        task.update!(board_step: completed_step)
+        task.conversations << open_conversation
+      end
+
+      it 'does not resolve conversations' do
+        listener.kanban_task_updated(event)
+
+        expect(open_conversation.reload.status).to eq('open')
+      end
     end
 
     context 'when auto_resolve_conversation_on_task_end is enabled' do
@@ -437,6 +485,19 @@ RSpec.describe FazerAi::KanbanListener do
 
     before do
       board.update!(steps_order: [first_step.id, completed_step.id])
+    end
+
+    context 'when kanban feature is disabled' do
+      before do
+        allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+        board.update!(settings: { 'auto_complete_task_on_conversation_resolve' => true })
+      end
+
+      it 'does not complete the task' do
+        listener.conversation_resolved(event)
+
+        expect(task.reload.board_step).to eq(first_step)
+      end
     end
 
     context 'when auto_complete_task_on_conversation_resolve is enabled' do

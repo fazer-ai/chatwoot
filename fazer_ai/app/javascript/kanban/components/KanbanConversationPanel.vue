@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { shortTimestampFromDate } from 'shared/helpers/timeHelper';
 import kanbanModule from 'kanban/store/modules/kanban';
 import TasksAPI from 'kanban/api/tasks';
@@ -12,11 +12,14 @@ import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import KanbanContextDropdown from './KanbanContextDropdown.vue';
 import KanbanTaskDatePicker from './KanbanTaskDatePicker.vue';
 import ContactDetailsItem from 'dashboard/routes/dashboard/conversation/ContactDetailsItem.vue';
+import BasePaywallModal from 'dashboard/routes/dashboard/settings/components/BasePaywallModal.vue';
 import { useAlert } from 'dashboard/composables';
+import { useAccount } from 'dashboard/composables/useAccount';
 import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import { useKanban } from '../composables/useKanban';
 import types from 'dashboard/store/mutation-types';
 import { useMapGetter } from 'dashboard/composables/store';
+import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
 const props = defineProps({
   conversationId: {
@@ -43,11 +46,37 @@ const props = defineProps({
 
 const store = useStore();
 const { t } = useI18n();
-const route = useRoute();
+const router = useRouter();
 const { priorities } = useKanban();
+const { isCloudFeatureEnabled, accountId, isOnChatwootCloud } = useAccount();
 
 const currentUser = useMapGetter('getCurrentUser');
 const accountLabels = useMapGetter('labels/getLabels');
+
+const fazerAiSubscription = computed(
+  () => store.getters['globalConfig/getFazerAiSubscription']
+);
+const isFazerAiSubscriptionActive = computed(() => {
+  const status = fazerAiSubscription.value?.status;
+  return ['active', 'past_due', 'trialing'].includes(status);
+});
+
+const isKanbanEnabled = computed(
+  () =>
+    isCloudFeatureEnabled(FEATURE_FLAGS.KANBAN) &&
+    isFazerAiSubscriptionActive.value
+);
+const isSuperAdmin = computed(() => currentUser.value?.type === 'SuperAdmin');
+const paywallI18nKey = computed(() =>
+  isOnChatwootCloud.value ? 'PAYWALL' : 'ENTERPRISE_PAYWALL'
+);
+
+const openBilling = () => {
+  router.push({
+    name: 'billing_settings_index',
+    params: { accountId: accountId.value },
+  });
+};
 
 if (!store.hasModule('kanban')) {
   store.registerModule('kanban', kanbanModule);
@@ -65,7 +94,6 @@ const dueDate = ref(null);
 
 const boards = computed(() => store.state.kanban.boards);
 const preferences = computed(() => store.state.kanban.preferences);
-const accountId = computed(() => route.params.accountId);
 
 const boardOptions = computed(() => {
   const favoriteBoardIds = preferences.value?.favorite_board_ids || [];
@@ -375,323 +403,343 @@ const handleDueDateChange = date => {
 
 <template>
   <div class="kanban-conversation-panel flex flex-col p-4">
-    <!-- No Task State -->
-    <div v-if="!existingTask && !isCreating" class="multiselect-wrap--small">
-      <ContactDetailsItem compact :title="$t('KANBAN.ADD_TO_BOARD')" />
-      <MultiselectDropdown
-        :selected-item="selectedBoard"
-        :options="boardOptions"
-        :multiselector-placeholder="$t('KANBAN.SELECT_BOARD')"
-        :input-placeholder="$t('KANBAN.SEARCH_BOARDS')"
-        @select="
-          val => {
-            selectedBoard = val;
-            createTask();
-          }
-        "
+    <!-- Paywall State -->
+    <template v-if="!isKanbanEnabled">
+      <BasePaywallModal
+        feature-prefix="KANBAN"
+        :i18n-key="paywallI18nKey"
+        :is-super-admin="isSuperAdmin"
+        :is-on-chatwoot-cloud="isOnChatwootCloud"
+        class="!max-w-none !shadow-none !border-0 !px-0 !py-0"
+        @upgrade="openBilling"
       />
-    </div>
+    </template>
 
-    <!-- Creating Task State -->
-    <div v-else-if="isCreating" class="flex flex-col gap-3">
-      <!-- Board Badge -->
-      <div class="flex flex-col gap-2">
-        <div
-          class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 self-start max-w-full"
-        >
-          <span class="i-lucide-kanban size-3 shrink-0" />
-          <span class="font-medium truncate">{{ selectedBoard?.name }}</span>
-        </div>
-        <div
-          class="h-5 rounded bg-slate-100 dark:bg-slate-800 animate-pulse w-3/4"
+    <!-- Normal Content (when feature is enabled) -->
+    <template v-else>
+      <!-- No Task State -->
+      <div v-if="!existingTask && !isCreating" class="multiselect-wrap--small">
+        <ContactDetailsItem compact :title="$t('KANBAN.ADD_TO_BOARD')" />
+        <MultiselectDropdown
+          :selected-item="selectedBoard"
+          :options="boardOptions"
+          :multiselector-placeholder="$t('KANBAN.SELECT_BOARD')"
+          :input-placeholder="$t('KANBAN.SEARCH_BOARDS')"
+          @select="
+            val => {
+              selectedBoard = val;
+              createTask();
+            }
+          "
         />
       </div>
 
-      <!-- Step Skeleton -->
-      <div class="multiselect-wrap--small">
-        <ContactDetailsItem compact :title="$t('KANBAN.MODAL.STEP_LABEL')" />
-        <div
-          class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
-        />
-      </div>
-
-      <!-- Priority Skeleton -->
-      <div class="multiselect-wrap--small">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="text-sm font-medium text-n-slate-12">
-            {{ $t('KANBAN.MODAL.PRIORITY_LABEL') }}
-          </span>
-        </div>
-        <div
-          class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
-        />
-      </div>
-
-      <!-- Agents Skeleton -->
-      <div class="multiselect-wrap--small">
-        <ContactDetailsItem compact :title="$t('KANBAN.ASSIGNED_AGENTS')" />
-        <div
-          class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
-        />
-      </div>
-    </div>
-
-    <!-- Task Exists State -->
-    <div v-else class="flex flex-col gap-3">
-      <!-- Board Badge & Task Title -->
-      <div class="flex flex-col gap-2">
-        <div
-          class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 self-start max-w-full"
-        >
-          <span class="i-lucide-kanban size-3 shrink-0" />
-          <span class="font-medium truncate">{{ boardName }}</span>
-        </div>
-        <div class="flex items-center gap-2 min-w-0">
-          <router-link
-            :to="taskUrl"
-            class="text-sm font-medium text-woot-500 hover:underline text-left truncate flex-1 min-w-0"
-          >
-            {{ existingTask.title }}
-          </router-link>
-        </div>
-      </div>
-
-      <!-- Step -->
-      <div class="multiselect-wrap--small">
-        <ContactDetailsItem compact :title="$t('KANBAN.MODAL.STEP_LABEL')" />
-        <div class="flex items-center gap-1">
-          <div class="flex-1 min-w-0">
-            <KanbanContextDropdown
-              :options="steps"
-              :selected-item="currentStep"
-              hide-search
-              :has-thumbnail="false"
-              @select="handleStepChange"
-            >
-              <template #trigger="{ open }">
-                <button
-                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg outline outline-1 outline-n-strong hover:bg-slate-50 dark:hover:bg-slate-800 min-w-0"
-                  @click.stop="open"
-                >
-                  <div
-                    class="size-2 rounded-full flex-shrink-0"
-                    :style="{ backgroundColor: currentStep?.color }"
-                  />
-                  <span class="truncate text-slate-900 dark:text-slate-100">
-                    {{
-                      currentStep?.name || $t('KANBAN.MODAL.STEP_PLACEHOLDER')
-                    }}
-                  </span>
-                </button>
-              </template>
-            </KanbanContextDropdown>
-          </div>
-          <Button
-            v-if="nextStep"
-            v-tooltip="$t('KANBAN.MOVE_TO_NEXT_STEP', { step: nextStep.name })"
-            variant="ghost"
-            size="sm"
-            class="shrink-0 !px-1"
-            :disabled="isUpdating"
-            @click="moveToNextStep"
-          >
-            <span class="i-lucide-chevron-right size-4" />
-          </Button>
-          <Button
-            v-if="canComplete"
-            v-tooltip="$t('KANBAN.MARK_COMPLETE')"
-            variant="ghost"
-            size="sm"
-            class="shrink-0 !px-1 text-n-teal-11"
-            :disabled="isUpdating"
-            @click="markComplete"
-          >
-            <span class="i-lucide-check size-4" />
-          </Button>
-        </div>
-      </div>
-
-      <!-- Assigned Agents -->
-      <div class="multiselect-wrap--small">
-        <ContactDetailsItem compact :title="$t('KANBAN.ASSIGNED_AGENTS')">
-          <template #button>
-            <Button
-              v-if="showSelfAssign"
-              link
-              xs
-              icon="i-lucide-arrow-right"
-              class="!gap-1"
-              :label="$t('CONVERSATION_SIDEBAR.SELF_ASSIGN')"
-              @click="assignToMe"
-            />
-          </template>
-        </ContactDetailsItem>
-        <multiselect
-          :model-value="assignedAgents"
-          :options="agentOptions"
-          track-by="id"
-          label="name"
-          multiple
-          :close-on-select="false"
-          :clear-on-select="false"
-          :placeholder="$t('KANBAN.SETTINGS.AGENTS_PLACEHOLDER')"
-          :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-          :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-          :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
-          class="!mb-0 kanban-agents-multiselect"
-          @update:model-value="handleAgentsChange"
-        >
-          <template #tag="{ option, remove }">
-            <span
-              class="multiselect__tag !inline-flex items-center gap-2 !relative !pl-7 !mb-1"
-            >
-              <Avatar
-                :src="option.avatar_url"
-                :name="option.name"
-                :size="16"
-                :status="option.availability_status"
-                class="!absolute !left-1.5 !top-1/2 !-translate-y-1/2"
-              />
-              <span
-                class="multiselect__tag-text !inline-block !max-w-[150px] !truncate"
-              >
-                {{ option.name }}
-              </span>
-              <i
-                class="multiselect__tag-icon"
-                @mousedown.prevent
-                @click.prevent.stop="remove(option)"
-                @keypress.enter.prevent="remove(option)"
-              />
-            </span>
-          </template>
-          <template #option="{ option }">
-            <div class="flex items-center gap-2 min-w-0">
-              <Avatar
-                :src="option.avatar_url"
-                :name="option.name"
-                :size="16"
-                :status="option.availability_status"
-                class="leading-none text-center"
-              />
-              <span class="truncate">{{ option.name }}</span>
-            </div>
-          </template>
-          <template #noResult>
-            {{ $t('KANBAN.SETTINGS.NO_AGENTS_FOUND') }}
-          </template>
-          <template #noOptions>
-            {{ $t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE') }}
-          </template>
-        </multiselect>
-      </div>
-
-      <!-- Priority -->
-      <div class="multiselect-wrap--small">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="text-sm font-medium text-n-slate-12">
-            {{ $t('KANBAN.MODAL.PRIORITY_LABEL') }}
-          </span>
+      <!-- Creating Task State -->
+      <div v-else-if="isCreating" class="flex flex-col gap-3">
+        <!-- Board Badge -->
+        <div class="flex flex-col gap-2">
           <div
-            v-if="timeAgo"
-            v-tooltip="createdDate"
-            class="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
+            class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 self-start max-w-full"
           >
-            <span class="i-lucide-clock size-3" />
-            <span>{{ timeAgo }}</span>
+            <span class="i-lucide-kanban size-3 shrink-0" />
+            <span class="font-medium truncate">{{ selectedBoard?.name }}</span>
+          </div>
+          <div
+            class="h-5 rounded bg-slate-100 dark:bg-slate-800 animate-pulse w-3/4"
+          />
+        </div>
+
+        <!-- Step Skeleton -->
+        <div class="multiselect-wrap--small">
+          <ContactDetailsItem compact :title="$t('KANBAN.MODAL.STEP_LABEL')" />
+          <div
+            class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
+          />
+        </div>
+
+        <!-- Priority Skeleton -->
+        <div class="multiselect-wrap--small">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ $t('KANBAN.MODAL.PRIORITY_LABEL') }}
+            </span>
+          </div>
+          <div
+            class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
+          />
+        </div>
+
+        <!-- Agents Skeleton -->
+        <div class="multiselect-wrap--small">
+          <ContactDetailsItem compact :title="$t('KANBAN.ASSIGNED_AGENTS')" />
+          <div
+            class="h-9 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse"
+          />
+        </div>
+      </div>
+
+      <!-- Task Exists State -->
+      <div v-else class="flex flex-col gap-3">
+        <!-- Board Badge & Task Title -->
+        <div class="flex flex-col gap-2">
+          <div
+            class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 self-start max-w-full"
+          >
+            <span class="i-lucide-kanban size-3 shrink-0" />
+            <span class="font-medium truncate">{{ boardName }}</span>
+          </div>
+          <div class="flex items-center gap-2 min-w-0">
+            <router-link
+              :to="taskUrl"
+              class="text-sm font-medium text-woot-500 hover:underline text-left truncate flex-1 min-w-0"
+            >
+              {{ existingTask.title }}
+            </router-link>
           </div>
         </div>
-        <KanbanContextDropdown
-          :options="priorities"
-          :selected-item="currentPriority"
-          hide-search
-          @select="handlePriorityChange"
-        >
-          <template #trigger="{ open }">
-            <button
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg outline outline-1 outline-n-strong hover:bg-slate-50 dark:hover:bg-slate-800 min-w-0"
-              @click.stop="open"
-            >
-              <div
-                v-if="currentPriority?.icon"
-                :class="currentPriority.icon"
-                :style="{ color: currentPriority.color }"
-                class="size-4"
-              />
-              <span class="truncate text-slate-900 dark:text-slate-100">
-                {{
-                  currentPriority?.name ||
-                  $t('KANBAN.MODAL.PRIORITY_PLACEHOLDER')
-                }}
-              </span>
-            </button>
-          </template>
-        </KanbanContextDropdown>
-      </div>
 
-      <!-- Labels -->
-      <div v-if="labelOptions.length" class="multiselect-wrap--small">
-        <ContactDetailsItem compact :title="$t('KANBAN.MODAL.LABELS_LABEL')" />
-        <multiselect
-          :model-value="selectedLabels"
-          :options="labelOptions"
-          track-by="id"
-          label="title"
-          multiple
-          :close-on-select="false"
-          :clear-on-select="false"
-          :placeholder="$t('KANBAN.MODAL.LABELS_PLACEHOLDER')"
-          :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-          :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-          :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
-          class="!mb-0 kanban-labels-multiselect"
-          @update:model-value="handleLabelsChange"
-        >
-          <template #tag="{ option, remove }">
-            <span
-              class="inline-flex items-center gap-1 px-2 py-0.5 mr-0.5 mb-1 text-xs font-medium rounded bg-n-slate-3 border border-solid border-n-strong"
-            >
-              <span
-                class="size-2 rounded-full flex-shrink-0"
-                :style="{ backgroundColor: option.color }"
-              />
-              <span class="truncate max-w-24">{{ option.title }}</span>
-              <button
-                type="button"
-                class="flex items-center justify-center p-0 ml-0.5 text-n-slate-10 hover:text-n-slate-12"
-                @mousedown.prevent.stop="remove(option)"
+        <!-- Step -->
+        <div class="multiselect-wrap--small">
+          <ContactDetailsItem compact :title="$t('KANBAN.MODAL.STEP_LABEL')" />
+          <div class="flex items-center gap-1">
+            <div class="flex-1 min-w-0">
+              <KanbanContextDropdown
+                :options="steps"
+                :selected-item="currentStep"
+                hide-search
+                :has-thumbnail="false"
+                @select="handleStepChange"
               >
-                <span class="i-lucide-x size-3" />
-              </button>
-            </span>
-          </template>
-          <template #option="{ option }">
-            <div class="flex items-center gap-2 min-w-0">
-              <div
-                class="w-2 h-2 rounded-full flex-shrink-0"
-                :style="{ backgroundColor: option.color }"
-              />
-              <span class="truncate">{{ option.title }}</span>
+                <template #trigger="{ open }">
+                  <button
+                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg outline outline-1 outline-n-strong hover:bg-slate-50 dark:hover:bg-slate-800 min-w-0"
+                    @click.stop="open"
+                  >
+                    <div
+                      class="size-2 rounded-full flex-shrink-0"
+                      :style="{ backgroundColor: currentStep?.color }"
+                    />
+                    <span class="truncate text-slate-900 dark:text-slate-100">
+                      {{
+                        currentStep?.name || $t('KANBAN.MODAL.STEP_PLACEHOLDER')
+                      }}
+                    </span>
+                  </button>
+                </template>
+              </KanbanContextDropdown>
             </div>
-          </template>
-          <template #noResult>
-            {{ $t('KANBAN.MODAL.NO_LABELS_FOUND') }}
-          </template>
-          <template #noOptions>
-            {{ $t('KANBAN.MODAL.NO_LABELS_AVAILABLE') }}
-          </template>
-        </multiselect>
-      </div>
+            <Button
+              v-if="nextStep"
+              v-tooltip="
+                $t('KANBAN.MOVE_TO_NEXT_STEP', { step: nextStep.name })
+              "
+              variant="ghost"
+              size="sm"
+              class="shrink-0 !px-1"
+              :disabled="isUpdating"
+              @click="moveToNextStep"
+            >
+              <span class="i-lucide-chevron-right size-4" />
+            </Button>
+            <Button
+              v-if="canComplete"
+              v-tooltip="$t('KANBAN.MARK_COMPLETE')"
+              variant="ghost"
+              size="sm"
+              class="shrink-0 !px-1 text-n-teal-11"
+              :disabled="isUpdating"
+              @click="markComplete"
+            >
+              <span class="i-lucide-check size-4" />
+            </Button>
+          </div>
+        </div>
 
-      <!-- Dates -->
-      <KanbanTaskDatePicker
-        :start-date="startDate"
-        :due-date="dueDate"
-        stacked
-        @update:start-date="handleStartDateChange"
-        @update:due-date="handleDueDateChange"
-      />
-    </div>
+        <!-- Assigned Agents -->
+        <div class="multiselect-wrap--small">
+          <ContactDetailsItem compact :title="$t('KANBAN.ASSIGNED_AGENTS')">
+            <template #button>
+              <Button
+                v-if="showSelfAssign"
+                link
+                xs
+                icon="i-lucide-arrow-right"
+                class="!gap-1"
+                :label="$t('CONVERSATION_SIDEBAR.SELF_ASSIGN')"
+                @click="assignToMe"
+              />
+            </template>
+          </ContactDetailsItem>
+          <multiselect
+            :model-value="assignedAgents"
+            :options="agentOptions"
+            track-by="id"
+            label="name"
+            multiple
+            :close-on-select="false"
+            :clear-on-select="false"
+            :placeholder="$t('KANBAN.SETTINGS.AGENTS_PLACEHOLDER')"
+            :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+            :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
+            :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
+            class="!mb-0 kanban-agents-multiselect"
+            @update:model-value="handleAgentsChange"
+          >
+            <template #tag="{ option, remove }">
+              <span
+                class="multiselect__tag !inline-flex items-center gap-2 !relative !pl-7 !mb-1"
+              >
+                <Avatar
+                  :src="option.avatar_url"
+                  :name="option.name"
+                  :size="16"
+                  :status="option.availability_status"
+                  class="!absolute !left-1.5 !top-1/2 !-translate-y-1/2"
+                />
+                <span
+                  class="multiselect__tag-text !inline-block !max-w-[150px] !truncate"
+                >
+                  {{ option.name }}
+                </span>
+                <i
+                  class="multiselect__tag-icon"
+                  @mousedown.prevent
+                  @click.prevent.stop="remove(option)"
+                  @keypress.enter.prevent="remove(option)"
+                />
+              </span>
+            </template>
+            <template #option="{ option }">
+              <div class="flex items-center gap-2 min-w-0">
+                <Avatar
+                  :src="option.avatar_url"
+                  :name="option.name"
+                  :size="16"
+                  :status="option.availability_status"
+                  class="leading-none text-center"
+                />
+                <span class="truncate">{{ option.name }}</span>
+              </div>
+            </template>
+            <template #noResult>
+              {{ $t('KANBAN.SETTINGS.NO_AGENTS_FOUND') }}
+            </template>
+            <template #noOptions>
+              {{ $t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE') }}
+            </template>
+          </multiselect>
+        </div>
+
+        <!-- Priority -->
+        <div class="multiselect-wrap--small">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ $t('KANBAN.MODAL.PRIORITY_LABEL') }}
+            </span>
+            <div
+              v-if="timeAgo"
+              v-tooltip="createdDate"
+              class="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
+            >
+              <span class="i-lucide-clock size-3" />
+              <span>{{ timeAgo }}</span>
+            </div>
+          </div>
+          <KanbanContextDropdown
+            :options="priorities"
+            :selected-item="currentPriority"
+            hide-search
+            @select="handlePriorityChange"
+          >
+            <template #trigger="{ open }">
+              <button
+                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg outline outline-1 outline-n-strong hover:bg-slate-50 dark:hover:bg-slate-800 min-w-0"
+                @click.stop="open"
+              >
+                <div
+                  v-if="currentPriority?.icon"
+                  :class="currentPriority.icon"
+                  :style="{ color: currentPriority.color }"
+                  class="size-4"
+                />
+                <span class="truncate text-slate-900 dark:text-slate-100">
+                  {{
+                    currentPriority?.name ||
+                    $t('KANBAN.MODAL.PRIORITY_PLACEHOLDER')
+                  }}
+                </span>
+              </button>
+            </template>
+          </KanbanContextDropdown>
+        </div>
+
+        <!-- Labels -->
+        <div v-if="labelOptions.length" class="multiselect-wrap--small">
+          <ContactDetailsItem
+            compact
+            :title="$t('KANBAN.MODAL.LABELS_LABEL')"
+          />
+          <multiselect
+            :model-value="selectedLabels"
+            :options="labelOptions"
+            track-by="id"
+            label="title"
+            multiple
+            :close-on-select="false"
+            :clear-on-select="false"
+            :placeholder="$t('KANBAN.MODAL.LABELS_PLACEHOLDER')"
+            :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+            :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
+            :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
+            class="!mb-0 kanban-labels-multiselect"
+            @update:model-value="handleLabelsChange"
+          >
+            <template #tag="{ option, remove }">
+              <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 mr-0.5 mb-1 text-xs font-medium rounded bg-n-slate-3 border border-solid border-n-strong"
+              >
+                <span
+                  class="size-2 rounded-full flex-shrink-0"
+                  :style="{ backgroundColor: option.color }"
+                />
+                <span class="truncate max-w-24">{{ option.title }}</span>
+                <button
+                  type="button"
+                  class="flex items-center justify-center p-0 ml-0.5 text-n-slate-10 hover:text-n-slate-12"
+                  @mousedown.prevent.stop="remove(option)"
+                >
+                  <span class="i-lucide-x size-3" />
+                </button>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <div class="flex items-center gap-2 min-w-0">
+                <div
+                  class="w-2 h-2 rounded-full flex-shrink-0"
+                  :style="{ backgroundColor: option.color }"
+                />
+                <span class="truncate">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #noResult>
+              {{ $t('KANBAN.MODAL.NO_LABELS_FOUND') }}
+            </template>
+            <template #noOptions>
+              {{ $t('KANBAN.MODAL.NO_LABELS_AVAILABLE') }}
+            </template>
+          </multiselect>
+        </div>
+
+        <!-- Dates -->
+        <KanbanTaskDatePicker
+          :start-date="startDate"
+          :due-date="dueDate"
+          stacked
+          @update:start-date="handleStartDateChange"
+          @update:due-date="handleDueDateChange"
+        />
+      </div>
+    </template>
   </div>
 </template>
 

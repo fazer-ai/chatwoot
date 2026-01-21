@@ -24,22 +24,22 @@ pt_BR:
         title: "Conversa #%{display_id} - %{contact_name}"
         unknown_contact: "Contato desconhecido"
       errors:
-        invalid_conversations: 'devem pertencer a uma das caixas de entrada do quadro'
-        invalid_conversation_inbox: 'devem pertencer a uma das caixas de entrada do quadro'
+        invalid_conversations: 'devem pertencer a uma das caixas de entrada do funil'
+        invalid_conversation_inbox: 'devem pertencer a uma das caixas de entrada do funil'
         invalid_due_date: 'deve ser igual ou posterior à data de início'
-        invalid_board_step: 'deve pertencer ao mesmo quadro'
+        invalid_board_step: 'deve pertencer ao mesmo funil'
         invalid_assignee: 'deve pertencer à mesma conta'
-        invalid_assignees: 'devem pertencer aos agentes do quadro'
+        invalid_assignees: 'devem pertencer aos agentes do funil'
         invalid_contact_account: 'deve pertencer à mesma conta'
     agents:
       errors:
-        invalid_agent: 'deve pertencer à mesma conta do quadro'
+        invalid_agent: 'deve pertencer à mesma conta do funil'
     inboxes:
       errors:
-        mismatched_account: 'deve pertencer à mesma conta do quadro'
+        mismatched_account: 'deve pertencer à mesma conta do funil'
     board_steps:
       errors:
-        cannot_delete_last_step: "Não é possível excluir a última etapa do quadro"
+        cannot_delete_last_step: "Não é possível excluir a última etapa do funil"
   inbox:
     reauthorization:
       success: 'Canal reautenticado com sucesso'
@@ -242,7 +242,7 @@ pt_BR:
         auto_resolved_days: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} dias de inatividade'
         auto_resolved_hours: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} horas de inatividade'
         auto_resolved_minutes: 'A conversa foi marcada como resolvida pelo sistema por ter %{count} minutos de inatividade'
-        kanban_task_resolved: 'A conversa foi marcada como resolvida porque a tarefa vinculada "%{task_title}" no quadro "%{board_name}" foi concluída'
+        kanban_task_resolved: 'A conversa foi marcada como resolvida porque a tarefa vinculada "%{task_title}" no funil "%{board_name}" foi ganha'
         system_auto_open: O sistema reabriu a conversa devido a uma nova mensagem recebida.
       priority:
         added: '%{user_name} definiu a prioridade para %{new_priority}'

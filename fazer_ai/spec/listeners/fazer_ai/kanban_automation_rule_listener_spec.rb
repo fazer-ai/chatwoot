@@ -15,9 +15,32 @@ RSpec.describe FazerAi::KanbanAutomationRuleListener do
   let(:action_service) { instance_double(FazerAi::AutomationRules::KanbanActionService) }
 
   before do
+    allow(account).to receive(:kanban_feature_enabled?).and_return(true)
     allow(FazerAi::AutomationRules::KanbanConditionsFilterService).to receive(:new).and_return(conditions_filter_service)
     allow(FazerAi::AutomationRules::KanbanActionService).to receive(:new).and_return(action_service)
     allow(action_service).to receive(:perform)
+  end
+
+  describe 'when kanban feature is disabled' do
+    before do
+      allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+    end
+
+    let!(:automation_rule) do # rubocop:disable RSpec/LetSetup
+      create(:automation_rule,
+             account: account,
+             event_name: 'kanban_task_created',
+             conditions: [{ attribute_key: 'kanban_board_id', filter_operator: 'equal_to', values: [board.id], query_operator: nil }],
+             actions: [{ action_name: 'assign_agent', action_params: [agent.id] }])
+    end
+
+    let(:event) { Events::Base.new('kanban_task_created', Time.zone.now, { task: task }) }
+
+    it 'does not execute automation rules' do
+      allow(conditions_filter_service).to receive(:perform).and_return(true)
+      listener.kanban_task_created(event)
+      expect(FazerAi::AutomationRules::KanbanActionService).not_to have_received(:new)
+    end
   end
 
   describe '#kanban_task_created' do

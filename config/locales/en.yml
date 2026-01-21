@@ -36,22 +36,22 @@ en:
         title: "Conversation #%{display_id} - %{contact_name}"
         unknown_contact: "Unknown contact"
       errors:
-        invalid_conversations: "must belong to one of the board inboxes"
-        invalid_conversation_inbox: "must belong to one of the board inboxes"
+        invalid_conversations: "must belong to one of the funnel inboxes"
+        invalid_conversation_inbox: "must belong to one of the funnel inboxes"
         invalid_due_date: "must be on or after the start date"
-        invalid_board_step: "must belong to the same board"
+        invalid_board_step: "must belong to the same funnel"
         invalid_assignee: "must belong to the same account"
-        invalid_assignees: "must belong to the board agents"
+        invalid_assignees: "must belong to the funnel agents"
         invalid_contact_account: "must belong to the same account"
     agents:
       errors:
-        invalid_agent: "must belong to the same account as the board"
+        invalid_agent: "must belong to the same account as the funnel"
     inboxes:
       errors:
-        mismatched_account: "must belong to the same account as the board"
+        mismatched_account: "must belong to the same account as the funnel"
     board_steps:
       errors:
-        cannot_delete_last_step: "Cannot delete the last step in the board"
+        cannot_delete_last_step: "Cannot delete the last step in the funnel"
   hello: 'Hello world'
   inbox:
     reauthorization:
@@ -271,7 +271,7 @@ en:
         auto_resolved_days: 'Conversation was marked resolved by system due to %{count} days of inactivity'
         auto_resolved_hours: 'Conversation was marked resolved by system due to %{count} hours of inactivity'
         auto_resolved_minutes: 'Conversation was marked resolved by system due to %{count} minutes of inactivity'
-        kanban_task_resolved: 'Conversation was marked resolved because the linked task "%{task_title}" on board "%{board_name}" was completed'
+        kanban_task_resolved: 'Conversation was marked resolved because the linked task "%{task_title}" on funnel "%{board_name}" was won'
         system_auto_open: System reopened the conversation due to a new incoming message.
       priority:
         added: '%{user_name} set the priority to %{new_priority}'

@@ -3,21 +3,21 @@
 class FazerAi::KanbanListener < BaseListener
   def conversation_created(event)
     conversation = event.data[:conversation]
-    return unless conversation
+    return unless conversation&.account&.kanban_feature_enabled?
 
     auto_create_task_for_conversation(conversation)
   end
 
   def conversation_resolved(event)
     conversation = event.data[:conversation]
-    return unless conversation
+    return unless conversation&.account&.kanban_feature_enabled?
 
     auto_complete_task_on_conversation_resolve(conversation)
   end
 
   def kanban_task_created(event)
     task = event.data[:task]
-    return unless task
+    return unless task&.account&.kanban_feature_enabled?
 
     auto_assign_task_to_agent(task)
   end
@@ -25,7 +25,7 @@ class FazerAi::KanbanListener < BaseListener
   def kanban_task_updated(event)
     task = event.data[:task]
     changed_attributes = event.data[:changed_attributes]
-    return unless task
+    return unless task&.account&.kanban_feature_enabled?
     return unless changed_attributes
 
     auto_resolve_conversations_on_task_end(task, changed_attributes)

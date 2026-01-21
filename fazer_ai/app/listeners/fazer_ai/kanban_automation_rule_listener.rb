@@ -19,11 +19,11 @@ class FazerAi::KanbanAutomationRuleListener < BaseListener
 
   private
 
-  def process_kanban_task_event(event, event_name)
+  def process_kanban_task_event(event, event_name) # rubocop:disable Metrics/CyclomaticComplexity
     return if performed_by_automation?(event)
 
     task = event.data[:task]
-    return unless task
+    return unless task&.account&.kanban_feature_enabled?
 
     account = task.account
     changed_attributes = event.data[:changed_attributes]

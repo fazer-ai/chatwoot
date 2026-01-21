@@ -135,8 +135,8 @@
       "CONVERSATION_OPENED": "Conversa Aberta",
       "KANBAN_TASK_CREATED": "Tarefa Criada",
       "KANBAN_TASK_UPDATED": "Tarefa Atualizada",
-      "KANBAN_TASK_COMPLETED": "Tarefa Concluída",
-      "KANBAN_TASK_CANCELLED": "Tarefa Cancelada"
+      "KANBAN_TASK_COMPLETED": "Tarefa Ganha",
+      "KANBAN_TASK_CANCELLED": "Tarefa Perdida"
     },
     "ACTIONS": {
       "ASSIGN_AGENT": "Atribuir ao Agente",
@@ -156,9 +156,9 @@
       "ADD_SLA": "Adicionar SLA",
       "OPEN_CONVERSATION": "Abrir conversa",
       "KANBAN_TASK_MOVE_TO_STEP": "Mover Tarefa para Etapa",
-      "KANBAN_TASK_MARK_COMPLETED": "Marcar Tarefa como Concluída",
-      "KANBAN_TASK_MARK_CANCELLED": "Marcar Tarefa como Cancelada",
-      "ASSIGN_TO_BOARD": "Atribuir ao Quadro",
+      "KANBAN_TASK_MARK_COMPLETED": "Marcar Tarefa como Ganha",
+      "KANBAN_TASK_MARK_CANCELLED": "Marcar Tarefa como Perdida",
+      "ASSIGN_TO_BOARD": "Atribuir ao Funil",
       "MOVE_TO_STEP": "Mover para Etapa"
     },
     "MESSAGE_TYPES": {
@@ -188,12 +188,12 @@
       "TEAM_NAME": "Time",
       "PRIORITY": "Prioridade",
       "LABELS": "Etiquetas",
-      "KANBAN_BOARD": "Quadro",
+      "KANBAN_BOARD": "Funil",
       "KANBAN_STEP": "Etapa"
     },
     "KANBAN": {
-      "SELECT_BOARD_FIRST": "Por favor, adicione uma condição de Quadro primeiro para selecionar etapas",
-      "SELECT_BOARD_ACTION_FIRST": "Por favor, adicione uma ação de Atribuir ao Quadro primeiro para selecionar etapas"
+      "SELECT_BOARD_FIRST": "Por favor, adicione uma condição de Funil primeiro para selecionar etapas",
+      "SELECT_BOARD_ACTION_FIRST": "Por favor, adicione uma ação de Atribuir ao Funil primeiro para selecionar etapas"
     }
   }
 }

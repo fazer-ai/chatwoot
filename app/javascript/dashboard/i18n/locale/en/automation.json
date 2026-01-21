@@ -135,8 +135,8 @@
       "CONVERSATION_OPENED": "Conversation Opened",
       "KANBAN_TASK_CREATED": "Task Created",
       "KANBAN_TASK_UPDATED": "Task Updated",
-      "KANBAN_TASK_COMPLETED": "Task Completed",
-      "KANBAN_TASK_CANCELLED": "Task Cancelled"
+      "KANBAN_TASK_COMPLETED": "Task Won",
+      "KANBAN_TASK_CANCELLED": "Task Lost"
     },
     "ACTIONS": {
       "ASSIGN_AGENT": "Assign to Agent",
@@ -156,9 +156,9 @@
       "ADD_SLA": "Add SLA",
       "OPEN_CONVERSATION": "Open conversation",
       "KANBAN_TASK_MOVE_TO_STEP": "Move Task to Step",
-      "KANBAN_TASK_MARK_COMPLETED": "Mark Task as Completed",
-      "KANBAN_TASK_MARK_CANCELLED": "Mark Task as Cancelled",
-      "ASSIGN_TO_BOARD": "Assign to Board",
+      "KANBAN_TASK_MARK_COMPLETED": "Mark Task as Won",
+      "KANBAN_TASK_MARK_CANCELLED": "Mark Task as Lost",
+      "ASSIGN_TO_BOARD": "Assign to Funnel",
       "MOVE_TO_STEP": "Move to Step"
     },
     "MESSAGE_TYPES": {
@@ -188,12 +188,12 @@
       "TEAM_NAME": "Team",
       "PRIORITY": "Priority",
       "LABELS": "Labels",
-      "KANBAN_BOARD": "Board",
+      "KANBAN_BOARD": "Funnel",
       "KANBAN_STEP": "Step"
     },
     "KANBAN": {
-      "SELECT_BOARD_FIRST": "Please add a Board condition first to select steps",
-      "SELECT_BOARD_ACTION_FIRST": "Please add an Assign to Board action first to select steps"
+      "SELECT_BOARD_FIRST": "Please add a Funnel condition first to select steps",
+      "SELECT_BOARD_ACTION_FIRST": "Please add an Assign to Funnel action first to select steps"
     }
   }
 }
