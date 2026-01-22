@@ -49,7 +49,8 @@
             "PROVIDER_EVENT_RECEIVED": "Evento do Provedor Recebido",
             "KANBAN_TASK_CREATED": "Tarefa do Kanban criada",
             "KANBAN_TASK_UPDATED": "Tarefa do Kanban atualizada",
-            "KANBAN_TASK_DELETED": "Tarefa do Kanban excluída"
+            "KANBAN_TASK_DELETED": "Tarefa do Kanban excluída",
+            "KANBAN_TASK_OVERDUE": "Tarefa do Kanban vencida"
           }
         },
         "NAME": {

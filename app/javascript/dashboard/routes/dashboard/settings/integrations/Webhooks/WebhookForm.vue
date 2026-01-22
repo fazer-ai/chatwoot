@@ -26,6 +26,7 @@ const SUPPORTED_WEBHOOK_EVENTS = [
   'kanban_task_created',
   'kanban_task_updated',
   'kanban_task_deleted',
+  'kanban_task_overdue',
 ];
 
 const localhostUrl = value => {

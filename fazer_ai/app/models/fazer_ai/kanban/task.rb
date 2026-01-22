@@ -28,6 +28,7 @@
 #  index_kanban_tasks_on_board_step_id               (board_step_id)
 #  index_kanban_tasks_on_board_step_id_and_priority  (board_step_id,priority)
 #  index_kanban_tasks_on_created_by_id               (created_by_id)
+#  index_kanban_tasks_on_due_date                    (due_date)
 #  index_kanban_tasks_on_priority                    (priority)
 #  index_kanban_tasks_on_step_and_created_at         (board_step_id,created_at)
 #
