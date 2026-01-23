@@ -753,9 +753,9 @@ const handleClickOutside = () => {
                     :size="16"
                   />
                   <div
-                    class="absolute -bottom-0.5 -right-0.5 flex h-2 w-2 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
+                    class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
                   >
-                    <ChannelIcon class="size-1.5" :inbox="option.inbox" />
+                    <ChannelIcon class="size-3 min-w-3" :inbox="option.inbox" />
                   </div>
                 </div>
                 <span
@@ -791,12 +791,9 @@ const handleClickOutside = () => {
                     class="leading-none text-center"
                   />
                   <div
-                    class="absolute -bottom-0.5 -right-0.5 flex h-2 w-2 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
+                    class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
                   >
-                    <ChannelIcon
-                      class="size-1.5 min-w-1.5"
-                      :inbox="option.inbox"
-                    />
+                    <ChannelIcon class="size-3 min-w-3" :inbox="option.inbox" />
                   </div>
                 </div>
                 <div class="flex flex-col min-w-0 overflow-hidden">

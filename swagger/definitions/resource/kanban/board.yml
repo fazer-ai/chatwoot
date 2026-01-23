@@ -1,0 +1,68 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the board
+  account_id:
+    type: integer
+    description: The ID of the account
+  name:
+    type: string
+    description: The name of the board
+  description:
+    type: string
+    description: The description of the board
+  settings:
+    type: object
+    description: Board settings
+    properties:
+      auto_assign_agent_to_conversation:
+        type: boolean
+        description: Automatically assign an agent to conversations
+      auto_assign_task_to_agent:
+        type: boolean
+        description: Automatically assign tasks to agents
+      auto_create_task_for_conversation:
+        type: boolean
+        description: Automatically create tasks for new conversations
+  steps_order:
+    type: array
+    description: Ordered list of step IDs
+    items:
+      type: integer
+  assigned_inbox_ids:
+    type: array
+    description: List of assigned inbox IDs
+    items:
+      type: integer
+  assigned_inboxes:
+    type: array
+    description: List of assigned inboxes
+    items:
+      $ref: '#/components/schemas/kanban_inbox_summary'
+  assigned_agent_ids:
+    type: array
+    description: List of assigned agent IDs
+    items:
+      type: integer
+  assigned_agents:
+    type: array
+    description: List of assigned agents
+    items:
+      $ref: '#/components/schemas/kanban_agent_summary'
+  total_tasks_count:
+    type: integer
+    description: Total number of tasks across all steps
+  steps_summary:
+    type: array
+    description: Summary of all steps
+    items:
+      $ref: '#/components/schemas/kanban_step_summary'
+  created_at:
+    type: string
+    format: date-time
+    description: Board creation timestamp
+  updated_at:
+    type: string
+    format: date-time
+    description: Board last update timestamp

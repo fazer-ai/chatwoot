@@ -37,6 +37,11 @@ class FazerAi::Kanban::Board < ApplicationRecord
            class_name: 'FazerAi::Kanban::BoardStep',
            dependent: :destroy,
            inverse_of: :board
+  has_one :cancelled_step,
+          -> { where(cancelled: true) },
+          class_name: 'FazerAi::Kanban::BoardStep',
+          inverse_of: :board,
+          dependent: :nullify
   has_many :board_agents,
            class_name: 'FazerAi::Kanban::BoardAgent',
            dependent: :destroy,

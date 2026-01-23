@@ -1,23 +1,34 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>ReDoc</title>
-    <!-- needed for adaptive design -->
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!--
-    ReDoc doesn't change outer page styles
-    -->
+    <title>Chatwoot fazer.ai API Docs</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://framerusercontent.com/images/qXZmpotHTLpymCfaJlzrYz9ns.png" rel="icon" media="(prefers-color-scheme: light)">
+    <link href="https://framerusercontent.com/images/u5KNIONna5h9jZiwBP6pC6R8IA.png" rel="icon" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="https://framerusercontent.com/images/oI6WMZXXuNN3hdbhCAU8oYLpJsU.png">
     <style>
       body {
         margin: 0;
         padding: 0;
-        font-family:  'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
       }
     </style>
   </head>
   <body>
-    <redoc spec-url='/swagger/swagger.json'></redoc>
-    <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"> </script>
+    <script
+      id="api-reference"
+      data-url="/swagger/swagger.json"
+      data-configuration='{
+        "theme": "purple",
+        "layout": "modern",
+        "hideDarkModeToggle": false,
+        "servers": [
+          { "url": "https://app.chatwoot.com", "description": "Chatwoot Cloud" },
+          { "url": "http://localhost:3000", "description": "Local Development" },
+          { "url": "{customUrl}", "description": "Custom Server", "variables": { "customUrl": { "default": "https://your-instance.com", "description": "Your Chatwoot instance URL" } } }
+        ]
+      }'
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   </body>
 </html>

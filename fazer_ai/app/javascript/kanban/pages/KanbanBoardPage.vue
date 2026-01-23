@@ -140,6 +140,7 @@ const moveTask = ({ task, destinationStepId, insertBeforeTaskId }) =>
     taskId: task.id,
     destinationStepId,
     insertBeforeTaskId,
+    refreshStepId: destinationStepId,
   });
 const removeTask = id => store.dispatch('kanban/deleteTask', id);
 const createStep = data => store.dispatch('kanban/createStep', data);

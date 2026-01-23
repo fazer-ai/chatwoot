@@ -34,6 +34,18 @@ RSpec.describe FazerAi::AutomationRule do
       expect(automation_rule.actions_attributes).to include('mark_cancelled')
     end
 
+    it 'includes assign to board action' do
+      expect(automation_rule.actions_attributes).to include('assign_to_board')
+    end
+
+    it 'includes add label to task action' do
+      expect(automation_rule.actions_attributes).to include('add_label_to_task')
+    end
+
+    it 'includes remove label from task action' do
+      expect(automation_rule.actions_attributes).to include('remove_label_from_task')
+    end
+
     it 'includes standard automation actions' do
       expect(automation_rule.actions_attributes).to include('send_message')
       expect(automation_rule.actions_attributes).to include('assign_agent')

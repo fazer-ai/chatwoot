@@ -38,6 +38,18 @@ RSpec.describe FazerAi::Kanban::BoardStep, type: :model do
         middle_step.cancelled = true
         expect(middle_step).to be_valid
       end
+
+      it 'uncancels other steps when setting a step as cancelled' do
+        another_middle_step = create(:kanban_board_step, board: board)
+        board.update!(steps_order: [first_step.id, middle_step.id, another_middle_step.id, last_step.id])
+
+        middle_step.update!(cancelled: true)
+        expect(middle_step.reload.cancelled).to be true
+
+        another_middle_step.update!(cancelled: true)
+        expect(another_middle_step.reload.cancelled).to be true
+        expect(middle_step.reload.cancelled).to be false
+      end
     end
   end
 

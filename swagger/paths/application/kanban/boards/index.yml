@@ -1,0 +1,47 @@
+tags:
+  - Kanban Boards
+operationId: listKanbanBoards
+summary: List all Kanban boards
+description: List all Kanban boards available in the current account
+security:
+  - userApiKey: []
+parameters:
+  - name: sort
+    in: query
+    description: Sort field
+    schema:
+      type: string
+      enum:
+        - name
+        - updated_at
+        - created_at
+  - name: order
+    in: query
+    description: Sort order
+    schema:
+      type: string
+      enum:
+        - asc
+        - desc
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            boards:
+              type: array
+              description: Array of boards
+              items:
+                $ref: '#/components/schemas/kanban_board'
+            preferences:
+              type: object
+              description: User preferences for Kanban
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

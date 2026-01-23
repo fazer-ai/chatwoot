@@ -1,0 +1,49 @@
+tags:
+  - Kanban
+operationId: updateKanbanPreferences
+summary: Update Kanban user preferences
+description: Update the current user's Kanban preferences (task ordering, sorting, favorites, etc.)
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          preferences:
+            type: object
+            description: Preferences to merge with existing preferences
+            properties:
+              favorite_board_ids:
+                type: array
+                description: List of favorite board IDs
+                items:
+                  type: integer
+              task_sorting:
+                type: object
+                description: Sorting preferences per board
+                additionalProperties:
+                  type: object
+                  properties:
+                    sort:
+                      type: string
+                    order:
+                      type: string
+              tasks_order:
+                type: object
+                description: Task ordering per step
+                additionalProperties:
+                  type: array
+                  items:
+                    type: integer
+responses:
+  '204':
+    description: Preferences updated successfully
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

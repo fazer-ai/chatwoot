@@ -209,6 +209,9 @@
       "TIME_PLACEHOLDER": "Hora"
     },
     "CREATED_AT_TOOLTIP": "Criado em {date}",
+    "STEP_CHANGED_AT_TOOLTIP": "Movido em {date}",
+    "WON_AT_TOOLTIP": "Ganho em {date}",
+    "LOST_AT_TOOLTIP": "Perdido em {date}",
     "SHOW_MORE": "Ver mais",
     "SHOW_LESS": "Ver menos",
     "EMPTY_STATE": {
@@ -263,7 +266,7 @@
       "AUTO_RESOLVE_CONVERSATION": "Resolver conversas automaticamente ao finalizar tarefa",
       "AUTO_RESOLVE_CONVERSATION_DESCRIPTION": "Quando uma tarefa é movida para uma etapa com status ganho ou perdido, resolve automaticamente todas as conversas abertas vinculadas à tarefa.",
       "AUTO_COMPLETE_TASK": "Ganhar tarefa automaticamente ao resolver conversa",
-      "AUTO_COMPLETE_TASK_DESCRIPTION": "Quando uma conversa é resolvida, move automaticamente a tarefa vinculada para a etapa com status ganho."
+      "AUTO_COMPLETE_TASK_DESCRIPTION": "Quando uma conversa é resolvida, move automaticamente a tarefa vinculada para a etapa com status ganho, a menos que a tarefa tenha status perdido."
     },
     "FILTERS": {
       "AGENT": "Agente",

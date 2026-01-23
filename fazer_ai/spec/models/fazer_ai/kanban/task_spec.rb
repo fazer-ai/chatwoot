@@ -237,6 +237,41 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         expect(task.contacts.count).to eq(1)
       end
     end
+
+    describe 'step_changed_at tracking' do
+      let!(:task) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: create(:user, account: account)) }
+      let(:new_step) { create(:kanban_board_step, board: board) }
+
+      it 'sets step_changed_at when board_step_id changes' do
+        expect(task.step_changed_at).to be_nil
+
+        freeze_time do
+          task.update!(board_step: new_step)
+          expect(task.step_changed_at).to eq(Time.current)
+        end
+      end
+
+      it 'does not change step_changed_at when other attributes change' do
+        task.update!(board_step: new_step)
+        original_step_changed_at = task.step_changed_at
+
+        travel_to 1.hour.from_now do
+          task.update!(title: 'Updated title')
+          expect(task.step_changed_at).to eq(original_step_changed_at)
+        end
+      end
+
+      it 'updates step_changed_at on subsequent step changes' do
+        task.update!(board_step: new_step)
+        first_change = task.step_changed_at
+
+        another_step = create(:kanban_board_step, board: board)
+        travel_to 1.hour.from_now do
+          task.update!(board_step: another_step)
+          expect(task.step_changed_at).to be > first_change
+        end
+      end
+    end
   end
 
   describe '#overdue?' do

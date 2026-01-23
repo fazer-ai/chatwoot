@@ -1,0 +1,22 @@
+tags:
+  - Kanban Tasks
+operationId: deleteKanbanTask
+summary: Delete a Kanban task
+description: Delete a Kanban task
+security:
+  - userApiKey: []
+responses:
+  '204':
+    description: Task deleted successfully
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Task not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

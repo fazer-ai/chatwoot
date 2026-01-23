@@ -54,3 +54,15 @@ public_contact_identifier:
 
 portal_id:
   $ref: ./portal_id.yml
+
+kanban_board_id:
+  $ref: ./kanban_board_id.yml
+
+kanban_step_id:
+  $ref: ./kanban_step_id.yml
+
+kanban_task_id:
+  $ref: ./kanban_task_id.yml
+
+kanban_audit_event_id:
+  $ref: ./kanban_audit_event_id.yml

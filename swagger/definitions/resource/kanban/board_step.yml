@@ -1,0 +1,39 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the step
+  board_id:
+    type: integer
+    description: The ID of the board this step belongs to
+  name:
+    type: string
+    description: The name of the step
+  description:
+    type: string
+    description: The description of the step
+  color:
+    type: string
+    description: The color of the step (hex code)
+    example: '#475569'
+  cancelled:
+    type: boolean
+    description: Whether this step represents cancelled/archived tasks
+  tasks_count:
+    type: integer
+    description: Number of tasks in this step
+  inferred_task_status:
+    type: string
+    description: The inferred status of tasks in this step
+    enum:
+      - open
+      - completed
+      - cancelled
+  created_at:
+    type: string
+    format: date-time
+    description: Step creation timestamp
+  updated_at:
+    type: string
+    format: date-time
+    description: Step last update timestamp

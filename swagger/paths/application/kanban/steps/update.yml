@@ -1,0 +1,38 @@
+tags:
+  - Kanban Board Steps
+operationId: updateKanbanBoardStep
+summary: Update a board step
+description: Update an existing board step
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/kanban_step_create_update_payload'
+responses:
+  '200':
+    description: Step updated successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_board_step'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Step not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable Entity
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/request_error'

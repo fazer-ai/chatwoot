@@ -81,6 +81,16 @@ tags:
     description: Workflow automation rules
   - name: Help Center
     description: Knowledge base management
+  - name: Kanban Boards
+    description: Kanban board management APIs
+  - name: Kanban Board Steps
+    description: Kanban board step management APIs
+  - name: Kanban Tasks
+    description: Kanban task management APIs
+  - name: Kanban Audit Events
+    description: Kanban task audit history APIs
+  - name: Kanban
+    description: Kanban user preferences
   - name: Contacts API
     description: Public contact APIs
   - name: Conversations API
@@ -119,6 +129,11 @@ x-tagGroups:
       - Webhooks
       - Automation Rule
       - Help Center
+      - Kanban Boards
+      - Kanban Board Steps
+      - Kanban Tasks
+      - Kanban Audit Events
+      - Kanban
   - name: Client
     tags:
       - Contacts API

@@ -1,0 +1,38 @@
+tags:
+  - Kanban Boards
+operationId: updateKanbanBoardAgents
+summary: Update board agents
+description: Update the list of agents assigned to a Kanban board
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          agent_ids:
+            type: array
+            description: List of agent IDs to assign to the board
+            items:
+              type: integer
+responses:
+  '200':
+    description: Agents updated successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_board'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

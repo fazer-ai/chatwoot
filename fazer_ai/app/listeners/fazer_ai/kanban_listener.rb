@@ -52,7 +52,7 @@ class FazerAi::KanbanListener < BaseListener
     task = conversation.kanban_task
     return unless task
     return unless task.board.auto_complete_task_on_conversation_resolve?
-    return if task.status == 'completed'
+    return if task.status.in?(%w[completed cancelled])
 
     completed_step = task.board.completed_step
     return unless completed_step

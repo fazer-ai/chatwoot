@@ -4,23 +4,47 @@
       "NAME": "Pipeline de Vendas",
       "DESCRIPTION": "Acompanhe seus leads de vendas desde o contato inicial até o fechamento do negócio.",
       "STEPS": {
-        "LEAD_IN": "Entrada de Lead",
-        "CONTACTED": "Contatado",
-        "DEMO_SCHEDULED": "Demo Agendada",
+        "NEW_LEAD": "Novo Lead",
+        "QUALIFYING": "Qualificando",
         "PROPOSAL_SENT": "Proposta Enviada",
-        "NEGOTIATION": "Negociação"
+        "NEGOTIATION": "Negociação",
+        "LOST": "Oportunidade Perdida",
+        "WON": "Oportunidade Ganha"
       },
       "TASKS": {
-        "NEW_LEAD": "Novo Lead: Acme Corp",
+        "NEW_LEAD": "Novo Lead: Vetta Cosméticos",
         "NEW_LEAD_DESC": "Contato inicial feito pelo site.",
-        "FOLLOW_UP": "Acompanhamento com John Doe",
-        "FOLLOW_UP_DESC": "Enviar brochura do produto.",
-        "DEMO": "Demo para TechStart",
-        "DEMO_DESC": "Preparar ambiente de demonstração personalizado.",
-        "CONTRACT_DRAFT": "Minuta de Contrato para MegaCorp",
-        "CONTRACT_DRAFT_DESC": "Revisar termos com a equipe jurídica.",
-        "PRICING_REVIEW": "Revisão de Preços: Global Systems",
-        "PRICING_REVIEW_DESC": "Discutir descontos por volume."
+        "QUALIFY_LEAD": "Qualificar: Onda Digital",
+        "QUALIFY_LEAD_DESC": "Avaliar orçamento e prazo de decisão.",
+        "SEND_PROPOSAL": "Enviar Proposta: Grupo Estrela",
+        "SEND_PROPOSAL_DESC": "Preparar documento de preços e termos.",
+        "NEGOTIATE": "Negociar: Nexus Soluções",
+        "NEGOTIATE_DESC": "Discutir descontos por volume e termos do contrato.",
+        "CLOSE_DEAL": "Fechar Negócio: Zetta Logística",
+        "CLOSE_DEAL_DESC": "Finalizar contrato e integração."
+      }
+    },
+    "SUPPORT": {
+      "NAME": "Suporte",
+      "DESCRIPTION": "Gerencie tickets de suporte desde a criação até a resolução.",
+      "STEPS": {
+        "NEW_TICKET": "Novo Ticket",
+        "IN_ANALYSIS": "Em Análise",
+        "WAITING_CUSTOMER": "Aguardando Cliente",
+        "IN_PROGRESS": "Em Progresso",
+        "RESOLVED": "Resolvido"
+      },
+      "TASKS": {
+        "BUG_REPORT": "Relato de Bug: Problema de Login",
+        "BUG_REPORT_DESC": "Usuário não consegue fazer login no celular.",
+        "FEATURE_REQUEST": "Solicitação de Recurso: Modo Escuro",
+        "FEATURE_REQUEST_DESC": "Cliente solicitou opção de tema escuro.",
+        "BILLING_ISSUE": "Problema de Cobrança: Dúvida sobre Fatura",
+        "BILLING_ISSUE_DESC": "Cliente com dúvidas sobre a última fatura.",
+        "INTEGRATION_HELP": "Ajuda com Integração: Configuração de API",
+        "INTEGRATION_HELP_DESC": "Cliente precisa de ajuda com integração de API.",
+        "FOLLOW_UP": "Acompanhamento: Resposta Pendente",
+        "FOLLOW_UP_DESC": "Aguardando cliente fornecer mais detalhes."
       }
     },
     "RECRUITMENT": {
@@ -31,95 +55,20 @@
         "SCREENING": "Triagem",
         "INTERVIEW": "Entrevista",
         "OFFER": "Oferta",
+        "REJECTED": "Não Aprovado",
         "HIRED": "Contratado"
       },
       "TASKS": {
-        "REVIEW_RESUME": "Revisar Currículo: Jane Smith",
+        "REVIEW_RESUME": "Revisar Currículo: Ana Silva",
         "REVIEW_RESUME_DESC": "Verificar experiência relevante em SaaS.",
-        "PHONE_SCREEN": "Triagem Telefônica: Mike Johnson",
+        "PHONE_SCREEN": "Triagem Telefônica: João Santos",
         "PHONE_SCREEN_DESC": "Avaliar habilidades de comunicação e fit cultural.",
-        "ONSITE": "Presencial: Sarah Williams",
-        "ONSITE_DESC": "Entrevista técnica com a equipe.",
-        "CHECK_REFS": "Checar Referências: David Brown",
-        "CHECK_REFS_DESC": "Contatar empregadores anteriores.",
-        "DRAFT_OFFER": "Minuta de Carta de Oferta: Emily Davis",
-        "DRAFT_OFFER_DESC": "Incluir detalhes sobre stock options.",
-        "SOURCING": "Buscar Candidatos para Dev Senior",
-        "SOURCING_DESC": "Procurar no LinkedIn e GitHub."
-      }
-    },
-    "ROADMAP": {
-      "NAME": "Roadmap de Produto",
-      "DESCRIPTION": "Planeje e acompanhe recursos e lançamentos de produtos.",
-      "STEPS": {
-        "BACKLOG": "Backlog",
-        "NEXT_UP": "Próximos",
-        "IN_PROGRESS": "Em Progresso",
-        "TESTING": "Testes",
-        "RELEASED": "Lançado"
-      },
-      "TASKS": {
-        "DARK_MODE": "Recurso: Modo Escuro",
-        "DARK_MODE_DESC": "Implementar tema escuro em todo o sistema.",
-        "API_V2": "Recurso: API V2",
-        "API_V2_DESC": "Projetar novos endpoints RESTful.",
-        "LOGIN_BUG": "Correção: Problema de Login",
-        "LOGIN_BUG_DESC": "Corrigir falha intermitente no Safari.",
-        "PERF_OPT": "Otimização de Performance",
-        "PERF_OPT_DESC": "Reduzir tempo de carregamento inicial em 20%.",
-        "USER_ROLES": "Recurso: Funções de Usuário Personalizadas",
-        "USER_ROLES_DESC": "Permitir que admins definam permissões granulares.",
-        "MOBILE_APP": "Beta do App Móvel",
-        "MOBILE_APP_DESC": "Lançar beta para iOS e Android."
-      }
-    },
-    "CONTENT": {
-      "NAME": "Calendário de Conteúdo",
-      "DESCRIPTION": "Organize sua criação de conteúdo e cronograma de publicação.",
-      "STEPS": {
-        "IDEAS": "Ideias",
-        "DRAFTING": "Redação",
-        "REVIEW": "Revisão",
-        "SCHEDULED": "Agendado",
-        "PUBLISHED": "Publicado"
-      },
-      "TASKS": {
-        "BLOG_TIPS": "Blog: Top 10 Dicas",
-        "BLOG_TIPS_DESC": "Focar em hacks de produtividade.",
-        "NEWSLETTER": "Newsletter: Edição de Junho",
-        "NEWSLETTER_DESC": "Destacar novos lançamentos de recursos.",
-        "SOCIAL_LAUNCH": "Redes Sociais: Lançamento de Produto",
-        "SOCIAL_LAUNCH_DESC": "Preparar assets para Twitter e LinkedIn.",
-        "CASE_STUDY": "Estudo de Caso: História de Sucesso",
-        "CASE_STUDY_DESC": "Entrevistar o cliente e redigir a história.",
-        "VIDEO_TUTORIAL": "Vídeo: Primeiros Passos",
-        "VIDEO_TUTORIAL_DESC": "Gravar captura de tela e narração.",
-        "WEBINAR": "Webinar: Roadmap Q3",
-        "WEBINAR_DESC": "Preparar slides e convidar palestrantes."
-      }
-    },
-    "PROJECT": {
-      "NAME": "Gestão de Projetos",
-      "DESCRIPTION": "Acompanhe tarefas e marcos para qualquer projeto.",
-      "STEPS": {
-        "TO_DO": "A Fazer",
-        "IN_PROGRESS": "Em Progresso",
-        "BLOCKED": "Bloqueado",
-        "DONE": "Feito"
-      },
-      "TASKS": {
-        "SETUP_ENV": "Configurar Ambiente",
-        "SETUP_ENV_DESC": "Configurar ambiente de desenvolvimento local.",
-        "DEV_CORE": "Desenvolver Módulo Principal",
-        "DEV_CORE_DESC": "Implementar lógica de negócios principal.",
-        "API_KEYS": "Aguardando Chaves de API",
-        "API_KEYS_DESC": "Solicitado à equipe de DevOps.",
-        "WRITE_DOCS": "Escrever Documentação",
-        "WRITE_DOCS_DESC": "Documentar endpoints da API e uso.",
-        "DEPLOY_STAGING": "Deploy para Staging",
-        "DEPLOY_STAGING_DESC": "Enviar última build para servidor de staging.",
-        "TEAM_MEETING": "Reunião Semanal da Equipe",
-        "TEAM_MEETING_DESC": "Discutir progresso e bloqueios."
+        "TECHNICAL_INTERVIEW": "Entrevista Técnica: Mariana Oliveira",
+        "TECHNICAL_INTERVIEW_DESC": "Desafio de código e design de sistemas.",
+        "FINAL_INTERVIEW": "Entrevista Final: Pedro Costa",
+        "FINAL_INTERVIEW_DESC": "Reunião com a liderança.",
+        "DRAFT_OFFER": "Preparar Oferta: Camila Souza",
+        "DRAFT_OFFER_DESC": "Preparar pacote de remuneração."
       }
     }
   }

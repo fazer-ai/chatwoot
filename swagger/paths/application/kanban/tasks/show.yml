@@ -1,0 +1,26 @@
+tags:
+  - Kanban Tasks
+operationId: getKanbanTask
+summary: Get a Kanban task
+description: Get details of a specific Kanban task
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_task'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Task not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

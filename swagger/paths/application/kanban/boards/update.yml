@@ -1,0 +1,38 @@
+tags:
+  - Kanban Boards
+operationId: updateKanbanBoard
+summary: Update a Kanban board
+description: Update an existing Kanban board
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/kanban_board_create_update_payload'
+responses:
+  '200':
+    description: Board updated successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_board'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable Entity
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/request_error'

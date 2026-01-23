@@ -661,6 +661,130 @@
   get:
     $ref: './application/reports/channel_summary.yml'
 
+# ------------  Kanban API routes  ------------#
+
+# Kanban Boards
+/api/v1/accounts/{account_id}/kanban/boards:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/kanban/boards/index.yml
+  post:
+    $ref: ./application/kanban/boards/create.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  get:
+    $ref: ./application/kanban/boards/show.yml
+  patch:
+    $ref: ./application/kanban/boards/update.yml
+  delete:
+    $ref: ./application/kanban/boards/delete.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/toggle_favorite:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  post:
+    $ref: ./application/kanban/boards/toggle_favorite.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/update_agents:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  post:
+    $ref: ./application/kanban/boards/update_agents.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/update_inboxes:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  post:
+    $ref: ./application/kanban/boards/update_inboxes.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/conversations:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  get:
+    $ref: ./application/kanban/boards/conversations.yml
+
+# Kanban Board Steps
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/steps:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+  get:
+    $ref: ./application/kanban/steps/index.yml
+  post:
+    $ref: ./application/kanban/steps/create.yml
+
+/api/v1/accounts/{account_id}/kanban/boards/{board_id}/steps/{step_id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_board_id'
+    - $ref: '#/components/parameters/kanban_step_id'
+  get:
+    $ref: ./application/kanban/steps/show.yml
+  patch:
+    $ref: ./application/kanban/steps/update.yml
+  delete:
+    $ref: ./application/kanban/steps/delete.yml
+
+# Kanban Tasks
+/api/v1/accounts/{account_id}/kanban/tasks:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/kanban/tasks/index.yml
+  post:
+    $ref: ./application/kanban/tasks/create.yml
+
+/api/v1/accounts/{account_id}/kanban/tasks/{task_id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_task_id'
+  get:
+    $ref: ./application/kanban/tasks/show.yml
+  patch:
+    $ref: ./application/kanban/tasks/update.yml
+  delete:
+    $ref: ./application/kanban/tasks/delete.yml
+
+/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/move:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_task_id'
+  post:
+    $ref: ./application/kanban/tasks/move.yml
+
+# Kanban Audit Events
+/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/audit_events:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_task_id'
+  get:
+    $ref: ./application/kanban/audit_events/index.yml
+
+/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/audit_events/{audit_event_id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/kanban_task_id'
+    - $ref: '#/components/parameters/kanban_audit_event_id'
+  get:
+    $ref: ./application/kanban/audit_events/show.yml
+
+# Kanban User Preferences
+/api/v1/accounts/{account_id}/kanban/account_user_preferences:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  patch:
+    $ref: ./application/kanban/preferences/update.yml
+
+# ------------ end of Kanban API routes -----------#
+
 # Conversations Messages
 /accounts/{account_id}/conversations/{conversation_id}/messages:
   parameters:

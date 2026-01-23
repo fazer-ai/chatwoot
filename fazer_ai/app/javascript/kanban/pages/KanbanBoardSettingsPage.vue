@@ -338,6 +338,18 @@ const getStepStatusTooltip = (step, index) => {
 };
 
 const toggleStepCancelled = async (step, value) => {
+  // Optimistically uncancel other steps when setting a new cancelled step
+  const previouslyCancelledStep = value
+    ? steps.value.find(s => s.cancelled && s.id !== step.id)
+    : null;
+
+  if (previouslyCancelledStep) {
+    store.commit('kanban/UPDATE_STEP', {
+      ...previouslyCancelledStep,
+      cancelled: false,
+    });
+  }
+
   try {
     await updateStep({
       boardId: boardId.value,
@@ -346,6 +358,13 @@ const toggleStepCancelled = async (step, value) => {
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
+    // Revert optimistic update on error
+    if (previouslyCancelledStep) {
+      store.commit('kanban/UPDATE_STEP', {
+        ...previouslyCancelledStep,
+        cancelled: true,
+      });
+    }
     useAlert(parseAPIErrorResponse(error) || t('KANBAN.SETTINGS.UPDATE_ERROR'));
   }
 };

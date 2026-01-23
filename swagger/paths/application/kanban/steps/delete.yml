@@ -1,0 +1,28 @@
+tags:
+  - Kanban Board Steps
+operationId: deleteKanbanBoardStep
+summary: Delete a board step
+description: Delete a board step. Tasks in the step will be moved to an adjacent step. Cannot delete the last remaining step.
+security:
+  - userApiKey: []
+responses:
+  '204':
+    description: Step deleted successfully
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Step not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Cannot delete the last step
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/request_error'

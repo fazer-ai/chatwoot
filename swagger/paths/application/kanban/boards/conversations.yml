@@ -1,0 +1,90 @@
+tags:
+  - Kanban Boards
+operationId: listKanbanBoardConversations
+summary: List board conversations
+description: List conversations associated with a board's inboxes
+security:
+  - userApiKey: []
+parameters:
+  - name: q
+    in: query
+    description: Search query (searches display_id, contact name, email, phone, identifier)
+    schema:
+      type: string
+  - name: page
+    in: query
+    description: Page number
+    schema:
+      type: integer
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: array
+              description: Array of conversations
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  display_id:
+                    type: integer
+                  status:
+                    type: string
+                    enum:
+                      - open
+                      - resolved
+                      - pending
+                      - snoozed
+                  kanban_task_id:
+                    type: integer
+                    nullable: true
+                  inbox:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      channel_type:
+                        type: string
+                  contact:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      avatar_url:
+                        type: string
+                  created_at:
+                    type: integer
+                    description: Unix timestamp
+            meta:
+              type: object
+              properties:
+                count:
+                  type: integer
+                current_page:
+                  type: integer
+                total_pages:
+                  type: integer
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

@@ -1,0 +1,99 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the task
+  account_id:
+    type: integer
+    description: The ID of the account
+  board_id:
+    type: integer
+    description: The ID of the board
+  board_step_id:
+    type: integer
+    description: The ID of the current step
+  created_by_id:
+    type: integer
+    description: The ID of the user who created the task
+  title:
+    type: string
+    description: The title of the task
+  description:
+    type: string
+    description: The description of the task
+  priority:
+    type: string
+    description: The priority of the task
+    enum:
+      - urgent
+      - high
+      - medium
+      - low
+  status:
+    type: string
+    description: The computed status based on the step
+    enum:
+      - open
+      - completed
+      - cancelled
+  date_status:
+    type: string
+    description: The date status of the task
+    enum:
+      - overdue
+      - due_soon
+      - on_track
+  start_date:
+    type: string
+    format: date-time
+    description: The start date of the task
+  due_date:
+    type: string
+    format: date-time
+    description: The due date of the task
+  step_changed_at:
+    type: string
+    format: date-time
+    description: When the task was last moved to a different step
+  contact_ids:
+    type: array
+    description: List of associated contact IDs
+    items:
+      type: integer
+  conversation_ids:
+    type: array
+    description: List of associated conversation IDs
+    items:
+      type: integer
+  labels:
+    type: array
+    description: List of labels
+    items:
+      type: string
+  contacts:
+    type: array
+    description: List of associated contacts
+    items:
+      $ref: '#/components/schemas/kanban_contact_summary'
+  conversations:
+    type: array
+    description: List of associated conversations
+    items:
+      $ref: '#/components/schemas/kanban_conversation_summary'
+  assigned_agents:
+    type: array
+    description: List of assigned agents
+    items:
+      $ref: '#/components/schemas/kanban_agent_summary'
+  creator:
+    $ref: '#/components/schemas/kanban_user_summary'
+  board:
+    $ref: '#/components/schemas/kanban_board_summary'
+  created_at:
+    type: string
+    format: date-time
+    description: Task creation timestamp
+  updated_at:
+    type: string
+    format: date-time
+    description: Task last update timestamp

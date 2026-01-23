@@ -1,0 +1,54 @@
+type: object
+required:
+  - title
+  - board_id
+properties:
+  title:
+    type: string
+    description: The title of the task
+  description:
+    type: string
+    description: The description of the task
+    maxLength: 5000
+  priority:
+    type: string
+    description: The priority of the task
+    enum:
+      - urgent
+      - high
+      - medium
+      - low
+  board_id:
+    type: integer
+    description: The ID of the board to create the task in
+  board_step_id:
+    type: integer
+    description: The ID of the step to create the task in (defaults to first step)
+  start_date:
+    type: string
+    format: date-time
+    description: The start date of the task
+  due_date:
+    type: string
+    format: date-time
+    description: The due date of the task
+  contact_ids:
+    type: array
+    description: List of contact IDs to associate with the task
+    items:
+      type: integer
+  conversation_ids:
+    type: array
+    description: List of conversation IDs to associate with the task
+    items:
+      type: integer
+  assigned_agent_ids:
+    type: array
+    description: List of agent IDs to assign to the task
+    items:
+      type: integer
+  labels:
+    type: array
+    description: List of labels for the task
+    items:
+      type: string

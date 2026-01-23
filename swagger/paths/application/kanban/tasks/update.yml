@@ -1,0 +1,43 @@
+tags:
+  - Kanban Tasks
+operationId: updateKanbanTask
+summary: Update a Kanban task
+description: Update an existing Kanban task
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - task
+        properties:
+          task:
+            $ref: '#/components/schemas/kanban_task_update_payload'
+responses:
+  '200':
+    description: Task updated successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_task'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Task not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable Entity
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/request_error'

@@ -23,6 +23,8 @@ pt_BR:
       auto_create:
         title: "Conversa #%{display_id} - %{contact_name}"
         unknown_contact: "Contato desconhecido"
+      automation:
+        copied_from_board: "Copiado do funil: %{board_name}"
       errors:
         invalid_conversations: 'devem pertencer a uma das caixas de entrada do funil'
         invalid_conversation_inbox: 'devem pertencer a uma das caixas de entrada do funil'

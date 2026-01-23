@@ -77,6 +77,30 @@ integrations_hook:
 audit_log:
   $ref: ./resource/audit_log.yml
 
+## Kanban resources
+kanban_board:
+  $ref: ./resource/kanban/board.yml
+kanban_board_step:
+  $ref: ./resource/kanban/board_step.yml
+kanban_task:
+  $ref: ./resource/kanban/task.yml
+kanban_audit_event:
+  $ref: ./resource/kanban/audit_event.yml
+kanban_agent_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_agent_summary
+kanban_user_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_user_summary
+kanban_contact_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_contact_summary
+kanban_inbox_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_inbox_summary
+kanban_conversation_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_conversation_summary
+kanban_step_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_step_summary
+kanban_board_summary:
+  $ref: ./resource/kanban/shared.yml#/kanban_board_summary
+
 ## public resources
 public_contact:
   $ref: ./resource/public/contact.yml
@@ -141,6 +165,16 @@ inbox_update_payload:
 # Team
 team_create_update_payload:
   $ref: ./request/team/create_update_payload.yml
+
+# Kanban
+kanban_board_create_update_payload:
+  $ref: ./request/kanban/board_create_update_payload.yml
+kanban_step_create_update_payload:
+  $ref: ./request/kanban/step_create_update_payload.yml
+kanban_task_create_payload:
+  $ref: ./request/kanban/task_create_payload.yml
+kanban_task_update_payload:
+  $ref: ./request/kanban/task_update_payload.yml
 
 # Custom Filter
 custom_filter_create_update_payload:

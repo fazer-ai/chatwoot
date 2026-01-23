@@ -124,18 +124,52 @@ const boardOptions = computed(() => {
   });
 });
 const timeAgo = computed(() => {
-  if (!existingTask.value?.created_at) return '';
-  const date = existingTask.value.created_at;
+  if (!existingTask.value) return '';
+  const date =
+    existingTask.value.step_changed_at || existingTask.value.created_at;
+  if (!date) return '';
   const unixTime = new Date(date).getTime() / 1000;
   return shortTimestampFromDate({ time: unixTime, withAgo: false, t });
 });
 
-const createdDate = computed(() => {
-  if (!existingTask.value?.created_at) return '';
-  const date = existingTask.value.created_at;
-  return t('KANBAN.CREATED_AT_TOOLTIP', {
-    date: new Date(date).toLocaleString(),
-  });
+const stepChangedDate = computed(() => {
+  if (!existingTask.value) return '';
+  const date =
+    existingTask.value.step_changed_at || existingTask.value.created_at;
+  if (!date) return '';
+  const formattedDate = new Date(date).toLocaleString();
+
+  if (existingTask.value.status === 'completed') {
+    return t('KANBAN.WON_AT_TOOLTIP', { date: formattedDate });
+  }
+  if (existingTask.value.status === 'cancelled') {
+    return t('KANBAN.LOST_AT_TOOLTIP', { date: formattedDate });
+  }
+  if (existingTask.value.step_changed_at) {
+    return t('KANBAN.STEP_CHANGED_AT_TOOLTIP', { date: formattedDate });
+  }
+  return t('KANBAN.CREATED_AT_TOOLTIP', { date: formattedDate });
+});
+
+const statusIcon = computed(() => {
+  if (!existingTask.value) return null;
+  if (existingTask.value.status === 'completed') return 'i-lucide-check-circle-2';
+  if (existingTask.value.status === 'cancelled') return 'i-lucide-x-circle';
+  return null;
+});
+
+const statusColor = computed(() => {
+  if (!existingTask.value) return '';
+  if (existingTask.value.status === 'completed') return 'text-n-teal-11';
+  if (existingTask.value.status === 'cancelled') return 'text-n-ruby-11';
+  return '';
+});
+
+const statusTooltip = computed(() => {
+  if (!existingTask.value) return '';
+  if (existingTask.value.status === 'completed') return t('KANBAN.STATUS.COMPLETED');
+  if (existingTask.value.status === 'cancelled') return t('KANBAN.STATUS.CANCELLED');
+  return '';
 });
 
 const currentStep = computed(() => {
@@ -489,6 +523,12 @@ const handleDueDateChange = date => {
             <span class="font-medium truncate">{{ boardName }}</span>
           </div>
           <div class="flex items-center gap-2 min-w-0">
+            <span
+              v-if="statusIcon"
+              v-tooltip="statusTooltip"
+              :class="[statusIcon, statusColor]"
+              class="size-4 flex-shrink-0"
+            />
             <router-link
               :to="taskUrl"
               class="text-sm font-medium text-woot-500 hover:underline text-left truncate flex-1 min-w-0"
@@ -638,7 +678,7 @@ const handleDueDateChange = date => {
             </span>
             <div
               v-if="timeAgo"
-              v-tooltip="createdDate"
+              v-tooltip="stepChangedDate"
               class="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
             >
               <span class="i-lucide-clock size-3" />

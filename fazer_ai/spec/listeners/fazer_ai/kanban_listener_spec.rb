@@ -517,6 +517,21 @@ RSpec.describe FazerAi::KanbanListener do
         expect { listener.conversation_resolved(event) }.not_to(change { task.reload.board_step })
       end
 
+      context 'when task is in cancelled step' do
+        let!(:cancelled_step) { create(:kanban_board_step, board: board) }
+
+        before do
+          board.update!(steps_order: [first_step.id, cancelled_step.id, completed_step.id])
+          cancelled_step.update!(cancelled: true)
+          task.update!(board_step: cancelled_step)
+        end
+
+        it 'does not move the task to completed step' do
+          expect { listener.conversation_resolved(event) }.not_to(change { task.reload.board_step })
+          expect(task.reload.board_step).to eq(cancelled_step)
+        end
+      end
+
       context 'when conversation has no linked task' do
         let(:conversation_without_task) { create(:conversation, account: account, inbox: inbox, contact: contact, status: 'resolved') }
         let(:event_without_task) { Events::Base.new('conversation.resolved', Time.zone.now, { conversation: conversation_without_task }) }

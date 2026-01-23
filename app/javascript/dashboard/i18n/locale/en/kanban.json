@@ -209,6 +209,9 @@
       "TIME_PLACEHOLDER": "Time"
     },
     "CREATED_AT_TOOLTIP": "Created at {date}",
+    "STEP_CHANGED_AT_TOOLTIP": "Moved at {date}",
+    "WON_AT_TOOLTIP": "Won at {date}",
+    "LOST_AT_TOOLTIP": "Lost at {date}",
     "SHOW_MORE": "Show more",
     "SHOW_LESS": "Show less",
     "EMPTY_STATE": {
@@ -263,7 +266,7 @@
       "AUTO_RESOLVE_CONVERSATION": "Auto-resolve conversations on task end",
       "AUTO_RESOLVE_CONVERSATION_DESCRIPTION": "When a task is moved to a won or lost step, automatically resolve all linked conversations.",
       "AUTO_COMPLETE_TASK": "Auto-win task on conversation resolve",
-      "AUTO_COMPLETE_TASK_DESCRIPTION": "When a conversation is resolved, automatically move its linked task to the won step."
+      "AUTO_COMPLETE_TASK_DESCRIPTION": "When a conversation is resolved, automatically move its linked task to the won step, unless the task has lost status."
     },
     "FILTERS": {
       "AGENT": "Agent",

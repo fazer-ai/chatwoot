@@ -148,16 +148,25 @@ const dateStatusIcon = computed(() => {
 });
 
 const timeAgo = computed(() => {
-  const date = props.task.created_at;
+  const date = props.task.step_changed_at || props.task.created_at;
   const unixTime = new Date(date).getTime() / 1000;
   return shortTimestampFromDate({ time: unixTime, withAgo: false, t });
 });
 
-const createdDate = computed(() => {
-  const date = props.task.created_at;
-  return t('KANBAN.CREATED_AT_TOOLTIP', {
-    date: new Date(date).toLocaleString(),
-  });
+const stepChangedDate = computed(() => {
+  const date = props.task.step_changed_at || props.task.created_at;
+  const formattedDate = new Date(date).toLocaleString();
+
+  if (props.task.status === 'completed') {
+    return t('KANBAN.WON_AT_TOOLTIP', { date: formattedDate });
+  }
+  if (props.task.status === 'cancelled') {
+    return t('KANBAN.LOST_AT_TOOLTIP', { date: formattedDate });
+  }
+  if (props.task.step_changed_at) {
+    return t('KANBAN.STEP_CHANGED_AT_TOOLTIP', { date: formattedDate });
+  }
+  return t('KANBAN.CREATED_AT_TOOLTIP', { date: formattedDate });
 });
 
 const assignedAgents = computed(
@@ -485,7 +494,7 @@ const handleDescriptionClick = event => {
       >
         <div
           v-if="contactsAndConversations.length"
-          class="flex items-center gap-1 overflow-hidden min-w-0 p-0.5"
+          class="flex items-center gap-1 overflow-visible min-w-0 p-0.5"
         >
           <template
             v-for="(item, index) in contactsAndConversations"
@@ -515,7 +524,7 @@ const handleDescriptionClick = event => {
               v-else-if="item.type === 'conversation'"
               v-tooltip="`${item.data.contact.name} - ${item.data.inbox.name}`"
               role="link"
-              class="relative flex h-6 w-6 items-center justify-center cursor-pointer"
+              class="relative flex h-6 w-6 items-center justify-center cursor-pointer overflow-visible"
               :class="{
                 'ltr:-ml-2 rtl:-mr-2': index > 0,
               }"
@@ -538,9 +547,9 @@ const handleDescriptionClick = event => {
                 </span>
               </div>
               <div
-                class="absolute bottom-0 right-0 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
+                class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-slate-800 outline outline-1 outline-n-background"
               >
-                <ChannelIcon class="size-1.5" :inbox="item.data.inbox" />
+                <ChannelIcon class="size-3.5" :inbox="item.data.inbox" />
               </div>
               <div
                 v-if="item.data.status === 'resolved'"
@@ -662,7 +671,7 @@ const handleDescriptionClick = event => {
           </div>
           <div
             v-if="timeAgo"
-            v-tooltip="createdDate"
+            v-tooltip="stepChangedDate"
             class="flex items-center gap-1 text-xs text-n-slate-10"
           >
             <span class="i-lucide-clock h-3 w-3" />

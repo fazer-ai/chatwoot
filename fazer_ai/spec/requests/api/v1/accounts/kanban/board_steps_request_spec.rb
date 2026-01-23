@@ -176,6 +176,18 @@ RSpec.describe 'Api::V1::Accounts::Kanban::BoardSteps' do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(last_step.reload.cancelled).to be false
       end
+
+      it 'uncancels previously cancelled step when setting another step as cancelled' do
+        middle_step.update!(cancelled: true)
+        another_middle_step = create(:kanban_board_step, board: board)
+        board.update!(steps_order: [first_step.id, middle_step.id, another_middle_step.id, last_step.id])
+
+        patch "#{base_path}/#{another_middle_step.id}", params: { step: { cancelled: true } }, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        expect(another_middle_step.reload.cancelled).to be true
+        expect(middle_step.reload.cancelled).to be false
+      end
     end
   end
 

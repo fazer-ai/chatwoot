@@ -209,13 +209,19 @@ const findSelectedBoard = (kanbanBoards, conditions, actions) => {
 
 /**
  * Gets step options from a board for dropdowns.
+ * For move_to_step action, prioritizes the assign_to_board target board
+ * to enable moving tasks to steps on a different board.
  * @param {Array} kanbanBoards - List of kanban boards
  * @param {Array} conditions - Automation conditions to find selected board
  * @param {Array} actions - Automation actions to find selected board
  * @returns {Array} Formatted step options for dropdown
  */
 const getKanbanStepOptions = (kanbanBoards, conditions, actions) => {
-  const board = findSelectedBoard(kanbanBoards, conditions, actions);
+  // Prioritize assign_to_board action's target board for move_to_step
+  const boardFromActions = findSelectedBoardFromActions(kanbanBoards, actions);
+  const board =
+    boardFromActions ||
+    findSelectedBoardFromConditions(kanbanBoards, conditions);
   if (!board) return [];
 
   const steps = getBoardSteps(board);

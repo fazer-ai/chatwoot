@@ -1,0 +1,19 @@
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+    description: The name of the step
+    maxLength: 60
+  description:
+    type: string
+    description: The description of the step
+    maxLength: 120
+  color:
+    type: string
+    description: The color of the step (hex code)
+    example: '#475569'
+  cancelled:
+    type: boolean
+    description: Whether this step represents cancelled/archived tasks

@@ -48,6 +48,25 @@ module FazerAi::ActionService
     task.update!(board_step: step)
   end
 
+  def add_label_to_task(labels)
+    return if labels.blank?
+
+    task = @conversation.kanban_task
+    return if task.blank?
+
+    task.add_labels(labels)
+  end
+
+  def remove_label_from_task(labels)
+    return if labels.blank?
+
+    task = @conversation.kanban_task
+    return if task.blank?
+
+    remaining_labels = task.label_list - labels
+    task.update!(label_list: remaining_labels)
+  end
+
   private
 
   def ensure_task_exists_from_actions

@@ -1,0 +1,39 @@
+tags:
+  - Kanban Tasks
+operationId: moveKanbanTask
+summary: Move a Kanban task
+description: Move a task to a different step or reorder within the same step
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          board_step_id:
+            type: integer
+            description: The target step ID to move the task to
+          insert_before_task_id:
+            type: integer
+            description: Insert the task before this task ID in the ordering
+responses:
+  '200':
+    description: Task moved successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_task'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Task not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

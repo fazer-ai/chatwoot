@@ -1,0 +1,42 @@
+tags:
+  - Kanban Tasks
+operationId: createKanbanTask
+summary: Create a Kanban task
+description: Create a new task in a Kanban board
+security:
+  - userApiKey: []
+parameters:
+  - $ref: '#/components/parameters/account_id'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - task
+        properties:
+          task:
+            $ref: '#/components/schemas/kanban_task_create_payload'
+          insert_before_task_id:
+            type: integer
+            description: Insert the new task before this task ID in the ordering
+responses:
+  '201':
+    description: Task created successfully
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_task'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable Entity
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/request_error'

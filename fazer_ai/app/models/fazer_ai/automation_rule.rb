@@ -6,6 +6,6 @@ module FazerAi::AutomationRule
   end
 
   def actions_attributes
-    super + %w[move_to_step mark_completed mark_cancelled assign_to_board]
+    super + %w[move_to_step mark_completed mark_cancelled assign_to_board add_label_to_task remove_label_from_task]
   end
 end

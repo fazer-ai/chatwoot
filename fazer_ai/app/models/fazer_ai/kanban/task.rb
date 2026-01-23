@@ -10,6 +10,7 @@
 #  due_date          :datetime
 #  priority          :string
 #  start_date        :datetime
+#  step_changed_at   :datetime
 #  title             :string           not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
@@ -45,6 +46,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   self.table_name = 'kanban_tasks'
 
   PRIORITIES = %w[urgent high medium low].freeze
+  DESCRIPTION_MAX_LENGTH = 5000
 
   belongs_to :account
   belongs_to :board
@@ -98,7 +100,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
 
   validates :account, :board, :board_step, presence: true
   validates :title, presence: true, length: { maximum: 255 }
-  validates :description, length: { maximum: 5000 }
+  validates :description, length: { maximum: DESCRIPTION_MAX_LENGTH }
   validates :priority, inclusion: { in: PRIORITIES }, allow_nil: true
   validate :scheduled_dates_are_coherent
   validate :assigned_agents_belong_to_board
@@ -112,6 +114,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
 
   after_create :assign_conversations_on_create
   after_create :sync_contacts_from_conversations
+  before_update :track_step_change
   after_update :assign_conversations_on_update
   after_update :sync_contacts_from_conversations
   after_update :accumulate_changes_for_dispatch
@@ -187,6 +190,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       date_status: date_status,
       start_date: start_date,
       due_date: due_date,
+      step_changed_at: step_changed_at,
       created_at: created_at,
       updated_at: updated_at,
       contact_ids: contact_ids,
@@ -249,6 +253,12 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   private
+
+  def track_step_change
+    return unless board_step_id_changed?
+
+    self.step_changed_at = Time.current
+  end
 
   def set_defaults_from_associations # rubocop:disable Metrics/CyclomaticComplexity
     self.board ||= board_step.board if board_step

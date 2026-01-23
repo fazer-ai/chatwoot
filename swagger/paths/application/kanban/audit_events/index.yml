@@ -1,0 +1,32 @@
+tags:
+  - Kanban Audit Events
+operationId: listKanbanAuditEvents
+summary: List audit events for a task
+description: List all audit events (history) for a specific Kanban task
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            audit_events:
+              type: array
+              description: Array of audit events
+              items:
+                $ref: '#/components/schemas/kanban_audit_event'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Task not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

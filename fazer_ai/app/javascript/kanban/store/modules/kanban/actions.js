@@ -121,8 +121,8 @@ export default {
   },
 
   async moveTask(
-    { commit, state },
-    { taskId, destinationStepId, insertBeforeTaskId }
+    { commit, state, dispatch },
+    { taskId, destinationStepId, insertBeforeTaskId, refreshStepId = null }
   ) {
     // Find task in stepTasks
     let task = null;
@@ -187,6 +187,15 @@ export default {
         board_step_id: destinationStepId,
         insert_before_task_id: insertBeforeTaskId,
       });
+
+      // Refresh step tasks after successful move (e.g., when sorting by last activity)
+      if (refreshStepId) {
+        dispatch('fetchTasksForStep', {
+          stepId: refreshStepId,
+          page: 1,
+          perPage: 10,
+        });
+      }
     } catch {
       // Revert based on original task state
       // We don't have the original insertBeforeTaskId easily available to restore exact position

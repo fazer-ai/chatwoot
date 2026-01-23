@@ -1,0 +1,154 @@
+# Shared schema definitions for Kanban API
+
+kanban_agent_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the agent
+    name:
+      type: string
+      description: The name of the agent
+    email:
+      type: string
+      description: The email of the agent
+    avatar_url:
+      type: string
+      description: The avatar URL of the agent
+    availability_status:
+      type: string
+      description: The availability status of the agent
+      enum:
+        - online
+        - offline
+        - busy
+
+kanban_user_summary:
+  type: object
+  nullable: true
+  properties:
+    id:
+      type: integer
+      description: The ID of the user
+    name:
+      type: string
+      description: The name of the user
+
+kanban_contact_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the contact
+    name:
+      type: string
+      description: The name of the contact
+    email:
+      type: string
+      description: The email of the contact
+    avatar_url:
+      type: string
+      description: The avatar URL of the contact
+
+kanban_inbox_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the inbox
+    name:
+      type: string
+      description: The name of the inbox
+    channel_type:
+      type: string
+      description: The type of channel
+      enum:
+        - Channel::Api
+        - Channel::Email
+        - Channel::FacebookPage
+        - Channel::Line
+        - Channel::Sms
+        - Channel::Telegram
+        - Channel::TwilioSms
+        - Channel::TwitterProfile
+        - Channel::WebWidget
+        - Channel::Whatsapp
+    provider:
+      type: string
+      description: The provider of the channel
+    medium:
+      type: string
+      description: The medium (for Twilio channels)
+
+kanban_conversation_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the conversation
+    display_id:
+      type: integer
+      description: The display ID of the conversation
+    status:
+      type: string
+      description: The status of the conversation
+      enum:
+        - open
+        - resolved
+        - pending
+        - snoozed
+    inbox:
+      $ref: '#/components/schemas/kanban_inbox_summary'
+    contact:
+      $ref: '#/components/schemas/kanban_contact_summary'
+
+kanban_step_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the step
+    name:
+      type: string
+      description: The name of the step
+    color:
+      type: string
+      description: The color of the step
+    tasks_count:
+      type: integer
+      description: Number of tasks in this step
+    cancelled:
+      type: boolean
+      description: Whether this is a cancelled step
+    inferred_task_status:
+      type: string
+      description: The inferred status of tasks in this step
+      enum:
+        - open
+        - completed
+        - cancelled
+
+kanban_board_summary:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: The ID of the board
+    name:
+      type: string
+      description: The name of the board
+    steps:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: integer
+          name:
+            type: string
+          color:
+            type: string
+    assigned_agents:
+      type: array
+      items:
+        $ref: '#/components/schemas/kanban_agent_summary'

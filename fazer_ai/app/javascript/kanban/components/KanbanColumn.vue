@@ -116,10 +116,8 @@ const localTasks = computed({
 
 const onChange = event => {
   if (event.moved) {
-    const { element, newIndex, oldIndex } = event.moved;
-    const newOrder = [...props.tasks];
-    newOrder.splice(oldIndex, 1);
-    newOrder.splice(newIndex, 0, element);
+    const { element, newIndex } = event.moved;
+    const newOrder = [...internalTasks.value];
 
     const beforeTask =
       newIndex < newOrder.length - 1 ? newOrder[newIndex + 1] : null;

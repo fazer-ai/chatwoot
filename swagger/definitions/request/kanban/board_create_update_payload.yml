@@ -1,0 +1,30 @@
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+    description: The name of the board
+    maxLength: 60
+  description:
+    type: string
+    description: The description of the board
+    maxLength: 2000
+  settings:
+    type: object
+    description: Board settings
+    properties:
+      auto_assign_agent_to_conversation:
+        type: boolean
+        description: Automatically assign an agent to conversations
+      auto_assign_task_to_agent:
+        type: boolean
+        description: Automatically assign tasks to agents
+      auto_create_task_for_conversation:
+        type: boolean
+        description: Automatically create tasks for new conversations
+  inbox_ids:
+    type: array
+    description: List of inbox IDs to associate with the board
+    items:
+      type: integer

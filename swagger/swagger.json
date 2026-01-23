@@ -1208,10 +1208,13 @@
             "name": "typing_status",
             "in": "query",
             "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Typing status, either 'on' or 'off'"
+            "type": "string",
+            "enum": [
+              "on",
+              "recording",
+              "off"
+            ],
+            "description": "Typing status."
           }
         ],
         "requestBody": {
@@ -1225,6 +1228,7 @@
                     "type": "string",
                     "enum": [
                       "on",
+                      "recording",
                       "off"
                     ],
                     "description": "The typing status to set",
@@ -7946,6 +7950,1686 @@
         }
       }
     },
+    "/api/v1/accounts/{account_id}/kanban/boards": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "listKanbanBoards",
+        "summary": "List all Kanban boards",
+        "description": "List all Kanban boards available in the current account",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort field",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "updated_at",
+                "created_at"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "boards": {
+                      "type": "array",
+                      "description": "Array of boards",
+                      "items": {
+                        "$ref": "#/components/schemas/kanban_board"
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "description": "User preferences for Kanban"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "createKanbanBoard",
+        "summary": "Create a Kanban board",
+        "description": "Create a new Kanban board in the account",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/account_id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/kanban_board_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Board created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "getKanbanBoard",
+        "summary": "Get a Kanban board",
+        "description": "Get details of a specific Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "updateKanbanBoard",
+        "summary": "Update a Kanban board",
+        "description": "Update an existing Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/kanban_board_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Board updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "deleteKanbanBoard",
+        "summary": "Delete a Kanban board",
+        "description": "Delete a Kanban board and all its associated tasks",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Board deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/toggle_favorite": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "toggleKanbanBoardFavorite",
+        "summary": "Toggle board favorite status",
+        "description": "Toggle the favorite status of a Kanban board for the current user",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite_board_ids": {
+                      "type": "array",
+                      "description": "List of favorite board IDs for the user",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/update_agents": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "updateKanbanBoardAgents",
+        "summary": "Update board agents",
+        "description": "Update the list of agents assigned to a Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_ids": {
+                    "type": "array",
+                    "description": "List of agent IDs to assign to the board",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agents updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/update_inboxes": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "updateKanbanBoardInboxes",
+        "summary": "Update board inboxes",
+        "description": "Update the list of inboxes associated with a Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inbox_ids": {
+                    "type": "array",
+                    "description": "List of inbox IDs to associate with the board",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inboxes updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/conversations": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Boards"
+        ],
+        "operationId": "listKanbanBoardConversations",
+        "summary": "List board conversations",
+        "description": "List conversations associated with a board's inboxes",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search query (searches display_id, contact name, email, phone, identifier)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "array",
+                      "description": "Array of conversations",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "display_id": {
+                            "type": "integer"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "open",
+                              "resolved",
+                              "pending",
+                              "snoozed"
+                            ]
+                          },
+                          "kanban_task_id": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "inbox": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "channel_type": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "contact": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              },
+                              "avatar_url": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "created_at": {
+                            "type": "integer",
+                            "description": "Unix timestamp"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "total_pages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/steps": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Board Steps"
+        ],
+        "operationId": "listKanbanBoardSteps",
+        "summary": "List all steps in a board",
+        "description": "List all steps in a Kanban board, ordered by their position",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "Filter task counts by agent ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "query",
+            "description": "Filter task counts by inbox ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "steps": {
+                      "type": "array",
+                      "description": "Array of board steps",
+                      "items": {
+                        "$ref": "#/components/schemas/kanban_board_step"
+                      }
+                    },
+                    "filtered_counts": {
+                      "type": "object",
+                      "description": "Filtered task counts per step (when filter params are provided)",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Kanban Board Steps"
+        ],
+        "operationId": "createKanbanBoardStep",
+        "summary": "Create a board step",
+        "description": "Create a new step in a Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/kanban_step_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Step created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board_step"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Board not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/boards/{board_id}/steps/{step_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_board_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_step_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Board Steps"
+        ],
+        "operationId": "getKanbanBoardStep",
+        "summary": "Get a board step",
+        "description": "Get details of a specific board step",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board_step"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Step not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Kanban Board Steps"
+        ],
+        "operationId": "updateKanbanBoardStep",
+        "summary": "Update a board step",
+        "description": "Update an existing board step",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/kanban_step_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Step updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_board_step"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Step not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Kanban Board Steps"
+        ],
+        "operationId": "deleteKanbanBoardStep",
+        "summary": "Delete a board step",
+        "description": "Delete a board step. Tasks in the step will be moved to an adjacent step. Cannot delete the last remaining step.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Step deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Step not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Cannot delete the last step",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/tasks": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "listKanbanTasks",
+        "summary": "List Kanban tasks",
+        "description": "List Kanban tasks with optional filtering and pagination.\nWhen `board_step_id` and `page` are provided, returns paginated results.\nOtherwise, returns all matching tasks.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "query",
+            "description": "Filter by board ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "board_step_id",
+            "in": "query",
+            "description": "Filter by step ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "description": "Filter by priority",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "urgent",
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "Filter by assigned agent ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "assigned_agent_ids",
+            "in": "query",
+            "description": "Filter by multiple assigned agent IDs",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "query",
+            "description": "Filter by inbox ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination (requires board_step_id)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Number of items per page (max 100, default 25)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort field",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "updated_at",
+                "created_at",
+                "priority",
+                "due_date"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tasks": {
+                      "type": "array",
+                      "description": "Array of tasks",
+                      "items": {
+                        "$ref": "#/components/schemas/kanban_task"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "description": "Pagination metadata (when paginated)",
+                      "properties": {
+                        "total_count": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "createKanbanTask",
+        "summary": "Create a Kanban task",
+        "description": "Create a new task in a Kanban board",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/account_id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "task"
+                ],
+                "properties": {
+                  "task": {
+                    "$ref": "#/components/schemas/kanban_task_create_payload"
+                  },
+                  "insert_before_task_id": {
+                    "type": "integer",
+                    "description": "Insert the new task before this task ID in the ordering"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/tasks/{task_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_task_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "getKanbanTask",
+        "summary": "Get a Kanban task",
+        "description": "Get details of a specific Kanban task",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "updateKanbanTask",
+        "summary": "Update a Kanban task",
+        "description": "Update an existing Kanban task",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "task"
+                ],
+                "properties": {
+                  "task": {
+                    "$ref": "#/components/schemas/kanban_task_update_payload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "deleteKanbanTask",
+        "summary": "Delete a Kanban task",
+        "description": "Delete a Kanban task",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Task deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/move": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_task_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Kanban Tasks"
+        ],
+        "operationId": "moveKanbanTask",
+        "summary": "Move a Kanban task",
+        "description": "Move a task to a different step or reorder within the same step",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "board_step_id": {
+                    "type": "integer",
+                    "description": "The target step ID to move the task to"
+                  },
+                  "insert_before_task_id": {
+                    "type": "integer",
+                    "description": "Insert the task before this task ID in the ordering"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task moved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/audit_events": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_task_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Audit Events"
+        ],
+        "operationId": "listKanbanAuditEvents",
+        "summary": "List audit events for a task",
+        "description": "List all audit events (history) for a specific Kanban task",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "audit_events": {
+                      "type": "array",
+                      "description": "Array of audit events",
+                      "items": {
+                        "$ref": "#/components/schemas/kanban_audit_event"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/tasks/{task_id}/audit_events/{audit_event_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_task_id"
+        },
+        {
+          "$ref": "#/components/parameters/kanban_audit_event_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Kanban Audit Events"
+        ],
+        "operationId": "getKanbanAuditEvent",
+        "summary": "Get an audit event",
+        "description": "Get details of a specific audit event",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kanban_audit_event"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Audit event not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/kanban/account_user_preferences": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Kanban"
+        ],
+        "operationId": "updateKanbanPreferences",
+        "summary": "Update Kanban user preferences",
+        "description": "Update the current user's Kanban preferences (task ordering, sorting, favorites, etc.)",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "preferences": {
+                    "type": "object",
+                    "description": "Preferences to merge with existing preferences",
+                    "properties": {
+                      "favorite_board_ids": {
+                        "type": "array",
+                        "description": "List of favorite board IDs",
+                        "items": {
+                          "type": "integer"
+                        }
+                      },
+                      "task_sorting": {
+                        "type": "object",
+                        "description": "Sorting preferences per board",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "sort": {
+                              "type": "string"
+                            },
+                            "order": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "tasks_order": {
+                        "type": "object",
+                        "description": "Task ordering per step",
+                        "additionalProperties": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Preferences updated successfully"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/accounts/{account_id}/conversations/{conversation_id}/messages": {
       "parameters": [
         {
@@ -9686,6 +11370,525 @@
           }
         }
       },
+      "kanban_board": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the board"
+          },
+          "account_id": {
+            "type": "integer",
+            "description": "The ID of the account"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the board"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the board"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Board settings",
+            "properties": {
+              "auto_assign_agent_to_conversation": {
+                "type": "boolean",
+                "description": "Automatically assign an agent to conversations"
+              },
+              "auto_assign_task_to_agent": {
+                "type": "boolean",
+                "description": "Automatically assign tasks to agents"
+              },
+              "auto_create_task_for_conversation": {
+                "type": "boolean",
+                "description": "Automatically create tasks for new conversations"
+              }
+            }
+          },
+          "steps_order": {
+            "type": "array",
+            "description": "Ordered list of step IDs",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "assigned_inbox_ids": {
+            "type": "array",
+            "description": "List of assigned inbox IDs",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "assigned_inboxes": {
+            "type": "array",
+            "description": "List of assigned inboxes",
+            "items": {
+              "$ref": "#/components/schemas/kanban_inbox_summary"
+            }
+          },
+          "assigned_agent_ids": {
+            "type": "array",
+            "description": "List of assigned agent IDs",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "assigned_agents": {
+            "type": "array",
+            "description": "List of assigned agents",
+            "items": {
+              "$ref": "#/components/schemas/kanban_agent_summary"
+            }
+          },
+          "total_tasks_count": {
+            "type": "integer",
+            "description": "Total number of tasks across all steps"
+          },
+          "steps_summary": {
+            "type": "array",
+            "description": "Summary of all steps",
+            "items": {
+              "$ref": "#/components/schemas/kanban_step_summary"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Board creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Board last update timestamp"
+          }
+        }
+      },
+      "kanban_board_step": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the step"
+          },
+          "board_id": {
+            "type": "integer",
+            "description": "The ID of the board this step belongs to"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the step"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the step"
+          },
+          "color": {
+            "type": "string",
+            "description": "The color of the step (hex code)",
+            "example": "#475569"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Whether this step represents cancelled/archived tasks"
+          },
+          "tasks_count": {
+            "type": "integer",
+            "description": "Number of tasks in this step"
+          },
+          "inferred_task_status": {
+            "type": "string",
+            "description": "The inferred status of tasks in this step",
+            "enum": [
+              "open",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Step creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Step last update timestamp"
+          }
+        }
+      },
+      "kanban_task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the task"
+          },
+          "account_id": {
+            "type": "integer",
+            "description": "The ID of the account"
+          },
+          "board_id": {
+            "type": "integer",
+            "description": "The ID of the board"
+          },
+          "board_step_id": {
+            "type": "integer",
+            "description": "The ID of the current step"
+          },
+          "created_by_id": {
+            "type": "integer",
+            "description": "The ID of the user who created the task"
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the task"
+          },
+          "priority": {
+            "type": "string",
+            "description": "The priority of the task",
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "The computed status based on the step",
+            "enum": [
+              "open",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "date_status": {
+            "type": "string",
+            "description": "The date status of the task",
+            "enum": [
+              "overdue",
+              "due_soon",
+              "on_track"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The start date of the task"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The due date of the task"
+          },
+          "step_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the task was last moved to a different step"
+          },
+          "contact_ids": {
+            "type": "array",
+            "description": "List of associated contact IDs",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "conversation_ids": {
+            "type": "array",
+            "description": "List of associated conversation IDs",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "description": "List of labels",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "description": "List of associated contacts",
+            "items": {
+              "$ref": "#/components/schemas/kanban_contact_summary"
+            }
+          },
+          "conversations": {
+            "type": "array",
+            "description": "List of associated conversations",
+            "items": {
+              "$ref": "#/components/schemas/kanban_conversation_summary"
+            }
+          },
+          "assigned_agents": {
+            "type": "array",
+            "description": "List of assigned agents",
+            "items": {
+              "$ref": "#/components/schemas/kanban_agent_summary"
+            }
+          },
+          "creator": {
+            "$ref": "#/components/schemas/kanban_user_summary"
+          },
+          "board": {
+            "$ref": "#/components/schemas/kanban_board_summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task last update timestamp"
+          }
+        }
+      },
+      "kanban_audit_event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the audit event"
+          },
+          "task_id": {
+            "type": "integer",
+            "description": "The ID of the task"
+          },
+          "action": {
+            "type": "string",
+            "description": "The action that was performed",
+            "example": "task.created"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata about the event",
+            "properties": {
+              "changes": {
+                "type": "object",
+                "description": "The changes made during the action"
+              }
+            }
+          },
+          "actor": {
+            "$ref": "#/components/schemas/kanban_user_summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event timestamp"
+          }
+        }
+      },
+      "kanban_agent_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the agent"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the agent"
+          },
+          "email": {
+            "type": "string",
+            "description": "The email of the agent"
+          },
+          "avatar_url": {
+            "type": "string",
+            "description": "The avatar URL of the agent"
+          },
+          "availability_status": {
+            "type": "string",
+            "description": "The availability status of the agent",
+            "enum": [
+              "online",
+              "offline",
+              "busy"
+            ]
+          }
+        }
+      },
+      "kanban_user_summary": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the user"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the user"
+          }
+        }
+      },
+      "kanban_contact_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the contact"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the contact"
+          },
+          "email": {
+            "type": "string",
+            "description": "The email of the contact"
+          },
+          "avatar_url": {
+            "type": "string",
+            "description": "The avatar URL of the contact"
+          }
+        }
+      },
+      "kanban_inbox_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the inbox"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the inbox"
+          },
+          "channel_type": {
+            "type": "string",
+            "description": "The type of channel",
+            "enum": [
+              "Channel::Api",
+              "Channel::Email",
+              "Channel::FacebookPage",
+              "Channel::Line",
+              "Channel::Sms",
+              "Channel::Telegram",
+              "Channel::TwilioSms",
+              "Channel::TwitterProfile",
+              "Channel::WebWidget",
+              "Channel::Whatsapp"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "description": "The provider of the channel"
+          },
+          "medium": {
+            "type": "string",
+            "description": "The medium (for Twilio channels)"
+          }
+        }
+      },
+      "kanban_conversation_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the conversation"
+          },
+          "display_id": {
+            "type": "integer",
+            "description": "The display ID of the conversation"
+          },
+          "status": {
+            "type": "string",
+            "description": "The status of the conversation",
+            "enum": [
+              "open",
+              "resolved",
+              "pending",
+              "snoozed"
+            ]
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/kanban_inbox_summary"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/kanban_contact_summary"
+          }
+        }
+      },
+      "kanban_step_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the step"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the step"
+          },
+          "color": {
+            "type": "string",
+            "description": "The color of the step"
+          },
+          "tasks_count": {
+            "type": "integer",
+            "description": "Number of tasks in this step"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Whether this is a cancelled step"
+          },
+          "inferred_task_status": {
+            "type": "string",
+            "description": "The inferred status of tasks in this step",
+            "enum": [
+              "open",
+              "completed",
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "kanban_board_summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the board"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the board"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "assigned_agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/kanban_agent_summary"
+            }
+          }
+        }
+      },
       "public_contact": {
         "type": "object",
         "properties": {
@@ -10838,6 +13041,216 @@
             "type": "boolean",
             "description": "If this setting is turned on, the system would automatically assign the conversation to an agent in the team while assigning the conversation to a team",
             "example": true
+          }
+        }
+      },
+      "kanban_board_create_update_payload": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the board",
+            "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the board",
+            "maxLength": 2000
+          },
+          "settings": {
+            "type": "object",
+            "description": "Board settings",
+            "properties": {
+              "auto_assign_agent_to_conversation": {
+                "type": "boolean",
+                "description": "Automatically assign an agent to conversations"
+              },
+              "auto_assign_task_to_agent": {
+                "type": "boolean",
+                "description": "Automatically assign tasks to agents"
+              },
+              "auto_create_task_for_conversation": {
+                "type": "boolean",
+                "description": "Automatically create tasks for new conversations"
+              }
+            }
+          },
+          "inbox_ids": {
+            "type": "array",
+            "description": "List of inbox IDs to associate with the board",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "kanban_step_create_update_payload": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the step",
+            "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the step",
+            "maxLength": 120
+          },
+          "color": {
+            "type": "string",
+            "description": "The color of the step (hex code)",
+            "example": "#475569"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Whether this step represents cancelled/archived tasks"
+          }
+        }
+      },
+      "kanban_task_create_payload": {
+        "type": "object",
+        "required": [
+          "title",
+          "board_id"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the task",
+            "maxLength": 5000
+          },
+          "priority": {
+            "type": "string",
+            "description": "The priority of the task",
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "board_id": {
+            "type": "integer",
+            "description": "The ID of the board to create the task in"
+          },
+          "board_step_id": {
+            "type": "integer",
+            "description": "The ID of the step to create the task in (defaults to first step)"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The start date of the task"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The due date of the task"
+          },
+          "contact_ids": {
+            "type": "array",
+            "description": "List of contact IDs to associate with the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "conversation_ids": {
+            "type": "array",
+            "description": "List of conversation IDs to associate with the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "assigned_agent_ids": {
+            "type": "array",
+            "description": "List of agent IDs to assign to the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "description": "List of labels for the task",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "kanban_task_update_payload": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the task",
+            "maxLength": 5000
+          },
+          "priority": {
+            "type": "string",
+            "description": "The priority of the task",
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "board_step_id": {
+            "type": "integer",
+            "description": "The ID of the step to move the task to"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The start date of the task"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The due date of the task"
+          },
+          "contact_ids": {
+            "type": "array",
+            "description": "List of contact IDs to associate with the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "conversation_ids": {
+            "type": "array",
+            "description": "List of conversation IDs to associate with the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "assigned_agent_ids": {
+            "type": "array",
+            "description": "List of agent IDs to assign to the task",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "description": "List of labels for the task",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -12723,6 +15136,42 @@
         },
         "required": true,
         "description": "The slug identifier of the portal"
+      },
+      "kanban_board_id": {
+        "in": "path",
+        "name": "board_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the Kanban board"
+      },
+      "kanban_step_id": {
+        "in": "path",
+        "name": "step_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the Kanban board step"
+      },
+      "kanban_task_id": {
+        "in": "path",
+        "name": "task_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the Kanban task"
+      },
+      "kanban_audit_event_id": {
+        "in": "path",
+        "name": "audit_event_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the audit event"
       }
     },
     "securitySchemes": {
@@ -12840,6 +15289,26 @@
       "description": "Knowledge base management"
     },
     {
+      "name": "Kanban Boards",
+      "description": "Kanban board management APIs"
+    },
+    {
+      "name": "Kanban Board Steps",
+      "description": "Kanban board step management APIs"
+    },
+    {
+      "name": "Kanban Tasks",
+      "description": "Kanban task management APIs"
+    },
+    {
+      "name": "Kanban Audit Events",
+      "description": "Kanban task audit history APIs"
+    },
+    {
+      "name": "Kanban",
+      "description": "Kanban user preferences"
+    },
+    {
       "name": "Contacts API",
       "description": "Public contact APIs"
     },
@@ -12889,7 +15358,12 @@
         "Teams",
         "Webhooks",
         "Automation Rule",
-        "Help Center"
+        "Help Center",
+        "Kanban Boards",
+        "Kanban Board Steps",
+        "Kanban Tasks",
+        "Kanban Audit Events",
+        "Kanban"
       ]
     },
     {

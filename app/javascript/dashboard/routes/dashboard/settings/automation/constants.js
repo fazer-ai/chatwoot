@@ -136,6 +136,14 @@ export const AUTOMATIONS = {
         key: 'move_to_step',
         name: 'MOVE_TO_STEP',
       },
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
     ],
   },
   conversation_created: {
@@ -259,6 +267,14 @@ export const AUTOMATIONS = {
       {
         key: 'move_to_step',
         name: 'MOVE_TO_STEP',
+      },
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
       },
     ],
   },
@@ -396,6 +412,14 @@ export const AUTOMATIONS = {
         key: 'move_to_step',
         name: 'MOVE_TO_STEP',
       },
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
     ],
   },
   conversation_opened: {
@@ -522,6 +546,14 @@ export const AUTOMATIONS = {
         key: 'move_to_step',
         name: 'MOVE_TO_STEP',
       },
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
     ],
   },
   conversation_resolved: {
@@ -630,6 +662,14 @@ export const AUTOMATIONS = {
         key: 'move_to_step',
         name: 'MOVE_TO_STEP',
       },
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
     ],
   },
   kanban_task_created: {
@@ -679,6 +719,14 @@ export const AUTOMATIONS = {
         name: 'CHANGE_PRIORITY',
       },
       {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
+      {
         key: 'send_webhook_event',
         name: 'SEND_WEBHOOK_EVENT',
       },
@@ -689,6 +737,10 @@ export const AUTOMATIONS = {
       {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
       },
     ],
   },
@@ -747,6 +799,14 @@ export const AUTOMATIONS = {
         name: 'CHANGE_PRIORITY',
       },
       {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
+      {
         key: 'send_webhook_event',
         name: 'SEND_WEBHOOK_EVENT',
       },
@@ -757,6 +817,10 @@ export const AUTOMATIONS = {
       {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'assign_to_board',
+        name: 'ASSIGN_TO_BOARD',
       },
     ],
   },
@@ -788,6 +852,14 @@ export const AUTOMATIONS = {
       },
     ],
     actions: [
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
       {
         key: 'send_webhook_event',
         name: 'SEND_WEBHOOK_EVENT',
@@ -830,6 +902,14 @@ export const AUTOMATIONS = {
       },
     ],
     actions: [
+      {
+        key: 'add_label_to_task',
+        name: 'ADD_LABEL_TO_TASK',
+      },
+      {
+        key: 'remove_label_from_task',
+        name: 'REMOVE_LABEL_FROM_TASK',
+      },
       {
         key: 'send_webhook_event',
         name: 'SEND_WEBHOOK_EVENT',
@@ -902,8 +982,18 @@ export const AUTOMATION_ACTION_TYPES = [
     inputType: 'multi_select',
   },
   {
+    key: 'add_label_to_task',
+    label: 'ADD_LABEL_TO_TASK',
+    inputType: 'multi_select',
+  },
+  {
     key: 'remove_label',
     label: 'REMOVE_LABEL',
+    inputType: 'multi_select',
+  },
+  {
+    key: 'remove_label_from_task',
+    label: 'REMOVE_LABEL_FROM_TASK',
     inputType: 'multi_select',
   },
   {

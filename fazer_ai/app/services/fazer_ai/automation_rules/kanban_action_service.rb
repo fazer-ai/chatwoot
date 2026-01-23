@@ -91,6 +91,19 @@ class FazerAi::AutomationRules::KanbanActionService
     end
   end
 
+  def add_label_to_task(labels)
+    return if labels.blank?
+
+    @task.add_labels(labels)
+  end
+
+  def remove_label_from_task(labels)
+    return if labels.blank?
+
+    remaining_labels = @task.label_list - labels
+    @task.update!(label_list: remaining_labels)
+  end
+
   def add_private_note(message)
     return if message.blank?
 
@@ -100,6 +113,19 @@ class FazerAi::AutomationRules::KanbanActionService
       params = { content: message.first, private: true, content_attributes: { automation_rule_id: @rule.id } }
       Messages::MessageBuilder.new(nil, conversation.reload, params).perform
     end
+  end
+
+  def assign_to_board(board_ids = [])
+    return if board_ids.blank?
+
+    board = find_target_board(board_ids.first)
+    return if board.blank?
+
+    new_task = create_task_on_board(board)
+    copy_task_attributes_to(new_task, board)
+    dispatch_old_task_update
+    dispatch_new_task_update(new_task)
+    new_task
   end
 
   def unassign_agent
@@ -119,5 +145,75 @@ class FazerAi::AutomationRules::KanbanActionService
     return false if conversation.additional_attributes.blank?
 
     conversation.additional_attributes['type'] == 'tweet'
+  end
+
+  def build_copied_description
+    max_length = FazerAi::Kanban::Task::DESCRIPTION_MAX_LENGTH
+    copied_from_header = I18n.t(
+      'kanban.tasks.automation.copied_from_board',
+      locale: @account.locale,
+      board_name: @task.board.name
+    )
+
+    original_description = @task.description.to_s
+    return copied_from_header if original_description.blank?
+
+    full_description = "#{copied_from_header}\n\n#{original_description}"
+    return full_description if full_description.length <= max_length
+
+    full_description.truncate(max_length)
+  end
+
+  def find_target_board(board_id)
+    board = @account.kanban_boards.find_by(id: board_id)
+    return nil if board.blank? || board.id == @task.board_id
+
+    board
+  end
+
+  def create_task_on_board(board)
+    new_task = FazerAi::Kanban::Task.create!(
+      account: @account,
+      board: board,
+      board_step: board.first_step,
+      creator: nil,
+      title: @task.title,
+      description: build_copied_description,
+      priority: @task.priority
+    )
+
+    # Move only conversations whose inbox is associated with the target board
+    move_conversations_to_task(new_task, board)
+
+    new_task
+  end
+
+  def move_conversations_to_task(new_task, board)
+    @task.conversations.find_each do |conversation|
+      next unless board.includes_inbox?(conversation.inbox_id)
+
+      # Update directly to avoid re-triggering Task validations
+      conversation.update_column(:kanban_task_id, new_task.id) # rubocop:disable Rails/SkipsModelValidations
+      # Dispatch conversation update event for ActionCable
+      Rails.configuration.dispatcher.dispatch(Events::Types::CONVERSATION_UPDATED, Time.zone.now, conversation: conversation.reload)
+    end
+  end
+
+  def copy_task_attributes_to(new_task, board)
+    new_task.add_labels(@task.label_list) if @task.label_list.present?
+
+    @task.assigned_agents.each do |agent|
+      new_task.task_agents.create!(agent: agent) if board.assigned_agents.exists?(id: agent.id)
+    end
+  end
+
+  def dispatch_old_task_update
+    @task.reload
+    Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_UPDATED, Time.zone.now, task: @task, changed_attributes: {})
+  end
+
+  def dispatch_new_task_update(new_task)
+    new_task.reload
+    Rails.configuration.dispatcher.dispatch(Events::Types::KANBAN_TASK_UPDATED, Time.zone.now, task: new_task, changed_attributes: {})
   end
 end

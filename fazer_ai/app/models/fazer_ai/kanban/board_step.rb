@@ -43,6 +43,7 @@ class FazerAi::Kanban::BoardStep < ApplicationRecord
 
   scope :ordered, -> { order(created_at: :asc) }
 
+  before_save :uncancel_other_steps, if: -> { cancelled? && cancelled_changed? }
   after_create :add_to_board_order
   after_destroy :remove_from_board_order
   after_commit :dispatch_create_event, on: :create
@@ -86,6 +87,13 @@ class FazerAi::Kanban::BoardStep < ApplicationRecord
 
     errors.add(:cancelled, :cannot_be_first_step) if first_step?
     errors.add(:cancelled, :cannot_be_last_step) if last_step?
+  end
+
+  def uncancel_other_steps
+    previously_cancelled_steps = board.steps.where(cancelled: true).where.not(id: id)
+    previously_cancelled_steps.find_each do |step|
+      step.update!(cancelled: false)
+    end
   end
 
   def add_to_board_order

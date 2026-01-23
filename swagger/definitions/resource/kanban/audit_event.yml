@@ -1,0 +1,25 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the audit event
+  task_id:
+    type: integer
+    description: The ID of the task
+  action:
+    type: string
+    description: The action that was performed
+    example: task.created
+  metadata:
+    type: object
+    description: Additional metadata about the event
+    properties:
+      changes:
+        type: object
+        description: The changes made during the action
+  actor:
+    $ref: '#/components/schemas/kanban_user_summary'
+  created_at:
+    type: string
+    format: date-time
+    description: Event timestamp

@@ -1,0 +1,22 @@
+tags:
+  - Kanban Boards
+operationId: deleteKanbanBoard
+summary: Delete a Kanban board
+description: Delete a Kanban board and all its associated tasks
+security:
+  - userApiKey: []
+responses:
+  '204':
+    description: Board deleted successfully
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

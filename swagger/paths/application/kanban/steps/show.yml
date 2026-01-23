@@ -1,0 +1,26 @@
+tags:
+  - Kanban Board Steps
+operationId: getKanbanBoardStep
+summary: Get a board step
+description: Get details of a specific board step
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_board_step'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Step not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

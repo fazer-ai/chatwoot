@@ -1,0 +1,32 @@
+tags:
+  - Kanban Boards
+operationId: toggleKanbanBoardFavorite
+summary: Toggle board favorite status
+description: Toggle the favorite status of a Kanban board for the current user
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            favorite_board_ids:
+              type: array
+              description: List of favorite board IDs for the user
+              items:
+                type: integer
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

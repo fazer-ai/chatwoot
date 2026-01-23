@@ -1,0 +1,26 @@
+tags:
+  - Kanban Boards
+operationId: getKanbanBoard
+summary: Get a Kanban board
+description: Get details of a specific Kanban board
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_board'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

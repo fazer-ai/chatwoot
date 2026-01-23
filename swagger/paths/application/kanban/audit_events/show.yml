@@ -1,0 +1,26 @@
+tags:
+  - Kanban Audit Events
+operationId: getKanbanAuditEvent
+summary: Get an audit event
+description: Get details of a specific audit event
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/kanban_audit_event'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Audit event not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

@@ -35,6 +35,8 @@ en:
       auto_create:
         title: "Conversation #%{display_id} - %{contact_name}"
         unknown_contact: "Unknown contact"
+      automation:
+        copied_from_board: "Copied from funnel: %{board_name}"
       errors:
         invalid_conversations: "must belong to one of the funnel inboxes"
         invalid_conversation_inbox: "must belong to one of the funnel inboxes"

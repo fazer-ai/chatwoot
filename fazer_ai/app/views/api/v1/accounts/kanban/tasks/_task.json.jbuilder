@@ -9,6 +9,7 @@ json.extract! task,
               :priority,
               :start_date,
               :due_date,
+              :step_changed_at,
               :created_at,
               :updated_at
 

@@ -1,0 +1,48 @@
+tags:
+  - Kanban Board Steps
+operationId: listKanbanBoardSteps
+summary: List all steps in a board
+description: List all steps in a Kanban board, ordered by their position
+security:
+  - userApiKey: []
+parameters:
+  - name: agent_id
+    in: query
+    description: Filter task counts by agent ID
+    schema:
+      type: integer
+  - name: inbox_id
+    in: query
+    description: Filter task counts by inbox ID
+    schema:
+      type: integer
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            steps:
+              type: array
+              description: Array of board steps
+              items:
+                $ref: '#/components/schemas/kanban_board_step'
+            filtered_counts:
+              type: object
+              description: Filtered task counts per step (when filter params are provided)
+              additionalProperties:
+                type: integer
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Board not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
