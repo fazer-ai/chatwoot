@@ -28,6 +28,9 @@ RSpec.configure do |config|
     if example.metadata[:file_path]&.include?('fazer_ai/spec/')
       stub_request(:post, FazerAiHub::PING_URL)
         .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+      # Also stub ChatwootHub ping called when enabling kanban feature
+      stub_request(:post, "#{ChatwootHub::BASE_URL}/ping")
+        .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
     end
 
     if example.metadata[:file_path]&.include?('fazer_ai/spec/') &&

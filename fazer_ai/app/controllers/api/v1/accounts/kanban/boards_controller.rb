@@ -44,11 +44,12 @@ class Api::V1::Accounts::Kanban::BoardsController < Api::V1::Accounts::Kanban::B
 
   def create
     ensure_actor_present!
-    @board = Current.account.kanban_boards.new(board_params)
+    @board = Current.account.kanban_boards.new(board_params_without_cancelled)
     authorize @board
 
     ActiveRecord::Base.transaction do
       @board.save!
+      apply_cancelled_steps
       sync_inboxes(@board)
     end
 
@@ -146,10 +147,36 @@ class Api::V1::Accounts::Kanban::BoardsController < Api::V1::Accounts::Kanban::B
       settings: {},
       steps_order: [],
       steps_attributes: [
-        :name, :description, :color,
+        :name, :description, :color, :cancelled,
         { tasks_attributes: [:title, :description, :priority, :due_date] }
       ]
     )
+  end
+
+  def board_params_without_cancelled
+    permitted = board_params
+    if permitted[:steps_attributes].present?
+      permitted[:steps_attributes] = permitted[:steps_attributes].map do |step_attrs|
+        step_attrs.except(:cancelled)
+      end
+    end
+    permitted
+  end
+
+  def apply_cancelled_steps # rubocop:disable Metrics/CyclomaticComplexity
+    steps_attrs = params.dig(:board, :steps_attributes)
+    return if steps_attrs.blank?
+
+    ordered_steps = @board.ordered_steps
+    last_index = ordered_steps.size - 1
+
+    steps_attrs.each_with_index do |step_attrs, index|
+      next unless step_attrs[:cancelled] == true || step_attrs[:cancelled] == 'true'
+      # Skip first/last positions - BoardStep validation prevents cancelled on these
+      next if index.zero? || index == last_index
+
+      ordered_steps[index]&.update!(cancelled: true)
+    end
   end
 
   def sync_inboxes(board)

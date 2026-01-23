@@ -117,6 +117,78 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Boards' do
       expect(response).to have_http_status(:created)
       expect(response.parsed_body['name']).to eq('Sales Board')
     end
+
+    context 'with steps_attributes including cancelled step' do
+      let(:params_with_steps) do
+        {
+          board: {
+            name: 'Sales Pipeline',
+            description: 'From lead to close',
+            steps_attributes: [
+              { name: 'New Lead', color: '#94a3b8', cancelled: false },
+              { name: 'Qualifying', color: '#60a5fa', cancelled: false },
+              { name: 'Lost', color: '#ef4444', cancelled: true },
+              { name: 'Won', color: '#34d399', cancelled: false }
+            ]
+          }
+        }
+      end
+
+      it 'creates the board with steps and applies cancelled attribute' do
+        expect do
+          post base_path, params: params_with_steps, headers: headers
+        end.to change { account.kanban_boards.count }.by(1)
+
+        expect(response).to have_http_status(:created)
+
+        board = account.kanban_boards.find_by(name: 'Sales Pipeline')
+        expect(board.steps.count).to eq(4)
+
+        lost_step = board.steps.find_by(name: 'Lost')
+        expect(lost_step.cancelled).to be(true)
+
+        other_steps = board.steps.where.not(name: 'Lost')
+        expect(other_steps.pluck(:cancelled)).to all(be(false))
+      end
+
+      it 'ignores cancelled on first step position' do
+        params_first_cancelled = {
+          board: {
+            name: 'First Cancelled',
+            steps_attributes: [
+              { name: 'First', color: '#ef4444', cancelled: true },
+              { name: 'Middle', color: '#60a5fa', cancelled: false },
+              { name: 'Last', color: '#34d399', cancelled: false }
+            ]
+          }
+        }
+
+        post base_path, params: params_first_cancelled, headers: headers
+
+        expect(response).to have_http_status(:created)
+        board = account.kanban_boards.find_by(name: 'First Cancelled')
+        expect(board.steps.pluck(:cancelled)).to all(be(false))
+      end
+
+      it 'ignores cancelled on last step position' do
+        params_last_cancelled = {
+          board: {
+            name: 'Last Cancelled',
+            steps_attributes: [
+              { name: 'First', color: '#94a3b8', cancelled: false },
+              { name: 'Middle', color: '#60a5fa', cancelled: false },
+              { name: 'Last', color: '#ef4444', cancelled: true }
+            ]
+          }
+        }
+
+        post base_path, params: params_last_cancelled, headers: headers
+
+        expect(response).to have_http_status(:created)
+        board = account.kanban_boards.find_by(name: 'Last Cancelled')
+        expect(board.steps.pluck(:cancelled)).to all(be(false))
+      end
+    end
   end
 
   describe 'PATCH /api/v1/accounts/:account_id/kanban/boards/:id' do

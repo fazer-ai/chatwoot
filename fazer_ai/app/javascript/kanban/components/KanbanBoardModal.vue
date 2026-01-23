@@ -87,12 +87,13 @@ const onSave = () => {
   } else if (selectedTemplate.value) {
     payload.steps_attributes = selectedTemplate.value.steps_attributes.map(
       s => ({
-        ...s,
         name: t(s.nameKey),
+        color: s.color,
+        cancelled: s.cancelled || false,
         tasks_attributes: s.tasks_attributes.map(task => ({
-          ...task,
           title: t(task.titleKey),
           description: task.descriptionKey ? t(task.descriptionKey) : undefined,
+          priority: task.priority,
         })),
       })
     );

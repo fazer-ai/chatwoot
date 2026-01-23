@@ -30,7 +30,7 @@ class BoardsAPI extends ApiClient {
   }
 
   create(data) {
-    return axios.post(this.url, data);
+    return axios.post(this.url, { board: data });
   }
 
   update(boardId, data) {
