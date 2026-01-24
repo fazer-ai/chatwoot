@@ -470,6 +470,77 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         service.perform
       end
     end
+
+    describe 'conversation duplication after deletion or resolution' do
+      let(:phone) { '5511912345678' }
+      let(:lid) { '12345678' }
+
+      def build_params(message_id:, text:)
+        {
+          type: 'ReceivedCallback',
+          messageId: message_id,
+          momment: Time.current.to_i * 1000,
+          fromMe: false,
+          phone: phone,
+          chatLid: "#{lid}@lid",
+          chatName: 'John Doe',
+          text: { message: text }
+        }
+      end
+
+      shared_examples 'routes messages to the new conversation' do |first_msg_id:, second_msg_id:|
+        it 'routes incoming messages to the new conversation, not a third one' do
+          # Step 1: Create contact and first contact_inbox with phone as source_id
+          contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: nil)
+          first_contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+          first_conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: first_contact_inbox)
+
+          # Step 2: Contact responds - this updates contact_inbox source_id from phone to LID
+          Whatsapp::IncomingMessageZapiService.new(
+            inbox: inbox,
+            params: build_params(message_id: first_msg_id, text: 'First response')
+          ).perform
+
+          # Verify message landed in first conversation and source_id migrated
+          expect(first_conversation.messages.count).to eq(1)
+          expect(first_contact_inbox.reload.source_id).to eq(lid)
+
+          # Step 3: Either delete or resolve the first conversation
+          close_first_conversation.call(first_conversation)
+
+          # Step 4: Create a new conversation (simulating UI creating a new contact_inbox)
+          second_contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+          second_conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: second_contact_inbox, status: :open)
+          expect(inbox.contact_inboxes.where(contact: contact).count).to eq(2)
+
+          # Step 5: Contact responds again - should NOT create a third conversation
+          expect do
+            Whatsapp::IncomingMessageZapiService.new(
+              inbox: inbox,
+              params: build_params(message_id: second_msg_id, text: 'Second response')
+            ).perform
+          end.not_to change(Conversation, :count)
+
+          # The message should arrive in the second conversation
+          expect(second_conversation.reload.messages.last.content).to eq('Second response')
+
+          # The duplicate contact_inboxes should be consolidated
+          expect(inbox.contact_inboxes.where(contact: contact).count).to eq(1)
+        end
+      end
+
+      context 'when a conversation is deleted and a new one is created for the same contact' do
+        let(:close_first_conversation) { ->(conv) { conv.destroy! } }
+
+        it_behaves_like 'routes messages to the new conversation', first_msg_id: 'msg_001', second_msg_id: 'msg_002'
+      end
+
+      context 'when a conversation is resolved and a new one is created for the same contact' do
+        let(:close_first_conversation) { ->(conv) { conv.update!(status: :resolved) } }
+
+        it_behaves_like 'routes messages to the new conversation', first_msg_id: 'msg_003', second_msg_id: 'msg_004'
+      end
+    end
   end
 
   describe '#process_received_callback' do

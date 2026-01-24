@@ -54,7 +54,12 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     source_id = extract_from_jid(type: 'lid')
     identifier = "#{source_id}@lid"
 
-    update_existing_contact_inbox(phone, source_id, identifier) if phone
+    Whatsapp::ContactInboxConsolidationService.new(
+      inbox: inbox,
+      phone: phone,
+      lid: source_id,
+      identifier: identifier
+    ).perform
 
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: source_id,
@@ -66,26 +71,6 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     @contact = contact_inbox.contact
 
     update_contact_info(phone, source_id, identifier)
-  end
-
-  def update_existing_contact_inbox(phone, source_id, identifier)
-    # NOTE: This is useful when we create a new contact manually, so we don't have information about contact LID;
-    # With this, when we receive a message from that contact, we can link it properly.
-    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: phone)
-    return unless existing_contact_inbox
-    return if inbox.contact_inboxes.exists?(source_id: source_id)
-
-    existing_contact = existing_contact_inbox.contact
-    conflicting_identifier = inbox.account.contacts.find_by(identifier: identifier)
-    conflicting_phone = inbox.account.contacts.find_by(phone_number: "+#{phone}")
-
-    return if conflicting_identifier && conflicting_identifier.id != existing_contact.id
-    return if conflicting_phone && conflicting_phone.id != existing_contact.id
-
-    ActiveRecord::Base.transaction do
-      existing_contact_inbox.update!(source_id: source_id)
-      existing_contact.update!(identifier: identifier, phone_number: "+#{phone}")
-    end
   end
 
   def update_contact_info(phone, source_id, identifier)
