@@ -2356,9 +2356,9 @@
             "type": "object",
             "description": "Board settings",
             "properties": {
-              "auto_assign_agent_to_conversation": {
+              "sync_task_and_conversation_agents": {
                 "type": "boolean",
-                "description": "Automatically assign an agent to conversations"
+                "description": "Keep task and conversation agents in sync (assigning/unassigning agents on one will update the other)"
               },
               "auto_assign_task_to_agent": {
                 "type": "boolean",
@@ -2367,6 +2367,14 @@
               "auto_create_task_for_conversation": {
                 "type": "boolean",
                 "description": "Automatically create tasks for new conversations"
+              },
+              "auto_resolve_conversation_on_task_end": {
+                "type": "boolean",
+                "description": "Automatically resolve conversations when task reaches the end step"
+              },
+              "auto_complete_task_on_conversation_resolve": {
+                "type": "boolean",
+                "description": "Automatically complete tasks when conversation is resolved"
               }
             }
           },
@@ -4027,9 +4035,9 @@
             "type": "object",
             "description": "Board settings",
             "properties": {
-              "auto_assign_agent_to_conversation": {
+              "sync_task_and_conversation_agents": {
                 "type": "boolean",
-                "description": "Automatically assign an agent to conversations"
+                "description": "Keep task and conversation agents in sync (assigning/unassigning agents on one will update the other)"
               },
               "auto_assign_task_to_agent": {
                 "type": "boolean",
@@ -4038,6 +4046,14 @@
               "auto_create_task_for_conversation": {
                 "type": "boolean",
                 "description": "Automatically create tasks for new conversations"
+              },
+              "auto_resolve_conversation_on_task_end": {
+                "type": "boolean",
+                "description": "Automatically resolve conversations when task reaches the end step"
+              },
+              "auto_complete_task_on_conversation_resolve": {
+                "type": "boolean",
+                "description": "Automatically complete tasks when conversation is resolved"
               }
             }
           },
