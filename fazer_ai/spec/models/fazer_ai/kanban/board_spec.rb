@@ -100,20 +100,20 @@ RSpec.describe FazerAi::Kanban::Board, type: :model do
     end
   end
 
-  describe '#auto_assign_agent_to_conversation?' do
+  describe '#sync_task_and_conversation_agents?' do
     it 'returns true when setting is enabled' do
-      board.settings = { 'auto_assign_agent_to_conversation' => true }
-      expect(board.auto_assign_agent_to_conversation?).to be(true)
+      board.settings = { 'sync_task_and_conversation_agents' => true }
+      expect(board.sync_task_and_conversation_agents?).to be(true)
     end
 
     it 'returns false when setting is disabled' do
-      board.settings = { 'auto_assign_agent_to_conversation' => false }
-      expect(board.auto_assign_agent_to_conversation?).to be(false)
+      board.settings = { 'sync_task_and_conversation_agents' => false }
+      expect(board.sync_task_and_conversation_agents?).to be(false)
     end
 
     it 'returns false when setting is not present' do
       board.settings = {}
-      expect(board.auto_assign_agent_to_conversation?).to be(false)
+      expect(board.sync_task_and_conversation_agents?).to be(false)
     end
   end
 

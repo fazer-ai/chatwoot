@@ -58,7 +58,7 @@ const selectedAgents = ref([]);
 const selectedInboxes = ref([]);
 const autoCreateTaskForConversation = ref(false);
 const autoAssignTaskToAgent = ref(false);
-const autoAssignAgentToConversation = ref(false);
+const syncTaskAndConversationAgents = ref(false);
 const autoResolveConversationOnTaskEnd = ref(false);
 const autoCompleteTaskOnConversationResolve = ref(false);
 const isSaving = ref(false);
@@ -141,8 +141,8 @@ const saveAutomationSettings = async () => {
           auto_create_task_for_conversation:
             autoCreateTaskForConversation.value,
           auto_assign_task_to_agent: autoAssignTaskToAgent.value,
-          auto_assign_agent_to_conversation:
-            autoAssignAgentToConversation.value,
+          sync_task_and_conversation_agents:
+            syncTaskAndConversationAgents.value,
           auto_resolve_conversation_on_task_end:
             autoResolveConversationOnTaskEnd.value,
           auto_complete_task_on_conversation_resolve:
@@ -170,7 +170,7 @@ watch(autoAssignTaskToAgent, async (newValue, oldValue) => {
   await saveAutomationSettings();
 });
 
-watch(autoAssignAgentToConversation, async (newValue, oldValue) => {
+watch(syncTaskAndConversationAgents, async (newValue, oldValue) => {
   if (!isInitialized.value) return;
   if (newValue === oldValue) return;
   await saveAutomationSettings();
@@ -221,8 +221,8 @@ const initializeBoardData = () => {
       activeBoard.value.settings?.auto_create_task_for_conversation || false;
     autoAssignTaskToAgent.value =
       activeBoard.value.settings?.auto_assign_task_to_agent || false;
-    autoAssignAgentToConversation.value =
-      activeBoard.value.settings?.auto_assign_agent_to_conversation || false;
+    syncTaskAndConversationAgents.value =
+      activeBoard.value.settings?.sync_task_and_conversation_agents || false;
     autoResolveConversationOnTaskEnd.value =
       activeBoard.value.settings?.auto_resolve_conversation_on_task_end ||
       false;
@@ -868,13 +868,17 @@ const confirmDeleteBoard = async () => {
               </div>
             </label>
             <label class="flex items-start gap-3">
-              <Switch v-model="autoAssignAgentToConversation" />
+              <Switch v-model="syncTaskAndConversationAgents" />
               <div class="flex flex-col gap-1">
                 <span class="text-sm font-medium text-n-slate-12">
-                  {{ t('KANBAN.AUTOMATION.AUTO_ASSIGN_AGENT') }}
+                  {{ t('KANBAN.AUTOMATION.SYNC_TASK_CONVERSATION_AGENTS') }}
                 </span>
                 <span class="text-sm text-n-slate-11">
-                  {{ t('KANBAN.AUTOMATION.AUTO_ASSIGN_AGENT_DESCRIPTION') }}
+                  {{
+                    t(
+                      'KANBAN.AUTOMATION.SYNC_TASK_CONVERSATION_AGENTS_DESCRIPTION'
+                    )
+                  }}
                 </span>
               </div>
             </label>

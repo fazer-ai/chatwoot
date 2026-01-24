@@ -15,6 +15,15 @@ class FazerAi::KanbanListener < BaseListener
     auto_complete_task_on_conversation_resolve(conversation)
   end
 
+  def conversation_updated(event)
+    conversation = event.data[:conversation]
+    changed_attributes = event.data[:changed_attributes]
+    return unless conversation&.account&.kanban_feature_enabled?
+    return unless changed_attributes
+
+    sync_conversation_assignee_to_task(conversation, changed_attributes)
+  end
+
   def kanban_task_created(event)
     task = event.data[:task]
     return unless task&.account&.kanban_feature_enabled?
@@ -58,6 +67,54 @@ class FazerAi::KanbanListener < BaseListener
     return unless completed_step
 
     task.update!(board_step: completed_step)
+  end
+
+  def sync_conversation_assignee_to_task(conversation, changed_attributes)
+    return unless changed_attributes['assignee_id']
+
+    task = conversation.kanban_task
+    return unless task_syncable?(task)
+
+    perform_agent_sync(task, changed_attributes['assignee_id'])
+  end
+
+  def task_syncable?(task)
+    task&.board&.sync_task_and_conversation_agents?
+  end
+
+  def perform_agent_sync(task, assignee_change)
+    old_assignee_id, new_assignee_id = assignee_change
+
+    changed = remove_agent_from_task(task, old_assignee_id) if old_assignee_id.present?
+    changed = add_agent_to_task(task, new_assignee_id) || changed if new_assignee_id.present?
+
+    dispatch_task_update(task) if changed
+  end
+
+  def remove_agent_from_task(task, agent_id)
+    task_agent = task.task_agents.find_by(agent_id: agent_id)
+    return false unless task_agent
+
+    task_agent.skip_sync_callbacks = true
+    task_agent.destroy!
+    true
+  end
+
+  def add_agent_to_task(task, agent_id)
+    return false if task.task_agents.exists?(agent_id: agent_id)
+    return false unless task.board.assigned_agents.exists?(id: agent_id)
+
+    task.task_agents.create!(agent_id: agent_id, skip_sync_callbacks: true)
+    true
+  end
+
+  def dispatch_task_update(task)
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::KANBAN_TASK_UPDATED,
+      Time.zone.now,
+      task: task.reload,
+      changed_attributes: {}
+    )
   end
 
   def auto_create_task_for_conversation(conversation)

@@ -569,4 +569,200 @@ RSpec.describe FazerAi::KanbanListener do
       end
     end
   end
+
+  describe '#conversation_updated' do
+    let!(:admin) { create(:user, account: account, role: :administrator) }
+    let(:agent) { create(:user, account: account) }
+    let(:other_agent) { create(:user, account: account) }
+    let(:task) { create(:kanban_task, board: board, board_step: board_step, account: account, creator: admin) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact, kanban_task: task) }
+
+    before do
+      create(:kanban_board_agent, board: board, agent: agent)
+      create(:kanban_board_agent, board: board, agent: other_agent)
+    end
+
+    context 'when kanban feature is disabled' do
+      let(:event) do
+        Events::Base.new(
+          'conversation.updated',
+          Time.zone.now,
+          { conversation: conversation, changed_attributes: { 'assignee_id' => [nil, agent.id] } }
+        )
+      end
+
+      before do
+        allow(account).to receive(:kanban_feature_enabled?).and_return(false)
+        board.update!(settings: { 'sync_task_and_conversation_agents' => true })
+      end
+
+      it 'does not sync agents to task' do
+        listener.conversation_updated(event)
+
+        expect(task.reload.assigned_agents).to be_empty
+      end
+    end
+
+    context 'when sync_task_and_conversation_agents is enabled' do
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => true }) }
+
+      context 'when agent is assigned to conversation' do
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation, changed_attributes: { 'assignee_id' => [nil, agent.id] } }
+          )
+        end
+
+        it 'adds the agent to the task' do
+          listener.conversation_updated(event)
+
+          expect(task.reload.assigned_agents).to include(agent)
+        end
+
+        it 'dispatches task update event' do
+          expect(Rails.configuration.dispatcher).to receive(:dispatch).with(
+            Events::Types::KANBAN_TASK_UPDATED,
+            anything,
+            hash_including(task: task)
+          ).once
+          allow(Rails.configuration.dispatcher).to receive(:dispatch).with(anything, anything, anything)
+
+          listener.conversation_updated(event)
+        end
+
+        it 'does not duplicate agent if already assigned to task' do
+          task.assigned_agents << agent
+
+          expect { listener.conversation_updated(event) }.not_to(change { task.reload.assigned_agents.count })
+        end
+
+        it 'does not dispatch task update event if agent already assigned' do
+          task.assigned_agents << agent
+
+          expect(Rails.configuration.dispatcher).not_to receive(:dispatch).with(
+            Events::Types::KANBAN_TASK_UPDATED,
+            anything,
+            anything
+          )
+          allow(Rails.configuration.dispatcher).to receive(:dispatch).with(anything, anything, anything)
+
+          listener.conversation_updated(event)
+        end
+      end
+
+      context 'when agent is unassigned from conversation' do
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation, changed_attributes: { 'assignee_id' => [agent.id, nil] } }
+          )
+        end
+
+        before { task.assigned_agents << agent }
+
+        it 'removes the agent from the task' do
+          listener.conversation_updated(event)
+
+          expect(task.reload.assigned_agents).not_to include(agent)
+        end
+
+        it 'dispatches task update event' do
+          expect(Rails.configuration.dispatcher).to receive(:dispatch).with(
+            Events::Types::KANBAN_TASK_UPDATED,
+            anything,
+            hash_including(task: task)
+          ).once
+          allow(Rails.configuration.dispatcher).to receive(:dispatch).with(anything, anything, anything)
+
+          listener.conversation_updated(event)
+        end
+      end
+
+      context 'when agent is reassigned' do
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation, changed_attributes: { 'assignee_id' => [agent.id, other_agent.id] } }
+          )
+        end
+
+        before { task.assigned_agents << agent }
+
+        it 'removes old agent and adds new agent' do
+          listener.conversation_updated(event)
+
+          expect(task.reload.assigned_agents).not_to include(agent)
+          expect(task.reload.assigned_agents).to include(other_agent)
+        end
+      end
+
+      context 'when new agent is not on the board' do
+        let(:non_board_agent) { create(:user, account: account) }
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation, changed_attributes: { 'assignee_id' => [nil, non_board_agent.id] } }
+          )
+        end
+
+        it 'does not add the agent to the task' do
+          listener.conversation_updated(event)
+
+          expect(task.reload.assigned_agents).not_to include(non_board_agent)
+        end
+      end
+
+      context 'when conversation has no linked task' do
+        let(:conversation_without_task) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation_without_task, changed_attributes: { 'assignee_id' => [nil, agent.id] } }
+          )
+        end
+
+        it 'does nothing' do
+          expect { listener.conversation_updated(event) }.not_to raise_error
+        end
+      end
+
+      context 'when changed_attributes does not include assignee_id' do
+        let(:event) do
+          Events::Base.new(
+            'conversation.updated',
+            Time.zone.now,
+            { conversation: conversation, changed_attributes: { 'status' => %w[open resolved] } }
+          )
+        end
+
+        it 'does nothing' do
+          expect { listener.conversation_updated(event) }.not_to(change { task.reload.assigned_agents.count })
+        end
+      end
+    end
+
+    context 'when sync_task_and_conversation_agents is disabled' do
+      let(:event) do
+        Events::Base.new(
+          'conversation.updated',
+          Time.zone.now,
+          { conversation: conversation, changed_attributes: { 'assignee_id' => [nil, agent.id] } }
+        )
+      end
+
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => false }) }
+
+      it 'does not sync agents' do
+        listener.conversation_updated(event)
+
+        expect(task.reload.assigned_agents).to be_empty
+      end
+    end
+  end
 end

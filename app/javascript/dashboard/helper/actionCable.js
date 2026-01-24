@@ -4,6 +4,7 @@ import DashboardAudioNotificationHelper from './AudioAlerts/DashboardAudioNotifi
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 import { useImpersonation } from 'dashboard/composables/useImpersonation';
+import types from 'dashboard/store/mutation-types';
 
 const { isImpersonating } = useImpersonation();
 
@@ -210,6 +211,14 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (this.app.$store.hasModule?.('kanban')) {
       this.app.$store.dispatch('kanban/updateTaskFromEvent', data);
     }
+    // Update the kanban_task on any conversations linked to this task
+    const conversationIds = data.conversation_ids || [];
+    conversationIds.forEach(conversationId => {
+      this.app.$store.commit(types.UPDATE_CONVERSATION_KANBAN_TASK, {
+        task: data,
+        conversationId,
+      });
+    });
   };
 
   onKanbanTaskDeleted = data => {

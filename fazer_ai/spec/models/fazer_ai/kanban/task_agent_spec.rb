@@ -26,7 +26,7 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
     end
   end
 
-  describe '#auto_assign_agent_to_conversations' do
+  describe '#sync_agent_to_conversations' do
     let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee_id: nil) }
 
     before do
@@ -34,8 +34,8 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
       task.save!
     end
 
-    context 'when auto_assign_agent_to_conversation is enabled' do
-      before { board.update!(settings: { 'auto_assign_agent_to_conversation' => true }) }
+    context 'when sync_task_and_conversation_agents is enabled' do
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => true }) }
 
       it 'assigns the agent to unassigned conversations when agent is assignable' do
         create(:inbox_member, inbox: inbox, user: agent)
@@ -61,8 +61,8 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
       end
     end
 
-    context 'when auto_assign_agent_to_conversation is disabled' do
-      before { board.update!(settings: { 'auto_assign_agent_to_conversation' => false }) }
+    context 'when sync_task_and_conversation_agents is disabled' do
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => false }) }
 
       it 'does not assign agents to conversations' do
         create(:kanban_task_agent, task: task, agent: agent)
@@ -71,13 +71,81 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
       end
     end
 
-    context 'when auto_assign_agent_to_conversation setting is not present' do
+    context 'when sync_task_and_conversation_agents setting is not present' do
       before { board.update!(settings: {}) }
 
       it 'does not assign agents to conversations' do
         create(:kanban_task_agent, task: task, agent: agent)
 
         expect(conversation.reload.assignee_id).to be_nil
+      end
+    end
+  end
+
+  describe '#unassign_agent_from_conversations' do
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee_id: agent.id) }
+
+    before do
+      create(:inbox_member, inbox: inbox, user: agent)
+      task.conversation_ids = [conversation.id]
+      task.save!
+    end
+
+    context 'when sync_task_and_conversation_agents is enabled' do
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => true }) }
+
+      it 'unassigns the agent from conversations when task agent is destroyed' do
+        task_agent = create(:kanban_task_agent, task: task, agent: agent)
+        task_agent.destroy!
+
+        expect(conversation.reload.assignee_id).to be_nil
+      end
+
+      it 'unassigns the agent from conversations when using assigned_agent_ids=' do
+        task.assigned_agent_ids = [agent.id]
+        task.save!
+
+        expect(task.reload.assigned_agents).to include(agent)
+
+        task.assigned_agent_ids = []
+        task.save!
+
+        expect(conversation.reload.assignee_id).to be_nil
+      end
+
+      it 'does not unassign other agents from conversations' do
+        other_agent = create(:user, account: account)
+        conversation.update!(assignee_id: other_agent.id)
+
+        task_agent = create(:kanban_task_agent, task: task, agent: agent)
+        task_agent.destroy!
+
+        expect(conversation.reload.assignee_id).to eq(other_agent.id)
+      end
+
+      it 'reassigns conversation to next available task agent when current assignee is removed' do
+        other_agent = create(:user, account: account)
+        create(:inbox_member, inbox: conversation.inbox, user: other_agent)
+
+        create(:kanban_task_agent, task: task, agent: agent)
+        create(:kanban_task_agent, task: task, agent: other_agent)
+
+        expect(conversation.reload.assignee_id).to eq(agent.id)
+
+        task.task_agents.find_by(agent_id: agent.id).destroy!
+
+        expect(conversation.reload.assignee_id).to eq(other_agent.id)
+      end
+    end
+
+    context 'when sync_task_and_conversation_agents is disabled' do
+      before { board.update!(settings: { 'sync_task_and_conversation_agents' => false }) }
+
+      it 'does not unassign agents from conversations' do
+        task_agent = create(:kanban_task_agent, task: task, agent: agent)
+        task_agent.destroy!
+
+        expect(conversation.reload.assignee_id).to eq(agent.id)
       end
     end
   end

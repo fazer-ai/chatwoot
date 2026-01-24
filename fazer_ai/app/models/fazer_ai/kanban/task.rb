@@ -98,6 +98,16 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
     Conversation.where(kanban_task_id: id).pluck(:id)
   end
 
+  def assigned_agent_ids=(ids)
+    @assigned_agent_ids_to_sync = Array(ids).filter_map { |id| id.to_i if id.present? }
+  end
+
+  def assigned_agent_ids
+    return @assigned_agent_ids_to_sync if @assigned_agent_ids_to_sync.present?
+
+    task_agents.pluck(:agent_id)
+  end
+
   validates :account, :board, :board_step, presence: true
   validates :title, presence: true, length: { maximum: 255 }
   validates :description, length: { maximum: DESCRIPTION_MAX_LENGTH }
@@ -114,9 +124,11 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
 
   after_create :assign_conversations_on_create
   after_create :sync_contacts_from_conversations
+  after_create :sync_assigned_agents
   before_update :track_step_change
   after_update :assign_conversations_on_update
   after_update :sync_contacts_from_conversations
+  after_update :sync_assigned_agents
   after_update :accumulate_changes_for_dispatch
   before_destroy :capture_conversations_for_dispatch, prepend: true
   before_destroy :capture_event_data, prepend: true
@@ -351,6 +363,25 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
     end
 
     conversations.reload if to_remove_ids.present? || to_add_ids.present?
+  end
+
+  def sync_assigned_agents
+    return if @assigned_agent_ids_to_sync.nil?
+
+    current_ids = task_agents.pluck(:agent_id)
+    new_ids = @assigned_agent_ids_to_sync
+
+    to_remove_ids = current_ids - new_ids
+    to_add_ids = new_ids - current_ids
+
+    # Destroy removed agents (triggers callbacks for conversation sync)
+    task_agents.where(agent_id: to_remove_ids).find_each(&:destroy!) if to_remove_ids.present?
+
+    # Create new agents (triggers callbacks for conversation sync)
+    to_add_ids.each { |agent_id| task_agents.create!(agent_id: agent_id) } if to_add_ids.present?
+
+    task_agents.reload if to_remove_ids.present? || to_add_ids.present?
+    @assigned_agent_ids_to_sync = nil
   end
 
   def sync_contacts_from_conversations

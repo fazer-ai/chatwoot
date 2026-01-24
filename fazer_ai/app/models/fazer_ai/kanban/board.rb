@@ -67,8 +67,8 @@ class FazerAi::Kanban::Board < ApplicationRecord
   after_save :reset_cancelled_on_first_or_last_step, if: :saved_change_to_steps_order?
   after_commit :dispatch_update_event, on: :update
 
-  def auto_assign_agent_to_conversation?
-    settings['auto_assign_agent_to_conversation'] == true
+  def sync_task_and_conversation_agents?
+    settings['sync_task_and_conversation_agents'] == true
   end
 
   def auto_assign_task_to_agent?

@@ -122,9 +122,22 @@ export const mutations = {
   },
 
   [types.UPDATE_CONVERSATION_KANBAN_TASK](_state, { task, conversationId }) {
-    const [chat] = _state.allConversations.filter(c => c.id === conversationId);
+    // conversationId from task is the database_id, not the display id
+    const [chat] = _state.allConversations.filter(
+      c => c.database_id === conversationId
+    );
     if (chat) {
-      chat.kanban_task = task;
+      // Preserve board.steps from existing task since push_event_data doesn't include them
+      const existingSteps = chat.kanban_task?.board?.steps;
+      const existingBoardAgents = chat.kanban_task?.board?.assigned_agents;
+      chat.kanban_task = {
+        ...task,
+        board: {
+          ...task.board,
+          steps: task.board?.steps || existingSteps,
+          assigned_agents: task.board?.assigned_agents || existingBoardAgents,
+        },
+      };
     }
   },
 
@@ -234,6 +247,10 @@ export const mutations = {
       }
 
       const { messages, ...updates } = conversation;
+      // Preserve kanban_task if not provided in update (avoid race with kanban.task.updated)
+      if (!updates.kanban_task && selectedConversation.kanban_task) {
+        updates.kanban_task = selectedConversation.kanban_task;
+      }
       allConversations[index] = { ...selectedConversation, ...updates };
       if (_state.selectedChatId === conversation.id) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);

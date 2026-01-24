@@ -27,17 +27,41 @@ class FazerAi::Kanban::TaskAgent < ApplicationRecord
 
   validates :task_id, uniqueness: { scope: :agent_id }
 
-  after_commit :auto_assign_agent_to_conversations, on: :create
+  attr_accessor :skip_sync_callbacks
+
+  before_destroy :cache_associations_for_callback
+  after_commit :sync_agent_to_conversations, on: :create, unless: :skip_sync_callbacks
+  after_commit :unassign_agent_from_conversations, on: :destroy, unless: :skip_sync_callbacks
 
   private
 
-  def auto_assign_agent_to_conversations
-    return unless task.board.auto_assign_agent_to_conversation?
+  def cache_associations_for_callback
+    @cached_task = task
+    @cached_agent_id = agent_id
+  end
+
+  def sync_agent_to_conversations
+    return unless task.board.sync_task_and_conversation_agents?
 
     task.conversations.where(assignee_id: nil).find_each do |conversation|
       next unless conversation.inbox.assignable_agents.include?(agent)
 
       conversation.update!(assignee_id: agent_id)
     end
+  end
+
+  def unassign_agent_from_conversations
+    return unless @cached_task&.board&.sync_task_and_conversation_agents?
+
+    @cached_task.conversations.where(assignee_id: @cached_agent_id).find_each do |conversation|
+      next_agent = find_next_assignable_agent(conversation)
+      conversation.update!(assignee_id: next_agent&.id)
+    end
+  end
+
+  def find_next_assignable_agent(conversation)
+    inbox_agents = conversation.inbox.assignable_agents
+    remaining_agents = User.joins(:kanban_task_agents).where(kanban_task_agents: { task_id: @cached_task.id })
+    remaining_agents.find { |agent| inbox_agents.include?(agent) }
   end
 end
