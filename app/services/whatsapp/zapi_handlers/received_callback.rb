@@ -266,10 +266,12 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     @message = find_message_by_source_id(@raw_message[:messageId])
     return unless @message
 
+    # Preserve original previous_content if message was already edited
+    previous_content_to_save = @message.is_edited ? @message.previous_content : @message.content
     @message.update!(
       content: message_content,
       is_edited: true,
-      previous_content: @message.content
+      previous_content: previous_content_to_save
     )
   end
 end

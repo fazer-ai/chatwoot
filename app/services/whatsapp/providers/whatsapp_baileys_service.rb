@@ -67,9 +67,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     if @message.content_attributes[:is_reaction]
       @message_content = reaction_message_content
     elsif @message.attachments.present?
-      @message_content = attachment_message_content
+      @message_content = attachment_message_content.merge(reply_context)
     elsif @message.outgoing_content.present?
-      @message_content = { text: @message.outgoing_content }
+      @message_content = { text: @message.outgoing_content }.merge(reply_context)
     else
       @message.update!(is_unsupported: true)
       return
@@ -241,6 +241,49 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response.parsed_response&.first || { 'jid' => remote_jid, 'exists' => false }
   end
 
+  def delete_message(recipient_id, message)
+    @recipient_id = recipient_id
+
+    response = HTTParty.delete(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/messages",
+      headers: api_headers,
+      body: {
+        jid: remote_jid,
+        key: {
+          id: message.source_id,
+          remoteJid: remote_jid,
+          fromMe: message.message_type == 'outgoing'
+        }
+      }.to_json
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
+  def edit_message(recipient_id, message, new_content)
+    @recipient_id = recipient_id
+
+    response = HTTParty.patch(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/messages",
+      headers: api_headers,
+      body: {
+        jid: remote_jid,
+        key: {
+          id: message.source_id,
+          remoteJid: remote_jid,
+          fromMe: message.message_type == 'outgoing'
+        },
+        messageContent: { text: new_content }
+      }.to_json
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
   private
 
   def provider_url
@@ -259,6 +302,45 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       fromMe: reply_to.message_type == 'outgoing' },
                text: @message.outgoing_content }
     }
+  end
+
+  def reply_context
+    reply_to_external_id = @message.content_attributes[:in_reply_to_external_id]
+    return {} if reply_to_external_id.blank?
+
+    reply_to_message = @message.conversation.messages.find_by(source_id: reply_to_external_id)
+    return {} unless reply_to_message
+
+    {
+      quotedMessage: {
+        key: {
+          id: reply_to_external_id,
+          remoteJid: remote_jid,
+          fromMe: reply_to_message.message_type == 'outgoing'
+        },
+        message: quoted_message_content(reply_to_message)
+      }
+    }
+  end
+
+  def quoted_message_content(message)
+    if message.attachments.present?
+      attachment = message.attachments.first
+      case attachment.file_type
+      when 'image'
+        { imageMessage: { caption: message.content } }
+      when 'video'
+        { videoMessage: { caption: message.content } }
+      when 'audio'
+        { audioMessage: {} }
+      when 'file'
+        { documentMessage: { caption: message.content, fileName: attachment.file.filename.to_s } }
+      else
+        { conversation: message.content.to_s }
+      end
+    else
+      { conversation: message.content.to_s }
+    end
   end
 
   def attachment_message_content # rubocop:disable Metrics/MethodLength
@@ -362,5 +444,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :read_messages,
                       :unread_message,
                       :received_messages,
-                      :on_whatsapp
+                      :on_whatsapp,
+                      :delete_message,
+                      :edit_message
 end

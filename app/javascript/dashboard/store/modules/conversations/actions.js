@@ -333,6 +333,23 @@ const actions = {
     }
   },
 
+  editMessage: async function editMessage(
+    { commit },
+    { conversationId, messageId, content }
+  ) {
+    try {
+      const { data } = await MessageApi.editContent(
+        conversationId,
+        messageId,
+        content
+      );
+      commit(types.ADD_MESSAGE, data);
+      return data;
+    } catch (error) {
+      throw new Error(error);
+    }
+  },
+
   deleteConversation: async ({ commit, dispatch }, conversationId) => {
     try {
       await ConversationApi.delete(conversationId);

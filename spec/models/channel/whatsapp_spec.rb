@@ -378,6 +378,58 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe '#delete_message' do
+    let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:contact) { create(:contact, identifier: '+551187654321') }
+    let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, contact: contact) }
+    let(:conversation) { create(:conversation, inbox: channel.inbox, contact: contact, contact_inbox: contact_inbox) }
+    let(:message) { create(:message, conversation: conversation, inbox: channel.inbox, source_id: 'msg_123', message_type: :outgoing) }
+
+    it 'calls provider service delete_message method for baileys' do
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, delete_message: true)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+        .with(whatsapp_channel: channel)
+        .and_return(provider_double)
+
+      channel.delete_message(message, conversation: conversation)
+
+      expect(provider_double).to have_received(:delete_message).with(contact.identifier, message)
+    end
+
+    it 'calls provider service delete_message method for zapi with phone_number' do
+      contact.update!(phone_number: '+551199999999')
+      channel.update!(provider: 'zapi')
+      provider_double = instance_double(Whatsapp::Providers::WhatsappZapiService, delete_message: true)
+      allow(Whatsapp::Providers::WhatsappZapiService).to receive(:new)
+        .with(whatsapp_channel: channel)
+        .and_return(provider_double)
+
+      channel.delete_message(message, conversation: conversation)
+
+      expect(provider_double).to have_received(:delete_message).with(contact.phone_number, message)
+    end
+
+    it 'calls provider service delete_message method for zapi falling back to identifier when phone_number is blank' do
+      channel.update!(provider: 'zapi')
+      provider_double = instance_double(Whatsapp::Providers::WhatsappZapiService, delete_message: true)
+      allow(Whatsapp::Providers::WhatsappZapiService).to receive(:new)
+        .with(whatsapp_channel: channel)
+        .and_return(provider_double)
+
+      channel.delete_message(message, conversation: conversation)
+
+      expect(provider_double).to have_received(:delete_message).with(contact.identifier, message)
+    end
+
+    it 'does not call method if provider service does not implement it' do
+      channel.update!(provider: 'whatsapp_cloud')
+
+      expect do
+        channel.delete_message(message, conversation: conversation)
+      end.not_to raise_error
+    end
+  end
+
   describe 'callbacks' do
     describe '#disconnect_channel_provider' do
       context 'when provider implements the method' do

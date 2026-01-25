@@ -273,6 +273,16 @@
         "MESSAGE": "Você não pode desfazer essa ação",
         "DELETE": "Excluir",
         "CANCEL": "Cancelar"
+      },
+      "EDIT": {
+        "LABEL": "Editar",
+        "TITLE": "Editar mensagem",
+        "PLACEHOLDER": "Digite o conteúdo da mensagem",
+        "SAVE": "Salvar",
+        "CANCEL": "Cancelar",
+        "SUCCESS": "Mensagem editada com sucesso",
+        "ERROR": "Falha ao editar mensagem",
+        "EMPTY_CONTENT": "O conteúdo da mensagem não pode estar vazio"
       }
     },
     "SIDEBAR": {

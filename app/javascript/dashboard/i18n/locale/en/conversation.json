@@ -274,6 +274,16 @@
         "MESSAGE": "You cannot undo this action",
         "DELETE": "Delete",
         "CANCEL": "Cancel"
+      },
+      "EDIT": {
+        "LABEL": "Edit",
+        "TITLE": "Edit message",
+        "PLACEHOLDER": "Enter message content",
+        "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "SUCCESS": "Message edited successfully",
+        "ERROR": "Failed to edit message",
+        "EMPTY_CONTENT": "Message content cannot be empty"
       }
     },
     "SIDEBAR": {

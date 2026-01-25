@@ -288,6 +288,60 @@ describe Whatsapp::Providers::WhatsappZapiService do
     end
   end
 
+  describe '#delete_message' do
+    let(:outgoing_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_456', message_type: :outgoing) }
+    let(:incoming_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_789', message_type: :incoming) }
+
+    context 'when deleting an outgoing message' do
+      it 'sends delete request with owner true' do
+        stub_request(:delete, "#{api_instance_path_with_token}/messages")
+          .with(
+            headers: stub_headers,
+            query: { messageId: outgoing_message.source_id, phone: test_send_phone_number, owner: 'true' }
+          )
+          .to_return(status: 204, body: '{}')
+
+        result = service.delete_message("+#{test_send_phone_number}", outgoing_message)
+
+        expect(result).to be(true)
+      end
+    end
+
+    context 'when deleting an incoming message' do
+      it 'sends delete request with owner false' do
+        stub_request(:delete, "#{api_instance_path_with_token}/messages")
+          .with(
+            headers: stub_headers,
+            query: { messageId: incoming_message.source_id, phone: test_send_phone_number, owner: 'false' }
+          )
+          .to_return(status: 204, body: '{}')
+
+        result = service.delete_message("+#{test_send_phone_number}", incoming_message)
+
+        expect(result).to be(true)
+      end
+    end
+
+    context 'when response is unsuccessful' do
+      it 'raises ProviderUnavailableError and logs the error' do
+        stub_request(:delete, "#{api_instance_path_with_token}/messages")
+          .with(
+            headers: stub_headers,
+            query: { messageId: outgoing_message.source_id, phone: test_send_phone_number, owner: 'true' }
+          )
+          .to_return(status: 400, body: 'error message')
+
+        allow(Rails.logger).to receive(:error)
+
+        expect do
+          service.delete_message("+#{test_send_phone_number}", outgoing_message)
+        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+
+        expect(Rails.logger).to have_received(:error).with('error message')
+      end
+    end
+  end
+
   describe '#send_message' do
     let(:request_path) { "#{api_instance_path_with_token}/send-text" }
     let(:result_body) { { 'messageId' => 'msg_123' } }
@@ -384,6 +438,84 @@ describe Whatsapp::Providers::WhatsappZapiService do
           expect(message.reload.status).to eq('failed')
           expect(message.external_error).to eq('Failed to send message')
         end
+      end
+    end
+
+    context 'when message is a reply to another message' do
+      let(:inbox) { whatsapp_channel.inbox }
+      let(:account_user) { create(:account_user, account: inbox.account) }
+      let(:contact) { create(:contact, account: inbox.account, name: 'John Doe', phone_number: "+#{test_send_phone_number}") }
+      let(:conversation) do
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: test_send_phone_number)
+        create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+      end
+
+      it 'sends text reply with messageId parameter' do
+        original_message = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                            message_type: 'incoming', source_id: 'original_zapi_msg_123', content: 'Original text')
+        reply_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                         content: 'Reply text', content_attributes: { in_reply_to_external_id: original_message.source_id })
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers,
+            body: {
+              phone: test_send_phone_number,
+              message: 'Reply text',
+              messageId: 'original_zapi_msg_123'
+            }.to_json
+          )
+          .to_return(status: 200, body: result_body.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        result = service.send_message("+#{test_send_phone_number}", reply_message)
+
+        expect(result).to eq('msg_123')
+      end
+
+      it 'sends image reply with messageId parameter' do
+        base64_image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+        buffer = "data:image/png;base64,#{base64_image}"
+
+        original_message = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                            message_type: 'incoming', source_id: 'original_zapi_img_456', content: 'Check this')
+        reply_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                         content: 'Nice!', content_attributes: { in_reply_to_external_id: original_message.source_id })
+        reply_message.attachments.create!(account_id: reply_message.account_id, file_type: 'image',
+                                          file: { io: StringIO.new(Base64.decode64(base64_image)), filename: 'reply.png' })
+
+        stub_request(:post, "#{api_instance_path_with_token}/send-image")
+          .with(
+            headers: stub_headers,
+            body: {
+              phone: test_send_phone_number,
+              image: buffer,
+              caption: 'Nice!',
+              messageId: 'original_zapi_img_456'
+            }.to_json
+          )
+          .to_return(status: 200, body: result_body.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        result = service.send_message("+#{test_send_phone_number}", reply_message)
+
+        expect(result).to eq('msg_123')
+      end
+
+      it 'sends message without messageId when in_reply_to_external_id is blank' do
+        regular_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user, content: 'Regular message')
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers,
+            body: {
+              phone: test_send_phone_number,
+              message: 'Regular message'
+            }.to_json
+          )
+          .to_return(status: 200, body: result_body.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        result = service.send_message("+#{test_send_phone_number}", regular_message)
+
+        expect(result).to eq('msg_123')
       end
     end
 

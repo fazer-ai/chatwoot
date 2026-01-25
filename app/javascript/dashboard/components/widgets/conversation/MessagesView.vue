@@ -262,6 +262,10 @@ export default {
 
       return { incoming, outgoing };
     },
+    inboxSupportsEdit() {
+      // Currently only Baileys WhatsApp channel supports message editing
+      return this.isAWhatsAppBaileysChannel;
+    },
     inboxProviderConnection() {
       return this.currentInbox.provider_connection?.connection;
     },
@@ -557,6 +561,7 @@ export default {
       :first-unread-id="unReadMessages[0]?.id"
       :is-an-email-channel="isAnEmailChannel"
       :inbox-supports-reply-to="inboxSupportsReplyTo"
+      :inbox-supports-edit="inboxSupportsEdit"
       :messages="getMessages"
       @retry="handleMessageRetry"
     >

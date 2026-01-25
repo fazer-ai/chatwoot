@@ -275,6 +275,88 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(response).to have_http_status(:not_found)
       end
     end
+
+    context 'when channel supports delete_message' do
+      let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', account: account, validate_provider_config: false) }
+      let(:whatsapp_inbox) { whatsapp_channel.inbox }
+      let(:contact) { create(:contact, account: account, identifier: '+551187654321', phone_number: '+551187654321') }
+      let(:contact_inbox) { create(:contact_inbox, inbox: whatsapp_inbox, contact: contact) }
+      let(:whatsapp_conversation) { create(:conversation, inbox: whatsapp_inbox, account: account, contact: contact, contact_inbox: contact_inbox) }
+      let(:message_with_source) do
+        create(:message, account: account, conversation: whatsapp_conversation, inbox: whatsapp_inbox, source_id: 'msg_123', message_type: :outgoing)
+      end
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:delete_request_path) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/messages" }
+
+      before do
+        create(:inbox_member, inbox: whatsapp_inbox, user: agent)
+      end
+
+      it 'calls delete_message on the channel' do
+        delete_stub = stub_request(:delete, delete_request_path)
+                      .with(
+                        headers: { 'Content-Type' => 'application/json', 'x-api-key' => whatsapp_channel.provider_config['api_key'] },
+                        body: hash_including(jid: "#{contact.identifier.delete('+')}@s.whatsapp.net")
+                      )
+                      .to_return(status: 200, body: '{}')
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message_with_source.reload.deleted).to be true
+        expect(delete_stub).to have_been_requested
+      end
+
+      it 'does not fail when channel delete_message raises an error' do
+        stub_request(:delete, delete_request_path)
+          .to_return(status: 400, body: 'Provider error')
+
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+          .to_return(status: 200)
+
+        allow(Rails.logger).to receive(:error)
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message_with_source.reload.deleted).to be true
+      end
+
+      it 'skips channel deletion when message has no source_id' do
+        message_without_source = create(:message, account: account, conversation: whatsapp_conversation, inbox: whatsapp_inbox, source_id: nil)
+        delete_stub = stub_request(:delete, delete_request_path).to_return(status: 200, body: '{}')
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_without_source.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message_without_source.reload.deleted).to be true
+        expect(delete_stub).not_to have_been_requested
+      end
+    end
+
+    context 'when channel does not support delete_message' do
+      let(:message_with_source) { create(:message, account: account, conversation: conversation, source_id: 'msg_123') }
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      before do
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+      end
+
+      it 'skips channel deletion' do
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message_with_source.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message_with_source.reload.deleted).to be true
+      end
+    end
   end
 
   describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/retry' do

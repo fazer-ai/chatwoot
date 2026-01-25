@@ -437,6 +437,146 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    context 'when message is a reply to another message' do
+      let(:inbox) { whatsapp_channel.inbox }
+      let(:account_user) { create(:account_user, account: inbox.account) }
+      let(:contact) { create(:contact, account: inbox.account, name: 'John Doe', phone_number: "+#{test_send_phone_number}") }
+      let(:conversation) do
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: test_send_phone_number)
+        create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+      end
+
+      it 'sends text reply to outgoing message with quotedMessage' do
+        original_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                            message_type: 'outgoing', source_id: 'original_msg_123', content: 'Original text')
+        reply_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                         content: 'Reply text', content_attributes: { in_reply_to_external_id: original_message.source_id })
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: {
+                text: 'Reply text',
+                quotedMessage: {
+                  key: {
+                    id: 'original_msg_123',
+                    remoteJid: test_send_jid,
+                    fromMe: true
+                  },
+                  message: { conversation: 'Original text' }
+                }
+              }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: result_body.to_json
+          )
+
+        result = service.send_message(test_send_phone_number, reply_message)
+
+        expect(result).to eq('msg_123')
+      end
+
+      it 'sends text reply to incoming message with quotedMessage' do
+        original_message = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                            message_type: 'incoming', source_id: 'incoming_msg_456', content: 'Incoming text')
+        reply_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                         content: 'Reply to incoming', content_attributes: { in_reply_to_external_id: original_message.source_id })
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: {
+                text: 'Reply to incoming',
+                quotedMessage: {
+                  key: {
+                    id: 'incoming_msg_456',
+                    remoteJid: test_send_jid,
+                    fromMe: false
+                  },
+                  message: { conversation: 'Incoming text' }
+                }
+              }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: result_body.to_json
+          )
+
+        result = service.send_message(test_send_phone_number, reply_message)
+
+        expect(result).to eq('msg_123')
+      end
+
+      it 'sends reply to message with image attachment' do
+        original_message = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                            message_type: 'incoming', source_id: 'image_msg_789', content: 'Check this image')
+        original_message.attachments.create!(account_id: original_message.account_id, file_type: 'image',
+                                             file: { io: StringIO.new('fake'), filename: 'image.png' })
+
+        reply_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user,
+                                         content: 'Nice image!', content_attributes: { in_reply_to_external_id: original_message.source_id })
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: {
+                text: 'Nice image!',
+                quotedMessage: {
+                  key: {
+                    id: 'image_msg_789',
+                    remoteJid: test_send_jid,
+                    fromMe: false
+                  },
+                  message: { imageMessage: { caption: 'Check this image' } }
+                }
+              }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: result_body.to_json
+          )
+
+        result = service.send_message(test_send_phone_number, reply_message)
+
+        expect(result).to eq('msg_123')
+      end
+
+      it 'sends message without quotedMessage when in_reply_to_external_id is blank' do
+        regular_message = create(:message, inbox: inbox, conversation: conversation, sender: account_user, content: 'Regular message')
+
+        stub_request(:post, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              messageContent: { text: 'Regular message' }
+            }.to_json
+          )
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: result_body.to_json
+          )
+
+        result = service.send_message(test_send_phone_number, regular_message)
+
+        expect(result).to eq('msg_123')
+      end
+    end
+
     context 'when request is unsuccessful' do
       it 'raises ProviderUnavailableError' do
         stub_request(:post, request_path)
@@ -797,6 +937,75 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         expect do
           service.on_whatsapp(phone_number)
+        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+
+        expect(Rails.logger).to have_received(:error).with('error message')
+      end
+    end
+  end
+
+  describe '#delete_message' do
+    let(:request_path) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/messages" }
+    let(:outgoing_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_456', message_type: :outgoing) }
+    let(:incoming_message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_789', message_type: :incoming) }
+
+    context 'when deleting an outgoing message' do
+      it 'sends delete request with fromMe true' do
+        stub_request(:delete, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              key: {
+                id: outgoing_message.source_id,
+                remoteJid: test_send_jid,
+                fromMe: true
+              }
+            }.to_json
+          )
+          .to_return(status: 200, body: '{}')
+
+        result = service.delete_message(test_send_phone_number, outgoing_message)
+
+        expect(result).to be(true)
+      end
+    end
+
+    context 'when deleting an incoming message' do
+      it 'sends delete request with fromMe false' do
+        stub_request(:delete, request_path)
+          .with(
+            headers: stub_headers(whatsapp_channel),
+            body: {
+              jid: test_send_jid,
+              key: {
+                id: incoming_message.source_id,
+                remoteJid: test_send_jid,
+                fromMe: false
+              }
+            }.to_json
+          )
+          .to_return(status: 200, body: '{}')
+
+        result = service.delete_message(test_send_phone_number, incoming_message)
+
+        expect(result).to be(true)
+      end
+    end
+
+    context 'when response is unsuccessful' do
+      it 'raises ProviderUnavailableError and logs the error' do
+        stub_request(:delete, request_path)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_return(status: 400, body: 'error message')
+
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+          .to_return(status: 200)
+
+        allow(Rails.logger).to receive(:error)
+
+        expect do
+          service.delete_message(test_send_phone_number, outgoing_message)
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
 
         expect(Rails.logger).to have_received(:error).with('error message')
