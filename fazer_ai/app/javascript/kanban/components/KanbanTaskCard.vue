@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { frontendURL } from 'dashboard/helper/URLHelper';
 import { shortTimestampFromDate } from 'shared/helpers/timeHelper';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
@@ -30,6 +30,7 @@ const { t } = useI18n();
 const { priorities } = useKanban();
 const { formatMessage } = useMessageFormatter();
 const route = useRoute();
+const router = useRouter();
 
 const accountId = computed(() => route.params.accountId);
 
@@ -420,8 +421,12 @@ const taskUrl = computed(() => ({
   },
 }));
 
-const openInNewTab = url => {
-  window.open(url, '_blank');
+const handleLinkClick = (event, url) => {
+  if (event.ctrlKey || event.metaKey || event.button === 1) {
+    window.open(url, '_blank');
+  } else {
+    router.push(url);
+  }
 };
 
 const handleDescriptionClick = event => {
@@ -508,7 +513,12 @@ const handleDescriptionClick = event => {
               :class="{
                 'ltr:-ml-2 rtl:-mr-2': index > 0,
               }"
-              @click.stop.prevent="openInNewTab(getContactUrl(item.data))"
+              @click.stop.prevent="
+                handleLinkClick($event, getContactUrl(item.data))
+              "
+              @auxclick.stop.prevent="
+                handleLinkClick($event, getContactUrl(item.data))
+              "
             >
               <img
                 v-if="item.data.avatar_url"
@@ -528,7 +538,12 @@ const handleDescriptionClick = event => {
               :class="{
                 'ltr:-ml-2 rtl:-mr-2': index > 0,
               }"
-              @click.stop.prevent="openInNewTab(getConversationUrl(item.data))"
+              @click.stop.prevent="
+                handleLinkClick($event, getConversationUrl(item.data))
+              "
+              @auxclick.stop.prevent="
+                handleLinkClick($event, getConversationUrl(item.data))
+              "
             >
               <div
                 class="h-full w-full rounded-full overflow-hidden bg-n-slate-4 outline outline-1 outline-n-background shadow"
