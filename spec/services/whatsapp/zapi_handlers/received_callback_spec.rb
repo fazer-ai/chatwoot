@@ -541,6 +541,61 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         it_behaves_like 'routes messages to the new conversation', first_msg_id: 'msg_003', second_msg_id: 'msg_004'
       end
     end
+
+    describe 'single conversation mode' do
+      let(:phone) { '5511912345678' }
+      let(:lid) { '12345678' }
+
+      before { inbox.update!(lock_to_single_conversation: true) }
+
+      def build_params(message_id:, text:)
+        {
+          type: 'ReceivedCallback',
+          messageId: message_id,
+          momment: Time.current.to_i * 1000,
+          fromMe: false,
+          phone: phone,
+          chatLid: "#{lid}@lid",
+          chatName: 'John Doe',
+          text: { message: text }
+        }
+      end
+
+      it 'reopens resolved conversation when contact sends new message' do
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_1', text: 'First')).perform
+        conversation = Conversation.last
+        conversation.update!(status: :resolved)
+
+        expect { Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_2', text: 'Second')).perform }
+          .not_to change(Conversation, :count)
+
+        expect(conversation.reload.status).to eq('open')
+      end
+
+      it 'migrates phone source_id to LID and routes to existing conversation' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+        conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_3', text: 'Response')).perform
+
+        expect(contact_inbox.reload.source_id).to eq(lid)
+        expect(conversation.messages.count).to eq(1)
+      end
+
+      it 'finds conversation via ConversationBuilder when agent creates new contact_inbox with phone' do
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_4', text: 'Hello')).perform
+        first_conversation = Conversation.last
+        first_conversation.update!(status: :resolved)
+
+        contact = Contact.last
+        phone_contact_inbox = ContactInboxBuilder.new(contact: contact, inbox: inbox, source_id: nil).perform
+
+        conversation = ConversationBuilder.new(params: ActionController::Parameters.new({}), contact_inbox: phone_contact_inbox).perform
+
+        expect(conversation.id).to eq(first_conversation.id)
+      end
+    end
   end
 
   describe '#process_received_callback' do

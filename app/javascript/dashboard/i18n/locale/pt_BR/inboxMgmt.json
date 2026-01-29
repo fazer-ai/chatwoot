@@ -355,11 +355,6 @@
           "MANUAL_LINK_TEXT": "fluxo de configuração manual"
         },
         "ZAPI_PROMO": {
-          "SWITCH_BANNER": {
-            "TITLE": "Considere mudar para Z-API para configuração mais fácil",
-            "DESCRIPTION": "Z-API fornece uma conexão mais estável que Baileys e requer menos configuração que Cloud/Twilio. Mude para uma integração WhatsApp sem complicações.",
-            "CTA": "Mudar para Z-API"
-          },
           "SETUP_BANNER": {
             "TITLE": "Ganhe 10% de desconto na sua assinatura Z-API",
             "DESCRIPTION": "Crie sua conta Z-API usando nosso link de afiliado e receba 10% de desconto. Configuração simples, conexões confiáveis e ótimo suporte.",

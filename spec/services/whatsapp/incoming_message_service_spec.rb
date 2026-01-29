@@ -44,7 +44,7 @@ describe Whatsapp::IncomingMessageService do
       it 'reopen last conversation if last conversation is resolved and lock to single conversation is enabled' do
         whatsapp_channel.inbox.update!(lock_to_single_conversation: true)
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         last_conversation.update!(status: 'resolved')
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # no new conversation should be created
