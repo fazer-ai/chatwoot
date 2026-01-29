@@ -11,7 +11,6 @@ import { isValidURL } from '../../../../../helper/URLHelper';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
-import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
 
 const router = useRouter();
 const store = useStore();
@@ -84,32 +83,10 @@ const createChannel = async () => {
 const setShowAdvancedOptions = () => {
   showAdvancedOptions.value = true;
 };
-
-const switchToZapi = () => {
-  router.push({
-    name: router.currentRoute.value.name,
-    params: router.currentRoute.value.params,
-    query: { provider: 'zapi' },
-  });
-};
 </script>
 
 <template>
   <form class="flex flex-wrap mx-0" @submit.prevent="createChannel()">
-    <div class="w-full mb-6">
-      <PromoBanner
-        :title="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SWITCH_BANNER.TITLE')"
-        :description="
-          $t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SWITCH_BANNER.DESCRIPTION')
-        "
-        variant="info"
-        logo-src="/assets/images/dashboard/channels/z-api/z-api-dark-blue.png"
-        logo-alt="Z-API"
-        :cta-text="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SWITCH_BANNER.CTA')"
-        @cta-click="switchToZapi"
-      />
-    </div>
-
     <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
       <label :class="{ error: v$.inboxName.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.LABEL') }}
