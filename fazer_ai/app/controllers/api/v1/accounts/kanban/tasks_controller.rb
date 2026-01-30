@@ -10,8 +10,7 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
 
   def index
     authorize(FazerAi::Kanban::Task)
-    @paginated = paginated_request?
-    @tasks = @paginated ? paginated_tasks : filtered_tasks
+    @tasks = paginated_tasks
   end
 
   def show
@@ -103,10 +102,6 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     end
   end
 
-  def paginated_request?
-    params[:board_step_id].present? && params[:page].present?
-  end
-
   def paginated_tasks
     scope = initial_task_scope
     scope = apply_filters(scope)
@@ -123,12 +118,6 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
     @has_more = offset + per_page < @total_count
 
     scope.limit(per_page).offset(offset)
-  end
-
-  def filtered_tasks
-    scope = initial_task_scope
-    scope = apply_filters(scope)
-    apply_sorting(scope)
   end
 
   def initial_task_scope
