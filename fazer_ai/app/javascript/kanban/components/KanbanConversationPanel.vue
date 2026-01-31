@@ -153,7 +153,8 @@ const stepChangedDate = computed(() => {
 
 const statusIcon = computed(() => {
   if (!existingTask.value) return null;
-  if (existingTask.value.status === 'completed') return 'i-lucide-check-circle-2';
+  if (existingTask.value.status === 'completed')
+    return 'i-lucide-check-circle-2';
   if (existingTask.value.status === 'cancelled') return 'i-lucide-x-circle';
   return null;
 });
@@ -167,8 +168,10 @@ const statusColor = computed(() => {
 
 const statusTooltip = computed(() => {
   if (!existingTask.value) return '';
-  if (existingTask.value.status === 'completed') return t('KANBAN.STATUS.COMPLETED');
-  if (existingTask.value.status === 'cancelled') return t('KANBAN.STATUS.CANCELLED');
+  if (existingTask.value.status === 'completed')
+    return t('KANBAN.STATUS.COMPLETED');
+  if (existingTask.value.status === 'cancelled')
+    return t('KANBAN.STATUS.CANCELLED');
   return '';
 });
 
