@@ -232,7 +232,7 @@ RSpec.describe ScheduledMessage, type: :model do
       # NOTE: Travel to a time where due_same_minute and overdue are due but not_due_yet is not
       travel_to(5.minutes.from_now)
 
-      expect(described_class.due_for_sending).to contain_exactly(due_same_minute, overdue)
+      expect(described_class.due_for_sending.pluck(:id)).to contain_exactly(due_same_minute.id, overdue.id)
     end
   end
 end

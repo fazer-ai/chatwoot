@@ -37,7 +37,7 @@ RSpec.describe 'Scheduled Messages API', type: :request do
       get scheduled_messages_url, headers: agent.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:success)
-      expect(response.parsed_body['payload'].pluck('id')).to eq([earlier.id, later.id])
+      expect(response.parsed_body['payload'].pluck('id')).to eq([later.id, earlier.id])
     end
   end
 

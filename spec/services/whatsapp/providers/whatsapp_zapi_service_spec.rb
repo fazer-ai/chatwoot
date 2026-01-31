@@ -117,7 +117,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         expect do
           service.setup_channel_provider
-        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+        end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
       end
     end
   end
@@ -143,7 +143,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         expect do
           service.disconnect_channel_provider
-        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+        end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
       end
     end
   end
@@ -283,7 +283,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         expect do
           service.on_whatsapp(phone_number)
-        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+        end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
       end
     end
   end
@@ -335,7 +335,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         expect do
           service.delete_message("+#{test_send_phone_number}", outgoing_message)
-        end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+        end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
 
         expect(Rails.logger).to have_received(:error).with('error message')
       end
@@ -433,7 +433,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
           expect do
             service.send_message("+#{test_send_phone_number}", message)
-          end.to raise_error(Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError)
+          end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
 
           expect(message.reload.status).to eq('failed')
           expect(message.external_error).to eq('Failed to send message')

@@ -209,7 +209,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       echo_id: @params[:echo_id],
       source_id: @params[:source_id]
     }.merge(external_created_at).merge(automation_rule_id).merge(campaign_id)
-      .merge(template_params).merge(zapi_args).merge(scheduled_message_metadata)
+      .deep_merge(template_params).merge(zapi_args).deep_merge(scheduled_message_metadata)
   end
 
   def email_inbox?
