@@ -43,6 +43,7 @@ class Message < ApplicationRecord
 
   include MessageFilterHelpers
   include Liquidable
+  include ScheduledMessageHandler
   NUMBER_OF_PERMITTED_ATTACHMENTS = 15
 
   TEMPLATE_PARAMS_SCHEMA = {

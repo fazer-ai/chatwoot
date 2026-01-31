@@ -136,6 +136,22 @@ const validateSingleAction = action => {
     return ACTION_PARAMETERS_REQUIRED;
   }
 
+  if (action.action_name === 'create_scheduled_message') {
+    const params = action.action_params?.[0];
+    if (!params || typeof params !== 'object') {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
+    const hasContent = params.content?.trim?.();
+    const hasAttachment = params.blob_id;
+    const hasDelay = params.delay_minutes && params.delay_minutes >= 1;
+    if (!hasContent && !hasAttachment) {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
+    if (!hasDelay) {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
+  }
+
   return null;
 };
 

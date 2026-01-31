@@ -334,10 +334,21 @@ export const getConditionOptions = ({
 };
 
 export const getFileName = (action, files = []) => {
-  const blobId = action.action_params[0];
+  const scheduledParams = Array.isArray(action.action_params)
+    ? action.action_params[0]
+    : action.action_params;
+  const blobId =
+    action.action_name === 'create_scheduled_message'
+      ? scheduledParams?.blob_id
+      : action.action_params?.[0];
   if (!blobId) return '';
-  if (action.action_name === 'send_attachment') {
-    const file = files.find(item => item.blob_id === blobId);
+  if (
+    action.action_name === 'send_attachment' ||
+    action.action_name === 'create_scheduled_message'
+  ) {
+    const file = files.find(
+      item => item.blob_id?.toString() === blobId.toString()
+    );
     if (file) return file.filename.toString();
   }
   return '';
@@ -514,7 +525,11 @@ export const getCustomAttributeType = (automationTypes, automation, key) => {
  * @returns {boolean} True if the action input should be shown, false otherwise.
  */
 export const showActionInput = (automationActionTypes, action) => {
-  if (action === 'send_email_to_team' || action === 'send_message')
+  if (
+    action === 'send_email_to_team' ||
+    action === 'send_message' ||
+    action === 'create_scheduled_message'
+  )
     return false;
   const type = automationActionTypes.find(i => i.key === action)?.inputType;
   return !!type;

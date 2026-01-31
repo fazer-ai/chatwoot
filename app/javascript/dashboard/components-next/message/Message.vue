@@ -94,6 +94,7 @@ import ContextMenu from 'dashboard/modules/conversations/components/MessageConte
  * @property {boolean} [isEmailInbox=false] - Whether the message is from an email inbox
  * @property {number} conversationId - The ID of the conversation to which the message belongs
  * @property {number} inboxId - The ID of the inbox to which the message belongs
+ * @property {Object} [additionalAttributes={}] - Additional attributes of the message
  */
 
 // eslint-disable-next-line vue/define-macros-order
@@ -117,6 +118,8 @@ const props = defineProps({
     default: 'text',
     validator: value => Object.values(CONTENT_TYPES).includes(value),
   },
+  // eslint-disable-next-line vue/no-unused-properties
+  additionalAttributes: { type: Object, default: () => ({}) },
   conversationId: { type: Number, required: true },
   createdAt: { type: Number, required: true }, // eslint-disable-line vue/no-unused-properties
   currentUserId: { type: Number, required: true }, // eslint-disable-line vue/no-unused-properties

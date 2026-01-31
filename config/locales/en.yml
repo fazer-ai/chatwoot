@@ -92,6 +92,10 @@ en:
       kanban_feature_not_available: 'Kanban feature is not available. Please upgrade your subscription to enable this feature.'
     attachments:
       invalid: Invalid attachment
+    automation:
+      scheduled_message:
+        delay_out_of_range: Delay minutes must be between 0 and 999999
+        content_or_attachment_required: Scheduled message must have content or attachment
     saml:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation

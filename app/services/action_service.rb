@@ -79,6 +79,30 @@ class ActionService
     end
   end
 
+  def create_scheduled_message(action_params)
+    return if conversation_a_tweet?
+
+    params = action_params.first&.with_indifferent_access || {}
+    delay_minutes = params[:delay_minutes].to_i.clamp(0, 999_999)
+    scheduled_at = delay_minutes.minutes.from_now
+
+    scheduled_message = @conversation.scheduled_messages.new(
+      account: @account,
+      inbox: @conversation.inbox,
+      author: scheduled_message_author,
+      content: params[:content],
+      scheduled_at: scheduled_at,
+      status: :pending,
+      template_params: {}
+    )
+
+    blob = scheduled_message_attachment_blob(params[:blob_id])
+    scheduled_message.attachment.attach(blob) if blob.present?
+
+    scheduled_message.save!
+    dispatch_scheduled_message_created(scheduled_message)
+  end
+
   private
 
   def agent_belongs_to_inbox?(agent_ids)
@@ -96,6 +120,24 @@ class ActionService
     return false if @conversation.additional_attributes.blank?
 
     @conversation.additional_attributes['type'] == 'tweet'
+  end
+
+  def scheduled_message_author
+    Current.executed_by || Current.user
+  end
+
+  def scheduled_message_attachment_blob(blob_id)
+    return if blob_id.blank?
+
+    ActiveStorage::Blob.find_by(id: blob_id)
+  end
+
+  def dispatch_scheduled_message_created(scheduled_message)
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::SCHEDULED_MESSAGE_CREATED,
+      Time.zone.now,
+      scheduled_message: scheduled_message
+    )
   end
 end
 

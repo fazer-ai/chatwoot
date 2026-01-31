@@ -101,6 +101,10 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'send_email_transcript',
         name: 'SEND_EMAIL_TRANSCRIPT',
       },
@@ -235,6 +239,10 @@ export const AUTOMATIONS = {
       {
         key: 'send_message',
         name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
       },
       {
         key: 'send_email_transcript',
@@ -381,6 +389,10 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'send_email_transcript',
         name: 'SEND_EMAIL_TRANSCRIPT',
       },
@@ -519,6 +531,10 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'send_email_transcript',
         name: 'SEND_EMAIL_TRANSCRIPT',
       },
@@ -641,6 +657,10 @@ export const AUTOMATIONS = {
       {
         key: 'send_message',
         name: 'SEND_MESSAGE',
+      },
+      {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
       },
       {
         key: 'send_email_transcript',
@@ -1040,6 +1060,11 @@ export const AUTOMATION_ACTION_TYPES = [
     key: 'send_message',
     label: 'SEND_MESSAGE',
     inputType: 'textarea',
+  },
+  {
+    key: 'create_scheduled_message',
+    label: 'CREATE_SCHEDULED_MESSAGE',
+    inputType: 'scheduled_message',
   },
   {
     key: 'add_private_note',

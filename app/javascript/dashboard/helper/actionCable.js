@@ -41,6 +41,9 @@ class ActionCableConnector extends BaseActionCableConnector {
       'kanban.step.created': this.onKanbanStepCreated,
       'kanban.step.updated': this.onKanbanStepUpdated,
       'kanban.board.updated': this.onKanbanBoardUpdated,
+      'scheduled_message.created': this.onScheduledMessageCreated,
+      'scheduled_message.updated': this.onScheduledMessageUpdated,
+      'scheduled_message.deleted': this.onScheduledMessageDeleted,
     };
   }
 
@@ -124,6 +127,18 @@ class ActionCableConnector extends BaseActionCableConnector {
   onConversationUpdated = data => {
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
+  };
+
+  onScheduledMessageCreated = data => {
+    this.app.$store.dispatch('handleScheduledMessageCreated', data);
+  };
+
+  onScheduledMessageUpdated = data => {
+    this.app.$store.dispatch('handleScheduledMessageUpdated', data);
+  };
+
+  onScheduledMessageDeleted = data => {
+    this.app.$store.dispatch('handleScheduledMessageDeleted', data);
   };
 
   onTypingOn = ({ conversation, user }) => {

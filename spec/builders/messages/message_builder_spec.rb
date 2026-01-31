@@ -340,4 +340,45 @@ describe Messages::MessageBuilder do
       end
     end
   end
+
+  describe 'scheduled_message metadata' do
+    let(:scheduled_message) { create(:scheduled_message, account: account, inbox: inbox, conversation: conversation, author: user, content: 'Hello') }
+    let(:params) do
+      ActionController::Parameters.new({
+                                         content: 'test',
+                                         scheduled_message: scheduled_message
+                                       })
+    end
+
+    it 'includes scheduled_message_id in additional_attributes' do
+      message = message_builder
+
+      expect(message.additional_attributes['scheduled_message_id']).to eq(scheduled_message.id)
+    end
+
+    it 'includes scheduled_by with author info' do
+      message = message_builder
+
+      expect(message.additional_attributes['scheduled_by']).to include('id' => user.id, 'type' => 'User', 'name' => user.name)
+    end
+
+    it 'includes scheduled_at timestamp' do
+      message = message_builder
+
+      expect(message.additional_attributes['scheduled_at']).to eq(scheduled_message.updated_at.to_i)
+    end
+
+    context 'when author is AutomationRule' do
+      let(:automation_rule) { create(:automation_rule, account: account) }
+      let(:scheduled_message) do
+        create(:scheduled_message, account: account, inbox: inbox, conversation: conversation, author: automation_rule, content: 'Hello')
+      end
+
+      it 'includes scheduled_by with automation_rule info' do
+        message = message_builder
+
+        expect(message.additional_attributes['scheduled_by']).to include('id' => automation_rule.id, 'type' => 'AutomationRule')
+      end
+    end
+  end
 end

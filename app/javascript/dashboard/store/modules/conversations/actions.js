@@ -436,6 +436,18 @@ const actions = {
     commit(types.UPDATE_CONVERSATION_CONTACT, data);
   },
 
+  handleScheduledMessageCreated({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/upsertFromEvent', scheduledMessage);
+  },
+
+  handleScheduledMessageUpdated({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/upsertFromEvent', scheduledMessage);
+  },
+
+  handleScheduledMessageDeleted({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/removeFromEvent', scheduledMessage);
+  },
+
   setActiveInbox({ commit }, inboxId) {
     commit(types.SET_ACTIVE_INBOX, inboxId);
   },

@@ -41,6 +41,11 @@ module Events::Types
   MESSAGE_UPDATED = 'message.updated'
   MESSAGES_READ = 'messages.read'
 
+  # scheduled message events
+  SCHEDULED_MESSAGE_CREATED = 'scheduled_message.created'
+  SCHEDULED_MESSAGE_UPDATED = 'scheduled_message.updated'
+  SCHEDULED_MESSAGE_DELETED = 'scheduled_message.deleted'
+
   # contact events
   CONTACT_CREATED = 'contact.created'
   CONTACT_UPDATED = 'contact.updated'

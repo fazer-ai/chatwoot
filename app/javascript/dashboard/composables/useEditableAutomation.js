@@ -82,6 +82,9 @@ export function useEditableAutomation() {
         ...getActionDropdownValues(action.action_name, conditions, actions),
       ].filter(item => [...params].includes(item.id));
     }
+    if (inputType === 'scheduled_message') {
+      return params[0] || {};
+    }
     if (inputType === 'team_message') {
       return {
         team_ids: [...getActionDropdownValues(action.action_name)].filter(

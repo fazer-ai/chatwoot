@@ -237,7 +237,8 @@
         "REMOVE_PREVIEW": "Remove quoted email thread",
         "COLLAPSE": "Collapse preview",
         "EXPAND": "Expand preview"
-      }
+      },
+      "SCHEDULE_SEND": "Schedule send"
     },
     "VISIBLE_TO_AGENTS": "Private Note: Only visible to you and your team",
     "CHANGE_STATUS": "Conversation status changed",
@@ -363,6 +364,7 @@
     },
     "ACCORDION": {
       "CONTACT_DETAILS": "Contact Details",
+      "SCHEDULED_MESSAGES": "Scheduled Messages",
       "CONVERSATION_ACTIONS": "Conversation Actions",
       "CONVERSATION_LABELS": "Conversation Labels",
       "CONVERSATION_INFO": "Conversation Information",
@@ -391,6 +393,69 @@
         "PARTIALLY_FULFILLED": "Partially Fulfilled",
         "UNFULFILLED": "Unfulfilled"
       }
+    }
+  },
+  "SCHEDULED_MESSAGES": {
+    "NEW_BUTTON": "Schedule message",
+    "PAST_MESSAGES_SECTION": "Sent",
+    "EMPTY_STATE": "There are no scheduled messages yet.",
+    "STATUS": {
+      "DRAFT": "Draft",
+      "PENDING": "Pending",
+      "SENT": "Sent",
+      "FAILED": "Failed"
+    },
+    "ITEM": {
+      "SCHEDULED_FOR": "Scheduled for {time}",
+      "NO_SCHEDULE": "No schedule",
+      "TEMPLATE_PREVIEW": "Template: {name}",
+      "ATTACHMENT_PREVIEW": "Attachment: {filename}",
+      "ATTACHMENT_LABEL": "Attachment: {filename}",
+      "EMPTY_PREVIEW": "No content",
+      "EXPAND": "Expand",
+      "COLLAPSE": "Collapse"
+    },
+    "MODAL": {
+      "TITLE_NEW": "Schedule a message",
+      "TITLE_EDIT": "Edit scheduled message",
+      "MESSAGE_LABEL": "Message",
+      "MESSAGE_PLACEHOLDER": "Write your message...",
+      "DATETIME_LABEL": "Date and time to send",
+      "DATETIME_PLACEHOLDER": "Select date and time",
+      "ATTACHMENT_LABEL": "Attachment",
+      "ATTACHMENT_ADD": "Attach file",
+      "ATTACHMENT_CURRENT": "Current attachment: {filename}",
+      "CANCEL": "Cancel",
+      "SAVE_DRAFT": "Save as draft",
+      "SCHEDULE": "Schedule"
+    },
+    "CONFIRM_CLOSE": {
+      "TITLE": "Unsaved changes",
+      "MESSAGE": "You have unsaved content. Would you like to discard your changes?",
+      "CONTINUE_EDITING": "Continue editing",
+      "DISCARD": "Discard",
+      "CANCEL": "Cancel"
+    },
+    "CONFIRM_DELETE": {
+      "TITLE": "Delete scheduled message",
+      "MESSAGE": "Are you sure you want to delete this scheduled message? This action cannot be undone.",
+      "CANCEL": "Cancel",
+      "DELETE": "Delete"
+    },
+    "META": {
+      "TOOLTIP": "Scheduled at {time} by {author}",
+      "YOU": "You",
+      "AUTHOR_YOU": "{name} (You)",
+      "AUTOMATION": "Automation",
+      "UNKNOWN_AUTHOR": "Unknown"
+    },
+    "ERRORS": {
+      "CONTENT_REQUIRED": "Add a message, template, or attachment before saving.",
+      "CONTENT_TOO_LONG": "Message is too long. Maximum {maxLength} characters allowed.",
+      "DATETIME_REQUIRED": "Select a date and time to schedule the message.",
+      "SCHEDULE_IN_PAST": "Scheduled time must be in the future.",
+      "SAVE_FAILED": "Unable to save scheduled message. Please try again.",
+      "DELETE_FAILED": "Unable to delete scheduled message. Please try again."
     }
   },
   "CONVERSATION_CUSTOM_ATTRIBUTES": {

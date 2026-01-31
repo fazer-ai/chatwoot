@@ -29,6 +29,7 @@ import {
 } from '@chatwoot/utils';
 import WhatsappTemplates from './WhatsappTemplates/Modal.vue';
 import ContentTemplates from './ContentTemplates/ContentTemplatesModal.vue';
+import ScheduledMessageModal from 'dashboard/routes/dashboard/conversation/scheduledMessages/ScheduledMessageModal.vue';
 import { MESSAGE_MAX_LENGTH } from 'shared/helpers/MessageTypeHelper';
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
 import { trimContent, debounce, getRecipients } from '@chatwoot/utils';
@@ -67,6 +68,7 @@ export default {
     WhatsappTemplates,
     WootMessageEditor,
     QuotedEmailPreview,
+    ScheduledMessageModal,
   },
   mixins: [inboxMixin, fileUploadMixin, keyboardEventListenerMixins],
   props: {
@@ -124,6 +126,7 @@ export default {
       showVariablesMenu: false,
       newConversationModalActive: false,
       showArticleSearchPopover: false,
+      showScheduledMessageModal: false,
     };
   },
   computed: {
@@ -633,6 +636,7 @@ export default {
         !this.showMentions &&
         !this.showCannedMenu &&
         !this.showVariablesMenu &&
+        !this.showScheduledMessageModal &&
         this.isFocused &&
         this.isEditorHotKeyEnabled(selectedKey)
       );
@@ -652,6 +656,8 @@ export default {
     onPaste(e) {
       // Don't handle paste if compose new conversation modal is open
       if (this.newConversationModalActive) return;
+      // NOTE: Don't handle paste if scheduled message modal is open
+      if (this.showScheduledMessageModal) return;
 
       // Filter valid files (non-zero size)
       Array.from(e.clipboardData.files)
@@ -700,6 +706,21 @@ export default {
     },
     hideContentTemplatesModal() {
       this.showContentTemplatesModal = false;
+    },
+    openScheduledMessageModal() {
+      this.showScheduledMessageModal = true;
+    },
+    closeScheduledMessageModal() {
+      this.showScheduledMessageModal = false;
+    },
+    async onScheduledMessageCreated() {
+      this.closeScheduledMessageModal();
+      this.clearMessage();
+      // NOTE: Open sidebar and expand scheduled messages card
+      this.$store.dispatch('updateUISettings', {
+        is_contact_sidebar_open: true,
+        is_scheduled_messages_open: true,
+      });
     },
     confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
@@ -1233,11 +1254,13 @@ export default {
       :message="message"
       :portal-slug="connectedPortalSlug"
       :new-conversation-modal-active="newConversationModalActive"
+      :show-schedule-options="!isPrivate"
       @select-whatsapp-template="openWhatsappTemplateModal"
       @select-content-template="openContentTemplateModal"
       @replace-text="replaceText"
       @toggle-insert-article="toggleInsertArticle"
       @toggle-quoted-reply="toggleQuotedReply"
+      @schedule-message="openScheduledMessageModal"
     />
     <WhatsappTemplates
       :inbox-id="inbox.id"
@@ -1253,6 +1276,15 @@ export default {
       @close="hideContentTemplatesModal"
       @on-send="onSendContentTemplateReply"
       @cancel="hideContentTemplatesModal"
+    />
+
+    <ScheduledMessageModal
+      v-model:show="showScheduledMessageModal"
+      :conversation-id="conversationId"
+      :inbox-id="inbox.id"
+      :initial-content="message"
+      :initial-attachment="attachedFiles[0] || null"
+      @scheduled-message-created="onScheduledMessageCreated"
     />
 
     <woot-confirm-modal
