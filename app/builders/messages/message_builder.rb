@@ -167,6 +167,22 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @params[:template_params].present? ? { additional_attributes: { template_params: JSON.parse(@params[:template_params].to_json) } } : {}
   end
 
+  def scheduled_message_metadata
+    return {} if @params[:scheduled_message].blank?
+
+    sm = @params[:scheduled_message]
+    scheduled_by = { 'id' => sm.author_id, 'type' => sm.author_type }
+    scheduled_by['name'] = sm.author.name if sm.author.respond_to?(:name)
+
+    {
+      additional_attributes: {
+        scheduled_message_id: sm.id,
+        scheduled_by: scheduled_by,
+        scheduled_at: sm.updated_at.to_i
+      }
+    }
+  end
+
   def message_sender
     return if @params[:sender_type] != 'AgentBot'
 
@@ -192,7 +208,8 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       is_reaction: @is_reaction,
       echo_id: @params[:echo_id],
       source_id: @params[:source_id]
-    }.merge(external_created_at).merge(automation_rule_id).merge(campaign_id).merge(template_params).merge(zapi_args)
+    }.merge(external_created_at).merge(automation_rule_id).merge(campaign_id)
+      .merge(template_params).merge(zapi_args).merge(scheduled_message_metadata)
   end
 
   def email_inbox?

@@ -1,4 +1,4 @@
-class ActionCableListener < BaseListener
+class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   include Events::Types
 
   def notification_created(event)
@@ -52,6 +52,30 @@ class ActionCableListener < BaseListener
     tokens = user_tokens(account, conversation.inbox.members) + contact_tokens(conversation.contact_inbox, message)
 
     broadcast(account, tokens, MESSAGE_UPDATED, message.push_event_data.merge(previous_changes: event.data[:previous_changes]))
+  end
+
+  def scheduled_message_created(event)
+    scheduled_message = event.data[:scheduled_message]
+    account = scheduled_message.account
+    tokens = user_tokens(account, scheduled_message.conversation.inbox.members)
+
+    broadcast(account, tokens, SCHEDULED_MESSAGE_CREATED, scheduled_message.push_event_data)
+  end
+
+  def scheduled_message_updated(event)
+    scheduled_message = event.data[:scheduled_message]
+    account = scheduled_message.account
+    tokens = user_tokens(account, scheduled_message.conversation.inbox.members)
+
+    broadcast(account, tokens, SCHEDULED_MESSAGE_UPDATED, scheduled_message.push_event_data)
+  end
+
+  def scheduled_message_deleted(event)
+    scheduled_message = event.data[:scheduled_message]
+    account = scheduled_message.account
+    tokens = user_tokens(account, scheduled_message.conversation.inbox.members)
+
+    broadcast(account, tokens, SCHEDULED_MESSAGE_DELETED, scheduled_message.push_event_data)
   end
 
   def first_reply_created(event)

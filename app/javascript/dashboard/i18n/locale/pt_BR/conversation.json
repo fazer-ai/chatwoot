@@ -237,7 +237,8 @@
         "REMOVE_PREVIEW": "Remover o encadeamento de e-mails citado",
         "COLLAPSE": "Recolher a prévia",
         "EXPAND": "Expandir a prévia"
-      }
+      },
+      "SCHEDULE_SEND": "Agendar envio"
     },
     "VISIBLE_TO_AGENTS": "Mensagem Privada: Apenas visível para você e seu time",
     "CHANGE_STATUS": "Estado da conversa mudou",
@@ -362,6 +363,7 @@
     },
     "ACCORDION": {
       "CONTACT_DETAILS": "Detalhes do contato",
+      "SCHEDULED_MESSAGES": "Mensagens agendadas",
       "CONVERSATION_ACTIONS": "Ações da conversa",
       "CONVERSATION_LABELS": "Etiquetas da conversa",
       "CONVERSATION_INFO": "Informação da conversa",
@@ -390,6 +392,69 @@
         "PARTIALLY_FULFILLED": "Partially Fulfilled",
         "UNFULFILLED": "Unfulfilled"
       }
+    }
+  },
+  "SCHEDULED_MESSAGES": {
+    "NEW_BUTTON": "Agendar mensagem",
+    "PAST_MESSAGES_SECTION": "Enviadas",
+    "EMPTY_STATE": "Ainda não há mensagens agendadas.",
+    "STATUS": {
+      "DRAFT": "Rascunho",
+      "PENDING": "Pendente",
+      "SENT": "Enviada",
+      "FAILED": "Falhou"
+    },
+    "ITEM": {
+      "SCHEDULED_FOR": "Agendada para {time}",
+      "NO_SCHEDULE": "Sem agendamento",
+      "TEMPLATE_PREVIEW": "Template: {name}",
+      "ATTACHMENT_PREVIEW": "Anexo: {filename}",
+      "ATTACHMENT_LABEL": "Anexo: {filename}",
+      "EMPTY_PREVIEW": "Sem conteúdo",
+      "EXPAND": "Expandir",
+      "COLLAPSE": "Recolher"
+    },
+    "MODAL": {
+      "TITLE_NEW": "Agendar mensagem",
+      "TITLE_EDIT": "Editar mensagem agendada",
+      "MESSAGE_LABEL": "Mensagem",
+      "MESSAGE_PLACEHOLDER": "Escreva sua mensagem...",
+      "DATETIME_LABEL": "Data e hora de envio",
+      "DATETIME_PLACEHOLDER": "Selecione data e hora",
+      "ATTACHMENT_LABEL": "Anexo",
+      "ATTACHMENT_ADD": "Anexar arquivo",
+      "ATTACHMENT_CURRENT": "Anexo atual: {filename}",
+      "CANCEL": "Cancelar",
+      "SAVE_DRAFT": "Salvar como rascunho",
+      "SCHEDULE": "Agendar"
+    },
+    "CONFIRM_CLOSE": {
+      "TITLE": "Alterações não salvas",
+      "MESSAGE": "Você tem conteúdo não salvo. Deseja descartar suas alterações?",
+      "CONTINUE_EDITING": "Continuar editando",
+      "DISCARD": "Descartar",
+      "CANCEL": "Cancelar"
+    },
+    "CONFIRM_DELETE": {
+      "TITLE": "Excluir mensagem agendada",
+      "MESSAGE": "Tem certeza de que deseja excluir esta mensagem agendada? Esta ação não pode ser desfeita.",
+      "CANCEL": "Cancelar",
+      "DELETE": "Excluir"
+    },
+    "ERRORS": {
+      "CONTENT_REQUIRED": "Adicione uma mensagem, template ou anexo antes de salvar.",
+      "CONTENT_TOO_LONG": "A mensagem é muito longa. Máximo de {maxLength} caracteres permitidos.",
+      "DATETIME_REQUIRED": "Selecione uma data e hora para agendar a mensagem.",
+      "SCHEDULE_IN_PAST": "O horário agendado deve ser no futuro.",
+      "SAVE_FAILED": "Não foi possível salvar a mensagem agendada. Por favor, tente novamente.",
+      "DELETE_FAILED": "Não foi possível excluir a mensagem agendada. Por favor, tente novamente."
+    },
+    "META": {
+      "TOOLTIP": "Agendada em {time} por {author}",
+      "YOU": "Você",
+      "AUTHOR_YOU": "{name} (Você)",
+      "AUTOMATION": "Automação",
+      "UNKNOWN_AUTHOR": "Desconhecido"
     }
   },
   "CONVERSATION_CUSTOM_ATTRIBUTES": {

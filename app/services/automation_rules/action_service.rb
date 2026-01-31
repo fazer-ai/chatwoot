@@ -61,4 +61,11 @@ class AutomationRules::ActionService < ActionService
       TeamNotifications::AutomationNotificationMailer.conversation_creation(@conversation, team, params[0][:message])&.deliver_now
     end
   end
+
+  def scheduled_message_attachment_blob(blob_id)
+    return if blob_id.blank?
+
+    attachment = @rule.files.find { |file| file.blob_id == blob_id.to_i }
+    attachment&.blob
+  end
 end

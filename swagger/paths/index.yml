@@ -404,6 +404,27 @@
   get:
     $ref: ./application/conversation/reporting_events.yml
 
+# Scheduled Messages
+
+/api/v1/accounts/{account_id}/conversations/{conversation_id}/scheduled_messages:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/conversation_id'
+  get:
+    $ref: ./application/conversation/scheduled_messages/index.yml
+  post:
+    $ref: ./application/conversation/scheduled_messages/create.yml
+
+/api/v1/accounts/{account_id}/conversations/{conversation_id}/scheduled_messages/{scheduled_message_id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/conversation_id'
+    - $ref: '#/components/parameters/scheduled_message_id'
+  patch:
+    $ref: ./application/conversation/scheduled_messages/update.yml
+  delete:
+    $ref: ./application/conversation/scheduled_messages/delete.yml
+
 # Inboxes
 /api/v1/accounts/{account_id}/inboxes:
   $ref: ./application/inboxes/index.yml
