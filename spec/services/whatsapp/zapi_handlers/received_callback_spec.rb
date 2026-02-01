@@ -1333,12 +1333,13 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
           create(:account_user, account: inbox.account)
         end
 
-        it 'creates outgoing message' do
+        it 'creates outgoing message with nil sender (sent from WhatsApp)' do
           service.perform
 
           message = Message.last
           expect(message.message_type).to eq('outgoing')
-          expect(message.sender_type).to eq('User')
+          expect(message.sender).to be_nil
+          expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
         end
 
         it 'creates contact attachment for outgoing message' do
