@@ -433,8 +433,16 @@ function handleReplyTo() {
 }
 
 const avatarInfo = computed(() => {
-  // If no sender, return bot info
+  // If no sender, check for external sender name
   if (!props.sender) {
+    const externalSenderName = props.contentAttributes?.externalSenderName;
+    if (externalSenderName === 'WhatsApp') {
+      return {
+        name: t('CONVERSATION.WHATSAPP'),
+        src: '',
+        iconName: 'i-woot-whatsapp',
+      };
+    }
     return {
       name: t('CONVERSATION.BOT'),
       src: '',

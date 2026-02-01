@@ -156,8 +156,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: raw_message_id,
-      sender: incoming_message? ? @contact : @inbox.account.account_users.first.user,
-      sender_type: incoming_message? ? 'Contact' : 'User',
+      sender: incoming_message? ? @contact : nil,
       message_type: incoming_message? ? :incoming : :outgoing,
       content_attributes: message_content_attributes
     )
@@ -170,6 +169,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   def message_content_attributes
     type = message_type
     content_attributes = { external_created_at: @raw_message[:momment] / 1000 }
+    content_attributes[:external_sender_name] = 'WhatsApp' unless incoming_message?
 
     if type == 'reaction'
       content_attributes[:in_reply_to_external_id] = @raw_message.dig(:reaction, :referencedMessage, :messageId)

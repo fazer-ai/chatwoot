@@ -22,7 +22,7 @@ class AutomationRule < ApplicationRecord
   include Reauthorizable
 
   belongs_to :account
-  has_many :scheduled_messages, as: :author, dependent: :destroy
+  has_many :scheduled_messages, as: :author, dependent: :nullify
   has_many_attached :files
 
   validate :json_conditions_format

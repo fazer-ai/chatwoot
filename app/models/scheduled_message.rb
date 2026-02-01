@@ -3,7 +3,7 @@
 # Table name: scheduled_messages
 #
 #  id              :bigint           not null, primary key
-#  author_type     :string           not null
+#  author_type     :string
 #  content         :text
 #  scheduled_at    :datetime
 #  status          :integer          default("draft"), not null
@@ -11,7 +11,7 @@
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  account_id      :bigint           not null
-#  author_id       :bigint           not null
+#  author_id       :bigint
 #  conversation_id :bigint           not null
 #  inbox_id        :bigint           not null
 #  message_id      :bigint
@@ -43,7 +43,7 @@ class ScheduledMessage < ApplicationRecord
   belongs_to :account
   belongs_to :inbox
   belongs_to :conversation
-  belongs_to :author, polymorphic: true
+  belongs_to :author, polymorphic: true, optional: true
   belongs_to :message, optional: true
 
   has_one_attached :attachment

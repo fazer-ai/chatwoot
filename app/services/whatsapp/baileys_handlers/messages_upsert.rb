@@ -93,8 +93,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: raw_message_id,
-      sender: incoming? ? @contact : @inbox.account.account_users.first.user,
-      sender_type: incoming? ? 'Contact' : 'User',
+      sender: incoming? ? @contact : nil,
       message_type: incoming? ? :incoming : :outgoing,
       content_attributes: message_content_attributes
     )
@@ -110,6 +109,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     type = message_type
     msg = unwrap_ephemeral_message(@raw_message[:message])
     content_attributes = { external_created_at: baileys_extract_message_timestamp(@raw_message[:messageTimestamp]) }
+    content_attributes[:external_sender_name] = 'WhatsApp' unless incoming?
     if type == 'reaction'
       content_attributes[:in_reply_to_external_id] = msg.dig(:reactionMessage, :key, :id)
       content_attributes[:is_reaction] = true
