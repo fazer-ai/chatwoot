@@ -410,6 +410,7 @@
       "SCHEDULED_FOR": "Scheduled for {time}",
       "NO_SCHEDULE": "No schedule",
       "TEMPLATE_PREVIEW": "Template: {name}",
+      "TEMPLATE_LABEL": "Template: {name}",
       "ATTACHMENT_PREVIEW": "Attachment: {filename}",
       "ATTACHMENT_LABEL": "Attachment: {filename}",
       "EMPTY_PREVIEW": "No content",
@@ -426,6 +427,9 @@
       "ATTACHMENT_LABEL": "Attachment",
       "ATTACHMENT_ADD": "Attach file",
       "ATTACHMENT_CURRENT": "Current attachment: {filename}",
+      "TEMPLATE_SELECT": "Use template",
+      "TEMPLATE_SELECTED": "Template: {name}",
+      "TEMPLATE_ACTION": "Schedule message",
       "CANCEL": "Cancel",
       "SAVE_DRAFT": "Save as draft",
       "SCHEDULE": "Schedule"

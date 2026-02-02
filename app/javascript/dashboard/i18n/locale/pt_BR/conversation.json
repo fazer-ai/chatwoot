@@ -408,7 +408,8 @@
     "ITEM": {
       "SCHEDULED_FOR": "Agendada para {time}",
       "NO_SCHEDULE": "Sem agendamento",
-      "TEMPLATE_PREVIEW": "Template: {name}",
+      "TEMPLATE_PREVIEW": "Modelo: {name}",
+      "TEMPLATE_LABEL": "Modelo: {name}",
       "ATTACHMENT_PREVIEW": "Anexo: {filename}",
       "ATTACHMENT_LABEL": "Anexo: {filename}",
       "EMPTY_PREVIEW": "Sem conteúdo",
@@ -425,6 +426,9 @@
       "ATTACHMENT_LABEL": "Anexo",
       "ATTACHMENT_ADD": "Anexar arquivo",
       "ATTACHMENT_CURRENT": "Anexo atual: {filename}",
+      "TEMPLATE_SELECT": "Usar modelo",
+      "TEMPLATE_SELECTED": "Modelo: {name}",
+      "TEMPLATE_ACTION": "Agendar mensagem",
       "CANCEL": "Cancelar",
       "SAVE_DRAFT": "Salvar como rascunho",
       "SCHEDULE": "Agendar"

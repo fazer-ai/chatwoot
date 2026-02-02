@@ -109,6 +109,8 @@ const templateName = computed(() => {
   return templateParams.name || templateParams.id;
 });
 
+const hasTemplate = computed(() => Boolean(templateName.value));
+
 const attachment = computed(() => props.scheduledMessage?.attachment);
 const attachmentName = computed(() => attachment.value?.filename);
 const attachmentUrl = computed(() => attachment.value?.file_url);
@@ -245,6 +247,20 @@ watch(previewContent, () => {
           {{ t('SCHEDULED_MESSAGES.ITEM.EXPAND') }}
         </template>
       </Button>
+    </div>
+
+    <div
+      v-if="hasTemplate"
+      class="flex items-center gap-1.5 text-xs text-n-slate-11"
+    >
+      <Icon icon="i-lucide-zap" class="size-3 shrink-0" />
+      <span class="truncate">
+        {{
+          t('SCHEDULED_MESSAGES.ITEM.TEMPLATE_LABEL', {
+            name: templateName,
+          })
+        }}
+      </span>
     </div>
 
     <div

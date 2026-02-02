@@ -17,6 +17,7 @@ import DropdownContainer from 'next/dropdown-menu/base/DropdownContainer.vue';
 import DropdownBody from 'next/dropdown-menu/base/DropdownBody.vue';
 import DropdownSection from 'next/dropdown-menu/base/DropdownSection.vue';
 import DropdownItem from 'next/dropdown-menu/base/DropdownItem.vue';
+import WhatsappTemplates from 'dashboard/components/widgets/conversation/WhatsappTemplates/Modal.vue';
 
 const props = defineProps({
   show: {
@@ -59,12 +60,21 @@ const isUpdating = computed(() => uiFlags.value.isUpdating);
 const isSubmitting = computed(() => isCreating.value || isUpdating.value);
 const currentInbox = computed(() => inboxGetter.value(props.inboxId));
 
+const whatsAppTemplates = computed(() => {
+  return store.getters['inboxes/getWhatsAppTemplates'](props.inboxId) || [];
+});
+
+const showWhatsappTemplates = computed(() => {
+  return whatsAppTemplates.value.length > 0;
+});
+
 const messageContent = ref('');
 const scheduledDateTime = ref(null);
 const attachments = ref([]);
 const existingAttachment = ref(null);
 const templateParams = ref(null);
 const showConfirmClose = ref(false);
+const showWhatsAppTemplatesModal = ref(false);
 const datePickerOpen = ref(false);
 const contentError = ref(false);
 const contentLengthError = ref(false);
@@ -172,7 +182,18 @@ const hasTemplate = computed(
   () => templateParams.value && Object.keys(templateParams.value).length
 );
 const hasExistingAttachment = computed(() => !!existingAttachment.value);
-const showAttachmentUpload = computed(() => !hasNewAttachment.value);
+const showAttachmentUpload = computed(
+  () => !hasNewAttachment.value && !hasTemplate.value
+);
+
+const templateName = computed(() => {
+  return templateParams.value?.name || templateParams.value?.id || null;
+});
+
+const clearTemplate = () => {
+  templateParams.value = null;
+  messageContent.value = '';
+};
 
 const maxLength = computed(() => {
   const channelType = currentInbox.value?.channel_type;
@@ -354,6 +375,21 @@ const closeModal = () => {
   resetForm();
 };
 
+const openWhatsAppTemplatesModal = () => {
+  showWhatsAppTemplatesModal.value = true;
+};
+
+const hideWhatsAppTemplatesModal = () => {
+  showWhatsAppTemplatesModal.value = false;
+};
+
+const onTemplateSelect = messagePayload => {
+  templateParams.value = messagePayload.templateParams;
+  messageContent.value = messagePayload.message;
+  hideWhatsAppTemplatesModal();
+  contentError.value = false;
+};
+
 const submit = async status => {
   if (!validatePayload(status)) return;
 
@@ -458,14 +494,16 @@ watch(
         <WootMessageEditor
           v-model="messageContent"
           class="message-editor min-h-[10rem] max-h-[20rem] !px-3 resize-y overflow-auto"
-          :class="
+          :class="[
             contentError || contentLengthError
               ? 'border border-n-ruby-9 rounded-xl'
-              : ''
-          "
+              : '',
+            hasTemplate ? 'opacity-60 cursor-not-allowed' : '',
+          ]"
           :placeholder="t('SCHEDULED_MESSAGES.MODAL.MESSAGE_PLACEHOLDER')"
           :channel-type="currentInbox?.channel_type"
           :medium="currentInbox?.medium"
+          :disabled="hasTemplate"
           override-line-breaks
           @update:model-value="
             () => {
@@ -518,7 +556,7 @@ watch(
               @change="onDateTimeChange"
             />
           </div>
-          <div v-if="showAttachmentUpload" class="flex items-center h-10">
+          <div v-if="showAttachmentUpload" class="flex items-center gap-2 h-10">
             <FileUpload
               :accept="ALLOWED_FILE_TYPES"
               :multiple="false"
@@ -534,6 +572,33 @@ watch(
                 class="pointer-events-none"
               />
             </FileUpload>
+            <NextButton
+              v-if="showWhatsappTemplates"
+              ghost
+              xs
+              icon="i-lucide-zap"
+              :label="t('SCHEDULED_MESSAGES.MODAL.TEMPLATE_SELECT')"
+              @click="openWhatsAppTemplatesModal"
+            />
+          </div>
+          <div
+            v-if="hasTemplate"
+            class="flex items-center gap-2 text-xs text-n-slate-11"
+          >
+            <span>
+              {{
+                t('SCHEDULED_MESSAGES.MODAL.TEMPLATE_SELECTED', {
+                  name: templateName,
+                })
+              }}
+            </span>
+            <NextButton
+              ghost
+              xs
+              slate
+              icon="i-lucide-x"
+              @click="clearTemplate"
+            />
           </div>
           <span
             v-if="existingAttachment && !attachments.length"
@@ -632,5 +697,13 @@ watch(
         </div>
       </div>
     </woot-modal>
+
+    <WhatsappTemplates
+      v-model:show="showWhatsAppTemplatesModal"
+      :inbox-id="inboxId"
+      :send-button-label="t('SCHEDULED_MESSAGES.MODAL.TEMPLATE_ACTION')"
+      @on-send="onTemplateSelect"
+      @cancel="hideWhatsAppTemplatesModal"
+    />
   </woot-modal>
 </template>
