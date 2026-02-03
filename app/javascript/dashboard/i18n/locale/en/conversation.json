@@ -424,6 +424,7 @@
       "MESSAGE_PLACEHOLDER": "Write your message...",
       "DATETIME_LABEL": "Date and time to send",
       "DATETIME_PLACEHOLDER": "Select date and time",
+      "DATETIME_FORMAT": "MMM D, YYYY h:mm A",
       "ATTACHMENT_LABEL": "Attachment",
       "ATTACHMENT_ADD": "Attach file",
       "ATTACHMENT_CURRENT": "Current attachment: {filename}",

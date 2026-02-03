@@ -544,10 +544,11 @@ watch(
               type="datetime"
               :placeholder="t('SCHEDULED_MESSAGES.MODAL.DATETIME_PLACEHOLDER')"
               :lang="datePickerLang"
-              format="MMM D, YYYY h:mm A"
+              :format="t('SCHEDULED_MESSAGES.MODAL.DATETIME_FORMAT')"
               value-type="date"
               :disabled-date="disablePastDates"
               :show-second="false"
+              editable
               clearable
               append-to-body
               popup-class="z-[10000]"
