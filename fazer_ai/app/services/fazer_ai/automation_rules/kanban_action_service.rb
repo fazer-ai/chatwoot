@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class FazerAi::AutomationRules::KanbanActionService
+class FazerAi::AutomationRules::KanbanActionService # rubocop:disable Metrics/ClassLength
   def initialize(rule, account, task)
     @rule = rule
     @account = account
@@ -112,6 +112,36 @@ class FazerAi::AutomationRules::KanbanActionService
 
       params = { content: message.first, private: true, content_attributes: { automation_rule_id: @rule.id } }
       Messages::MessageBuilder.new(nil, conversation.reload, params).perform
+    end
+  end
+
+  def mute_conversation(params = nil)
+    delegate_to_conversations(:mute_conversation, params)
+  end
+
+  def snooze_conversation(params = nil)
+    delegate_to_conversations(:snooze_conversation, params)
+  end
+
+  def resolve_conversation(params = nil)
+    delegate_to_conversations(:resolve_conversation, params)
+  end
+
+  def open_conversation(params = nil)
+    delegate_to_conversations(:open_conversation, params)
+  end
+
+  def assign_team(params = [])
+    delegate_to_conversations(:assign_team, params)
+  end
+
+  def create_scheduled_message(params = nil)
+    delegate_to_conversations(:create_scheduled_message, params)
+  end
+
+  def delegate_to_conversations(action_name, params)
+    @task.conversations.each do |conversation|
+      ActionService.new(conversation).send(action_name, params)
     end
   end
 

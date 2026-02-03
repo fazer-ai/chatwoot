@@ -731,6 +731,10 @@ export const AUTOMATIONS = {
         name: 'ASSIGN_AGENT',
       },
       {
+        key: 'assign_team',
+        name: 'ASSIGN_TEAM',
+      },
+      {
         key: 'move_to_step',
         name: 'KANBAN_TASK_MOVE_TO_STEP',
       },
@@ -755,8 +759,28 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'mute_conversation',
+        name: 'MUTE_CONVERSATION',
+      },
+      {
+        key: 'snooze_conversation',
+        name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'resolve_conversation',
+        name: 'RESOLVE_CONVERSATION',
+      },
+      {
+        key: 'open_conversation',
+        name: 'OPEN_CONVERSATION',
       },
       {
         key: 'assign_to_board',
@@ -803,6 +827,10 @@ export const AUTOMATIONS = {
         name: 'ASSIGN_AGENT',
       },
       {
+        key: 'assign_team',
+        name: 'ASSIGN_TEAM',
+      },
+      {
         key: 'move_to_step',
         name: 'KANBAN_TASK_MOVE_TO_STEP',
       },
@@ -835,8 +863,28 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'mute_conversation',
+        name: 'MUTE_CONVERSATION',
+      },
+      {
+        key: 'snooze_conversation',
+        name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'resolve_conversation',
+        name: 'RESOLVE_CONVERSATION',
+      },
+      {
+        key: 'open_conversation',
+        name: 'OPEN_CONVERSATION',
       },
       {
         key: 'assign_to_board',
@@ -889,8 +937,32 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'mute_conversation',
+        name: 'MUTE_CONVERSATION',
+      },
+      {
+        key: 'snooze_conversation',
+        name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'resolve_conversation',
+        name: 'RESOLVE_CONVERSATION',
+      },
+      {
+        key: 'open_conversation',
+        name: 'OPEN_CONVERSATION',
+      },
+      {
+        key: 'assign_team',
+        name: 'ASSIGN_TEAM',
       },
     ],
   },
@@ -939,8 +1011,32 @@ export const AUTOMATIONS = {
         name: 'SEND_MESSAGE',
       },
       {
+        key: 'create_scheduled_message',
+        name: 'CREATE_SCHEDULED_MESSAGE',
+      },
+      {
         key: 'add_private_note',
         name: 'ADD_PRIVATE_NOTE',
+      },
+      {
+        key: 'mute_conversation',
+        name: 'MUTE_CONVERSATION',
+      },
+      {
+        key: 'snooze_conversation',
+        name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'resolve_conversation',
+        name: 'RESOLVE_CONVERSATION',
+      },
+      {
+        key: 'open_conversation',
+        name: 'OPEN_CONVERSATION',
+      },
+      {
+        key: 'assign_team',
+        name: 'ASSIGN_TEAM',
       },
     ],
   },
