@@ -17,7 +17,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import Switch from 'next/switch/Switch.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import ComboBox from 'dashboard/components-next/combobox/ComboBox.vue';
-import languages from 'dashboard/components/widgets/conversation/advancedFilterItems/languages.js';
+import whatsappTemplateLanguages from './whatsappTemplateLanguages.js';
 import ConfirmTemplateUpdateDialog from './components/ConfirmTemplateUpdateDialog.vue';
 
 const props = defineProps({
@@ -80,7 +80,10 @@ const labelOptions = computed(() =>
 );
 
 const languageOptions = computed(() =>
-  languages.map(({ name, id }) => ({ label: `${name} (${id})`, value: id }))
+  whatsappTemplateLanguages.map(({ name, id }) => ({
+    label: `${name} (${id})`,
+    value: id,
+  }))
 );
 
 const messagePreviewData = computed(() => ({
