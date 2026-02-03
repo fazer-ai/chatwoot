@@ -206,7 +206,9 @@
       "TODAY": "Hoje",
       "YESTERDAY": "Ontem",
       "TOMORROW": "Amanhã",
-      "TIME_PLACEHOLDER": "Hora"
+      "TIME_PLACEHOLDER": "Hora",
+      "DATE_FORMAT": "D [de] MMM, YYYY",
+      "TIME_FORMAT": "HH:mm"
     },
     "CREATED_AT_TOOLTIP": "Criado em {date}",
     "STEP_CHANGED_AT_TOOLTIP": "Movido em {date}",

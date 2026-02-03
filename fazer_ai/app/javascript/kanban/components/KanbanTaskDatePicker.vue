@@ -235,8 +235,9 @@ const datePickerLang = {
           type="date"
           :placeholder="t('KANBAN.MODAL.START_DATE_PLACEHOLDER')"
           :lang="datePickerLang"
-          format="MMM D, YYYY"
+          :format="t('KANBAN.DATE.DATE_FORMAT')"
           value-type="date"
+          editable
           :disabled-date="disabledStartDate"
           :append-to-body="false"
           @change="onStartDateChange"
@@ -248,8 +249,9 @@ const datePickerLang = {
           type="time"
           :placeholder="t('KANBAN.DATE.TIME_PLACEHOLDER')"
           :lang="datePickerLang"
-          format="h:mm A"
+          :format="t('KANBAN.DATE.TIME_FORMAT')"
           value-type="date"
+          editable
           :append-to-body="false"
           @change="onStartTimeChange"
         />
@@ -267,8 +269,9 @@ const datePickerLang = {
           type="date"
           :placeholder="t('KANBAN.MODAL.DUE_DATE_PLACEHOLDER')"
           :lang="datePickerLang"
-          format="MMM D, YYYY"
+          :format="t('KANBAN.DATE.DATE_FORMAT')"
           value-type="date"
+          editable
           :disabled-date="disabledDueDate"
           :append-to-body="false"
           @change="onDueDateChange"
@@ -280,8 +283,9 @@ const datePickerLang = {
           type="time"
           :placeholder="t('KANBAN.DATE.TIME_PLACEHOLDER')"
           :lang="datePickerLang"
-          format="h:mm A"
+          :format="t('KANBAN.DATE.TIME_FORMAT')"
           value-type="date"
+          editable
           :append-to-body="false"
           @change="onDueTimeChange"
         />
