@@ -97,8 +97,11 @@
       "TEAM_DROPDOWN_PLACEHOLDER": "Select teams",
       "EMAIL_INPUT_PLACEHOLDER": "Enter email",
       "URL_INPUT_PLACEHOLDER": "Enter URL",
-      "SCHEDULED_MESSAGE_DELAY_LABEL": "Delay (minutes)",
-      "SCHEDULED_MESSAGE_DELAY_PLACEHOLDER": "Enter delay in minutes"
+      "SCHEDULED_MESSAGE_DELAY_LABEL": "Delay",
+      "ATTACHMENT_ADD": "Add attachment",
+      "TEMPLATE_SELECT": "Use template",
+      "TEMPLATE_SELECTED": "Template: {name}",
+      "TEMPLATE_USE": "Use this template"
     },
     "TOGGLE": {
       "ACTIVATION_TITLE": "Activate Automation Rule",

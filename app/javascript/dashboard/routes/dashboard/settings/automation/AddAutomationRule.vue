@@ -352,6 +352,7 @@ export default {
                   automation.actions[i].action_name
                 )
               "
+              :conditions="automation.conditions"
               :show-select-board-warning="
                 automation.actions[i].action_name === 'move_to_step' &&
                 !hasBoardSelected

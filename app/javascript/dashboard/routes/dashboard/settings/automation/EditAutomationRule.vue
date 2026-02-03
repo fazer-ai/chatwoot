@@ -332,6 +332,7 @@ export default {
               :show-action-input="
                 showActionInput(automationActionTypes, action.action_name)
               "
+              :conditions="automation.conditions"
               :show-select-board-warning="
                 action.action_name === 'move_to_step' && !hasBoardSelected
               "

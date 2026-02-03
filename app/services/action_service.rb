@@ -83,7 +83,7 @@ class ActionService
     return if conversation_a_tweet?
 
     params = action_params.first&.with_indifferent_access || {}
-    delay_minutes = params[:delay_minutes].to_i.clamp(0, 999_999)
+    delay_minutes = params[:delay_minutes].to_i.clamp(1, AutomationRule::MAX_SCHEDULED_MESSAGE_DELAY_MINUTES)
     scheduled_at = delay_minutes.minutes.from_now
 
     scheduled_message = @conversation.scheduled_messages.new(
@@ -93,7 +93,7 @@ class ActionService
       content: params[:content],
       scheduled_at: scheduled_at,
       status: :pending,
-      template_params: {}
+      template_params: params[:template_params] || {}
     )
 
     blob = scheduled_message_attachment_blob(params[:blob_id])

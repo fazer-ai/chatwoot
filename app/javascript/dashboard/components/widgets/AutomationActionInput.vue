@@ -42,6 +42,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    conditions: {
+      type: Array,
+      default: () => [],
+    },
     showSelectBoardWarning: {
       type: Boolean,
       default: false,
@@ -230,6 +234,7 @@ export default {
       v-if="inputType === 'scheduled_message'"
       v-model="action_params"
       :initial-file-name="initialFileName"
+      :conditions="conditions"
     />
     <p v-if="errorMessage" class="filter-error">
       {{ errorMessage }}

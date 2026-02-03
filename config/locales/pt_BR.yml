@@ -76,8 +76,8 @@ pt_BR:
       invalid: Anexo inválido
     automation:
       scheduled_message:
-        delay_out_of_range: O tempo de atraso deve ser entre 0 e 999999 minutos
-        content_or_attachment_required: A mensagem agendada deve ter conteúdo ou anexo
+        delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias
+        content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou template
     saml:
       feature_not_enabled: SAML não está habilitado para esta conta
       sso_not_enabled: O SSO via SAML não está habilitado para esta instalação

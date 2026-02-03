@@ -50,6 +50,7 @@ class ScheduledMessage < ApplicationRecord
 
   enum status: { draft: 0, pending: 1, sent: 2, failed: 3 }
 
+  before_validation :process_message_variables, if: :content_changed?
   before_destroy :prevent_destroy_if_processed
 
   validates :scheduled_at, presence: true, unless: -> { status == 'draft' }
@@ -150,5 +151,35 @@ class ScheduledMessage < ApplicationRecord
     data = { id: author_id, type: author_type }
     data[:name] = author.name if author.respond_to?(:name)
     data
+  end
+
+  def process_message_variables
+    return if content.blank?
+
+    processed_content = modified_liquid_content(content)
+    template = Liquid::Template.parse(processed_content)
+    self.content = template.render(message_drops)
+  rescue Liquid::Error
+    # Keep original content if Liquid parsing/rendering fails
+    nil
+  end
+
+  def modified_liquid_content(raw_content)
+    return raw_content if raw_content.blank?
+
+    # Wrap inline code (text between single backticks) in Liquid raw blocks
+    # so that any {{ ... }} inside code is not interpreted by Liquid.
+    raw_content.gsub(/`([^`\n]+)`/) do
+      "{% raw %}`#{Regexp.last_match(1)}`{% endraw %}"
+    end
+  end
+
+  def message_drops
+    {
+      'contact' => ContactDrop.new(conversation.contact),
+      'conversation' => ConversationDrop.new(conversation),
+      'inbox' => InboxDrop.new(inbox),
+      'account' => AccountDrop.new(account)
+    }
   end
 end

@@ -235,4 +235,53 @@ RSpec.describe ScheduledMessage, type: :model do
       expect(described_class.due_for_sending.pluck(:id)).to contain_exactly(due_same_minute.id, overdue.id)
     end
   end
+
+  describe '#process_message_variables' do
+    it 'renders Liquid variables with contact data on save' do
+      contact.update!(name: 'John Doe')
+      scheduled_message = build_scheduled_message(content: 'Hello {{contact.name}}!')
+
+      scheduled_message.save!
+
+      expect(scheduled_message.content).to eq('Hello John Doe!')
+    end
+
+    it 'renders conversation variables on save' do
+      scheduled_message = build_scheduled_message(content: 'Conversation #{{conversation.display_id}}')
+
+      scheduled_message.save!
+
+      expect(scheduled_message.content).to eq("Conversation ##{conversation.display_id}")
+    end
+
+    it 'preserves original content when Liquid syntax is invalid' do
+      original_content = 'Hello {{contact.name | }'
+      scheduled_message = build_scheduled_message(content: original_content)
+
+      scheduled_message.save!
+
+      expect(scheduled_message.content).to eq(original_content)
+    end
+
+    it 'does not process variables when content has not changed' do
+      contact.update!(name: 'John Doe')
+      scheduled_message = create_scheduled_message(content: 'Hello {{contact.name}}!')
+
+      expect(scheduled_message.content).to eq('Hello John Doe!')
+
+      # Update a different field
+      scheduled_message.update!(scheduled_at: 2.hours.from_now)
+
+      # Content should remain the same
+      expect(scheduled_message.content).to eq('Hello John Doe!')
+    end
+
+    it 'preserves Liquid variables inside inline code blocks' do
+      scheduled_message = build_scheduled_message(content: 'Use `{{contact.name}}` to get the name')
+
+      scheduled_message.save!
+
+      expect(scheduled_message.content).to eq('Use `{{contact.name}}` to get the name')
+    end
+  end
 end

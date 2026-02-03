@@ -94,8 +94,8 @@ en:
       invalid: Invalid attachment
     automation:
       scheduled_message:
-        delay_out_of_range: Delay minutes must be between 0 and 999999
-        content_or_attachment_required: Scheduled message must have content or attachment
+        delay_out_of_range: Delay must be between 1 minute and 999 days
+        content_attachment_or_template_required: Scheduled message must have content, attachment, or template
     saml:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation
