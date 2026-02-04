@@ -3,6 +3,19 @@ class GlobalConfig
   KEY_PREFIX = 'GLOBAL_CONFIG'.freeze
   DEFAULT_EXPIRY = 1.day
 
+  BRANDING_CONFIGS = {
+    'INSTALLATION_NAME' => { default: 'Chatwoot', type: :string },
+    'LOGO_THUMBNAIL' => { default: '/brand-assets/logo_thumbnail.svg', type: :string },
+    'LOGO' => { default: '/brand-assets/logo.svg', type: :string },
+    'LOGO_DARK' => { default: '/brand-assets/logo_dark.svg', type: :string },
+    'BRAND_URL' => { default: 'https://www.chatwoot.com', type: :string },
+    'WIDGET_BRAND_URL' => { default: 'https://www.chatwoot.com', type: :string },
+    'BRAND_NAME' => { default: 'Chatwoot', type: :string },
+    'TERMS_URL' => { default: 'https://www.chatwoot.com/terms-of-service', type: :string },
+    'PRIVACY_URL' => { default: 'https://www.chatwoot.com/privacy-policy', type: :string },
+    'DISPLAY_MANIFEST' => { default: true, type: :boolean }
+  }.freeze
+
   class << self
     def get(*args)
       config_keys = *args
@@ -38,6 +51,9 @@ class GlobalConfig
     end
 
     def load_from_cache(config_key)
+      env_value = branding_env_override(config_key)
+      return env_value unless env_value.nil?
+
       cache_key = "#{VERSION}:#{KEY_PREFIX}:#{config_key}"
       cached_value = $alfred.with { |conn| conn.get(cache_key) }
 
@@ -48,6 +64,23 @@ class GlobalConfig
       end
 
       JSON.parse(cached_value)['value']
+    end
+
+    def branding_env_override(config_key)
+      branding_config = BRANDING_CONFIGS[config_key]
+      return nil unless branding_config
+
+      env_value = ENV.fetch(config_key, nil)
+      return nil if env_value.nil?
+
+      # Don't override if ENV value matches default (user hasn't customized)
+      return nil if env_value == branding_config[:default].to_s
+
+      if branding_config[:type] == :boolean
+        env_value == 'true'
+      else
+        env_value
+      end
     end
 
     def db_fallback(config_key)
