@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onBeforeMount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -10,6 +10,7 @@ import DurationInput from 'dashboard/components-next/input/DurationInput.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import WhatsappTemplates from 'dashboard/components/widgets/conversation/WhatsappTemplates/Modal.vue';
 import { DURATION_UNITS } from 'dashboard/components-next/input/constants';
+import { DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES } from 'dashboard/routes/dashboard/settings/automation/constants.js';
 
 const props = defineProps({
   modelValue: {
@@ -28,7 +29,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const DEFAULT_DELAY_MINUTES = 24 * 60; // 24 hours
 const MAX_DELAY_MINUTES = 999 * 24 * 60; // 999 days
 
 const { t } = useI18n();
@@ -59,7 +59,9 @@ const content = computed({
 });
 
 const delayMinutes = computed({
-  get: () => normalizedParams.value.delay_minutes ?? DEFAULT_DELAY_MINUTES,
+  get: () =>
+    normalizedParams.value.delay_minutes ??
+    DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES,
   set: value => {
     const numValue = Math.min(
       Math.max(1, Number(value) || 1),
@@ -79,15 +81,23 @@ const detectUnit = minutes => {
   return DURATION_UNITS.MINUTES;
 };
 
-onMounted(() => {
-  // Always emit the properly formatted params on mount
-  // This ensures the data is in the correct array format for validation
-  // and sets default delay_minutes if not present
-  const currentDelay = normalizedParams.value.delay_minutes;
-  const rawDelay = currentDelay ?? DEFAULT_DELAY_MINUTES;
-  const delay = Math.min(Math.max(1, Number(rawDelay) || 1), MAX_DELAY_MINUTES);
-  updateParams({ delay_minutes: delay });
-  delayUnit.value = detectUnit(delay);
+onBeforeMount(() => {
+  // Normalize delay_minutes for existing automations with invalid/out-of-range values
+  // For new actions, resetAction in useAutomation.js sets the default
+  const rawDelay =
+    normalizedParams.value.delay_minutes ??
+    DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES;
+  const clampedDelay = Math.min(
+    Math.max(1, Number(rawDelay) || 1),
+    MAX_DELAY_MINUTES
+  );
+
+  // Only emit if the value needs normalization to avoid unnecessary updates
+  if (clampedDelay !== normalizedParams.value.delay_minutes) {
+    updateParams({ delay_minutes: clampedDelay });
+  }
+
+  delayUnit.value = detectUnit(clampedDelay);
 });
 
 // Attachment handling

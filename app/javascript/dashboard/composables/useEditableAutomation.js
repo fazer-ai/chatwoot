@@ -83,7 +83,8 @@ export function useEditableAutomation() {
       ].filter(item => [...params].includes(item.id));
     }
     if (inputType === 'scheduled_message') {
-      return params[0] || {};
+      // Keep as array to maintain consistent format with how the component emits updates
+      return params[0] ? [params[0]] : [];
     }
     if (inputType === 'team_message') {
       return {

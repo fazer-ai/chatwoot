@@ -1198,3 +1198,6 @@ export const AUTOMATION_ACTION_TYPES = [
     inputType: 'search_select',
   },
 ];
+
+// Default delay for scheduled messages (24 hours in minutes)
+export const DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES = 24 * 60;
