@@ -182,20 +182,52 @@ RSpec.describe ScheduledMessage, type: :model do
         expect { scheduled_message.destroy }.to change(described_class, :count).by(-1)
       end
 
-      it 'does not allow deleting sent messages' do
+      it 'allows deleting pending messages with attachments' do
+        scheduled_message = create_scheduled_message
+        scheduled_message.attachment.attach(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+
+        expect { scheduled_message.destroy! }.to change(described_class, :count).by(-1)
+      end
+
+      it 'allows destroying conversation with pending scheduled messages with attachments' do
+        scheduled_message = create_scheduled_message
+        scheduled_message.attachment.attach(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+
+        expect { conversation.destroy! }.to change(described_class, :count).by(-1)
+      end
+
+      it 'allows destroying conversation with sent scheduled messages with attachments' do
+        scheduled_message = create_scheduled_message
+        scheduled_message.attachment.attach(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+        scheduled_message.update!(status: :sent)
+
+        expect { conversation.destroy! }.to change(described_class, :count).by(-1)
+      end
+
+      it 'allows deleting sent messages at model level (controller enforces restriction)' do
         scheduled_message = create_scheduled_message
         scheduled_message.update!(status: :sent)
 
-        expect { scheduled_message.destroy }.not_to change(described_class, :count)
-        expect(scheduled_message.errors[:base]).to include('Cannot delete a scheduled message that has already been sent or failed')
+        expect { scheduled_message.destroy! }.to change(described_class, :count).by(-1)
       end
 
-      it 'does not allow deleting failed messages' do
+      it 'allows deleting failed messages at model level (controller enforces restriction)' do
         scheduled_message = create_scheduled_message
         scheduled_message.update!(status: :failed)
 
-        expect { scheduled_message.destroy }.not_to change(described_class, :count)
-        expect(scheduled_message.errors[:base]).to include('Cannot delete a scheduled message that has already been sent or failed')
+        expect { scheduled_message.destroy! }.to change(described_class, :count).by(-1)
       end
     end
   end

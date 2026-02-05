@@ -27,11 +27,13 @@ class Api::V1::Accounts::Conversations::ScheduledMessagesController < Api::V1::A
   end
 
   def destroy
+    if @scheduled_message.sent? || @scheduled_message.failed?
+      return render json: { error: I18n.t('errors.scheduled_messages.cannot_delete_processed') }, status: :unprocessable_entity
+    end
+
     scheduled_message = @scheduled_message
     scheduled_message.destroy!
     dispatch_event(SCHEDULED_MESSAGE_DELETED, scheduled_message: scheduled_message)
-  rescue ActiveRecord::RecordNotDestroyed => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   private

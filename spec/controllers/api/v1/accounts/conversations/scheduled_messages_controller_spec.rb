@@ -114,6 +114,19 @@ RSpec.describe 'Scheduled Messages API', type: :request do
       expect(ScheduledMessage.exists?(scheduled_message.id)).to be(false)
     end
 
+    it 'deletes pending scheduled messages with attachments' do
+      scheduled_message.attachment.attach(
+        io: Rails.root.join('spec/assets/avatar.png').open,
+        filename: 'avatar.png',
+        content_type: 'image/png'
+      )
+
+      delete scheduled_message_url(scheduled_message), headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(ScheduledMessage.exists?(scheduled_message.id)).to be(false)
+    end
+
     it 'rejects delete for sent messages' do
       scheduled_message.update!(status: :sent)
 

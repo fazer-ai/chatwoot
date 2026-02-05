@@ -51,7 +51,6 @@ class ScheduledMessage < ApplicationRecord
   enum status: { draft: 0, pending: 1, sent: 2, failed: 3 }
 
   before_validation :process_message_variables, if: :content_changed?
-  before_destroy :prevent_destroy_if_processed
 
   validates :scheduled_at, presence: true, unless: -> { status == 'draft' }
   validates :content, presence: true, unless: :content_optional?
@@ -119,13 +118,6 @@ class ScheduledMessage < ApplicationRecord
 
   def only_status_changed?
     changed_attributes.keys == ['status']
-  end
-
-  def prevent_destroy_if_processed
-    return unless sent? || failed?
-
-    errors.add(:base, 'Cannot delete a scheduled message that has already been sent or failed')
-    throw(:abort)
   end
 
   def scheduled_at_must_be_in_future

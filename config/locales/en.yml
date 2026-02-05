@@ -96,6 +96,8 @@ en:
       scheduled_message:
         delay_out_of_range: Delay must be between 1 minute and 999 days
         content_attachment_or_template_required: Scheduled message must have content, attachment, or template
+    scheduled_messages:
+      cannot_delete_processed: Cannot delete a scheduled message that has already been sent or failed
     saml:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation
