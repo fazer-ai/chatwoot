@@ -1,6 +1,6 @@
 module BaileysHelper
   CHANNEL_LOCK_ON_OUTGOING_MESSAGE_KEY = 'BAILEYS::CHANNEL_LOCK_ON_OUTGOING_MESSAGE::%<channel_id>s'.freeze
-  CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT = 15.seconds
+  CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT = 60.seconds
 
   def baileys_extract_message_timestamp(timestamp)
     # NOTE: Timestamp might be in this format {"low"=>1748003165, "high"=>0, "unsigned"=>true}
@@ -18,13 +18,20 @@ module BaileysHelper
     raise ArgumentError, 'A block is required for with_baileys_channel_lock_on_outgoing_message' unless block_given?
 
     start_time = Time.now.to_i
+    lock_acquired = false
 
-    # NOTE: On timeout, we ignore the lock and proceed with the block execution
+    # NOTE: On timeout, we log a warning and proceed with the block execution.
+    # The re-check inside the contact lock handles potential duplicates.
     while (Time.now.to_i - start_time) < timeout
-      break if baileys_lock_channel_on_outgoing_message(channel_id, timeout)
+      if baileys_lock_channel_on_outgoing_message(channel_id, timeout)
+        lock_acquired = true
+        break
+      end
 
       sleep(0.1)
     end
+
+    Rails.logger.warn "Baileys channel lock timeout for channel #{channel_id} after #{timeout}s - proceeding anyway" unless lock_acquired
 
     yield
   ensure

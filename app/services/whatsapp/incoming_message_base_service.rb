@@ -37,6 +37,10 @@ class Whatsapp::IncomingMessageBaseService
     # from the same contact arrive simultaneously (e.g., WhatsApp albums).
     contact_phone = @processed_params[:messages].first[:from]
     with_contact_lock(contact_phone) do
+      # Re-check after acquiring lock to handle race conditions where an outgoing message
+      # was sent from Chatwoot and the webhook arrived before source_id was saved
+      return if find_message_by_source_id(@processed_params[:messages].first[:id])
+
       set_contact
       return unless @contact
 

@@ -20,7 +20,7 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     end
   end
 
-  def handle_message # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def handle_message # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength
     @lock_acquired = false
 
     return unless %w[lid user].include?(jid_type)
@@ -35,6 +35,13 @@ module Whatsapp::BaileysHandlers::MessagesUpsert # rubocop:disable Metrics/Modul
     # from the same contact arrive simultaneously (e.g., WhatsApp albums).
     contact_phone = extract_from_jid(type: 'pn') || extract_from_jid(type: 'lid')
     with_contact_lock(contact_phone) do
+      # Re-check after acquiring lock to handle race conditions where:
+      # 1. An agent sends a message from Chatwoot (slow API call)
+      # 2. WhatsApp sends webhook before source_id is saved
+      # 3. Webhook handler times out waiting for channel lock and proceeds
+      # 4. By now, source_id should be set, so we can find the message
+      return if find_message_by_source_id(raw_message_id)
+
       set_contact
 
       unless @contact
