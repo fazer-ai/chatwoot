@@ -546,3 +546,6 @@ en:
               inclusion: "is not a valid priority"
             status:
               inclusion: "is not a valid status"
+  super_admin:
+    settings:
+      unlimited: 'Unlimited'

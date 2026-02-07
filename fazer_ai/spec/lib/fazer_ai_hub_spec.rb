@@ -78,6 +78,14 @@ RSpec.describe FazerAiHub do
     end
 
     context 'when no valid token exists' do
+      it 'returns nil' do
+        expect(described_class.kanban_account_limit).to be_nil
+      end
+    end
+
+    context 'when valid token has account_limit 0 (unlimited)' do
+      before { setup_valid_subscription(kanban_limit: 0) }
+
       it 'returns 0' do
         expect(described_class.kanban_account_limit).to eq(0)
       end

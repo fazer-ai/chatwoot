@@ -26,16 +26,19 @@ class FazerAiHub
     end
 
     def kanban_account_limit
-      return 0 unless subscription_token_valid?
+      return nil unless subscription_token_valid?
 
       feature_limit('kanban', 'account_limit')
     end
 
     def feature_limit(feature_name, limit_key)
       feature_config = features.with_indifferent_access[feature_name]
-      return 0 unless feature_config.is_a?(Hash)
+      return nil unless feature_config.is_a?(Hash)
 
-      feature_config.with_indifferent_access[limit_key].to_i
+      config = feature_config.with_indifferent_access
+      return nil unless config.key?(limit_key)
+
+      config[limit_key].to_i
     end
 
     def instance_type
