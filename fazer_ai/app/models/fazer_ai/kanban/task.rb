@@ -208,7 +208,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       updated_at: updated_at,
       contact_ids: contact_ids,
       conversation_ids: conversation_ids,
-      contacts: contacts.reload.map { |c| { id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url } },
+      contacts: contacts.reload.map { |c| contact_push_data(c) },
       conversations: conversations.reload.map { |conv| conversation_push_data(conv) },
       assigned_agents: assigned_agents.reload.map do |a|
         { id: a.id, name: a.name, avatar_url: a.avatar_url, availability_status: a.availability_status }
@@ -220,24 +220,6 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       # Only include insert_before_task_id when explicitly set (during move operations)
       data[:insert_before_task_id] = @insert_before_task_id if insert_before_task_id_set?
     end
-  end
-
-  def conversation_push_data(conversation)
-    {
-      id: conversation.id,
-      display_id: conversation.display_id,
-      status: conversation.status,
-      inbox: {
-        id: conversation.inbox.id,
-        name: conversation.inbox.name,
-        channel_type: conversation.inbox.channel_type
-      },
-      contact: {
-        id: conversation.contact.id,
-        name: conversation.contact.name,
-        avatar_url: conversation.contact.avatar_url
-      }
-    }
   end
 
   def reorder_for_user!(user, preference: nil)
@@ -266,6 +248,30 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   private
+
+  def contact_push_data(contact)
+    {
+      id: contact.id,
+      name: contact.name,
+      email: contact.email,
+      phone_number: contact.phone_number,
+      avatar_url: contact.avatar_url
+    }
+  end
+
+  def conversation_push_data(conversation)
+    {
+      id: conversation.id,
+      display_id: conversation.display_id,
+      status: conversation.status,
+      inbox: {
+        id: conversation.inbox.id,
+        name: conversation.inbox.name,
+        channel_type: conversation.inbox.channel_type
+      },
+      contact: contact_push_data(conversation.contact)
+    }
+  end
 
   def track_step_change
     return unless board_step_id_changed?
