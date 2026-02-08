@@ -220,6 +220,14 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (this.app.$store.hasModule?.('kanban')) {
       this.app.$store.dispatch('kanban/addTaskFromEvent', data);
     }
+    // Update the kanban_task on any conversations linked to this task
+    const conversationIds = data.conversation_ids || [];
+    conversationIds.forEach(conversationId => {
+      this.app.$store.commit(types.UPDATE_CONVERSATION_KANBAN_TASK, {
+        task: data,
+        conversationId,
+      });
+    });
   };
 
   onKanbanTaskUpdated = data => {

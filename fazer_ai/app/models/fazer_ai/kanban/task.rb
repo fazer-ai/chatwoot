@@ -192,7 +192,8 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       board_step_id: board_step_id,
       board_step: {
         id: board_step.id,
-        name: board_step.name
+        name: board_step.name,
+        cancelled: board_step.cancelled
       },
       created_by_id: created_by_id,
       title: title,

@@ -15,6 +15,11 @@ module FazerAi::Conversations::EventDataPresenter
       account_id: kanban_task.account_id,
       board_id: kanban_task.board_id,
       board_step_id: kanban_task.board_step_id,
+      board_step: {
+        id: kanban_task.board_step.id,
+        name: kanban_task.board_step.name,
+        cancelled: kanban_task.board_step.cancelled
+      },
       created_by_id: kanban_task.created_by_id,
       title: kanban_task.title,
       description: kanban_task.description,
@@ -47,7 +52,7 @@ module FazerAi::Conversations::EventDataPresenter
           {
             id: step.id,
             name: step.name,
-            color: step.color
+            cancelled: step.cancelled
           }
         end,
         assigned_agents: kanban_task.board.assigned_agents.map do |agent|

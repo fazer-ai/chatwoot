@@ -70,15 +70,18 @@ describe('ActionCableConnector - Kanban Tests', () => {
   let store;
   let actionCable;
   let mockDispatch;
+  let mockCommit;
   let mockHasModule;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockDispatch = vi.fn();
+    mockCommit = vi.fn();
     mockHasModule = vi.fn(() => true);
     store = {
       $store: {
         dispatch: mockDispatch,
+        commit: mockCommit,
         hasModule: mockHasModule,
         getters: {
           getCurrentAccountId: 1,
@@ -139,6 +142,7 @@ describe('ActionCableConnector - Kanban Tests', () => {
         board_id: 1,
         board_step_id: 1,
         account_id: 1,
+        conversation_ids: [10, 20],
       };
 
       actionCable.onReceived({
@@ -150,6 +154,14 @@ describe('ActionCableConnector - Kanban Tests', () => {
       expect(mockDispatch).toHaveBeenCalledWith(
         'kanban/addTaskFromEvent',
         taskData
+      );
+      expect(mockCommit).toHaveBeenCalledWith(
+        'UPDATE_CONVERSATION_KANBAN_TASK',
+        { task: taskData, conversationId: 10 }
+      );
+      expect(mockCommit).toHaveBeenCalledWith(
+        'UPDATE_CONVERSATION_KANBAN_TASK',
+        { task: taskData, conversationId: 20 }
       );
     });
 
@@ -252,13 +264,14 @@ describe('ActionCableConnector - Kanban Tests', () => {
       );
     });
 
-    it('should not dispatch kanban events when module is not registered', () => {
+    it('should not dispatch kanban store events when module is not registered but still updates conversations', () => {
       mockHasModule.mockReturnValue(false);
 
       const taskData = {
         id: 1,
         title: 'Test Task',
         account_id: 1,
+        conversation_ids: [10],
       };
 
       actionCable.onReceived({
@@ -268,6 +281,10 @@ describe('ActionCableConnector - Kanban Tests', () => {
 
       expect(mockHasModule).toHaveBeenCalledWith('kanban');
       expect(mockDispatch).not.toHaveBeenCalled();
+      expect(mockCommit).toHaveBeenCalledWith(
+        'UPDATE_CONVERSATION_KANBAN_TASK',
+        { task: taskData, conversationId: 10 }
+      );
     });
 
     it('should not dispatch kanban events for different account', () => {
