@@ -133,7 +133,7 @@ class FazerAiHub
     end
 
     def kanban_enabled_accounts_count
-      Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).count
+      Account.where('feature_flags & ? != 0', Featurable.feature_flag_value('kanban')).count
     end
 
     def sync_subscription

@@ -16,7 +16,10 @@ module Featurable
     feature_index = FEATURE_LIST.index { |f| f['name'] == feature_name }
     return 0 if feature_index.nil?
 
-    2**feature_index
+    value = 2**feature_index
+    # Convert to signed 64-bit representation for PostgreSQL bigint compatibility.
+    # Values >= 2^63 overflow signed bigint; two's complement conversion fixes this.
+    value >= (1 << 63) ? value - (1 << 64) : value
   end
 
   included do

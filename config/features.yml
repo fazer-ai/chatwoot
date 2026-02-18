@@ -234,6 +234,10 @@
   display_name: CSAT Review Notes
   enabled: false
   premium: true
+- name: kanban
+  display_name: Kanban
+  enabled: false
+  fazer_ai: true
 - name: captain_tasks
   display_name: Captain Tasks
   enabled: true
@@ -245,7 +249,3 @@
   display_name: Advanced Assignment
   enabled: false
   premium: true
-- name: kanban
-  display_name: Kanban
-  enabled: false
-  fazer_ai: true
