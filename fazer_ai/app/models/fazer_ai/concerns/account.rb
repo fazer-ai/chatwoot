@@ -72,7 +72,7 @@ module FazerAi::Concerns::Account
     # 0 means unlimited, skip enforcement
     return if limit.zero?
 
-    current_count = Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).where.not(id: id).count
+    current_count = Account.where('feature_flags & ? != 0', Featurable.feature_flag_value('kanban')).where.not(id: id).count
     return if current_count < limit
 
     errors.add(:base, I18n.t('errors.fazer_ai.kanban_account_limit_reached', limit: limit))

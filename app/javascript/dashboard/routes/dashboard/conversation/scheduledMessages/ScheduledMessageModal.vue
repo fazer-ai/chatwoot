@@ -504,6 +504,7 @@ watch(
           :channel-type="currentInbox?.channel_type"
           :medium="currentInbox?.medium"
           :disabled="hasTemplate"
+          :enable-copilot="false"
           override-line-breaks
           @update:model-value="
             () => {

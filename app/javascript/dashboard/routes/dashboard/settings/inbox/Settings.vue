@@ -517,7 +517,7 @@ export default {
       :header-title="inboxName"
     >
       <woot-tabs
-        class="[&_ul]:p-0"
+        class="[&_ul]:p-0 top-px relative"
         :index="selectedTabIndex"
         :border="false"
         @change="onTabChange"

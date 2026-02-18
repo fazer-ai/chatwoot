@@ -9,7 +9,6 @@ import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getAllowedFileTypesByChannel } from '@chatwoot/utils';
 import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
 import VideoCallButton from '../VideoCallButton.vue';
-import AIAssistanceButton from '../AIAssistanceButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -24,7 +23,6 @@ export default {
     NextButton,
     FileUpload,
     VideoCallButton,
-    AIAssistanceButton,
     DropdownContainer,
     DropdownBody,
     DropdownSection,
@@ -111,6 +109,7 @@ export default {
       type: Number,
       required: true,
     },
+    // eslint-disable-next-line vue/no-unused-properties
     message: {
       type: String,
       default: '',
@@ -135,6 +134,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    isEditorDisabled: {
+      type: Boolean,
+      default: false,
+    },
     showScheduleOptions: {
       type: Boolean,
       default: false,
@@ -148,7 +151,7 @@ export default {
     'toggleQuotedReply',
     'scheduleMessage',
   ],
-  setup() {
+  setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
       useUISettings();
 
@@ -157,6 +160,9 @@ export default {
     const keyboardEvents = {
       '$mod+Alt+KeyA': {
         action: () => {
+          // Skip if editor is disabled (e.g., WhatsApp 24-hour window expired)
+          if (props.isEditorDisabled) return;
+
           // TODO: This is really hacky, we need to replace the file picker component with
           // a custom one, where the logic and the component markup is isolated.
           // Once we have the custom component, we can remove the hacky logic below.
@@ -164,7 +170,7 @@ export default {
           const uploadTriggerButton = document.querySelector(
             '#conversationAttachment'
           );
-          uploadTriggerButton.click();
+          if (uploadTriggerButton) uploadTriggerButton.click();
         },
         allowOnFocusedInput: true,
       },
@@ -195,9 +201,11 @@ export default {
       };
     },
     showAttachButton() {
+      if (this.isEditorDisabled) return false;
       return this.showFileUpload || this.isNote;
     },
     showAudioRecorderButton() {
+      if (this.isEditorDisabled) return false;
       if (this.isALineChannel) {
         return false;
       }
@@ -215,6 +223,7 @@ export default {
       );
     },
     showAudioPlayStopButton() {
+      if (this.isEditorDisabled) return false;
       return this.showAudioRecorder && this.isRecordingAudio;
     },
     isInstagramDM() {
@@ -254,6 +263,7 @@ export default {
       }
     },
     showMessageSignatureButton() {
+      if (this.isEditorDisabled) return false;
       return !this.isOnPrivateNote;
     },
     sendWithSignature() {
@@ -301,6 +311,7 @@ export default {
   <div class="flex justify-between p-3" :class="wrapClass">
     <div class="left-wrap">
       <NextButton
+        v-if="!isEditorDisabled"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_EMOJI_ICON')"
         icon="i-ph-smiley-sticker"
         slate
@@ -309,6 +320,7 @@ export default {
         @click="toggleEmojiPicker"
       />
       <FileUpload
+        v-if="showAttachButton"
         ref="uploadRef"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_ATTACH_ICON')"
         input-id="conversationAttachment"
@@ -390,13 +402,6 @@ export default {
       <VideoCallButton
         v-if="(isAWebWidgetInbox || isAPIInbox) && !isOnPrivateNote"
         :conversation-id="conversationId"
-      />
-      <AIAssistanceButton
-        v-if="!isFetchingAppIntegrations"
-        :conversation-id="conversationId"
-        :is-private-note="isOnPrivateNote"
-        :message="message"
-        @replace-text="replaceText"
       />
       <transition name="modal-fade">
         <div

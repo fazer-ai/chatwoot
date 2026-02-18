@@ -1,24 +1,12 @@
-<script>
-import { mapGetters } from 'vuex';
-import FilterInputBox from 'dashboard/components/widgets/FilterInput/Index.vue';
-import AutomationActionInput from 'dashboard/components/widgets/AutomationActionInput.vue';
-import NextButton from 'dashboard/components-next/button/Button.vue';
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useStore } from 'dashboard/composables/store';
 import { useAutomation } from 'dashboard/composables/useAutomation';
-import { validateAutomation } from 'dashboard/helper/validations';
-import {
-  generateAutomationPayload,
-  getAttributes,
-  getInputType,
-  getOperators,
-  getCustomAttributeType,
-  showActionInput,
-  getSelectedBoardId,
-  getSelectedBoardIdFromActions,
-  KANBAN_EVENTS,
-} from 'dashboard/helper/automationHelper';
-import { AUTOMATION_RULE_EVENTS, AUTOMATION_ACTION_TYPES } from './constants';
+import AutomationRuleForm from './AutomationRuleForm.vue';
 
-const start_value = {
+const emit = defineEmits(['saveAutomation']);
+
+const START_VALUE = {
   name: null,
   description: null,
   event_name: 'conversation_created',
@@ -39,365 +27,60 @@ const start_value = {
   ],
 };
 
-export default {
-  components: {
-    FilterInputBox,
-    AutomationActionInput,
-    NextButton,
-  },
-  props: {
-    onClose: {
-      type: Function,
-      default: () => {},
-    },
-  },
-  emits: ['saveAutomation'],
-  setup() {
-    const {
-      automation,
-      automationTypes,
-      onEventChange,
-      getConditionDropdownValues,
-      appendNewCondition,
-      appendNewAction,
-      removeFilter,
-      removeAction,
-      resetFilter,
-      resetAction,
-      getActionDropdownValues,
-      manifestCustomAttributes,
-    } = useAutomation(start_value);
-    return {
-      automation,
-      automationTypes,
-      onEventChange,
-      getConditionDropdownValues,
-      appendNewCondition,
-      appendNewAction,
-      removeFilter,
-      removeAction,
-      resetFilter,
-      resetAction,
-      getActionDropdownValues,
-      manifestCustomAttributes,
-    };
-  },
-  data() {
-    return {
-      automationRuleEvent: AUTOMATION_RULE_EVENTS[0].key,
-      automationMutated: false,
-      show: true,
-      showDeleteConfirmationModal: false,
-      allCustomAttributes: [],
-      mode: 'create',
-      errors: {},
-    };
-  },
-  computed: {
-    ...mapGetters({
-      accountId: 'getCurrentAccountId',
-      isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
-    }),
-    automationRuleEvents() {
-      return AUTOMATION_RULE_EVENTS.map(event => ({
-        ...event,
-        value: this.$t(`AUTOMATION.EVENTS.${event.value}`),
-      }));
-    },
-    selectedBoardId() {
-      return getSelectedBoardId(this.automation.conditions);
-    },
-    selectedBoardIdFromActions() {
-      return getSelectedBoardIdFromActions(this.automation.actions);
-    },
-    hasBoardSelected() {
-      return !!(this.selectedBoardId || this.selectedBoardIdFromActions);
-    },
-    isKanbanEvent() {
-      return KANBAN_EVENTS.includes(this.automation.event_name);
-    },
-    hasAutomationMutated() {
-      if (
-        this.automation.conditions[0].values ||
-        this.automation.actions[0].action_params.length
-      )
-        return true;
-      return false;
-    },
-    automationActionTypes() {
-      const actionTypes = this.isFeatureEnabled('sla')
-        ? AUTOMATION_ACTION_TYPES
-        : AUTOMATION_ACTION_TYPES.filter(({ key }) => key !== 'add_sla');
+const store = useStore();
+const formRef = ref(null);
 
-      return actionTypes.map(action => ({
-        ...action,
-        label: this.$t(`AUTOMATION.ACTIONS.${action.label}`),
-      }));
-    },
-  },
-  mounted() {
-    this.$store.dispatch('inboxes/get');
-    this.$store.dispatch('agents/get');
-    this.$store.dispatch('contacts/get');
-    this.$store.dispatch('teams/get');
-    this.$store.dispatch('labels/get');
-    this.$store.dispatch('campaigns/get');
-    if (this.$store.hasModule('kanban')) {
-      this.$store.dispatch('kanban/fetchBoards');
-    }
-    this.allCustomAttributes = this.$store.getters['attributes/getAttributes'];
-    this.manifestCustomAttributes();
-  },
-  methods: {
-    getAttributes,
-    getInputType,
-    getOperators,
-    getCustomAttributeType,
-    showActionInput,
-    isFeatureEnabled(flag) {
-      return this.isFeatureEnabledonAccount(this.accountId, flag);
-    },
-    emitSaveAutomation() {
-      this.errors = validateAutomation(this.automation);
-      if (Object.keys(this.errors).length === 0) {
-        const automation = generateAutomationPayload(this.automation);
-        this.$emit('saveAutomation', automation, this.mode);
-      }
-    },
-    getTranslatedAttributes(type, event, currentAttributeKey) {
-      const hasBoardCondition = this.automation.conditions.some(
-        c => c.attribute_key === 'kanban_board_id'
-      );
+const {
+  automation,
+  automationTypes,
+  onEventChange,
+  getConditionDropdownValues,
+  appendNewCondition,
+  appendNewAction,
+  removeFilter,
+  removeAction,
+  resetAction,
+  getActionDropdownValues,
+  manifestCustomAttributes,
+} = useAutomation(START_VALUE);
 
-      return getAttributes(type, event)
-        .filter(attribute => {
-          if (attribute.key === currentAttributeKey) return true;
-          if (attribute.key === 'kanban_board_id' && hasBoardCondition)
-            return false;
-          return true;
-        })
-        .map(attribute => {
-          // Skip translation
-          // 1. If customAttributeType key is present then its rendering attributes from API
-          // 2. If contact_custom_attribute or conversation_custom_attribute is present then its rendering section title
-          const skipTranslation =
-            attribute.customAttributeType ||
-            [
-              'contact_custom_attribute',
-              'conversation_custom_attribute',
-            ].includes(attribute.key);
-
-          return {
-            ...attribute,
-            name: skipTranslation
-              ? attribute.name
-              : this.$t(`AUTOMATION.ATTRIBUTES.${attribute.name}`),
-          };
-        });
-    },
-  },
+const open = () => {
+  automation.value = structuredClone(START_VALUE);
+  manifestCustomAttributes();
+  formRef.value?.open();
 };
+const close = () => formRef.value?.close();
+
+const onSave = (payload, mode) => {
+  emit('saveAutomation', payload, mode);
+};
+
+onMounted(() => {
+  store.dispatch('inboxes/get');
+  store.dispatch('agents/get');
+  store.dispatch('contacts/get');
+  store.dispatch('teams/get');
+  store.dispatch('labels/get');
+  store.dispatch('campaigns/get');
+});
+
+defineExpose({ open, close });
 </script>
 
 <template>
-  <div>
-    <woot-modal-header :header-title="$t('AUTOMATION.ADD.TITLE')" />
-    <div class="flex flex-col modal-content">
-      <div class="w-full">
-        <woot-input
-          v-model="automation.name"
-          :label="$t('AUTOMATION.ADD.FORM.NAME.LABEL')"
-          type="text"
-          :class="{ error: errors.name }"
-          :error="errors.name ? $t('AUTOMATION.ADD.FORM.NAME.ERROR') : ''"
-          :placeholder="$t('AUTOMATION.ADD.FORM.NAME.PLACEHOLDER')"
-        />
-        <woot-input
-          v-model="automation.description"
-          :label="$t('AUTOMATION.ADD.FORM.DESC.LABEL')"
-          type="text"
-          :class="{ error: errors.description }"
-          :error="
-            errors.description ? $t('AUTOMATION.ADD.FORM.DESC.ERROR') : ''
-          "
-          :placeholder="$t('AUTOMATION.ADD.FORM.DESC.PLACEHOLDER')"
-        />
-        <div class="mb-6">
-          <label :class="{ error: errors.event_name }">
-            {{ $t('AUTOMATION.ADD.FORM.EVENT.LABEL') }}
-            <select
-              v-model="automation.event_name"
-              class="m-0"
-              @change="onEventChange(automation)"
-            >
-              <option
-                v-for="event in automationRuleEvents"
-                :key="event.key"
-                :value="event.key"
-              >
-                {{ event.value }}
-              </option>
-            </select>
-            <span v-if="errors.event_name" class="message">
-              {{ $t('AUTOMATION.ADD.FORM.EVENT.ERROR') }}
-            </span>
-          </label>
-          <p
-            v-if="hasAutomationMutated"
-            class="text-xs text-right text-n-teal-10 pt-1"
-          >
-            {{ $t('AUTOMATION.FORM.RESET_MESSAGE') }}
-          </p>
-        </div>
-        <!-- // Conditions Start -->
-        <section>
-          <label>
-            {{ $t('AUTOMATION.ADD.FORM.CONDITIONS.LABEL') }}
-          </label>
-          <div
-            class="w-full p-4 mb-4 border border-solid rounded-lg bg-n-slate-2 dark:bg-n-solid-2 border-n-strong"
-          >
-            <FilterInputBox
-              v-for="(condition, i) in automation.conditions"
-              :key="`${i}-${selectedBoardId}`"
-              v-model="automation.conditions[i]"
-              :filter-attributes="
-                getTranslatedAttributes(
-                  automationTypes,
-                  automation.event_name,
-                  automation.conditions[i].attribute_key
-                )
-              "
-              :input-type="
-                getInputType(
-                  allCustomAttributes,
-                  automationTypes,
-                  automation,
-                  automation.conditions[i].attribute_key
-                )
-              "
-              :operators="
-                getOperators(
-                  allCustomAttributes,
-                  automationTypes,
-                  automation,
-                  mode,
-                  automation.conditions[i].attribute_key
-                )
-              "
-              :dropdown-values="
-                getConditionDropdownValues(
-                  automation.conditions[i].attribute_key,
-                  automation.conditions
-                )
-              "
-              :show-query-operator="i !== automation.conditions.length - 1"
-              :show-select-board-warning="
-                automation.conditions[i].attribute_key === 'kanban_step_id' &&
-                !automation.conditions.some(
-                  c => c.attribute_key === 'kanban_board_id' && c.values
-                )
-              "
-              :custom-attribute-type="
-                getCustomAttributeType(
-                  automationTypes,
-                  automation,
-                  automation.conditions[i].attribute_key
-                )
-              "
-              :error-message="
-                errors[`condition_${i}`]
-                  ? $t(`AUTOMATION.ERRORS.${errors[`condition_${i}`]}`)
-                  : ''
-              "
-              @reset-filter="resetFilter(i, automation.conditions[i])"
-              @remove-filter="removeFilter(i)"
-            />
-            <div class="mt-4">
-              <NextButton
-                icon="i-lucide-plus"
-                blue
-                faded
-                sm
-                :label="$t('AUTOMATION.ADD.CONDITION_BUTTON_LABEL')"
-                @click="appendNewCondition"
-              />
-            </div>
-          </div>
-        </section>
-        <!-- // Conditions End -->
-        <!-- // Actions Start -->
-        <section>
-          <label>
-            {{ $t('AUTOMATION.ADD.FORM.ACTIONS.LABEL') }}
-          </label>
-          <div
-            class="w-full p-4 mb-4 border border-solid rounded-lg bg-n-slate-2 dark:bg-n-solid-2 border-n-strong"
-          >
-            <AutomationActionInput
-              v-for="(action, i) in automation.actions"
-              :key="`${i}-${selectedBoardId}-${selectedBoardIdFromActions}`"
-              v-model="automation.actions[i]"
-              :action-types="automationActionTypes"
-              :dropdown-values="
-                getActionDropdownValues(
-                  automation.actions[i].action_name,
-                  automation.conditions,
-                  automation.actions
-                )
-              "
-              :show-action-input="
-                showActionInput(
-                  automationActionTypes,
-                  automation.actions[i].action_name
-                )
-              "
-              :conditions="automation.conditions"
-              :show-select-board-warning="
-                automation.actions[i].action_name === 'move_to_step' &&
-                !hasBoardSelected
-              "
-              :is-kanban-event="isKanbanEvent"
-              :error-message="
-                errors[`action_${i}`]
-                  ? $t(`AUTOMATION.ERRORS.${errors[`action_${i}`]}`)
-                  : ''
-              "
-              @reset-action="resetAction(i)"
-              @remove-action="removeAction(i)"
-            />
-            <div class="mt-4">
-              <NextButton
-                icon="i-lucide-plus"
-                blue
-                faded
-                sm
-                :label="$t('AUTOMATION.ADD.ACTION_BUTTON_LABEL')"
-                @click="appendNewAction"
-              />
-            </div>
-          </div>
-        </section>
-        <!-- // Actions End -->
-        <div class="w-full">
-          <div class="flex flex-row justify-end w-full gap-2 px-0 py-2">
-            <NextButton
-              faded
-              slate
-              type="reset"
-              :label="$t('AUTOMATION.ADD.CANCEL_BUTTON_TEXT')"
-              @click.prevent="onClose"
-            />
-            <NextButton
-              solid
-              blue
-              type="submit"
-              :label="$t('AUTOMATION.ADD.SUBMIT')"
-              @click="emitSaveAutomation"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <AutomationRuleForm
+    ref="formRef"
+    v-model:automation="automation"
+    mode="create"
+    :automation-types="automationTypes"
+    :get-condition-dropdown-values="getConditionDropdownValues"
+    :get-action-dropdown-values="getActionDropdownValues"
+    :append-new-condition="appendNewCondition"
+    :append-new-action="appendNewAction"
+    :remove-filter="removeFilter"
+    :remove-action="removeAction"
+    :reset-action="resetAction"
+    :on-event-change="onEventChange"
+    @save="onSave"
+  />
 </template>

@@ -85,7 +85,7 @@ module SuperAdmin::FeaturesHelper # rubocop:disable Metrics/ModuleLength
 
   def self.kanban_accounts_text
     kanban_limit = FazerAiHub.kanban_account_limit
-    current_count = Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban')).count
+    current_count = Account.where('feature_flags & ? != 0', Featurable.feature_flag_value('kanban')).count
     limit_display = if kanban_limit.nil?
                       '-'
                     elsif kanban_limit.zero?
@@ -113,7 +113,7 @@ module SuperAdmin::FeaturesHelper # rubocop:disable Metrics/ModuleLength
       flag_value = Featurable.feature_flag_value(feature)
       next if flag_value.zero?
 
-      Account.where('feature_flags & ? > 0', flag_value).find_each do |account|
+      Account.where('feature_flags & ? != 0', flag_value).find_each do |account|
         existing = accounts_data.find { |a| a[:id] == account.id }
         if existing
           existing[:features] << feature.titleize

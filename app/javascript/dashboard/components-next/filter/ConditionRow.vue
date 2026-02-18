@@ -14,6 +14,8 @@ import { validateSingleFilter } from 'dashboard/helper/validations.js';
 const { filterTypes } = defineProps({
   showQueryOperator: { type: Boolean, default: false },
   filterTypes: { type: Array, required: true },
+  showBoardWarning: { type: Boolean, default: false },
+  boardWarningMessage: { type: String, default: '' },
 });
 
 const emit = defineEmits(['remove']);
@@ -50,12 +52,12 @@ const currentFilter = computed(() =>
 );
 
 const getOperator = (filter, selectedOperator) => {
-  const operatorFromOptions = filter.filterOperators.find(
+  const operatorFromOptions = filter?.filterOperators?.find(
     operator => operator.value === selectedOperator
   );
 
   if (!operatorFromOptions) {
-    return filter.filterOperators[0];
+    return filter?.filterOperators?.[0];
   }
 
   return operatorFromOptions;
@@ -77,12 +79,12 @@ const queryOperatorOptions = computed(() => {
     {
       label: t(`FILTER.QUERY_DROPDOWN_LABELS.AND`),
       value: 'and',
-      icon: h('span', { class: 'i-lucide-ampersands !text-n-blue-text' }),
+      icon: h('span', { class: 'i-lucide-ampersands !text-n-blue-11' }),
     },
     {
       label: t(`FILTER.QUERY_DROPDOWN_LABELS.OR`),
       value: 'or',
-      icon: h('span', { class: 'i-woot-logic-or !text-n-blue-text' }),
+      icon: h('span', { class: 'i-woot-logic-or !text-n-blue-11' }),
     },
   ];
 });
@@ -138,7 +140,11 @@ const validate = () => {
   return !validationError.value;
 };
 
-defineExpose({ validate });
+const resetValidation = () => {
+  showErrors.value = false;
+};
+
+defineExpose({ validate, resetValidation });
 </script>
 
 <template>
@@ -166,18 +172,28 @@ defineExpose({ validate });
       <FilterSelect
         v-model="filterOperator"
         variant="ghost"
-        :options="currentFilter.filterOperators"
+        :options="currentFilter?.filterOperators"
       />
-      <template v-if="currentOperator.hasInput">
+      <template v-if="currentOperator?.hasInput">
+        <div
+          v-if="showBoardWarning"
+          class="flex items-center px-3 py-1.5 bg-n-amber-3 dark:bg-n-amber-3 border border-solid border-n-amber-6 dark:border-n-amber-6 rounded"
+        >
+          <span class="text-n-slate-11 text-sm">
+            {{ boardWarningMessage }}
+          </span>
+        </div>
         <MultiSelect
           v-if="inputType === 'multiSelect'"
           v-model="values"
           :options="currentFilter.options"
+          dropdown-max-height="max-h-72"
         />
         <SingleSelect
           v-else-if="inputType === 'searchSelect'"
           v-model="values"
           :options="currentFilter.options"
+          dropdown-max-height="max-h-64"
         />
         <SingleSelect
           v-else-if="inputType === 'booleanSelect'"

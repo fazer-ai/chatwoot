@@ -163,6 +163,7 @@
       "CHANGE_PRIORITY": "Change Priority",
       "ADD_SLA": "Add SLA",
       "OPEN_CONVERSATION": "Open conversation",
+      "PENDING_CONVERSATION": "Mark conversation as pending",
       "KANBAN_TASK_MOVE_TO_STEP": "Move Task to Step",
       "KANBAN_TASK_MARK_COMPLETED": "Mark Task as Won",
       "KANBAN_TASK_MARK_CANCELLED": "Mark Task as Lost",

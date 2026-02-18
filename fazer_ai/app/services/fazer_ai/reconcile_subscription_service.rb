@@ -20,7 +20,7 @@ class FazerAi::ReconcileSubscriptionService
     # nil means feature not available, 0 means unlimited — skip reconciliation in both cases
     return if limit.nil? || limit.zero?
 
-    enabled_accounts = Account.where('feature_flags & ? > 0', Featurable.feature_flag_value('kanban'))
+    enabled_accounts = Account.where('feature_flags & ? != 0', Featurable.feature_flag_value('kanban'))
                               .order(id: :asc)
                               .pluck(:id)
 
