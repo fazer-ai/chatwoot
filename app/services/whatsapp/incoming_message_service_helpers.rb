@@ -21,7 +21,7 @@ module Whatsapp::IncomingMessageServiceHelpers
   end
 
   def message_type
-    @processed_params[:messages].first[:type]
+    messages_data.first[:type]
   end
 
   def message_content(message)
@@ -70,19 +70,19 @@ module Whatsapp::IncomingMessageServiceHelpers
   end
 
   def message_under_process?
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{@processed_params[:messages].first[:id]}")
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{messages_data.first[:id]}")
     Redis::Alfred.get(key)
   end
 
   def acquire_message_processing_lock
     return false if @processed_params.try(:[], :messages).blank?
 
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{@processed_params[:messages].first[:id]}")
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{messages_data.first[:id]}")
     Redis::Alfred.set(key, true, nx: true, ex: 1.day)
   end
 
   def clear_message_source_id_from_redis
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{@processed_params[:messages].first[:id]}")
+    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{messages_data.first[:id]}")
     ::Redis::Alfred.delete(key)
   end
 

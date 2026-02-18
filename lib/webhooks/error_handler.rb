@@ -28,6 +28,7 @@ class Webhooks::ErrorHandler
   def handle_agent_bot_error
     conversation = message.conversation
     return unless conversation&.pending?
+    return if conversation&.account&.keep_pending_on_bot_failure
 
     conversation.open!
     Conversations::ActivityMessageJob.perform_later(conversation, activity_message_params(conversation))

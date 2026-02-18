@@ -1,19 +1,24 @@
 # Mostly modeled after the intial implementation of the service based on 360 Dialog
 # https://docs.360dialog.com/whatsapp-api/whatsapp-api/media
 # https://developers.facebook.com/docs/whatsapp/api/media/
-class Whatsapp::IncomingMessageBaseService
+class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   include ::Whatsapp::IncomingMessageServiceHelpers
 
-  pattr_initialize [:inbox!, :params!]
+  pattr_initialize [:inbox!, :params!, :outgoing_echo]
 
   def perform
     processed_params
 
     if processed_params.try(:[], :statuses).present?
       process_statuses
-    elsif processed_params.try(:[], :messages).present?
+    elsif messages_data.present?
       process_messages
     end
+  end
+
+  # Returns messages array for both regular messages and echo events
+  def messages_data
+    @processed_params&.dig(:messages) || @processed_params&.dig(:message_echoes)
   end
 
   private
@@ -28,7 +33,7 @@ class Whatsapp::IncomingMessageBaseService
     # Multiple webhook event can be received against the same message due to misconfigurations in the Meta
     # business manager account. While we have not found the core reason yet, the following line ensure that
     # there are no duplicate messages created.
-    return if find_message_by_source_id(@processed_params[:messages].first[:id])
+    return if find_message_by_source_id(messages_data.first[:id])
 
     @lock_acquired = acquire_message_processing_lock
     return unless @lock_acquired
@@ -73,7 +78,7 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def create_messages
-    message = @processed_params[:messages].first
+    message = messages_data.first
     log_error(message) && return if error_webhook_event?(message)
 
     process_in_reply_to(message)
@@ -83,20 +88,44 @@ class Whatsapp::IncomingMessageBaseService
 
   def create_contact_messages(message)
     message['contacts'].each do |contact|
-      create_message(contact)
+      # Pass source_id from parent message since contact objects don't have :id
+      create_message(contact, source_id: message[:id])
       attach_contact(contact)
       @message.save!
     end
   end
 
   def create_regular_message(message)
-    create_message(message)
+    create_message(message, source_id: message[:id])
     attach_files
     attach_location if message_type == 'location'
     @message.save!
   end
 
   def set_contact
+    if outgoing_echo
+      set_contact_from_echo
+    else
+      set_contact_from_message
+    end
+  end
+
+  def set_contact_from_echo
+    # For echo messages, contact phone is in the 'to' field
+    phone_number = messages_data.first[:to]
+    waid = processed_waid(phone_number)
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: waid,
+      inbox: inbox,
+      contact_attributes: { name: "+#{phone_number}", phone_number: "+#{phone_number}" }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+  end
+
+  def set_contact_from_message
     contact_params = @processed_params[:contacts]&.first
     return if contact_params.blank?
 
@@ -105,7 +134,7 @@ class Whatsapp::IncomingMessageBaseService
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: waid,
       inbox: inbox,
-      contact_attributes: { name: contact_params.dig(:profile, :name), phone_number: "+#{@processed_params[:messages].first[:from]}" }
+      contact_attributes: { name: contact_params.dig(:profile, :name), phone_number: "+#{messages_data.first[:from]}" }
     ).perform
 
     @contact_inbox = contact_inbox
@@ -131,7 +160,7 @@ class Whatsapp::IncomingMessageBaseService
   def attach_files
     return if %w[text button interactive location contacts].include?(message_type)
 
-    attachment_payload = @processed_params[:messages].first[message_type.to_sym]
+    attachment_payload = messages_data.first[message_type.to_sym]
     @message.content ||= attachment_payload[:caption]
 
     attachment_file = download_attachment_file(attachment_payload)
@@ -150,7 +179,7 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def attach_location
-    location = @processed_params[:messages].first['location']
+    location = messages_data.first['location']
     location_name = location['name'] ? "#{location['name']}, #{location['address']}" : ''
     @message.attachments.new(
       account_id: @message.account_id,
@@ -162,16 +191,21 @@ class Whatsapp::IncomingMessageBaseService
     )
   end
 
-  def create_message(message)
+  def create_message(message, source_id: nil)
+    content_attrs = outgoing_echo ? { external_echo: true } : {}
+    content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
+    content_attrs[:external_created_at] = message[:timestamp].to_i
+
     @message = @conversation.messages.build(
       content: message_content(message),
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
-      message_type: :incoming,
-      sender: @contact,
-      source_id: message[:id].to_s,
-      in_reply_to_external_id: @in_reply_to_external_id,
-      external_created_at: message[:timestamp].to_i
+      message_type: outgoing_echo ? :outgoing : :incoming,
+      # Set status to :delivered for echo messages to prevent SendReplyJob from trying to send them
+      status: outgoing_echo ? :delivered : :sent,
+      sender: outgoing_echo ? nil : @contact,
+      source_id: (source_id || message[:id]).to_s,
+      content_attributes: content_attrs
     )
   end
 
@@ -207,7 +241,7 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def contact_name_matches_phone_number?
-    phone_number = "+#{@processed_params[:messages].first[:from]}"
+    phone_number = "+#{messages_data.first[:from]}"
     formatted_phone_number = TelephoneNumber.parse(phone_number).international_number
     @contact.name == phone_number || @contact.name == formatted_phone_number
   end
