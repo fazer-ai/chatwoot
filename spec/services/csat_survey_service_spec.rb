@@ -348,6 +348,95 @@ describe CsatSurveyService do
           expect(whatsapp_conversation.messages.where(content_type: :input_csat)).to be_empty
         end
       end
+
+      context 'when template has body variables' do
+        before do
+          whatsapp_inbox.update!(csat_config: {
+                                   'template' => {
+                                     'name' => 'customer_survey_template',
+                                     'language' => 'en',
+                                     'body_variables' => { '1' => '{{contact.name}}', '2' => 'static text' }
+                                   },
+                                   'message' => 'Hi {{1}}, {{2}}'
+                                 })
+          allow(mock_provider_service).to receive(:get_template_status)
+            .with('customer_survey_template')
+            .and_return({ success: true, template: { status: 'APPROVED' } })
+        end
+
+        it 'includes resolved body parameters in template payload' do
+          allow(mock_provider_service).to receive(:send_template) do |_phone, template_info, message|
+            message.save!
+            body_component = template_info[:parameters].find { |p| p[:type] == 'body' }
+            expect(body_component).to be_present
+            expect(body_component[:parameters].length).to eq(2)
+            expect(body_component[:parameters][0][:type]).to eq('text')
+            expect(body_component[:parameters][0][:text]).to be_present
+            expect(body_component[:parameters][1]).to eq({ type: 'text', text: 'static text' })
+            'msg_id'
+          end
+
+          whatsapp_service.perform
+        end
+
+        it 'resolves liquid variables in CSAT message content' do
+          mock_successful_template_send('msg_id')
+
+          whatsapp_service.perform
+
+          csat_message = whatsapp_conversation.messages.where(content_type: :input_csat).last
+          expect(csat_message.content).to include('static text')
+          expect(csat_message.content).not_to include('{{1}}')
+          expect(csat_message.content).not_to include('{{2}}')
+        end
+
+        it 'falls back to original value in body parameters when liquid variable resolves to empty' do
+          whatsapp_inbox.update!(csat_config: {
+                                   'template' => {
+                                     'name' => 'customer_survey_template',
+                                     'language' => 'en',
+                                     'body_variables' => { '1' => '{{contact.nonexistent_attr}}' }
+                                   },
+                                   'message' => 'Attr: {{1}}'
+                                 })
+
+          allow(mock_provider_service).to receive(:send_template) do |_phone, template_info, message|
+            message.save!
+            # The body parameter should contain the original liquid variable string as fallback
+            body_component = template_info[:parameters].find { |p| p[:type] == 'body' }
+            expect(body_component[:parameters][0][:text]).to eq('{{contact.nonexistent_attr}}')
+            'msg_id'
+          end
+
+          whatsapp_service.perform
+        end
+      end
+
+      context 'when template has no body variables' do
+        before do
+          whatsapp_inbox.update!(csat_config: {
+                                   'template' => {
+                                     'name' => 'customer_survey_template',
+                                     'language' => 'en'
+                                   },
+                                   'message' => 'Please rate your experience'
+                                 })
+          allow(mock_provider_service).to receive(:get_template_status)
+            .with('customer_survey_template')
+            .and_return({ success: true, template: { status: 'APPROVED' } })
+        end
+
+        it 'does not include body parameters in template payload' do
+          allow(mock_provider_service).to receive(:send_template) do |_phone, template_info, message|
+            message.save!
+            body_component = template_info[:parameters].find { |p| p[:type] == 'body' }
+            expect(body_component).to be_nil
+            'msg_id'
+          end
+
+          whatsapp_service.perform
+        end
+      end
     end
   end
 

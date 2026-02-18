@@ -953,6 +953,32 @@
         "SUCCESS_MESSAGE": "WhatsApp template created successfully and sent for approval",
         "ERROR_MESSAGE": "Failed to create WhatsApp template"
       },
+      "TEMPLATE_MODE": {
+        "LABEL": "Template source",
+        "CREATE_NEW": "Create new template",
+        "USE_EXISTING": "Use existing template"
+      },
+      "EXISTING_TEMPLATE": {
+        "LABEL": "Select template",
+        "PLACEHOLDER": "Select an approved template",
+        "SYNC_BUTTON": "Sync templates",
+        "SYNCING": "Syncing...",
+        "EMPTY_STATE": "No compatible templates found. Templates must have a URL button with a dynamic parameter.",
+        "LINK_SUCCESS": "Template linked successfully",
+        "LINK_ERROR": "Failed to link template",
+        "LOADING": "Loading templates...",
+        "USING_LABEL": "Using existing template: {name}",
+        "SYNC_ERROR": "Failed to sync templates. Please try again."
+      },
+      "TEMPLATE_VARIABLES": {
+        "TITLE": "Template variables",
+        "DESCRIPTION": "Set values for the template body variables. You can use dynamic variables like {'{{'} contact.name {'}}'} that will be resolved at send time.",
+        "VARIABLE_LABEL": "Variable {variable}",
+        "VARIABLE_PLACEHOLDER": "Enter value for {variable}",
+        "VARIABLE_REQUIRED": "This variable is required",
+        "VALIDATION_ERROR": "Please set all template variables before saving.",
+        "INSERT_VARIABLE": "Insert variable"
+      },
       "TEMPLATE_UPDATE_DIALOG": {
         "TITLE": "Edit survey details",
         "DESCRIPTION": "We will delete the previous template and make a new one which will be sent again for WhatsApp approval",
@@ -970,7 +996,7 @@
         "SELECT_PLACEHOLDER": "select labels"
       },
       "NOTE": "Note: CSAT surveys are sent only once per conversation",
-      "WHATSAPP_NOTE": "Note: We will create a template and send it for WhatsApp approval. After being approved, surveys will be sent only once per conversation as per the survey rule.",
+      "WHATSAPP_NOTE": "Note: You can create a new template (which will be sent for WhatsApp approval) or use an existing approved template from your Meta template manager. Surveys are sent only once per conversation as per the survey rule.",
       "API": {
         "SUCCESS_MESSAGE": "CSAT settings updated successfully",
         "ERROR_MESSAGE": "We couldn't update CSAT settings. Please try again later."

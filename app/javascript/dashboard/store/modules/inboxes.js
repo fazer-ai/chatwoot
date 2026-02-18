@@ -360,6 +360,14 @@ export const actions = {
     const response = await InboxesAPI.getCSATTemplateStatus(inboxId);
     return response.data;
   },
+  linkCSATTemplate: async (_, { inboxId, template }) => {
+    const response = await InboxesAPI.linkCSATTemplate(inboxId, template);
+    return response.data;
+  },
+  getAvailableCSATTemplates: async (_, { inboxId }) => {
+    const response = await InboxesAPI.getAvailableCSATTemplates(inboxId);
+    return response.data;
+  },
   setupChannelProvider: async (_, inboxId) => {
     try {
       await InboxesAPI.setupChannelProvider(inboxId);
