@@ -28,6 +28,25 @@ properties:
     type: integer
     description: The campaign id to which the message belongs
     example: 1
+  transcode_audio:
+    type: string
+    enum: ['opus']
+    description: |
+      Target format for server-side audio transcoding. When set, audio attachments are transcoded
+      to the specified format before being stored. Currently only `opus` is supported, which
+      produces an OGG/Opus file (`audio/ogg`). This is required for WhatsApp voice messages.
+    example: 'opus'
+  is_recorded_audio:
+    description: |
+      Marks audio attachments as recorded voice messages. When `true`, all audio attachments in
+      the message are flagged as voice recordings. This metadata is used by channels like WhatsApp
+      to render the message as a voice message bubble instead of a generic audio file.
+    oneOf:
+      - type: boolean
+      - type: array
+        items:
+          type: string
+    example: true
   template_params:
     type: object
     description: WhatsApp template parameters for sending structured messages
