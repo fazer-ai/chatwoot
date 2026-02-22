@@ -109,23 +109,43 @@ describe Whatsapp::Providers::WhatsappCloudService do
         expect(service.send_message('+123456789', message)).to eq 'message_id'
       end
 
-      # FIXME: This requires transcoding to opus/ogg.
-      # it 'calls message endpoints with voice flag for recorded audio attachment' do
-      #   attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_recorded_audio' => true })
-      #   attachment.file.attach(io: Rails.root.join('spec/assets/sample.mp3').open, filename: 'sample.mp3', content_type: 'audio/mpeg')
+      it 'does not send voice flag for recorded audio in non-ogg format' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_recorded_audio' => true })
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample.mp3').open, filename: 'sample.mp3', content_type: 'audio/mpeg')
 
-      #   stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
-      #     .with(
-      #       body: hash_including({
-      #                              messaging_product: 'whatsapp',
-      #                              to: '+123456789',
-      #                              type: 'audio',
-      #                              audio: WebMock::API.hash_including({ link: anything, voice: true })
-      #                            })
-      #     )
-      #     .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
-      #   expect(service.send_message('+123456789', message)).to eq 'message_id'
-      # end
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(
+            body: hash_including({
+                                   messaging_product: 'whatsapp',
+                                   to: '+123456789',
+                                   type: 'audio',
+                                   audio: WebMock::API.hash_including({ link: anything })
+                                 })
+          )
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+        # Ensure voice flag is NOT present for non-ogg audio
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+        expect(WebMock).not_to(have_requested(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with { |req| JSON.parse(req.body).dig('audio', 'voice') })
+      end
+
+      it 'sends voice flag for recorded audio in ogg format' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_recorded_audio' => true })
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'sample.ogg', content_type: 'audio/ogg')
+
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(
+            body: hash_including({
+                                   messaging_product: 'whatsapp',
+                                   to: '+123456789',
+                                   type: 'audio',
+                                   audio: WebMock::API.hash_including({ link: anything, voice: true })
+                                 })
+          )
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+      end
     end
   end
 

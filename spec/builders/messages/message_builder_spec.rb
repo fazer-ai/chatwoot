@@ -186,6 +186,50 @@ describe Messages::MessageBuilder do
                                                      })
       end
 
+      context 'when transcode_audio is set' do
+        let(:params) do
+          ActionController::Parameters.new({
+                                             content: 'test',
+                                             transcode_audio: 'opus',
+                                             attachments: [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+                                           })
+        end
+
+        it 'transcodes audio attachment and sets is_recorded_audio metadata' do
+          service_instance = instance_double(Audio::TranscodeService)
+          allow(Audio::TranscodeService).to receive(:new).and_return(service_instance)
+          allow(service_instance).to receive(:perform)
+
+          message = message_builder
+
+          expect(Audio::TranscodeService).to have_received(:new)
+          expect(service_instance).to have_received(:perform)
+          expect(message.attachments.first.meta).to include('is_recorded_audio' => true)
+        end
+
+        it 'does not transcode non-audio attachments' do
+          allow(Audio::TranscodeService).to receive(:new)
+          params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png')]
+
+          message = message_builder
+
+          expect(Audio::TranscodeService).not_to have_received(:new)
+          expect(message.attachments.first.file_type).to eq 'image'
+        end
+      end
+
+      context 'when transcode_audio is not set' do
+        it 'does not invoke transcoding service' do
+          allow(Audio::TranscodeService).to receive(:new)
+          params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+
+          message = message_builder
+
+          expect(Audio::TranscodeService).not_to have_received(:new)
+          expect(message.attachments.first.file_type).to eq 'audio'
+        end
+      end
+
       context 'when DIRECT_UPLOAD_ENABLED' do
         let(:params) do
           ActionController::Parameters.new({

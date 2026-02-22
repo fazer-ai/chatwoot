@@ -14,6 +14,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @message_type = params[:message_type] || 'outgoing'
     @attachments = params[:attachments]
     @is_recorded_audio = params[:is_recorded_audio]
+    @transcode_audio = params[:transcode_audio]
     @attachments_metadata = normalize_attachments_metadata(params[:attachments_metadata])
     @automation_rule = content_attributes&.dig(:automation_rule_id)
     return unless params.instance_of?(ActionController::Parameters)
@@ -67,6 +68,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
                              else
                                file_type(uploaded_attachment&.content_type)
                              end
+      transcode_attachment(attachment, file_like_source(uploaded_attachment)) if should_transcode?(attachment)
     end
   end
 
@@ -78,9 +80,9 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   end
 
   def recorded_audio_metadata(attachment) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
-    # NOTE: `is_recorded_audio` can be either a boolean or an array of file names.
+    # NOTE: `is_recorded_audio` can be either a boolean, the string "true", or an array of file names.
     return unless @is_recorded_audio
-    return { is_recorded_audio: true } if @is_recorded_audio == true
+    return { is_recorded_audio: true } if @is_recorded_audio == true || @is_recorded_audio == 'true'
 
     return { is_recorded_audio: true } if @is_recorded_audio.is_a?(Array) && attachment.original_filename.in?(@is_recorded_audio)
 
@@ -108,6 +110,27 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
 
     metadata = metadata.to_unsafe_h if metadata.respond_to?(:to_unsafe_h)
     metadata.deep_stringify_keys
+  end
+
+  def should_transcode?(attachment)
+    @transcode_audio.present? && attachment.file_type == 'audio'
+  end
+
+  # Returns the uploaded file only when it's a real file-like object (ActionDispatch::Http::UploadedFile,
+  # Tempfile, etc.). Direct-upload signed-ID Strings are not usable as source files for transcoding;
+  # TranscodeService falls back to downloading from the blob in that case.
+  def file_like_source(uploaded_attachment)
+    return uploaded_attachment if uploaded_attachment.respond_to?(:path) || uploaded_attachment.respond_to?(:tempfile)
+  end
+
+  def transcode_attachment(attachment, uploaded_file = nil)
+    Audio::TranscodeService.new(attachment, @transcode_audio, source_file: uploaded_file).perform
+    attachment.meta ||= {}
+    attachment.meta['is_recorded_audio'] = true
+  rescue CustomExceptions::Audio::UnsupportedFormatError, CustomExceptions::Audio::TranscodingError => e
+    Rails.logger.error("Audio transcoding failed, keeping original attachment: #{e.message}")
+    attachment.meta ||= {}
+    attachment.meta['audio_transcoding_failed'] = true
   end
 
   def process_emails

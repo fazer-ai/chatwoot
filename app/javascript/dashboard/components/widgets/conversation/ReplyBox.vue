@@ -360,6 +360,9 @@ export default {
       return `draft-${this.conversationIdByRoute}-${this.replyType}`;
     },
     audioRecordFormat() {
+      if (this.isAWhatsAppCloudChannel) {
+        return AUDIO_FORMATS.OGG;
+      }
       if (this.isAWhatsAppChannel || this.isATelegramChannel) {
         return AUDIO_FORMATS.MP3;
       }
@@ -1027,6 +1030,10 @@ export default {
       };
       return file && this.onFileUpload(autoRecordedFile);
     },
+    onRecordError() {
+      this.toggleAudioRecorder();
+      useAlert(this.$t('CONVERSATION.REPLYBOX.AUDIO_CONVERSION_FAILED'));
+    },
     toggleTyping(status) {
       const conversationId = this.currentChat.id;
       const isPrivate = this.isPrivate;
@@ -1094,6 +1101,13 @@ export default {
             sender: this.sender,
           };
 
+          if (attachment.isRecordedAudio) {
+            attachmentPayload.isRecordedAudio = this.globalConfig
+              .directUploadsEnabled
+              ? true
+              : [attachment.resource.file.name];
+          }
+
           attachmentPayload = this.setReplyToInPayload(attachmentPayload);
           multipleMessagePayload.push(attachmentPayload);
           // For WhatsApp, only the first attachment gets a caption
@@ -1142,6 +1156,9 @@ export default {
         this.attachedFiles.forEach(attachment => {
           if (this.globalConfig.directUploadsEnabled) {
             messagePayload.files.push(attachment.blobSignedId);
+            if (attachment.isRecordedAudio) {
+              messagePayload.isRecordedAudio = true;
+            }
           } else {
             messagePayload.files.push(attachment.resource.file);
             if (attachment.isRecordedAudio) {
@@ -1304,6 +1321,7 @@ export default {
           :audio-record-format="audioRecordFormat"
           @recorder-progress-changed="onRecordProgressChanged"
           @finish-record="onFinishRecorder"
+          @record-error="onRecordError"
           @play="recordingAudioState = 'playing'"
           @pause="recordingAudioState = 'paused'"
         />
