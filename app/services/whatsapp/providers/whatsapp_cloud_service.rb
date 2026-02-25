@@ -181,21 +181,6 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     type == 'audio' && attachment.meta&.dig('is_recorded_audio') && attachment.file.content_type == 'audio/ogg'
   end
 
-  # Marcel gem may re-detect OGG/Opus files as audio/opus after ActiveStorage
-  # blob attachment, but WhatsApp Cloud API requires audio/ogg content type
-  # for voice messages. Normalize so the download URL serves the correct
-  # Content-Type header. No-op when the frontend already uploads as audio/ogg.
-  def normalize_opus_content_type(attachment)
-    return unless attachment.file.attached?
-
-    blob = attachment.file.blob
-    return unless blob.content_type == 'audio/opus'
-
-    return if blob.update(content_type: 'audio/ogg')
-
-    Rails.logger.error("Failed to normalize blob #{blob.id} content_type from audio/opus to audio/ogg")
-  end
-
   def error_message(response)
     # https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/#sample-response
     response.parsed_response&.dig('error', 'message')

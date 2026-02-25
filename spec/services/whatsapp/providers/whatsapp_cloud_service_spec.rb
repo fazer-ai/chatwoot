@@ -146,6 +146,28 @@ describe Whatsapp::Providers::WhatsappCloudService do
           .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
         expect(service.send_message('+123456789', message)).to eq 'message_id'
       end
+
+      it 'normalizes audio/opus to audio/ogg and sends voice flag for recorded audio' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_recorded_audio' => true })
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'sample.ogg', content_type: 'audio/ogg')
+        attachment.save!
+        # Simulate Marcel detecting audio/opus (as happens with OGG Opus files in Marcel 1.1.0)
+        attachment.file.blob.update_column(:content_type, 'audio/opus') # rubocop:disable Rails/SkipsModelValidations
+        attachment.file.blob.reload
+
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(
+            body: hash_including({
+                                   messaging_product: 'whatsapp',
+                                   to: '+123456789',
+                                   type: 'audio',
+                                   audio: WebMock::API.hash_including({ link: anything, voice: true })
+                                 })
+          )
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+        expect(attachment.file.blob.reload.content_type).to eq('audio/ogg')
+      end
     end
   end
 
