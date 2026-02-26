@@ -718,6 +718,33 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         expect(event_data[:insert_before_task_id]).to be_nil
       end
     end
+
+    context 'with contact social profiles' do
+      let(:contact_with_social) do
+        create(:contact, account: account, additional_attributes: { 'social_profiles' => { 'instagram' => 'handle_test' } })
+      end
+      let(:conversation_with_social) { create(:conversation, account: account, inbox: inbox, contact: contact_with_social) }
+
+      it 'includes additional_attributes with social_profiles on contacts' do
+        create(:kanban_task_contact, task: task, contact: contact_with_social)
+        task.reload
+
+        event_data = task.push_event_data
+        contact_data = event_data[:contacts].find { |c| c[:id] == contact_with_social.id }
+
+        expect(contact_data[:additional_attributes]).to include('social_profiles' => { 'instagram' => 'handle_test' })
+      end
+
+      it 'includes additional_attributes on contact nested in conversations' do
+        task.conversation_ids = [conversation_with_social.id]
+        task.save!
+
+        event_data = task.push_event_data
+        contact_data = event_data[:conversations].first[:contact]
+
+        expect(contact_data[:additional_attributes]).to include('social_profiles' => { 'instagram' => 'handle_test' })
+      end
+    end
   end
 
   describe '#insert_before_task_id_set?' do

@@ -256,7 +256,8 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       name: contact.name,
       email: contact.email,
       phone_number: contact.phone_number,
-      avatar_url: contact.avatar_url
+      avatar_url: contact.avatar_url,
+      additional_attributes: contact.additional_attributes
     }
   end
 
