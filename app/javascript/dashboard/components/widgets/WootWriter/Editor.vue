@@ -88,6 +88,9 @@ const props = defineProps({
   // allowSignature is a kill switch, ensuring no signature methods
   // are triggered except when this flag is true
   allowSignature: { type: Boolean, default: false },
+  // Per-inbox overrides; when empty, falls back to currentUser.ui_settings
+  signaturePositionOverride: { type: String, default: '' },
+  signatureSeparatorOverride: { type: String, default: '' },
   channelType: { type: String, default: '' },
   conversationId: { type: Number, default: null },
   medium: { type: String, default: '' },
@@ -325,11 +328,19 @@ const sendWithSignature = computed(() => {
 });
 
 const signaturePosition = computed(() => {
-  return currentUser.value?.ui_settings?.signature_position || 'top';
+  return (
+    props.signaturePositionOverride ||
+    currentUser.value?.ui_settings?.signature_position ||
+    'top'
+  );
 });
 
 const signatureSeparator = computed(() => {
-  return currentUser.value?.ui_settings?.signature_separator || 'blank';
+  return (
+    props.signatureSeparatorOverride ||
+    currentUser.value?.ui_settings?.signature_separator ||
+    'blank'
+  );
 });
 
 const shouldShowSignaturePreview = computed(() => {
@@ -954,6 +965,7 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
     <!-- Signature preview at top -->
     <div
       v-if="shouldShowSignaturePreview && signaturePosition === 'top'"
+      v-tooltip="t('CONVERSATION.FOOTER.SIGNATURE_LABEL_TOP_TOOLTIP')"
       class="signature-preview signature-preview--top"
     >
       <div class="signature-label">
@@ -968,6 +980,7 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
     <!-- Signature preview at bottom -->
     <div
       v-if="shouldShowSignaturePreview && signaturePosition === 'bottom'"
+      v-tooltip="t('CONVERSATION.FOOTER.SIGNATURE_LABEL_BOTTOM_TOOLTIP')"
       class="signature-preview signature-preview--bottom"
     >
       <div class="signature-label">
@@ -1003,7 +1016,7 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
 @import '@chatwoot/prosemirror-schema/src/styles/base.scss';
 
 .signature-preview {
-  @apply px-1 py-1 text-n-slate-10 text-sm pointer-events-none select-none opacity-70;
+  @apply px-1 py-1 text-n-slate-10 text-sm select-none opacity-70 cursor-default;
 
   &--top {
     @apply border-b border-n-weak pb-1;
