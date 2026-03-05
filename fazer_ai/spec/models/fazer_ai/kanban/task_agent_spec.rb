@@ -30,7 +30,7 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
     let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee_id: nil) }
 
     before do
-      task.conversation_ids = [conversation.id]
+      task.conversation_ids = [conversation.display_id]
       task.save!
     end
 
@@ -87,7 +87,7 @@ RSpec.describe FazerAi::Kanban::TaskAgent, type: :model do
 
     before do
       create(:inbox_member, inbox: inbox, user: agent)
-      task.conversation_ids = [conversation.id]
+      task.conversation_ids = [conversation.display_id]
       task.save!
     end
 

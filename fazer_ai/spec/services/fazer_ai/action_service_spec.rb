@@ -9,7 +9,7 @@ RSpec.describe FazerAi::ActionService do
   let(:board) { create(:kanban_board, account: account) }
   let!(:board_inbox) { create(:kanban_board_inbox, board: board, inbox: inbox) } # rubocop:disable RSpec/LetSetup
   let!(:step) { create(:kanban_board_step, board: board) }
-  let(:task) { create(:kanban_task, account: account, board: board, board_step: step, conversation_ids: [conversation.id]) }
+  let(:task) { create(:kanban_task, account: account, board: board, board_step: step, conversation_ids: [conversation.display_id]) }
   let(:action_service) { ActionService.new(conversation) }
 
   describe '#add_label_to_task' do

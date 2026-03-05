@@ -33,7 +33,7 @@ properties:
       type: integer
   conversation_ids:
     type: array
-    description: List of conversation IDs to associate with the task
+    description: List of conversation display IDs (account-scoped) to associate with the task
     items:
       type: integer
   assigned_agent_ids:

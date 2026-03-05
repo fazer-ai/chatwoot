@@ -388,7 +388,7 @@ const onSave = () => {
     board_step_id: selectedStepId.value,
     assigned_agent_ids: selectedAgents.value.map(a => a.id),
     contact_ids: selectedContacts.value.map(c => c.id),
-    conversation_ids: selectedConversations.value.map(c => c.id),
+    conversation_ids: selectedConversations.value.map(c => c.display_id),
     board_id: props.boardId,
     start_date: normalizeDate(startDate.value),
     due_date: normalizeDate(dueDate.value),

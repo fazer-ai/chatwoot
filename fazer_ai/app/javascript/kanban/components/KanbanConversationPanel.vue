@@ -26,10 +26,6 @@ const props = defineProps({
     type: Number,
     required: true,
   },
-  conversationDatabaseId: {
-    type: Number,
-    required: true,
-  },
   contactName: {
     type: String,
     default: '',
@@ -322,7 +318,7 @@ const createTask = async () => {
       task: {
         title,
         board_id: selectedBoard.value.id,
-        conversation_ids: [props.conversationDatabaseId],
+        conversation_ids: [props.conversationId],
       },
     };
 

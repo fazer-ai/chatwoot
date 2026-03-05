@@ -135,10 +135,7 @@ export const mutations = {
   },
 
   [types.UPDATE_CONVERSATION_KANBAN_TASK](_state, { task, conversationId }) {
-    // conversationId from task is the database_id, not the display id
-    const [chat] = _state.allConversations.filter(
-      c => c.database_id === conversationId
-    );
+    const [chat] = _state.allConversations.filter(c => c.id === conversationId);
     if (chat) {
       // Preserve board.steps from existing task since push_event_data doesn't include them
       const existingSteps = chat.kanban_task?.board?.steps;

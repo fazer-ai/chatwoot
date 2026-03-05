@@ -19,7 +19,7 @@ RSpec.describe FazerAi::AutomationRules::KanbanConditionsFilterService do
            account: account,
            board: board,
            board_step: step1,
-           conversation_ids: [conversation.id])
+           conversation_ids: [conversation.display_id])
   end
 
   let(:automation_rule) do

@@ -161,7 +161,6 @@ onMounted(() => {
               >
                 <KanbanConversationPanel
                   :conversation-id="currentChat.id"
-                  :conversation-database-id="currentChat.database_id"
                   :contact-name="contact.name"
                   :kanban-task="currentChat.kanban_task"
                   :inbox-id="currentChat.inbox_id"

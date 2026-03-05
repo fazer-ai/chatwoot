@@ -88,14 +88,13 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
     @insert_before_task_id_set == true
   end
 
-  def conversation_ids=(ids)
-    @conversation_ids_to_assign = ids
+  def conversation_ids=(display_ids)
+    resolved_account = account || Current.account
+    @conversation_ids_to_assign = resolved_account.conversations.where(display_id: display_ids).pluck(:id)
   end
 
   def conversation_ids
-    return @conversation_ids_to_assign if @conversation_ids_to_assign.present?
-
-    Conversation.where(kanban_task_id: id).pluck(:id)
+    Conversation.where(kanban_task_id: id).pluck(:display_id)
   end
 
   def assigned_agent_ids=(ids)
@@ -181,6 +180,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   def push_event_data # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+    reloaded_conversations = conversations.reload
     {
       id: id,
       account_id: account_id,
@@ -208,9 +208,9 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
       created_at: created_at,
       updated_at: updated_at,
       contact_ids: contact_ids,
-      conversation_ids: conversation_ids,
+      conversation_ids: reloaded_conversations.pluck(:display_id),
       contacts: contacts.reload.map { |c| contact_push_data(c) },
-      conversations: conversations.reload.map { |conv| conversation_push_data(conv) },
+      conversations: reloaded_conversations.map { |conv| conversation_push_data(conv) },
       assigned_agents: assigned_agents.reload.map do |a|
         { id: a.id, name: a.name, avatar_url: a.avatar_url, availability_status: a.availability_status }
       end,
@@ -335,7 +335,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   end
 
   def capture_conversations_for_dispatch
-    @conversations_to_dispatch_unassigned = conversation_ids
+    @conversations_to_dispatch_unassigned = Conversation.where(kanban_task_id: id).pluck(:id)
   end
 
   def assign_conversations_on_create

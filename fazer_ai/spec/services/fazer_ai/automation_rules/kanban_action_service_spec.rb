@@ -12,7 +12,7 @@ RSpec.describe FazerAi::AutomationRules::KanbanActionService do
   let!(:board_inbox) { create(:kanban_board_inbox, board: board, inbox: inbox) } # rubocop:disable RSpec/LetSetup
   let!(:step1) { create(:kanban_board_step, board: board) }
   let!(:step2) { create(:kanban_board_step, board: board) }
-  let(:task) { create(:kanban_task, account: account, board: board, board_step: step1, conversation_ids: [conversation.id]) }
+  let(:task) { create(:kanban_task, account: account, board: board, board_step: step1, conversation_ids: [conversation.display_id]) }
   let(:agent) { create(:user, account: account) }
   let!(:board_agent) { create(:kanban_board_agent, board: board, agent: agent) } # rubocop:disable RSpec/LetSetup
   let!(:inbox_member) { create(:inbox_member, inbox: inbox, user: agent) } # rubocop:disable RSpec/LetSetup
@@ -289,7 +289,7 @@ RSpec.describe FazerAi::AutomationRules::KanbanActionService do
 
       before do
         create(:kanban_board_inbox, board: board, inbox: other_inbox)
-        task.update!(conversation_ids: [other_conversation.id])
+        task.update!(conversation_ids: [other_conversation.display_id])
       end
 
       it 'creates task without the invalid conversation and keeps it on old task' do

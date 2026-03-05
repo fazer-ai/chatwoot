@@ -87,12 +87,13 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
         expect(response.parsed_body['meta']['per_page']).to eq(25)
       end
 
-      it 'does not include meta for non-paginated requests' do
+      it 'paginates when filtering by board_id' do
         get base_path, params: { board_id: board.id }, headers: headers
 
         expect(response).to have_http_status(:ok)
-        expect(response.parsed_body['tasks'].size).to eq(30)
-        expect(response.parsed_body['meta']).to be_nil
+        expect(response.parsed_body['tasks'].size).to eq(25)
+        expect(response.parsed_body['meta']['total_count']).to eq(30)
+        expect(response.parsed_body['meta']['has_more']).to be(true)
       end
 
       it 'filters tasks by board_step_id' do
@@ -236,19 +237,19 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
       before { create(:kanban_board_inbox, board: board, inbox: inbox) }
 
       it 'persists when conversation inbox matches board inbox' do
-        post base_path, params: { task: params[:task].merge(conversation_ids: [conversation.id]) }, headers: headers
+        post base_path, params: { task: params[:task].merge(conversation_ids: [conversation.display_id]) }, headers: headers
 
         expect(response).to have_http_status(:created)
         task_id = response.parsed_body['id']
         task = FazerAi::Kanban::Task.find(task_id)
-        expect(task.conversation_ids).to contain_exactly(conversation.id)
+        expect(task.conversation_ids).to contain_exactly(conversation.display_id)
       end
 
       it 'rejects conversations from another inbox linked to the account' do
         mismatched_conversation = create(:conversation, account: account, inbox: other_inbox)
 
         expect do
-          post base_path, params: { task: params[:task].merge(conversation_ids: [mismatched_conversation.id]) }, headers: headers
+          post base_path, params: { task: params[:task].merge(conversation_ids: [mismatched_conversation.display_id]) }, headers: headers
         end.not_to(change { account.kanban_tasks.count })
 
         expect(response).to have_http_status(:unprocessable_entity)

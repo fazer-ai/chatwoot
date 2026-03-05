@@ -62,7 +62,7 @@ properties:
       type: integer
   conversation_ids:
     type: array
-    description: List of associated conversation IDs
+    description: List of associated conversation display IDs (account-scoped)
     items:
       type: integer
   labels:

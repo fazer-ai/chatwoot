@@ -223,7 +223,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
       end
 
       it 'automatically adds contact when conversation is added' do
-        task.conversation_ids = [conversation.id]
+        task.conversation_ids = [conversation.display_id]
         task.save!
 
         expect(task.contacts).to include(contact)
@@ -231,7 +231,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
 
       it 'does not duplicate contact if already present' do
         task.contacts << contact
-        task.conversation_ids = [conversation.id]
+        task.conversation_ids = [conversation.display_id]
         task.save!
 
         expect(task.contacts.count).to eq(1)
@@ -560,7 +560,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         create(:kanban_board_inbox, board: board, inbox: inbox)
         conversation = create(:conversation, account: account, inbox: inbox)
 
-        task.conversation_ids = [conversation.id]
+        task.conversation_ids = [conversation.display_id]
         task.save!
 
         RSpec::Mocks.space.proxy_for(Rails.configuration.dispatcher).reset
@@ -582,7 +582,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         task.save!
         allow(Rails.configuration.dispatcher).to receive(:dispatch)
 
-        task.update!(conversation_ids: [conversation.id])
+        task.update!(conversation_ids: [conversation.display_id])
 
         expect(Rails.configuration.dispatcher).to have_received(:dispatch)
           .with(Conversation::CONVERSATION_UPDATED, anything, satisfy { |data| data[:conversation].kanban_task == task })
@@ -590,7 +590,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
 
       it 'dispatches conversation.updated when conversation is unassigned from task' do
         task.save!
-        task.update!(conversation_ids: [conversation.id])
+        task.update!(conversation_ids: [conversation.display_id])
 
         RSpec::Mocks.space.proxy_for(Rails.configuration.dispatcher).reset
         allow(Rails.configuration.dispatcher).to receive(:dispatch)
@@ -611,7 +611,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         allow(Rails.configuration.dispatcher).to receive(:dispatch)
 
         new_task = build(:kanban_task, account: account, board: board, board_step: board_step, creator: task.creator)
-        new_task.conversation_ids = [conversation.id]
+        new_task.conversation_ids = [conversation.display_id]
         new_task.save!
 
         expect(Rails.configuration.dispatcher).to have_received(:dispatch)
@@ -637,7 +637,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         conversation2 = create(:conversation, account: account, inbox: inbox)
 
         task.save!
-        task.update!(conversation_ids: [conversation1.id, conversation2.id])
+        task.update!(conversation_ids: [conversation1.display_id, conversation2.display_id])
         task.reload
 
         allow(Rails.configuration.dispatcher).to receive(:dispatch)
@@ -662,7 +662,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
     end
 
     it 'returns correct conversations after removing conversation' do
-      task.conversation_ids = [conversation.id]
+      task.conversation_ids = [conversation.display_id]
       task.save!
       task.reload
 
@@ -680,7 +680,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
 
     it 'returns correct conversations after creating task with conversations' do
       new_task = build(:kanban_task, account: account, board: board, board_step: board_step, creator: task.creator)
-      new_task.conversation_ids = [conversation.id]
+      new_task.conversation_ids = [conversation.display_id]
 
       expect(new_task.conversations).to be_empty
 
@@ -688,7 +688,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
 
       event_data = new_task.push_event_data
 
-      expect(event_data[:conversation_ids]).to contain_exactly(conversation.id)
+      expect(event_data[:conversation_ids]).to contain_exactly(conversation.display_id)
       expect(event_data[:conversations].map { |c| c[:id] }).to contain_exactly(conversation.id)
     end
 
@@ -736,7 +736,7 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
       end
 
       it 'includes additional_attributes on contact nested in conversations' do
-        task.conversation_ids = [conversation_with_social.id]
+        task.conversation_ids = [conversation_with_social.display_id]
         task.save!
 
         event_data = task.push_event_data
