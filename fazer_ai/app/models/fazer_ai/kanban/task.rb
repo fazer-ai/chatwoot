@@ -4,20 +4,21 @@
 #
 # Table name: kanban_tasks
 #
-#  id                :bigint           not null, primary key
-#  cached_label_list :text
-#  description       :text
-#  due_date          :datetime
-#  priority          :string
-#  start_date        :datetime
-#  step_changed_at   :datetime
-#  title             :string           not null
-#  created_at        :datetime         not null
-#  updated_at        :datetime         not null
-#  account_id        :bigint           not null
-#  board_id          :bigint           not null
-#  board_step_id     :bigint           not null
-#  created_by_id     :bigint
+#  id                  :bigint           not null, primary key
+#  cached_label_list   :text
+#  description         :text
+#  due_date            :datetime
+#  overdue_notified_at :datetime
+#  priority            :string
+#  start_date          :datetime
+#  step_changed_at     :datetime
+#  title               :string           not null
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  account_id          :bigint           not null
+#  board_id            :bigint           not null
+#  board_step_id       :bigint           not null
+#  created_by_id       :bigint
 #
 # Indexes
 #
@@ -125,6 +126,7 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
   after_create :sync_contacts_from_conversations
   after_create :sync_assigned_agents
   before_update :track_step_change
+  before_update :reset_overdue_webhook_marker
   after_update :assign_conversations_on_update
   after_update :sync_contacts_from_conversations
   after_update :sync_assigned_agents
@@ -279,6 +281,12 @@ class FazerAi::Kanban::Task < ApplicationRecord # rubocop:disable Metrics/ClassL
     return unless board_step_id_changed?
 
     self.step_changed_at = Time.current
+  end
+
+  def reset_overdue_webhook_marker
+    return unless due_date_changed?
+
+    self.overdue_notified_at = nil
   end
 
   def set_defaults_from_associations # rubocop:disable Metrics/CyclomaticComplexity

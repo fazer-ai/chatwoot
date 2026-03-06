@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_26_194714) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_06_210544) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1024,6 +1024,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_194714) do
     t.datetime "updated_at", null: false
     t.text "cached_label_list"
     t.datetime "step_changed_at"
+    t.datetime "overdue_notified_at"
     t.index ["account_id", "created_at"], name: "index_kanban_tasks_on_account_id_and_created_at"
     t.index ["account_id"], name: "index_kanban_tasks_on_account_id"
     t.index ["board_id", "board_step_id"], name: "index_kanban_tasks_on_board_id_and_board_step_id"

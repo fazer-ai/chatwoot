@@ -80,3 +80,10 @@ remove_orphan_conversations_job:
   cron: '0 */12 * * *'
   class: 'Internal::RemoveOrphanConversationsJob'
   queue: housekeeping
+
+# executed every minute
+# triggers webhook notifications for due kanban tasks
+fazer_ai_trigger_task_due_webhooks_job:
+  cron: '* * * * *'
+  class: 'FazerAi::Kanban::TriggerTaskDueWebhooksSchedulerJob'
+  queue: scheduled_jobs

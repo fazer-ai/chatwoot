@@ -16,7 +16,7 @@ RSpec.describe FazerAi::Kanban::TriggerTaskDueWebhookJob do
   end
 
   describe '#perform' do
-    context 'when task is open and account has subscribed webhook' do
+    context 'when task is open and overdue' do
       it 'enqueues webhook job with task data' do
         task = create(:kanban_task, board: board, board_step: middle_step, due_date: 2.minutes.ago)
         webhook = create(:webhook, account: account, subscriptions: ['kanban_task_overdue'])
@@ -45,6 +45,17 @@ RSpec.describe FazerAi::Kanban::TriggerTaskDueWebhookJob do
     context 'when task is in completed step (last step)' do
       it 'does not enqueue webhook job' do
         task = create(:kanban_task, board: board, board_step: last_step, due_date: 2.minutes.ago)
+        create(:webhook, account: account, subscriptions: ['kanban_task_overdue'])
+
+        expect do
+          job.perform(task)
+        end.not_to have_enqueued_job(WebhookJob)
+      end
+    end
+
+    context 'when task due_date was changed to the future after enqueue' do
+      it 'does not enqueue webhook job' do
+        task = create(:kanban_task, board: board, board_step: middle_step, due_date: 1.hour.from_now)
         create(:webhook, account: account, subscriptions: ['kanban_task_overdue'])
 
         expect do

@@ -272,6 +272,29 @@ RSpec.describe FazerAi::Kanban::Task, type: :model do
         end
       end
     end
+
+    describe 'overdue_notified_at reset' do
+      let!(:task) do
+        create(:kanban_task, board: board, board_step: board_step, account: account,
+                             creator: create(:user, account: account), due_date: 1.day.ago)
+      end
+
+      before { task.update_column(:overdue_notified_at, 1.hour.ago) } # rubocop:disable Rails/SkipsModelValidations
+
+      it 'resets overdue_notified_at when due_date changes' do
+        expect(task.overdue_notified_at).not_to be_nil
+
+        task.update!(due_date: 1.day.from_now)
+        expect(task.overdue_notified_at).to be_nil
+      end
+
+      it 'does not reset overdue_notified_at when other attributes change' do
+        original_notified_at = task.overdue_notified_at
+
+        task.update!(title: 'Updated title')
+        expect(task.overdue_notified_at).to eq(original_notified_at)
+      end
+    end
   end
 
   describe '#overdue?' do
