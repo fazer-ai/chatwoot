@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n';
 import { useToggle } from '@vueuse/core';
 import { fromUnixTime } from 'date-fns';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -150,6 +152,19 @@ const checkOverflow = () => {
 const onEdit = () => emit('edit', props.scheduledMessage);
 const onDelete = () => emit('delete', props.scheduledMessage);
 
+const canScrollToMessage = computed(
+  () =>
+    props.scheduledMessage?.status === 'sent' &&
+    Boolean(props.scheduledMessage?.message_id)
+);
+
+const scrollToMessage = () => {
+  if (!canScrollToMessage.value) return;
+  emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, {
+    messageId: props.scheduledMessage.message_id,
+  });
+};
+
 onMounted(() => {
   checkOverflow();
 });
@@ -218,6 +233,21 @@ watch(previewContent, () => {
             icon="i-lucide-trash"
             @click="onDelete"
           />
+        </div>
+        <div
+          v-if="canScrollToMessage"
+          class="flex items-center gap-1 opacity-0 group-hover/scheduled:opacity-100"
+        >
+          <Button
+            variant="faded"
+            color="blue"
+            size="xs"
+            icon="i-lucide-arrow-right"
+            :title="t('SCHEDULED_MESSAGES.ITEM.GO_TO_MESSAGE')"
+            @click="scrollToMessage"
+          >
+            {{ t('SCHEDULED_MESSAGES.ITEM.GO_TO_MESSAGE') }}
+          </Button>
         </div>
       </div>
     </div>

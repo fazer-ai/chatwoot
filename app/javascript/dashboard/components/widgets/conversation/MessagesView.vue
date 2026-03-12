@@ -426,11 +426,34 @@ export default {
           this.isProgrammaticScroll = true;
           messageElement.scrollIntoView({ behavior: 'smooth' });
           this.fetchPreviousMessages();
+          if (messageId) {
+            emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
+          }
+        } else if (messageId) {
+          this.fetchAndScrollToMessage(messageId);
         } else {
           this.scrollToBottom();
         }
       });
       this.makeMessagesRead();
+    },
+    async fetchAndScrollToMessage(messageId) {
+      try {
+        await this.$store.dispatch('fetchPreviousMessages', {
+          conversationId: this.currentChat.id,
+          after: messageId,
+        });
+        this.$nextTick(() => {
+          const messageElement = document.getElementById('message' + messageId);
+          if (messageElement) {
+            this.isProgrammaticScroll = true;
+            messageElement.scrollIntoView({ behavior: 'smooth' });
+            emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
+          }
+        });
+      } catch {
+        // Message may have been deleted
+      }
     },
     addScrollListener() {
       this.conversationPanel = this.$el.querySelector('.conversation-panel');
