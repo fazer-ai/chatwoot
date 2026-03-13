@@ -279,7 +279,7 @@ const isFutureSchedule = date => {
 const validatePayload = status => {
   contentError.value = false;
   contentLengthError.value = false;
-  dateTimeError.value = null;
+  dateTimeError.value = '';
 
   const hasPayloadContent =
     hasContent.value ||
