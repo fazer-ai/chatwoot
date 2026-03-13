@@ -1,5 +1,4 @@
 import {
-  format,
   getDay,
   addDays,
   startOfMonth,
@@ -86,9 +85,13 @@ export const isTimePeriodPast = (date, timePeriod, now = new Date()) => {
 };
 
 /**
- * Format a date as "dd/MM" for display in chip labels.
+ * Format a date as a locale-aware short date (day/month) for display in labels.
  */
-export const formatShortDate = date => format(date, 'dd/MM');
+export const formatShortDate = date =>
+  new Intl.DateTimeFormat(navigator.language, {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date);
 
 /**
  * Build the list of day shortcut options with computed dates.
