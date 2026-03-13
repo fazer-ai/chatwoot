@@ -86,7 +86,7 @@ watch([selectedDay, selectedTimePeriod], ([day, time]) => {
   emit('update:modelValue', dateTime);
 });
 
-// Reset local state when modelValue is cleared externally (e.g. resetForm)
+// Sync local state when modelValue changes externally (edit mode or resetForm)
 watch(
   () => props.modelValue,
   newValue => {
@@ -94,8 +94,13 @@ watch(
       selectedDay.value = '';
       selectedTimePeriod.value = '';
       customDateTime.value = null;
+    } else if (!selectedDay.value) {
+      // Pre-existing value (e.g. edit mode) — open in Custom mode
+      selectedDay.value = SCHEDULE_DAY_OPTIONS.CUSTOM;
+      customDateTime.value = newValue;
     }
-  }
+  },
+  { immediate: true }
 );
 
 const onDayChange = event => {
