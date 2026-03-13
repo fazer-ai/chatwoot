@@ -449,10 +449,12 @@ export default {
             this.isProgrammaticScroll = true;
             messageElement.scrollIntoView({ behavior: 'smooth' });
             emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
+          } else {
+            useAlert(this.$t('SCHEDULED_MESSAGES.ITEM.MESSAGE_NOT_FOUND'));
           }
         });
       } catch {
-        // Message may have been deleted
+        useAlert(this.$t('SCHEDULED_MESSAGES.ITEM.MESSAGE_NOT_FOUND'));
       }
     },
     addScrollListener() {
