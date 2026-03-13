@@ -26,8 +26,8 @@ const emit = defineEmits(['update:modelValue']);
 
 const { t } = useI18n();
 
-const selectedDay = ref(null);
-const selectedTimePeriod = ref(null);
+const selectedDay = ref('');
+const selectedTimePeriod = ref('');
 const customDateTime = ref(null);
 const datePickerOpen = ref(false);
 
@@ -64,7 +64,7 @@ const timePeriodOptions = computed(() => {
 
 watch(selectedDay, newDay => {
   if (!newDay || isCustomMode.value) {
-    selectedTimePeriod.value = null;
+    selectedTimePeriod.value = '';
     return;
   }
   const targetDate = getShortcutDate(newDay);
@@ -73,7 +73,7 @@ watch(selectedDay, newDay => {
     SCHEDULE_TIME_PERIODS.AFTERNOON,
     SCHEDULE_TIME_PERIODS.EVENING,
   ].find(tp => !isTimePeriodPast(targetDate, tp));
-  selectedTimePeriod.value = firstAvailable || null;
+  selectedTimePeriod.value = firstAvailable || '';
 });
 
 watch([selectedDay, selectedTimePeriod], ([day, time]) => {
@@ -92,23 +92,23 @@ watch(
   () => props.modelValue,
   newValue => {
     if (!newValue) {
-      selectedDay.value = null;
-      selectedTimePeriod.value = null;
+      selectedDay.value = '';
+      selectedTimePeriod.value = '';
       customDateTime.value = null;
     }
   }
 );
 
-const selectDay = key => {
+const onDayChange = event => {
+  const key = event.target.value;
   selectedDay.value = key;
   if (key === SCHEDULE_DAY_OPTIONS.CUSTOM) {
     customDateTime.value = props.modelValue;
   }
 };
 
-const selectTimePeriod = option => {
-  if (option.disabled) return;
-  selectedTimePeriod.value = option.key;
+const onTimePeriodChange = event => {
+  selectedTimePeriod.value = event.target.value;
 };
 
 const onCustomDateTimeChange = value => {
@@ -141,57 +141,59 @@ const disablePastDates = date => {
   today.setHours(0, 0, 0, 0);
   return date < today;
 };
+
+const dayOptionLabel = option => {
+  const label = t(option.labelI18nKey);
+  return option.formattedDate ? `${label} ${option.formattedDate}` : label;
+};
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
-    <div class="flex flex-col gap-2">
-      <span class="text-sm font-medium text-n-slate-12">
-        {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS_LABEL') }}
-      </span>
-      <div class="flex flex-wrap gap-2">
-        <button
+    <div class="flex items-center gap-3">
+      <select
+        :value="selectedDay"
+        class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
+        :class="{
+          'text-n-slate-9': !selectedDay,
+          'text-n-slate-12': selectedDay,
+        }"
+        @change="onDayChange"
+      >
+        <option value="" disabled selected hidden>
+          {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS_LABEL') }}
+        </option>
+        <option
           v-for="option in dayOptions"
           :key="option.key"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border-0 transition-colors duration-150 cursor-pointer"
-          :class="[
-            selectedDay === option.key
-              ? 'bg-n-brand/10 text-n-blue-11 font-medium'
-              : 'bg-n-alpha-1 dark:bg-n-solid-1 text-n-slate-12 hover:bg-n-alpha-2 dark:hover:bg-n-solid-3',
-          ]"
-          @click="selectDay(option.key)"
+          :value="option.key"
         >
-          <span>{{ t(option.labelI18nKey) }}</span>
-          <span v-if="option.formattedDate" class="text-n-slate-11">
-            {{ option.formattedDate }}
-          </span>
-        </button>
-      </div>
-    </div>
+          {{ dayOptionLabel(option) }}
+        </option>
+      </select>
 
-    <div v-if="selectedDay && !isCustomMode" class="flex flex-col gap-2">
-      <span class="text-sm font-medium text-n-slate-12">
-        {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES_LABEL') }}
-      </span>
-      <div class="flex flex-wrap gap-2">
-        <button
+      <select
+        v-if="selectedDay && !isCustomMode"
+        :value="selectedTimePeriod"
+        class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
+        :class="{
+          'text-n-slate-9': !selectedTimePeriod,
+          'text-n-slate-12': selectedTimePeriod,
+        }"
+        @change="onTimePeriodChange"
+      >
+        <option value="" disabled selected hidden>
+          {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES_LABEL') }}
+        </option>
+        <option
           v-for="option in timePeriodOptions"
           :key="option.key"
+          :value="option.key"
           :disabled="option.disabled"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border-0 transition-colors duration-150"
-          :class="[
-            option.disabled
-              ? 'opacity-40 cursor-not-allowed bg-n-alpha-1 dark:bg-n-solid-1 text-n-slate-10'
-              : selectedTimePeriod === option.key
-                ? 'bg-n-brand/10 text-n-blue-11 font-medium cursor-pointer'
-                : 'bg-n-alpha-1 dark:bg-n-solid-1 text-n-slate-12 hover:bg-n-alpha-2 dark:hover:bg-n-solid-3 cursor-pointer',
-          ]"
-          @click="selectTimePeriod(option)"
         >
-          <span>{{ t(option.labelI18nKey) }}</span>
-          <span class="text-n-slate-11">{{ option.hour }}</span>
-        </button>
-      </div>
+          {{ t(option.labelI18nKey) }} ({{ option.hour }})
+        </option>
+      </select>
     </div>
 
     <div

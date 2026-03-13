@@ -490,9 +490,6 @@ watch(
       </div>
 
       <div class="flex flex-col gap-2 min-w-0">
-        <span class="text-sm font-medium text-n-slate-12">
-          {{ t('SCHEDULED_MESSAGES.MODAL.DATETIME_LABEL') }}
-        </span>
         <ScheduleDateShortcuts
           v-model="scheduledDateTime"
           :date-time-error="dateTimeError"
