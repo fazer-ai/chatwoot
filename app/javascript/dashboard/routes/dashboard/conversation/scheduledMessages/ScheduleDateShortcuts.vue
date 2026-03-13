@@ -99,8 +99,7 @@ watch(
       selectedDay.value = '';
       selectedTimePeriod.value = '';
       customDateTime.value = null;
-    } else if (!selectedDay.value) {
-      // Pre-existing value (e.g. edit mode) — open in Custom mode
+    } else if (!selectedDay.value || isCustomMode.value) {
       selectedDay.value = SCHEDULE_DAY_OPTIONS.CUSTOM;
       customDateTime.value = newValue;
     }
