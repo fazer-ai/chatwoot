@@ -456,7 +456,25 @@
       "TEMPLATE_ACTION": "Schedule message",
       "CANCEL": "Cancel",
       "SAVE_DRAFT": "Save as draft",
-      "SCHEDULE": "Schedule"
+      "SCHEDULE": "Schedule",
+      "SHORTCUTS": {
+        "DAYS_LABEL": "Day",
+        "TIMES_LABEL": "Time",
+        "DAYS": {
+          "TODAY": "Today",
+          "TOMORROW": "Tomorrow",
+          "THIS_WEEKEND": "This weekend",
+          "NEXT_WEEK": "Next week",
+          "NEXT_WEEKEND": "Next weekend",
+          "NEXT_MONTH": "Next month",
+          "CUSTOM": "Custom"
+        },
+        "TIMES": {
+          "MORNING": "Morning",
+          "AFTERNOON": "Afternoon",
+          "EVENING": "Evening"
+        }
+      }
     },
     "CONFIRM_CLOSE": {
       "TITLE": "Unsaved changes",
