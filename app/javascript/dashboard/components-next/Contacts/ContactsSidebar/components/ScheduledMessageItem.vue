@@ -176,7 +176,16 @@ watch(previewContent, () => {
 
 <template>
   <div
-    class="flex flex-col gap-3 border-b border-n-strong py-3 group/scheduled"
+    class="flex flex-col gap-3 border-b border-n-strong py-3 group/scheduled rounded-md transition-colors"
+    :class="{
+      'cursor-pointer hover:bg-n-alpha-1': canScrollToMessage,
+    }"
+    :title="
+      canScrollToMessage
+        ? t('SCHEDULED_MESSAGES.ITEM.GO_TO_MESSAGE')
+        : undefined
+    "
+    @click="scrollToMessage"
   >
     <div class="flex items-center gap-3">
       <Avatar
@@ -233,21 +242,6 @@ watch(previewContent, () => {
             icon="i-lucide-trash"
             @click="onDelete"
           />
-        </div>
-        <div
-          v-if="canScrollToMessage"
-          class="flex items-center gap-1 opacity-0 group-hover/scheduled:opacity-100"
-        >
-          <Button
-            variant="faded"
-            color="blue"
-            size="xs"
-            icon="i-lucide-arrow-right"
-            :title="t('SCHEDULED_MESSAGES.ITEM.GO_TO_MESSAGE')"
-            @click="scrollToMessage"
-          >
-            {{ t('SCHEDULED_MESSAGES.ITEM.GO_TO_MESSAGE') }}
-          </Button>
         </div>
       </div>
     </div>
