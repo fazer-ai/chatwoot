@@ -5,11 +5,13 @@ import DatePicker from 'vue-datepicker-next';
 import {
   SCHEDULE_DAY_OPTIONS,
   SCHEDULE_TIME_PERIODS,
+  TIME_PERIOD_HOURS,
   getDayShortcutOptions,
   getDatePickerLang,
   getShortcutDate,
   applyTimePeriod,
   isTimePeriodPast,
+  formatHour,
 } from 'dashboard/helper/scheduleDateShortcutHelpers';
 
 const props = defineProps({
@@ -46,19 +48,19 @@ const timePeriodOptions = computed(() => {
     {
       key: SCHEDULE_TIME_PERIODS.MORNING,
       labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.MORNING',
-      hour: '8:00',
+      hour: formatHour(TIME_PERIOD_HOURS.morning, locale.value),
       disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.MORNING),
     },
     {
       key: SCHEDULE_TIME_PERIODS.AFTERNOON,
       labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.AFTERNOON',
-      hour: '13:00',
+      hour: formatHour(TIME_PERIOD_HOURS.afternoon, locale.value),
       disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.AFTERNOON),
     },
     {
       key: SCHEDULE_TIME_PERIODS.EVENING,
       labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.EVENING',
-      hour: '18:00',
+      hour: formatHour(TIME_PERIOD_HOURS.evening, locale.value),
       disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.EVENING),
     },
   ];

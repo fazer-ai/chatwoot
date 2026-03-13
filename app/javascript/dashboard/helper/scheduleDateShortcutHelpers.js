@@ -90,6 +90,17 @@ export const isTimePeriodPast = (date, timePeriod, now = new Date()) => {
 const toBcp47 = locale => (locale || 'en').replace('_', '-');
 
 /**
+ * Format an hour (0-23) as a locale-aware time string (e.g. '18:00' or '6:00 PM').
+ */
+export const formatHour = (hour, locale = 'en') => {
+  const date = new Date(2023, 0, 1, hour, 0, 0);
+  return new Intl.DateTimeFormat(toBcp47(locale), {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+};
+
+/**
  * Format a date as a locale-aware short date (day/month) for display in labels.
  * @param {Date} date
  * @param {string} locale - Locale tag (e.g. 'en', 'pt_BR')
