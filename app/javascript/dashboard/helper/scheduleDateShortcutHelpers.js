@@ -86,17 +86,40 @@ export const isTimePeriodPast = (date, timePeriod, now = new Date()) => {
 
 /**
  * Format a date as a locale-aware short date (day/month) for display in labels.
+ * @param {Date} date
+ * @param {string} locale - BCP 47 locale tag (e.g. 'en', 'pt-BR')
  */
-export const formatShortDate = date =>
-  new Intl.DateTimeFormat(navigator.language, {
+export const formatShortDate = (date, locale = 'en') =>
+  new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: '2-digit',
   }).format(date);
 
 /**
+ * Build locale-aware lang config for vue-datepicker-next.
+ * Uses Intl.DateTimeFormat to generate day/month names for the given locale.
+ */
+export const getDatePickerLang = (locale = 'en') => {
+  const baseSunday = new Date(2023, 0, 1); // Sunday
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(baseSunday);
+    d.setDate(d.getDate() + i);
+    return new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d);
+  });
+
+  const months = Array.from({ length: 12 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { month: 'long' }).format(
+      new Date(2023, i, 1)
+    )
+  );
+
+  return { days, months, yearFormat: 'YYYY', monthFormat: 'MMMM' };
+};
+
+/**
  * Build the list of day shortcut options with computed dates.
  */
-export const getDayShortcutOptions = (now = new Date()) => {
+export const getDayShortcutOptions = (now = new Date(), locale = 'en') => {
   const options = [
     {
       key: SCHEDULE_DAY_OPTIONS.TODAY,
@@ -133,6 +156,6 @@ export const getDayShortcutOptions = (now = new Date()) => {
       return { ...option, date: null, formattedDate: null };
     }
     const date = getShortcutDate(option.key, now);
-    return { ...option, date, formattedDate: formatShortDate(date) };
+    return { ...option, date, formattedDate: formatShortDate(date, locale) };
   });
 };

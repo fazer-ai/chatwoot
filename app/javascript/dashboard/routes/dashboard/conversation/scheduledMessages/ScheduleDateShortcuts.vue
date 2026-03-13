@@ -6,6 +6,7 @@ import {
   SCHEDULE_DAY_OPTIONS,
   SCHEDULE_TIME_PERIODS,
   getDayShortcutOptions,
+  getDatePickerLang,
   getShortcutDate,
   applyTimePeriod,
   isTimePeriodPast,
@@ -24,7 +25,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const selectedDay = ref('');
 const selectedTimePeriod = ref('');
@@ -34,7 +35,9 @@ const isCustomMode = computed(
   () => selectedDay.value === SCHEDULE_DAY_OPTIONS.CUSTOM
 );
 
-const dayOptions = computed(() => getDayShortcutOptions());
+const dayOptions = computed(() =>
+  getDayShortcutOptions(new Date(), locale.value)
+);
 
 const timePeriodOptions = computed(() => {
   if (!selectedDay.value || isCustomMode.value) return [];
@@ -120,25 +123,7 @@ const onCustomDateTimeChange = value => {
   emit('update:modelValue', value);
 };
 
-const datePickerLang = {
-  days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-  months: [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ],
-  yearFormat: 'YYYY',
-  monthFormat: 'MMMM',
-};
+const datePickerLang = computed(() => getDatePickerLang(locale.value));
 
 const disablePastDates = date => {
   const today = new Date();
