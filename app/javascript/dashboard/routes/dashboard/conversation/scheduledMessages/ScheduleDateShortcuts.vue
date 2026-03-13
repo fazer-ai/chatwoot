@@ -143,6 +143,7 @@ const dayOptionLabel = option => {
     <div class="flex items-center gap-3">
       <select
         :value="selectedDay"
+        :aria-label="t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS_LABEL')"
         class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
         :class="{
           'text-n-slate-9': !selectedDay,
@@ -165,6 +166,7 @@ const dayOptionLabel = option => {
       <select
         v-if="selectedDay && !isCustomMode"
         :value="selectedTimePeriod"
+        :aria-label="t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES_LABEL')"
         class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
         :class="{
           'text-n-slate-9': !selectedTimePeriod,
