@@ -85,12 +85,17 @@ export const isTimePeriodPast = (date, timePeriod, now = new Date()) => {
 };
 
 /**
+ * Normalize a locale tag to BCP 47 format (e.g. 'pt_BR' → 'pt-BR').
+ */
+const toBcp47 = locale => (locale || 'en').replace('_', '-');
+
+/**
  * Format a date as a locale-aware short date (day/month) for display in labels.
  * @param {Date} date
- * @param {string} locale - BCP 47 locale tag (e.g. 'en', 'pt-BR')
+ * @param {string} locale - Locale tag (e.g. 'en', 'pt_BR')
  */
 export const formatShortDate = (date, locale = 'en') =>
-  new Intl.DateTimeFormat(locale, {
+  new Intl.DateTimeFormat(toBcp47(locale), {
     day: '2-digit',
     month: '2-digit',
   }).format(date);
@@ -100,15 +105,16 @@ export const formatShortDate = (date, locale = 'en') =>
  * Uses Intl.DateTimeFormat to generate day/month names for the given locale.
  */
 export const getDatePickerLang = (locale = 'en') => {
+  const bcp47 = toBcp47(locale);
   const baseSunday = new Date(2023, 0, 1); // Sunday
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(baseSunday);
     d.setDate(d.getDate() + i);
-    return new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d);
+    return new Intl.DateTimeFormat(bcp47, { weekday: 'short' }).format(d);
   });
 
   const months = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { month: 'long' }).format(
+    new Intl.DateTimeFormat(bcp47, { month: 'long' }).format(
       new Date(2023, i, 1)
     )
   );
