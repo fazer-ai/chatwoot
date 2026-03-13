@@ -29,7 +29,6 @@ const { t } = useI18n();
 const selectedDay = ref('');
 const selectedTimePeriod = ref('');
 const customDateTime = ref(null);
-const datePickerOpen = ref(false);
 
 const isCustomMode = computed(
   () => selectedDay.value === SCHEDULE_DAY_OPTIONS.CUSTOM
@@ -204,11 +203,9 @@ const dayOptionLabel = option => {
           ? '[&_.mx-input]:!border-n-ruby-9 [&_.mx-input]:!border-solid'
           : ''
       "
-      @click.stop
     >
       <DatePicker
         :value="customDateTime"
-        :open="datePickerOpen"
         type="datetime"
         :placeholder="t('SCHEDULED_MESSAGES.MODAL.DATETIME_PLACEHOLDER')"
         :lang="datePickerLang"
@@ -216,12 +213,11 @@ const dayOptionLabel = option => {
         value-type="date"
         :disabled-date="disablePastDates"
         :show-second="false"
+        confirm
         editable
         clearable
         append-to-body
         popup-class="z-[10000]"
-        @open="datePickerOpen = true"
-        @close="datePickerOpen = false"
         @change="onCustomDateTimeChange"
       />
     </div>
