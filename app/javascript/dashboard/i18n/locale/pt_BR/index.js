@@ -23,11 +23,11 @@ import inbox from './inbox.json';
 import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
+import kanban from './kanban.json';
+import kanbanTemplates from './kanbanTemplates.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
-import kanban from './kanban.json';
-import kanbanTemplates from './kanbanTemplates.json';
 import report from './report.json';
 import resetPassword from './resetPassword.json';
 import search from './search.json';
@@ -65,11 +65,11 @@ export default {
   ...inboxMgmt,
   ...integrationApps,
   ...integrations,
+  ...kanban,
+  ...kanbanTemplates,
   ...labelsMgmt,
   ...login,
   ...macros,
-  ...kanban,
-  ...kanbanTemplates,
   ...report,
   ...resetPassword,
   ...search,

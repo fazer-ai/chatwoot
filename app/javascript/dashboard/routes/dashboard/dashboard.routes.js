@@ -22,6 +22,7 @@ export default {
       component: AppContainer,
       children: [
         ...captainRoutes,
+        ...kanbanRoutes,
         ...inboxRoutes,
         ...conversation.routes,
         ...settings.routes,
@@ -31,7 +32,6 @@ export default {
         ...notificationRoutes,
         ...helpcenterRoutes.routes,
         ...campaignsRoutes.routes,
-        ...kanbanRoutes,
         ...dashboardAppsRoutes.routes,
       ],
     },
