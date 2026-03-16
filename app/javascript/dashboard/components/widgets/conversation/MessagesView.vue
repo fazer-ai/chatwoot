@@ -425,7 +425,6 @@ export default {
         if (messageElement) {
           this.isProgrammaticScroll = true;
           messageElement.scrollIntoView({ behavior: 'smooth' });
-          this.fetchPreviousMessages();
           if (messageId) {
             emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
             this.clearMessageIdFromRoute();
