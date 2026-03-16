@@ -447,22 +447,11 @@
       "SAVE_DRAFT": "Salvar como rascunho",
       "SCHEDULE": "Agendar",
       "SHORTCUTS": {
-        "DAYS_LABEL": "Dia",
-        "TIMES_LABEL": "Turno",
-        "DAYS": {
-          "TODAY": "Hoje",
-          "TOMORROW": "Amanhã",
-          "THIS_WEEKEND": "Este final de semana",
-          "NEXT_WEEK": "Próxima semana",
-          "NEXT_WEEKEND": "Próximo final de semana",
-          "NEXT_MONTH": "Próximo mês",
-          "CUSTOM": "Personalizado"
-        },
-        "TIMES": {
-          "MORNING": "Manhã",
-          "AFTERNOON": "Tarde",
-          "EVENING": "Noite"
-        }
+        "LABEL": "Agendar para",
+        "TOMORROW_MORNING": "Amanhã de manhã",
+        "TOMORROW_AFTERNOON": "Amanhã de tarde",
+        "MONDAY_MORNING": "Segunda-feira de manhã",
+        "CUSTOM": "Personalizado"
       }
     },
     "CONFIRM_CLOSE": {

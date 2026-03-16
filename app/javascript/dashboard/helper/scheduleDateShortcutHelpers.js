@@ -1,93 +1,52 @@
 import {
   getDay,
   addDays,
-  startOfMonth,
-  addMonths,
   setHours,
   setMinutes,
   setSeconds,
   isBefore,
 } from 'date-fns';
 
-export const SCHEDULE_DAY_OPTIONS = {
-  TODAY: 'today',
-  TOMORROW: 'tomorrow',
-  THIS_WEEKEND: 'this_weekend',
-  NEXT_WEEK: 'next_week',
-  NEXT_WEEKEND: 'next_weekend',
-  NEXT_MONTH: 'next_month',
+export const SHORTCUT_KEYS = {
+  TOMORROW_MORNING: 'tomorrow_morning',
+  TOMORROW_AFTERNOON: 'tomorrow_afternoon',
+  MONDAY_MORNING: 'monday_morning',
   CUSTOM: 'custom',
-};
-
-export const SCHEDULE_TIME_PERIODS = {
-  MORNING: 'morning',
-  AFTERNOON: 'afternoon',
-  EVENING: 'evening',
-};
-
-export const TIME_PERIOD_HOURS = {
-  [SCHEDULE_TIME_PERIODS.MORNING]: 8,
-  [SCHEDULE_TIME_PERIODS.AFTERNOON]: 13,
-  [SCHEDULE_TIME_PERIODS.EVENING]: 18,
-};
-
-/**
- * Get the target date for a day shortcut (date only, at midnight).
- */
-export const getShortcutDate = (dayKey, now = new Date()) => {
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const dayOfWeek = getDay(now); // 0=Sun, 6=Sat
-
-  switch (dayKey) {
-    case SCHEDULE_DAY_OPTIONS.TODAY:
-      return today;
-
-    case SCHEDULE_DAY_OPTIONS.TOMORROW:
-      return addDays(today, 1);
-
-    case SCHEDULE_DAY_OPTIONS.THIS_WEEKEND:
-      if (dayOfWeek === 6) return today;
-      if (dayOfWeek === 0) return addDays(today, 6);
-      return addDays(today, 6 - dayOfWeek);
-
-    case SCHEDULE_DAY_OPTIONS.NEXT_WEEK:
-      if (dayOfWeek === 0) return addDays(today, 1);
-      return addDays(today, 8 - dayOfWeek);
-
-    case SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND:
-      if (dayOfWeek === 6) return addDays(today, 7);
-      if (dayOfWeek === 0) return addDays(today, 13);
-      return addDays(today, 13 - dayOfWeek);
-
-    case SCHEDULE_DAY_OPTIONS.NEXT_MONTH:
-      return startOfMonth(addMonths(today, 1));
-
-    default:
-      return today;
-  }
-};
-
-/**
- * Apply a time period to a date, returning a Date with hours set.
- */
-export const applyTimePeriod = (date, timePeriod) => {
-  const hours = TIME_PERIOD_HOURS[timePeriod] ?? 8;
-  return setSeconds(setMinutes(setHours(new Date(date), hours), 0), 0);
-};
-
-/**
- * Check if a time period would result in a past datetime for a given day.
- */
-export const isTimePeriodPast = (date, timePeriod, now = new Date()) => {
-  const target = applyTimePeriod(date, timePeriod);
-  return isBefore(target, now);
 };
 
 /**
  * Normalize a locale tag to BCP 47 format (e.g. 'pt_BR' → 'pt-BR').
  */
 const toBcp47 = locale => (locale || 'en').replace('_', '-');
+
+/**
+ * Get the date for "tomorrow" (always the next calendar day).
+ */
+export const getTomorrowDate = (now = new Date()) => {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  return addDays(today, 1);
+};
+
+/**
+ * Get the date for the "Monday" shortcut.
+ * On Sunday, tomorrow is already Monday, so this returns next week's Monday.
+ * On all other days, returns the upcoming Monday.
+ */
+export const getMondayDate = (now = new Date()) => {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const dayOfWeek = getDay(now); // 0=Sun, 6=Sat
+
+  if (dayOfWeek === 0) return addDays(today, 8);
+  return addDays(today, 8 - dayOfWeek);
+};
+
+/**
+ * Apply an hour to a date, returning a new Date with that hour set (minutes/seconds zeroed).
+ */
+export const applyHour = (date, hour) =>
+  setSeconds(setMinutes(setHours(new Date(date), hour), 0), 0);
 
 /**
  * Format an hour (0-23) as a locale-aware time string (e.g. '18:00' or '6:00 PM').
@@ -102,8 +61,6 @@ export const formatHour = (hour, locale = 'en') => {
 
 /**
  * Format a date as a locale-aware short date (day/month) for display in labels.
- * @param {Date} date
- * @param {string} locale - Locale tag (e.g. 'en', 'pt_BR')
  */
 export const formatShortDate = (date, locale = 'en') =>
   new Intl.DateTimeFormat(toBcp47(locale), {
@@ -113,7 +70,6 @@ export const formatShortDate = (date, locale = 'en') =>
 
 /**
  * Build locale-aware lang config for vue-datepicker-next.
- * Uses Intl.DateTimeFormat to generate day/month names for the given locale.
  */
 export const getDatePickerLang = (locale = 'en') => {
   const bcp47 = toBcp47(locale);
@@ -134,45 +90,46 @@ export const getDatePickerLang = (locale = 'en') => {
 };
 
 /**
- * Build the list of day shortcut options with computed dates.
+ * Build the 3 predefined schedule shortcuts with pre-computed dates.
+ * Shortcuts whose datetime is already in the past are excluded.
  */
-export const getDayShortcutOptions = (now = new Date(), locale = 'en') => {
-  const options = [
+export const getScheduleShortcuts = (now = new Date(), locale = 'en') => {
+  const tomorrow = getTomorrowDate(now);
+  const monday = getMondayDate(now);
+
+  const shortcuts = [
     {
-      key: SCHEDULE_DAY_OPTIONS.TODAY,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.TODAY',
+      key: SHORTCUT_KEYS.TOMORROW_MORNING,
+      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TOMORROW_MORNING',
+      date: tomorrow,
+      hour: 8,
     },
     {
-      key: SCHEDULE_DAY_OPTIONS.TOMORROW,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.TOMORROW',
+      key: SHORTCUT_KEYS.TOMORROW_AFTERNOON,
+      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TOMORROW_AFTERNOON',
+      date: tomorrow,
+      hour: 13,
     },
     {
-      key: SCHEDULE_DAY_OPTIONS.THIS_WEEKEND,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.THIS_WEEKEND',
-    },
-    {
-      key: SCHEDULE_DAY_OPTIONS.NEXT_WEEK,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.NEXT_WEEK',
-    },
-    {
-      key: SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.NEXT_WEEKEND',
-    },
-    {
-      key: SCHEDULE_DAY_OPTIONS.NEXT_MONTH,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.NEXT_MONTH',
-    },
-    {
-      key: SCHEDULE_DAY_OPTIONS.CUSTOM,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS.CUSTOM',
+      key: SHORTCUT_KEYS.MONDAY_MORNING,
+      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.MONDAY_MORNING',
+      date: monday,
+      hour: 8,
     },
   ];
 
-  return options.map(option => {
-    if (option.key === SCHEDULE_DAY_OPTIONS.CUSTOM) {
-      return { ...option, date: null, formattedDate: null };
-    }
-    const date = getShortcutDate(option.key, now);
-    return { ...option, date, formattedDate: formatShortDate(date, locale) };
-  });
+  return shortcuts
+    .map(s => {
+      const dateTime = applyHour(s.date, s.hour);
+      const formattedDate = formatShortDate(s.date, locale);
+      const formattedTime = formatHour(s.hour, locale);
+      return {
+        ...s,
+        dateTime,
+        formattedDate,
+        formattedTime,
+        detail: `${formattedDate}, ${formattedTime}`,
+      };
+    })
+    .filter(s => !isBefore(s.dateTime, now));
 };

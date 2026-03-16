@@ -458,22 +458,11 @@
       "SAVE_DRAFT": "Save as draft",
       "SCHEDULE": "Schedule",
       "SHORTCUTS": {
-        "DAYS_LABEL": "Day",
-        "TIMES_LABEL": "Time",
-        "DAYS": {
-          "TODAY": "Today",
-          "TOMORROW": "Tomorrow",
-          "THIS_WEEKEND": "This weekend",
-          "NEXT_WEEK": "Next week",
-          "NEXT_WEEKEND": "Next weekend",
-          "NEXT_MONTH": "Next month",
-          "CUSTOM": "Custom"
-        },
-        "TIMES": {
-          "MORNING": "Morning",
-          "AFTERNOON": "Afternoon",
-          "EVENING": "Evening"
-        }
+        "LABEL": "Schedule for",
+        "TOMORROW_MORNING": "Tomorrow morning",
+        "TOMORROW_AFTERNOON": "Tomorrow afternoon",
+        "MONDAY_MORNING": "Monday morning",
+        "CUSTOM": "Custom"
       }
     },
     "CONFIRM_CLOSE": {

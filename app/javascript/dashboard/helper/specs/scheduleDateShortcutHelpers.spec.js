@@ -1,14 +1,12 @@
 import {
-  SCHEDULE_DAY_OPTIONS,
-  SCHEDULE_TIME_PERIODS,
-  TIME_PERIOD_HOURS,
-  getShortcutDate,
-  applyTimePeriod,
-  isTimePeriodPast,
+  SHORTCUT_KEYS,
+  getTomorrowDate,
+  getMondayDate,
+  applyHour,
   formatShortDate,
   formatHour,
   getDatePickerLang,
-  getDayShortcutOptions,
+  getScheduleShortcuts,
 } from '../scheduleDateShortcutHelpers';
 
 describe('#scheduleDateShortcutHelpers', () => {
@@ -18,172 +16,66 @@ describe('#scheduleDateShortcutHelpers', () => {
   const saturday = new Date('2023-06-17T10:30:00');
   // Sunday 2023-06-18
   const sunday = new Date('2023-06-18T10:30:00');
+  // Monday 2023-06-19
+  const monday = new Date('2023-06-19T10:30:00');
 
-  describe('getShortcutDate', () => {
-    it('returns today at midnight for TODAY', () => {
-      const result = getShortcutDate(SCHEDULE_DAY_OPTIONS.TODAY, wednesday);
-      expect(result).toEqual(new Date('2023-06-14T00:00:00'));
-    });
-
-    it('returns tomorrow at midnight for TOMORROW', () => {
-      const result = getShortcutDate(SCHEDULE_DAY_OPTIONS.TOMORROW, wednesday);
-      expect(result).toEqual(new Date('2023-06-15T00:00:00'));
-    });
-
-    describe('THIS_WEEKEND', () => {
-      it('returns next Saturday from a weekday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.THIS_WEEKEND,
-          wednesday
-        );
-        expect(result).toEqual(new Date('2023-06-17T00:00:00'));
-      });
-
-      it('returns today when already Saturday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.THIS_WEEKEND,
-          saturday
-        );
-        expect(result).toEqual(new Date('2023-06-17T00:00:00'));
-      });
-
-      it('returns next Saturday from Sunday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.THIS_WEEKEND,
-          sunday
-        );
-        expect(result).toEqual(new Date('2023-06-24T00:00:00'));
-      });
-    });
-
-    describe('NEXT_WEEK', () => {
-      it('returns next Monday from a weekday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.NEXT_WEEK,
-          wednesday
-        );
-        expect(result).toEqual(new Date('2023-06-19T00:00:00'));
-      });
-
-      it('returns next Monday from Sunday', () => {
-        const result = getShortcutDate(SCHEDULE_DAY_OPTIONS.NEXT_WEEK, sunday);
-        expect(result).toEqual(new Date('2023-06-19T00:00:00'));
-      });
-
-      it('returns next Monday from Saturday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.NEXT_WEEK,
-          saturday
-        );
-        expect(result).toEqual(new Date('2023-06-19T00:00:00'));
-      });
-    });
-
-    describe('NEXT_WEEKEND', () => {
-      it('returns next-next Saturday from a weekday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND,
-          wednesday
-        );
-        expect(result).toEqual(new Date('2023-06-24T00:00:00'));
-      });
-
-      it('returns next Saturday from Saturday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND,
-          saturday
-        );
-        expect(result).toEqual(new Date('2023-06-24T00:00:00'));
-      });
-
-      it('returns Saturday 13 days later from Sunday', () => {
-        const result = getShortcutDate(
-          SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND,
-          sunday
-        );
-        expect(result).toEqual(new Date('2023-07-01T00:00:00'));
-      });
-    });
-
-    it('returns first day of next month for NEXT_MONTH', () => {
-      const result = getShortcutDate(
-        SCHEDULE_DAY_OPTIONS.NEXT_MONTH,
-        wednesday
+  describe('getTomorrowDate', () => {
+    it('returns the next day at midnight', () => {
+      expect(getTomorrowDate(wednesday)).toEqual(
+        new Date('2023-06-15T00:00:00')
       );
-      expect(result).toEqual(new Date('2023-07-01T00:00:00'));
     });
 
-    it('returns today for unknown key', () => {
-      const result = getShortcutDate('unknown', wednesday);
-      expect(result).toEqual(new Date('2023-06-14T00:00:00'));
+    it('returns Monday from Sunday', () => {
+      expect(getTomorrowDate(sunday)).toEqual(new Date('2023-06-19T00:00:00'));
+    });
+
+    it('returns Sunday from Saturday', () => {
+      expect(getTomorrowDate(saturday)).toEqual(
+        new Date('2023-06-18T00:00:00')
+      );
     });
   });
 
-  describe('applyTimePeriod', () => {
+  describe('getMondayDate', () => {
+    it('returns next Monday from a weekday (Wednesday)', () => {
+      expect(getMondayDate(wednesday)).toEqual(new Date('2023-06-19T00:00:00'));
+    });
+
+    it('returns next Monday from Saturday', () => {
+      expect(getMondayDate(saturday)).toEqual(new Date('2023-06-19T00:00:00'));
+    });
+
+    it('returns Monday of NEXT week from Sunday (8 days away)', () => {
+      // On Sunday, tomorrow is already Monday, so this returns the Monday after
+      expect(getMondayDate(sunday)).toEqual(new Date('2023-06-26T00:00:00'));
+    });
+
+    it('returns next Monday from Monday (7 days away)', () => {
+      expect(getMondayDate(monday)).toEqual(new Date('2023-06-26T00:00:00'));
+    });
+  });
+
+  describe('applyHour', () => {
     const baseDate = new Date('2023-06-14T00:00:00');
 
-    it('sets 8:00 for morning', () => {
-      const result = applyTimePeriod(baseDate, SCHEDULE_TIME_PERIODS.MORNING);
+    it('sets 8:00 for hour 8', () => {
+      const result = applyHour(baseDate, 8);
       expect(result.getHours()).toBe(8);
       expect(result.getMinutes()).toBe(0);
       expect(result.getSeconds()).toBe(0);
     });
 
-    it('sets 13:00 for afternoon', () => {
-      const result = applyTimePeriod(baseDate, SCHEDULE_TIME_PERIODS.AFTERNOON);
+    it('sets 13:00 for hour 13', () => {
+      const result = applyHour(baseDate, 13);
       expect(result.getHours()).toBe(13);
       expect(result.getMinutes()).toBe(0);
     });
 
-    it('sets 18:00 for evening', () => {
-      const result = applyTimePeriod(baseDate, SCHEDULE_TIME_PERIODS.EVENING);
-      expect(result.getHours()).toBe(18);
-      expect(result.getMinutes()).toBe(0);
-    });
-
-    it('defaults to 8:00 for unknown period', () => {
-      const result = applyTimePeriod(baseDate, 'unknown');
-      expect(result.getHours()).toBe(8);
-    });
-
     it('does not mutate the original date', () => {
       const original = new Date('2023-06-14T00:00:00');
-      applyTimePeriod(original, SCHEDULE_TIME_PERIODS.EVENING);
+      applyHour(original, 18);
       expect(original.getHours()).toBe(0);
-    });
-  });
-
-  describe('isTimePeriodPast', () => {
-    it('returns true when the time period is in the past', () => {
-      const today = new Date('2023-06-14T00:00:00');
-      const now = new Date('2023-06-14T14:00:00');
-      expect(isTimePeriodPast(today, SCHEDULE_TIME_PERIODS.MORNING, now))
-        .toBe()
-        .toBe(true);
-    });
-
-    it('returns false when the time period is in the future', () => {
-      const today = new Date('2023-06-14T00:00:00');
-      const now = new Date('2023-06-14T07:00:00');
-      expect(isTimePeriodPast(today, SCHEDULE_TIME_PERIODS.MORNING, now)).toBe(
-        false
-      );
-    });
-
-    it('returns true for all periods late at night', () => {
-      const today = new Date('2023-06-14T00:00:00');
-      const now = new Date('2023-06-14T23:00:00');
-      expect(isTimePeriodPast(today, SCHEDULE_TIME_PERIODS.EVENING, now)).toBe(
-        true
-      );
-    });
-
-    it('returns false for future dates regardless of time', () => {
-      const tomorrow = new Date('2023-06-15T00:00:00');
-      const now = new Date('2023-06-14T23:00:00');
-      expect(
-        isTimePeriodPast(tomorrow, SCHEDULE_TIME_PERIODS.MORNING, now)
-      ).toBe(false);
     });
   });
 
@@ -243,59 +135,78 @@ describe('#scheduleDateShortcutHelpers', () => {
     });
   });
 
-  describe('getDayShortcutOptions', () => {
-    it('returns 7 options (6 shortcuts + custom)', () => {
-      const options = getDayShortcutOptions(wednesday);
-      expect(options).toHaveLength(7);
+  describe('getScheduleShortcuts', () => {
+    it('returns 3 shortcuts on a normal weekday', () => {
+      const shortcuts = getScheduleShortcuts(wednesday);
+      expect(shortcuts).toHaveLength(3);
     });
 
-    it('includes all day option keys', () => {
-      const options = getDayShortcutOptions(wednesday);
-      const keys = options.map(o => o.key);
+    it('returns correct keys', () => {
+      const shortcuts = getScheduleShortcuts(wednesday);
+      const keys = shortcuts.map(s => s.key);
       expect(keys).toEqual([
-        SCHEDULE_DAY_OPTIONS.TODAY,
-        SCHEDULE_DAY_OPTIONS.TOMORROW,
-        SCHEDULE_DAY_OPTIONS.THIS_WEEKEND,
-        SCHEDULE_DAY_OPTIONS.NEXT_WEEK,
-        SCHEDULE_DAY_OPTIONS.NEXT_WEEKEND,
-        SCHEDULE_DAY_OPTIONS.NEXT_MONTH,
-        SCHEDULE_DAY_OPTIONS.CUSTOM,
+        SHORTCUT_KEYS.TOMORROW_MORNING,
+        SHORTCUT_KEYS.TOMORROW_AFTERNOON,
+        SHORTCUT_KEYS.MONDAY_MORNING,
       ]);
     });
 
-    it('sets formattedDate for non-custom options', () => {
-      const options = getDayShortcutOptions(wednesday);
-      options
-        .filter(o => o.key !== SCHEDULE_DAY_OPTIONS.CUSTOM)
-        .forEach(o => {
-          expect(o.formattedDate).toBeTruthy();
-          expect(o.date).toBeInstanceOf(Date);
-        });
+    it('computes correct dates for Wednesday', () => {
+      const shortcuts = getScheduleShortcuts(wednesday);
+      // Tomorrow = Thursday 2023-06-15
+      expect(shortcuts[0].dateTime).toEqual(new Date('2023-06-15T08:00:00'));
+      expect(shortcuts[1].dateTime).toEqual(new Date('2023-06-15T13:00:00'));
+      // Monday = 2023-06-19
+      expect(shortcuts[2].dateTime).toEqual(new Date('2023-06-19T08:00:00'));
     });
 
-    it('sets null date and formattedDate for custom option', () => {
-      const options = getDayShortcutOptions(wednesday);
-      const custom = options.find(o => o.key === SCHEDULE_DAY_OPTIONS.CUSTOM);
-      expect(custom.date).toBeNull();
-      expect(custom.formattedDate).toBeNull();
+    it('on Sunday: tomorrow is Monday, Monday shortcut is next weeks Monday', () => {
+      const shortcuts = getScheduleShortcuts(sunday);
+      // Tomorrow = Monday 2023-06-19
+      expect(shortcuts[0].dateTime).toEqual(new Date('2023-06-19T08:00:00'));
+      expect(shortcuts[1].dateTime).toEqual(new Date('2023-06-19T13:00:00'));
+      // Monday = next week's Monday 2023-06-26
+      expect(shortcuts[2].dateTime).toEqual(new Date('2023-06-26T08:00:00'));
     });
 
-    it('passes locale to formatShortDate', () => {
-      expect(() => getDayShortcutOptions(wednesday, 'pt_BR')).not.toThrow();
-    });
-  });
-
-  describe('TIME_PERIOD_HOURS', () => {
-    it('maps morning to 8', () => {
-      expect(TIME_PERIOD_HOURS[SCHEDULE_TIME_PERIODS.MORNING]).toBe(8);
-    });
-
-    it('maps afternoon to 13', () => {
-      expect(TIME_PERIOD_HOURS[SCHEDULE_TIME_PERIODS.AFTERNOON]).toBe(13);
+    it('on Saturday: tomorrow is Sunday, Monday is the day after', () => {
+      const shortcuts = getScheduleShortcuts(saturday);
+      // Tomorrow = Sunday 2023-06-18
+      expect(shortcuts[0].dateTime).toEqual(new Date('2023-06-18T08:00:00'));
+      expect(shortcuts[1].dateTime).toEqual(new Date('2023-06-18T13:00:00'));
+      // Monday = 2023-06-19
+      expect(shortcuts[2].dateTime).toEqual(new Date('2023-06-19T08:00:00'));
     });
 
-    it('maps evening to 18', () => {
-      expect(TIME_PERIOD_HOURS[SCHEDULE_TIME_PERIODS.EVENING]).toBe(18);
+    it('on Monday: tomorrow is Tuesday, Monday shortcut is next Monday', () => {
+      const shortcuts = getScheduleShortcuts(monday);
+      // Tomorrow = Tuesday 2023-06-20
+      expect(shortcuts[0].dateTime).toEqual(new Date('2023-06-20T08:00:00'));
+      expect(shortcuts[1].dateTime).toEqual(new Date('2023-06-20T13:00:00'));
+      // Monday = 2023-06-26
+      expect(shortcuts[2].dateTime).toEqual(new Date('2023-06-26T08:00:00'));
+    });
+
+    it('includes formatted date and time', () => {
+      const shortcuts = getScheduleShortcuts(wednesday, 'en');
+      shortcuts.forEach(s => {
+        expect(s.formattedDate).toBeTruthy();
+        expect(s.formattedTime).toBeTruthy();
+      });
+    });
+
+    it('handles pt_BR locale', () => {
+      expect(() => getScheduleShortcuts(wednesday, 'pt_BR')).not.toThrow();
+    });
+
+    it('filters out shortcuts that are in the past', () => {
+      // Late Wednesday night — tomorrow morning 08:00 is still in the future
+      const lateWednesday = new Date('2023-06-14T23:59:00');
+      const shortcuts = getScheduleShortcuts(lateWednesday);
+      expect(shortcuts.length).toBeGreaterThanOrEqual(2);
+      shortcuts.forEach(s => {
+        expect(s.dateTime.getTime()).toBeGreaterThan(lateWednesday.getTime());
+      });
     });
   });
 });

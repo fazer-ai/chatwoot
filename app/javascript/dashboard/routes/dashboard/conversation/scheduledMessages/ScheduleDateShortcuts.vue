@@ -3,15 +3,9 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DatePicker from 'vue-datepicker-next';
 import {
-  SCHEDULE_DAY_OPTIONS,
-  SCHEDULE_TIME_PERIODS,
-  TIME_PERIOD_HOURS,
-  getDayShortcutOptions,
+  SHORTCUT_KEYS,
+  getScheduleShortcuts,
   getDatePickerLang,
-  getShortcutDate,
-  applyTimePeriod,
-  isTimePeriodPast,
-  formatHour,
 } from 'dashboard/helper/scheduleDateShortcutHelpers';
 
 const props = defineProps({
@@ -29,100 +23,14 @@ const emit = defineEmits(['update:modelValue']);
 
 const { t, locale } = useI18n();
 
-const selectedDay = ref('');
-const selectedTimePeriod = ref('');
+const selectedKey = ref('');
 const customDateTime = ref(null);
 
-const isCustomMode = computed(
-  () => selectedDay.value === SCHEDULE_DAY_OPTIONS.CUSTOM
+const isCustomMode = computed(() => selectedKey.value === SHORTCUT_KEYS.CUSTOM);
+
+const shortcuts = computed(() =>
+  getScheduleShortcuts(new Date(), locale.value)
 );
-
-const dayOptions = computed(() =>
-  getDayShortcutOptions(new Date(), locale.value)
-);
-
-const timePeriodOptions = computed(() => {
-  if (!selectedDay.value || isCustomMode.value) return [];
-  const targetDate = getShortcutDate(selectedDay.value);
-  return [
-    {
-      key: SCHEDULE_TIME_PERIODS.MORNING,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.MORNING',
-      hour: formatHour(TIME_PERIOD_HOURS.morning, locale.value),
-      disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.MORNING),
-    },
-    {
-      key: SCHEDULE_TIME_PERIODS.AFTERNOON,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.AFTERNOON',
-      hour: formatHour(TIME_PERIOD_HOURS.afternoon, locale.value),
-      disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.AFTERNOON),
-    },
-    {
-      key: SCHEDULE_TIME_PERIODS.EVENING,
-      labelI18nKey: 'SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES.EVENING',
-      hour: formatHour(TIME_PERIOD_HOURS.evening, locale.value),
-      disabled: isTimePeriodPast(targetDate, SCHEDULE_TIME_PERIODS.EVENING),
-    },
-  ];
-});
-
-watch(selectedDay, newDay => {
-  if (!newDay || isCustomMode.value) {
-    selectedTimePeriod.value = '';
-    return;
-  }
-  const targetDate = getShortcutDate(newDay);
-  const firstAvailable = [
-    SCHEDULE_TIME_PERIODS.MORNING,
-    SCHEDULE_TIME_PERIODS.AFTERNOON,
-    SCHEDULE_TIME_PERIODS.EVENING,
-  ].find(tp => !isTimePeriodPast(targetDate, tp));
-  selectedTimePeriod.value = firstAvailable || '';
-});
-
-watch([selectedDay, selectedTimePeriod], ([day, time]) => {
-  if (!day || isCustomMode.value) return;
-  if (!time) {
-    emit('update:modelValue', null);
-    return;
-  }
-  const targetDate = getShortcutDate(day);
-  const dateTime = applyTimePeriod(targetDate, time);
-  emit('update:modelValue', dateTime);
-});
-
-// Sync local state when modelValue changes externally (edit mode or resetForm)
-watch(
-  () => props.modelValue,
-  newValue => {
-    if (!newValue) {
-      selectedDay.value = '';
-      selectedTimePeriod.value = '';
-      customDateTime.value = null;
-    } else if (!selectedDay.value || isCustomMode.value) {
-      selectedDay.value = SCHEDULE_DAY_OPTIONS.CUSTOM;
-      customDateTime.value = newValue;
-    }
-  },
-  { immediate: true }
-);
-
-const onDayChange = event => {
-  const key = event.target.value;
-  selectedDay.value = key;
-  if (key === SCHEDULE_DAY_OPTIONS.CUSTOM) {
-    customDateTime.value = props.modelValue;
-  }
-};
-
-const onTimePeriodChange = event => {
-  selectedTimePeriod.value = event.target.value;
-};
-
-const onCustomDateTimeChange = value => {
-  customDateTime.value = value;
-  emit('update:modelValue', value);
-};
 
 const datePickerLang = computed(() => getDatePickerLang(locale.value));
 
@@ -132,60 +40,80 @@ const disablePastDates = date => {
   return date < today;
 };
 
-const dayOptionLabel = option => {
-  const label = t(option.labelI18nKey);
-  return option.formattedDate ? `${label} ${option.formattedDate}` : label;
+const onSelectShortcut = shortcut => {
+  selectedKey.value = shortcut.key;
+  emit('update:modelValue', shortcut.dateTime);
 };
+
+const onSelectCustom = () => {
+  selectedKey.value = SHORTCUT_KEYS.CUSTOM;
+  customDateTime.value = props.modelValue;
+  emit('update:modelValue', null);
+};
+
+const onCustomDateTimeChange = value => {
+  customDateTime.value = value;
+  emit('update:modelValue', value);
+};
+
+// Sync local state when modelValue changes externally (edit mode or resetForm)
+watch(
+  () => props.modelValue,
+  newValue => {
+    if (!newValue) {
+      if (!isCustomMode.value) {
+        selectedKey.value = '';
+      }
+      customDateTime.value = null;
+    } else if (!selectedKey.value || isCustomMode.value) {
+      selectedKey.value = SHORTCUT_KEYS.CUSTOM;
+      customDateTime.value = newValue;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
-    <div class="flex items-center gap-3">
-      <select
-        :value="selectedDay"
-        :aria-label="t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS_LABEL')"
-        class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
-        :class="{
-          'text-n-slate-9': !selectedDay,
-          'text-n-slate-12': selectedDay,
-        }"
-        @change="onDayChange"
+  <div class="flex flex-col gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        v-for="shortcut in shortcuts"
+        :key="shortcut.key"
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors cursor-pointer"
+        :class="
+          selectedKey === shortcut.key
+            ? 'border-n-brand bg-n-alpha-2 text-n-blue-text font-medium'
+            : 'border-n-weak bg-n-background text-n-slate-11 hover:bg-n-alpha-1 hover:border-n-strong'
+        "
+        @click="onSelectShortcut(shortcut)"
       >
-        <option value="" disabled selected hidden>
-          {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.DAYS_LABEL') }}
-        </option>
-        <option
-          v-for="option in dayOptions"
-          :key="option.key"
-          :value="option.key"
+        <span>{{ t(shortcut.labelI18nKey) }}</span>
+        <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+        <span
+          class="text-xs"
+          :class="
+            selectedKey === shortcut.key
+              ? 'text-n-blue-text/70'
+              : 'text-n-slate-9'
+          "
         >
-          {{ dayOptionLabel(option) }}
-        </option>
-      </select>
-
-      <select
-        v-if="selectedDay && !isCustomMode"
-        :value="selectedTimePeriod"
-        :aria-label="t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES_LABEL')"
-        class="block w-full px-3 py-2 pr-6 mb-0 text-sm border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"
-        :class="{
-          'text-n-slate-9': !selectedTimePeriod,
-          'text-n-slate-12': selectedTimePeriod,
-        }"
-        @change="onTimePeriodChange"
+          · {{ shortcut.detail }}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center px-3 py-1.5 text-sm rounded-lg border transition-colors cursor-pointer"
+        :class="
+          isCustomMode
+            ? 'border-n-brand bg-n-alpha-2 text-n-blue-text font-medium'
+            : 'border-n-weak bg-n-background text-n-slate-11 hover:bg-n-alpha-1 hover:border-n-strong'
+        "
+        @click="onSelectCustom"
       >
-        <option value="" disabled selected hidden>
-          {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.TIMES_LABEL') }}
-        </option>
-        <option
-          v-for="option in timePeriodOptions"
-          :key="option.key"
-          :value="option.key"
-          :disabled="option.disabled"
-        >
-          {{ t(option.labelI18nKey) }} ({{ option.hour }})
-        </option>
-      </select>
+        {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}
+      </button>
     </div>
 
     <div
