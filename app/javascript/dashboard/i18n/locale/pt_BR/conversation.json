@@ -451,7 +451,8 @@
         "TOMORROW_AFTERNOON": "Amanhã à tarde",
         "MONDAY_MORNING": "Segunda-feira de manhã",
         "CUSTOM": "Escolher data e hora"
-      }
+      },
+      "SCHEDULE_LABEL": "Programar envio"
     },
     "CONFIRM_CLOSE": {
       "TITLE": "Alterações não salvas",

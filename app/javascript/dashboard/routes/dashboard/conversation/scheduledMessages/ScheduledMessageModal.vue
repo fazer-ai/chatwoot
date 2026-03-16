@@ -487,14 +487,6 @@ watch(
             })
           }}
         </span>
-      </div>
-
-      <div class="flex flex-col gap-2 min-w-0">
-        <ScheduleDateShortcuts
-          v-model="scheduledDateTime"
-          :date-time-error="dateTimeError"
-          @update:model-value="dateTimeError = ''"
-        />
         <div class="flex items-center gap-2">
           <div v-if="showAttachmentUpload" class="flex items-center gap-2 h-10">
             <FileUpload
@@ -557,6 +549,17 @@ watch(
             @update:attachments="onAttachmentsChange"
           />
         </div>
+      </div>
+
+      <div class="flex flex-col gap-3 min-w-0">
+        <span class="text-sm font-medium text-n-slate-12">
+          {{ t('SCHEDULED_MESSAGES.MODAL.SCHEDULE_LABEL') }}
+        </span>
+        <ScheduleDateShortcuts
+          v-model="scheduledDateTime"
+          :date-time-error="dateTimeError"
+          @update:model-value="dateTimeError = ''"
+        />
         <span v-if="dateTimeError" class="text-xs text-n-ruby-9">
           {{ dateTimeError }}
         </span>

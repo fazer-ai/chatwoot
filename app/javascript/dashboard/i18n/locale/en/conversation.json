@@ -462,7 +462,8 @@
         "TOMORROW_AFTERNOON": "Tomorrow afternoon",
         "MONDAY_MORNING": "Monday morning",
         "CUSTOM": "Choose date and time"
-      }
+      },
+      "SCHEDULE_LABEL": "Schedule send"
     },
     "CONFIRM_CLOSE": {
       "TITLE": "Unsaved changes",
