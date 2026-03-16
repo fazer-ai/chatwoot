@@ -1,11 +1,10 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import { useToggle } from '@vueuse/core';
 import { fromUnixTime } from 'date-fns';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
-import { emitter } from 'shared/helpers/mitt';
-import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -40,6 +39,8 @@ const [isExpanded, toggleExpanded] = useToggle();
 const showToggle = ref(false);
 const { t, locale } = useI18n();
 const { formatMessage } = useMessageFormatter();
+const route = useRoute();
+const router = useRouter();
 
 const statusConfig = {
   draft: {
@@ -160,8 +161,10 @@ const canScrollToMessage = computed(
 
 const scrollToMessage = () => {
   if (!canScrollToMessage.value) return;
-  emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, {
-    messageId: props.scheduledMessage.message_id,
+  const messageId = props.scheduledMessage.message_id;
+  router.replace({
+    ...route,
+    query: { ...route.query, messageId },
   });
 };
 

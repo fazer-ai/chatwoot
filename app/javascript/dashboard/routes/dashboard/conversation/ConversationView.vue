@@ -165,13 +165,20 @@ export default {
         const selectedConversation = this.findConversation();
         // If conversation doesn't exist or selected conversation is same as the active
         // conversation, don't set active conversation.
-        if (
-          !selectedConversation ||
-          selectedConversation.id === this.currentChat.id
-        ) {
+        if (!selectedConversation) {
           return;
         }
+
         const { messageId } = this.$route.query;
+
+        // Same conversation but new messageId — fetch around that message
+        if (selectedConversation.id === this.currentChat.id) {
+          if (messageId) {
+            this.scrollToMessageById(messageId);
+          }
+          return;
+        }
+
         this.$store
           .dispatch('setActiveChat', {
             data: selectedConversation,
@@ -183,6 +190,19 @@ export default {
       } else {
         this.$store.dispatch('clearSelectedState');
       }
+    },
+    async scrollToMessageById(messageId) {
+      this.$store.commit('CLEAR_ALL_MESSAGES_LOADED', this.currentChat.id);
+      try {
+        await this.$store.dispatch('fetchPreviousMessages', {
+          conversationId: this.currentChat.id,
+          after: messageId,
+          before: this.currentChat.messages?.[0]?.id,
+        });
+      } catch {
+        // ignore fetch error — scroll handler will show alert if message not found
+      }
+      emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, { messageId });
     },
     onSearch() {
       this.showSearchModal = true;
