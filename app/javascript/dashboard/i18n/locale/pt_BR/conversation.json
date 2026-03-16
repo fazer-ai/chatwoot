@@ -447,11 +447,10 @@
       "SAVE_DRAFT": "Salvar como rascunho",
       "SCHEDULE": "Agendar",
       "SHORTCUTS": {
-        "LABEL": "Agendar para",
         "TOMORROW_MORNING": "Amanhã de manhã",
-        "TOMORROW_AFTERNOON": "Amanhã de tarde",
+        "TOMORROW_AFTERNOON": "Amanhã à tarde",
         "MONDAY_MORNING": "Segunda-feira de manhã",
-        "CUSTOM": "Personalizado"
+        "CUSTOM": "Escolher data e hora"
       }
     },
     "CONFIRM_CLOSE": {

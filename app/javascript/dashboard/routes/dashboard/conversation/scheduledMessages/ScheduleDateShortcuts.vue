@@ -75,50 +75,52 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <div class="flex flex-wrap items-center gap-2">
-      <button
-        v-for="shortcut in shortcuts"
-        :key="shortcut.key"
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors cursor-pointer"
+  <div class="flex flex-col rounded-xl border border-n-weak bg-n-background">
+    <button
+      v-for="shortcut in shortcuts"
+      :key="shortcut.key"
+      type="button"
+      class="flex items-center justify-between px-4 py-3 text-sm transition-colors border-b border-n-weak cursor-pointer"
+      :class="
+        selectedKey === shortcut.key
+          ? 'bg-n-alpha-2 text-n-blue-text'
+          : 'text-n-slate-12 hover:bg-n-alpha-1'
+      "
+      @click="onSelectShortcut(shortcut)"
+    >
+      <span :class="{ 'font-medium': selectedKey === shortcut.key }">
+        {{ t(shortcut.labelI18nKey) }}
+      </span>
+      <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+      <span
+        class="text-sm"
         :class="
           selectedKey === shortcut.key
-            ? 'border-n-brand bg-n-alpha-2 text-n-blue-text font-medium'
-            : 'border-n-weak bg-n-background text-n-slate-11 hover:bg-n-alpha-1 hover:border-n-strong'
+            ? 'text-n-blue-text/70'
+            : 'text-n-slate-9'
         "
-        @click="onSelectShortcut(shortcut)"
       >
-        <span>{{ t(shortcut.labelI18nKey) }}</span>
-        <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
-        <span
-          class="text-xs"
-          :class="
-            selectedKey === shortcut.key
-              ? 'text-n-blue-text/70'
-              : 'text-n-slate-9'
-          "
-        >
-          · {{ shortcut.detail }}
-        </span>
-      </button>
-      <button
-        type="button"
-        class="inline-flex items-center px-3 py-1.5 text-sm rounded-lg border transition-colors cursor-pointer"
-        :class="
-          isCustomMode
-            ? 'border-n-brand bg-n-alpha-2 text-n-blue-text font-medium'
-            : 'border-n-weak bg-n-background text-n-slate-11 hover:bg-n-alpha-1 hover:border-n-strong'
-        "
-        @click="onSelectCustom"
-      >
-        {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}
-      </button>
-    </div>
+        {{ shortcut.detail }}
+      </span>
+    </button>
+
+    <button
+      type="button"
+      class="flex items-center gap-2 px-4 py-3 text-sm transition-colors cursor-pointer rounded-b-xl"
+      :class="
+        isCustomMode
+          ? 'bg-n-alpha-2 text-n-blue-text font-medium'
+          : 'text-n-slate-12 hover:bg-n-alpha-1'
+      "
+      @click="onSelectCustom"
+    >
+      <span class="i-lucide-calendar size-4 shrink-0" />
+      <span>{{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}</span>
+    </button>
 
     <div
       v-if="isCustomMode"
-      class="flex-1 min-w-0 [&_.mx-datepicker]:w-full [&_.mx-input-wrapper]:w-full [&_.mx-input]:w-full [&_.mx-input]:!mb-0"
+      class="px-4 pb-3 [&_.mx-datepicker]:w-full [&_.mx-input-wrapper]:w-full [&_.mx-input]:w-full [&_.mx-input]:!mb-0"
       :class="
         dateTimeError
           ? '[&_.mx-input]:!border-n-ruby-9 [&_.mx-input]:!border-solid'

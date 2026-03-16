@@ -60,12 +60,12 @@ export const formatHour = (hour, locale = 'en') => {
 };
 
 /**
- * Format a date as a locale-aware short date (day/month) for display in labels.
+ * Format a date as a locale-aware short date with month name (e.g. '11 de mar.' / 'Mar 11').
  */
 export const formatShortDate = (date, locale = 'en') =>
   new Intl.DateTimeFormat(toBcp47(locale), {
-    day: '2-digit',
-    month: '2-digit',
+    day: 'numeric',
+    month: 'short',
   }).format(date);
 
 /**

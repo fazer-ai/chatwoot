@@ -82,9 +82,9 @@ describe('#scheduleDateShortcutHelpers', () => {
   describe('formatShortDate', () => {
     const date = new Date('2023-03-15T00:00:00');
 
-    it('formats with en locale', () => {
+    it('formats with en locale using month name', () => {
       const result = formatShortDate(date, 'en');
-      expect(result).toMatch(/03.*15|15.*03/);
+      expect(result).toMatch(/Mar.*15|15.*Mar/i);
     });
 
     it('handles underscore locale tags like pt_BR', () => {

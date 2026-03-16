@@ -458,11 +458,10 @@
       "SAVE_DRAFT": "Save as draft",
       "SCHEDULE": "Schedule",
       "SHORTCUTS": {
-        "LABEL": "Schedule for",
         "TOMORROW_MORNING": "Tomorrow morning",
         "TOMORROW_AFTERNOON": "Tomorrow afternoon",
         "MONDAY_MORNING": "Monday morning",
-        "CUSTOM": "Custom"
+        "CUSTOM": "Choose date and time"
       }
     },
     "CONFIRM_CLOSE": {
