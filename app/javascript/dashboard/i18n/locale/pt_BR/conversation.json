@@ -435,8 +435,6 @@
       "MESSAGE_LABEL": "Mensagem",
       "MESSAGE_PLACEHOLDER": "Escreva sua mensagem...",
       "DATETIME_LABEL": "Data e hora de envio",
-      "DATETIME_PLACEHOLDER": "Selecione data e hora",
-      "DATETIME_FORMAT": "D [de] MMM, YYYY HH:mm",
       "ATTACHMENT_LABEL": "Anexo",
       "ATTACHMENT_ADD": "Anexar arquivo",
       "ATTACHMENT_CURRENT": "Anexo atual: {filename}",

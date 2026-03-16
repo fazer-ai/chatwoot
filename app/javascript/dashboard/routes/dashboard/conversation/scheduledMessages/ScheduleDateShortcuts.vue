@@ -40,6 +40,11 @@ const disablePastDates = date => {
   return date < today;
 };
 
+const disablePastTimes = date => {
+  const now = new Date();
+  return date < now;
+};
+
 const onSelectShortcut = shortcut => {
   selectedKey.value = shortcut.key;
   emit('update:modelValue', shortcut.dateTime);
@@ -122,29 +127,46 @@ watch(
 
     <div
       v-if="isCustomMode"
-      class="[&_.mx-datepicker]:w-full [&_.mx-input-wrapper]:w-full [&_.mx-input]:w-full [&_.mx-input]:!mb-0 [&_.mx-input]:!rounded-xl [&_.mx-input]:!py-2 [&_.mx-input]:!text-sm"
-      :class="
-        dateTimeError
-          ? '[&_.mx-input]:!border-n-ruby-9 [&_.mx-input]:!border-solid'
-          : ''
-      "
+      class="inline-datepicker-wrapper rounded-xl border border-n-weak bg-n-background p-3"
+      :class="dateTimeError ? '!border-n-ruby-9' : ''"
     >
       <DatePicker
-        :value="customDateTime"
+        v-model:value="customDateTime"
         type="datetime"
-        :placeholder="t('SCHEDULED_MESSAGES.MODAL.DATETIME_PLACEHOLDER')"
+        inline
         :lang="datePickerLang"
-        :format="t('SCHEDULED_MESSAGES.MODAL.DATETIME_FORMAT')"
-        value-type="date"
         :disabled-date="disablePastDates"
+        :disabled-time="disablePastTimes"
         :show-second="false"
-        confirm
-        editable
-        clearable
-        append-to-body
-        popup-class="z-[10000]"
         @change="onCustomDateTimeChange"
       />
     </div>
   </div>
 </template>
+
+<style scoped>
+.inline-datepicker-wrapper :deep(.mx-datepicker-inline) {
+  width: 100%;
+}
+
+.inline-datepicker-wrapper :deep(.mx-calendar) {
+  width: 100%;
+}
+
+.inline-datepicker-wrapper :deep(.mx-calendar-content) {
+  width: 100%;
+}
+
+.inline-datepicker-wrapper :deep(.mx-table) {
+  width: 100%;
+}
+
+.inline-datepicker-wrapper :deep(.mx-table th),
+.inline-datepicker-wrapper :deep(.mx-table td) {
+  text-align: center;
+}
+
+.inline-datepicker-wrapper :deep(.mx-time) {
+  width: 100%;
+}
+</style>
