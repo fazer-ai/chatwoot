@@ -75,6 +75,8 @@ const toggleDatePicker = () => {
   showDatePicker.value = !showDatePicker.value;
   if (showDatePicker.value) {
     datePickerValue.value = parsedDate.value || null;
+  } else {
+    nextTick(() => inputRef.value?.focus());
   }
 };
 
@@ -168,7 +170,7 @@ watch(
         </div>
 
         <div v-if="isCustomMode" class="flex flex-col gap-2">
-          <div class="flex items-center gap-1.5">
+          <div v-if="!showDatePicker" class="flex items-center gap-1.5">
             <input
               ref="inputRef"
               v-model="customText"
@@ -186,11 +188,7 @@ watch(
             />
             <button
               type="button"
-              class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-n-weak text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
-              :class="{
-                'bg-n-alpha-2 text-n-blue-text border-n-blue-text/30':
-                  showDatePicker,
-              }"
+              class="flex size-[34px] shrink-0 items-center justify-center rounded-lg border border-n-weak text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
               :title="t('SCHEDULED_MESSAGES.MODAL.DATEPICKER_TOOLTIP')"
               @click="toggleDatePicker"
             >
@@ -198,15 +196,27 @@ watch(
             </button>
           </div>
 
-          <div v-if="showDatePicker" class="rounded-lg border border-n-weak">
-            <DatePicker
-              v-model:value="datePickerValue"
-              type="datetime"
-              inline
-              :disabled-date="disableBeforeToday"
-              :disabled-time="disablePastTimes"
-              @change="onDatePickerChange"
-            />
+          <div v-if="showDatePicker" class="flex flex-col gap-2">
+            <div class="rounded-lg border border-n-weak">
+              <DatePicker
+                v-model:value="datePickerValue"
+                type="datetime"
+                inline
+                :disabled-date="disableBeforeToday"
+                :disabled-time="disablePastTimes"
+                @change="onDatePickerChange"
+              />
+            </div>
+            <button
+              type="button"
+              class="flex items-center gap-1.5 self-start text-xs text-n-slate-9 transition-colors hover:text-n-slate-12"
+              @click="toggleDatePicker"
+            >
+              <span class="i-lucide-keyboard size-3.5 shrink-0" />
+              <span>
+                {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}
+              </span>
+            </button>
           </div>
 
           <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
