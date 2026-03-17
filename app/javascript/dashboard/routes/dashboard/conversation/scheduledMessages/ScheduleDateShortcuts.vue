@@ -190,6 +190,7 @@ watch(
                 confirm
                 :clearable="false"
                 :editable="false"
+                :show-second="false"
                 :disabled-date="disableBeforeToday"
                 :disabled-time="disablePastTimes"
                 :confirm-text="t('SCHEDULED_MESSAGES.MODAL.SCHEDULE')"
