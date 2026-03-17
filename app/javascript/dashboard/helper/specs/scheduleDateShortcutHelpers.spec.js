@@ -226,6 +226,19 @@ describe('#scheduleDateShortcutHelpers', () => {
       expect(result.getHours()).toBe(8);
     });
 
+    it('parses weekday names forward (not past) — PT "sexta"', () => {
+      // now is Wednesday Jun 14; "sexta" should be upcoming Friday Jun 16
+      const result = parseNaturalDate('sexta', 'pt_BR', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(16);
+    });
+
+    it('parses weekday names forward (not past) — EN "friday"', () => {
+      const result = parseNaturalDate('friday', 'en', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(16);
+    });
+
     it('returns null for unrecognizable input', () => {
       expect(parseNaturalDate('xyz abc', 'en', now)).toBeNull();
     });

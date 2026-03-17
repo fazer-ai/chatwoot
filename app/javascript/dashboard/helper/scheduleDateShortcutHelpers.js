@@ -158,7 +158,7 @@ export const parseNaturalDate = (text, locale = 'en', now = new Date()) => {
   const processed = preProcessDateInput(text.trim());
   const isPt = locale.startsWith('pt');
   const parser = isPt ? chrono.pt : chrono;
-  return parser.parseDate(processed, now);
+  return parser.parseDate(processed, now, { forwardDate: true });
 };
 
 /**
