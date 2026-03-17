@@ -182,7 +182,7 @@ watch(
               "
               @input="onCustomInput"
             />
-            <div class="relative shrink-0">
+            <div class="relative shrink-0 [&_.mx-datepicker]:!w-auto">
               <DatePicker
                 v-model:value="datePickerValue"
                 v-model:open="datePickerOpen"
