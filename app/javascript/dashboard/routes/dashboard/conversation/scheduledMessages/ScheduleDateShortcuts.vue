@@ -188,7 +188,7 @@ watch(
             />
             <button
               type="button"
-              class="flex size-[34px] shrink-0 items-center justify-center rounded-lg border border-n-weak text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
+              class="flex shrink-0 items-center justify-center self-stretch rounded-lg border border-n-weak px-2 text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
               :title="t('SCHEDULED_MESSAGES.MODAL.DATEPICKER_TOOLTIP')"
               @click="toggleDatePicker"
             >
