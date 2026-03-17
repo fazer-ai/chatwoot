@@ -427,7 +427,6 @@ export default {
           messageElement.scrollIntoView({ behavior: 'smooth' });
           if (messageId) {
             emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
-            this.clearMessageIdFromRoute();
           }
         } else if (messageId) {
           this.fetchAndScrollToMessage(messageId);
@@ -453,22 +452,14 @@ export default {
             this.isProgrammaticScroll = true;
             messageElement.scrollIntoView({ behavior: 'smooth' });
             emitter.emit(BUS_EVENTS.HIGHLIGHT_MESSAGE, { messageId });
-            this.clearMessageIdFromRoute();
           } else {
             useAlert(this.$t('SCHEDULED_MESSAGES.ITEM.MESSAGE_NOT_FOUND'));
-            this.clearMessageIdFromRoute();
           }
         });
       } catch {
         dismissSearch();
         useAlert(this.$t('SCHEDULED_MESSAGES.ITEM.MESSAGE_NOT_FOUND'));
-        this.clearMessageIdFromRoute();
       }
-    },
-    clearMessageIdFromRoute() {
-      if (!this.$route.query.messageId) return;
-      const { messageId: _, ...remainingQuery } = this.$route.query;
-      this.$router.replace({ ...this.$route, query: remainingQuery });
     },
     addScrollListener() {
       this.conversationPanel = this.$el.querySelector('.conversation-panel');
