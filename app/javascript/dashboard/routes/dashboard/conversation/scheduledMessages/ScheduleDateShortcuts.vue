@@ -29,8 +29,8 @@ const selectedKey = ref('');
 const customText = ref('');
 const parsedDate = ref(null);
 const inputRef = ref(null);
-const showDatePicker = ref(false);
 const datePickerValue = ref(null);
+const datePickerOpen = ref(false);
 
 const isCustomMode = computed(() => selectedKey.value === SHORTCUT_KEYS.CUSTOM);
 
@@ -52,7 +52,7 @@ const onSelectShortcut = shortcut => {
   selectedKey.value = shortcut.key;
   customText.value = '';
   parsedDate.value = null;
-  showDatePicker.value = false;
+  datePickerOpen.value = false;
   emit('update:modelValue', shortcut.dateTime);
 };
 
@@ -60,7 +60,7 @@ const onSelectCustom = () => {
   selectedKey.value = SHORTCUT_KEYS.CUSTOM;
   customText.value = '';
   parsedDate.value = null;
-  showDatePicker.value = false;
+  datePickerOpen.value = false;
   emit('update:modelValue', null);
   nextTick(() => inputRef.value?.focus());
 };
@@ -71,20 +71,16 @@ const onCustomInput = () => {
   emit('update:modelValue', date);
 };
 
-const toggleDatePicker = () => {
-  showDatePicker.value = !showDatePicker.value;
-  if (showDatePicker.value) {
-    datePickerValue.value = parsedDate.value || null;
-  } else {
-    nextTick(() => inputRef.value?.focus());
-  }
+const openDatePicker = () => {
+  datePickerValue.value = parsedDate.value || null;
+  datePickerOpen.value = true;
 };
 
-const onDatePickerChange = value => {
+const onDatePickerConfirm = value => {
   if (!value) return;
   parsedDate.value = value;
   customText.value = formatFullDateTime(value, locale.value);
-  showDatePicker.value = false;
+  datePickerOpen.value = false;
   emit('update:modelValue', value);
 };
 
@@ -170,7 +166,7 @@ watch(
         </div>
 
         <div v-if="isCustomMode" class="flex flex-col gap-2">
-          <div v-if="!showDatePicker" class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5">
             <input
               ref="inputRef"
               v-model="customText"
@@ -186,42 +182,37 @@ watch(
               "
               @input="onCustomInput"
             />
-            <button
-              type="button"
-              class="flex shrink-0 items-center justify-center self-stretch rounded-lg border border-n-weak px-2 text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
-              :title="t('SCHEDULED_MESSAGES.MODAL.DATEPICKER_TOOLTIP')"
-              @click="toggleDatePicker"
-            >
-              <span class="i-lucide-calendar size-3.5" />
-            </button>
-          </div>
-
-          <div v-if="showDatePicker" class="flex flex-col gap-2">
-            <div class="rounded-lg border border-n-weak">
+            <div class="relative shrink-0">
               <DatePicker
                 v-model:value="datePickerValue"
+                v-model:open="datePickerOpen"
                 type="datetime"
-                inline
+                confirm
+                :clearable="false"
+                :editable="false"
                 :disabled-date="disableBeforeToday"
                 :disabled-time="disablePastTimes"
-                @change="onDatePickerChange"
-              />
+                :confirm-text="t('SCHEDULED_MESSAGES.MODAL.SCHEDULE')"
+                append-to-body
+                @confirm="onDatePickerConfirm"
+              >
+                <template #input>
+                  <button
+                    type="button"
+                    class="flex items-center justify-center self-stretch rounded-lg border border-n-weak px-2 py-2 text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
+                    :title="t('SCHEDULED_MESSAGES.MODAL.DATEPICKER_TOOLTIP')"
+                    @click="openDatePicker"
+                  >
+                    <span class="i-lucide-calendar size-3.5" />
+                  </button>
+                </template>
+              </DatePicker>
             </div>
-            <button
-              type="button"
-              class="flex items-center gap-1.5 self-start text-xs text-n-slate-9 transition-colors hover:text-n-slate-12"
-              @click="toggleDatePicker"
-            >
-              <span class="i-lucide-keyboard size-3.5 shrink-0" />
-              <span>
-                {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}
-              </span>
-            </button>
           </div>
 
           <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
           <div
-            v-if="parsedDate && !isParsedInPast && !showDatePicker"
+            v-if="parsedDate && !isParsedInPast"
             class="flex items-center gap-1.5 text-xs text-n-green-text"
           >
             <span class="i-lucide-check size-3.5 shrink-0" />
@@ -229,7 +220,7 @@ watch(
           </div>
 
           <div
-            v-else-if="parsedDate && isParsedInPast && !showDatePicker"
+            v-else-if="parsedDate && isParsedInPast"
             class="flex items-center gap-1.5 text-xs text-n-amber-text"
           >
             <span class="i-lucide-alert-triangle size-3.5 shrink-0" />
@@ -237,7 +228,7 @@ watch(
           </div>
 
           <div
-            v-else-if="customText.length > 2 && !parsedDate && !showDatePicker"
+            v-else-if="customText.length > 2 && !parsedDate"
             class="flex items-center gap-1.5 text-xs text-n-slate-9"
           >
             <span class="i-lucide-help-circle size-3.5 shrink-0" />
