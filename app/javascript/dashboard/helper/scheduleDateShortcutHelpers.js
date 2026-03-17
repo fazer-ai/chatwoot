@@ -161,17 +161,27 @@ export const preProcessDateInput = text => {
  * Supports both PT and EN locales.
  * Returns a Date object if successfully parsed, otherwise null.
  */
-// eslint-disable-next-line no-unused-vars
 export const parseNaturalDate = (text, locale = 'en', now = new Date()) => {
   if (!text || !text.trim()) return null;
   const processed = preProcessDateInput(text.trim());
   const opts = { forwardDate: true };
-  const ptResults = chrono.pt.parse(processed, now, opts);
-  const enResults = chrono.parse(processed, now, opts);
+  const isPt = locale.startsWith('pt');
+  const primaryResults = (isPt ? chrono.pt : chrono).parse(
+    processed,
+    now,
+    opts
+  );
+  const fallbackResults = (isPt ? chrono : chrono.pt).parse(
+    processed,
+    now,
+    opts
+  );
   const matchLen = results => results.reduce((s, r) => s + r.text.length, 0);
   // Pick the parser that matched more of the input text
   const best =
-    matchLen(ptResults) >= matchLen(enResults) ? ptResults : enResults;
+    matchLen(primaryResults) >= matchLen(fallbackResults)
+      ? primaryResults
+      : fallbackResults;
   return best.length ? best[0].start.date() : null;
 };
 

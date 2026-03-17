@@ -180,6 +180,9 @@ watch(
               :placeholder="
                 t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_PLACEHOLDER')
               "
+              :aria-label="
+                t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_PLACEHOLDER')
+              "
               @input="onCustomInput"
             />
             <div class="relative shrink-0 [&_.mx-datepicker]:!w-auto">
