@@ -175,7 +175,7 @@ watch(
               ref="inputRef"
               v-model="customText"
               type="text"
-              class="min-w-0 flex-1 rounded-lg border bg-n-background px-3 py-2 text-sm text-n-slate-12 placeholder:text-n-slate-9 outline-none focus:ring-1"
+              class="min-w-0 flex-1 !mb-0 rounded-lg border bg-n-background px-3 py-2 text-sm text-n-slate-12 placeholder:text-n-slate-9 outline-none focus:ring-1"
               :class="
                 dateTimeError
                   ? 'border-n-ruby-9 focus:ring-n-ruby-9'
