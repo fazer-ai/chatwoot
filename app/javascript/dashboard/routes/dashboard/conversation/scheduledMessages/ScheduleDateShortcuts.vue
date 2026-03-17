@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import addDays from 'date-fns/addDays';
+import DatePicker from 'vue-datepicker-next';
 import {
   SHORTCUT_KEYS,
   getScheduleShortcuts,
@@ -27,6 +29,8 @@ const selectedKey = ref('');
 const customText = ref('');
 const parsedDate = ref(null);
 const inputRef = ref(null);
+const showDatePicker = ref(false);
+const datePickerValue = ref(null);
 
 const isCustomMode = computed(() => selectedKey.value === SHORTCUT_KEYS.CUSTOM);
 
@@ -48,6 +52,7 @@ const onSelectShortcut = shortcut => {
   selectedKey.value = shortcut.key;
   customText.value = '';
   parsedDate.value = null;
+  showDatePicker.value = false;
   emit('update:modelValue', shortcut.dateTime);
 };
 
@@ -55,6 +60,7 @@ const onSelectCustom = () => {
   selectedKey.value = SHORTCUT_KEYS.CUSTOM;
   customText.value = '';
   parsedDate.value = null;
+  showDatePicker.value = false;
   emit('update:modelValue', null);
   nextTick(() => inputRef.value?.focus());
 };
@@ -63,6 +69,29 @@ const onCustomInput = () => {
   const date = parseNaturalDate(customText.value, locale.value);
   parsedDate.value = date;
   emit('update:modelValue', date);
+};
+
+const toggleDatePicker = () => {
+  showDatePicker.value = !showDatePicker.value;
+  if (showDatePicker.value) {
+    datePickerValue.value = parsedDate.value || null;
+  }
+};
+
+const onDatePickerChange = value => {
+  if (!value) return;
+  parsedDate.value = value;
+  customText.value = formatFullDateTime(value, locale.value);
+  showDatePicker.value = false;
+  emit('update:modelValue', value);
+};
+
+const disableBeforeToday = date => date < addDays(new Date(), -1);
+
+const disablePastTimes = date => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - 1);
+  return date < now;
 };
 
 // Sync local state when modelValue changes externally (edit mode or resetForm)
@@ -139,25 +168,50 @@ watch(
         </div>
 
         <div v-if="isCustomMode" class="flex flex-col gap-2">
-          <input
-            ref="inputRef"
-            v-model="customText"
-            type="text"
-            class="w-full rounded-lg border bg-n-background px-3 py-2 text-sm text-n-slate-12 placeholder:text-n-slate-9 outline-none focus:ring-1"
-            :class="
-              dateTimeError
-                ? 'border-n-ruby-9 focus:ring-n-ruby-9'
-                : 'border-n-weak focus:border-n-blue-text focus:ring-n-blue-text'
-            "
-            :placeholder="
-              t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_PLACEHOLDER')
-            "
-            @input="onCustomInput"
-          />
+          <div class="flex items-center gap-1.5">
+            <input
+              ref="inputRef"
+              v-model="customText"
+              type="text"
+              class="min-w-0 flex-1 rounded-lg border bg-n-background px-3 py-2 text-sm text-n-slate-12 placeholder:text-n-slate-9 outline-none focus:ring-1"
+              :class="
+                dateTimeError
+                  ? 'border-n-ruby-9 focus:ring-n-ruby-9'
+                  : 'border-n-weak focus:border-n-blue-text focus:ring-n-blue-text'
+              "
+              :placeholder="
+                t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_PLACEHOLDER')
+              "
+              @input="onCustomInput"
+            />
+            <button
+              type="button"
+              class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-n-weak text-n-slate-9 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
+              :class="{
+                'bg-n-alpha-2 text-n-blue-text border-n-blue-text/30':
+                  showDatePicker,
+              }"
+              :title="t('SCHEDULED_MESSAGES.MODAL.DATEPICKER_TOOLTIP')"
+              @click="toggleDatePicker"
+            >
+              <span class="i-lucide-calendar size-3.5" />
+            </button>
+          </div>
+
+          <div v-if="showDatePicker" class="rounded-lg border border-n-weak">
+            <DatePicker
+              v-model:value="datePickerValue"
+              type="datetime"
+              inline
+              :disabled-date="disableBeforeToday"
+              :disabled-time="disablePastTimes"
+              @change="onDatePickerChange"
+            />
+          </div>
 
           <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
           <div
-            v-if="parsedDate && !isParsedInPast"
+            v-if="parsedDate && !isParsedInPast && !showDatePicker"
             class="flex items-center gap-1.5 text-xs text-n-green-text"
           >
             <span class="i-lucide-check size-3.5 shrink-0" />
@@ -165,7 +219,7 @@ watch(
           </div>
 
           <div
-            v-else-if="parsedDate && isParsedInPast"
+            v-else-if="parsedDate && isParsedInPast && !showDatePicker"
             class="flex items-center gap-1.5 text-xs text-n-amber-text"
           >
             <span class="i-lucide-alert-triangle size-3.5 shrink-0" />
@@ -173,7 +227,7 @@ watch(
           </div>
 
           <div
-            v-else-if="customText.length > 2 && !parsedDate"
+            v-else-if="customText.length > 2 && !parsedDate && !showDatePicker"
             class="flex items-center gap-1.5 text-xs text-n-slate-9"
           >
             <span class="i-lucide-help-circle size-3.5 shrink-0" />

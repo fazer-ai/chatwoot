@@ -453,6 +453,7 @@
       "CUSTOM_INPUT_PLACEHOLDER": "ex: amanhã às 14h, próxima sexta de manhã",
       "CUSTOM_INPUT_HINT": "Tente: amanhã às 15h, próxima segunda, 20 de março às 10h",
       "PARSED_DATE_IN_PAST": "Esta data já passou",
+      "DATEPICKER_TOOLTIP": "Escolher no calendário",
       "SCHEDULE_LABEL": "Programar envio"
     },
     "CONFIRM_CLOSE": {

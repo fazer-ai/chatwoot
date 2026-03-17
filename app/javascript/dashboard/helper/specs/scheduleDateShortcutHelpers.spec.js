@@ -172,6 +172,24 @@ describe('#scheduleDateShortcutHelpers', () => {
     it('leaves EN text with explicit times unchanged', () => {
       expect(preProcessDateInput('tomorrow at 2pm')).toBe('tomorrow at 2pm');
     });
+
+    it('inserts "às" between PT weekday and bare number', () => {
+      expect(preProcessDateInput('quarta 10')).toBe('quarta às 10');
+    });
+
+    it('inserts "às" between PT weekday and am/pm time', () => {
+      expect(preProcessDateInput('sexta 2pm')).toBe('sexta às 2pm');
+    });
+
+    it('inserts "às" between PT weekday-feira and number', () => {
+      expect(preProcessDateInput('quarta-feira 14h')).toBe(
+        'quarta-feira às 14:00'
+      );
+    });
+
+    it('does not double-insert "às" when already present', () => {
+      expect(preProcessDateInput('quarta às 10')).toBe('quarta às 10');
+    });
   });
 
   describe('parseNaturalDate', () => {

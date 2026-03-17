@@ -127,6 +127,14 @@ export const preProcessDateInput = text => {
   // PT: normalize 'as' → 'às' before digits or time-of-day words
   result = result.replace(/\bas\s+(\d)/gi, 'às $1');
   result = result.replace(/\bas\s+(manh|tard|noit)/gi, 'às $1');
+  // PT: insert 'às' connector between weekday name and bare number/time
+  // chrono.pt needs 'às' to link weekday + time (e.g. "quarta 10" → "quarta às 10")
+  const ptWeekdays =
+    '(?:segunda(?:-feira)?|ter[çc]a(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[áa]bado|domingo)';
+  result = result.replace(
+    new RegExp(`(${ptWeekdays})\\s+(?!às|as)(\\d)`, 'gi'),
+    '$1 às $2'
+  );
   // PT: 'Xh' or 'XhMM' → 'X:00' or 'X:MM' (e.g. '14h' → '14:00', '14h30' → '14:30')
   result = result.replace(
     /(\d{1,2})h(\d{2})?(?=\s|$|,)/gi,
@@ -153,12 +161,18 @@ export const preProcessDateInput = text => {
  * Supports both PT and EN locales.
  * Returns a Date object if successfully parsed, otherwise null.
  */
+// eslint-disable-next-line no-unused-vars
 export const parseNaturalDate = (text, locale = 'en', now = new Date()) => {
   if (!text || !text.trim()) return null;
   const processed = preProcessDateInput(text.trim());
-  const isPt = locale.startsWith('pt');
-  const parser = isPt ? chrono.pt : chrono;
-  return parser.parseDate(processed, now, { forwardDate: true });
+  const opts = { forwardDate: true };
+  const ptResults = chrono.pt.parse(processed, now, opts);
+  const enResults = chrono.parse(processed, now, opts);
+  const matchLen = results => results.reduce((s, r) => s + r.text.length, 0);
+  // Pick the parser that matched more of the input text
+  const best =
+    matchLen(ptResults) >= matchLen(enResults) ? ptResults : enResults;
+  return best.length ? best[0].start.date() : null;
 };
 
 /**

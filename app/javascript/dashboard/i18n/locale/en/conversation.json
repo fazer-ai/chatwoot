@@ -464,6 +464,7 @@
       "CUSTOM_INPUT_PLACEHOLDER": "e.g. tomorrow at 2pm, next friday morning",
       "CUSTOM_INPUT_HINT": "Try: tomorrow at 3pm, next monday, in 2 hours",
       "PARSED_DATE_IN_PAST": "This date is in the past",
+      "DATEPICKER_TOOLTIP": "Pick from calendar",
       "SCHEDULE_LABEL": "Schedule send"
     },
     "CONFIRM_CLOSE": {
