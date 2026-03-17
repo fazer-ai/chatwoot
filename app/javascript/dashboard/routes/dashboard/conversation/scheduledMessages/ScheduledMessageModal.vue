@@ -162,8 +162,29 @@ const hasTemplate = computed(
 );
 const hasExistingAttachment = computed(() => !!existingAttachment.value);
 const showAttachmentUpload = computed(
-  () => !hasNewAttachment.value && !hasTemplate.value
+  () =>
+    !hasNewAttachment.value &&
+    !hasExistingAttachment.value &&
+    !hasTemplate.value
 );
+
+const displayAttachments = computed(() => {
+  if (attachments.value.length) return attachments.value;
+  if (existingAttachment.value) {
+    return [
+      {
+        id: existingAttachment.value.id,
+        thumb: existingAttachment.value.file_url,
+        resource: {
+          id: existingAttachment.value.id,
+          content_type: existingAttachment.value.file_type,
+          filename: existingAttachment.value.filename,
+        },
+      },
+    ];
+  }
+  return [];
+});
 
 const templateName = computed(() => {
   return templateParams.value?.name || templateParams.value?.id || null;
@@ -256,6 +277,15 @@ watch(
 
 const onAttachmentsChange = value => {
   attachments.value = value.slice(0, 1);
+};
+
+const onDisplayAttachmentsChange = value => {
+  if (value.length === 0) {
+    attachments.value = [];
+    existingAttachment.value = null;
+  } else {
+    onAttachmentsChange(value);
+  }
 };
 
 const resolveAttachmentPayload = () => {
@@ -532,21 +562,11 @@ watch(
               @click="clearTemplate"
             />
           </div>
-          <span
-            v-if="existingAttachment && !attachments.length"
-            class="text-xs text-n-slate-11"
-          >
-            {{
-              t('SCHEDULED_MESSAGES.MODAL.ATTACHMENT_CURRENT', {
-                filename: existingAttachment.filename,
-              })
-            }}
-          </span>
           <AttachmentPreviews
-            v-if="attachments.length"
+            v-if="displayAttachments.length"
             class="!p-0"
-            :attachments="attachments"
-            @update:attachments="onAttachmentsChange"
+            :attachments="displayAttachments"
+            @update:attachments="onDisplayAttachmentsChange"
           />
         </div>
       </div>
