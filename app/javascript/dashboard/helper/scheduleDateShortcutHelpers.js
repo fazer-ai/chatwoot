@@ -6,6 +6,7 @@ import {
   setSeconds,
   isBefore,
 } from 'date-fns';
+import * as chrono from 'chrono-node';
 
 export const SHORTCUT_KEYS = {
   TOMORROW_MORNING: 'tomorrow_morning',
@@ -69,27 +70,6 @@ export const formatShortDate = (date, locale = 'en') =>
   }).format(date);
 
 /**
- * Build locale-aware lang config for vue-datepicker-next.
- */
-export const getDatePickerLang = (locale = 'en') => {
-  const bcp47 = toBcp47(locale);
-  const baseSunday = new Date(2023, 0, 1); // Sunday
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(baseSunday);
-    d.setDate(d.getDate() + i);
-    return new Intl.DateTimeFormat(bcp47, { weekday: 'short' }).format(d);
-  });
-
-  const months = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(bcp47, { month: 'long' }).format(
-      new Date(2023, i, 1)
-    )
-  );
-
-  return { days, months, yearFormat: 'YYYY', monthFormat: 'MMMM' };
-};
-
-/**
  * Build the 3 predefined schedule shortcuts with pre-computed dates.
  * Shortcuts whose datetime is already in the past are excluded.
  */
@@ -133,3 +113,47 @@ export const getScheduleShortcuts = (now = new Date(), locale = 'en') => {
     })
     .filter(s => !isBefore(s.dateTime, now));
 };
+
+/**
+ * Pre-process natural language input to normalize PT/EN time expressions
+ * before passing to chrono-node.
+ */
+export const preProcessDateInput = text => {
+  let result = text;
+  // PT: 'Xh' or 'XhMM' → 'X:00' or 'X:MM' (e.g. '14h' → '14:00', '14h30' → '14:30')
+  result = result.replace(
+    /(\d{1,2})h(\d{2})?(?=\s|$|,)/gi,
+    (_, h, min) => `${h}:${min || '00'}`
+  );
+  // PT: time-of-day shortcuts
+  result = result.replace(/(?:de|à)\s+manh[ãa]/gi, '8:00');
+  result = result.replace(/(?:de|à)\s+tarde/gi, '13:00');
+  result = result.replace(/(?:de|à)\s+noite/gi, '18:00');
+  return result;
+};
+
+/**
+ * Parse a natural language date/time string using chrono-node.
+ * Supports both PT and EN locales.
+ * Returns a Date object if successfully parsed, otherwise null.
+ */
+export const parseNaturalDate = (text, locale = 'en', now = new Date()) => {
+  if (!text || !text.trim()) return null;
+  const processed = preProcessDateInput(text.trim());
+  const isPt = locale.startsWith('pt');
+  const parser = isPt ? chrono.pt : chrono;
+  return parser.parseDate(processed, now);
+};
+
+/**
+ * Format a Date as a full locale-aware date-time string for preview display.
+ * e.g. '17 de mar. de 2026, 08:00' (pt-BR) or 'Mar 17, 2026, 8:00 AM' (en)
+ */
+export const formatFullDateTime = (date, locale = 'en') =>
+  new Intl.DateTimeFormat(toBcp47(locale), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);

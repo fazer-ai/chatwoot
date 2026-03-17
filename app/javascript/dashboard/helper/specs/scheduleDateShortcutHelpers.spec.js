@@ -5,8 +5,10 @@ import {
   applyHour,
   formatShortDate,
   formatHour,
-  getDatePickerLang,
   getScheduleShortcuts,
+  preProcessDateInput,
+  parseNaturalDate,
+  formatFullDateTime,
 } from '../scheduleDateShortcutHelpers';
 
 describe('#scheduleDateShortcutHelpers', () => {
@@ -112,26 +114,85 @@ describe('#scheduleDateShortcutHelpers', () => {
     });
   });
 
-  describe('getDatePickerLang', () => {
-    it('returns 7 days and 12 months', () => {
-      const lang = getDatePickerLang('en');
-      expect(lang.days).toHaveLength(7);
-      expect(lang.months).toHaveLength(12);
+  describe('preProcessDateInput', () => {
+    it('converts PT hour format "8h" to "8:00"', () => {
+      expect(preProcessDateInput('amanhã às 8h')).toBe('amanhã às 8:00');
     });
 
-    it('starts with Sunday', () => {
-      const lang = getDatePickerLang('en');
-      expect(lang.days[0]).toMatch(/Sun/i);
+    it('converts PT hour+min format "14h30" to "14:30"', () => {
+      expect(preProcessDateInput('amanhã às 14h30')).toBe('amanhã às 14:30');
     });
 
-    it('includes yearFormat and monthFormat', () => {
-      const lang = getDatePickerLang('en');
-      expect(lang.yearFormat).toBe('YYYY');
-      expect(lang.monthFormat).toBe('MMMM');
+    it('converts PT "de manhã" to "8:00"', () => {
+      expect(preProcessDateInput('amanhã de manhã')).toBe('amanhã 8:00');
     });
 
-    it('handles underscore locale tags', () => {
-      expect(() => getDatePickerLang('pt_BR')).not.toThrow();
+    it('converts PT "à tarde" to "13:00"', () => {
+      expect(preProcessDateInput('amanhã à tarde')).toBe('amanhã 13:00');
+    });
+
+    it('converts PT "de noite" to "18:00"', () => {
+      expect(preProcessDateInput('amanhã de noite')).toBe('amanhã 18:00');
+    });
+
+    it('leaves EN text with explicit times unchanged', () => {
+      expect(preProcessDateInput('tomorrow at 2pm')).toBe('tomorrow at 2pm');
+    });
+  });
+
+  describe('parseNaturalDate', () => {
+    const now = new Date('2023-06-14T10:00:00');
+
+    it('returns null for empty string', () => {
+      expect(parseNaturalDate('', 'en', now)).toBeNull();
+    });
+
+    it('returns null for whitespace-only string', () => {
+      expect(parseNaturalDate('   ', 'en', now)).toBeNull();
+    });
+
+    it('parses EN "tomorrow at 8am"', () => {
+      const result = parseNaturalDate('tomorrow at 8am', 'en', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(8);
+    });
+
+    it('parses EN "tomorrow at 1pm"', () => {
+      const result = parseNaturalDate('tomorrow at 1pm', 'en', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getHours()).toBe(13);
+    });
+
+    it('parses PT "amanhã às 8h" via preprocessing', () => {
+      const result = parseNaturalDate('amanhã às 8h', 'pt_BR', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(8);
+    });
+
+    it('parses PT "amanhã à tarde" via preprocessing', () => {
+      const result = parseNaturalDate('amanhã à tarde', 'pt_BR', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(13);
+    });
+
+    it('returns null for unrecognizable input', () => {
+      expect(parseNaturalDate('xyz abc', 'en', now)).toBeNull();
+    });
+  });
+
+  describe('formatFullDateTime', () => {
+    const date = new Date('2023-03-17T08:00:00');
+
+    it('formats in EN locale', () => {
+      const result = formatFullDateTime(date, 'en');
+      expect(result).toMatch(/Mar.*17.*2023.*8.*00/i);
+    });
+
+    it('handles pt_BR locale without errors', () => {
+      expect(() => formatFullDateTime(date, 'pt_BR')).not.toThrow();
     });
   });
 

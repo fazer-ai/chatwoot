@@ -448,8 +448,11 @@
         "TOMORROW_MORNING": "Amanhã de manhã",
         "TOMORROW_AFTERNOON": "Amanhã à tarde",
         "MONDAY_MORNING": "Segunda-feira de manhã",
-        "CUSTOM": "Escolher data e hora"
+        "CUSTOM": "Digitar data e hora"
       },
+      "CUSTOM_INPUT_PLACEHOLDER": "ex: amanhã às 14h, próxima sexta de manhã",
+      "CUSTOM_INPUT_HINT": "Tente: amanhã às 15h, próxima segunda, 20 de março às 10h",
+      "PARSED_DATE_IN_PAST": "Esta data já passou",
       "SCHEDULE_LABEL": "Programar envio"
     },
     "CONFIRM_CLOSE": {

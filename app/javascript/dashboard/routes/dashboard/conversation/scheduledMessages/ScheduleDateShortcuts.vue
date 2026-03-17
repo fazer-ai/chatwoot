@@ -1,11 +1,11 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import DatePicker from 'vue-datepicker-next';
 import {
   SHORTCUT_KEYS,
   getScheduleShortcuts,
-  getDatePickerLang,
+  parseNaturalDate,
+  formatFullDateTime,
 } from 'dashboard/helper/scheduleDateShortcutHelpers';
 
 const props = defineProps({
@@ -24,7 +24,9 @@ const emit = defineEmits(['update:modelValue']);
 const { t, locale } = useI18n();
 
 const selectedKey = ref('');
-const customDateTime = ref(null);
+const customText = ref('');
+const parsedDate = ref(null);
+const inputRef = ref(null);
 
 const isCustomMode = computed(() => selectedKey.value === SHORTCUT_KEYS.CUSTOM);
 
@@ -32,33 +34,35 @@ const shortcuts = computed(() =>
   getScheduleShortcuts(new Date(), locale.value)
 );
 
-const datePickerLang = computed(() => getDatePickerLang(locale.value));
+const parsedPreview = computed(() => {
+  if (!parsedDate.value) return '';
+  return formatFullDateTime(parsedDate.value, locale.value);
+});
 
-const disablePastDates = date => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today;
-};
-
-const disablePastTimes = date => {
-  const now = new Date();
-  return date < now;
-};
+const isParsedInPast = computed(() => {
+  if (!parsedDate.value) return false;
+  return parsedDate.value <= new Date();
+});
 
 const onSelectShortcut = shortcut => {
   selectedKey.value = shortcut.key;
+  customText.value = '';
+  parsedDate.value = null;
   emit('update:modelValue', shortcut.dateTime);
 };
 
 const onSelectCustom = () => {
   selectedKey.value = SHORTCUT_KEYS.CUSTOM;
-  customDateTime.value = props.modelValue;
+  customText.value = '';
+  parsedDate.value = null;
   emit('update:modelValue', null);
+  nextTick(() => inputRef.value?.focus());
 };
 
-const onCustomDateTimeChange = value => {
-  customDateTime.value = value;
-  emit('update:modelValue', value);
+const onCustomInput = () => {
+  const date = parseNaturalDate(customText.value, locale.value);
+  parsedDate.value = date;
+  emit('update:modelValue', date);
 };
 
 // Sync local state when modelValue changes externally (edit mode or resetForm)
@@ -69,10 +73,13 @@ watch(
       if (!isCustomMode.value) {
         selectedKey.value = '';
       }
-      customDateTime.value = null;
-    } else if (!selectedKey.value || isCustomMode.value) {
+      if (!customText.value) {
+        parsedDate.value = null;
+      }
+    } else if (!selectedKey.value) {
       selectedKey.value = SHORTCUT_KEYS.CUSTOM;
-      customDateTime.value = newValue;
+      parsedDate.value = newValue;
+      customText.value = formatFullDateTime(newValue, locale.value);
     }
   },
   { immediate: true }
@@ -110,63 +117,70 @@ watch(
         </span>
       </button>
 
-      <button
-        type="button"
-        class="flex items-center gap-2 px-4 py-3 text-sm transition-colors cursor-pointer rounded-b-xl"
+      <div
+        class="flex flex-col gap-2 px-4 py-3 transition-colors rounded-b-xl"
         :class="
-          isCustomMode
-            ? 'bg-n-alpha-2 text-n-blue-text font-medium'
-            : 'text-n-slate-12 hover:bg-n-alpha-1'
+          isCustomMode ? 'bg-n-alpha-2' : 'cursor-pointer hover:bg-n-alpha-1'
         "
-        @click="onSelectCustom"
+        @click="!isCustomMode && onSelectCustom()"
       >
-        <span class="i-lucide-calendar size-4 shrink-0" />
-        <span>{{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}</span>
-      </button>
-    </div>
+        <div class="flex items-center gap-2 text-sm">
+          <span
+            class="i-lucide-keyboard size-4 shrink-0"
+            :class="isCustomMode ? 'text-n-blue-text' : ''"
+          />
+          <span
+            :class="
+              isCustomMode ? 'text-n-blue-text font-medium' : 'text-n-slate-12'
+            "
+          >
+            {{ t('SCHEDULED_MESSAGES.MODAL.SHORTCUTS.CUSTOM') }}
+          </span>
+        </div>
 
-    <div
-      v-if="isCustomMode"
-      class="inline-datepicker-wrapper rounded-xl border border-n-weak bg-n-background p-3"
-      :class="dateTimeError ? '!border-n-ruby-9' : ''"
-    >
-      <DatePicker
-        v-model:value="customDateTime"
-        type="datetime"
-        inline
-        :lang="datePickerLang"
-        :disabled-date="disablePastDates"
-        :disabled-time="disablePastTimes"
-        :show-second="false"
-        @change="onCustomDateTimeChange"
-      />
+        <div v-if="isCustomMode" class="flex flex-col gap-2">
+          <input
+            ref="inputRef"
+            v-model="customText"
+            type="text"
+            class="w-full rounded-lg border bg-n-background px-3 py-2 text-sm text-n-slate-12 placeholder:text-n-slate-9 outline-none focus:ring-1"
+            :class="
+              dateTimeError
+                ? 'border-n-ruby-9 focus:ring-n-ruby-9'
+                : 'border-n-weak focus:border-n-blue-text focus:ring-n-blue-text'
+            "
+            :placeholder="
+              t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_PLACEHOLDER')
+            "
+            @input="onCustomInput"
+          />
+
+          <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+          <div
+            v-if="parsedDate && !isParsedInPast"
+            class="flex items-center gap-1.5 text-xs text-n-green-text"
+          >
+            <span class="i-lucide-check size-3.5 shrink-0" />
+            <span>{{ parsedPreview }}</span>
+          </div>
+
+          <div
+            v-else-if="parsedDate && isParsedInPast"
+            class="flex items-center gap-1.5 text-xs text-n-amber-text"
+          >
+            <span class="i-lucide-alert-triangle size-3.5 shrink-0" />
+            <span>{{ t('SCHEDULED_MESSAGES.MODAL.PARSED_DATE_IN_PAST') }}</span>
+          </div>
+
+          <div
+            v-else-if="customText.length > 2 && !parsedDate"
+            class="flex items-center gap-1.5 text-xs text-n-slate-9"
+          >
+            <span class="i-lucide-help-circle size-3.5 shrink-0" />
+            <span>{{ t('SCHEDULED_MESSAGES.MODAL.CUSTOM_INPUT_HINT') }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.inline-datepicker-wrapper :deep(.mx-datepicker-inline) {
-  width: 100%;
-}
-
-.inline-datepicker-wrapper :deep(.mx-calendar) {
-  width: 100%;
-}
-
-.inline-datepicker-wrapper :deep(.mx-calendar-content) {
-  width: 100%;
-}
-
-.inline-datepicker-wrapper :deep(.mx-table) {
-  width: 100%;
-}
-
-.inline-datepicker-wrapper :deep(.mx-table th),
-.inline-datepicker-wrapper :deep(.mx-table td) {
-  text-align: center;
-}
-
-.inline-datepicker-wrapper :deep(.mx-time) {
-  width: 100%;
-}
-</style>
