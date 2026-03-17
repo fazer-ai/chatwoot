@@ -120,15 +120,31 @@ export const getScheduleShortcuts = (now = new Date(), locale = 'en') => {
  */
 export const preProcessDateInput = text => {
   let result = text;
+  // PT: normalize common words typed without accents
+  result = result.replace(/\bamanha\b/gi, 'amanhã');
+  result = result.replace(/\bsabado\b/gi, 'sábado');
+  result = result.replace(/\bproxim([ao])\b/gi, 'próxim$1');
+  // PT: normalize 'as' → 'às' before digits or time-of-day words
+  result = result.replace(/\bas\s+(\d)/gi, 'às $1');
+  result = result.replace(/\bas\s+(manh|tard|noit)/gi, 'às $1');
   // PT: 'Xh' or 'XhMM' → 'X:00' or 'X:MM' (e.g. '14h' → '14:00', '14h30' → '14:30')
   result = result.replace(
     /(\d{1,2})h(\d{2})?(?=\s|$|,)/gi,
     (_, h, min) => `${h}:${min || '00'}`
   );
-  // PT: time-of-day shortcuts
-  result = result.replace(/(?:de|à)\s+manh[ãa]/gi, '8:00');
-  result = result.replace(/(?:de|à)\s+tarde/gi, '13:00');
-  result = result.replace(/(?:de|à)\s+noite/gi, '18:00');
+  // PT: time-of-day expressions (de manhã, pela tarde, no período da noite, etc.)
+  result = result.replace(
+    /(?:no per[ií]odo da|pela|de|à|às)\s+manh[ãa]/gi,
+    '8:00'
+  );
+  result = result.replace(
+    /(?:no per[ií]odo da|pela|de|à|às)\s+tarde/gi,
+    '13:00'
+  );
+  result = result.replace(
+    /(?:no per[ií]odo da|pela|de|à|às)\s+noite/gi,
+    '18:00'
+  );
   return result;
 };
 

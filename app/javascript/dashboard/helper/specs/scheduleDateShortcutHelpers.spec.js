@@ -135,6 +135,40 @@ describe('#scheduleDateShortcutHelpers', () => {
       expect(preProcessDateInput('amanhã de noite')).toBe('amanhã 18:00');
     });
 
+    it('normalizes "amanha" without accent to "amanhã"', () => {
+      expect(preProcessDateInput('amanha as 8h')).toBe('amanhã às 8:00');
+    });
+
+    it('normalizes "as" to "às" before digits', () => {
+      expect(preProcessDateInput('amanhã as 19h')).toBe('amanhã às 19:00');
+    });
+
+    it('normalizes "as" to "às" before time-of-day words', () => {
+      expect(preProcessDateInput('amanhã as manha')).toBe('amanhã 8:00');
+    });
+
+    it('normalizes "sabado" to "sábado"', () => {
+      expect(preProcessDateInput('sabado as 10h')).toContain('sábado');
+    });
+
+    it('normalizes "proxima" to "próxima"', () => {
+      expect(preProcessDateInput('proxima segunda')).toContain('próxima');
+    });
+
+    it('converts "pela manhã" to "8:00"', () => {
+      expect(preProcessDateInput('amanhã pela manhã')).toBe('amanhã 8:00');
+    });
+
+    it('converts "pela tarde" to "13:00"', () => {
+      expect(preProcessDateInput('amanhã pela tarde')).toBe('amanhã 13:00');
+    });
+
+    it('converts "no período da noite" to "18:00"', () => {
+      expect(preProcessDateInput('amanhã no período da noite')).toBe(
+        'amanhã 18:00'
+      );
+    });
+
     it('leaves EN text with explicit times unchanged', () => {
       expect(preProcessDateInput('tomorrow at 2pm')).toBe('tomorrow at 2pm');
     });
@@ -176,6 +210,20 @@ describe('#scheduleDateShortcutHelpers', () => {
       expect(result).toBeInstanceOf(Date);
       expect(result.getDate()).toBe(15);
       expect(result.getHours()).toBe(13);
+    });
+
+    it('parses PT "amanha as 19h" (no accents) via preprocessing', () => {
+      const result = parseNaturalDate('amanha as 19h', 'pt_BR', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(19);
+    });
+
+    it('parses PT "amanhã pela manhã" via preprocessing', () => {
+      const result = parseNaturalDate('amanhã pela manhã', 'pt_BR', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(8);
     });
 
     it('returns null for unrecognizable input', () => {
