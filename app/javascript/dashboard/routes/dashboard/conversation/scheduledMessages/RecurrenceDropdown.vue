@@ -1,11 +1,9 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { vOnClickOutside } from '@vueuse/components';
 
-import DropdownContainer from 'next/dropdown-menu/base/DropdownContainer.vue';
-import DropdownBody from 'next/dropdown-menu/base/DropdownBody.vue';
-import DropdownSection from 'next/dropdown-menu/base/DropdownSection.vue';
-import DropdownItem from 'next/dropdown-menu/base/DropdownItem.vue';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 
 import {
   getRecurrenceShortcuts,
@@ -28,6 +26,10 @@ const emit = defineEmits(['update:modelValue', 'openCustom']);
 
 const { t, locale } = useI18n();
 
+const isOpen = ref(false);
+const triggerRef = ref(null);
+const dropdownStyle = ref({});
+
 const shortcuts = computed(() => {
   return getRecurrenceShortcuts(props.scheduledDate || new Date());
 });
@@ -48,12 +50,47 @@ const selectedLabel = computed(() => {
   return buildRecurrenceDescription(props.modelValue, locale.value);
 });
 
+const updatePosition = () => {
+  if (!triggerRef.value) return;
+  const rect = triggerRef.value.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const dropdownHeight = shortcuts.value.length * 40 + 16;
+  const openAbove = spaceBelow < dropdownHeight && rect.top > spaceBelow;
+
+  dropdownStyle.value = {
+    position: 'fixed',
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    zIndex: 10001,
+    ...(openAbove
+      ? { bottom: `${window.innerHeight - rect.top + 4}px` }
+      : { top: `${rect.bottom + 4}px` }),
+  };
+};
+
+const toggleDropdown = async () => {
+  isOpen.value = !isOpen.value;
+  if (isOpen.value) {
+    await nextTick();
+    updatePosition();
+  }
+};
+
+const close = () => {
+  isOpen.value = false;
+};
+
 const onSelect = shortcut => {
+  close();
   if (shortcut.value === 'custom') {
     emit('openCustom');
   } else {
     emit('update:modelValue', shortcut.value);
   }
+};
+
+const isSelected = shortcut => {
+  return JSON.stringify(shortcut.value) === JSON.stringify(props.modelValue);
 };
 </script>
 
@@ -62,41 +99,46 @@ const onSelect = shortcut => {
     <span class="text-sm font-medium text-n-slate-12">
       {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
     </span>
-    <DropdownContainer>
-      <template #trigger="{ toggle }">
+    <button
+      ref="triggerRef"
+      class="flex items-center gap-2 rounded-lg border border-n-weak px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-1 w-full justify-between"
+      @click="toggleDropdown"
+    >
+      <div class="flex items-center gap-2">
+        <Icon
+          icon="i-lucide-repeat"
+          class="size-4"
+          :class="modelValue ? 'text-n-blue-10' : 'text-n-slate-11'"
+        />
+        <span>{{ selectedLabel }}</span>
+      </div>
+      <Icon icon="i-lucide-chevron-down" class="size-4 text-n-slate-11" />
+    </button>
+    <Teleport to="body">
+      <div
+        v-if="isOpen"
+        v-on-click-outside="close"
+        :style="dropdownStyle"
+        class="bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak rounded-xl shadow-lg py-1"
+      >
         <button
-          class="flex items-center gap-2 rounded-lg border border-n-weak px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-1 w-full justify-between"
-          @click="toggle"
+          v-for="shortcut in shortcuts"
+          :key="shortcut.label"
+          class="flex items-center gap-3 w-full px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2 cursor-pointer transition-colors text-left"
+          :class="{ 'bg-n-alpha-1': isSelected(shortcut) }"
+          @click="onSelect(shortcut)"
         >
-          <div class="flex items-center gap-2">
-            <i
-              class="i-lucide-repeat text-n-slate-11"
-              :class="{ 'text-n-blue-10': modelValue }"
-            />
-            <span>{{ selectedLabel }}</span>
-          </div>
-          <i class="i-lucide-chevron-down text-n-slate-11" />
-        </button>
-      </template>
-      <DropdownBody class="min-w-[280px] z-[10000]">
-        <DropdownSection>
-          <DropdownItem
-            v-for="shortcut in shortcuts"
-            :key="shortcut.label"
-            :label="formatShortcutLabel(shortcut, t, locale)"
+          <Icon
             :icon="
               shortcut.label === 'CUSTOM'
                 ? 'i-lucide-settings-2'
                 : 'i-lucide-repeat'
             "
-            :class="{
-              'bg-n-alpha-1':
-                JSON.stringify(shortcut.value) === JSON.stringify(modelValue),
-            }"
-            :click="() => onSelect(shortcut)"
+            class="size-4 text-n-slate-11 shrink-0"
           />
-        </DropdownSection>
-      </DropdownBody>
-    </DropdownContainer>
+          <span>{{ formatShortcutLabel(shortcut, t, locale) }}</span>
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
