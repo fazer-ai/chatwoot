@@ -70,7 +70,7 @@ const statusConfig = {
   },
   active: {
     labelKey: 'SCHEDULED_MESSAGES.RECURRENCE.STATUS_ACTIVE',
-    class: 'bg-n-teal-3 text-n-teal-11',
+    class: 'bg-n-brand/10 text-n-blue-text',
   },
   completed: {
     labelKey: 'SCHEDULED_MESSAGES.RECURRENCE.STATUS_COMPLETED',
