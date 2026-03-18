@@ -5,7 +5,6 @@ import { useAlert } from 'dashboard/composables';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 
 import ScheduledMessageItem from 'next/Contacts/ContactsSidebar/components/ScheduledMessageItem.vue';
-import RecurringScheduledMessageItem from './RecurringScheduledMessageItem.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import ScheduledMessageSkeletonLoader from './ScheduledMessageSkeletonLoader.vue';
 import ScheduledMessageModal from './ScheduledMessageModal.vue';
@@ -238,10 +237,15 @@ watch(
             {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
           </span>
         </div>
-        <RecurringScheduledMessageItem
+        <ScheduledMessageItem
           v-for="rm in activeRecurringMessages"
           :key="rm.id"
-          :recurring-message="rm"
+          class="px-4 py-4"
+          :scheduled-message="rm"
+          :written-by="getWrittenBy(rm)"
+          allow-edit
+          allow-delete
+          collapsible
           @edit="openEditRecurringModal"
           @stop="stopRecurring"
         />
@@ -310,10 +314,15 @@ watch(
             {{ t('SCHEDULED_MESSAGES.PAST_MESSAGES_SECTION') }}
           </span>
         </div>
-        <RecurringScheduledMessageItem
+        <ScheduledMessageItem
           v-for="rm in inactiveRecurringMessages"
           :key="rm.id"
-          :recurring-message="rm"
+          class="px-4 py-4"
+          :scheduled-message="rm"
+          :written-by="getWrittenBy(rm)"
+          :allow-edit="false"
+          :allow-delete="false"
+          collapsible
         />
         <ScheduledMessageItem
           v-for="message in historyMessages"
