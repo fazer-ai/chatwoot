@@ -49,13 +49,31 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
   end
 
   def recurring_scheduled_message_params
-    params.permit(
+    permitted = params.permit(
       :content,
       :status,
       :attachment,
       template_params: {},
-      recurrence_rule: {}
+      recurrence_rule: [:frequency, :interval, :end_type, :end_date, :end_count,
+                        :monthly_type, :monthly_week, :monthly_weekday, { week_days: [] }]
     )
+
+    permitted[:recurrence_rule] = cast_recurrence_rule(permitted[:recurrence_rule].to_h) if permitted[:recurrence_rule].present?
+
+    permitted
+  end
+
+  def cast_recurrence_rule(rule)
+    integer_keys = %w[interval end_count monthly_week monthly_weekday]
+    rule.each_with_object({}) do |(key, value), hash|
+      hash[key] = if key == 'week_days' && value.is_a?(Array)
+                    value.map(&:to_i)
+                  elsif integer_keys.include?(key)
+                    value.to_i
+                  else
+                    value
+                  end
+    end
   end
 
   def create_first_occurrence

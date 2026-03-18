@@ -119,6 +119,7 @@ const setFormFromMessage = scheduledMessage => {
   templateParams.value = scheduledMessage.template_params || null;
   existingAttachment.value = scheduledMessage.attachment || null;
   attachments.value = [];
+  recurrenceRule.value = scheduledMessage.recurrence_rule || null;
 
   if (scheduledMessage.scheduled_at) {
     const dateValue = new Date(scheduledMessage.scheduled_at * 1000);
@@ -399,21 +400,49 @@ const submit = async status => {
   if (!validatePayload(status)) return;
 
   try {
-    if (recurrenceRule.value && status === 'pending' && !isEditing.value) {
-      // Create recurring scheduled message
-      await store.dispatch('recurringScheduledMessages/create', {
-        conversationId: props.conversationId,
-        payload: {
-          content: messageContent.value,
-          scheduled_at: scheduledAt.value
-            ? scheduledAt.value.toISOString()
-            : null,
-          recurrence_rule: recurrenceRule.value,
-          attachment: resolveAttachmentPayload(),
-          template_params: templateParams.value,
-        },
-      });
+    const hasRecurrence = !!recurrenceRule.value;
+    const existingRecurringId =
+      props.scheduledMessage?.recurring_scheduled_message_id;
+
+    if (hasRecurrence && status === 'pending') {
+      const recurringPayload = {
+        content: messageContent.value,
+        scheduledAt: scheduledAt.value ? scheduledAt.value.toISOString() : null,
+        recurrenceRule: recurrenceRule.value,
+        attachment: resolveAttachmentPayload(),
+        templateParams: templateParams.value,
+        status: 'active',
+      };
+
+      if (isEditing.value && existingRecurringId) {
+        // Update existing recurring series
+        await store.dispatch('recurringScheduledMessages/update', {
+          conversationId: props.conversationId,
+          recurringScheduledMessageId: existingRecurringId,
+          payload: recurringPayload,
+        });
+      } else {
+        // Create new recurring series (new message or standalone gaining recurrence)
+        await store.dispatch('recurringScheduledMessages/create', {
+          conversationId: props.conversationId,
+          payload: recurringPayload,
+        });
+        // If converting a standalone message, delete the old one
+        if (isEditing.value) {
+          await store.dispatch('scheduledMessages/delete', {
+            conversationId: props.conversationId,
+            scheduledMessageId: props.scheduledMessage.id,
+          });
+        }
+      }
     } else if (isEditing.value) {
+      // Editing without recurrence - if it had a recurring parent and user removed it, cancel the series
+      if (existingRecurringId && !hasRecurrence) {
+        await store.dispatch('recurringScheduledMessages/delete', {
+          conversationId: props.conversationId,
+          recurringScheduledMessageId: existingRecurringId,
+        });
+      }
       await store.dispatch('scheduledMessages/update', {
         conversationId: props.conversationId,
         scheduledMessageId: props.scheduledMessage.id,
@@ -611,7 +640,6 @@ watch(
       </div>
 
       <RecurrenceDropdown
-        v-if="!isEditing"
         v-model="recurrenceRule"
         :scheduled-date="scheduledDateTime"
         @open-custom="showRecurrenceCustomModal = true"
