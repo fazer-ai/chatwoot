@@ -408,6 +408,8 @@
   "SCHEDULED_MESSAGES": {
     "NEW_BUTTON": "Agendar mensagem",
     "PAST_MESSAGES_SECTION": "Enviadas",
+    "DRAFT_MESSAGES_SECTION": "Rascunhos",
+    "PENDING_MESSAGES_SECTION": "Pendentes",
     "EMPTY_STATE": "Ainda não há mensagens agendadas.",
     "STATUS": {
       "DRAFT": "Rascunho",
@@ -485,7 +487,7 @@
       "UNKNOWN_AUTHOR": "Desconhecido"
     },
     "RECURRENCE": {
-      "SECTION_TITLE": "Recorrências",
+      "SECTION_TITLE": "Recorrentes",
       "NO_REPEAT": "Não se repete",
       "DAILY": "Todos os dias",
       "WEEKLY": "Semanal: cada {day}",

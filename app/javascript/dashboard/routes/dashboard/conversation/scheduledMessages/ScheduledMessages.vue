@@ -238,25 +238,26 @@ watch(
             {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
           </span>
         </div>
-        <div class="flex flex-col gap-2 px-4 pb-2">
-          <RecurringScheduledMessageItem
-            v-for="rm in activeRecurringMessages"
-            :key="rm.id"
-            :recurring-message="rm"
-            @edit="openEditRecurringModal"
-            @stop="stopRecurring"
-          />
-        </div>
-        <div
-          v-if="draftMessages.length || pendingMessages.length"
-          class="border-t border-n-weak mx-4"
+        <RecurringScheduledMessageItem
+          v-for="rm in activeRecurringMessages"
+          :key="rm.id"
+          :recurring-message="rm"
+          @edit="openEditRecurringModal"
+          @stop="stopRecurring"
         />
       </template>
 
-      <!-- Draft Messages -->
-      <template v-if="draftMessages.length">
+      <!-- Pending Messages -->
+      <template v-if="pendingMessages.length">
+        <div
+          class="flex items-center gap-2 px-4 pt-4 pb-2 border-t border-n-weak"
+        >
+          <span class="text-xs font-medium text-n-slate-11 uppercase">
+            {{ t('SCHEDULED_MESSAGES.PENDING_MESSAGES_SECTION') }}
+          </span>
+        </div>
         <ScheduledMessageItem
-          v-for="message in draftMessages"
+          v-for="message in pendingMessages"
           :key="message.id"
           class="px-4 py-4"
           :scheduled-message="message"
@@ -269,10 +270,17 @@ watch(
         />
       </template>
 
-      <!-- Pending Messages -->
-      <template v-if="pendingMessages.length">
+      <!-- Draft Messages -->
+      <template v-if="draftMessages.length">
+        <div
+          class="flex items-center gap-2 px-4 pt-4 pb-2 border-t border-n-weak"
+        >
+          <span class="text-xs font-medium text-n-slate-11 uppercase">
+            {{ t('SCHEDULED_MESSAGES.DRAFT_MESSAGES_SECTION') }}
+          </span>
+        </div>
         <ScheduledMessageItem
-          v-for="message in pendingMessages"
+          v-for="message in draftMessages"
           :key="message.id"
           class="px-4 py-4"
           :scheduled-message="message"
@@ -302,16 +310,11 @@ watch(
             {{ t('SCHEDULED_MESSAGES.PAST_MESSAGES_SECTION') }}
           </span>
         </div>
-        <div
-          v-if="inactiveRecurringMessages.length"
-          class="flex flex-col gap-2 px-4 pb-2"
-        >
-          <RecurringScheduledMessageItem
-            v-for="rm in inactiveRecurringMessages"
-            :key="rm.id"
-            :recurring-message="rm"
-          />
-        </div>
+        <RecurringScheduledMessageItem
+          v-for="rm in inactiveRecurringMessages"
+          :key="rm.id"
+          :recurring-message="rm"
+        />
         <ScheduledMessageItem
           v-for="message in historyMessages"
           :key="message.id"

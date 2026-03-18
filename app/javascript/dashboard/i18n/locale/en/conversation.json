@@ -419,6 +419,8 @@
   "SCHEDULED_MESSAGES": {
     "NEW_BUTTON": "Schedule message",
     "PAST_MESSAGES_SECTION": "Sent",
+    "DRAFT_MESSAGES_SECTION": "Drafts",
+    "PENDING_MESSAGES_SECTION": "Pending",
     "EMPTY_STATE": "There are no scheduled messages yet.",
     "STATUS": {
       "DRAFT": "Draft",
@@ -496,7 +498,7 @@
       "DELETE_FAILED": "Unable to delete scheduled message. Please try again."
     },
     "RECURRENCE": {
-      "SECTION_TITLE": "Recurrences",
+      "SECTION_TITLE": "Recurrence",
       "NO_REPEAT": "Does not repeat",
       "DAILY": "Every day",
       "WEEKLY": "Weekly on {day}",
