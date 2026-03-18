@@ -49,13 +49,12 @@ const selectedLabel = computed(() => {
   return buildRecurrenceDescription(props.modelValue, locale.value);
 });
 
-const onSelect = (shortcut, toggle) => {
+const onSelect = shortcut => {
   if (shortcut.value === 'custom') {
     emit('openCustom');
   } else {
     emit('update:modelValue', shortcut.value);
   }
-  toggle();
 };
 </script>
 
@@ -80,27 +79,25 @@ const onSelect = (shortcut, toggle) => {
           <i class="i-lucide-chevron-down text-n-slate-11" />
         </button>
       </template>
-      <template #default="{ toggle }">
-        <DropdownBody class="min-w-[280px] z-[10000]">
-          <DropdownSection>
-            <DropdownItem
-              v-for="shortcut in shortcuts"
-              :key="shortcut.label"
-              :label="formatShortcutLabel(shortcut, t, locale)"
-              :icon="
-                shortcut.label === 'CUSTOM'
-                  ? 'i-lucide-settings-2'
-                  : 'i-lucide-repeat'
-              "
-              :class="{
-                'bg-n-alpha-1':
-                  JSON.stringify(shortcut.value) === JSON.stringify(modelValue),
-              }"
-              @click="onSelect(shortcut, toggle)"
-            />
-          </DropdownSection>
-        </DropdownBody>
-      </template>
+      <DropdownBody class="min-w-[280px] z-[10000]">
+        <DropdownSection>
+          <DropdownItem
+            v-for="shortcut in shortcuts"
+            :key="shortcut.label"
+            :label="formatShortcutLabel(shortcut, t, locale)"
+            :icon="
+              shortcut.label === 'CUSTOM'
+                ? 'i-lucide-settings-2'
+                : 'i-lucide-repeat'
+            "
+            :class="{
+              'bg-n-alpha-1':
+                JSON.stringify(shortcut.value) === JSON.stringify(modelValue),
+            }"
+            :click="() => onSelect(shortcut)"
+          />
+        </DropdownSection>
+      </DropdownBody>
     </DropdownContainer>
   </div>
 </template>

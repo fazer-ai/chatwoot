@@ -33,10 +33,12 @@ const statusLabel = computed(() => {
   return t(`SCHEDULED_MESSAGES.RECURRENCE.STATUS_${key}`);
 });
 
+const normalizedLocale = computed(() => locale.value.replace('_', '-'));
+
 const recurrenceDescription = computed(() =>
   buildRecurrenceDescription(
     props.recurringMessage.recurrence_rule,
-    locale.value
+    normalizedLocale.value
   )
 );
 
@@ -51,7 +53,7 @@ const nextSendLabel = computed(() => {
   if (!pending?.scheduled_at) return null;
   const date = new Date(pending.scheduled_at * 1000);
   return t('SCHEDULED_MESSAGES.RECURRENCE.NEXT_SEND', {
-    time: date.toLocaleString(locale.value, {
+    time: date.toLocaleString(normalizedLocale.value, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
