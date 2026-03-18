@@ -29,8 +29,7 @@ const emit = defineEmits(['update:modelValue', 'openCustom']);
 const { t, locale } = useI18n();
 
 const shortcuts = computed(() => {
-  if (!props.scheduledDate) return [];
-  return getRecurrenceShortcuts(props.scheduledDate);
+  return getRecurrenceShortcuts(props.scheduledDate || new Date());
 });
 
 const selectedLabel = computed(() => {
@@ -59,7 +58,7 @@ const onSelect = shortcut => {
 </script>
 
 <template>
-  <div v-if="scheduledDate" class="flex flex-col gap-1">
+  <div class="flex flex-col gap-1">
     <span class="text-sm font-medium text-n-slate-12">
       {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
     </span>
