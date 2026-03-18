@@ -16,7 +16,8 @@ const props = defineProps({
 const emit = defineEmits(['stop']);
 
 const { t, locale } = useI18n();
-const [isExpanded, toggleExpand] = useToggle(false);
+const [isContentExpanded, toggleContent] = useToggle(false);
+const showHistory = ref(false);
 
 const statusBadgeClass = computed(() => {
   const map = {
@@ -42,11 +43,48 @@ const recurrenceDescription = computed(() =>
   )
 );
 
-const occurrencesSentLabel = computed(() =>
-  t('SCHEDULED_MESSAGES.RECURRENCE.OCCURRENCES_SENT', {
-    count: props.recurringMessage.occurrences_sent || 0,
-  })
-);
+const childStatusConfig = {
+  sent: {
+    labelKey: 'SCHEDULED_MESSAGES.STATUS.SENT',
+    class: 'bg-n-teal-9/10 text-n-teal-11',
+    icon: 'i-lucide-check-circle',
+  },
+  failed: {
+    labelKey: 'SCHEDULED_MESSAGES.STATUS.FAILED',
+    class: 'bg-n-ruby-9/10 text-n-ruby-11',
+    icon: 'i-lucide-x-circle',
+  },
+  pending: {
+    labelKey: 'SCHEDULED_MESSAGES.STATUS.PENDING',
+    class: 'bg-n-brand/10 text-n-blue-text',
+    icon: 'i-lucide-clock',
+  },
+};
+
+const completedChildren = computed(() => {
+  const children = props.recurringMessage.scheduled_messages || [];
+  return children
+    .filter(m => ['sent', 'failed'].includes(m.status))
+    .sort((a, b) => (b.scheduled_at || 0) - (a.scheduled_at || 0));
+});
+
+const hasCompletedChildren = computed(() => completedChildren.value.length > 0);
+
+const formatChildTime = scheduledAt => {
+  if (!scheduledAt) return '';
+  const date = new Date(scheduledAt * 1000);
+  const now = new Date();
+  const options = {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
+  if (date.getFullYear() !== now.getFullYear()) {
+    options.year = 'numeric';
+  }
+  return date.toLocaleString(normalizedLocale.value, options);
+};
 
 const nextSendLabel = computed(() => {
   const pending = props.recurringMessage.pending_scheduled_message;
@@ -95,15 +133,68 @@ const confirmStop = () => {
     </div>
 
     <!-- Content Preview -->
-    <p class="text-sm text-n-slate-11" :class="{ 'line-clamp-2': !isExpanded }">
+    <p
+      class="text-sm text-n-slate-11"
+      :class="{ 'line-clamp-2': !isContentExpanded }"
+    >
       {{ recurringMessage.content }}
     </p>
 
     <!-- Meta Row -->
     <div class="flex items-center gap-3 text-xs text-n-slate-10">
-      <span>{{ occurrencesSentLabel }}</span>
-      <span v-if="nextSendLabel">·</span>
+      <button
+        v-if="hasCompletedChildren"
+        class="flex items-center gap-1 hover:text-n-slate-12 cursor-pointer transition-colors"
+        @click="showHistory = !showHistory"
+      >
+        <i
+          class="text-xs"
+          :class="showHistory ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+        />
+        <span>
+          {{
+            t('SCHEDULED_MESSAGES.RECURRENCE.OCCURRENCES_SENT', {
+              count: completedChildren.length,
+            })
+          }}
+        </span>
+      </button>
+      <span v-else>
+        {{ t('SCHEDULED_MESSAGES.RECURRENCE.OCCURRENCES_SENT', { count: 0 }) }}
+      </span>
+      <span v-if="nextSendLabel" class="text-n-slate-10">·</span>
       <span v-if="nextSendLabel">{{ nextSendLabel }}</span>
+    </div>
+
+    <!-- History of sent/failed children -->
+    <div
+      v-if="showHistory && hasCompletedChildren"
+      class="flex flex-col gap-1 border-t border-n-weak pt-2"
+    >
+      <div
+        v-for="child in completedChildren"
+        :key="child.id"
+        class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <i
+            class="shrink-0 text-xs"
+            :class="[
+              childStatusConfig[child.status]?.icon || 'i-lucide-circle',
+              child.status === 'sent' ? 'text-n-teal-11' : 'text-n-ruby-11',
+            ]"
+          />
+          <span class="text-n-slate-11">
+            {{ formatChildTime(child.scheduled_at) }}
+          </span>
+        </div>
+        <span
+          class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
+          :class="childStatusConfig[child.status]?.class"
+        >
+          {{ t(childStatusConfig[child.status]?.labelKey) }}
+        </span>
+      </div>
     </div>
 
     <!-- Actions -->
@@ -112,13 +203,15 @@ const confirmStop = () => {
         v-if="recurringMessage.content?.length > 80"
         ghost
         xs
-        :icon="isExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+        :icon="
+          isContentExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'
+        "
         :label="
-          isExpanded
+          isContentExpanded
             ? t('SCHEDULED_MESSAGES.RECURRENCE.COLLAPSE')
             : t('SCHEDULED_MESSAGES.RECURRENCE.EXPAND')
         "
-        @click="toggleExpand()"
+        @click="toggleContent()"
       />
       <NextButton
         v-if="isActive"

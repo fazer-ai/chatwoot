@@ -226,6 +226,10 @@ watch(
             @stop="stopRecurring"
           />
         </div>
+        <div
+          v-if="draftMessages.length || pendingMessages.length"
+          class="border-t border-n-weak mx-4"
+        />
       </template>
 
       <!-- Draft Messages -->
