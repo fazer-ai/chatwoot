@@ -134,6 +134,24 @@ const openEditModal = message => {
   shouldShowModal.value = true;
 };
 
+const openEditRecurringModal = recurringMessage => {
+  // Transform recurring message into a scheduledMessage-compatible shape
+  // so the modal can reuse the same edit flow
+  const pendingChild = recurringMessage.pending_scheduled_message;
+  editingMessage.value = {
+    id: `recurring-${recurringMessage.id}`,
+    content: recurringMessage.content,
+    scheduled_at: pendingChild?.scheduled_at || null,
+    recurrence_rule: recurringMessage.recurrence_rule,
+    recurring_scheduled_message_id: recurringMessage.id,
+    template_params: recurringMessage.template_params,
+    attachment: recurringMessage.attachment,
+    author: recurringMessage.author,
+    author_type: recurringMessage.author_type,
+  };
+  shouldShowModal.value = true;
+};
+
 const closeModal = () => {
   shouldShowModal.value = false;
   editingMessage.value = null;
@@ -223,6 +241,7 @@ watch(
             v-for="rm in activeRecurringMessages"
             :key="rm.id"
             :recurring-message="rm"
+            @edit="openEditRecurringModal"
             @stop="stopRecurring"
           />
         </div>

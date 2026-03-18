@@ -14,7 +14,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['stop']);
+const emit = defineEmits(['stop', 'edit']);
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -230,6 +230,14 @@ const scrollToMessage = child => {
             : t('SCHEDULED_MESSAGES.RECURRENCE.EXPAND')
         "
         @click="toggleContent()"
+      />
+      <NextButton
+        v-if="isActive"
+        ghost
+        xs
+        icon="i-lucide-pencil"
+        :label="t('SCHEDULED_MESSAGES.RECURRENCE.EDIT')"
+        @click="emit('edit', recurringMessage)"
       />
       <NextButton
         v-if="isActive"

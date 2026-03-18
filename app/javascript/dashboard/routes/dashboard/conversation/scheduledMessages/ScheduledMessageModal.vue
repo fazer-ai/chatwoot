@@ -57,6 +57,11 @@ const inboxGetter = useMapGetter('inboxes/getInbox');
 const uiFlags = useMapGetter('scheduledMessages/getUIFlags');
 
 const isEditing = computed(() => !!props.scheduledMessage?.id);
+const isEditingRecurring = computed(
+  () =>
+    isEditing.value &&
+    String(props.scheduledMessage?.id).startsWith('recurring-')
+);
 const isCreating = computed(() => uiFlags.value.isCreating);
 const isUpdating = computed(() => uiFlags.value.isUpdating);
 const isSubmitting = computed(() => isCreating.value || isUpdating.value);
@@ -442,6 +447,11 @@ const submit = async status => {
           conversationId: props.conversationId,
           recurringScheduledMessageId: existingRecurringId,
         });
+        // If this was a direct recurring message edit, just close — no standalone to update
+        if (isEditingRecurring.value) {
+          closeModal();
+          return;
+        }
       }
       await store.dispatch('scheduledMessages/update', {
         conversationId: props.conversationId,
