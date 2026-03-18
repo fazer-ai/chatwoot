@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import { useToggle } from '@vueuse/core';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -16,6 +17,8 @@ const props = defineProps({
 const emit = defineEmits(['stop']);
 
 const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const [isContentExpanded, toggleContent] = useToggle(false);
 const showHistory = ref(false);
 
@@ -112,6 +115,17 @@ const confirmStop = () => {
   emit('stop', props.recurringMessage);
   showStopConfirm.value = false;
 };
+
+const canNavigateToMessage = child =>
+  child.status === 'sent' && Boolean(child.message_id);
+
+const scrollToMessage = child => {
+  if (!canNavigateToMessage(child)) return;
+  router.replace({
+    ...route,
+    query: { ...route.query, messageId: child.message_id },
+  });
+};
 </script>
 
 <template>
@@ -174,7 +188,11 @@ const confirmStop = () => {
       <div
         v-for="child in completedChildren"
         :key="child.id"
-        class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs"
+        class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+        :class="{
+          'cursor-pointer hover:bg-n-alpha-2': canNavigateToMessage(child),
+        }"
+        @click="scrollToMessage(child)"
       >
         <div class="flex items-center gap-2 min-w-0">
           <i
