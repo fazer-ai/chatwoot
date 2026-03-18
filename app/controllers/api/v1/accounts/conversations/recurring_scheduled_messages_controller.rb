@@ -96,13 +96,13 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
   def reschedule_pending_occurrence
     @recurring_scheduled_message.scheduled_messages.pending.destroy_all
 
-    scheduled_at = params[:scheduled_at]
-    return if scheduled_at.blank?
+    next_scheduled_at = compute_next_valid_date
+    return if next_scheduled_at.blank?
 
     sm = @recurring_scheduled_message.scheduled_messages.create!(
       content: @recurring_scheduled_message.content,
       template_params: @recurring_scheduled_message.template_params,
-      scheduled_at: scheduled_at,
+      scheduled_at: next_scheduled_at,
       status: :pending,
       account: @recurring_scheduled_message.account,
       conversation: @recurring_scheduled_message.conversation,
@@ -110,6 +110,27 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
       author: @recurring_scheduled_message.author
     )
     copy_attachment(sm) if @recurring_scheduled_message.attachment.attached?
+  end
+
+  def compute_next_valid_date
+    user_date = params[:scheduled_at].present? ? Time.zone.parse(params[:scheduled_at].to_s) : nil
+    rule = @recurring_scheduled_message.recurrence_rule
+
+    return user_date if user_date.present? && date_matches_rule?(user_date, rule)
+
+    base = [user_date, Time.current].compact.min
+    RecurringScheduledMessages::RecurrenceCalculatorService
+      .new(recurrence_rule: rule, last_date: base)
+      .next_date
+  end
+
+  def date_matches_rule?(date, rule)
+    return true unless rule.is_a?(Hash)
+
+    rule = rule.with_indifferent_access
+    return true unless rule[:frequency] == 'weekly' && rule[:week_days].present?
+
+    rule[:week_days].map(&:to_i).include?(date.wday)
   end
 
   def cancel_recurring_message
