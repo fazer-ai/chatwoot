@@ -137,7 +137,9 @@ const openEditModal = message => {
 const openEditRecurringModal = recurringMessage => {
   // Transform recurring message into a scheduledMessage-compatible shape
   // so the modal can reuse the same edit flow
-  const pendingChild = recurringMessage.pending_scheduled_message;
+  const pendingChild =
+    recurringMessage.pending_scheduled_message ||
+    recurringMessage.scheduled_messages?.find(sm => sm.status === 'pending');
   editingMessage.value = {
     id: `recurring-${recurringMessage.id}`,
     content: recurringMessage.content,

@@ -90,7 +90,11 @@ const formatChildTime = scheduledAt => {
 };
 
 const nextSendLabel = computed(() => {
-  const pending = props.recurringMessage.pending_scheduled_message;
+  const pending =
+    props.recurringMessage.pending_scheduled_message ||
+    props.recurringMessage.scheduled_messages?.find(
+      sm => sm.status === 'pending'
+    );
   if (!pending?.scheduled_at) return null;
   const date = new Date(pending.scheduled_at * 1000);
   return t('SCHEDULED_MESSAGES.RECURRENCE.NEXT_SEND', {
