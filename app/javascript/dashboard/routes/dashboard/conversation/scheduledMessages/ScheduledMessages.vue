@@ -230,13 +230,24 @@ watch(
     </div>
 
     <div v-else class="flex flex-col max-h-[400px] overflow-y-auto">
+      <!-- Draft Messages -->
+      <template v-if="draftMessages.length">
+        <ScheduledMessageItem
+          v-for="message in draftMessages"
+          :key="message.id"
+          class="px-4 py-4"
+          :scheduled-message="message"
+          :written-by="getWrittenBy(message)"
+          allow-edit
+          allow-delete
+          collapsible
+          @edit="openEditModal"
+          @delete="openDeleteConfirm"
+        />
+      </template>
+
       <!-- Active Recurring Messages -->
       <template v-if="activeRecurringMessages.length">
-        <div class="flex items-center gap-2 px-4 pt-2 pb-2">
-          <span class="text-xs font-medium text-n-slate-11 uppercase">
-            {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
-          </span>
-        </div>
         <ScheduledMessageItem
           v-for="rm in activeRecurringMessages"
           :key="rm.id"
@@ -253,38 +264,8 @@ watch(
 
       <!-- Pending Messages -->
       <template v-if="pendingMessages.length">
-        <div
-          class="flex items-center gap-2 px-4 pt-4 pb-2 border-t border-n-weak"
-        >
-          <span class="text-xs font-medium text-n-slate-11 uppercase">
-            {{ t('SCHEDULED_MESSAGES.PENDING_MESSAGES_SECTION') }}
-          </span>
-        </div>
         <ScheduledMessageItem
           v-for="message in pendingMessages"
-          :key="message.id"
-          class="px-4 py-4"
-          :scheduled-message="message"
-          :written-by="getWrittenBy(message)"
-          allow-edit
-          allow-delete
-          collapsible
-          @edit="openEditModal"
-          @delete="openDeleteConfirm"
-        />
-      </template>
-
-      <!-- Draft Messages -->
-      <template v-if="draftMessages.length">
-        <div
-          class="flex items-center gap-2 px-4 pt-4 pb-2 border-t border-n-weak"
-        >
-          <span class="text-xs font-medium text-n-slate-11 uppercase">
-            {{ t('SCHEDULED_MESSAGES.DRAFT_MESSAGES_SECTION') }}
-          </span>
-        </div>
-        <ScheduledMessageItem
-          v-for="message in draftMessages"
           :key="message.id"
           class="px-4 py-4"
           :scheduled-message="message"
