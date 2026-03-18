@@ -5,6 +5,7 @@ import { useAlert } from 'dashboard/composables';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 
 import ScheduledMessageItem from 'next/Contacts/ContactsSidebar/components/ScheduledMessageItem.vue';
+import RecurringScheduledMessageItem from './RecurringScheduledMessageItem.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import ScheduledMessageSkeletonLoader from './ScheduledMessageSkeletonLoader.vue';
 import ScheduledMessageModal from './ScheduledMessageModal.vue';
@@ -28,6 +29,16 @@ const scheduledMessagesGetter = useMapGetter(
   'scheduledMessages/getAllByConversation'
 );
 const uiFlags = useMapGetter('scheduledMessages/getUIFlags');
+const recurringMessagesGetter = useMapGetter(
+  'recurringScheduledMessages/getAllByConversation'
+);
+const conversationGetter = useMapGetter('getConversationById');
+
+const isConversationResolved = computed(() => {
+  if (!props.conversationId) return false;
+  const conversation = conversationGetter.value(props.conversationId);
+  return conversation?.status === 'resolved';
+});
 
 const isFetching = computed(() => uiFlags.value.isFetching);
 const isDeleting = computed(() => uiFlags.value.isDeleting);
@@ -42,18 +53,46 @@ const scheduledMessages = computed(() => {
   return scheduledMessagesGetter.value(props.conversationId) || [];
 });
 
+const recurringMessages = computed(() => {
+  if (!props.conversationId) return [];
+  return recurringMessagesGetter.value(props.conversationId) || [];
+});
+
+const activeRecurringMessages = computed(() =>
+  recurringMessages.value.filter(m => m.status === 'active')
+);
+
+const inactiveRecurringMessages = computed(() =>
+  recurringMessages.value.filter(m =>
+    ['completed', 'cancelled'].includes(m.status)
+  )
+);
+
+// IDs of scheduled messages that belong to a recurring series (to filter from one-off list)
+const recurringChildIds = computed(() => {
+  const ids = new Set();
+  scheduledMessages.value.forEach(m => {
+    if (m.recurring_scheduled_message_id) ids.add(m.id);
+  });
+  return ids;
+});
+
+const standaloneMessages = computed(() =>
+  scheduledMessages.value.filter(m => !recurringChildIds.value.has(m.id))
+);
+
 const draftMessages = computed(() =>
-  scheduledMessages.value.filter(message => message.status === 'draft')
+  standaloneMessages.value.filter(message => message.status === 'draft')
 );
 
 const pendingMessages = computed(() =>
-  scheduledMessages.value
+  standaloneMessages.value
     .filter(message => message.status === 'pending')
     .sort((a, b) => (a.scheduled_at || 0) - (b.scheduled_at || 0))
 );
 
 const historyMessages = computed(() =>
-  scheduledMessages.value
+  standaloneMessages.value
     .filter(message => ['sent', 'failed'].includes(message.status))
     .sort((a, b) => (b.scheduled_at || 0) - (a.scheduled_at || 0))
 );
@@ -67,6 +106,7 @@ const hasHistory = computed(() => historyMessages.value.length > 0);
 const fetchScheduledMessages = conversationId => {
   if (!conversationId) return;
   store.dispatch('scheduledMessages/get', { conversationId });
+  store.dispatch('recurringScheduledMessages/get', { conversationId });
 };
 
 const getWrittenBy = scheduledMessage => {
@@ -123,6 +163,17 @@ const confirmDelete = async () => {
   }
 };
 
+const stopRecurring = async recurringMessage => {
+  try {
+    await store.dispatch('recurringScheduledMessages/delete', {
+      conversationId: props.conversationId,
+      recurringScheduledMessageId: recurringMessage.id,
+    });
+  } catch (error) {
+    useAlert(t('SCHEDULED_MESSAGES.ERRORS.DELETE_FAILED'));
+  }
+};
+
 watch(
   () => props.conversationId,
   newConversationId => {
@@ -147,7 +198,36 @@ watch(
 
     <ScheduledMessageSkeletonLoader v-if="isFetching" :rows="3" />
 
+    <!-- Resolved conversation warning -->
+    <div
+      v-if="
+        isConversationResolved &&
+        (hasActiveMessages || activeRecurringMessages.length)
+      "
+      class="mx-4 mb-2 flex items-start gap-2 rounded-lg bg-n-amber-2 px-3 py-2 text-xs text-n-amber-11"
+    >
+      <i class="i-lucide-alert-triangle mt-0.5 shrink-0" />
+      <span>{{ t('SCHEDULED_MESSAGES.RECURRENCE.RESOLVED_WARNING') }}</span>
+    </div>
+
     <div v-else class="flex flex-col max-h-[400px] overflow-y-auto">
+      <!-- Active Recurring Messages -->
+      <template v-if="activeRecurringMessages.length">
+        <div class="flex items-center gap-2 px-4 pt-2 pb-2">
+          <span class="text-xs font-medium text-n-slate-11 uppercase">
+            {{ t('SCHEDULED_MESSAGES.RECURRENCE.SECTION_TITLE') }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-2 px-4 pb-2">
+          <RecurringScheduledMessageItem
+            v-for="rm in activeRecurringMessages"
+            :key="rm.id"
+            :recurring-message="rm"
+            @stop="stopRecurring"
+          />
+        </div>
+      </template>
+
       <!-- Draft Messages -->
       <template v-if="draftMessages.length">
         <ScheduledMessageItem
@@ -189,13 +269,23 @@ watch(
       </p>
 
       <!-- History Section -->
-      <template v-if="hasHistory">
+      <template v-if="hasHistory || inactiveRecurringMessages.length">
         <div
           class="flex items-center gap-2 px-4 pt-4 pb-2 border-t border-n-weak"
         >
           <span class="text-xs font-medium text-n-slate-11 uppercase">
             {{ t('SCHEDULED_MESSAGES.PAST_MESSAGES_SECTION') }}
           </span>
+        </div>
+        <div
+          v-if="inactiveRecurringMessages.length"
+          class="flex flex-col gap-2 px-4 pb-2"
+        >
+          <RecurringScheduledMessageItem
+            v-for="rm in inactiveRecurringMessages"
+            :key="rm.id"
+            :recurring-message="rm"
+          />
         </div>
         <ScheduledMessageItem
           v-for="message in historyMessages"

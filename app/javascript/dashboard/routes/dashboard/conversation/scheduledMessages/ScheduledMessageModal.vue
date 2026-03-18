@@ -18,6 +18,8 @@ import DropdownSection from 'next/dropdown-menu/base/DropdownSection.vue';
 import DropdownItem from 'next/dropdown-menu/base/DropdownItem.vue';
 import WhatsappTemplates from 'dashboard/components/widgets/conversation/WhatsappTemplates/Modal.vue';
 import ScheduleDateShortcuts from './ScheduleDateShortcuts.vue';
+import RecurrenceDropdown from './RecurrenceDropdown.vue';
+import RecurrenceCustomModal from './RecurrenceCustomModal.vue';
 
 const props = defineProps({
   show: {
@@ -78,6 +80,8 @@ const showWhatsAppTemplatesModal = ref(false);
 const contentError = ref(false);
 const contentLengthError = ref(false);
 const dateTimeError = ref('');
+const recurrenceRule = ref(null);
+const showRecurrenceCustomModal = ref(false);
 
 // Original values for change detection
 const originalContent = ref('');
@@ -98,6 +102,7 @@ const resetForm = () => {
   templateParams.value = null;
   contentError.value = false;
   dateTimeError.value = '';
+  recurrenceRule.value = null;
   // Reset original values
   originalContent.value = '';
   originalScheduledAt.value = null;
@@ -394,7 +399,21 @@ const submit = async status => {
   if (!validatePayload(status)) return;
 
   try {
-    if (isEditing.value) {
+    if (recurrenceRule.value && status === 'pending' && !isEditing.value) {
+      // Create recurring scheduled message
+      await store.dispatch('recurringScheduledMessages/create', {
+        conversationId: props.conversationId,
+        payload: {
+          content: messageContent.value,
+          scheduled_at: scheduledAt.value
+            ? scheduledAt.value.toISOString()
+            : null,
+          recurrence_rule: recurrenceRule.value,
+          attachment: resolveAttachmentPayload(),
+          template_params: templateParams.value,
+        },
+      });
+    } else if (isEditing.value) {
       await store.dispatch('scheduledMessages/update', {
         conversationId: props.conversationId,
         scheduledMessageId: props.scheduledMessage.id,
@@ -590,6 +609,21 @@ watch(
           {{ dateTimeError }}
         </span>
       </div>
+
+      <RecurrenceDropdown
+        v-if="!isEditing"
+        v-model="recurrenceRule"
+        :scheduled-date="scheduledDateTime"
+        @open-custom="showRecurrenceCustomModal = true"
+      />
+
+      <RecurrenceCustomModal
+        :show="showRecurrenceCustomModal"
+        :model-value="recurrenceRule"
+        :scheduled-date="scheduledDateTime"
+        @update:model-value="recurrenceRule = $event"
+        @close="showRecurrenceCustomModal = false"
+      />
 
       <div class="flex items-center justify-end gap-3">
         <NextButton
