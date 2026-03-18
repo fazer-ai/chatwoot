@@ -87,11 +87,14 @@ const originalHasAttachment = ref(false);
 // NOTE: Local ref to control modal visibility, prevents auto-close when unsaved changes exist
 const localShowModal = ref(false);
 
+const removedExistingAttachment = ref(false);
+
 const resetForm = () => {
   messageContent.value = '';
   scheduledDateTime.value = null;
   attachments.value = [];
   existingAttachment.value = null;
+  removedExistingAttachment.value = false;
   templateParams.value = null;
   contentError.value = false;
   dateTimeError.value = '';
@@ -281,6 +284,7 @@ const onAttachmentsChange = value => {
 
 const onDisplayAttachmentsChange = value => {
   if (value.length === 0) {
+    if (existingAttachment.value) removedExistingAttachment.value = true;
     attachments.value = [];
     existingAttachment.value = null;
   } else {
@@ -356,6 +360,8 @@ const buildPayload = status => {
   const attachmentPayload = resolveAttachmentPayload();
   if (attachmentPayload) {
     payload.attachment = attachmentPayload;
+  } else if (removedExistingAttachment.value) {
+    payload.removeAttachment = true;
   }
 
   return payload;
