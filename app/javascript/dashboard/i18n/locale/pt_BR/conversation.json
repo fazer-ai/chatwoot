@@ -485,7 +485,7 @@
       "UNKNOWN_AUTHOR": "Desconhecido"
     },
     "RECURRENCE": {
-      "SECTION_TITLE": "Recorrencia",
+      "SECTION_TITLE": "Recorrências",
       "NO_REPEAT": "Não se repete",
       "DAILY": "Todos os dias",
       "WEEKLY": "Semanal: cada {day}",

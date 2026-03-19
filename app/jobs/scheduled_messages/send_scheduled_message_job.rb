@@ -89,21 +89,24 @@ class ScheduledMessages::SendScheduledMessageJob < ApplicationJob
 
     next_message = RecurringScheduledMessages::CreateNextOccurrenceService.new(
       recurring_scheduled_message: recurring,
-      previous_scheduled_message: scheduled_message
+      previous_scheduled_message: scheduled_message,
+      skip_increment: true
     ).perform
 
     create_failure_activity_message(scheduled_message, next_message) if next_message
   end
 
   def create_failure_activity_message(scheduled_message, next_message)
-    scheduled_message.conversation.messages.create!(
-      account: scheduled_message.account,
-      inbox: scheduled_message.inbox,
-      message_type: :activity,
-      content: I18n.t(
-        'conversations.activity.recurring_message_failed',
-        next_date: next_message.scheduled_at.strftime('%Y-%m-%d %H:%M')
+    I18n.with_locale(scheduled_message.account.locale) do
+      scheduled_message.conversation.messages.create!(
+        account: scheduled_message.account,
+        inbox: scheduled_message.inbox,
+        message_type: :activity,
+        content: I18n.t(
+          'conversations.activity.recurring_message_failed',
+          next_date: I18n.l(next_message.scheduled_at, format: :short)
+        )
       )
-    )
+    end
   end
 end

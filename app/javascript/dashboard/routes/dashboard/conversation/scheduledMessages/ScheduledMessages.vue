@@ -62,9 +62,11 @@ const activeRecurringMessages = computed(() =>
 );
 
 const inactiveRecurringMessages = computed(() =>
-  recurringMessages.value.filter(m =>
-    ['completed', 'cancelled'].includes(m.status)
-  )
+  recurringMessages.value.filter(m => {
+    if (!['completed', 'cancelled'].includes(m.status)) return false;
+    const children = m.scheduled_messages || [];
+    return children.some(c => ['sent', 'failed'].includes(c.status));
+  })
 );
 
 // IDs of scheduled messages that belong to a recurring series (to filter from one-off list)
@@ -229,7 +231,7 @@ watch(
       <span>{{ t('SCHEDULED_MESSAGES.RECURRENCE.RESOLVED_WARNING') }}</span>
     </div>
 
-    <div v-else class="flex flex-col max-h-[400px] overflow-y-auto">
+    <div class="flex flex-col max-h-[400px] overflow-y-auto">
       <!-- Draft Messages -->
       <template v-if="draftMessages.length">
         <ScheduledMessageItem
