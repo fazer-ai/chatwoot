@@ -79,7 +79,10 @@ class RecurringScheduledMessage < ApplicationRecord
   end
 
   def validate_recurrence_rule
-    return if recurrence_rule.blank?
+    if recurrence_rule.blank? || recurrence_rule == {}
+      errors.add(:recurrence_rule, 'must have a valid frequency') if active?
+      return
+    end
 
     rule = recurrence_rule.with_indifferent_access
     validate_frequency(rule)
@@ -120,10 +123,18 @@ class RecurringScheduledMessage < ApplicationRecord
 
     case end_type
     when 'on_date'
-      errors.add(:recurrence_rule, 'must have an end_date for on_date end_type') if rule[:end_date].blank?
+      validate_end_date(rule[:end_date])
     when 'after_count'
       end_count = rule[:end_count]
       errors.add(:recurrence_rule, 'must have end_count >= 1 for after_count end_type') unless end_count.is_a?(Integer) && end_count >= 1
     end
+  end
+
+  def validate_end_date(end_date)
+    return errors.add(:recurrence_rule, 'must have an end_date for on_date end_type') if end_date.blank?
+
+    Date.iso8601(end_date)
+  rescue ArgumentError
+    errors.add(:recurrence_rule, 'end_date must be a valid ISO8601 date (YYYY-MM-DD)')
   end
 end

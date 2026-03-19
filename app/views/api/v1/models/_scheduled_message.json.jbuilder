@@ -26,7 +26,7 @@ end
 
 json.attachment scheduled_message.attachment_data if scheduled_message.attachment.attached?
 
-if scheduled_message.recurring_scheduled_message.present?
+if scheduled_message.recurring_scheduled_message_id.present?
   json.recurring_scheduled_message_id scheduled_message.recurring_scheduled_message_id
-  json.recurrence_rule scheduled_message.recurring_scheduled_message.recurrence_rule
+  json.recurrence_rule scheduled_message.recurring_scheduled_message&.recurrence_rule
 end

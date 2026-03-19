@@ -118,7 +118,7 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
 
     return user_date if user_date.present? && date_matches_rule?(user_date, rule)
 
-    base = [user_date, Time.current].compact.min
+    base = [user_date, Time.current].compact.max
     RecurringScheduledMessages::RecurrenceCalculatorService
       .new(recurrence_rule: rule, last_date: base)
       .next_date
@@ -137,15 +137,17 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
     @recurring_scheduled_message.scheduled_messages.pending.destroy_all
     @recurring_scheduled_message.update!(status: :cancelled)
 
-    @recurring_scheduled_message.conversation.messages.create!(
-      account: @recurring_scheduled_message.account,
-      inbox: @recurring_scheduled_message.inbox,
-      message_type: :activity,
-      content: I18n.t(
-        'conversations.activity.recurring_message_cancelled',
-        agent: @recurring_scheduled_message.author&.name || 'Unknown'
+    I18n.with_locale(@recurring_scheduled_message.account.locale) do
+      @recurring_scheduled_message.conversation.messages.create!(
+        account: @recurring_scheduled_message.account,
+        inbox: @recurring_scheduled_message.inbox,
+        message_type: :activity,
+        content: I18n.t(
+          'conversations.activity.recurring_message_cancelled',
+          agent: @recurring_scheduled_message.author&.name || I18n.t('conversations.activity.unknown_agent')
+        )
       )
-    )
+    end
   end
 
   def copy_attachment(scheduled_message)

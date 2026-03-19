@@ -50,9 +50,14 @@ const hasValidEndCount = computed(
   () => endType.value !== 'after_count' || endCount.value >= 1
 );
 
+const hasValidInterval = computed(() => interval.value >= 1);
+
 const isValid = computed(
   () =>
-    hasValidWeekDays.value && hasValidEndDate.value && hasValidEndCount.value
+    hasValidInterval.value &&
+    hasValidWeekDays.value &&
+    hasValidEndDate.value &&
+    hasValidEndCount.value
 );
 
 const toggleWeekDay = day => {

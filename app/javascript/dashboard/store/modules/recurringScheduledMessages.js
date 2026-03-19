@@ -101,13 +101,13 @@ export const actions = {
     });
     try {
       const normalizedConversationId = Number(conversationId);
-      await RecurringScheduledMessagesAPI.delete(
+      const response = await RecurringScheduledMessagesAPI.delete(
         normalizedConversationId,
         recurringScheduledMessageId
       );
-      commit(types.DELETE_RECURRING_SCHEDULED_MESSAGE, {
+      commit(types.UPDATE_RECURRING_SCHEDULED_MESSAGE, {
         conversationId: normalizedConversationId,
-        recurringScheduledMessageId,
+        data: response.data,
       });
     } catch (error) {
       throw new Error(error);

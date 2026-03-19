@@ -1,11 +1,15 @@
 class RecurringScheduledMessages::CreateNextOccurrenceService
-  def initialize(recurring_scheduled_message:, previous_scheduled_message:)
+  def initialize(recurring_scheduled_message:, previous_scheduled_message:, skip_increment: false)
     @recurring = recurring_scheduled_message
     @previous = previous_scheduled_message
+    @skip_increment = skip_increment
   end
 
   def perform
-    @recurring.update!(occurrences_sent: @recurring.occurrences_sent + 1)
+    unless @skip_increment
+      @recurring.class.update_counters(@recurring.id, occurrences_sent: 1) # rubocop:disable Rails/SkipsModelValidations
+      @recurring.reload
+    end
 
     if should_complete?
       complete_series
@@ -25,7 +29,12 @@ class RecurringScheduledMessages::CreateNextOccurrenceService
       @recurring.occurrences_sent >= rule[:end_count]
     when 'on_date'
       next_date = calculate_next_date
-      next_date.nil? || next_date.to_date > Date.parse(rule[:end_date])
+      end_date = begin
+        Date.iso8601(rule[:end_date])
+      rescue StandardError
+        nil
+      end
+      next_date.nil? || end_date.nil? || next_date.to_date > end_date
     else
       false
     end
@@ -69,15 +78,17 @@ class RecurringScheduledMessages::CreateNextOccurrenceService
   end
 
   def create_completion_activity_message
-    @recurring.conversation.messages.create!(
-      account: @recurring.account,
-      inbox: @recurring.inbox,
-      message_type: :activity,
-      content: I18n.t(
-        'conversations.activity.recurring_message_completed',
-        count: @recurring.occurrences_sent
+    I18n.with_locale(@recurring.account.locale) do
+      @recurring.conversation.messages.create!(
+        account: @recurring.account,
+        inbox: @recurring.inbox,
+        message_type: :activity,
+        content: I18n.t(
+          'conversations.activity.recurring_message_completed',
+          count: @recurring.occurrences_sent
+        )
       )
-    )
+    end
   end
 
   def dispatch_event(event_name)

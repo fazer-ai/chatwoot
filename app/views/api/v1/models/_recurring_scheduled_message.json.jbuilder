@@ -21,7 +21,7 @@ end
 
 json.attachment recurring_scheduled_message.attachment_data if recurring_scheduled_message.attachment.attached?
 
-pending_sm = recurring_scheduled_message.scheduled_messages.where(status: :pending).order(scheduled_at: :asc).first
+pending_sm = recurring_scheduled_message.scheduled_messages.select { |sm| sm.status == 'pending' }.min_by(&:scheduled_at)
 if pending_sm
   json.pending_scheduled_message do
     json.id pending_sm.id
@@ -29,7 +29,7 @@ if pending_sm
   end
 end
 
-json.scheduled_messages recurring_scheduled_message.scheduled_messages.order(scheduled_at: :desc).limit(50) do |sm|
+json.scheduled_messages recurring_scheduled_message.scheduled_messages.sort_by { |sm| sm.scheduled_at || Time.zone.at(0) }.last(50).reverse do |sm|
   json.id sm.id
   json.status sm.status
   json.scheduled_at sm.scheduled_at&.to_i

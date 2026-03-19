@@ -5,7 +5,7 @@ class CreateRecurringScheduledMessages < ActiveRecord::Migration[7.0]
       t.jsonb :template_params, default: {}
       t.jsonb :recurrence_rule, null: false, default: {}
       t.integer :status, default: 0, null: false
-      t.integer :occurrences_sent, default: 0
+      t.integer :occurrences_sent, default: 0, null: false
 
       t.references :account, null: false, foreign_key: true
       t.references :conversation, null: false, foreign_key: true
