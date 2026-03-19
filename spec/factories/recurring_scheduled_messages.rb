@@ -1,8 +1,8 @@
 FactoryBot.define do
   factory :recurring_scheduled_message do
-    account
-    inbox
     conversation
+    account { conversation.account }
+    inbox { conversation.inbox }
     association :author, factory: :user
     content { 'Recurring scheduled message content' }
     recurrence_rule do

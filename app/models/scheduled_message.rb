@@ -75,25 +75,22 @@ class ScheduledMessage < ApplicationRecord
   end
 
   def push_event_data
-    data = {
-      id: id,
-      content: content,
-      inbox_id: inbox_id,
-      conversation_id: conversation.display_id,
-      account_id: account_id,
-      status: status,
-      scheduled_at: scheduled_at&.to_i,
-      template_params: template_params,
-      author_id: author_id,
-      author_type: author_type,
-      message_id: message_id,
-      created_at: created_at.to_i,
-      updated_at: updated_at.to_i
-    }
+    base_event_data.tap do |data|
+      data[:author] = author_event_data if author.present?
+      data[:attachment] = attachment_data if attachment.attached?
+      data[:recurring_scheduled_message_id] = recurring_scheduled_message_id if recurring_scheduled_message_id.present?
+    end
+  end
 
-    data[:author] = author_event_data if author.present?
-    data[:attachment] = attachment_data if attachment.attached?
-    data
+  def base_event_data
+    {
+      id: id, content: content, inbox_id: inbox_id,
+      conversation_id: conversation.display_id, account_id: account_id,
+      status: status, scheduled_at: scheduled_at&.to_i,
+      template_params: template_params, author_id: author_id,
+      author_type: author_type, message_id: message_id,
+      created_at: created_at.to_i, updated_at: updated_at.to_i
+    }
   end
 
   def attachment_data

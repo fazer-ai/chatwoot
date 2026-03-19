@@ -18,7 +18,7 @@ class RecurringScheduledMessagePolicy < ApplicationPolicy
   private
 
   def accessible?
-    administrator? || agent_can_view_conversation?
+    administrator? || agent_bot? || agent_can_view_conversation?
   end
 
   def agent_can_view_conversation?
@@ -27,6 +27,10 @@ class RecurringScheduledMessagePolicy < ApplicationPolicy
 
   def administrator?
     account_user&.administrator?
+  end
+
+  def agent_bot?
+    user.is_a?(AgentBot)
   end
 
   def conversation

@@ -29,6 +29,8 @@ class RecurringScheduledMessages::RecurrenceCalculatorService
   end
 
   def calculate_weekly
+    return nil if @rule[:week_days].blank?
+
     week_days = @rule[:week_days].sort
     current_wday = @last_date.wday
     next_day = week_days.find { |d| d > current_wday }
