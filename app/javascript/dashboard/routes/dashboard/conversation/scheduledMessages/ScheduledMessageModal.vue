@@ -652,6 +652,7 @@ watch(
       <RecurrenceDropdown
         v-model="recurrenceRule"
         :scheduled-date="scheduledDateTime"
+        :hide-no-repeat="isEditingRecurring"
         @open-custom="showRecurrenceCustomModal = true"
       />
 

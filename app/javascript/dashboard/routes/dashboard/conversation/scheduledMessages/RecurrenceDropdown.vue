@@ -20,6 +20,10 @@ const props = defineProps({
     type: Date,
     default: null,
   },
+  hideNoRepeat: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['update:modelValue', 'openCustom']);
@@ -31,7 +35,8 @@ const triggerRef = ref(null);
 const dropdownStyle = ref({});
 
 const shortcuts = computed(() => {
-  return getRecurrenceShortcuts(props.scheduledDate || new Date());
+  const all = getRecurrenceShortcuts(props.scheduledDate || new Date());
+  return props.hideNoRepeat ? all.filter(s => s.label !== 'NO_REPEAT') : all;
 });
 
 const selectedLabel = computed(() => {
