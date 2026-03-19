@@ -495,8 +495,8 @@ watch(previewContent, () => {
     <woot-modal
       v-if="isRecurring"
       v-model:show="showStopConfirm"
-      :on-close="() => (showStopConfirm = false)"
       size="small"
+      @close="() => (showStopConfirm = false)"
     >
       <div class="flex w-full flex-col gap-4 px-6 py-6">
         <h3 class="text-lg font-semibold text-n-slate-12">

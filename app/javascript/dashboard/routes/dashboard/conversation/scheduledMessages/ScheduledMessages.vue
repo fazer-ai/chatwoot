@@ -328,8 +328,8 @@ watch(
 
     <woot-modal
       v-model:show="showDeleteConfirm"
-      :on-close="closeDeleteConfirm"
       size="small"
+      @close="closeDeleteConfirm"
     >
       <div class="flex w-full flex-col gap-4 px-6 py-6">
         <h3 class="text-lg font-semibold text-n-slate-12">

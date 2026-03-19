@@ -152,7 +152,7 @@ watch(frequency, newFrequency => {
 </script>
 
 <template>
-  <woot-modal :show="show" :on-close="onCancel" size="small">
+  <woot-modal :show="show" size="small" @close="onCancel">
     <div class="flex w-full flex-col gap-5 px-6 py-6">
       <h3 class="text-lg font-semibold text-n-slate-12">
         {{ t('SCHEDULED_MESSAGES.RECURRENCE.CUSTOM_MODAL.TITLE') }}
