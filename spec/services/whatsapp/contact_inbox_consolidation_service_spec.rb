@@ -204,6 +204,9 @@ describe Whatsapp::ContactInboxConsolidationService do
           # Phone contact becomes canonical
           expect(contact.reload.identifier).to eq(identifier)
 
+          # Orphaned LID contact is destroyed
+          expect(Contact.exists?(lid_contact.id)).to be(false)
+
           # Conversation moved to phone contact
           expect(lid_conversation.reload.contact_id).to eq(contact.id)
           expect(lid_conversation.contact_inbox_id).to eq(old_contact_inbox.id)
