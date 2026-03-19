@@ -109,8 +109,14 @@ class Whatsapp::ContactInboxConsolidationService
 
     existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox_id: @inbox.id)
     return unless existing_contact_inbox
-    # Don't update if we'd create a duplicate contact_inbox or identifier conflict
-    return if find_lid_contact_inbox
+
+    # If a LID contact_inbox already exists, route into the merge logic instead of early-returning
+    lid_contact_inbox = find_lid_contact_inbox
+    if lid_contact_inbox
+      return if lid_contact_inbox.contact_id == existing_contact.id
+
+      return consolidate_different_contacts(existing_contact_inbox, lid_contact_inbox)
+    end
     return if identifier_conflict?(existing_contact)
 
     ActiveRecord::Base.transaction do
