@@ -58,12 +58,15 @@ const recurringMessages = computed(() => {
 });
 
 const activeRecurringMessages = computed(() =>
-  recurringMessages.value.filter(m => m.status === 'active')
+  recurringMessages.value.filter(
+    m => m.status === 'active' || m.pending_scheduled_message
+  )
 );
 
 const inactiveRecurringMessages = computed(() =>
   recurringMessages.value.filter(m => {
     if (!['completed', 'cancelled'].includes(m.status)) return false;
+    if (m.pending_scheduled_message) return false;
     const children = m.scheduled_messages || [];
     return children.some(c => ['sent', 'failed'].includes(c.status));
   })
@@ -257,7 +260,7 @@ watch(
           :scheduled-message="rm"
           :written-by="getWrittenBy(rm)"
           allow-edit
-          allow-delete
+          :allow-delete="rm.status === 'active'"
           collapsible
           @edit="openEditRecurringModal"
           @stop="stopRecurring"

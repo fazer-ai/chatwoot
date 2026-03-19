@@ -36,7 +36,7 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
       if @recurring_scheduled_message.active?
         reschedule_pending_occurrence
       else
-        @recurring_scheduled_message.scheduled_messages.pending.destroy_all
+        update_pending_on_deactivation
       end
     end
 
@@ -96,6 +96,33 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
       content: @recurring_scheduled_message.content,
       template_params: @recurring_scheduled_message.template_params,
       scheduled_at: scheduled_at,
+      status: :pending,
+      account: @recurring_scheduled_message.account,
+      conversation: @recurring_scheduled_message.conversation,
+      inbox: @recurring_scheduled_message.inbox,
+      author: @recurring_scheduled_message.author
+    )
+    copy_attachment(sm) if @recurring_scheduled_message.attachment.attached?
+  end
+
+  def update_pending_on_deactivation
+    return if params[:scheduled_at].blank?
+
+    pending = @recurring_scheduled_message.scheduled_messages.pending.first
+    if pending
+      pending.update!(scheduled_at: Time.zone.parse(params[:scheduled_at].to_s),
+                      content: @recurring_scheduled_message.content,
+                      template_params: @recurring_scheduled_message.template_params)
+    else
+      create_final_pending_occurrence
+    end
+  end
+
+  def create_final_pending_occurrence
+    sm = @recurring_scheduled_message.scheduled_messages.create!(
+      content: @recurring_scheduled_message.content,
+      template_params: @recurring_scheduled_message.template_params,
+      scheduled_at: Time.zone.parse(params[:scheduled_at].to_s),
       status: :pending,
       account: @recurring_scheduled_message.account,
       conversation: @recurring_scheduled_message.conversation,
