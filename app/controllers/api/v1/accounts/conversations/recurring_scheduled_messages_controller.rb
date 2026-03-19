@@ -17,18 +17,29 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
     @recurring_scheduled_message = build_recurring_scheduled_message
     authorize @recurring_scheduled_message
     @recurring_scheduled_message.assign_attributes(recurring_scheduled_message_params)
-    @recurring_scheduled_message.save!
 
-    create_first_occurrence if @recurring_scheduled_message.active?
+    ActiveRecord::Base.transaction do
+      @recurring_scheduled_message.save!
+      create_first_occurrence if @recurring_scheduled_message.active?
+    end
+
     dispatch_event(RECURRING_SCHEDULED_MESSAGE_CREATED)
   end
 
   def update
     @recurring_scheduled_message.assign_attributes(recurring_scheduled_message_params)
-    @recurring_scheduled_message.attachment.purge if params[:remove_attachment].present? && @recurring_scheduled_message.attachment.attached?
-    @recurring_scheduled_message.save!
 
-    reschedule_pending_occurrence if @recurring_scheduled_message.active?
+    ActiveRecord::Base.transaction do
+      @recurring_scheduled_message.save!
+      @recurring_scheduled_message.attachment.purge if params[:remove_attachment].present? && @recurring_scheduled_message.attachment.attached?
+
+      if @recurring_scheduled_message.active?
+        reschedule_pending_occurrence
+      else
+        @recurring_scheduled_message.scheduled_messages.pending.destroy_all
+      end
+    end
+
     dispatch_event(RECURRING_SCHEDULED_MESSAGE_UPDATED)
   end
 
