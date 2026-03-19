@@ -213,8 +213,8 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
           data: { type: 'notify', messages: [raw_message] }
         }
 
-        # BUG: update_contact_info tries to set phone_number on the LID contact,
-        # but the phone contact already owns that phone_number → uniqueness violation
+        # This scenario previously caused a uniqueness violation when update_contact_info
+        # tried to set phone_number on the LID contact. The consolidation service now handles this.
         expect do
           Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
         end.not_to raise_error

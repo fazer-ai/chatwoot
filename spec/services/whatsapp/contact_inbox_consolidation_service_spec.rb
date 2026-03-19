@@ -133,8 +133,8 @@ describe Whatsapp::ContactInboxConsolidationService do
         # Phone contact becomes the canonical contact with LID identifier
         expect(phone_contact.reload.identifier).to eq(identifier)
 
-        # LID contact's identifier is cleared
-        expect(lid_contact.reload.identifier).to be_nil
+        # Orphaned LID contact is destroyed
+        expect(Contact.exists?(lid_contact.id)).to be(false)
 
         # Conversation is moved to the phone contact
         expect(lid_conversation.reload.contact_id).to eq(phone_contact.id)

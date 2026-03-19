@@ -80,6 +80,9 @@ class Whatsapp::ContactInboxConsolidationService
 
       lid_contact_inbox.destroy!
 
+      # Clean up orphaned LID contact if it has no remaining contact_inboxes
+      lid_contact.destroy! if lid_contact.contact_inboxes.reload.empty?
+
       # Update phone contact_inbox to use LID as source_id and set identifier on the canonical contact
       phone_contact_inbox.update!(source_id: @lid)
       phone_contact.update!(identifier: @identifier, phone_number: "+#{@phone}")
