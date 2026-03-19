@@ -172,7 +172,7 @@ const scheduledAt = computed(() => {
 const hasContent = computed(() => Boolean(messageContent.value?.trim()));
 const hasNewAttachment = computed(() => attachments.value.length > 0);
 const hasTemplate = computed(
-  () => templateParams.value && Object.keys(templateParams.value).length
+  () => !!(templateParams.value && Object.keys(templateParams.value).length)
 );
 const hasExistingAttachment = computed(() => !!existingAttachment.value);
 const showAttachmentUpload = computed(
@@ -531,10 +531,10 @@ watch(
 <template>
   <woot-modal
     v-model:show="showModal"
-    :on-close="handleClose"
     close-on-backdrop-click
     class="[&_.modal-container]:!w-[45rem] [&_.modal-container]:!max-w-[90%]"
     size="medium"
+    @close="handleClose"
   >
     <div class="flex w-full flex-col gap-6 px-6 py-6">
       <h3 class="text-lg font-semibold text-n-slate-12">
@@ -561,7 +561,7 @@ watch(
           :placeholder="t('SCHEDULED_MESSAGES.MODAL.MESSAGE_PLACEHOLDER')"
           :channel-type="currentInbox?.channel_type"
           :medium="currentInbox?.medium"
-          :disabled="hasTemplate"
+          :disabled="!!hasTemplate"
           :enable-copilot="false"
           override-line-breaks
           @update:model-value="
@@ -711,9 +711,9 @@ watch(
 
     <woot-modal
       v-model:show="showConfirmClose"
-      :on-close="() => {}"
       :show-close-button="false"
       size="small"
+      @close="() => {}"
     >
       <div class="flex w-full flex-col gap-4 px-6 py-6">
         <h3 class="text-lg font-semibold text-n-slate-12">
