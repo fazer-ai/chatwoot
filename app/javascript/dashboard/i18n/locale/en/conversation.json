@@ -561,6 +561,20 @@
         "FIFTH": "fifth",
         "LAST": "last"
       },
+      "DESCRIPTION": {
+        "DAILY_ONE": "Every day",
+        "DAILY_OTHER": "Every {count} days",
+        "WEEKLY_ONE": "Every week",
+        "WEEKLY_OTHER": "Every {count} weeks",
+        "WEEKLY_ON": "{prefix}: {days}",
+        "MONTHLY_ONE": "Monthly",
+        "MONTHLY_OTHER": "Every {count} months",
+        "MONTHLY_ON_WEEKDAY": "{prefix} on the {ordinal} {weekday}",
+        "YEARLY_ONE": "Every year",
+        "YEARLY_OTHER": "Every {count} years",
+        "UNTIL_DATE": "until {date}",
+        "AFTER_COUNT": "{count} occurrences"
+      },
       "RESOLVED_WARNING": "Scheduled messages will not be sent while the conversation is resolved. Reopen the conversation to resume sending."
     }
   },

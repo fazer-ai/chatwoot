@@ -31,7 +31,7 @@ class RecurringScheduledMessage < ApplicationRecord
   end
 
   def recurrence_description
-    RecurringScheduledMessages::RecurrenceDescriptionService.new(recurrence_rule).generate
+    RecurringScheduledMessages::RecurrenceDescriptionService.new(recurrence_rule, locale: account&.locale || :en).generate
   end
 
   def attachment_data

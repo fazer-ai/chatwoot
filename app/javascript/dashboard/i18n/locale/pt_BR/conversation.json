@@ -550,6 +550,20 @@
         "FIFTH": "5º",
         "LAST": "último(a)"
       },
+      "DESCRIPTION": {
+        "DAILY_ONE": "Todos os dias",
+        "DAILY_OTHER": "A cada {count} dias",
+        "WEEKLY_ONE": "Semanal",
+        "WEEKLY_OTHER": "A cada {count} semanas",
+        "WEEKLY_ON": "{prefix}: {days}",
+        "MONTHLY_ONE": "Mensal",
+        "MONTHLY_OTHER": "A cada {count} meses",
+        "MONTHLY_ON_WEEKDAY": "{prefix} no(a) {ordinal} {weekday}",
+        "YEARLY_ONE": "Anual",
+        "YEARLY_OTHER": "A cada {count} anos",
+        "UNTIL_DATE": "até {date}",
+        "AFTER_COUNT": "{count} ocorrências"
+      },
       "RESOLVED_WARNING": "Mensagens agendadas não serão enviadas enquanto a conversa estiver resolvida. Reabra a conversa para retomar o envio."
     }
   },

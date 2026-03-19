@@ -71,7 +71,7 @@ class ScheduledMessage < ApplicationRecord
   }
 
   def due_for_sending?
-    scheduled_at.present? && scheduled_at <= Time.current
+    scheduled_at.present? && scheduled_at <= Time.current && conversation&.status&.in?(%w[open pending])
   end
 
   def push_event_data

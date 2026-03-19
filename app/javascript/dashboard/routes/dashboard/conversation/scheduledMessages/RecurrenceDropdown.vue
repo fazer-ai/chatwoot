@@ -47,7 +47,7 @@ const selectedLabel = computed(() => {
     return formatShortcutLabel(match, t, locale.value);
   }
 
-  return buildRecurrenceDescription(props.modelValue, locale.value);
+  return buildRecurrenceDescription(props.modelValue, t, locale.value);
 });
 
 const updatePosition = () => {

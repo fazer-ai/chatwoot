@@ -113,6 +113,7 @@ const recurrenceDescription = computed(() => {
   if (!isRecurring.value) return '';
   return buildRecurrenceDescription(
     props.scheduledMessage.recurrence_rule,
+    t,
     normalizedLocale.value
   );
 });

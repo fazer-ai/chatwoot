@@ -485,3 +485,30 @@ pt_BR:
       subject: 'Termine de configurar %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Domínio personalizado não está configurado'
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: "Todos os dias"
+        other: "A cada %{count} dias"
+      weekly:
+        one: "Semanal"
+        other: "A cada %{count} semanas"
+      weekly_on: "%{prefix}: %{days}"
+      monthly:
+        one: "Mensal"
+        other: "A cada %{count} meses"
+      monthly_on_weekday: "%{prefix} no(a) %{ordinal} %{weekday}"
+      yearly:
+        one: "Anual"
+        other: "A cada %{count} anos"
+      until_date: "até %{date}"
+      after_count:
+        one: "%{count} ocorrência"
+        other: "%{count} ocorrências"
+      ordinals:
+        first: "primeiro(a)"
+        second: "segundo(a)"
+        third: "terceiro(a)"
+        fourth: "quarto(a)"
+        fifth: "quinto(a)"
+        last: "último(a)"
