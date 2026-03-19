@@ -113,7 +113,14 @@ const buildRule = () => {
     if (monthlyType.value === 'day_of_week') {
       rule.monthly_week = monthlyWeek.value;
       rule.monthly_weekday = monthlyWeekday.value;
+    } else if (props.scheduledDate) {
+      rule.month_day = props.scheduledDate.getDate();
     }
+  }
+
+  if (frequency.value === 'yearly' && props.scheduledDate) {
+    rule.year_day = props.scheduledDate.getDate();
+    rule.year_month = props.scheduledDate.getMonth() + 1;
   }
 
   if (endType.value === 'on_date') {

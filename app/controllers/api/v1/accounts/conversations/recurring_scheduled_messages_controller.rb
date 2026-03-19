@@ -66,7 +66,8 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
       :attachment,
       template_params: {},
       recurrence_rule: [:frequency, :interval, :end_type, :end_date, :end_count,
-                        :monthly_type, :monthly_week, :monthly_weekday, { week_days: [] }]
+                        :monthly_type, :monthly_week, :monthly_weekday, :month_day,
+                        :year_day, :year_month, { week_days: [] }]
     )
 
     permitted[:recurrence_rule] = cast_recurrence_rule(permitted[:recurrence_rule].to_h) if permitted[:recurrence_rule].present?
@@ -75,7 +76,7 @@ class Api::V1::Accounts::Conversations::RecurringScheduledMessagesController < A
   end
 
   def cast_recurrence_rule(rule)
-    integer_keys = %w[interval end_count monthly_week monthly_weekday]
+    integer_keys = %w[interval end_count monthly_week monthly_weekday month_day year_day year_month]
     rule.each_with_object({}) do |(key, value), hash|
       hash[key] = if key == 'week_days' && value.is_a?(Array)
                     value.map(&:to_i)

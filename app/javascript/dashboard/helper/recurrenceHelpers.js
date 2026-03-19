@@ -159,6 +159,8 @@ export function getRecurrenceShortcuts(date) {
       value: {
         frequency: 'yearly',
         interval: 1,
+        year_day: date.getDate(),
+        year_month: date.getMonth() + 1,
         end_type: 'never',
       },
     },
@@ -199,30 +201,27 @@ function getMonthNames(locale) {
 /**
  * Build a human-readable description of a recurrence rule.
  */
-export function buildRecurrenceDescription(rule, locale = 'en') {
+export function buildRecurrenceDescription(rule, t, locale = 'en') {
   if (!rule || !rule.frequency) return '';
 
-  const weekdayNames = getWeekdayNames(locale);
   const weekdayShortNames = getWeekdayShortNames(locale);
+  const weekdayNames = getWeekdayNames(locale);
   const ordinals = getOrdinals(locale);
-  const isPt = locale?.startsWith('pt');
+  const descKey = key => `SCHEDULED_MESSAGES.RECURRENCE.DESCRIPTION.${key}`;
 
-  const intervalLabel = (interval, singular, pluralPt, pluralEn) => {
-    if (interval === 1) return isPt ? singular.pt : singular.en;
-    return isPt
-      ? `A cada ${interval} ${pluralPt}`
-      : `Every ${interval} ${pluralEn}`;
+  const intervalDesc = (interval, oneKey, otherKey) => {
+    if (interval === 1) return t(descKey(oneKey));
+    return t(descKey(otherKey), { count: interval });
   };
 
   let description = '';
 
   switch (rule.frequency) {
     case 'daily':
-      description = intervalLabel(
+      description = intervalDesc(
         rule.interval || 1,
-        { pt: 'Todos os dias', en: 'Every day' },
-        'dias',
-        'days'
+        'DAILY_ONE',
+        'DAILY_OTHER'
       );
       break;
 
@@ -230,59 +229,54 @@ export function buildRecurrenceDescription(rule, locale = 'en') {
       const days = (rule.week_days || [])
         .sort((a, b) => a - b)
         .map(d => weekdayShortNames[d]);
-      const prefix = intervalLabel(
+      const prefix = intervalDesc(
         rule.interval || 1,
-        { pt: 'Semanal', en: 'Every week' },
-        'semanas',
-        'weeks'
+        'WEEKLY_ONE',
+        'WEEKLY_OTHER'
       );
-      description = days.length ? `${prefix}: ${days.join(', ')}` : prefix;
+      description = days.length
+        ? t(descKey('WEEKLY_ON'), { prefix, days: days.join(', ') })
+        : prefix;
       break;
     }
 
     case 'monthly': {
-      const prefix = intervalLabel(
+      const prefix = intervalDesc(
         rule.interval || 1,
-        { pt: 'Mensal', en: 'Monthly' },
-        'meses',
-        'months'
+        'MONTHLY_ONE',
+        'MONTHLY_OTHER'
       );
-
       if (rule.monthly_type === 'day_of_week') {
         const ordinal =
           ordinals[String(rule.monthly_week)] || rule.monthly_week;
         const weekday = weekdayNames[rule.monthly_weekday] || '';
-        description = isPt
-          ? `${prefix} no(a) ${ordinal} ${weekday}`
-          : `${prefix} on the ${ordinal} ${weekday}`;
+        description = t(descKey('MONTHLY_ON_WEEKDAY'), {
+          prefix,
+          ordinal,
+          weekday,
+        });
       } else {
         description = prefix;
       }
       break;
     }
 
-    case 'yearly': {
-      description = intervalLabel(
+    case 'yearly':
+      description = intervalDesc(
         rule.interval || 1,
-        { pt: 'Anual', en: 'Every year' },
-        'anos',
-        'years'
+        'YEARLY_ONE',
+        'YEARLY_OTHER'
       );
       break;
-    }
 
     default:
       return '';
   }
 
   if (rule.end_type === 'on_date' && rule.end_date) {
-    description += isPt
-      ? ` · até ${rule.end_date}`
-      : ` · until ${rule.end_date}`;
+    description += ` · ${t(descKey('UNTIL_DATE'), { date: rule.end_date })}`;
   } else if (rule.end_type === 'after_count' && rule.end_count) {
-    description += isPt
-      ? ` · ${rule.end_count} ocorrências`
-      : ` · ${rule.end_count} occurrences`;
+    description += ` · ${t(descKey('AFTER_COUNT'), { count: rule.end_count })}`;
   }
 
   return description;

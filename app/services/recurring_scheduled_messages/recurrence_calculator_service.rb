@@ -51,7 +51,7 @@ class RecurringScheduledMessages::RecurrenceCalculatorService
 
   def calculate_monthly_day_of_month
     target = @last_date.advance(months: @interval)
-    day = @last_date.day
+    day = @rule[:month_day] || @last_date.day
     last_day = Time.days_in_month(target.month, target.year)
     target.change(day: [day, last_day].min)
   end
@@ -88,12 +88,16 @@ class RecurringScheduledMessages::RecurrenceCalculatorService
   end
 
   def calculate_yearly
+    year_month = @rule[:year_month] || @last_date.month
+    year_day = @rule[:year_day] || @last_date.day
+
     target = @last_date.advance(years: @interval)
-    # Handle Feb 29 → Feb 28 in non-leap years
-    if @last_date.month == 2 && @last_date.day == 29 && !Date.leap?(target.year)
-      target.change(day: 28)
+
+    if year_month == 2 && year_day == 29
+      target.change(day: Date.leap?(target.year) ? 29 : 28)
     else
-      target
+      last_day = Time.days_in_month(target.month, target.year)
+      target.change(day: [year_day, last_day].min)
     end
   end
 
