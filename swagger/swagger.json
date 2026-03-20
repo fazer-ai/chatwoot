@@ -3743,7 +3743,7 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_members/{member_id}": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_members/{member_id}": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
@@ -3853,13 +3853,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_metadata": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_metadata": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -3941,13 +3941,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_invite": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_invite": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4005,13 +4005,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_invite/revoke": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_invite/revoke": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4069,13 +4069,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_join_requests": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_join_requests": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4132,13 +4132,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_join_requests/handle": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_join_requests/handle": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4210,13 +4210,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_admin": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_admin": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4287,13 +4287,13 @@
         }
       }
     },
-    "/api/v1/accounts/{account_id}/contacts/{contact_id}/group_admin/leave": {
+    "/api/v1/accounts/{account_id}/contacts/{id}/group_admin/leave": {
       "parameters": [
         {
           "$ref": "#/components/parameters/account_id"
         },
         {
-          "name": "contact_id",
+          "name": "id",
           "in": "path",
           "required": true,
           "schema": {

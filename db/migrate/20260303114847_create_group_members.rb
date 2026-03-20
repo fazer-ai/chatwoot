@@ -1,4 +1,4 @@
-class CreateGroupMembers < ActiveRecord::Migration[7.0]
+class CreateGroupMembers < ActiveRecord::Migration[7.1]
   def change
     create_table :group_members do |t|
       t.bigint :group_contact_id, null: false
