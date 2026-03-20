@@ -577,7 +577,9 @@ describe WebhookListener do
 
       it 'triggers the webhook event' do
         webhook = create(:webhook, account: account, subscriptions: ['kanban_task_created'])
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_created')).once
+        expect(WebhookJob).to receive(:perform_later)
+          .with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_created'), :account_webhook,
+                secret: webhook.secret, delivery_id: instance_of(String)).once
         listener.kanban_task_created(kanban_event)
       end
     end
@@ -597,7 +599,7 @@ describe WebhookListener do
 
       it 'triggers the webhook event with object format' do
         webhook = create(:webhook, account: account, subscriptions: ['kanban_task_updated'])
-        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+        expect(WebhookJob).to receive(:perform_later) do |url, payload, _webhook_type, **_kwargs|
           expect(url).to eq(webhook.url)
           expect(payload[:event]).to eq('kanban_task_updated')
           expect(payload[:changed_attributes]).to eq({
@@ -619,7 +621,7 @@ describe WebhookListener do
         }
         priority_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: priority_changed_attributes)
 
-        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+        expect(WebhookJob).to receive(:perform_later) do |url, payload, _webhook_type, **_kwargs|
           expect(url).to eq(webhook.url)
           expect(payload[:event]).to eq('kanban_task_updated')
           expect(payload[:changed_attributes]).to eq({
@@ -640,7 +642,7 @@ describe WebhookListener do
         }
         step_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: step_changed_attributes)
 
-        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+        expect(WebhookJob).to receive(:perform_later) do |url, payload, _webhook_type, **_kwargs|
           expect(url).to eq(webhook.url)
           expect(payload[:event]).to eq('kanban_task_updated')
           expect(payload[:changed_attributes]).to eq({
@@ -662,7 +664,7 @@ describe WebhookListener do
         }
         label_event = Events::Base.new(event_name, Time.zone.now, task: kanban_task, changed_attributes: label_changed_attributes)
 
-        expect(WebhookJob).to receive(:perform_later) do |url, payload|
+        expect(WebhookJob).to receive(:perform_later) do |url, payload, _webhook_type, **_kwargs|
           expect(url).to eq(webhook.url)
           expect(payload[:changed_attributes]).to eq({
                                                        'label_list' => { previous_value: [], current_value: ['urgent'] }
@@ -680,7 +682,9 @@ describe WebhookListener do
 
       it 'triggers the webhook event' do
         webhook = create(:webhook, account: account, subscriptions: ['kanban_task_deleted'])
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_deleted')).once
+        expect(WebhookJob).to receive(:perform_later)
+          .with(webhook.url, kanban_task.push_event_data.merge(event: 'kanban_task_deleted'), :account_webhook,
+                secret: webhook.secret, delivery_id: instance_of(String)).once
         listener.kanban_task_deleted(kanban_event)
       end
     end
