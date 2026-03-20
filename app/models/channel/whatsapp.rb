@@ -1,3 +1,4 @@
+# rubocop:disable Layout/LineLength
 # == Schema Information
 #
 # Table name: channel_whatsapp
@@ -16,8 +17,9 @@
 # Indexes
 #
 #  index_channel_whatsapp_on_phone_number      (phone_number) UNIQUE
-#  index_channel_whatsapp_provider_connection  (provider_connection) WHERE (...) USING gin
+#  index_channel_whatsapp_provider_connection  (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[])) USING gin
 #
+# rubocop:enable Layout/LineLength
 
 class Channel::Whatsapp < ApplicationRecord
   include Channelable
