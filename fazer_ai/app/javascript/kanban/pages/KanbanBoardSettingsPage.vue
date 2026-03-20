@@ -192,27 +192,15 @@ watch(autoCompleteTaskOnConversationResolve, async (newValue, oldValue) => {
   await saveAutomationSettings();
 });
 
-watch(selectedAgents, async (newValue, oldValue) => {
-  if (!isInitialized.value) return;
-  if (
-    newValue.length === oldValue.length &&
-    newValue.every((item, index) => oldValue[index] === item)
-  ) {
-    return;
-  }
-  await saveAgents();
-});
+const handleAgentsChange = agentIds => {
+  selectedAgents.value = [...agentIds];
+  if (isInitialized.value) saveAgents();
+};
 
-watch(selectedInboxes, async (newValue, oldValue) => {
-  if (!isInitialized.value) return;
-  if (
-    newValue.length === oldValue.length &&
-    newValue.every((item, index) => oldValue[index] === item)
-  ) {
-    return;
-  }
-  await saveInboxes();
-});
+const handleInboxesChange = inboxIds => {
+  selectedInboxes.value = [...inboxIds];
+  if (isInitialized.value) saveInboxes();
+};
 
 const initializeBoardData = () => {
   if (activeBoard.value) {
@@ -726,7 +714,7 @@ const confirmDeleteBoard = async () => {
               :placeholder="t('KANBAN.SETTINGS.AGENTS_PLACEHOLDER')"
               :search-placeholder="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
               :empty-state="t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE')"
-              @update:model-value="selectedAgents = [...$event]"
+              @update:model-value="handleAgentsChange"
             />
           </section>
 
@@ -740,7 +728,7 @@ const confirmDeleteBoard = async () => {
               :placeholder="t('KANBAN.SETTINGS.INBOXES_PLACEHOLDER')"
               :search-placeholder="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
               :empty-state="t('KANBAN.SETTINGS.NO_INBOXES_AVAILABLE')"
-              @update:model-value="selectedInboxes = [...$event]"
+              @update:model-value="handleInboxesChange"
             />
           </section>
 
