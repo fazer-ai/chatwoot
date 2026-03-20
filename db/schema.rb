@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_03_120000) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1230,6 +1230,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_03_120000) do
     t.boolean "archived", default: false
     t.bigint "channel_web_widget_id"
     t.jsonb "ssl_settings", default: {}, null: false
+    t.text "custom_head_html"
+    t.text "custom_body_html"
     t.index ["channel_web_widget_id"], name: "index_portals_on_channel_web_widget_id"
     t.index ["custom_domain"], name: "index_portals_on_custom_domain", unique: true
     t.index ["slug"], name: "index_portals_on_slug", unique: true
