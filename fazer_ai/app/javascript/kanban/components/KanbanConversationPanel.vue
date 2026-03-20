@@ -8,7 +8,9 @@ import kanbanModule from 'kanban/store/modules/kanban';
 import TasksAPI from 'kanban/api/tasks';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
-import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import TagMultiSelectComboBox from 'dashboard/components-next/combobox/TagMultiSelectComboBox.vue';
+import LabelItem from 'dashboard/components-next/label/LabelItem.vue';
+import AddLabel from 'dashboard/components-next/label/AddLabel.vue';
 import KanbanContextDropdown from './KanbanContextDropdown.vue';
 import KanbanTaskDatePicker from './KanbanTaskDatePicker.vue';
 import ContactDetailsItem from 'dashboard/routes/dashboard/conversation/ContactDetailsItem.vue';
@@ -204,24 +206,24 @@ const canComplete = computed(() => {
   return existingTask.value.board_step_id !== lastStep.value.id;
 });
 
-const assignedAgents = computed(() => {
-  return existingTask.value?.assigned_agents || [];
+const selectedAgentIds = computed(() => {
+  return (existingTask.value?.assigned_agents || []).map(a => a.id);
 });
 
 const agentOptions = computed(() => {
   return boardAgents.value.map(agent => ({
-    id: agent.id,
-    name: agent.name,
-    avatar_url: agent.avatar_url,
-    availability_status: agent.availability_status,
+    value: agent.id,
+    label: agent.name,
   }));
 });
 
-const labelOptions = computed(() =>
+const labelMenuItems = computed(() =>
   accountLabels.value.map(label => ({
-    id: label.id,
-    title: label.title,
-    color: label.color,
+    label: label.title,
+    value: label.id,
+    thumbnail: { name: label.title, color: label.color },
+    isSelected: selectedLabels.value.some(l => l.title === label.title),
+    action: 'label',
   }))
 );
 
@@ -238,8 +240,8 @@ const boardName = computed(() => {
 
 const showSelfAssign = computed(() => {
   if (!existingTask.value || !currentUser.value) return false;
-  const isAssignedToSelf = assignedAgents.value.some(
-    a => a.id === currentUser.value.id
+  const isAssignedToSelf = selectedAgentIds.value.includes(
+    currentUser.value.id
   );
   const isInAgentsList = boardAgents.value.some(
     a => a.id === currentUser.value.id
@@ -270,9 +272,9 @@ watch(
       boardAgents.value = [];
       selectedBoard.value = null;
     }
-    if (!isUpdating.value && labelOptions.value.length > 0) {
+    if (!isUpdating.value && accountLabels.value.length > 0) {
       const taskLabelTitles = newTask?.labels || [];
-      selectedLabels.value = labelOptions.value
+      selectedLabels.value = accountLabels.value
         .filter(label => taskLabelTitles.includes(label.title))
         .sort((a, b) => a.title.localeCompare(b.title));
     }
@@ -285,16 +287,16 @@ watch(
 );
 
 watch(
-  () => labelOptions.value,
-  newOptions => {
+  () => accountLabels.value,
+  newLabels => {
     if (
       !isUpdating.value &&
-      newOptions.length > 0 &&
+      newLabels.length > 0 &&
       existingTask.value?.labels?.length > 0 &&
       selectedLabels.value.length === 0
     ) {
       const taskLabelTitles = existingTask.value.labels || [];
-      selectedLabels.value = newOptions
+      selectedLabels.value = newLabels
         .filter(label => taskLabelTitles.includes(label.title))
         .sort((a, b) => a.title.localeCompare(b.title));
     }
@@ -357,7 +359,7 @@ const updateTask = async updates => {
       task: response.data,
     });
     const responseLabelTitles = response.data.labels || [];
-    selectedLabels.value = labelOptions.value
+    selectedLabels.value = accountLabels.value
       .filter(label => responseLabelTitles.includes(label.title))
       .sort((a, b) => a.title.localeCompare(b.title));
   } catch (error) {
@@ -381,21 +383,47 @@ const handlePriorityChange = priority => {
   updateTask({ priority: priority.id });
 };
 
-const handleAgentsChange = agents => {
+const handleAgentsChange = agentIds => {
+  const agentObjects = boardAgents.value
+    .filter(a => agentIds.includes(a.id))
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      avatar_url: a.avatar_url,
+      availability_status: a.availability_status,
+    }));
   updateTask({
-    assigned_agent_ids: agents.map(a => a.id),
-    assigned_agents: agents,
+    assigned_agent_ids: agentIds,
+    assigned_agents: agentObjects,
   });
 };
 
-const handleLabelsChange = labels => {
-  const sortedLabels = [...labels].sort((a, b) =>
-    a.title.localeCompare(b.title)
+const hoveredLabel = ref(null);
+
+const handleLabelsChange = ({ value: labelId }) => {
+  const label = accountLabels.value.find(l => l.id === labelId);
+  if (!label) return;
+
+  const isAlreadySelected = selectedLabels.value.some(
+    l => l.title === label.title
   );
-  selectedLabels.value = sortedLabels;
-  updateTask({
-    labels: sortedLabels.map(l => l.title),
-  });
+  if (isAlreadySelected) {
+    selectedLabels.value = selectedLabels.value.filter(
+      l => l.title !== label.title
+    );
+  } else {
+    selectedLabels.value = [...selectedLabels.value, label].sort((a, b) =>
+      a.title.localeCompare(b.title)
+    );
+  }
+  updateTask({ labels: selectedLabels.value.map(l => l.title) });
+};
+
+const handleRemoveLabel = label => {
+  selectedLabels.value = selectedLabels.value.filter(
+    l => l.title !== label.title
+  );
+  updateTask({ labels: selectedLabels.value.map(l => l.title) });
 };
 
 const moveToNextStep = () => {
@@ -412,15 +440,9 @@ const markComplete = () => {
 
 const assignToMe = () => {
   if (!currentUser.value) return;
-  const currentAgents = [...assignedAgents.value];
-  const selfAgent = {
-    id: currentUser.value.id,
-    name: currentUser.value.name,
-    avatar_url: currentUser.value.avatar_url,
-    availability_status: currentUser.value.availability_status,
-  };
-  currentAgents.push(selfAgent);
-  handleAgentsChange(currentAgents);
+  const currentIds = (existingTask.value?.assigned_agents || []).map(a => a.id);
+  if (currentIds.includes(currentUser.value.id)) return;
+  handleAgentsChange([...currentIds, currentUser.value.id]);
 };
 
 const handleStartDateChange = date => {
@@ -595,7 +617,7 @@ const handleDueDateChange = date => {
         </div>
 
         <!-- Assigned Agents -->
-        <div class="multiselect-wrap--small">
+        <div>
           <ContactDetailsItem compact :title="$t('KANBAN.ASSIGNED_AGENTS')">
             <template #button>
               <Button
@@ -609,64 +631,14 @@ const handleDueDateChange = date => {
               />
             </template>
           </ContactDetailsItem>
-          <multiselect
-            :model-value="assignedAgents"
+          <TagMultiSelectComboBox
+            :model-value="selectedAgentIds"
             :options="agentOptions"
-            track-by="id"
-            label="name"
-            multiple
-            :close-on-select="false"
-            :clear-on-select="false"
             :placeholder="$t('KANBAN.SETTINGS.AGENTS_PLACEHOLDER')"
-            :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-            :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-            :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
-            class="!mb-0 kanban-agents-multiselect"
+            :search-placeholder="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+            :empty-state="$t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE')"
             @update:model-value="handleAgentsChange"
-          >
-            <template #tag="{ option, remove }">
-              <span
-                class="multiselect__tag !inline-flex items-center gap-2 !relative !pl-7 !mb-1"
-              >
-                <Avatar
-                  :src="option.avatar_url"
-                  :name="option.name"
-                  :size="16"
-                  :status="option.availability_status"
-                  class="!absolute !left-1.5 !top-1/2 !-translate-y-1/2"
-                />
-                <span
-                  class="multiselect__tag-text !inline-block !max-w-[150px] !truncate"
-                >
-                  {{ option.name }}
-                </span>
-                <i
-                  class="multiselect__tag-icon"
-                  @mousedown.prevent
-                  @click.prevent.stop="remove(option)"
-                  @keypress.enter.prevent="remove(option)"
-                />
-              </span>
-            </template>
-            <template #option="{ option }">
-              <div class="flex items-center gap-2 min-w-0">
-                <Avatar
-                  :src="option.avatar_url"
-                  :name="option.name"
-                  :size="16"
-                  :status="option.availability_status"
-                  class="leading-none text-center"
-                />
-                <span class="truncate">{{ option.name }}</span>
-              </div>
-            </template>
-            <template #noResult>
-              {{ $t('KANBAN.SETTINGS.NO_AGENTS_FOUND') }}
-            </template>
-            <template #noOptions>
-              {{ $t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE') }}
-            </template>
-          </multiselect>
+          />
         </div>
 
         <!-- Priority -->
@@ -713,60 +685,28 @@ const handleDueDateChange = date => {
         </div>
 
         <!-- Labels -->
-        <div v-if="labelOptions.length" class="multiselect-wrap--small">
+        <div v-if="labelMenuItems.length">
           <ContactDetailsItem
             compact
             :title="$t('KANBAN.MODAL.LABELS_LABEL')"
           />
-          <multiselect
-            :model-value="selectedLabels"
-            :options="labelOptions"
-            track-by="id"
-            label="title"
-            multiple
-            :close-on-select="false"
-            :clear-on-select="false"
-            :placeholder="$t('KANBAN.MODAL.LABELS_PLACEHOLDER')"
-            :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-            :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-            :selected-label="$t('FORMS.MULTISELECT.SELECTED')"
-            class="!mb-0 kanban-labels-multiselect"
-            @update:model-value="handleLabelsChange"
+          <div
+            class="flex flex-wrap items-center gap-1.5"
+            @mouseleave="hoveredLabel = null"
           >
-            <template #tag="{ option, remove }">
-              <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 mr-0.5 mb-1 text-xs font-medium rounded bg-n-slate-3 border border-solid border-n-strong"
-              >
-                <span
-                  class="size-2 rounded-full flex-shrink-0"
-                  :style="{ backgroundColor: option.color }"
-                />
-                <span class="truncate max-w-24">{{ option.title }}</span>
-                <button
-                  type="button"
-                  class="flex items-center justify-center p-0 ml-0.5 text-n-slate-10 hover:text-n-slate-12"
-                  @mousedown.prevent.stop="remove(option)"
-                >
-                  <span class="i-lucide-x size-3" />
-                </button>
-              </span>
-            </template>
-            <template #option="{ option }">
-              <div class="flex items-center gap-2 min-w-0">
-                <div
-                  class="w-2 h-2 rounded-full flex-shrink-0"
-                  :style="{ backgroundColor: option.color }"
-                />
-                <span class="truncate">{{ option.title }}</span>
-              </div>
-            </template>
-            <template #noResult>
-              {{ $t('KANBAN.MODAL.NO_LABELS_FOUND') }}
-            </template>
-            <template #noOptions>
-              {{ $t('KANBAN.MODAL.NO_LABELS_AVAILABLE') }}
-            </template>
-          </multiselect>
+            <LabelItem
+              v-for="label in selectedLabels"
+              :key="label.id"
+              :label="label"
+              :is-hovered="hoveredLabel === label.id"
+              @remove="handleRemoveLabel"
+              @hover="hoveredLabel = label.id"
+            />
+            <AddLabel
+              :label-menu-items="labelMenuItems"
+              @update-label="handleLabelsChange"
+            />
+          </div>
         </div>
 
         <!-- Dates -->
@@ -781,30 +721,3 @@ const handleDueDateChange = date => {
     </template>
   </div>
 </template>
-
-<style scoped>
-.kanban-agents-multiselect :deep(.multiselect__tags),
-.kanban-labels-multiselect :deep(.multiselect__tags) {
-  @apply w-full px-3 py-2 text-sm rounded-lg outline outline-1 outline-n-strong min-w-0 bg-transparent;
-}
-
-.kanban-agents-multiselect :deep(.multiselect__tags:hover),
-.kanban-labels-multiselect :deep(.multiselect__tags:hover) {
-  @apply bg-slate-50 dark:bg-slate-800;
-}
-
-.kanban-agents-multiselect :deep(.multiselect__placeholder),
-.kanban-labels-multiselect :deep(.multiselect__placeholder) {
-  @apply pt-0 pb-0 mb-0;
-}
-
-.kanban-agents-multiselect :deep(.multiselect__tags-wrap),
-.kanban-labels-multiselect :deep(.multiselect__tags-wrap) {
-  @apply mt-0;
-}
-
-.kanban-agents-multiselect :deep(.multiselect__input),
-.kanban-labels-multiselect :deep(.multiselect__input) {
-  @apply mb-0 pb-0;
-}
-</style>

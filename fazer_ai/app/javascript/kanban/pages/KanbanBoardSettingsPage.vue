@@ -11,9 +11,8 @@ import SettingsLayout from 'dashboard/routes/dashboard/settings/SettingsLayout.v
 import Button from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
-import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
-import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
+import TagMultiSelectComboBox from 'dashboard/components-next/combobox/TagMultiSelectComboBox.vue';
 import KanbanStepModal from 'kanban/components/KanbanStepModal.vue';
 import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import kanbanModule from 'kanban/store/modules/kanban';
@@ -44,10 +43,15 @@ const inboxes = computed(() => store.getters['inboxes/getInboxes']);
 
 const agentOptions = computed(() =>
   agents.value.map(agent => ({
-    id: agent.id,
-    name: agent.name,
-    avatar_url: agent.thumbnail,
-    availability_status: agent.availability_status,
+    value: agent.id,
+    label: agent.name,
+  }))
+);
+
+const inboxOptions = computed(() =>
+  inboxes.value.map(inbox => ({
+    value: inbox.id,
+    label: inbox.name,
   }))
 );
 
@@ -110,7 +114,7 @@ const saveAgents = async () => {
   try {
     await updateBoardAgents({
       boardId: boardId.value,
-      agentIds: selectedAgents.value.map(a => a.id),
+      agentIds: selectedAgents.value,
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
@@ -122,7 +126,7 @@ const saveInboxes = async () => {
   try {
     await updateBoardInboxes({
       boardId: boardId.value,
-      inboxIds: selectedInboxes.value.map(i => i.id),
+      inboxIds: selectedInboxes.value,
     });
     useAlert(t('KANBAN.SETTINGS.UPDATE_SUCCESS'));
   } catch (error) {
@@ -215,8 +219,12 @@ const initializeBoardData = () => {
     boardName.value = activeBoard.value.name || '';
     headerBoardName.value = activeBoard.value.name || '';
     boardDescription.value = activeBoard.value.description || '';
-    selectedAgents.value = activeBoard.value.assigned_agents || [];
-    selectedInboxes.value = activeBoard.value.assigned_inboxes || [];
+    selectedAgents.value = (activeBoard.value.assigned_agents || []).map(
+      a => a.id
+    );
+    selectedInboxes.value = (activeBoard.value.assigned_inboxes || []).map(
+      i => i.id
+    );
     autoCreateTaskForConversation.value =
       activeBoard.value.settings?.auto_create_task_for_conversation || false;
     autoAssignTaskToAgent.value =
@@ -712,119 +720,28 @@ const confirmDeleteBoard = async () => {
             <h2 class="text-lg font-medium text-n-slate-12">
               {{ t('KANBAN.SETTINGS.AGENTS') }}
             </h2>
-            <multiselect
-              v-model="selectedAgents"
+            <TagMultiSelectComboBox
+              :model-value="selectedAgents"
               :options="agentOptions"
-              track-by="id"
-              label="name"
-              multiple
-              :close-on-select="false"
-              :clear-on-select="false"
               :placeholder="t('KANBAN.SETTINGS.AGENTS_PLACEHOLDER')"
-              :select-label="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-              :deselect-label="t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-              :selected-label="t('FORMS.MULTISELECT.SELECTED')"
-              class="!mb-0"
-            >
-              <template #tag="{ option, remove }">
-                <span
-                  class="multiselect__tag !inline-flex items-center gap-2 !relative !pl-7"
-                >
-                  <Avatar
-                    :src="option.avatar_url"
-                    :name="option.name"
-                    :size="16"
-                    :status="option.availability_status"
-                    class="!absolute !left-1.5 !top-1/2 !-translate-y-1/2"
-                  />
-                  <span
-                    class="multiselect__tag-text !inline-block !max-w-[150px] !truncate"
-                  >
-                    {{ option.name }}
-                  </span>
-                  <i
-                    class="multiselect__tag-icon"
-                    @mousedown.prevent
-                    @click.prevent.stop="remove(option)"
-                    @keypress.enter.prevent="remove(option)"
-                  />
-                </span>
-              </template>
-              <template #option="{ option }">
-                <div class="flex items-center gap-2 min-w-0">
-                  <Avatar
-                    :src="option.avatar_url"
-                    :name="option.name"
-                    :size="16"
-                    :status="option.availability_status"
-                    class="leading-none text-center"
-                  />
-                  <span class="truncate">{{ option.name }}</span>
-                </div>
-              </template>
-              <template #noResult>
-                {{ t('KANBAN.SETTINGS.NO_AGENTS_FOUND') }}
-              </template>
-              <template #noOptions>
-                {{ t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE') }}
-              </template>
-            </multiselect>
+              :search-placeholder="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+              :empty-state="t('KANBAN.SETTINGS.NO_AGENTS_AVAILABLE')"
+              @update:model-value="selectedAgents = [...$event]"
+            />
           </section>
 
           <section id="board-inboxes" class="flex flex-col gap-4">
             <h2 class="text-lg font-medium text-n-slate-12">
               {{ t('KANBAN.SETTINGS.INBOXES') }}
             </h2>
-            <multiselect
-              v-model="selectedInboxes"
-              :options="inboxes"
-              track-by="id"
-              label="name"
-              multiple
-              :close-on-select="false"
-              :clear-on-select="false"
+            <TagMultiSelectComboBox
+              :model-value="selectedInboxes"
+              :options="inboxOptions"
               :placeholder="t('KANBAN.SETTINGS.INBOXES_PLACEHOLDER')"
-              :select-label="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
-              :deselect-label="t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
-              :selected-label="t('FORMS.MULTISELECT.SELECTED')"
-              class="!mb-0"
-            >
-              <template #tag="{ option, remove }">
-                <span
-                  class="multiselect__tag !inline-flex items-center gap-2 !relative !pl-7"
-                >
-                  <div class="!absolute !left-1.5 !top-1/2 !-translate-y-1/2">
-                    <ChannelIcon class="size-4" :inbox="option" />
-                  </div>
-                  <span
-                    class="multiselect__tag-text !inline-block !max-w-[150px] !truncate"
-                  >
-                    {{ option.name }}
-                  </span>
-                  <i
-                    class="multiselect__tag-icon"
-                    @mousedown.prevent
-                    @click.prevent.stop="remove(option)"
-                    @keypress.enter.prevent="remove(option)"
-                  />
-                </span>
-              </template>
-              <template #option="{ option }">
-                <div class="flex items-center gap-2 min-w-0">
-                  <ChannelIcon
-                    class="size-4 flex-shrink-0 min-w-4"
-                    :inbox="option"
-                  />
-                  <span class="truncate">{{ option.name }}</span>
-                </div>
-              </template>
-              <template #noResult>
-                {{ t('KANBAN.SETTINGS.NO_INBOXES_FOUND') }}
-              </template>
-              <template #noOptions>
-                {{ t('KANBAN.SETTINGS.NO_INBOXES_AVAILABLE') }}
-              </template>
-            </multiselect>
+              :search-placeholder="t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+              :empty-state="t('KANBAN.SETTINGS.NO_INBOXES_AVAILABLE')"
+              @update:model-value="selectedInboxes = [...$event]"
+            />
           </section>
 
           <section id="board-automation" class="flex flex-col gap-4">
