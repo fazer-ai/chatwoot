@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_18_180001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -591,7 +591,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.bigint "account_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "contacts_count"
+    t.integer "contacts_count", default: 0, null: false
     t.index ["account_id", "domain"], name: "index_companies_on_account_and_domain", unique: true, where: "(domain IS NOT NULL)"
     t.index ["account_id"], name: "index_companies_on_account_id"
     t.index ["name", "account_id"], name: "index_companies_on_name_and_account_id"
@@ -630,9 +630,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.string "country_code", default: ""
     t.boolean "blocked", default: false, null: false
     t.bigint "company_id"
+    t.integer "group_type", default: 0, null: false
     t.index "lower((email)::text), account_id", name: "index_contacts_on_lower_email_account_id"
     t.index ["account_id", "contact_type"], name: "index_contacts_on_account_id_and_contact_type"
     t.index ["account_id", "email", "phone_number", "identifier"], name: "index_contacts_on_nonempty_fields", where: "(((email)::text <> ''::text) OR ((phone_number)::text <> ''::text) OR ((identifier)::text <> ''::text))"
+    t.index ["account_id", "group_type"], name: "index_contacts_on_account_id_and_group_type"
     t.index ["account_id", "last_activity_at"], name: "index_contacts_on_account_id_and_last_activity_at", order: { last_activity_at: "DESC NULLS LAST" }
     t.index ["account_id"], name: "index_contacts_on_account_id"
     t.index ["account_id"], name: "index_resolved_contact_account_id", where: "(((email)::text <> ''::text) OR ((phone_number)::text <> ''::text) OR ((identifier)::text <> ''::text))"
@@ -683,8 +685,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.datetime "waiting_since"
     t.text "cached_label_list"
     t.bigint "assignee_agent_bot_id"
+    t.integer "group_type", default: 0, null: false
     t.bigint "kanban_task_id"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
+    t.index ["account_id", "group_type"], name: "index_conversations_on_account_id_and_group_type"
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"
     t.index ["account_id", "inbox_id", "status", "assignee_id"], name: "conv_acid_inbid_stat_asgnid_idx"
     t.index ["account_id"], name: "index_conversations_on_account_id"
@@ -694,6 +698,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.index ["contact_inbox_id"], name: "index_conversations_on_contact_inbox_id"
     t.index ["first_reply_created_at"], name: "index_conversations_on_first_reply_created_at"
     t.index ["identifier", "account_id"], name: "index_conversations_on_identifier_and_account_id"
+    t.index ["inbox_id", "group_type"], name: "index_conversations_on_inbox_id_and_group_type"
     t.index ["inbox_id"], name: "index_conversations_on_inbox_id"
     t.index ["kanban_task_id"], name: "index_conversations_on_kanban_task_id"
     t.index ["priority"], name: "index_conversations_on_priority"
@@ -828,6 +833,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "group_members", force: :cascade do |t|
+    t.bigint "group_contact_id", null: false
+    t.bigint "contact_id", null: false
+    t.integer "role", default: 0, null: false
+    t.boolean "is_active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_group_members_on_contact_id"
+    t.index ["group_contact_id", "contact_id"], name: "index_group_members_on_group_contact_id_and_contact_id", unique: true
+    t.index ["group_contact_id", "is_active"], name: "index_group_members_on_group_contact_id_and_is_active"
+    t.index ["group_contact_id"], name: "index_group_members_on_group_contact_id"
   end
 
   create_table "inbox_assignment_policies", force: :cascade do |t|
@@ -1228,6 +1246,28 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.index ["user_id"], name: "index_portals_members_on_user_id"
   end
 
+  create_table "recurring_scheduled_messages", force: :cascade do |t|
+    t.text "content"
+    t.jsonb "template_params", default: {}
+    t.jsonb "recurrence_rule", default: {}, null: false
+    t.integer "status", default: 0, null: false
+    t.integer "occurrences_sent", default: 0, null: false
+    t.bigint "account_id", null: false
+    t.bigint "conversation_id", null: false
+    t.bigint "inbox_id", null: false
+    t.string "author_type", null: false
+    t.bigint "author_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "status"], name: "idx_recurring_sched_msgs_on_account_status"
+    t.index ["account_id"], name: "index_recurring_scheduled_messages_on_account_id"
+    t.index ["author_type", "author_id"], name: "index_recurring_scheduled_messages_on_author"
+    t.index ["conversation_id", "status"], name: "idx_recurring_sched_msgs_on_conversation_status"
+    t.index ["conversation_id"], name: "index_recurring_scheduled_messages_on_conversation_id"
+    t.index ["inbox_id"], name: "index_recurring_scheduled_messages_on_inbox_id"
+    t.index ["status"], name: "idx_recurring_sched_msgs_on_status"
+  end
+
   create_table "related_categories", force: :cascade do |t|
     t.bigint "category_id"
     t.bigint "related_category_id"
@@ -1259,6 +1299,22 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.index ["user_id"], name: "index_reporting_events_on_user_id"
   end
 
+  create_table "reporting_events_rollups", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.date "date", null: false
+    t.string "dimension_type", null: false
+    t.bigint "dimension_id", null: false
+    t.string "metric", null: false
+    t.bigint "count", default: 0, null: false
+    t.float "sum_value", default: 0.0, null: false
+    t.float "sum_value_business_hours", default: 0.0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "date", "dimension_type", "dimension_id", "metric"], name: "index_rollup_unique_key", unique: true
+    t.index ["account_id", "dimension_type", "date"], name: "index_rollup_summary"
+    t.index ["account_id", "metric", "date"], name: "index_rollup_timeseries"
+  end
+
   create_table "scheduled_messages", force: :cascade do |t|
     t.text "content"
     t.jsonb "template_params", default: {}
@@ -1272,6 +1328,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.bigint "message_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "recurring_scheduled_message_id"
     t.index ["account_id", "status"], name: "index_scheduled_messages_on_account_id_and_status"
     t.index ["account_id"], name: "index_scheduled_messages_on_account_id"
     t.index ["author_type", "author_id", "status"], name: "idx_on_author_type_author_id_status_6997d67ef6"
@@ -1282,6 +1339,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.index ["inbox_id", "status"], name: "index_scheduled_messages_on_inbox_id_and_status"
     t.index ["inbox_id"], name: "index_scheduled_messages_on_inbox_id"
     t.index ["message_id"], name: "index_scheduled_messages_on_message_id"
+    t.index ["recurring_scheduled_message_id"], name: "index_scheduled_messages_on_recurring_scheduled_message_id"
     t.index ["status", "scheduled_at"], name: "index_scheduled_messages_on_status_and_scheduled_at"
   end
 
@@ -1392,7 +1450,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.text "message_signature"
     t.string "otp_secret"
     t.integer "consumed_timestep"
-    t.boolean "otp_required_for_login", default: false
+    t.boolean "otp_required_for_login", default: false, null: false
     t.text "otp_backup_codes"
     t.index ["email"], name: "index_users_on_email"
     t.index ["otp_required_for_login"], name: "index_users_on_otp_required_for_login"
@@ -1411,6 +1469,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
     t.integer "webhook_type", default: 0
     t.jsonb "subscriptions", default: ["conversation_status_changed", "conversation_updated", "conversation_created", "contact_created", "contact_updated", "message_created", "message_updated", "webwidget_triggered"]
     t.string "name"
+    t.string "secret"
     t.index ["account_id", "url"], name: "index_webhooks_on_account_id_and_url", unique: true
   end
 
@@ -1432,8 +1491,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "group_members", "contacts"
+  add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "conversations", "kanban_tasks"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "recurring_scheduled_messages", "accounts"
+  add_foreign_key "recurring_scheduled_messages", "conversations"
+  add_foreign_key "recurring_scheduled_messages", "inboxes"
   add_foreign_key "kanban_account_user_preferences", "account_users"
   add_foreign_key "kanban_audit_events", "accounts"
   add_foreign_key "kanban_audit_events", "kanban_tasks", column: "task_id"
@@ -1456,6 +1520,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_09_131532) do
   add_foreign_key "scheduled_messages", "conversations"
   add_foreign_key "scheduled_messages", "inboxes"
   add_foreign_key "scheduled_messages", "messages"
+  add_foreign_key "scheduled_messages", "recurring_scheduled_messages"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").
       after(:insert).

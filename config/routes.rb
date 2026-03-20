@@ -138,6 +138,7 @@ Rails.application.routes.draw do
                 resources :attachments, only: [:update]
               end
               resources :scheduled_messages, only: [:index, :create, :update, :destroy]
+              resources :recurring_scheduled_messages, only: [:index, :create, :update, :destroy]
               resources :assignments, only: [:create]
               resources :labels, only: [:create, :index]
               resource :participants, only: [:show, :create, :update, :destroy]
@@ -174,6 +175,7 @@ Rails.application.routes.draw do
               get :search
             end
           end
+          resources :groups, only: [:create]
           resources :contacts, only: [:index, :show, :update, :create, :destroy] do
             collection do
               get :active
@@ -185,11 +187,25 @@ Rails.application.routes.draw do
             member do
               get :contactable_inboxes
               post :destroy_custom_attributes
+              post :sync_group
               delete :avatar
             end
             scope module: :contacts do
               resources :conversations, only: [:index]
               resources :contact_inboxes, only: [:create]
+              resources :group_members, only: [:index, :create, :destroy] do
+                patch ':member_id', to: 'group_members#update', on: :collection
+              end
+              resource :group_metadata, only: [:update]
+              resource :group_invite, only: [:show] do
+                post :revoke, on: :member
+              end
+              resources :group_join_requests, only: [:index] do
+                post :handle, on: :collection
+              end
+              resource :group_admin, only: [:update], controller: 'group_admin' do
+                post :leave, on: :member
+              end
               resources :labels, only: [:create, :index]
               resources :notes
               post :call, on: :member, to: 'calls#create' if ChatwootApp.enterprise?
@@ -223,6 +239,7 @@ Rails.application.routes.draw do
             delete :avatar, on: :member
             post :sync_templates, on: :member
             get :health, on: :member
+            post :register_webhook, on: :member
             post :on_whatsapp, on: :member
             if ChatwootApp.enterprise?
               resource :conference, only: %i[create destroy], controller: 'conference' do
@@ -231,6 +248,7 @@ Rails.application.routes.draw do
             end
 
             resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates' do
+              post :analyze, on: :collection
               post :link, on: :member
               get :available_templates, on: :member
             end
@@ -380,7 +398,9 @@ Rails.application.routes.draw do
               post :send_instructions
               get :ssl_status
             end
-            resources :categories
+            resources :categories do
+              post :reorder, on: :collection
+            end
             resources :articles do
               post :reorder, on: :collection
             end

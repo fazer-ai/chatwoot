@@ -325,6 +325,10 @@ export const getConditionOptions = ({
     country_code: countries,
     message_type: messageTypeOptions,
     priority: priorityOptions,
+    group_type: [
+      { id: 'individual', name: 'Individual' },
+      { id: 'group', name: 'Group' },
+    ],
     labels: generateConditionOptions(labels, 'title'),
     kanban_board_id: kanbanBoardOptions,
     kanban_step_id: kanbanStepOptions,

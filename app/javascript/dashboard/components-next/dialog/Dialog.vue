@@ -131,7 +131,7 @@ defineExpose({ open, close, dialogRef });
           ? 'dialog-fullscreen-scroll fixed inset-0 w-full h-full max-w-none max-h-none bg-transparent shadow-none p-4 overflow-y-auto'
           : ['w-full shadow-xl rounded-xl overflow-visible', maxWidthClass],
       ]"
-      @close="close"
+      @close.prevent="handleDialogClose"
     >
       <OnClickOutside
         :class="[overflowYAuto ? ['w-full', maxWidthClass] : '']"

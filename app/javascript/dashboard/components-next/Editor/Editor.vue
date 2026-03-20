@@ -29,7 +29,7 @@ const props = defineProps({
   medium: { type: String, default: '' },
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'executeCopilotAction']);
 
 const slots = useSlots();
 
@@ -115,6 +115,9 @@ watch(
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
+        @execute-copilot-action="
+          (...args) => emit('executeCopilotAction', ...args)
+        "
       />
       <div
         v-if="showCharacterCount || slots.actions"

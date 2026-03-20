@@ -23,6 +23,8 @@ module Events::Types
   # FIXME: deprecate the opened and resolved events in future in favor of status changed event.
   CONVERSATION_OPENED = 'conversation.opened'
   CONVERSATION_RESOLVED = 'conversation.resolved'
+  CONVERSATION_CAPTAIN_INFERENCE_RESOLVED = 'conversation.captain_inference_resolved'
+  CONVERSATION_CAPTAIN_INFERENCE_HANDOFF = 'conversation.captain_inference_handoff'
 
   CONVERSATION_STATUS_CHANGED = 'conversation.status_changed'
   CONVERSATION_CONTACT_CHANGED = 'conversation.contact_changed'
@@ -46,11 +48,17 @@ module Events::Types
   SCHEDULED_MESSAGE_UPDATED = 'scheduled_message.updated'
   SCHEDULED_MESSAGE_DELETED = 'scheduled_message.deleted'
 
+  # recurring scheduled message events
+  RECURRING_SCHEDULED_MESSAGE_CREATED = 'recurring_scheduled_message.created'
+  RECURRING_SCHEDULED_MESSAGE_UPDATED = 'recurring_scheduled_message.updated'
+  RECURRING_SCHEDULED_MESSAGE_DELETED = 'recurring_scheduled_message.deleted'
+
   # contact events
   CONTACT_CREATED = 'contact.created'
   CONTACT_UPDATED = 'contact.updated'
   CONTACT_MERGED = 'contact.merged'
   CONTACT_DELETED = 'contact.deleted'
+  CONTACT_GROUP_SYNCED = 'contact.group_synced'
 
   # contact events
   INBOX_CREATED = 'inbox.created'
