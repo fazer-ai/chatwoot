@@ -1,3 +1,37 @@
+# == Schema Information
+#
+# Table name: recurring_scheduled_messages
+#
+#  id               :bigint           not null, primary key
+#  author_type      :string           not null
+#  content          :text
+#  occurrences_sent :integer          default(0), not null
+#  recurrence_rule  :jsonb            not null
+#  status           :integer          default("draft"), not null
+#  template_params  :jsonb
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  account_id       :bigint           not null
+#  author_id        :bigint           not null
+#  conversation_id  :bigint           not null
+#  inbox_id         :bigint           not null
+#
+# Indexes
+#
+#  idx_recurring_sched_msgs_on_account_status             (account_id,status)
+#  idx_recurring_sched_msgs_on_conversation_status        (conversation_id,status)
+#  idx_recurring_sched_msgs_on_status                     (status)
+#  index_recurring_scheduled_messages_on_account_id       (account_id)
+#  index_recurring_scheduled_messages_on_author           (author_type,author_id)
+#  index_recurring_scheduled_messages_on_conversation_id  (conversation_id)
+#  index_recurring_scheduled_messages_on_inbox_id         (inbox_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id)
+#  fk_rails_...  (conversation_id => conversations.id)
+#  fk_rails_...  (inbox_id => inboxes.id)
+#
 class RecurringScheduledMessage < ApplicationRecord
   include Rails.application.routes.url_helpers
 

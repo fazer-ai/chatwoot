@@ -1133,7 +1133,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_18_180001) do
     t.jsonb "template_params", default: {}
     t.jsonb "recurrence_rule", default: {}, null: false
     t.integer "status", default: 0, null: false
-    t.integer "occurrences_sent", default: 0
+    t.integer "occurrences_sent", default: 0, null: false
     t.bigint "account_id", null: false
     t.bigint "conversation_id", null: false
     t.bigint "inbox_id", null: false
