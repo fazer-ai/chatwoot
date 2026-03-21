@@ -8,6 +8,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   def index
     authorize InternalChat::Channel, :index?
     @channels = filtered_channels
+    @unread_counts = compute_unread_counts(@channels)
     render json: @channels.map { |channel| channel_index_response(channel) }
   end
 
@@ -21,10 +22,14 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     authorize @channel, :create?
     created = @channel.new_record?
 
-    ActiveRecord::Base.transaction do
-      @channel.save!
-      add_creator_as_admin
-      add_initial_members
+    if dm_params? && created
+      create_dm_with_lock
+    else
+      ActiveRecord::Base.transaction do
+        @channel.save!
+        add_creator_as_admin
+        add_initial_members
+      end
     end
 
     dispatch_channel_event(@channel) if created
@@ -41,6 +46,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   def destroy
     authorize @current_channel, :destroy?
     @current_channel.destroy!
+    Rails.configuration.dispatcher.dispatch(INTERNAL_CHAT_CHANNEL_UPDATED, Time.zone.now, channel: @current_channel)
     head :ok
   end
 
@@ -75,9 +81,12 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def mark_unread
     authorize @current_channel, :mark_unread?
+    msg_id = mark_unread_params[:message_id]
+    return head(:ok) if msg_id.blank?
+
     membership = @current_channel.channel_members.find_by(user_id: Current.user.id)
-    if membership.present? && params[:message_id].present?
-      message = @current_channel.messages.find(params[:message_id])
+    if membership.present?
+      message = @current_channel.messages.find(msg_id)
       membership.update!(last_read_at: message.created_at - 1.second)
     end
     head :ok
@@ -205,8 +214,43 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     params.permit(member_ids: [])[:member_ids] || create_channel_params[:member_ids]
   end
 
+  def mark_unread_params
+    params.permit(:message_id)
+  end
+
   def typing_status_param
     params.permit(:typing_status)[:typing_status]
+  end
+
+  def create_dm_with_lock
+    lock_key = "internal_chat_dm_#{Current.account.id}_#{dm_member_ids.sort.join('_')}"
+    ActiveRecord::Base.transaction do
+      ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(#{Zlib.crc32(lock_key)})")
+      existing = find_existing_dm(dm_member_ids)
+      if existing
+        @channel = existing
+      else
+        @channel.save!
+        add_initial_members
+      end
+    end
+  end
+
+  def compute_unread_counts(channels)
+    memberships = InternalChat::ChannelMember
+                  .where(internal_chat_channel_id: channels.select(:id), user_id: Current.user.id)
+                  .where.not(last_read_at: nil)
+
+    return {} if memberships.empty?
+
+    counts = {}
+    memberships.each do |m|
+      counts[m.internal_chat_channel_id] = InternalChat::Message
+                                           .where(internal_chat_channel_id: m.internal_chat_channel_id)
+                                           .where('created_at > ?', m.last_read_at)
+                                           .count
+    end
+    counts
   end
 
   def channel_base_response(channel)
@@ -230,7 +274,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       muted: membership&.muted || false,
       favorited: membership&.favorited || false,
       members_count: channel.channel_members.size,
-      unread_count: membership&.unread_messages_count || 0
+      unread_count: @unread_counts&.dig(channel.id) || 0
     )
   end
 
