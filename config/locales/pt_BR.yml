@@ -18,6 +18,9 @@
 #available at https://guides.rubyonrails.org/i18n.html.
 pt_BR:
   hello: 'Olá, mundo'
+  internal_chat:
+    default_category_name: 'Canais'
+    default_channel_name: 'Geral'
   inbox:
     reauthorization:
       success: 'Canal reautenticado com sucesso'

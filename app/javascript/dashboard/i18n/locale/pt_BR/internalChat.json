@@ -1,0 +1,63 @@
+{
+  "INTERNAL_CHAT": {
+    "TITLE": "Chat Interno",
+    "CHANNELS": "Canais",
+    "DIRECT_MESSAGES": "Mensagens Diretas",
+    "FAVORITES": "Favoritos",
+    "NEW_CHANNEL": "Novo Canal",
+    "NEW_DM": "Nova Mensagem",
+    "SEARCH_PLACEHOLDER": "Buscar canais...",
+    "NO_CHANNELS": "Nenhum canal encontrado",
+    "CHANNEL": {
+      "NAME": "Nome do Canal",
+      "DESCRIPTION": "Descrição",
+      "TYPE": "Tipo do Canal",
+      "PUBLIC": "Público",
+      "PRIVATE": "Privado",
+      "MEMBERS": "Membros",
+      "ARCHIVE": "Arquivar Canal",
+      "DELETE": "Excluir Canal",
+      "MUTE": "Silenciar Canal",
+      "UNMUTE": "Reativar Notificações",
+      "FAVORITE": "Adicionar aos Favoritos",
+      "UNFAVORITE": "Remover dos Favoritos",
+      "MARK_UNREAD": "Marcar como Não Lida",
+      "NO_MESSAGES": "Nenhuma mensagem ainda. Inicie a conversa!",
+      "ARCHIVED": "Este canal está arquivado",
+      "MEMBER_COUNT": "{count} membro | {count} membros"
+    },
+    "MESSAGE": {
+      "PLACEHOLDER": "Digite uma mensagem...",
+      "EDIT": "Editar",
+      "DELETE": "Excluir",
+      "REPLY": "Responder",
+      "REACT": "Reagir",
+      "EDITED": "(editado)",
+      "DELETED": "Esta mensagem foi excluída",
+      "SEND": "Enviar",
+      "UPLOAD_FILE": "Enviar Arquivo",
+      "CONFIRM_DELETE": "Tem certeza que deseja excluir esta mensagem?"
+    },
+    "TYPING": {
+      "SINGLE": "{name} está digitando...",
+      "MULTIPLE": "{names} estão digitando..."
+    },
+    "DM": {
+      "NEW": "Nova Mensagem Direta",
+      "SELECT_AGENTS": "Selecionar agentes"
+    },
+    "ERRORS": {
+      "FETCH_CHANNELS": "Falha ao carregar canais",
+      "FETCH_MESSAGES": "Falha ao carregar mensagens",
+      "SEND_MESSAGE": "Falha ao enviar mensagem",
+      "CREATE_CHANNEL": "Falha ao criar canal"
+    },
+    "DATE_SEPARATOR": {
+      "TODAY": "Hoje",
+      "YESTERDAY": "Ontem"
+    },
+    "SCROLL_TO_BOTTOM": "Ir para o final",
+    "NEW_MESSAGES": "Novas mensagens",
+    "LOADING_MESSAGES": "Carregando mensagens..."
+  }
+}
