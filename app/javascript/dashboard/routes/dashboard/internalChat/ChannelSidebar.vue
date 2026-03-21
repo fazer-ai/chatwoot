@@ -46,7 +46,7 @@ const filteredChannelsByCategory = computed(() => {
         ch.name.toLowerCase().includes(query)
       );
     }
-    return categoryChannels.sort((a, b) => {
+    return [...categoryChannels].sort((a, b) => {
       if (a.muted && !b.muted) return 1;
       if (!a.muted && b.muted) return -1;
       return 0;
@@ -186,17 +186,23 @@ function getChannelIcon(channel) {
           v-for="channel in channels.filter(ch => !ch.is_dm)"
           :key="channel.id"
           class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
-          :class="
+          :class="[
             activeChannelId === channel.id
               ? 'bg-n-alpha-2 text-n-slate-12'
-              : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12'
-          "
+              : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12',
+            { 'opacity-50': channel.muted },
+          ]"
           @click="navigateToChannel(channel)"
         >
           <Icon :icon="getChannelIcon(channel)" class="size-4 flex-shrink-0" />
+          <Icon
+            v-if="channel.muted"
+            icon="i-lucide-bell-off"
+            class="size-3 flex-shrink-0 text-n-slate-9"
+          />
           <span class="flex-1 truncate text-left">{{ channel.name }}</span>
           <span
-            v-if="channel.unread_count > 0"
+            v-if="channel.unread_count > 0 && !channel.muted"
             class="flex-shrink-0 rounded-full bg-n-brand px-1.5 py-0.5 text-xs font-medium text-white"
           >
             {{ channel.unread_count }}
