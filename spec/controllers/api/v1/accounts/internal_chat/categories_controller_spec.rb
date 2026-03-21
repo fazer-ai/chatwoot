@@ -90,7 +90,7 @@ RSpec.describe 'Internal Chat Categories API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['name']).to eq('Engineering')
         expect(body['position']).to eq(1)

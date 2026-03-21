@@ -37,4 +37,28 @@ RSpec.describe InternalChat::Draft do
       end
     end
   end
+
+  describe 'parent association' do
+    it 'allows creating a draft with a parent message' do
+      account = create(:account)
+      user = create(:user, account: account)
+      channel = create(:internal_chat_channel, account: account)
+      parent_message = create(:internal_chat_message, account: account, channel: channel, sender: user)
+
+      draft = create(:internal_chat_draft, account: account, user: user, channel: channel, parent: parent_message)
+
+      expect(draft.parent).to eq(parent_message)
+    end
+
+    it 'does not allow duplicate drafts for same user and channel' do
+      account = create(:account)
+      user = create(:user, account: account)
+      channel = create(:internal_chat_channel, account: account)
+
+      create(:internal_chat_draft, account: account, user: user, channel: channel)
+
+      duplicate = build(:internal_chat_draft, account: account, user: user, channel: channel)
+      expect(duplicate).not_to be_valid
+    end
+  end
 end

@@ -54,7 +54,7 @@ const isAdmin = computed(() => {
 });
 
 const isArchived = computed(() => {
-  return channel.value?.archived;
+  return channel.value?.status === 'archived';
 });
 
 const pinnedMessage = computed(() => {

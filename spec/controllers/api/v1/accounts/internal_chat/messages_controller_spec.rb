@@ -131,7 +131,7 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['content']).to eq('Hello everyone!')
         expect(body['internal_chat_channel_id']).to eq(channel.id)
@@ -143,7 +143,7 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['echo_id']).to eq('abc-123')
       end
@@ -156,7 +156,7 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['parent_id']).to eq(parent.id)
       end

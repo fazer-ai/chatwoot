@@ -14,4 +14,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  webServer: {
+    command: 'bin/rails s -p 3000',
+    url: 'http://localhost:3000',
+    reuseExistingServer: true,
+  },
 });

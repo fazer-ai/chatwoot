@@ -3,11 +3,13 @@ import {
   login,
   createChannelViaAPI,
   sendMessageViaAPI,
+  sendThreadReplyViaAPI,
+  channelURL,
 } from '../helpers/auth';
 
 test.describe('Internal Chat - Threads', () => {
-  let channelId: number;
-  let accountId: number;
+  let channelId;
+  let accountId;
   const baseURL = 'http://localhost:3000';
 
   test.beforeEach(async ({ page }) => {
@@ -24,9 +26,7 @@ test.describe('Internal Chat - Threads', () => {
     const messageText = `Thread parent ${Date.now()}`;
     await sendMessageViaAPI(page, channelId, messageText);
 
-    await page.goto(
-      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
-    );
+    await page.goto(channelURL(accountId, channelId));
     await page.waitForLoadState('networkidle');
 
     // Hover over the message to show action buttons
@@ -35,25 +35,26 @@ test.describe('Internal Chat - Threads', () => {
       .filter({ hasText: messageText });
     await messageBubble.hover();
 
-    // Click the reply button (title = "Responder" in pt_BR)
-    const replyButton = messageBubble.locator('button[title="Responder"]');
+    // Click the reply button (title = "Reply" from INTERNAL_CHAT.MESSAGE.REPLY)
+    const replyButton = messageBubble.locator('button[title="Reply"]');
     await expect(replyButton).toBeVisible();
     await replyButton.click();
 
-    // ThreadPanel.vue opens - it has class w-96 and an h3 with "Conversa" (pt_BR for Thread)
+    // ThreadPanel.vue opens with class w-96 and an h3 containing "Thread"
+    // (INTERNAL_CHAT.THREAD.TITLE)
     const threadPanel = page.locator('.w-96');
     await expect(threadPanel).toBeVisible();
 
     const threadTitle = threadPanel.locator('h3');
-    await expect(threadTitle).toContainText('Conversa');
+    await expect(threadTitle).toContainText('Thread');
 
     // The thread panel should show the parent message
     const parentInThread = threadPanel.getByText(messageText);
     await expect(parentInThread).toBeVisible();
 
     // The thread panel has a reply textarea with placeholder
-    // "Responder na conversa..." (pt_BR)
-    const threadInput = threadPanel.locator('textarea');
+    // "Reply in thread..." (INTERNAL_CHAT.THREAD.REPLY_PLACEHOLDER)
+    const threadInput = threadPanel.getByPlaceholder('Reply in thread...');
     await expect(threadInput).toBeVisible();
   });
 
@@ -61,9 +62,7 @@ test.describe('Internal Chat - Threads', () => {
     const messageText = `Thread reply test ${Date.now()}`;
     await sendMessageViaAPI(page, channelId, messageText);
 
-    await page.goto(
-      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
-    );
+    await page.goto(channelURL(accountId, channelId));
     await page.waitForLoadState('networkidle');
 
     // Open thread
@@ -71,12 +70,12 @@ test.describe('Internal Chat - Threads', () => {
       .locator('.group')
       .filter({ hasText: messageText });
     await messageBubble.hover();
-    const replyButton = messageBubble.locator('button[title="Responder"]');
+    const replyButton = messageBubble.locator('button[title="Reply"]');
     await replyButton.click();
 
     // Type a reply in the thread
     const threadPanel = page.locator('.w-96');
-    const threadInput = threadPanel.locator('textarea');
+    const threadInput = threadPanel.getByPlaceholder('Reply in thread...');
     await expect(threadInput).toBeVisible();
 
     const replyText = `Thread reply ${Date.now()}`;
@@ -92,9 +91,7 @@ test.describe('Internal Chat - Threads', () => {
     const messageText = `Close thread ${Date.now()}`;
     await sendMessageViaAPI(page, channelId, messageText);
 
-    await page.goto(
-      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
-    );
+    await page.goto(channelURL(accountId, channelId));
     await page.waitForLoadState('networkidle');
 
     // Open thread
@@ -102,7 +99,7 @@ test.describe('Internal Chat - Threads', () => {
       .locator('.group')
       .filter({ hasText: messageText });
     await messageBubble.hover();
-    const replyButton = messageBubble.locator('button[title="Responder"]');
+    const replyButton = messageBubble.locator('button[title="Reply"]');
     await replyButton.click();
 
     // Thread panel should be open
@@ -115,5 +112,57 @@ test.describe('Internal Chat - Threads', () => {
 
     // Thread panel should be hidden
     await expect(threadPanel).toHaveCount(0);
+  });
+
+  test('thread reply count badge shown on parent message', async ({ page }) => {
+    const messageText = `Reply count test ${Date.now()}`;
+    const msg = await sendMessageViaAPI(page, channelId, messageText);
+
+    // Send a thread reply via API
+    await sendThreadReplyViaAPI(page, channelId, msg.id, 'Thread reply 1');
+
+    await page.goto(channelURL(accountId, channelId));
+    await page.waitForLoadState('networkidle');
+
+    // The parent message should show the reply count button
+    // MessageBubble renders: "{count} replies" button with i-lucide-message-square icon
+    const messageBubble = page
+      .locator('.group')
+      .filter({ hasText: messageText });
+    await expect(messageBubble).toBeVisible();
+
+    const replyCountButton = messageBubble.locator(
+      'button:has(.i-lucide-message-square)'
+    );
+    await expect(replyCountButton).toBeVisible();
+    // Should contain "replies" text
+    await expect(replyCountButton).toContainText('replies');
+  });
+
+  test('clicking reply count opens thread panel', async ({ page }) => {
+    const messageText = `Open thread via count ${Date.now()}`;
+    const msg = await sendMessageViaAPI(page, channelId, messageText);
+
+    await sendThreadReplyViaAPI(page, channelId, msg.id, 'A reply');
+
+    await page.goto(channelURL(accountId, channelId));
+    await page.waitForLoadState('networkidle');
+
+    const messageBubble = page
+      .locator('.group')
+      .filter({ hasText: messageText });
+    const replyCountButton = messageBubble.locator(
+      'button:has(.i-lucide-message-square)'
+    );
+    await expect(replyCountButton).toBeVisible();
+
+    // Click the reply count button to open the thread
+    await replyCountButton.click();
+
+    // Thread panel should open showing the parent message and the reply
+    const threadPanel = page.locator('.w-96');
+    await expect(threadPanel).toBeVisible();
+    await expect(threadPanel.getByText(messageText)).toBeVisible();
+    await expect(threadPanel.getByText('A reply')).toBeVisible();
   });
 });

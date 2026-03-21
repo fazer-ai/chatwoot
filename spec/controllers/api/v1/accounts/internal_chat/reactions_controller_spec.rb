@@ -24,7 +24,7 @@ RSpec.describe 'Internal Chat Reactions API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['emoji']).to eq('👍')
         expect(body['user_id']).to eq(agent.id)
@@ -37,7 +37,7 @@ RSpec.describe 'Internal Chat Reactions API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['emoji']).to eq('🎉')
       end
@@ -66,7 +66,7 @@ RSpec.describe 'Internal Chat Reactions API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['emoji']).to eq('👍')
       end

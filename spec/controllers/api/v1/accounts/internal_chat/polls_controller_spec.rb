@@ -67,6 +67,50 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
 
         expect(response).to have_http_status(:unauthorized)
       end
+
+      it 'creates a poll with expiration date' do
+        expiry = 1.day.from_now.iso8601
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls",
+             params: valid_params.merge(expires_at: expiry),
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:created)
+        body = response.parsed_body
+        expect(body['content_attributes']['poll']['expires_at']).to be_present
+      end
+
+      it 'creates a poll with allow_revote disabled' do
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls",
+             params: valid_params.merge(allow_revote: false),
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:created)
+        body = response.parsed_body
+        expect(body['content_attributes']['poll']['allow_revote']).to be false
+      end
+
+      it 'returns bad request when options are missing' do
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls",
+             params: valid_params.except(:options),
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it 'creates the poll record in the database' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/internal_chat/polls",
+               params: valid_params,
+               headers: agent.create_new_auth_token,
+               as: :json
+        end.to change(InternalChat::Poll, :count).by(1)
+                                                 .and change(InternalChat::PollOption, :count).by(3)
+                                                                                              .and change(InternalChat::Message, :count).by(1)
+      end
     end
   end
 
@@ -133,6 +177,50 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
         expect(InternalChat::PollVote.where(user: agent).count).to eq(1)
         expect(InternalChat::PollVote.find_by(user: agent).option).to eq(option2)
       end
+
+      it 'allows adding votes on multiple-choice poll' do
+        poll.update!(multiple_choice: true)
+        option2 = create(:internal_chat_poll_option, poll: poll, position: 1)
+        create(:internal_chat_poll_vote, option: option, user: agent)
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls/#{poll.id}/vote",
+             params: { option_id: option2.id },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(InternalChat::PollVote.where(user: agent).count).to eq(2)
+      end
+
+      it 'returns unprocessable entity when voting on the same option twice in a multiple-choice poll' do
+        poll.update!(multiple_choice: true, allow_revote: true)
+        create(:internal_chat_poll_vote, option: option, user: agent)
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls/#{poll.id}/vote",
+             params: { option_id: option.id },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(InternalChat::PollVote.where(user: agent, internal_chat_poll_option_id: option.id).count).to eq(1)
+      end
+
+      it 'includes poll response structure with total_votes and options' do
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls/#{poll.id}/vote",
+             params: { option_id: option.id },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body).to have_key('content_attributes')
+        poll_data = body['content_attributes']['poll']
+        expect(poll_data).to have_key('total_votes')
+        expect(poll_data).to have_key('options')
+        expect(poll_data).to have_key('question')
+        expect(poll_data).to have_key('multiple_choice')
+        expect(poll_data).to have_key('allow_revote')
+      end
     end
   end
 
@@ -167,6 +255,33 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
                as: :json
 
         expect(response).to have_http_status(:not_found)
+      end
+
+      it 'returns bad request when unvoting on an expired poll' do
+        create(:internal_chat_poll_vote, option: option, user: agent)
+        poll.update!(expires_at: 1.hour.ago)
+
+        delete "/api/v1/accounts/#{account.id}/internal_chat/polls/#{poll.id}/vote",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it 'removes a specific option vote when option_id is provided' do
+        option2 = create(:internal_chat_poll_option, poll: poll, position: 1)
+        poll.update!(multiple_choice: true)
+        create(:internal_chat_poll_vote, option: option, user: agent)
+        create(:internal_chat_poll_vote, option: option2, user: agent)
+
+        delete "/api/v1/accounts/#{account.id}/internal_chat/polls/#{poll.id}/vote",
+               params: { option_id: option.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(InternalChat::PollVote.where(user: agent).count).to eq(1)
+        expect(InternalChat::PollVote.find_by(user: agent).option).to eq(option2)
       end
     end
   end

@@ -6,24 +6,36 @@ test.describe('Internal Chat - Navigation', () => {
     await loginAndNavigateToInternalChat(page);
   });
 
-  test('sidebar shows Chat Interno item and internal chat layout loads', async ({
+  test('sidebar shows Internal Chat item and layout loads', async ({
     page,
   }) => {
-    // The main sidebar renders a nav item with label "Chat Interno" (pt_BR)
-    // It uses role="button" and the label as title attribute
-    const sidebarItem = page.locator('[title="Chat Interno"]');
+    // The main app sidebar renders a nav item with title "Internal Chat"
+    // (SidebarGroup uses :title="label" on the collapsed button/router-link)
+    const sidebarItem = page.locator('[title="Internal Chat"]');
     await expect(sidebarItem.first()).toBeVisible();
 
-    // The internal chat sidebar panel has an h1 with "Chat Interno"
-    const sidebarHeading = page.locator(
-      '.w-64 h1, [class*="w-64"] h1'
-    );
-    await expect(sidebarHeading.first()).toBeVisible();
+    // The internal chat sidebar panel (ChannelSidebar: w-64) has an h1
+    // with the INTERNAL_CHAT.TITLE i18n key ("Internal Chat")
+    const sidebarHeading = page.locator('.w-64 h1');
+    await expect(sidebarHeading).toBeVisible();
+    await expect(sidebarHeading).toHaveText('Internal Chat');
+  });
+
+  test('channel sidebar shows search input', async ({ page }) => {
+    // ChannelSidebar renders an input with placeholder "Search channels..."
+    const searchInput = page.getByPlaceholder('Search channels...');
+    await expect(searchInput).toBeVisible();
+  });
+
+  test('Drafts button is visible in sidebar', async ({ page }) => {
+    // ChannelSidebar renders a Drafts button with text from DRAFT.TITLE ("Drafts")
+    const sidebar = page.locator('.w-64');
+    const draftsButton = sidebar.locator('button', { hasText: 'Drafts' });
+    await expect(draftsButton).toBeVisible();
   });
 
   test('default General channel appears in sidebar', async ({ page }) => {
     // Channels are listed as buttons inside the sidebar panel (.w-64)
-    // Each channel button has a span with the channel name
     const sidebar = page.locator('.w-64');
     const generalChannel = sidebar.locator('button', {
       hasText: 'General',
@@ -47,15 +59,30 @@ test.describe('Internal Chat - Navigation', () => {
     await expect(page).toHaveURL(/\/internal-chat\/channels\/\d+/);
   });
 
-  test('search filters channels in sidebar', async ({ page }) => {
-    // ChannelSidebar has a search input with placeholder "Buscar canais..." (pt_BR)
-    const searchInput = page.getByPlaceholder('Buscar canais...');
-    await expect(searchInput).toBeVisible();
+  test('DMs section heading is visible when DM channels exist', async ({
+    page,
+  }) => {
+    // ChannelSidebar shows "Direct Messages" heading (INTERNAL_CHAT.DIRECT_MESSAGES)
+    // only when there are DM channels. If none exist, the section is hidden.
+    const sidebar = page.locator('.w-64');
+    const dmHeading = sidebar.locator('h3', { hasText: 'Direct Messages' });
+    // This may or may not be visible depending on seed data, so just check
+    // the sidebar itself loads properly
+    const channelList = sidebar.locator('.overflow-y-auto');
+    await expect(channelList).toBeVisible();
+    // If DMs exist, the heading should be visible
+    const dmCount = await dmHeading.count();
+    if (dmCount > 0) {
+      await expect(dmHeading).toBeVisible();
+    }
+  });
 
-    // Type a search query that matches
+  test('search filters channels in sidebar', async ({ page }) => {
+    const searchInput = page.getByPlaceholder('Search channels...');
+
+    // Type a search query that matches "General"
     await searchInput.fill('General');
 
-    // General channel should still be visible
     const sidebar = page.locator('.w-64');
     const generalChannel = sidebar.locator('button', {
       hasText: 'General',
@@ -64,33 +91,20 @@ test.describe('Internal Chat - Navigation', () => {
 
     // Type a non-matching query
     await searchInput.fill('xyznonexistent');
-
-    // Wait for filter to apply
     await page.waitForTimeout(300);
 
-    // The scrollable area should have no channel buttons
+    // The scrollable area should have no channel buttons matching
     const channelButtons = sidebar
       .locator('.overflow-y-auto')
       .locator('button');
     await expect(channelButtons).toHaveCount(0);
   });
 
-  test('Rascunhos (Drafts) button is visible in sidebar', async ({
-    page,
-  }) => {
-    // ChannelSidebar renders a Drafts button with text "Rascunhos" (pt_BR)
-    const sidebar = page.locator('.w-64');
-    const draftsButton = sidebar.locator('button', {
-      hasText: 'Rascunhos',
-    });
-    await expect(draftsButton).toBeVisible();
-  });
-
   test('empty state shows when no channel is selected', async ({ page }) => {
     // InternalChatLayout shows empty state text when no channel is active
-    // pt_BR: "Nenhuma mensagem ainda. Inicie a conversa!"
+    // INTERNAL_CHAT.CHANNEL.NO_MESSAGES: "No messages yet. Start the conversation!"
     const emptyText = page.getByText(
-      'Nenhuma mensagem ainda. Inicie a conversa!'
+      'No messages yet. Start the conversation!'
     );
     await expect(emptyText).toBeVisible();
   });

@@ -27,7 +27,7 @@ const groupedReactions = computed(() => {
     }
     groups[reaction.emoji].count += 1;
     groups[reaction.emoji].users.push(reaction.user);
-    if (reaction.user?.id === props.currentUserId) {
+    if (reaction.user_id === props.currentUserId) {
       groups[reaction.emoji].userReactionId = reaction.id;
     }
   });

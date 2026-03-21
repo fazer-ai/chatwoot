@@ -107,6 +107,34 @@ RSpec.describe 'Internal Chat Drafts API', type: :request do
 
         expect(response).to have_http_status(:unauthorized)
       end
+
+      it 'creates a thread draft with parent_id' do
+        parent_message = create(:internal_chat_message, account: account, channel: channel, sender: agent)
+
+        patch "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/draft",
+              params: { content: 'thread reply draft', parent_id: parent_message.id },
+              headers: agent.create_new_auth_token,
+              as: :json
+
+        expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body['content']).to eq('thread reply draft')
+        expect(body['parent_id']).to eq(parent_message.id)
+      end
+
+      it 'does not create a duplicate draft, updates existing one for same channel' do
+        create(:internal_chat_draft, account: account, user: agent, channel: channel, content: 'old')
+
+        expect do
+          patch "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/draft",
+                params: { content: 'updated' },
+                headers: agent.create_new_auth_token,
+                as: :json
+        end.not_to change(InternalChat::Draft, :count)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body['content']).to eq('updated')
+      end
     end
   end
 
@@ -137,6 +165,33 @@ RSpec.describe 'Internal Chat Drafts API', type: :request do
                as: :json
 
         expect(response).to have_http_status(:not_found)
+      end
+
+      it 'removes a thread draft when parent_id is provided' do
+        parent_message = create(:internal_chat_message, account: account, channel: channel, sender: agent)
+        create(:internal_chat_draft, account: account, user: agent, channel: channel, parent: parent_message, content: 'thread draft')
+
+        delete "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/draft",
+               params: { parent_id: parent_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(InternalChat::Draft.where(user: agent, internal_chat_channel_id: channel.id, parent_id: parent_message.id).count).to eq(0)
+      end
+
+      it 'only removes the targeted draft, not drafts in other channels' do
+        channel2 = create(:internal_chat_channel, :public_channel, account: account, name: 'other')
+        create(:internal_chat_draft, account: account, user: agent, channel: channel, content: 'draft 1')
+        create(:internal_chat_draft, account: account, user: agent, channel: channel2, content: 'draft 2')
+
+        delete "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/draft",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(InternalChat::Draft.where(user: agent).count).to eq(1)
+        expect(InternalChat::Draft.find_by(user: agent).internal_chat_channel_id).to eq(channel2.id)
       end
     end
   end

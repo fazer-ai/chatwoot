@@ -112,5 +112,53 @@ RSpec.describe InternalChat::MentionService do
 
       expect(result).to contain_exactly(member.id.to_s)
     end
+
+    it 'deduplicates multiple mentions of the same user' do
+      sender = create(:user, account: account, role: :agent)
+      user1 = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://user/#{user1.id}/User1) and again (mention://user/#{user1.id}/User1)"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to contain_exactly(user1.id.to_s)
+    end
+
+    it 'returns empty array when content has no mentions' do
+      sender = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: 'Just a regular message with no mentions'
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to be_empty
+    end
+
+    it 'handles mixed @all and individual mentions for admin sender' do
+      admin = create(:user, account: account, role: :administrator)
+      member1 = create(:user, account: account, role: :agent)
+      member2 = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: admin)
+      create(:internal_chat_channel_member, channel: channel, user: member1)
+      create(:internal_chat_channel_member, channel: channel, user: member2)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: admin,
+                                content: "@all and (mention://user/#{member1.id}/Member1)"
+      )
+
+      result = described_class.new(message: message).perform
+
+      # @all overrides, includes all channel members except sender
+      expect(result).to contain_exactly(member1.id.to_s, member2.id.to_s)
+    end
   end
 end

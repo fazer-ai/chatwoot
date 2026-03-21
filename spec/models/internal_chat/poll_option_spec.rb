@@ -39,5 +39,29 @@ RSpec.describe InternalChat::PollOption do
 
       expect(option.votes_count).to eq(0)
     end
+
+    it 'does not count votes on other options' do
+      poll = create(:internal_chat_poll)
+      option1 = create(:internal_chat_poll_option, poll: poll)
+      option2 = create(:internal_chat_poll_option, poll: poll)
+      create(:internal_chat_poll_vote, option: option1)
+      create(:internal_chat_poll_vote, option: option2)
+      create(:internal_chat_poll_vote, option: option2)
+
+      expect(option1.votes_count).to eq(1)
+      expect(option2.votes_count).to eq(2)
+    end
+  end
+
+  describe 'optional fields' do
+    it 'allows emoji to be nil' do
+      option = build(:internal_chat_poll_option, emoji: nil)
+      expect(option).to be_valid
+    end
+
+    it 'allows image_url to be nil' do
+      option = build(:internal_chat_poll_option, image_url: nil)
+      expect(option).to be_valid
+    end
   end
 end

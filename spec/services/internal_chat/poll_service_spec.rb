@@ -72,4 +72,35 @@ RSpec.describe InternalChat::PollService do
       expect { service.unvote }.to raise_error(ActiveRecord::RecordNotFound)
     end
   end
+
+  describe 'option validation' do
+    it 'raises ArgumentError when option does not belong to the poll' do
+      other_poll = create(:internal_chat_poll)
+      other_option = create(:internal_chat_poll_option, poll: other_poll)
+
+      service = described_class.new(poll: poll, user: user, option: other_option)
+
+      expect { service.vote }.to raise_error(ArgumentError, 'Option does not belong to this poll')
+    end
+
+    it 'raises ArgumentError on unvote when option does not belong to the poll' do
+      other_poll = create(:internal_chat_poll)
+      other_option = create(:internal_chat_poll_option, poll: other_poll)
+
+      service = described_class.new(poll: poll, user: user, option: other_option)
+
+      expect { service.unvote }.to raise_error(ArgumentError, 'Option does not belong to this poll')
+    end
+  end
+
+  describe 'idempotency' do
+    it 'raises uniqueness error when voting for the same option twice' do
+      create(:internal_chat_poll_vote, option: option, user: user)
+      poll.update!(allow_revote: true, multiple_choice: true)
+
+      service = described_class.new(poll: poll, user: user, option: option)
+
+      expect { service.vote }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+  end
 end

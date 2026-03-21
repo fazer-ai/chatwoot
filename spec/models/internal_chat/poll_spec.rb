@@ -28,6 +28,13 @@ RSpec.describe InternalChat::Poll do
       poll = build(:internal_chat_poll, expires_at: 1.hour.ago)
       expect(poll.expired?).to be true
     end
+
+    it 'returns false at the exact boundary (expires_at == current time)' do
+      freeze_time do
+        poll = build(:internal_chat_poll, expires_at: Time.current)
+        expect(poll.expired?).to be false
+      end
+    end
   end
 
   describe '#total_votes_count' do
@@ -46,6 +53,32 @@ RSpec.describe InternalChat::Poll do
       create(:internal_chat_poll_option, poll: poll)
 
       expect(poll.total_votes_count).to eq(0)
+    end
+
+    it 'counts multiple votes on the same option' do
+      poll = create(:internal_chat_poll)
+      option = create(:internal_chat_poll_option, poll: poll)
+      create(:internal_chat_poll_vote, option: option)
+      create(:internal_chat_poll_vote, option: option)
+
+      expect(poll.total_votes_count).to eq(2)
+    end
+  end
+
+  describe 'default attribute values' do
+    it 'defaults multiple_choice to false' do
+      poll = build(:internal_chat_poll)
+      expect(poll.multiple_choice).to be false
+    end
+
+    it 'defaults public_results to true' do
+      poll = build(:internal_chat_poll)
+      expect(poll.public_results).to be true
+    end
+
+    it 'defaults allow_revote to true' do
+      poll = build(:internal_chat_poll)
+      expect(poll.allow_revote).to be true
     end
   end
 end

@@ -115,5 +115,60 @@ RSpec.describe InternalChat::NotificationService do
 
       expect { described_class.new(message: message).perform }.not_to change(Notification, :count)
     end
+
+    it 'does not broadcast anything when sender is the only member' do
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      described_class.new(message: message).perform
+
+      expect(ActionCableBroadcastJob).not_to have_received(:perform_later)
+    end
+
+    it 'does not broadcast anything when channel has no members' do
+      described_class.new(message: message).perform
+
+      expect(ActionCableBroadcastJob).not_to have_received(:perform_later)
+    end
+
+    it 'does not send @all mention notifications when sender is a non-admin agent' do
+      member = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+      create(:internal_chat_channel_member, channel: channel, user: member)
+
+      all_message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: '@all please review'
+      )
+
+      described_class.new(message: all_message).perform
+
+      # Should still receive regular message notification, not mention notification
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
+        [member.pubsub_token], 'notification.created', hash_including(notification_type: :internal_chat_message)
+      )
+      expect(ActionCableBroadcastJob).not_to have_received(:perform_later).with(
+        [member.pubsub_token], 'notification.created', hash_including(notification_type: :internal_chat_mention)
+      )
+    end
+
+    it 'includes the correct payload structure' do
+      member = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+      create(:internal_chat_channel_member, channel: channel, user: member)
+
+      described_class.new(message: message).perform
+
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
+        [member.pubsub_token],
+        'notification.created',
+        hash_including(
+          notification_type: :internal_chat_message,
+          account_id: account.id,
+          channel_id: channel.id,
+          message_id: message.id,
+          sender: sender.push_event_data
+        )
+      )
+    end
   end
 end

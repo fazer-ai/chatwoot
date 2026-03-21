@@ -144,7 +144,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['channel_type']).to eq('dm')
         expect(body['members'].map { |m| m['user_id'] }).to include(agent.id, other_agent.id)
@@ -161,7 +161,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['id']).to eq(existing_dm.id)
       end
@@ -174,7 +174,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['name']).to eq('general')
         expect(body['channel_type']).to eq('public_channel')
@@ -187,7 +187,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['channel_type']).to eq('private_channel')
       end
@@ -198,7 +198,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         admin_member = body['members'].find { |m| m['user_id'] == administrator.id }
         expect(admin_member).to be_present
@@ -211,7 +211,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         member_user_ids = body['members'].map { |m| m['user_id'] }
         expect(member_user_ids).to include(agent.id)
@@ -225,7 +225,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
              headers: administrator.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['category_id']).to eq(category.id)
       end
