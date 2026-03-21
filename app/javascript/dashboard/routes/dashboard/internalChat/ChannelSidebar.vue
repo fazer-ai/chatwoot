@@ -13,19 +13,19 @@ const router = useRouter();
 const searchQuery = ref('');
 
 const channels = computed(() => {
-  return store.getters['internalChat/getChannels'];
+  return store.getters['internalChat/getChannels'] || [];
 });
 
 const categories = computed(() => {
-  return store.getters['internalChat/getCategories'];
+  return store.getters['internalChat/getCategories'] || [];
 });
 
 const favoriteChannels = computed(() => {
-  return store.getters['internalChat/getFavoriteChannels'];
+  return store.getters['internalChat/getFavoriteChannels'] || [];
 });
 
 const dmChannels = computed(() => {
-  return store.getters['internalChat/getDMChannels'];
+  return store.getters['internalChat/getDMChannels'] || [];
 });
 
 const activeChannelId = computed(() => {
@@ -39,7 +39,7 @@ const accountId = computed(() => {
 const filteredChannelsByCategory = computed(() => {
   return categoryId => {
     let categoryChannels =
-      store.getters['internalChat/getChannelsByCategory'](categoryId);
+      store.getters['internalChat/getChannelsByCategory'](categoryId) || [];
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase();
       categoryChannels = categoryChannels.filter(ch =>
@@ -55,17 +55,17 @@ const filteredChannelsByCategory = computed(() => {
 });
 
 const filteredDMChannels = computed(() => {
-  if (!searchQuery.value) return dmChannels.value;
+  const dms = dmChannels.value || [];
+  if (!searchQuery.value) return dms;
   const query = searchQuery.value.toLowerCase();
-  return dmChannels.value.filter(ch => ch.name.toLowerCase().includes(query));
+  return dms.filter(ch => (ch.name || '').toLowerCase().includes(query));
 });
 
 const filteredFavoriteChannels = computed(() => {
-  if (!searchQuery.value) return favoriteChannels.value;
+  const favs = favoriteChannels.value || [];
+  if (!searchQuery.value) return favs;
   const query = searchQuery.value.toLowerCase();
-  return favoriteChannels.value.filter(ch =>
-    ch.name.toLowerCase().includes(query)
-  );
+  return favs.filter(ch => (ch.name || '').toLowerCase().includes(query));
 });
 
 function navigateToChannel(channel) {

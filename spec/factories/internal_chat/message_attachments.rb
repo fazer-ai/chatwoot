@@ -2,8 +2,8 @@
 
 FactoryBot.define do
   factory :internal_chat_message_attachment, class: 'InternalChat::MessageAttachment' do
-    account
     association :message, factory: :internal_chat_message
+    account { message.account }
     file_type { :image }
 
     trait :with_file do

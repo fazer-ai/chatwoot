@@ -24,6 +24,7 @@ class InternalChatListener < BaseListener
     account = Account.find_by(id: message_data[:account_id])
     channel = InternalChat::Channel.find_by(id: message_data[:channel_id])
     return if account.blank? || channel.blank?
+    return unless channel.account_id == account.id
 
     tokens = member_tokens(channel)
     broadcast(account, tokens, INTERNAL_CHAT_MESSAGE_DELETED, message_data)
@@ -62,6 +63,7 @@ class InternalChatListener < BaseListener
     account = Account.find_by(id: reaction_data[:account_id])
     channel = InternalChat::Channel.find_by(id: reaction_data[:channel_id])
     return if account.blank? || channel.blank?
+    return unless channel.account_id == account.id
 
     tokens = member_tokens(channel)
     broadcast(account, tokens, INTERNAL_CHAT_REACTION_DELETED, reaction_data)

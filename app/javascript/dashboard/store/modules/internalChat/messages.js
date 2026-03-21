@@ -37,10 +37,10 @@ const actions = {
       return messages;
     } catch (error) {
       throwErrorMessage(error);
+      throw error;
     } finally {
       commit('SET_UI_FLAG', { isFetching: false });
     }
-    return [];
   },
 
   sendMessage: async ({ commit }, { channelId, data }) => {

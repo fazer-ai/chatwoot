@@ -166,6 +166,17 @@ describe InternalChatListener do
         listener.internal_chat_message_deleted(event)
       end
     end
+
+    context 'when account and channel belong to different accounts' do
+      let(:other_account) { create(:account) }
+      let(:other_channel) { create(:internal_chat_channel, :public_channel, account: other_account) }
+      let(:message_data) { { account_id: account.id, channel_id: other_channel.id, id: 999 } }
+
+      it 'does not broadcast' do
+        expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+        listener.internal_chat_message_deleted(event)
+      end
+    end
   end
 
   describe '#internal_chat_reaction_deleted' do
@@ -187,6 +198,17 @@ describe InternalChatListener do
 
     context 'when account or channel is not found' do
       let(:reaction_data) { { account_id: 0, channel_id: 0, id: 999 } }
+
+      it 'does not broadcast' do
+        expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+        listener.internal_chat_reaction_deleted(event)
+      end
+    end
+
+    context 'when account and channel belong to different accounts' do
+      let(:other_account) { create(:account) }
+      let(:other_channel) { create(:internal_chat_channel, :public_channel, account: other_account) }
+      let(:reaction_data) { { account_id: account.id, channel_id: other_channel.id, id: 999 } }
 
       it 'does not broadcast' do
         expect(ActionCableBroadcastJob).not_to receive(:perform_later)

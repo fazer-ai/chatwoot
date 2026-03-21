@@ -6,16 +6,19 @@ class InternalChat::MessageCreateService
   def perform
     validate_parent_message! if params[:parent_id].present?
 
-    @message = channel.messages.create!(
-      account: channel.account,
-      sender: sender,
-      content: params[:content],
-      content_type: params[:content_type] || :text,
-      parent_id: params[:parent_id],
-      echo_id: params[:echo_id]
-    )
+    ActiveRecord::Base.transaction do
+      @message = channel.messages.create!(
+        account: channel.account,
+        sender: sender,
+        content: params[:content],
+        content_type: params[:content_type] || :text,
+        parent_id: params[:parent_id],
+        echo_id: params[:echo_id]
+      )
 
-    process_attachments if params[:attachments].present?
+      process_attachments if params[:attachments].present?
+    end
+
     dispatch_event
 
     @message
