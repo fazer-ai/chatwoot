@@ -97,7 +97,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def message_response(message)
-    {
+    response = {
       id: message.id,
       content: message.content,
       content_type: message.content_type,
@@ -112,6 +112,30 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
       attachments: message.attachments.map { |a| attachment_response(a) }
     }
+    response[:poll] = poll_data(message.poll) if message.poll?
+    response
+  end
+
+  def poll_data(poll)
+    return nil unless poll
+
+    {
+      id: poll.id,
+      question: poll.question,
+      multiple_choice: poll.multiple_choice,
+      public_results: poll.public_results,
+      allow_revote: poll.allow_revote,
+      expires_at: poll.expires_at,
+      options: poll.options.ordered.map { |o| poll_option_data(o, poll) },
+      total_votes: poll.total_votes_count
+    }
+  end
+
+  def poll_option_data(option, poll)
+    data = { id: option.id, text: option.text, emoji: option.emoji, votes_count: option.votes_count,
+             voted: option.votes.exists?(user: Current.user) }
+    data[:voters] = option.votes.includes(:user).map { |v| v.user.push_event_data } if poll.public_results
+    data
   end
 
   def attachment_response(attachment)

@@ -8,10 +8,6 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  currentUserId: {
-    type: Number,
-    required: true,
-  },
   isAdmin: {
     type: Boolean,
     default: false,
@@ -22,24 +18,24 @@ const emit = defineEmits(['vote', 'unvote']);
 
 const { t } = useI18n();
 
-const pollAttributes = computed(() => {
-  return props.message.content_attributes || {};
+const pollData = computed(() => {
+  return props.message.poll || props.message.content_attributes?.poll || {};
 });
 
 const pollItems = computed(() => {
-  return pollAttributes.value.items || [];
+  return pollData.value.options || [];
 });
 
 const isMultipleChoice = computed(() => {
-  return !!pollAttributes.value.multiple_choice;
+  return !!pollData.value.multiple_choice;
 });
 
 const isPublicResults = computed(() => {
-  return pollAttributes.value.public_results !== false;
+  return pollData.value.public_results !== false;
 });
 
 const isExpired = computed(() => {
-  const expiresAt = pollAttributes.value.expires_at;
+  const expiresAt = pollData.value.expires_at;
   if (!expiresAt) return false;
   return new Date(expiresAt) < new Date();
 });
@@ -55,12 +51,11 @@ const canSeeResults = computed(() => {
 });
 
 function hasUserVoted(item) {
-  const voters = item.voters || [];
-  return voters.some(v => v.id === props.currentUserId);
+  return !!item.voted;
 }
 
 function hasAnyVote() {
-  return pollItems.value.some(item => hasUserVoted(item));
+  return pollItems.value.some(item => item.voted);
 }
 
 function votePercentage(item) {

@@ -11,7 +11,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     @poll = build_poll
     create_poll_options
 
-    render json: poll_response(@poll), status: :ok
+    render json: message_with_poll_response(@message, @poll), status: :ok
   end
 
   def vote
@@ -20,7 +20,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     @vote = @option.votes.create!(user: Current.user)
     dispatch_poll_event
 
-    render json: poll_response(@poll.reload), status: :ok
+    render json: message_with_poll_response(@poll.message, @poll.reload), status: :ok
   end
 
   def unvote
@@ -28,7 +28,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     @vote.destroy!
     dispatch_poll_event
 
-    render json: poll_response(@poll.reload), status: :ok
+    render json: message_with_poll_response(@poll.message, @poll.reload), status: :ok
   end
 
   private
@@ -90,6 +90,22 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   def poll_params
     params.permit(:question, :multiple_choice, :public_results, :allow_revote, :expires_at, :channel_id,
                   options: [:text, :emoji, :image_url])
+  end
+
+  def message_with_poll_response(message, poll)
+    {
+      id: message.id,
+      content: message.content,
+      content_type: message.content_type,
+      content_attributes: message.content_attributes.merge(poll: poll_response(poll)),
+      internal_chat_channel_id: message.internal_chat_channel_id,
+      sender: message.sender.push_event_data,
+      parent_id: message.parent_id,
+      created_at: message.created_at,
+      updated_at: message.updated_at,
+      attachments: [],
+      reactions: []
+    }
   end
 
   def poll_response(poll)

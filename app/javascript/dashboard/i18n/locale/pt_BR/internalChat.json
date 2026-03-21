@@ -54,8 +54,9 @@
       "VOTES": "{count} votos",
       "EXPIRED": "Expirada",
       "PIN": "Fixar enquete",
-      "ADD_OPTION": "Adicionar op\u00e7\u00e3o",
-      "CANCEL": "Cancelar"
+      "ADD_OPTION": "Adicionar opção",
+      "CANCEL": "Cancelar",
+      "PERCENTAGE": "{value}%"
     },
     "DRAFT": {
       "TITLE": "Rascunhos",
