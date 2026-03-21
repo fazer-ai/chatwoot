@@ -18,7 +18,10 @@
     "story:dev": "histoire dev",
     "story:build": "histoire build",
     "story:preview": "histoire preview",
-    "sync:i18n": "bin/sync_i18n_file_change"
+    "sync:i18n": "bin/sync_i18n_file_change",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui"
   },
   "size-limit": [
     {
@@ -120,6 +123,7 @@
     "@iconify-json/ri": "^1.2.6",
     "@iconify-json/teenyicons": "^1.2.2",
     "@intlify/eslint-plugin-vue-i18n": "^3.2.0",
+    "@playwright/test": "^1.58.2",
     "@size-limit/file": "^8.2.4",
     "@vitest/coverage-v8": "3.0.5",
     "@vue/test-utils": "^2.4.6",

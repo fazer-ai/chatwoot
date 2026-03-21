@@ -10,7 +10,7 @@ class Api::V1::Accounts::InternalChat::CategoriesController < Api::V1::Accounts:
   def create
     authorize InternalChat::Category, :create?
     @category = Current.account.internal_chat_categories.create!(category_params)
-    render json: category_response(@category), status: :ok
+    render json: category_response(@category), status: :created
   end
 
   def update
@@ -41,7 +41,7 @@ class Api::V1::Accounts::InternalChat::CategoriesController < Api::V1::Accounts:
       name: category.name,
       position: category.position,
       account_id: category.account_id,
-      channels_count: category.channels.count,
+      channels_count: category.channels.size,
       created_at: category.created_at,
       updated_at: category.updated_at
     }

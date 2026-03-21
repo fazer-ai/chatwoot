@@ -75,11 +75,11 @@ const isPoll = computed(() => {
 });
 
 const isPinned = computed(() => {
-  return !!props.message.pinned;
+  return !!props.message.content_attributes?.pinned;
 });
 
 const threadReplyCount = computed(() => {
-  return props.message.thread_replies_count || 0;
+  return props.message.replies_count || 0;
 });
 
 const canEdit = computed(() => {

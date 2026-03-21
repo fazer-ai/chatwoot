@@ -18,8 +18,8 @@ export const actions = {
       // Handle error
     }
   },
-  create: ({ commit }, { channelId, user }) => {
-    const records = state.records[channelId] || [];
+  create: ({ commit, state: _state }, { channelId, user }) => {
+    const records = _state.records[channelId] || [];
     const hasUser = records.some(r => r.id === user.id);
     if (!hasUser) {
       commit('ADD_TYPING_USER', { channelId, user });

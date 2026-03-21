@@ -84,11 +84,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     msg_id = mark_unread_params[:message_id]
     return head(:ok) if msg_id.blank?
 
-    membership = @current_channel.channel_members.find_by(user_id: Current.user.id)
-    if membership.present?
-      message = @current_channel.messages.find(msg_id)
-      membership.update!(last_read_at: message.created_at - 1.second)
-    end
+    membership = @current_channel.channel_members.find_by!(user_id: Current.user.id)
+    message = @current_channel.messages.find(msg_id)
+    membership.update!(last_read_at: message.created_at - 1.second)
     head :ok
   end
 
@@ -278,7 +276,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     members = channel.channel_members.includes(:user).load
     membership = members.detect { |member| member.user_id == Current.user.id }
     recent_messages = channel.messages
-                             .includes(:sender, :reactions, attachments: { file_attachment: :blob })
+                             .includes(:sender, :reactions, :replies, attachments: { file_attachment: :blob })
                              .recent.limit(RECENT_MESSAGES_LIMIT).reverse
 
     channel_base_response(channel).merge(
@@ -315,6 +313,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       sender: message.sender&.push_event_data,
       parent_id: message.parent_id,
       echo_id: message.echo_id,
+      replies_count: message.respond_to?(:replies) ? message.replies.size : 0,
       created_at: message.created_at,
       updated_at: message.updated_at,
       reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },

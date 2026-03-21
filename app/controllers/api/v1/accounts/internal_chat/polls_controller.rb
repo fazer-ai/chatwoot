@@ -12,7 +12,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     @poll = build_poll
     create_poll_options
 
-    render json: message_with_poll_response(@message, @poll), status: :ok
+    render json: message_with_poll_response(@message, @poll), status: :created
   end
 
   def vote
@@ -37,14 +37,14 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   private
 
   def set_poll
-    @poll = InternalChat::Poll.find(params[:id])
+    @poll = InternalChat::Poll.joins(:message).where(internal_chat_messages: { account_id: Current.account.id }).find(params[:id])
     @option = @poll.options.find(params[:option_id])
     channel = @poll.message.channel
     authorize channel, :show?, policy_class: InternalChat::ChannelPolicy
   end
 
   def set_poll_for_unvote
-    @poll = InternalChat::Poll.find(params[:id])
+    @poll = InternalChat::Poll.joins(:message).where(internal_chat_messages: { account_id: Current.account.id }).find(params[:id])
     channel = @poll.message.channel
     authorize channel, :show?, policy_class: InternalChat::ChannelPolicy
   end
@@ -126,7 +126,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
       allow_revote: poll.allow_revote,
       expires_at: poll.expires_at,
       internal_chat_message_id: poll.internal_chat_message_id,
-      options: poll.options.ordered.map { |option| option_response(option, poll) },
+      options: poll.options.ordered.includes(votes: :user).map { |option| option_response(option, poll) },
       total_votes: poll.total_votes_count,
       created_at: poll.created_at,
       updated_at: poll.updated_at
@@ -140,10 +140,10 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
       emoji: option.emoji,
       image_url: option.image_url,
       position: option.position,
-      votes_count: option.votes_count,
-      voted: option.votes.exists?(user: Current.user)
+      votes_count: option.votes.size,
+      voted: option.votes.any? { |v| v.user_id == Current.user.id }
     }
-    response[:voters] = option.votes.includes(:user).map { |v| v.user.push_event_data } if poll.public_results
+    response[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
     response
   end
 

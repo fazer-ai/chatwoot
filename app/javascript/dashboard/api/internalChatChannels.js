@@ -44,8 +44,10 @@ class InternalChatChannelsAPI extends ApiClient {
     return axios.post(`${this.url}/${channelId}/mark_read`);
   }
 
-  markUnread(channelId) {
-    return axios.post(`${this.url}/${channelId}/mark_unread`);
+  markUnread(channelId, messageId) {
+    return axios.post(`${this.url}/${channelId}/mark_unread`, {
+      message_id: messageId,
+    });
   }
 }
 

@@ -13,12 +13,17 @@ export const getters = {
 
   getChannelsByCategory: _state => categoryId => {
     return Object.values(_state.records).filter(
-      channel => channel.category_id === categoryId && !channel.is_dm
+      channel =>
+        channel.category_id === categoryId &&
+        !channel.is_dm &&
+        channel.channel_type !== 'dm'
     );
   },
 
   getDMChannels: _state => {
-    return Object.values(_state.records).filter(channel => channel.is_dm);
+    return Object.values(_state.records).filter(
+      channel => channel.is_dm || channel.channel_type === 'dm'
+    );
   },
 
   getFavoriteChannels: _state => {

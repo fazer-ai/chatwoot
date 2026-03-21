@@ -58,7 +58,7 @@ const isArchived = computed(() => {
 });
 
 const pinnedMessage = computed(() => {
-  return messages.value.find(m => m.pinned) || null;
+  return messages.value.find(m => m.content_attributes?.pinned) || null;
 });
 
 function markRead() {
@@ -271,7 +271,11 @@ onMounted(() => {
 <template>
   <div class="flex h-full">
     <div class="flex flex-1 flex-col bg-n-solid-1 min-w-0">
-      <ChannelHeader :channel="channel" :pinned-message="pinnedMessage" />
+      <ChannelHeader
+        :channel="channel"
+        :pinned-message="pinnedMessage"
+        @settings="() => {}"
+      />
       <MessageList
         :messages="messages"
         :current-user-id="currentUserId"
@@ -297,6 +301,7 @@ onMounted(() => {
         @send="handleSend"
         @typing="handleTyping"
         @draft-update="handleDraftUpdate"
+        @create-poll="showPollCreator = true"
       />
       <div
         v-else

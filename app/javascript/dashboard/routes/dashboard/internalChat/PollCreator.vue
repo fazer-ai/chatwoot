@@ -64,6 +64,10 @@ function handleSubmit() {
   };
 
   emit('submit', pollData);
+  // Reset after a brief delay to allow parent to process and close
+  setTimeout(() => {
+    isSubmitting.value = false;
+  }, 1000);
 }
 </script>
 

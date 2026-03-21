@@ -5,7 +5,7 @@ class InternalChat::NotificationService
     channel_members_to_notify.each do |member|
       next if member.user_id == message.sender_id
 
-      create_notification(member)
+      notify_member(member)
     end
   end
 
@@ -32,29 +32,22 @@ class InternalChat::NotificationService
     account_user&.administrator? || message.channel.channel_members.exists?(user_id: message.sender_id, role: :admin)
   end
 
-  def create_notification(member)
+  def notify_member(member)
     if user_mentioned?(member.user_id)
-      create_mention_notification(member.user)
+      broadcast_notification(member.user, :internal_chat_mention)
     elsif !member.muted?
-      create_message_notification(member.user)
+      broadcast_notification(member.user, :internal_chat_message)
     end
   end
 
-  def create_mention_notification(user)
-    user.notifications.create!(
-      notification_type: :internal_chat_mention,
-      account: message.account,
-      primary_actor: message.channel,
-      secondary_actor: message
-    )
-  end
-
-  def create_message_notification(user)
-    user.notifications.create!(
-      notification_type: :internal_chat_message,
-      account: message.account,
-      primary_actor: message.channel,
-      secondary_actor: message
-    )
+  def broadcast_notification(user, type)
+    payload = {
+      notification_type: type,
+      account_id: message.account_id,
+      channel_id: message.internal_chat_channel_id,
+      message_id: message.id,
+      sender: message.sender&.push_event_data
+    }
+    ::ActionCableBroadcastJob.perform_later([user.pubsub_token], 'notification.created', payload)
   end
 end

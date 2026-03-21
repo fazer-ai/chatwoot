@@ -8,7 +8,7 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
     authorize @reaction, :create?, policy_class: InternalChat::ReactionPolicy
     @reaction.save!
     dispatch_reaction_event(INTERNAL_CHAT_REACTION_CREATED, reaction: @reaction)
-    render json: reaction_response(@reaction), status: :ok
+    render json: reaction_response(@reaction), status: :created
   end
 
   def destroy

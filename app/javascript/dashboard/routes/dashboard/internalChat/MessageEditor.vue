@@ -18,7 +18,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['send', 'typing', 'draftUpdate']);
+const emit = defineEmits(['send', 'typing', 'draftUpdate', 'create-poll']);
 
 const { t } = useI18n();
 
@@ -97,6 +97,14 @@ defineExpose({ focus, setContent });
         @keydown="handleKeyDown"
         @input="handleInput"
       />
+      <button
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        :disabled="disabled"
+        :title="t('INTERNAL_CHAT.POLL.CREATE')"
+        @click="emit('create-poll')"
+      >
+        <Icon icon="i-lucide-bar-chart-2" class="size-4" />
+      </button>
       <button
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 transition-colors"
         :class="

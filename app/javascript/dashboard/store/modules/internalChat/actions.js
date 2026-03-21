@@ -96,9 +96,9 @@ export const actions = {
     }
   },
 
-  markUnread: async ({ commit }, channelId) => {
+  markUnread: async ({ commit }, { channelId, messageId }) => {
     try {
-      await InternalChatChannelsAPI.markUnread(channelId);
+      await InternalChatChannelsAPI.markUnread(channelId, messageId);
       commit('UPDATE_CHANNEL', { id: channelId, unread_count: 1 });
     } catch (error) {
       throwErrorMessage(error);

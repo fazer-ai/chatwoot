@@ -39,17 +39,21 @@ function timeSince(dateString) {
 }
 
 function navigateToChannel(draft) {
-  const routeName =
-    draft.channel_type === 'dm' ? 'internal_chat_dm' : 'internal_chat_channel';
   router.push({
-    name: routeName,
-    params: { accountId: accountId.value, channelId: draft.channel_id },
+    name: 'internal_chat_channel',
+    params: {
+      accountId: accountId.value,
+      channelId: draft.internal_chat_channel_id,
+    },
   });
 }
 
-async function handleDelete(draftId) {
+async function handleDelete(draft) {
   try {
-    await store.dispatch('internalChat/drafts/deleteDraft', draftId);
+    await store.dispatch('internalChat/drafts/deleteDraft', {
+      channelId: draft.internal_chat_channel_id,
+      draftId: draft.id,
+    });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }
@@ -100,7 +104,7 @@ onMounted(() => {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-n-slate-12 truncate">
-                {{ draft.channel_name || `Channel #${draft.channel_id}` }}
+                {{ `Channel #${draft.internal_chat_channel_id}` }}
               </span>
               <span class="text-xs text-n-slate-10">
                 {{ timeSince(draft.updated_at) }}
@@ -113,7 +117,7 @@ onMounted(() => {
           <button
             class="flex-shrink-0 flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
             :title="t('INTERNAL_CHAT.DRAFT.DELETE')"
-            @click.stop="handleDelete(draft.id)"
+            @click.stop="handleDelete(draft)"
           >
             <Icon icon="i-lucide-trash-2" class="size-4" />
           </button>

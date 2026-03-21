@@ -131,12 +131,12 @@ class InternalChatListener < BaseListener
       id: poll.id,
       question: poll.question,
       internal_chat_message_id: poll.internal_chat_message_id,
-      options: poll.options.ordered.map do |option|
+      options: poll.options.ordered.includes(votes: :user).map do |option|
         {
           id: option.id,
           text: option.text,
-          votes_count: option.votes_count,
-          voters: option.votes.includes(:user).map { |v| v.user.push_event_data }
+          votes_count: option.votes.size,
+          voters: option.votes.map { |v| v.user.push_event_data }
         }
       end,
       total_votes: poll.total_votes_count

@@ -33,7 +33,11 @@ const actions = {
         params
       );
       const messages = response.data.messages || response.data;
-      commit('SET_MESSAGES', { channelId, messages });
+      if (params.before) {
+        commit('PREPEND_MESSAGES', { channelId, messages });
+      } else {
+        commit('SET_MESSAGES', { channelId, messages });
+      }
       return messages;
     } catch (error) {
       throwErrorMessage(error);
@@ -202,6 +206,16 @@ const mutations = {
     _state.records = {
       ..._state.records,
       [channelId]: messages,
+    };
+  },
+
+  PREPEND_MESSAGES(_state, { channelId, messages }) {
+    const existing = _state.records[channelId] || [];
+    const existingIds = new Set(existing.map(m => m.id));
+    const newMessages = messages.filter(m => !existingIds.has(m.id));
+    _state.records = {
+      ..._state.records,
+      [channelId]: [...newMessages, ...existing],
     };
   },
 

@@ -20,7 +20,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
         end
       end
     end
-    render json: members.map { |member| member_response(member) }, status: :ok
+    render json: members.map { |member| member_response(member) }, status: :created
   end
 
   def update

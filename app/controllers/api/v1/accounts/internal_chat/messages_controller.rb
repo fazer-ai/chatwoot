@@ -22,7 +22,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       sender: Current.user,
       params: message_params
     ).perform
-    render json: message_response(@message), status: :ok
+    render json: message_response(@message), status: :created
   end
 
   def update
@@ -43,7 +43,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       channel_id: @message.internal_chat_channel_id,
       account_id: @message.account_id
     }
-    @message.update!(content: I18n.t('conversations.messages.deleted'), content_attributes: { deleted: true })
+    @message.update!(content: I18n.t('internal_chat.messages.deleted'), content_attributes: { deleted: true })
     dispatch_message_event(INTERNAL_CHAT_MESSAGE_DELETED, message_data: message_data)
     head :ok
   end
@@ -80,15 +80,25 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def paginated_messages
-    messages = current_channel.messages.includes(:sender, :reactions)
+    messages = apply_time_filters(base_messages_scope)
+    messages.ordered.last(MESSAGES_PER_PAGE)
+  rescue ArgumentError
+    base_messages_scope.ordered.last(MESSAGES_PER_PAGE)
+  end
+
+  def base_messages_scope
+    current_channel.messages.includes(:sender, :reactions, :replies)
+  end
+
+  def apply_time_filters(messages)
     messages = messages.where('internal_chat_messages.created_at < ?', Time.zone.parse(params[:before])) if params[:before].present?
     messages = messages.where('internal_chat_messages.created_at > ?', Time.zone.parse(params[:after])) if params[:after].present?
-    messages.ordered.last(MESSAGES_PER_PAGE)
+    messages
   end
 
   def pagination_meta
     {
-      has_more: current_channel.messages.count > MESSAGES_PER_PAGE
+      has_more: @messages.size >= MESSAGES_PER_PAGE
     }
   end
 
@@ -126,15 +136,15 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       public_results: poll.public_results,
       allow_revote: poll.allow_revote,
       expires_at: poll.expires_at,
-      options: poll.options.ordered.map { |o| poll_option_data(o, poll) },
+      options: poll.options.ordered.includes(votes: :user).map { |o| poll_option_data(o, poll) },
       total_votes: poll.total_votes_count
     }
   end
 
   def poll_option_data(option, poll)
-    data = { id: option.id, text: option.text, emoji: option.emoji, votes_count: option.votes_count,
-             voted: option.votes.exists?(user: Current.user) }
-    data[:voters] = option.votes.includes(:user).map { |v| v.user.push_event_data } if poll.public_results
+    data = { id: option.id, text: option.text, emoji: option.emoji, votes_count: option.votes.size,
+             voted: option.votes.any? { |v| v.user_id == Current.user.id } }
+    data[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
     data
   end
 
