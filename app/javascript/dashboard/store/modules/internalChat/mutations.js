@@ -27,6 +27,9 @@ export const mutations = {
   DELETE_CHANNEL(_state, channelId) {
     const { [channelId]: _, ...rest } = _state.records;
     _state.records = rest;
+    if (_state.activeChannelId === channelId) {
+      _state.activeChannelId = null;
+    }
   },
 
   SET_CATEGORIES(_state, categories) {

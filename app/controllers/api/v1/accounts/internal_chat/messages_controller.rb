@@ -66,7 +66,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def thread
     authorize @message, :thread?, policy_class: InternalChat::MessagePolicy
-    replies = @message.replies.includes(:sender, :reactions).ordered
+    replies = @message.replies.includes(:sender, :reactions, :replies).ordered
     render json: {
       parent: message_response(@message),
       replies: replies.map { |msg| message_response(msg) }

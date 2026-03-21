@@ -8,9 +8,11 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     @channel = Current.account.internal_chat_channels.find(params[:channel_id])
     authorize @channel, :show?, policy_class: InternalChat::ChannelPolicy
 
-    @message = create_poll_message
-    @poll = build_poll
-    create_poll_options
+    ActiveRecord::Base.transaction do
+      @message = create_poll_message
+      @poll = build_poll
+      create_poll_options
+    end
 
     render json: message_with_poll_response(@message, @poll), status: :created
   end

@@ -256,7 +256,9 @@ const mutations = {
     const index = existing.findIndex(m => m.id === messageId);
     if (index > -1) {
       const message = existing[index];
-      const reactions = [...(message.reactions || []), reaction];
+      const currentReactions = message.reactions || [];
+      if (currentReactions.some(r => r.id === reaction.id)) return;
+      const reactions = [...currentReactions, reaction];
       const updated = [...existing];
       updated[index] = { ...message, reactions };
       _state.records = {

@@ -16,22 +16,29 @@ export const getters = {
       channel =>
         channel.category_id === categoryId &&
         !channel.is_dm &&
-        channel.channel_type !== 'dm'
+        channel.channel_type !== 'dm' &&
+        channel.status !== 'archived'
     );
   },
 
   getDMChannels: _state => {
     return Object.values(_state.records).filter(
-      channel => channel.is_dm || channel.channel_type === 'dm'
+      channel =>
+        (channel.is_dm || channel.channel_type === 'dm') &&
+        channel.status !== 'archived'
     );
   },
 
   getFavoriteChannels: _state => {
-    return Object.values(_state.records).filter(channel => channel.favorited);
+    return Object.values(_state.records).filter(
+      channel => channel.favorited && channel.status !== 'archived'
+    );
   },
 
   getMutedChannels: _state => {
-    return Object.values(_state.records).filter(channel => channel.muted);
+    return Object.values(_state.records).filter(
+      channel => channel.muted && channel.status !== 'archived'
+    );
   },
 
   getCategories: _state => {

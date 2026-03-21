@@ -270,9 +270,14 @@ class ActionCableConnector extends BaseActionCableConnector {
       data.internal_chat_channel_id
     );
     if (channel) {
+      const activeChannelId =
+        this.app.$store.getters['internalChat/getActiveChannelId'];
+      const isActiveChannel = activeChannelId === data.internal_chat_channel_id;
       this.app.$store.dispatch('internalChat/updateChannel', {
         id: data.internal_chat_channel_id,
-        unread_count: (channel.unread_count || 0) + 1,
+        unread_count: isActiveChannel
+          ? channel.unread_count || 0
+          : (channel.unread_count || 0) + 1,
         last_activity_at: data.created_at,
       });
     }

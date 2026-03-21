@@ -120,9 +120,13 @@ class InternalChatListener < BaseListener
       sender: message.sender.push_event_data,
       parent_id: message.parent_id,
       echo_id: message.echo_id,
+      replies_count: message.replies.size,
       created_at: message.created_at,
       updated_at: message.updated_at,
-      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } }
+      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
+      attachments: message.attachments.map do |a|
+        { id: a.id, file_type: a.file_type, external_url: a.external_url, extension: a.extension }
+      end
     }
   end
 

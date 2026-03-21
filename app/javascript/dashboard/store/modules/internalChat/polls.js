@@ -60,9 +60,15 @@ const actions = {
     }
   },
 
-  updatePollFromCable: ({ dispatch }, { channelId, poll }) => {
+  updatePollFromCable: ({ dispatch, rootGetters }, { channelId, poll }) => {
     const messageId = poll.internal_chat_message_id;
     if (!messageId) return;
+
+    const existingMessage = rootGetters['internalChat/messages/getMessageById'](
+      channelId,
+      messageId
+    );
+    const existingAttrs = existingMessage?.content_attributes || {};
 
     dispatch(
       'internalChat/messages/updateMessageFromCable',
@@ -71,7 +77,7 @@ const actions = {
         message: {
           id: messageId,
           poll: { ...poll },
-          content_attributes: { poll: { ...poll } },
+          content_attributes: { ...existingAttrs, poll: { ...poll } },
         },
       },
       { root: true }

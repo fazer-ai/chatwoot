@@ -93,7 +93,7 @@ function handleScroll() {
   const { scrollTop, scrollHeight, clientHeight } = listRef.value;
   showScrollToBottom.value = scrollHeight - scrollTop - clientHeight > 100;
 
-  if (scrollTop === 0 && props.messages.length > 0) {
+  if (scrollTop === 0 && props.messages.length > 0 && !props.isLoading) {
     emit('loadMore');
   }
 }

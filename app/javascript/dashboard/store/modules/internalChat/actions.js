@@ -73,18 +73,46 @@ export const actions = {
     }
   },
 
-  toggleMute: async ({ commit, state }, channelId) => {
+  toggleMute: async ({ commit, state, rootGetters }, channelId) => {
     const channel = state.records[channelId];
     if (!channel) return;
-    const updatedChannel = { ...channel, muted: !channel.muted };
-    commit('UPDATE_CHANNEL', updatedChannel);
+    const currentUserId = rootGetters.getCurrentUser?.id;
+    const member = (channel.members || []).find(
+      m => m.user_id === currentUserId
+    );
+    if (!member) return;
+
+    const newMuted = !channel.muted;
+    commit('UPDATE_CHANNEL', { id: channelId, muted: newMuted });
+    try {
+      await InternalChatChannelsAPI.updateMember(channelId, member.id, {
+        muted: newMuted,
+      });
+    } catch (error) {
+      commit('UPDATE_CHANNEL', { id: channelId, muted: !newMuted });
+      throwErrorMessage(error);
+    }
   },
 
-  toggleFavorite: async ({ commit, state }, channelId) => {
+  toggleFavorite: async ({ commit, state, rootGetters }, channelId) => {
     const channel = state.records[channelId];
     if (!channel) return;
-    const updatedChannel = { ...channel, favorited: !channel.favorited };
-    commit('UPDATE_CHANNEL', updatedChannel);
+    const currentUserId = rootGetters.getCurrentUser?.id;
+    const member = (channel.members || []).find(
+      m => m.user_id === currentUserId
+    );
+    if (!member) return;
+
+    const newFavorited = !channel.favorited;
+    commit('UPDATE_CHANNEL', { id: channelId, favorited: newFavorited });
+    try {
+      await InternalChatChannelsAPI.updateMember(channelId, member.id, {
+        favorited: newFavorited,
+      });
+    } catch (error) {
+      commit('UPDATE_CHANNEL', { id: channelId, favorited: !newFavorited });
+      throwErrorMessage(error);
+    }
   },
 
   markRead: async ({ commit }, channelId) => {

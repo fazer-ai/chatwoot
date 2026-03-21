@@ -13,6 +13,10 @@ export async function login(
     data: { email, password },
   });
 
+  if (!response.ok()) {
+    throw new Error(`Login failed with status ${response.status()}`);
+  }
+
   const body = await response.json();
   const data = body.data;
 
@@ -46,8 +50,10 @@ export async function login(
 
 export async function loginAndNavigateToInternalChat(page: Page) {
   const baseURL = 'http://localhost:3000';
-  await login(page, baseURL);
-  await page.goto(`${baseURL}/app/accounts/1/internal-chat`);
+  const { data } = await login(page, baseURL);
+  await page.goto(
+    `${baseURL}/app/accounts/${data.account_id}/internal-chat`
+  );
   await page.waitForLoadState('networkidle');
 }
 
@@ -56,11 +62,21 @@ export async function loginAndNavigateToChannel(
   channelId: number
 ) {
   const baseURL = 'http://localhost:3000';
-  await login(page, baseURL);
+  const { data } = await login(page, baseURL);
   await page.goto(
-    `${baseURL}/app/accounts/1/internal-chat/channels/${channelId}`
+    `${baseURL}/app/accounts/${data.account_id}/internal-chat/channels/${channelId}`
   );
   await page.waitForLoadState('networkidle');
+}
+
+async function getAccountId(page: Page): Promise<number> {
+  const cookies = await page.context().cookies();
+  const sessionCookie = cookies.find(c => c.name === 'cw_d_session_info');
+  if (sessionCookie) {
+    const parsed = JSON.parse(decodeURIComponent(sessionCookie.value));
+    return parsed.account_id;
+  }
+  throw new Error('No session cookie found — call login() first');
 }
 
 export async function createChannelViaAPI(
@@ -68,8 +84,9 @@ export async function createChannelViaAPI(
   channelData: { name: string; description?: string; channel_type?: string }
 ) {
   const baseURL = 'http://localhost:3000';
+  const accountId = await getAccountId(page);
   const response = await page.request.post(
-    `${baseURL}/api/v1/accounts/1/internal_chat/channels`,
+    `${baseURL}/api/v1/accounts/${accountId}/internal_chat/channels`,
     { data: channelData }
   );
   return response.json();
@@ -77,8 +94,9 @@ export async function createChannelViaAPI(
 
 export async function createDMViaAPI(page: Page, targetUserId: number) {
   const baseURL = 'http://localhost:3000';
+  const accountId = await getAccountId(page);
   const response = await page.request.post(
-    `${baseURL}/api/v1/accounts/1/internal_chat/channels`,
+    `${baseURL}/api/v1/accounts/${accountId}/internal_chat/channels`,
     {
       data: {
         channel_type: 'dm',
@@ -95,8 +113,9 @@ export async function sendMessageViaAPI(
   content: string
 ) {
   const baseURL = 'http://localhost:3000';
+  const accountId = await getAccountId(page);
   const response = await page.request.post(
-    `${baseURL}/api/v1/accounts/1/internal_chat/channels/${channelId}/messages`,
+    `${baseURL}/api/v1/accounts/${accountId}/internal_chat/channels/${channelId}/messages`,
     { data: { content } }
   );
   return response.json();

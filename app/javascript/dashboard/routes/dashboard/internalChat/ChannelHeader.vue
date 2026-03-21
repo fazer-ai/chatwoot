@@ -35,7 +35,7 @@ const isDM = computed(() => {
 });
 
 const isArchived = computed(() => {
-  return props.channel.archived;
+  return props.channel.status === 'archived';
 });
 
 const channelIcon = computed(() => {

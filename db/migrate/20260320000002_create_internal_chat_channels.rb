@@ -10,7 +10,7 @@ class CreateInternalChatChannels < ActiveRecord::Migration[7.0]
       t.bigint :created_by_id
       t.datetime :last_activity_at, null: false
       t.integer :messages_count, default: 0
-      t.uuid :uuid, null: false, default: 'gen_random_uuid()'
+      t.uuid :uuid, null: false, default: -> { 'gen_random_uuid()' }
       t.timestamps
     end
     add_index :internal_chat_channels, [:account_id, :channel_type]
