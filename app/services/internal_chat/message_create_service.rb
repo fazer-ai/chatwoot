@@ -4,6 +4,8 @@ class InternalChat::MessageCreateService
   pattr_initialize [:channel!, :sender!, :params!]
 
   def perform
+    validate_parent_message! if params[:parent_id].present?
+
     @message = channel.messages.create!(
       account: channel.account,
       sender: sender,
@@ -20,6 +22,10 @@ class InternalChat::MessageCreateService
   end
 
   private
+
+  def validate_parent_message!
+    raise ActiveRecord::RecordNotFound, 'Parent message not found in this channel' unless channel.messages.exists?(id: params[:parent_id])
+  end
 
   def process_attachments
     params[:attachments].each do |attachment|

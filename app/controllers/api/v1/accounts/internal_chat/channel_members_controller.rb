@@ -11,9 +11,13 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
   def create
     authorize current_channel, :update?, policy_class: InternalChat::ChannelPolicy
     user_ids = Array(params[:user_ids] || [params[:user_id]]).compact.map(&:to_i)
-    members = user_ids.map do |user_id|
-      current_channel.channel_members.find_or_create_by!(user_id: user_id) do |m|
-        m.role = params[:role] || :member
+    valid_user_ids = Current.account.users.where(id: user_ids).pluck(:id)
+
+    members = ActiveRecord::Base.transaction do
+      valid_user_ids.map do |user_id|
+        current_channel.channel_members.find_or_create_by!(user_id: user_id) do |m|
+          m.role = params[:role] || :member
+        end
       end
     end
     render json: members.map { |member| member_response(member) }, status: :ok

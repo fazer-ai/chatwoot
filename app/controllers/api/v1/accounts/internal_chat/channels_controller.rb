@@ -157,6 +157,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def dm_member_ids
     ids = Array(params[:member_ids] || params.dig(:channel, :member_ids)).map(&:to_i)
+    ids = Current.account.users.where(id: ids).pluck(:id)
     ids << Current.user.id unless ids.include?(Current.user.id)
     ids
   end
@@ -170,6 +171,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def add_initial_members
     member_ids = Array(params[:member_ids] || params.dig(:channel, :member_ids)).map(&:to_i)
+    member_ids = Current.account.users.where(id: member_ids).pluck(:id)
     member_ids << Current.user.id if @channel.channel_type_dm? && member_ids.exclude?(Current.user.id)
 
     member_ids.uniq.each do |user_id|

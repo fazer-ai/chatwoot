@@ -32,7 +32,7 @@ const actions = {
         channelId,
         params
       );
-      const messages = response.data;
+      const messages = response.data.messages || response.data;
       commit('SET_MESSAGES', { channelId, messages });
       return messages;
     } catch (error) {

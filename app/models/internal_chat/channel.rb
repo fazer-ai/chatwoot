@@ -56,6 +56,7 @@ class InternalChat::Channel < ApplicationRecord
   validates :name, presence: true, unless: :channel_type_dm?
   validates :uuid, uniqueness: true
 
+  before_validation :generate_uuid, on: :create
   before_validation :set_last_activity_at, on: :create
 
   scope :active, -> { where(status: :active) }
@@ -68,6 +69,10 @@ class InternalChat::Channel < ApplicationRecord
   end
 
   private
+
+  def generate_uuid
+    self.uuid ||= SecureRandom.uuid
+  end
 
   def set_last_activity_at
     self.last_activity_at ||= Time.current

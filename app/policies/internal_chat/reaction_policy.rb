@@ -4,6 +4,7 @@ class InternalChat::ReactionPolicy < ApplicationPolicy
   end
 
   def destroy?
+    return false unless channel_accessible?
     return true if administrator?
 
     record.user_id == @user.id

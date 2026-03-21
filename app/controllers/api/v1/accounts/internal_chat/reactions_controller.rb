@@ -30,7 +30,7 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
   private
 
   def fetch_message
-    @message = InternalChat::Message.find(params[:message_id])
+    @message = InternalChat::Message.joins(:channel).where(internal_chat_channels: { account_id: Current.account.id }).find(params[:message_id])
   end
 
   def reaction_response(reaction)
