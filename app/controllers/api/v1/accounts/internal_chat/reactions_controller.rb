@@ -4,7 +4,7 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
   before_action :fetch_message
 
   def create
-    @reaction = @message.reactions.build(user: Current.user, emoji: params[:emoji])
+    @reaction = @message.reactions.build(user: Current.user, emoji: reaction_params[:emoji])
     authorize @reaction, :create?, policy_class: InternalChat::ReactionPolicy
     @reaction.save!
     dispatch_reaction_event(INTERNAL_CHAT_REACTION_CREATED, reaction: @reaction)
@@ -41,6 +41,10 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
       internal_chat_message_id: reaction.internal_chat_message_id,
       created_at: reaction.created_at
     }
+  end
+
+  def reaction_params
+    params.permit(:emoji)
   end
 
   def dispatch_reaction_event(event, data)

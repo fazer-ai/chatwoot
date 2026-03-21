@@ -8,9 +8,9 @@ RSpec.describe InternalChat::Message do
     it { is_expected.to belong_to(:channel).class_name('InternalChat::Channel') }
     it { is_expected.to belong_to(:sender).class_name('User') }
     it { is_expected.to belong_to(:parent).class_name('InternalChat::Message').optional }
-    it { is_expected.to have_many(:replies).class_name('InternalChat::Message').dependent(:destroy_async) }
-    it { is_expected.to have_many(:attachments).class_name('InternalChat::MessageAttachment').dependent(:destroy_async) }
-    it { is_expected.to have_many(:reactions).class_name('InternalChat::Reaction').dependent(:destroy_async) }
+    it { is_expected.to have_many(:replies).class_name('InternalChat::Message').dependent(:destroy) }
+    it { is_expected.to have_many(:attachments).class_name('InternalChat::MessageAttachment').dependent(:destroy) }
+    it { is_expected.to have_many(:reactions).class_name('InternalChat::Reaction').dependent(:destroy) }
   end
 
   describe 'enums' do

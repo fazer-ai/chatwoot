@@ -2,18 +2,24 @@ class InternalChat::PollService
   pattr_initialize [:poll!, :user!, :option!]
 
   def vote
+    validate_option_belongs_to_poll!
     validate_vote!
     option.votes.create!(user: user)
     poll.reload
   end
 
   def unvote
+    validate_option_belongs_to_poll!
     vote_record = option.votes.find_by!(user: user)
     vote_record.destroy!
     poll.reload
   end
 
   private
+
+  def validate_option_belongs_to_poll!
+    raise ArgumentError, 'Option does not belong to this poll' unless option.internal_chat_poll_id == poll.id
+  end
 
   def validate_vote!
     raise StandardError, 'Poll has expired' if poll.expired?

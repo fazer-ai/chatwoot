@@ -39,11 +39,11 @@ class InternalChat::Message < ApplicationRecord
   belongs_to :parent, class_name: 'InternalChat::Message', optional: true, inverse_of: :replies
 
   has_many :replies, class_name: 'InternalChat::Message', foreign_key: :parent_id,
-                     dependent: :destroy_async, inverse_of: :parent
+                     dependent: :destroy, inverse_of: :parent
   has_many :attachments, class_name: 'InternalChat::MessageAttachment', foreign_key: :internal_chat_message_id,
-                         dependent: :destroy_async, inverse_of: :message
+                         dependent: :destroy, inverse_of: :message
   has_many :reactions, class_name: 'InternalChat::Reaction', foreign_key: :internal_chat_message_id,
-                       dependent: :destroy_async, inverse_of: :message
+                       dependent: :destroy, inverse_of: :message
   has_one :poll, class_name: 'InternalChat::Poll', foreign_key: :internal_chat_message_id,
                  dependent: :destroy, inverse_of: :message
 

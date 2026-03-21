@@ -38,7 +38,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def update
     authorize @current_channel, :update?
-    @current_channel.update!(update_channel_params)
+    attrs = update_channel_params
+    validate_category!(attrs[:category_id])
+    @current_channel.update!(attrs)
     dispatch_channel_event(@current_channel)
     render json: channel_show_response(@current_channel)
   end
@@ -138,7 +140,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     if dm_params?
       find_or_build_dm
     else
-      Current.account.internal_chat_channels.build(create_channel_params.except(:member_ids).merge(created_by: Current.user))
+      attrs = create_channel_params.except(:member_ids)
+      validate_category!(attrs[:category_id])
+      Current.account.internal_chat_channels.build(attrs.merge(created_by: Current.user))
     end
   end
 
@@ -329,6 +333,12 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       extension: attachment.extension,
       file_url: attachment.file.attached? ? url_for(attachment.file) : nil
     }
+  end
+
+  def validate_category!(category_id)
+    return if category_id.blank?
+
+    Current.account.internal_chat_categories.find(category_id)
   end
 
   def dispatch_channel_event(channel)

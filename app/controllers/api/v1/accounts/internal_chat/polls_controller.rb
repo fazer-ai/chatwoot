@@ -15,6 +15,8 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
       create_poll_options
     end
 
+    dispatch_message_created_event
+
     render json: message_with_poll_response(@message, @poll), status: :created
   end
 
@@ -55,11 +57,12 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   end
 
   def create_poll_message
-    InternalChat::MessageCreateService.new(
-      channel: @channel,
+    @channel.messages.create!(
+      account: Current.account,
       sender: Current.user,
-      params: { content: poll_params[:question], content_type: :poll }
-    ).perform
+      content: poll_params[:question],
+      content_type: :poll
+    )
   end
 
   def build_poll
@@ -150,6 +153,10 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
     }
     response[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
     response
+  end
+
+  def dispatch_message_created_event
+    Rails.configuration.dispatcher.dispatch(INTERNAL_CHAT_MESSAGE_CREATED, Time.zone.now, message: @message)
   end
 
   def dispatch_poll_event
