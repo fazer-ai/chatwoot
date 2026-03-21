@@ -88,7 +88,11 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
 
     raise ActionController::BadRequest, 'Revoting is not allowed' unless @poll.allow_revote
 
-    existing_votes.destroy_all unless @poll.multiple_choice
+    if @poll.multiple_choice
+      raise ActionController::BadRequest, 'Already voted for this option' if @option.votes.exists?(user_id: Current.user.id)
+    else
+      existing_votes.destroy_all
+    end
   end
 
   def existing_user_votes

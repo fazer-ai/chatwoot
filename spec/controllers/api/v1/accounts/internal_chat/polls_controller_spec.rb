@@ -192,7 +192,7 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
         expect(InternalChat::PollVote.where(user: agent).count).to eq(2)
       end
 
-      it 'returns unprocessable entity when voting on the same option twice in a multiple-choice poll' do
+      it 'returns bad request when voting on the same option twice in a multiple-choice poll' do
         poll.update!(multiple_choice: true, allow_revote: true)
         create(:internal_chat_poll_vote, option: option, user: agent)
 
@@ -201,7 +201,7 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:bad_request)
         expect(InternalChat::PollVote.where(user: agent, internal_chat_poll_option_id: option.id).count).to eq(1)
       end
 
