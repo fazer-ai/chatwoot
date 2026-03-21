@@ -8,8 +8,10 @@ class CreateInternalChatDrafts < ActiveRecord::Migration[7.0]
       t.bigint :parent_id
       t.timestamps
     end
-    add_index :internal_chat_drafts, [:user_id, :internal_chat_channel_id, :parent_id], unique: true,
-                                                                                        name: 'idx_ic_drafts_user_channel_parent'
+    add_index :internal_chat_drafts, [:user_id, :internal_chat_channel_id],
+              unique: true, where: 'parent_id IS NULL', name: 'idx_ic_drafts_user_channel_root_unique'
+    add_index :internal_chat_drafts, [:user_id, :internal_chat_channel_id, :parent_id],
+              unique: true, where: 'parent_id IS NOT NULL', name: 'idx_ic_drafts_user_channel_parent_unique'
     add_index :internal_chat_drafts, [:user_id, :updated_at], name: 'idx_ic_drafts_user_updated'
   end
 end
