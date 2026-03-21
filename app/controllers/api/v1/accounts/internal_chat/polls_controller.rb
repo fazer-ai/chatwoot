@@ -7,6 +7,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   def create
     @channel = Current.account.internal_chat_channels.find(params[:channel_id])
     authorize @channel, :show?, policy_class: InternalChat::ChannelPolicy
+    raise ActionController::BadRequest, 'Options are required' if poll_params[:options].blank?
 
     ActiveRecord::Base.transaction do
       @message = create_poll_message
@@ -27,6 +28,8 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   end
 
   def unvote
+    raise ActionController::BadRequest, 'Poll has expired' if @poll.expired?
+
     @vote = InternalChat::PollVote.joins(:option)
                                   .where(internal_chat_poll_options: { internal_chat_poll_id: @poll.id }, user_id: Current.user.id)
                                   .first!

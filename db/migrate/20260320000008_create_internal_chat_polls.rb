@@ -1,7 +1,7 @@
 class CreateInternalChatPolls < ActiveRecord::Migration[7.0]
   def change
     create_table :internal_chat_polls do |t|
-      t.references :internal_chat_message, null: false, foreign_key: true, index: { name: 'idx_ic_polls_message' }
+      t.references :internal_chat_message, null: false, foreign_key: true, index: false
       t.string :question, null: false
       t.boolean :multiple_choice, null: false, default: false
       t.boolean :public_results, null: false, default: true

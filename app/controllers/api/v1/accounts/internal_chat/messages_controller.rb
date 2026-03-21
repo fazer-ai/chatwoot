@@ -29,7 +29,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
     authorize @message, :update?, policy_class: InternalChat::MessagePolicy
     previous_content = @message.content
     @message.update!(
-      content: params[:content],
+      content: update_params[:content],
       content_attributes: (@message.content_attributes || {}).merge('edited_at' => Time.current.iso8601, 'previous_content' => previous_content)
     )
     dispatch_message_event(INTERNAL_CHAT_MESSAGE_UPDATED, message: @message)
@@ -104,6 +104,10 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def message_params
     params.permit(:content, :content_type, :parent_id, :echo_id, attachments: [:file, :file_type])
+  end
+
+  def update_params
+    params.permit(:content)
   end
 
   def message_response(message)
