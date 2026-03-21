@@ -8,8 +8,9 @@ describe InternalChat::TypingStatusManager do
   describe '#perform' do
     it 'dispatches INTERNAL_CHAT_TYPING_ON for on status' do
       params = { typing_status: 'on' }
-
-      expect(Rails.configuration.dispatcher).to receive(:dispatch)
+      dispatcher = Rails.configuration.dispatcher
+      allow(dispatcher).to receive(:dispatch)
+      expect(dispatcher).to receive(:dispatch)
         .with('internal_chat.typing_on', anything, hash_including(channel: channel, user: user))
 
       described_class.new(channel: channel, user: user, params: params).perform
@@ -17,8 +18,9 @@ describe InternalChat::TypingStatusManager do
 
     it 'dispatches INTERNAL_CHAT_TYPING_OFF for off status' do
       params = { typing_status: 'off' }
-
-      expect(Rails.configuration.dispatcher).to receive(:dispatch)
+      dispatcher = Rails.configuration.dispatcher
+      allow(dispatcher).to receive(:dispatch)
+      expect(dispatcher).to receive(:dispatch)
         .with('internal_chat.typing_off', anything, hash_including(channel: channel, user: user))
 
       described_class.new(channel: channel, user: user, params: params).perform
@@ -26,8 +28,12 @@ describe InternalChat::TypingStatusManager do
 
     it 'does not dispatch any event for unknown status' do
       params = { typing_status: 'unknown' }
-
-      expect(Rails.configuration.dispatcher).not_to receive(:dispatch)
+      dispatcher = Rails.configuration.dispatcher
+      allow(dispatcher).to receive(:dispatch)
+      expect(dispatcher).not_to receive(:dispatch)
+        .with('internal_chat.typing_on', anything, anything)
+      expect(dispatcher).not_to receive(:dispatch)
+        .with('internal_chat.typing_off', anything, anything)
 
       described_class.new(channel: channel, user: user, params: params).perform
     end

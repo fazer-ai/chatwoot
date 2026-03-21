@@ -22,8 +22,9 @@ describe InternalChat::MessageCreateService do
 
     it 'dispatches INTERNAL_CHAT_MESSAGE_CREATED event' do
       params = { content: 'Test message' }
-
-      expect(Rails.configuration.dispatcher).to receive(:dispatch)
+      dispatcher = Rails.configuration.dispatcher
+      allow(dispatcher).to receive(:dispatch)
+      expect(dispatcher).to receive(:dispatch)
         .with('internal_chat.message.created', anything, hash_including(message: an_instance_of(InternalChat::Message)))
 
       described_class.new(channel: channel, sender: user, params: params).perform

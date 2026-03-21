@@ -75,7 +75,7 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
                                                      created_at: 1.minute.ago)
 
         get "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
-            params: { after: old_message.created_at.iso8601 },
+            params: { after: (old_message.created_at + 1.second).iso8601 },
             headers: agent.create_new_auth_token,
             as: :json
 
