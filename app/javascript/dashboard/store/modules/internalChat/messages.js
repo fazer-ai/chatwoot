@@ -113,6 +113,66 @@ const actions = {
     }
   },
 
+  fetchThread: async ({ commit }, { channelId, messageId }) => {
+    commit('SET_UI_FLAG', { isFetching: true });
+    try {
+      const response = await InternalChatMessagesAPI.getThread(
+        channelId,
+        messageId
+      );
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    } finally {
+      commit('SET_UI_FLAG', { isFetching: false });
+    }
+  },
+
+  sendThreadReply: async ({ commit }, { channelId, parentMessageId, data }) => {
+    commit('SET_UI_FLAG', { isSending: true });
+    try {
+      const response = await InternalChatMessagesAPI.createMessage(channelId, {
+        ...data,
+        parent_id: parentMessageId,
+      });
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    } finally {
+      commit('SET_UI_FLAG', { isSending: false });
+    }
+  },
+
+  pinMessage: async ({ commit }, { channelId, messageId }) => {
+    try {
+      const response = await InternalChatMessagesAPI.pinMessage(
+        channelId,
+        messageId
+      );
+      commit('UPDATE_MESSAGE', { channelId, message: response.data });
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    }
+  },
+
+  unpinMessage: async ({ commit }, { channelId, messageId }) => {
+    try {
+      const response = await InternalChatMessagesAPI.unpinMessage(
+        channelId,
+        messageId
+      );
+      commit('UPDATE_MESSAGE', { channelId, message: response.data });
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    }
+  },
+
   addMessageFromCable: ({ commit }, { channelId, message }) => {
     commit('ADD_MESSAGE', { channelId, message });
   },

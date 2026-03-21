@@ -10,20 +10,20 @@
     "NO_CHANNELS": "Nenhum canal encontrado",
     "CHANNEL": {
       "NAME": "Nome do Canal",
-      "DESCRIPTION": "Descrição",
+      "DESCRIPTION": "Descri\u00e7\u00e3o",
       "TYPE": "Tipo do Canal",
-      "PUBLIC": "Público",
+      "PUBLIC": "P\u00fablico",
       "PRIVATE": "Privado",
       "MEMBERS": "Membros",
       "ARCHIVE": "Arquivar Canal",
       "DELETE": "Excluir Canal",
       "MUTE": "Silenciar Canal",
-      "UNMUTE": "Reativar Notificações",
+      "UNMUTE": "Reativar Notifica\u00e7\u00f5es",
       "FAVORITE": "Adicionar aos Favoritos",
       "UNFAVORITE": "Remover dos Favoritos",
-      "MARK_UNREAD": "Marcar como Não Lida",
+      "MARK_UNREAD": "Marcar como N\u00e3o Lida",
       "NO_MESSAGES": "Nenhuma mensagem ainda. Inicie a conversa!",
-      "ARCHIVED": "Este canal está arquivado",
+      "ARCHIVED": "Este canal est\u00e1 arquivado",
       "MEMBER_COUNT": "{count} membro | {count} membros"
     },
     "MESSAGE": {
@@ -33,14 +33,44 @@
       "REPLY": "Responder",
       "REACT": "Reagir",
       "EDITED": "(editado)",
-      "DELETED": "Esta mensagem foi excluída",
+      "DELETED": "Esta mensagem foi exclu\u00edda",
       "SEND": "Enviar",
       "UPLOAD_FILE": "Enviar Arquivo",
       "CONFIRM_DELETE": "Tem certeza que deseja excluir esta mensagem?"
     },
+    "THREAD": {
+      "TITLE": "Conversa",
+      "REPLIES": "{count} respostas",
+      "REPLY_PLACEHOLDER": "Responder na conversa..."
+    },
+    "POLL": {
+      "CREATE": "Criar Enquete",
+      "QUESTION": "Pergunta",
+      "OPTIONS": "Op\u00e7\u00f5es",
+      "MULTIPLE_CHOICE": "M\u00faltipla escolha",
+      "DURATION": "Dura\u00e7\u00e3o",
+      "PUBLIC_RESULTS": "Resultados p\u00fablicos",
+      "VOTE": "Votar",
+      "VOTES": "{count} votos",
+      "EXPIRED": "Expirada",
+      "PIN": "Fixar enquete",
+      "ADD_OPTION": "Adicionar op\u00e7\u00e3o",
+      "CANCEL": "Cancelar"
+    },
+    "DRAFT": {
+      "TITLE": "Rascunhos",
+      "NO_DRAFTS": "Nenhum rascunho ainda",
+      "DELETE": "Excluir rascunho",
+      "SAVED_AGO": "Salvo h\u00e1 {time}"
+    },
+    "PIN": {
+      "PINNED_MESSAGE": "Mensagem fixada",
+      "PIN": "Fixar mensagem",
+      "UNPIN": "Desafixar mensagem"
+    },
     "TYPING": {
-      "SINGLE": "{name} está digitando...",
-      "MULTIPLE": "{names} estão digitando..."
+      "SINGLE": "{name} est\u00e1 digitando...",
+      "MULTIPLE": "{names} est\u00e3o digitando..."
     },
     "DM": {
       "NEW": "Nova Mensagem Direta",

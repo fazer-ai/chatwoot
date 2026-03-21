@@ -68,6 +68,10 @@ const filteredFavoriteChannels = computed(() => {
   return favs.filter(ch => (ch.name || '').toLowerCase().includes(query));
 });
 
+const isDraftsRoute = computed(() => {
+  return route.name === 'internal_chat_drafts';
+});
+
 function navigateToChannel(channel) {
   const routeName =
     channel.channel_type === 'dm'
@@ -76,6 +80,13 @@ function navigateToChannel(channel) {
   router.push({
     name: routeName,
     params: { accountId: accountId.value, channelId: channel.id },
+  });
+}
+
+function navigateToDrafts() {
+  router.push({
+    name: 'internal_chat_drafts',
+    params: { accountId: accountId.value },
   });
 }
 
@@ -104,6 +115,22 @@ function getChannelIcon(channel) {
           class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 py-1.5 pl-8 pr-3 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
         />
       </div>
+    </div>
+    <div class="px-1.5 pb-2">
+      <button
+        class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
+        :class="
+          isDraftsRoute
+            ? 'bg-n-alpha-2 text-n-slate-12'
+            : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12'
+        "
+        @click="navigateToDrafts"
+      >
+        <Icon icon="i-lucide-file-edit" class="size-4 flex-shrink-0" />
+        <span class="flex-1 text-left">{{
+          t('INTERNAL_CHAT.DRAFT.TITLE')
+        }}</span>
+      </button>
     </div>
     <div class="flex-1 overflow-y-auto px-1.5">
       <!-- Favorites -->

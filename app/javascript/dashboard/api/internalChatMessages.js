@@ -34,6 +34,25 @@ class InternalChatMessagesAPI extends ApiClient {
     return axios.delete(`${this.url}/${channelId}/messages/${messageId}/unpin`);
   }
 
+  createPoll(channelId, data) {
+    return axios.post(`${this.url}/${channelId}/messages`, {
+      content_type: 'poll',
+      ...data,
+    });
+  }
+
+  votePoll(channelId, messageId, optionId) {
+    return axios.post(`${this.url}/${channelId}/messages/${messageId}/vote`, {
+      option_id: optionId,
+    });
+  }
+
+  unvotePoll(channelId, messageId, optionId) {
+    return axios.delete(`${this.url}/${channelId}/messages/${messageId}/vote`, {
+      data: { option_id: optionId },
+    });
+  }
+
   addReaction(messageId, emoji) {
     const baseUrl = this.url.replace('/channels', '');
     return axios.post(`${baseUrl}/messages/${messageId}/reactions`, {

@@ -8,6 +8,8 @@ import ChannelHeader from './ChannelHeader.vue';
 import MessageList from './MessageList.vue';
 import MessageEditor from './MessageEditor.vue';
 import TypingIndicator from './TypingIndicator.vue';
+import ThreadPanel from './ThreadPanel.vue';
+import PollCreator from './PollCreator.vue';
 
 const props = defineProps({
   channelId: {
@@ -25,6 +27,8 @@ const typingUsers = computed(() => {
   );
 });
 const editorRef = ref(null);
+const activeThread = ref(null);
+const showPollCreator = ref(false);
 
 const currentUser = useMapGetter('getCurrentUser');
 
@@ -53,6 +57,10 @@ const isArchived = computed(() => {
   return channel.value?.archived;
 });
 
+const pinnedMessage = computed(() => {
+  return messages.value.find(m => m.pinned) || null;
+});
+
 function markRead() {
   store.dispatch('internalChat/markRead', props.channelId);
 }
@@ -64,6 +72,20 @@ async function fetchMessages() {
     });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.FETCH_MESSAGES'));
+  }
+}
+
+async function loadDraft() {
+  try {
+    await store.dispatch('internalChat/drafts/fetchDrafts');
+    const draft = store.getters['internalChat/drafts/getDraftByChannelId'](
+      props.channelId
+    );
+    if (draft && editorRef.value) {
+      editorRef.value.setContent(draft.content);
+    }
+  } catch {
+    // Silently handle draft load error
   }
 }
 
@@ -80,7 +102,6 @@ async function handleSend(content) {
 }
 
 async function handleEdit(message) {
-  // TODO: replace with modal dialog
   try {
     await store.dispatch('internalChat/messages/updateMessage', {
       channelId: props.channelId,
@@ -144,47 +165,156 @@ function handleTyping() {
   InternalChatChannelsAPI.toggleTypingStatus(props.channelId, 'on');
 }
 
+function handleReply(message) {
+  activeThread.value = message;
+}
+
+function handleOpenThread(message) {
+  activeThread.value = message;
+}
+
+function closeThread() {
+  activeThread.value = null;
+}
+
+async function handlePin(message) {
+  try {
+    await store.dispatch('internalChat/messages/pinMessage', {
+      channelId: props.channelId,
+      messageId: message.id,
+    });
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
+async function handleUnpin(message) {
+  try {
+    await store.dispatch('internalChat/messages/unpinMessage', {
+      channelId: props.channelId,
+      messageId: message.id,
+    });
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
+async function handleVote({ messageId, optionId }) {
+  try {
+    await store.dispatch('internalChat/polls/vote', {
+      channelId: props.channelId,
+      messageId,
+      optionId,
+    });
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
+async function handleUnvote({ messageId, optionId }) {
+  try {
+    await store.dispatch('internalChat/polls/unvote', {
+      channelId: props.channelId,
+      messageId,
+      optionId,
+    });
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
+async function handlePollSubmit(pollData) {
+  try {
+    await store.dispatch('internalChat/polls/createPoll', {
+      channelId: props.channelId,
+      data: pollData,
+    });
+    showPollCreator.value = false;
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
+async function handleDraftUpdate(content) {
+  if (!content || !content.trim()) return;
+  try {
+    await store.dispatch('internalChat/drafts/saveDraft', {
+      channelId: props.channelId,
+      content,
+    });
+  } catch {
+    // Silently handle draft save error
+  }
+}
+
 watch(
   () => props.channelId,
   () => {
     fetchMessages();
     markRead();
+    loadDraft();
+    activeThread.value = null;
   }
 );
 
 onMounted(() => {
   fetchMessages();
   markRead();
+  loadDraft();
 });
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-n-solid-1">
-    <ChannelHeader :channel="channel" />
-    <MessageList
-      :messages="messages"
+  <div class="flex h-full">
+    <div class="flex flex-1 flex-col bg-n-solid-1 min-w-0">
+      <ChannelHeader :channel="channel" :pinned-message="pinnedMessage" />
+      <MessageList
+        :messages="messages"
+        :current-user-id="currentUserId"
+        :is-admin="isAdmin"
+        :is-loading="messagesUIFlags.isFetching"
+        @edit="handleEdit"
+        @delete="handleDelete"
+        @reply="handleReply"
+        @open-thread="handleOpenThread"
+        @add-reaction="handleAddReaction"
+        @remove-reaction="handleRemoveReaction"
+        @pin="handlePin"
+        @unpin="handleUnpin"
+        @vote="handleVote"
+        @unvote="handleUnvote"
+        @load-more="handleLoadMore"
+      />
+      <TypingIndicator :typing-users="typingUsers" />
+      <MessageEditor
+        v-if="!isArchived"
+        ref="editorRef"
+        :disabled="messagesUIFlags.isSending"
+        @send="handleSend"
+        @typing="handleTyping"
+        @draft-update="handleDraftUpdate"
+      />
+      <div
+        v-else
+        class="border-t border-n-slate-5 bg-n-solid-2 px-4 py-3 text-center text-sm text-n-slate-10"
+      >
+        {{ t('INTERNAL_CHAT.CHANNEL.ARCHIVED') }}
+      </div>
+    </div>
+
+    <ThreadPanel
+      v-if="activeThread"
+      :channel-id="channelId"
+      :parent-message="activeThread"
       :current-user-id="currentUserId"
       :is-admin="isAdmin"
-      :is-loading="messagesUIFlags.isFetching"
-      @edit="handleEdit"
-      @delete="handleDelete"
-      @add-reaction="handleAddReaction"
-      @remove-reaction="handleRemoveReaction"
-      @load-more="handleLoadMore"
+      @close="closeThread"
     />
-    <TypingIndicator :typing-users="typingUsers" />
-    <MessageEditor
-      v-if="!isArchived"
-      ref="editorRef"
-      :disabled="messagesUIFlags.isSending"
-      @send="handleSend"
-      @typing="handleTyping"
+
+    <PollCreator
+      v-if="showPollCreator"
+      @submit="handlePollSubmit"
+      @close="showPollCreator = false"
     />
-    <div
-      v-else
-      class="border-t border-n-slate-5 bg-n-solid-2 px-4 py-3 text-center text-sm text-n-slate-10"
-    >
-      {{ t('INTERNAL_CHAT.CHANNEL.ARCHIVED') }}
-    </div>
   </div>
 </template>

@@ -3,6 +3,8 @@ import { actions } from './actions';
 import { mutations } from './mutations';
 import messages from './messages';
 import typingStatus from './typingStatus';
+import polls from './polls';
+import drafts from './drafts';
 
 const state = {
   records: {},
@@ -23,5 +25,7 @@ export default {
   modules: {
     messages,
     typingStatus,
+    polls,
+    drafts,
   },
 };

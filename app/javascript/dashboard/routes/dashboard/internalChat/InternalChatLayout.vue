@@ -20,6 +20,10 @@ const activeChannel = computed(() => {
   return store.getters['internalChat/getChannelById'](activeChannelId.value);
 });
 
+const isDraftsRoute = computed(() => {
+  return route.name === 'internal_chat_drafts';
+});
+
 async function fetchChannels() {
   try {
     await store.dispatch('internalChat/get');
@@ -42,6 +46,7 @@ onMounted(() => {
         :key="activeChannelId"
         :channel-id="activeChannelId"
       />
+      <router-view v-else-if="isDraftsRoute" />
       <div v-else class="flex h-full items-center justify-center bg-n-solid-1">
         <div class="text-center">
           <p class="text-sm text-n-slate-10">

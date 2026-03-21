@@ -6,6 +6,7 @@ import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import ReactionDisplay from './ReactionDisplay.vue';
 import EmojiReactionPicker from './EmojiReactionPicker.vue';
+import PollDisplay from './PollDisplay.vue';
 
 const props = defineProps({
   message: {
@@ -26,8 +27,13 @@ const emit = defineEmits([
   'edit',
   'delete',
   'reply',
+  'openThread',
   'addReaction',
   'removeReaction',
+  'pin',
+  'unpin',
+  'vote',
+  'unvote',
 ]);
 
 const { t } = useI18n();
@@ -64,11 +70,27 @@ const isDeleted = computed(() => {
   return !!props.message.content_attributes?.deleted;
 });
 
+const isPoll = computed(() => {
+  return props.message.content_type === 'poll';
+});
+
+const isPinned = computed(() => {
+  return !!props.message.pinned;
+});
+
+const threadReplyCount = computed(() => {
+  return props.message.thread_replies_count || 0;
+});
+
 const canEdit = computed(() => {
-  return isOwnMessage.value && !isDeleted.value;
+  return isOwnMessage.value && !isDeleted.value && !isPoll.value;
 });
 
 const canDelete = computed(() => {
+  return (isOwnMessage.value || props.isAdmin) && !isDeleted.value;
+});
+
+const canPin = computed(() => {
   return (isOwnMessage.value || props.isAdmin) && !isDeleted.value;
 });
 
@@ -95,6 +117,18 @@ function handleReply() {
   emit('reply', props.message);
 }
 
+function handleOpenThread() {
+  emit('openThread', props.message);
+}
+
+function handlePin() {
+  if (isPinned.value) {
+    emit('unpin', props.message);
+  } else {
+    emit('pin', props.message);
+  }
+}
+
 function handleAddReaction(emoji) {
   emit('addReaction', { messageId: props.message.id, emoji });
 }
@@ -104,6 +138,14 @@ function handleRemoveReaction(reactionId) {
     messageId: props.message.id,
     reactionId,
   });
+}
+
+function handleVote(payload) {
+  emit('vote', payload);
+}
+
+function handleUnvote(payload) {
+  emit('unvote', payload);
 }
 </script>
 
@@ -125,20 +167,52 @@ function handleRemoveReaction(reactionId) {
         <span v-if="isEdited" class="text-xs text-n-slate-10">
           {{ t('INTERNAL_CHAT.MESSAGE.EDITED') }}
         </span>
+        <span
+          v-if="isPinned"
+          class="flex items-center gap-1 text-xs text-n-amber-11"
+          :title="t('INTERNAL_CHAT.PIN.PINNED_MESSAGE')"
+        >
+          <Icon icon="i-lucide-pin" class="size-3" />
+        </span>
       </div>
+
+      <!-- Poll content -->
+      <div v-if="isPoll && !isDeleted" class="mt-1">
+        <PollDisplay
+          :message="message"
+          :current-user-id="currentUserId"
+          :is-admin="isAdmin"
+          @vote="handleVote"
+          @unvote="handleUnvote"
+        />
+      </div>
+
+      <!-- Regular message content -->
       <div
+        v-else
         class="mt-0.5 text-sm text-n-slate-12 break-words"
         :class="{ 'italic text-n-slate-10': isDeleted }"
       >
         <div v-if="!isDeleted" v-dompurify-html="messageContent" />
         <span v-else>{{ messageContent }}</span>
       </div>
+
       <ReactionDisplay
         :reactions="reactions"
         :current-user-id="currentUserId"
         @add="handleAddReaction"
         @remove="handleRemoveReaction"
       />
+
+      <!-- Thread reply count -->
+      <button
+        v-if="threadReplyCount > 0"
+        class="mt-1 flex items-center gap-1 text-xs font-medium text-n-brand hover:underline"
+        @click="handleOpenThread"
+      >
+        <Icon icon="i-lucide-message-square" class="size-3" />
+        {{ t('INTERNAL_CHAT.THREAD.REPLIES', { count: threadReplyCount }) }}
+      </button>
     </div>
     <div
       v-if="isHovered && !isDeleted"
@@ -151,6 +225,19 @@ function handleRemoveReaction(reactionId) {
         @click="handleReply"
       >
         <Icon icon="i-lucide-reply" class="size-4" />
+      </button>
+      <button
+        v-if="canPin"
+        class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+        :title="
+          isPinned ? t('INTERNAL_CHAT.PIN.UNPIN') : t('INTERNAL_CHAT.PIN.PIN')
+        "
+        @click="handlePin"
+      >
+        <Icon
+          :icon="isPinned ? 'i-lucide-pin-off' : 'i-lucide-pin'"
+          class="size-4"
+        />
       </button>
       <button
         v-if="canEdit"

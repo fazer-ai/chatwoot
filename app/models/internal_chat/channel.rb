@@ -49,6 +49,11 @@ class InternalChat::Channel < ApplicationRecord
            dependent: :destroy_async,
            inverse_of: :channel
   has_many :message_attachments, through: :messages, source: :attachments
+  has_many :drafts,
+           class_name: 'InternalChat::Draft',
+           foreign_key: :internal_chat_channel_id,
+           dependent: :destroy_async,
+           inverse_of: :channel
 
   enum :channel_type, { public_channel: 0, private_channel: 1, dm: 2 }, prefix: true
   enum :status, { active: 0, archived: 1 }

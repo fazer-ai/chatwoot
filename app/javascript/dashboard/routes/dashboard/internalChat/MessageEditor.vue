@@ -8,13 +8,23 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  placeholder: {
+    type: String,
+    default: '',
+  },
+  initialContent: {
+    type: String,
+    default: '',
+  },
 });
 
-const emit = defineEmits(['send', 'typing']);
+const emit = defineEmits(['send', 'typing', 'draftUpdate']);
 
 const { t } = useI18n();
 
-const messageContent = ref('');
+const messageContent = ref(props.initialContent);
+
+let draftTimer = null;
 const textareaRef = ref(null);
 
 const canSend = computed(() => {
@@ -32,6 +42,11 @@ function handleSend() {
   if (!canSend.value) return;
   emit('send', messageContent.value.trim());
   messageContent.value = '';
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  emit('draftUpdate', '');
   if (textareaRef.value) {
     textareaRef.value.style.height = 'auto';
   }
@@ -47,13 +62,24 @@ function handleKeyDown(event) {
 function handleInput() {
   emit('typing');
   autoResize();
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+  }
+  draftTimer = setTimeout(() => {
+    emit('draftUpdate', messageContent.value);
+  }, 3000);
 }
 
 function focus() {
   textareaRef.value?.focus();
 }
 
-defineExpose({ focus });
+function setContent(content) {
+  messageContent.value = content;
+  autoResize();
+}
+
+defineExpose({ focus, setContent });
 </script>
 
 <template>
@@ -64,7 +90,7 @@ defineExpose({ focus });
       <textarea
         ref="textareaRef"
         v-model="messageContent"
-        :placeholder="t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
+        :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
         :disabled="disabled"
         rows="1"
         class="flex-1 resize-none bg-transparent text-sm text-n-slate-12 placeholder-n-slate-10 outline-none"

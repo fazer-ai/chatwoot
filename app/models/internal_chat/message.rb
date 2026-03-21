@@ -44,6 +44,8 @@ class InternalChat::Message < ApplicationRecord
                          dependent: :destroy_async, inverse_of: :message
   has_many :reactions, class_name: 'InternalChat::Reaction', foreign_key: :internal_chat_message_id,
                        dependent: :destroy_async, inverse_of: :message
+  has_one :poll, class_name: 'InternalChat::Poll', foreign_key: :internal_chat_message_id,
+                 dependent: :destroy, inverse_of: :message
 
   enum :content_type, { text: 0, poll: 1, system: 2 }
 

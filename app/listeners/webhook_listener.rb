@@ -114,6 +114,20 @@ class WebhookListener < BaseListener
     handle_typing_status(__method__.to_s, event)
   end
 
+  def internal_chat_message_created(event)
+    message = event.data[:message]
+    account = message.account
+    payload = internal_chat_message_payload(message).merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, account)
+  end
+
+  def internal_chat_message_updated(event)
+    message = event.data[:message]
+    account = message.account
+    payload = internal_chat_message_payload(message).merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, account)
+  end
+
   def provider_event_received(event)
     inbox, account = extract_inbox_and_account(event)
 
@@ -141,6 +155,19 @@ class WebhookListener < BaseListener
       is_private: event.data[:is_private] || false
     }
     deliver_webhook_payloads(payload, inbox)
+  end
+
+  def internal_chat_message_payload(message)
+    {
+      id: message.id,
+      content: message.content,
+      content_type: message.content_type,
+      internal_chat_channel_id: message.internal_chat_channel_id,
+      sender: message.sender&.push_event_data,
+      account_id: message.account_id,
+      created_at: message.created_at,
+      updated_at: message.updated_at
+    }
   end
 
   def deliver_account_webhooks(payload, account)

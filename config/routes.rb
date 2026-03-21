@@ -179,9 +179,16 @@ Rails.application.routes.draw do
                   get :thread
                 end
               end
+              resource :draft, only: [:update, :destroy]
             end
             resources :messages, only: [] do
               resources :reactions, only: [:create, :destroy]
+            end
+            resources :polls, only: [:create] do
+              member do
+                post :vote
+                delete :vote, action: :unvote
+              end
             end
             resources :drafts, only: [:index]
           end

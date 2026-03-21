@@ -35,12 +35,28 @@ export default {
           component: EmptyComponent,
         },
         {
+          path: 'channels/:channelId/thread/:messageId',
+          name: 'internal_chat_thread',
+          meta: {
+            permissions: INTERNAL_CHAT_PERMISSIONS,
+          },
+          component: EmptyComponent,
+        },
+        {
           path: 'dm/:channelId',
           name: 'internal_chat_dm',
           meta: {
             permissions: INTERNAL_CHAT_PERMISSIONS,
           },
           component: EmptyComponent,
+        },
+        {
+          path: 'drafts',
+          name: 'internal_chat_drafts',
+          meta: {
+            permissions: INTERNAL_CHAT_PERMISSIONS,
+          },
+          component: () => import('./DraftsList.vue'),
         },
       ],
     },

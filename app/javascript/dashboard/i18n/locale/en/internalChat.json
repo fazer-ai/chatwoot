@@ -38,6 +38,37 @@
       "UPLOAD_FILE": "Upload File",
       "CONFIRM_DELETE": "Are you sure you want to delete this message?"
     },
+    "THREAD": {
+      "TITLE": "Thread",
+      "REPLIES": "{count} replies",
+      "REPLY_PLACEHOLDER": "Reply in thread..."
+    },
+    "POLL": {
+      "CREATE": "Create Poll",
+      "QUESTION": "Question",
+      "OPTIONS": "Options",
+      "MULTIPLE_CHOICE": "Multiple choice",
+      "DURATION": "Duration",
+      "PUBLIC_RESULTS": "Public results",
+      "VOTE": "Vote",
+      "VOTES": "{count} votes",
+      "EXPIRED": "Expired",
+      "PIN": "Pin poll",
+      "ADD_OPTION": "Add option",
+      "CANCEL": "Cancel",
+      "PERCENTAGE": "{value}%"
+    },
+    "DRAFT": {
+      "TITLE": "Drafts",
+      "NO_DRAFTS": "No drafts yet",
+      "DELETE": "Delete draft",
+      "SAVED_AGO": "Saved {time} ago"
+    },
+    "PIN": {
+      "PINNED_MESSAGE": "Pinned message",
+      "PIN": "Pin message",
+      "UNPIN": "Unpin message"
+    },
     "TYPING": {
       "SINGLE": "{name} is typing...",
       "MULTIPLE": "{names} are typing..."

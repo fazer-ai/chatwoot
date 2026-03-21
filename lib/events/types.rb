@@ -85,4 +85,5 @@ module Events::Types
   INTERNAL_CHAT_TYPING_OFF = 'internal_chat.typing_off'
   INTERNAL_CHAT_REACTION_CREATED = 'internal_chat.reaction.created'
   INTERNAL_CHAT_REACTION_DELETED = 'internal_chat.reaction.deleted'
+  INTERNAL_CHAT_POLL_VOTED = 'internal_chat.poll.voted'
 end

@@ -241,3 +241,6 @@
   display_name: Advanced Assignment
   enabled: false
   premium: true
+- name: internal_chat
+  display_name: Internal Chat
+  enabled: true

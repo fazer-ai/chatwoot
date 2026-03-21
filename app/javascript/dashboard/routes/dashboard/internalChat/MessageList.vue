@@ -28,8 +28,13 @@ const emit = defineEmits([
   'edit',
   'delete',
   'reply',
+  'openThread',
   'addReaction',
   'removeReaction',
+  'pin',
+  'unpin',
+  'vote',
+  'unvote',
   'loadMore',
 ]);
 
@@ -150,8 +155,13 @@ onMounted(async () => {
           @edit="emit('edit', $event)"
           @delete="emit('delete', $event)"
           @reply="emit('reply', $event)"
+          @open-thread="emit('openThread', $event)"
           @add-reaction="emit('addReaction', $event)"
           @remove-reaction="emit('removeReaction', $event)"
+          @pin="emit('pin', $event)"
+          @unpin="emit('unpin', $event)"
+          @vote="emit('vote', $event)"
+          @unvote="emit('unvote', $event)"
         />
       </template>
     </div>

@@ -65,6 +65,16 @@ class InternalChatListener < BaseListener
     broadcast(account, tokens, INTERNAL_CHAT_TYPING_OFF, { channel: { id: channel.id }, user: user.push_event_data })
   end
 
+  def internal_chat_poll_voted(event)
+    poll = event.data[:poll]
+    message = event.data[:message]
+    channel = message.channel
+    account = message.account
+    tokens = member_tokens(channel)
+
+    broadcast(account, tokens, INTERNAL_CHAT_POLL_VOTED, poll_event_data(poll))
+  end
+
   def internal_chat_reaction_created(event)
     reaction = event.data[:reaction]
     message = reaction.message
@@ -113,6 +123,23 @@ class InternalChatListener < BaseListener
       created_at: message.created_at,
       updated_at: message.updated_at,
       reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } }
+    }
+  end
+
+  def poll_event_data(poll)
+    {
+      id: poll.id,
+      question: poll.question,
+      internal_chat_message_id: poll.internal_chat_message_id,
+      options: poll.options.ordered.map do |option|
+        {
+          id: option.id,
+          text: option.text,
+          votes_count: option.votes_count,
+          voters: option.votes.includes(:user).map { |v| v.user.push_event_data }
+        }
+      end,
+      total_votes: poll.total_votes_count
     }
   end
 
