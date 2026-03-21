@@ -8,6 +8,6 @@ class SetupInternalChatDefaultChannels < ActiveRecord::Migration[7.0]
   end
 
   def down
-    InternalChat::Category.destroy_all
+    raise ActiveRecord::IrreversibleMigration, 'Cannot safely rollback internal chat default channel setup without deleting user data'
   end
 end

@@ -61,9 +61,19 @@ const actions = {
   },
 
   updatePollFromCable: ({ dispatch }, { channelId, poll }) => {
+    const messageId = poll.internal_chat_message_id;
+    if (!messageId) return;
+
     dispatch(
       'internalChat/messages/updateMessageFromCable',
-      { channelId, message: poll },
+      {
+        channelId,
+        message: {
+          id: messageId,
+          poll: { ...poll },
+          content_attributes: { poll: { ...poll } },
+        },
+      },
       { root: true }
     );
   },

@@ -202,6 +202,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   def channel_index_response(channel)
     membership = channel.channel_members.find_by(user_id: Current.user.id)
     channel_base_response(channel).merge(
+      is_dm: channel.channel_type_dm?,
+      muted: membership&.muted || false,
+      favorited: membership&.favorited || false,
       members_count: channel.channel_members.size,
       unread_count: membership&.unread_messages_count || 0
     )
@@ -213,6 +216,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     members = channel.channel_members.includes(:user)
 
     channel_base_response(channel).merge(
+      is_dm: channel.channel_type_dm?,
+      muted: membership&.muted || false,
+      favorited: membership&.favorited || false,
       account_id: channel.account_id,
       created_by_id: channel.created_by_id,
       members_count: members.size,

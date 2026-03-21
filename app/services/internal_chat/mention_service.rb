@@ -4,10 +4,7 @@ class InternalChat::MentionService
   def perform
     return if message.content.blank?
 
-    mentioned_user_ids = extract_mentioned_user_ids
-    return if mentioned_user_ids.blank?
-
-    create_mention_notifications(mentioned_user_ids)
+    extract_mentioned_user_ids
   end
 
   private
@@ -44,19 +41,5 @@ class InternalChat::MentionService
 
   def valid_user_ids(user_ids)
     message.account.users.where(id: user_ids).pluck(:id).map(&:to_s)
-  end
-
-  def create_mention_notifications(user_ids)
-    user_ids.each do |user_id|
-      user = User.find_by(id: user_id)
-      next if user.blank?
-
-      user.notifications.create!(
-        notification_type: :internal_chat_mention,
-        account: message.account,
-        primary_actor: message.channel,
-        secondary_actor: message
-      )
-    end
   end
 end

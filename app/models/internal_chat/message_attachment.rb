@@ -29,6 +29,8 @@ class InternalChat::MessageAttachment < ApplicationRecord
 
   has_one_attached :file
 
+  validates :file, presence: true
+
   enum :file_type, { image: 0, audio: 1, video: 2, file: 3 }
 end
 

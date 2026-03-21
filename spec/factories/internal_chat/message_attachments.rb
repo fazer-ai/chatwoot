@@ -5,10 +5,7 @@ FactoryBot.define do
     association :message, factory: :internal_chat_message
     account { message.account }
     file_type { :image }
-
-    trait :with_file do
-      file { Rack::Test::UploadedFile.new(Rails.root.join('spec/assets/avatar.png'), 'image/png') }
-    end
+    file { Rack::Test::UploadedFile.new(Rails.root.join('spec/assets/avatar.png'), 'image/png') }
 
     trait :audio do
       file_type { :audio }
