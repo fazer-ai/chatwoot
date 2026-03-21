@@ -1,0 +1,31 @@
+tags:
+  - Internal Chat Channels
+operationId: mark-internal-chat-channel-unread
+summary: Mark channel as unread
+security:
+  - userApiKey: []
+description: Mark the channel as unread from a specific message for the current user
+requestBody:
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          message_id:
+            type: integer
+            description: The ID of the message to mark as unread from
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

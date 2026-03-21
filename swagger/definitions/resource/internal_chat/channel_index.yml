@@ -1,0 +1,10 @@
+allOf:
+  - $ref: ./channel.yml
+  - type: object
+    properties:
+      members_count:
+        type: integer
+        description: The number of members in the channel
+      unread_count:
+        type: integer
+        description: The number of unread messages for the current user

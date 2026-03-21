@@ -1,0 +1,45 @@
+tags:
+  - Internal Chat Channels
+operationId: list-internal-chat-channels
+summary: List all channels
+security:
+  - userApiKey: []
+description: List all internal chat channels in the account. Supports filtering by type, status, and category.
+parameters:
+  - name: type
+    in: query
+    schema:
+      type: string
+      enum:
+        - text_channels
+        - direct_messages
+    description: Filter by channel type
+  - name: status
+    in: query
+    schema:
+      type: string
+      enum:
+        - active
+        - archived
+    description: Filter by channel status (defaults to active)
+  - name: category_id
+    in: query
+    schema:
+      type: integer
+    description: Filter by category ID
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: array
+          description: Array of channels
+          items:
+            $ref: '#/components/schemas/internal_chat_channel_index'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

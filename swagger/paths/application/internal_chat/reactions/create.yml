@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Reactions
+operationId: create-internal-chat-reaction
+summary: Add a reaction
+security:
+  - userApiKey: []
+description: Add an emoji reaction to an internal chat message
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - emoji
+        properties:
+          emoji:
+            type: string
+            description: The emoji to react with
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_reaction'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Message not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

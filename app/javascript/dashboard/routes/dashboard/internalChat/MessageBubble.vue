@@ -43,7 +43,13 @@ const senderAvatar = computed(() => {
 });
 
 const timestamp = computed(() => {
-  return messageTimestamp(props.message.created_at, 'h:mm a');
+  const createdAt = props.message.created_at;
+  if (!createdAt) return '';
+  const unixTime =
+    typeof createdAt === 'number'
+      ? createdAt
+      : Math.floor(new Date(createdAt).getTime() / 1000);
+  return messageTimestamp(unixTime, 'h:mm a');
 });
 
 const isOwnMessage = computed(() => {

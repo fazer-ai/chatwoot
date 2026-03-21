@@ -1,0 +1,14 @@
+type: object
+properties:
+  content:
+    type: string
+    description: The content of the message
+  content_type:
+    type: string
+    description: The type of message content
+  parent_id:
+    type: integer
+    description: The ID of the parent message for threaded replies
+  echo_id:
+    type: string
+    description: Client-generated ID for optimistic updates

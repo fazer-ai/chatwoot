@@ -1,0 +1,8 @@
+type: object
+properties:
+  name:
+    type: string
+    description: The name of the category
+  position:
+    type: integer
+    description: The display position of the category

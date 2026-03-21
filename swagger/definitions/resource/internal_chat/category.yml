@@ -1,0 +1,25 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the category
+  name:
+    type: string
+    description: The name of the category
+  position:
+    type: integer
+    description: The display position of the category
+  account_id:
+    type: integer
+    description: The ID of the account
+  channels_count:
+    type: integer
+    description: The number of channels in this category
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the category was created
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the category was last updated

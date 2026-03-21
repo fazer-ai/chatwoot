@@ -43,7 +43,11 @@ const dateSeparatedMessages = computed(() => {
   let currentDate = null;
 
   props.messages.forEach(message => {
-    const msgDate = new Date(message.created_at * 1000);
+    const createdAt = message.created_at;
+    const msgDate =
+      typeof createdAt === 'number'
+        ? new Date(createdAt * 1000)
+        : new Date(createdAt);
     const dateKey = msgDate.toDateString();
 
     if (dateKey !== currentDate) {

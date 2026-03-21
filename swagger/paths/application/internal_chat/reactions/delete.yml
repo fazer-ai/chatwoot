@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Reactions
+operationId: delete-internal-chat-reaction
+summary: Remove a reaction
+security:
+  - userApiKey: []
+description: Remove an emoji reaction from an internal chat message
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Reaction not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

@@ -1,0 +1,34 @@
+tags:
+  - Internal Chat Channels
+operationId: toggle-internal-chat-typing-status
+summary: Toggle typing status
+security:
+  - userApiKey: []
+description: Toggle typing status in an internal chat channel
+requestBody:
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          typing_status:
+            type: string
+            enum:
+              - 'on'
+              - 'off'
+            description: The typing status to set
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
