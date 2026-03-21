@@ -57,3 +57,21 @@ public_contact_identifier:
 
 portal_id:
   $ref: ./portal_id.yml
+
+internal_chat_channel_id:
+  $ref: ./internal_chat_channel_id.yml
+
+internal_chat_channel_id_path:
+  $ref: ./internal_chat_channel_id_path.yml
+
+internal_chat_message_id:
+  $ref: ./internal_chat_message_id.yml
+
+internal_chat_member_id:
+  $ref: ./internal_chat_member_id.yml
+
+internal_chat_category_id:
+  $ref: ./internal_chat_category_id.yml
+
+internal_chat_reaction_id:
+  $ref: ./internal_chat_reaction_id.yml

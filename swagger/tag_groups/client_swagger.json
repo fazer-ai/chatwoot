@@ -3193,6 +3193,623 @@
           }
         }
       },
+      "internal_chat_category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the category"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the category"
+          },
+          "position": {
+            "type": "integer",
+            "description": "The display position of the category"
+          },
+          "account_id": {
+            "type": "integer",
+            "description": "The ID of the account"
+          },
+          "channels_count": {
+            "type": "integer",
+            "description": "The number of channels in this category"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the category was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the category was last updated"
+          }
+        }
+      },
+      "internal_chat_channel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the channel"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the channel (null for DMs)"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The description of the channel"
+          },
+          "channel_type": {
+            "type": "string",
+            "enum": [
+              "public_channel",
+              "private_channel",
+              "dm"
+            ],
+            "description": "The type of channel"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "The status of the channel"
+          },
+          "category_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The ID of the category this channel belongs to"
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time of the last activity in the channel"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the channel was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the channel was last updated"
+          }
+        }
+      },
+      "internal_chat_channel_index": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ID of the channel"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The name of the channel (null for DMs)"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The description of the channel"
+              },
+              "channel_type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel",
+                  "dm"
+                ],
+                "description": "The type of channel"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "archived"
+                ],
+                "description": "The status of the channel"
+              },
+              "category_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The ID of the category this channel belongs to"
+              },
+              "last_activity_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "The time of the last activity in the channel"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the channel was created"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the channel was last updated"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "members_count": {
+                "type": "integer",
+                "description": "The number of members in the channel"
+              },
+              "unread_count": {
+                "type": "integer",
+                "description": "The number of unread messages for the current user"
+              }
+            }
+          }
+        ]
+      },
+      "internal_chat_channel_show": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ID of the channel"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The name of the channel (null for DMs)"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The description of the channel"
+              },
+              "channel_type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel",
+                  "dm"
+                ],
+                "description": "The type of channel"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "archived"
+                ],
+                "description": "The status of the channel"
+              },
+              "category_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The ID of the category this channel belongs to"
+              },
+              "last_activity_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "The time of the last activity in the channel"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the channel was created"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the channel was last updated"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "integer",
+                "description": "The ID of the account"
+              },
+              "created_by_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The ID of the user who created the channel"
+              },
+              "members_count": {
+                "type": "integer",
+                "description": "The number of members in the channel"
+              },
+              "unread_count": {
+                "type": "integer",
+                "description": "The number of unread messages for the current user"
+              },
+              "members": {
+                "type": "array",
+                "description": "Array of channel members",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The ID of the channel member"
+                    },
+                    "user_id": {
+                      "type": "integer",
+                      "description": "The ID of the user"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member"
+                      ],
+                      "description": "The role of the member in the channel"
+                    },
+                    "muted": {
+                      "type": "boolean",
+                      "description": "Whether the channel is muted for this member"
+                    },
+                    "favorited": {
+                      "type": "boolean",
+                      "description": "Whether the channel is favorited by this member"
+                    },
+                    "last_read_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time",
+                      "description": "The time the member last read messages"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The name of the user"
+                    },
+                    "avatar_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The avatar URL of the user"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The time at which the member was added"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The time at which the member record was last updated"
+                    }
+                  }
+                }
+              },
+              "messages": {
+                "type": "array",
+                "description": "Array of recent messages",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The ID of the message"
+                    },
+                    "content": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The content of the message"
+                    },
+                    "content_type": {
+                      "type": "string",
+                      "description": "The type of the message content"
+                    },
+                    "content_attributes": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "Additional attributes for the message content"
+                    },
+                    "internal_chat_channel_id": {
+                      "type": "integer",
+                      "description": "The ID of the channel this message belongs to"
+                    },
+                    "sender": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "The sender of the message"
+                    },
+                    "parent_id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The ID of the parent message (for threaded replies)"
+                    },
+                    "echo_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Client-generated ID for optimistic updates"
+                    },
+                    "replies_count": {
+                      "type": "integer",
+                      "description": "The number of replies to this message"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The time at which the message was created"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The time at which the message was last updated"
+                    },
+                    "reactions": {
+                      "type": "array",
+                      "description": "Array of reactions on this message",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "The ID of the reaction"
+                          },
+                          "emoji": {
+                            "type": "string",
+                            "description": "The emoji used for the reaction"
+                          },
+                          "user_id": {
+                            "type": "integer",
+                            "description": "The ID of the user who reacted"
+                          },
+                          "internal_chat_message_id": {
+                            "type": "integer",
+                            "description": "The ID of the message this reaction belongs to"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "The time at which the reaction was created"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "internal_chat_channel_member": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the channel member"
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "The ID of the user"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "description": "The role of the member in the channel"
+          },
+          "muted": {
+            "type": "boolean",
+            "description": "Whether the channel is muted for this member"
+          },
+          "favorited": {
+            "type": "boolean",
+            "description": "Whether the channel is favorited by this member"
+          },
+          "last_read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time the member last read messages"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the user"
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The avatar URL of the user"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the member was added"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the member record was last updated"
+          }
+        }
+      },
+      "internal_chat_message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the message"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The content of the message"
+          },
+          "content_type": {
+            "type": "string",
+            "description": "The type of the message content"
+          },
+          "content_attributes": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Additional attributes for the message content"
+          },
+          "internal_chat_channel_id": {
+            "type": "integer",
+            "description": "The ID of the channel this message belongs to"
+          },
+          "sender": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The sender of the message"
+          },
+          "parent_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The ID of the parent message (for threaded replies)"
+          },
+          "echo_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Client-generated ID for optimistic updates"
+          },
+          "replies_count": {
+            "type": "integer",
+            "description": "The number of replies to this message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the message was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the message was last updated"
+          },
+          "reactions": {
+            "type": "array",
+            "description": "Array of reactions on this message",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ID of the reaction"
+                },
+                "emoji": {
+                  "type": "string",
+                  "description": "The emoji used for the reaction"
+                },
+                "user_id": {
+                  "type": "integer",
+                  "description": "The ID of the user who reacted"
+                },
+                "internal_chat_message_id": {
+                  "type": "integer",
+                  "description": "The ID of the message this reaction belongs to"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The time at which the reaction was created"
+                }
+              }
+            }
+          }
+        }
+      },
+      "internal_chat_reaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the reaction"
+          },
+          "emoji": {
+            "type": "string",
+            "description": "The emoji used for the reaction"
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "The ID of the user who reacted"
+          },
+          "internal_chat_message_id": {
+            "type": "integer",
+            "description": "The ID of the message this reaction belongs to"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the reaction was created"
+          }
+        }
+      },
       "account_create_update_payload": {
         "type": "object",
         "properties": {
@@ -4581,6 +5198,132 @@
               "title": "article title",
               "description": "article description"
             }
+          }
+        }
+      },
+      "internal_chat_category_create_update_payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the category"
+          },
+          "position": {
+            "type": "integer",
+            "description": "The display position of the category"
+          }
+        }
+      },
+      "internal_chat_channel_create_payload": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the channel"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of the channel"
+              },
+              "channel_type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel",
+                  "dm"
+                ],
+                "description": "The type of channel to create"
+              },
+              "category_id": {
+                "type": "integer",
+                "description": "The ID of the category to assign the channel to"
+              }
+            }
+          },
+          "member_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "IDs of users to add as initial members"
+          }
+        }
+      },
+      "internal_chat_channel_update_payload": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the channel"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of the channel"
+              },
+              "channel_type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel"
+                ],
+                "description": "The type of channel"
+              },
+              "category_id": {
+                "type": "integer",
+                "description": "The ID of the category to assign the channel to"
+              }
+            }
+          }
+        }
+      },
+      "internal_chat_message_create_payload": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The content of the message"
+          },
+          "content_type": {
+            "type": "string",
+            "description": "The type of message content"
+          },
+          "parent_id": {
+            "type": "integer",
+            "description": "The ID of the parent message for threaded replies"
+          },
+          "echo_id": {
+            "type": "string",
+            "description": "Client-generated ID for optimistic updates"
+          }
+        }
+      },
+      "internal_chat_member_create_payload": {
+        "type": "object",
+        "properties": {
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "IDs of users to add as channel members"
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "ID of a single user to add as a channel member"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "description": "The role to assign to the new members"
           }
         }
       },
@@ -6665,6 +7408,60 @@
         },
         "required": true,
         "description": "The slug identifier of the portal"
+      },
+      "internal_chat_channel_id": {
+        "in": "path",
+        "name": "id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the internal chat channel"
+      },
+      "internal_chat_channel_id_path": {
+        "in": "path",
+        "name": "channel_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the internal chat channel"
+      },
+      "internal_chat_message_id": {
+        "in": "path",
+        "name": "message_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the internal chat message"
+      },
+      "internal_chat_member_id": {
+        "in": "path",
+        "name": "id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the channel member"
+      },
+      "internal_chat_category_id": {
+        "in": "path",
+        "name": "id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the internal chat category"
+      },
+      "internal_chat_reaction_id": {
+        "in": "path",
+        "name": "id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "description": "The ID of the reaction"
       }
     },
     "securitySchemes": {

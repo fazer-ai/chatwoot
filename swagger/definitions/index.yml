@@ -99,6 +99,22 @@ public_message_sender:
 public_inbox:
   $ref: ./resource/public/inbox.yml
 
+## internal chat resources
+internal_chat_category:
+  $ref: ./resource/internal_chat/category.yml
+internal_chat_channel:
+  $ref: ./resource/internal_chat/channel.yml
+internal_chat_channel_index:
+  $ref: ./resource/internal_chat/channel_index.yml
+internal_chat_channel_show:
+  $ref: ./resource/internal_chat/channel_show.yml
+internal_chat_channel_member:
+  $ref: ./resource/internal_chat/channel_member.yml
+internal_chat_message:
+  $ref: ./resource/internal_chat/message.yml
+internal_chat_reaction:
+  $ref: ./resource/internal_chat/reaction.yml
+
 ## ---------- REQUEST ------------- ##
 ## -------------------------------- ##
 
@@ -186,6 +202,18 @@ category_create_update_payload:
   $ref: ./request/portal/category_create_update_payload.yml
 article_create_update_payload:
   $ref: ./request/portal/article_create_update_payload.yml
+
+## Internal Chat
+internal_chat_category_create_update_payload:
+  $ref: ./request/internal_chat/category_create_update_payload.yml
+internal_chat_channel_create_payload:
+  $ref: ./request/internal_chat/channel_create_payload.yml
+internal_chat_channel_update_payload:
+  $ref: ./request/internal_chat/channel_update_payload.yml
+internal_chat_message_create_payload:
+  $ref: ./request/internal_chat/message_create_payload.yml
+internal_chat_member_create_payload:
+  $ref: ./request/internal_chat/member_create_payload.yml
 
 ## public requests
 public_contact_create_update_payload:
