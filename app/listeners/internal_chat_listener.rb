@@ -151,6 +151,7 @@ class InternalChatListener < BaseListener
     {
       id: reaction.id,
       emoji: reaction.emoji,
+      user_id: reaction.user_id,
       user: reaction.user.push_event_data,
       internal_chat_message_id: reaction.internal_chat_message_id,
       created_at: reaction.created_at

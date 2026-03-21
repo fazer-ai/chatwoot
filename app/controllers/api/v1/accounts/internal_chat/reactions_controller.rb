@@ -47,7 +47,7 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
     params.permit(:emoji)
   end
 
-  def dispatch_reaction_event(event, data)
+  def dispatch_reaction_event(event, **data)
     Rails.configuration.dispatcher.dispatch(event, Time.zone.now, **data)
   end
 end
