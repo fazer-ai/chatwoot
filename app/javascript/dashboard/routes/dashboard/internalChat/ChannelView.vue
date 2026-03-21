@@ -31,6 +31,7 @@ const activeThread = ref(null);
 const showPollCreator = ref(false);
 
 const currentUser = useMapGetter('getCurrentUser');
+const currentRole = useMapGetter('getCurrentRole');
 
 const channel = computed(() => {
   return store.getters['internalChat/getChannelById'](props.channelId);
@@ -49,8 +50,7 @@ const currentUserId = computed(() => {
 });
 
 const isAdmin = computed(() => {
-  const { role } = currentUser.value || {};
-  return role === 'administrator';
+  return currentRole.value === 'administrator';
 });
 
 const isArchived = computed(() => {
@@ -213,7 +213,7 @@ async function handleVote({ messageId, optionId }) {
   }
 }
 
-async function handleUnvote({ messageId }) {
+async function handleUnvote({ messageId, optionId }) {
   const msg = store.getters['internalChat/messages/getMessageById'](
     props.channelId,
     messageId
@@ -221,7 +221,7 @@ async function handleUnvote({ messageId }) {
   const pollId = msg?.poll?.id || msg?.content_attributes?.poll?.id;
   if (!pollId) return;
   try {
-    await store.dispatch('internalChat/polls/unvote', { pollId });
+    await store.dispatch('internalChat/polls/unvote', { pollId, optionId });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }

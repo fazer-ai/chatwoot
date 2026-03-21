@@ -54,9 +54,9 @@ const actions = {
     }
   },
 
-  deleteDraft: async ({ commit }, { channelId, draftId }) => {
+  deleteDraft: async ({ commit }, { channelId, draftId, parentId }) => {
     try {
-      await InternalChatDraftsAPI.deleteDraft(channelId);
+      await InternalChatDraftsAPI.deleteDraft(channelId, { parentId });
       commit('DELETE_DRAFT', draftId);
     } catch (error) {
       throwErrorMessage(error);

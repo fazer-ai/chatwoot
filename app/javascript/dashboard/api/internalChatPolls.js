@@ -14,8 +14,10 @@ class InternalChatPollsAPI extends ApiClient {
     return axios.post(`${this.url}/${pollId}/vote`, { option_id: optionId });
   }
 
-  unvote(pollId) {
-    return axios.delete(`${this.url}/${pollId}/vote`);
+  unvote(pollId, optionId) {
+    return axios.delete(`${this.url}/${pollId}/vote`, {
+      params: { option_id: optionId },
+    });
   }
 }
 

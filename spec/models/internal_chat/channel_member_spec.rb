@@ -65,9 +65,12 @@ RSpec.describe InternalChat::ChannelMember do
     let(:sender) { create(:user) }
     let(:member) { create(:internal_chat_channel_member, channel: channel) }
 
-    it 'returns 0 when last_read_at is blank' do
+    it 'counts all messages from other users when last_read_at is blank' do
+      create(:internal_chat_message, channel: channel, account: account, sender: sender, created_at: 3.minutes.ago)
+      create(:internal_chat_message, channel: channel, account: account, sender: sender, created_at: 1.minute.ago)
+
       member.update!(last_read_at: nil)
-      expect(member.unread_messages_count).to eq(0)
+      expect(member.unread_messages_count).to eq(2)
     end
 
     it 'returns the count of messages created after last_read_at' do

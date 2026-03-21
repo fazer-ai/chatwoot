@@ -47,10 +47,10 @@ const actions = {
     }
   },
 
-  unvote: async ({ commit }, { pollId }) => {
+  unvote: async ({ commit }, { pollId, optionId }) => {
     commit('SET_UI_FLAG', { isVoting: true });
     try {
-      const response = await InternalChatPollsAPI.unvote(pollId);
+      const response = await InternalChatPollsAPI.unvote(pollId, optionId);
       return response.data;
     } catch (error) {
       throwErrorMessage(error);

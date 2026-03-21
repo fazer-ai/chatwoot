@@ -58,6 +58,10 @@ function hasAnyVote() {
   return pollItems.value.some(item => item.voted);
 }
 
+const shouldShowResults = computed(() => {
+  return hasAnyVote() || isPublicResults.value || isExpired.value;
+});
+
 function votePercentage(item) {
   if (totalVotes.value === 0) return 0;
   return Math.round(((item.votes_count || 0) / totalVotes.value) * 100);
@@ -103,7 +107,7 @@ function handleVote(item) {
         @click="handleVote(item)"
       >
         <div
-          v-if="(hasAnyVote() || isExpired) && canSeeResults"
+          v-if="shouldShowResults && canSeeResults"
           class="absolute inset-0 rounded-lg bg-n-brand/10 transition-all"
           :style="{ width: `${votePercentage(item)}%` }"
         />
@@ -118,7 +122,7 @@ function handleVote(item) {
             <span class="text-n-slate-12">{{ item.text }}</span>
           </div>
           <span
-            v-if="(hasAnyVote() || isExpired) && canSeeResults"
+            v-if="shouldShowResults && canSeeResults"
             class="flex-shrink-0 text-xs text-n-slate-10"
           >
             {{

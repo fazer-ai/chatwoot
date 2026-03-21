@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -32,10 +32,15 @@ const emit = defineEmits(['close']);
 const store = useStore();
 const { t } = useI18n();
 
-const threadReplies = ref([]);
 const isLoading = ref(false);
 const isSending = ref(false);
 let activeThreadRequestId = null;
+
+const threadReplies = computed(() => {
+  return store.getters['internalChat/messages/getThreadReplies'](
+    props.parentMessage.id
+  );
+});
 
 const replyCount = computed(() => threadReplies.value.length);
 
@@ -44,12 +49,10 @@ async function fetchThread() {
   activeThreadRequestId = requestId;
   isLoading.value = true;
   try {
-    const data = await store.dispatch('internalChat/messages/fetchThread', {
+    await store.dispatch('internalChat/messages/fetchThread', {
       channelId: props.channelId,
       messageId: props.parentMessage.id,
     });
-    if (activeThreadRequestId !== requestId) return;
-    threadReplies.value = data.replies || data || [];
   } catch {
     if (activeThreadRequestId !== requestId) return;
     useAlert(t('INTERNAL_CHAT.ERRORS.FETCH_MESSAGES'));
@@ -63,15 +66,11 @@ async function fetchThread() {
 async function handleSendReply(content) {
   isSending.value = true;
   try {
-    const reply = await store.dispatch(
-      'internalChat/messages/sendThreadReply',
-      {
-        channelId: props.channelId,
-        parentMessageId: props.parentMessage.id,
-        data: { content },
-      }
-    );
-    threadReplies.value = [...threadReplies.value, reply];
+    await store.dispatch('internalChat/messages/sendThreadReply', {
+      channelId: props.channelId,
+      parentMessageId: props.parentMessage.id,
+      data: { content },
+    });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   } finally {
@@ -86,14 +85,6 @@ function handleEditReply(message) {
       messageId: message.id,
       data: { content: message.content },
     })
-    .then(updated => {
-      const index = threadReplies.value.findIndex(r => r.id === updated.id);
-      if (index > -1) {
-        const replies = [...threadReplies.value];
-        replies[index] = { ...replies[index], ...updated };
-        threadReplies.value = replies;
-      }
-    })
     .catch(() => {
       useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
     });
@@ -104,11 +95,6 @@ function handleDeleteReply(message) {
     .dispatch('internalChat/messages/deleteMessage', {
       channelId: props.channelId,
       messageId: message.id,
-    })
-    .then(() => {
-      threadReplies.value = threadReplies.value.filter(
-        r => r.id !== message.id
-      );
     })
     .catch(() => {
       useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
@@ -158,6 +144,7 @@ onMounted(() => {
         {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
       </h3>
       <button
+        :aria-label="t('INTERNAL_CHAT.THREAD.CLOSE')"
         class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
         @click="emit('close')"
       >

@@ -47,8 +47,11 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def destroy
     authorize @current_channel, :destroy?
+    # Capture member tokens before destroying so the listener can broadcast to them
+    cached_tokens = channel_member_tokens(@current_channel)
     @current_channel.destroy!
-    Rails.configuration.dispatcher.dispatch(INTERNAL_CHAT_CHANNEL_UPDATED, Time.zone.now, channel: @current_channel)
+    Rails.configuration.dispatcher.dispatch(INTERNAL_CHAT_CHANNEL_UPDATED, Time.zone.now, channel: @current_channel,
+                                                                                          member_tokens: cached_tokens)
     head :ok
   end
 
@@ -247,6 +250,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       )
       .where(internal_chat_channel_id: channels.select(:id), user_id: Current.user.id)
       .where.not(last_read_at: nil)
+      .where.not('internal_chat_messages.sender_id' => Current.user.id)
       .group('internal_chat_channel_members.internal_chat_channel_id')
       .count('internal_chat_messages.id')
   end
@@ -309,6 +313,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def message_response(message)
+    deleted = message.content_attributes&.dig('deleted')
     {
       id: message.id,
       content: message.content,
@@ -321,7 +326,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       created_at: message.created_at,
       updated_at: message.updated_at,
       reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
-      attachments: message.attachments.map { |a| attachment_response(a) }
+      attachments: deleted ? [] : message.attachments.map { |a| attachment_response(a) }
     }
   end
 
@@ -333,6 +338,11 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       extension: attachment.extension,
       file_url: attachment.file.attached? ? url_for(attachment.file) : nil
     }
+  end
+
+  def channel_member_tokens(channel)
+    users = channel.channel_type_public_channel? ? channel.account.users : channel.members
+    users.pluck(:pubsub_token)
   end
 
   def validate_category!(category_id)

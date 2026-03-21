@@ -19,7 +19,7 @@ class InternalChat::Category < ApplicationRecord
   self.table_name = 'internal_chat_categories'
 
   belongs_to :account
-  has_many :channels, class_name: 'InternalChat::Channel', dependent: :destroy_async, inverse_of: :category
+  has_many :channels, class_name: 'InternalChat::Channel', dependent: :nullify, inverse_of: :category
 
   validates :name, presence: true
   validates :name, uniqueness: { scope: :account_id }

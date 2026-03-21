@@ -49,7 +49,9 @@ class InternalChat::Message < ApplicationRecord
 
   enum :content_type, { text: 0, poll: 1, system: 2 }
 
-  validates :content, presence: true, unless: -> { attachments.any? }
+  attr_accessor :skip_content_validation
+
+  validates :content, presence: true, unless: -> { skip_content_validation || !text? }
   validates :content, length: { maximum: 150_000 }
 
   scope :ordered, -> { order(created_at: :asc) }

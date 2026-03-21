@@ -91,7 +91,6 @@ test.describe('Internal Chat - Navigation', () => {
 
     // Type a non-matching query
     await searchInput.fill('xyznonexistent');
-    await page.waitForTimeout(300);
 
     // The scrollable area should have no channel buttons matching
     const channelButtons = sidebar

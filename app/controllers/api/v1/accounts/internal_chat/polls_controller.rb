@@ -21,9 +21,10 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   end
 
   def vote
-    validate_vote!
-
-    @vote = @option.votes.create!(user: Current.user)
+    ActiveRecord::Base.transaction do
+      validate_vote!
+      @vote = @option.votes.create!(user: Current.user)
+    end
     dispatch_poll_event
 
     render json: message_with_poll_response(@poll.message, @poll.reload), status: :ok

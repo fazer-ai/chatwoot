@@ -33,7 +33,8 @@ class InternalChatListener < BaseListener
   def internal_chat_channel_updated(event)
     channel = event.data[:channel]
     account = channel.account
-    tokens = member_tokens(channel)
+    # Use pre-captured tokens when available (e.g. after channel destroy)
+    tokens = event.data[:member_tokens] || member_tokens(channel)
 
     broadcast(account, tokens, INTERNAL_CHAT_CHANNEL_UPDATED,
               {
@@ -131,17 +132,29 @@ class InternalChatListener < BaseListener
     {
       id: poll.id,
       question: poll.question,
+      multiple_choice: poll.multiple_choice,
+      public_results: poll.public_results,
+      allow_revote: poll.allow_revote,
+      expires_at: poll.expires_at,
       internal_chat_message_id: poll.internal_chat_message_id,
-      options: poll.options.ordered.includes(votes: :user).map do |option|
-        {
-          id: option.id,
-          text: option.text,
-          votes_count: option.votes.size,
-          voters: option.votes.map { |v| v.user.push_event_data }
-        }
-      end,
-      total_votes: poll.total_votes_count
+      options: poll.options.ordered.includes(votes: :user).map { |option| poll_option_event_data(option, poll) },
+      total_votes: poll.total_votes_count,
+      created_at: poll.created_at,
+      updated_at: poll.updated_at
     }
+  end
+
+  def poll_option_event_data(option, poll)
+    data = {
+      id: option.id,
+      text: option.text,
+      emoji: option.emoji,
+      image_url: option.image_url,
+      position: option.position,
+      votes_count: option.votes.size
+    }
+    data[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
+    data
   end
 
   def reaction_event_data(reaction)

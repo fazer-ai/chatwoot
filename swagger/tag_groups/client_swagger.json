@@ -3622,6 +3622,50 @@
                           }
                         }
                       }
+                    },
+                    "attachments": {
+                      "type": "array",
+                      "description": "Array of file attachments on this message",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "The ID of the attachment"
+                          },
+                          "file_type": {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "audio",
+                              "video",
+                              "file"
+                            ],
+                            "description": "The type of the attached file"
+                          },
+                          "external_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "External URL for the attachment"
+                          },
+                          "extension": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "File extension of the attachment"
+                          },
+                          "file_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "URL to download the attached file"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -3778,6 +3822,50 @@
                   "type": "string",
                   "format": "date-time",
                   "description": "The time at which the reaction was created"
+                }
+              }
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "description": "Array of file attachments on this message",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ID of the attachment"
+                },
+                "file_type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "audio",
+                    "video",
+                    "file"
+                  ],
+                  "description": "The type of the attached file"
+                },
+                "external_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "External URL for the attachment"
+                },
+                "extension": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "File extension of the attachment"
+                },
+                "file_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "URL to download the attached file"
                 }
               }
             }
@@ -5300,6 +5388,30 @@
           "echo_id": {
             "type": "string",
             "description": "Client-generated ID for optimistic updates"
+          },
+          "attachments": {
+            "type": "array",
+            "description": "File attachments to include with the message",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "The file to attach"
+                },
+                "file_type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "audio",
+                    "video",
+                    "file"
+                  ],
+                  "description": "The type of the attached file"
+                }
+              }
+            }
           }
         }
       },

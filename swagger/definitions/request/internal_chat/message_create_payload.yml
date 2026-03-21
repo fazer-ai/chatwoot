@@ -12,3 +12,21 @@ properties:
   echo_id:
     type: string
     description: Client-generated ID for optimistic updates
+  attachments:
+    type: array
+    description: File attachments to include with the message
+    items:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The file to attach
+        file_type:
+          type: string
+          enum:
+            - image
+            - audio
+            - video
+            - file
+          description: The type of the attached file

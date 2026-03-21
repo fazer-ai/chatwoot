@@ -14,8 +14,10 @@ class InternalChatDraftsAPI extends ApiClient {
     return axios.patch(`${this.url}/channels/${channelId}/draft`, data);
   }
 
-  deleteDraft(channelId) {
-    return axios.delete(`${this.url}/channels/${channelId}/draft`);
+  deleteDraft(channelId, { parentId } = {}) {
+    return axios.delete(`${this.url}/channels/${channelId}/draft`, {
+      params: { parent_id: parentId },
+    });
   }
 }
 

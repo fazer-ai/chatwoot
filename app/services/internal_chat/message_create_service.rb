@@ -25,7 +25,8 @@ class InternalChat::MessageCreateService
       content: params[:content],
       content_type: params[:content_type] || :text,
       parent_id: params[:parent_id],
-      echo_id: params[:echo_id]
+      echo_id: params[:echo_id],
+      skip_content_validation: params[:attachments].present?
     )
   end
 

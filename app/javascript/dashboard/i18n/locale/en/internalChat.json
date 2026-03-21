@@ -41,6 +41,7 @@
     },
     "THREAD": {
       "TITLE": "Thread",
+      "CLOSE": "Close thread",
       "REPLIES": "{count} replies",
       "REPLY_PLACEHOLDER": "Reply in thread..."
     },

@@ -38,9 +38,9 @@ class InternalChat::ChannelMember < ApplicationRecord
   scope :favorited, -> { where(favorited: true) }
 
   def unread_messages_count
-    return 0 if last_read_at.blank?
-
-    channel.messages.where('created_at > ?', last_read_at).where.not(sender_id: user_id).count
+    scope = channel.messages.where.not(sender_id: user_id)
+    scope = scope.where('created_at > ?', last_read_at) if last_read_at.present?
+    scope.count
   end
 end
 

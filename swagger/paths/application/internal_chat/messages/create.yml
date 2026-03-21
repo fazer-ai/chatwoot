@@ -12,8 +12,8 @@ requestBody:
       schema:
         $ref: '#/components/schemas/internal_chat_message_create_payload'
 responses:
-  '200':
-    description: Success
+  '201':
+    description: Created
     content:
       application/json:
         schema:

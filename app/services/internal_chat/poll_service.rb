@@ -12,6 +12,8 @@ class InternalChat::PollService
 
   def unvote
     validate_option_belongs_to_poll!
+    raise StandardError, 'Poll has expired' if poll.expired?
+
     vote_record = option.votes.find_by!(user: user)
     vote_record.destroy!
     poll.reload
@@ -34,6 +36,10 @@ class InternalChat::PollService
     return unless existing_votes.exists?
     raise StandardError, 'Revoting is not allowed' unless poll.allow_revote
 
-    existing_votes.destroy_all unless poll.multiple_choice
+    if poll.multiple_choice
+      raise StandardError, 'Already voted for this option' if option.votes.exists?(user_id: user.id)
+    else
+      existing_votes.destroy_all
+    end
   end
 end

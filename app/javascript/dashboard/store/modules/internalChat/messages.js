@@ -3,6 +3,7 @@ import { throwErrorMessage } from 'dashboard/store/utils/api';
 
 const state = {
   records: {},
+  threadReplies: {},
   uiFlags: {
     isFetching: false,
     isSending: false,
@@ -17,6 +18,10 @@ const getters = {
   getMessageById: _state => (channelId, messageId) => {
     const messages = _state.records[channelId] || [];
     return messages.find(m => m.id === messageId) || null;
+  },
+
+  getThreadReplies: _state => parentMessageId => {
+    return _state.threadReplies[parentMessageId] || [];
   },
 
   getUIFlags: _state => {
@@ -73,18 +78,38 @@ const actions = {
         messageId,
         data
       );
-      commit('UPDATE_MESSAGE', { channelId, message: response.data });
-      return response.data;
+      const message = response.data;
+      commit('UPDATE_MESSAGE', { channelId, message });
+      if (message.parent_id) {
+        commit('UPDATE_THREAD_REPLY', {
+          parentMessageId: message.parent_id,
+          reply: message,
+        });
+      }
+      return message;
     } catch (error) {
       throwErrorMessage(error);
       throw error;
     }
   },
 
-  deleteMessage: async ({ commit }, { channelId, messageId }) => {
+  deleteMessage: async (
+    { commit, state: _state },
+    { channelId, messageId }
+  ) => {
     try {
       await InternalChatMessagesAPI.deleteMessage(channelId, messageId);
       commit('DELETE_MESSAGE', { channelId, messageId });
+      // Also mark deleted in thread replies if applicable
+      Object.keys(_state.threadReplies).forEach(parentId => {
+        const replies = _state.threadReplies[parentId] || [];
+        if (replies.some(r => r.id === messageId)) {
+          commit('DELETE_THREAD_REPLY', {
+            parentMessageId: Number(parentId),
+            messageId,
+          });
+        }
+      });
     } catch (error) {
       throwErrorMessage(error);
       throw error;
@@ -126,6 +151,8 @@ const actions = {
         channelId,
         messageId
       );
+      const replies = response.data.replies || response.data || [];
+      commit('SET_THREAD_REPLIES', { parentMessageId: messageId, replies });
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
@@ -141,6 +168,10 @@ const actions = {
       const response = await InternalChatMessagesAPI.createMessage(channelId, {
         ...data,
         parent_id: parentMessageId,
+      });
+      commit('ADD_THREAD_REPLY', {
+        parentMessageId,
+        reply: response.data,
       });
       return response.data;
     } catch (error) {
@@ -180,6 +211,12 @@ const actions = {
   },
 
   addMessageFromCable: ({ commit }, { channelId, message }) => {
+    if (message.parent_id) {
+      commit('ADD_THREAD_REPLY', {
+        parentMessageId: message.parent_id,
+        reply: message,
+      });
+    }
     commit('ADD_MESSAGE', { channelId, message });
   },
 
@@ -305,6 +342,55 @@ const mutations = {
       _state.records = {
         ..._state.records,
         [channelId]: updated,
+      };
+    }
+  },
+
+  SET_THREAD_REPLIES(_state, { parentMessageId, replies }) {
+    _state.threadReplies = {
+      ..._state.threadReplies,
+      [parentMessageId]: replies,
+    };
+  },
+
+  ADD_THREAD_REPLY(_state, { parentMessageId, reply }) {
+    const existing = _state.threadReplies[parentMessageId] || [];
+    if (existing.some(r => r.id === reply.id)) return;
+    _state.threadReplies = {
+      ..._state.threadReplies,
+      [parentMessageId]: [...existing, reply],
+    };
+  },
+
+  UPDATE_THREAD_REPLY(_state, { parentMessageId, reply }) {
+    const existing = _state.threadReplies[parentMessageId] || [];
+    const index = existing.findIndex(r => r.id === reply.id);
+    if (index > -1) {
+      const updated = [...existing];
+      updated[index] = { ...updated[index], ...reply };
+      _state.threadReplies = {
+        ..._state.threadReplies,
+        [parentMessageId]: updated,
+      };
+    }
+  },
+
+  DELETE_THREAD_REPLY(_state, { parentMessageId, messageId }) {
+    const existing = _state.threadReplies[parentMessageId];
+    if (!existing) return;
+    const index = existing.findIndex(r => r.id === messageId);
+    if (index !== -1) {
+      const updated = [...existing];
+      updated[index] = {
+        ...updated[index],
+        content_attributes: {
+          ...updated[index].content_attributes,
+          deleted: true,
+        },
+      };
+      _state.threadReplies = {
+        ..._state.threadReplies,
+        [parentMessageId]: updated,
       };
     }
   },
