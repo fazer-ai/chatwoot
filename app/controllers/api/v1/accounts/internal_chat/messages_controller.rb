@@ -66,7 +66,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def thread
     authorize @message, :thread?, policy_class: InternalChat::MessagePolicy
-    replies = @message.replies.includes(:sender, :reactions, :replies).ordered
+    replies = @message.replies.includes(:sender, :reactions, :replies, :attachments, :poll).ordered
     render json: {
       parent: message_response(@message),
       replies: replies.map { |msg| message_response(msg) }
@@ -87,7 +87,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def base_messages_scope
-    current_channel.messages.includes(:sender, :reactions, :replies)
+    current_channel.messages.includes(:sender, :reactions, :replies, :attachments, :poll)
   end
 
   def apply_time_filters(messages)

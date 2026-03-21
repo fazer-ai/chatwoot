@@ -107,9 +107,9 @@ describe InternalChatListener do
     let!(:reaction) { create(:internal_chat_reaction, message: message, user: other_agent) }
     let!(:event) { Events::Base.new(:'internal_chat.reaction.created', Time.zone.now, reaction: reaction) }
 
-    it 'broadcasts to all channel members including the reaction creator' do
+    it 'broadcasts to all channel members except the reaction creator' do
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        a_collection_containing_exactly(admin.pubsub_token, agent.pubsub_token, other_agent.pubsub_token),
+        a_collection_containing_exactly(admin.pubsub_token, agent.pubsub_token),
         'internal_chat.reaction.created',
         hash_including(
           id: reaction.id,

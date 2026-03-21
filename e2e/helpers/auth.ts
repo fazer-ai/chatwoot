@@ -87,7 +87,7 @@ export async function createChannelViaAPI(
   const accountId = await getAccountId(page);
   const response = await page.request.post(
     `${baseURL}/api/v1/accounts/${accountId}/internal_chat/channels`,
-    { data: channelData }
+    { data: { channel: channelData } }
   );
   return response.json();
 }
@@ -99,8 +99,10 @@ export async function createDMViaAPI(page: Page, targetUserId: number) {
     `${baseURL}/api/v1/accounts/${accountId}/internal_chat/channels`,
     {
       data: {
-        channel_type: 'dm',
-        member_ids: [targetUserId],
+        channel: {
+          channel_type: 'dm',
+          member_ids: [targetUserId],
+        },
       },
     }
   );

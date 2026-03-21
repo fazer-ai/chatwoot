@@ -16,7 +16,7 @@ RSpec.describe InternalChat::Draft do
     describe 'uniqueness of user_id scoped to channel' do
       subject { create(:internal_chat_draft) }
 
-      it { is_expected.to validate_uniqueness_of(:user_id).scoped_to(:internal_chat_channel_id) }
+      it { is_expected.to validate_uniqueness_of(:user_id).scoped_to([:internal_chat_channel_id, :parent_id]) }
     end
   end
 

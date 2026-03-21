@@ -276,7 +276,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     members = channel.channel_members.includes(:user).load
     membership = members.detect { |member| member.user_id == Current.user.id }
     recent_messages = channel.messages
-                             .includes(:sender, :reactions, :replies, attachments: { file_attachment: :blob })
+                             .includes(:sender, :reactions, :replies, :poll, attachments: { file_attachment: :blob })
                              .recent.limit(RECENT_MESSAGES_LIMIT).reverse
 
     channel_base_response(channel).merge(

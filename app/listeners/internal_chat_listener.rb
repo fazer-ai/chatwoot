@@ -80,7 +80,7 @@ class InternalChatListener < BaseListener
     message = reaction.message
     channel = message.channel
     account = message.account
-    tokens = member_tokens(channel)
+    tokens = member_tokens(channel, exclude_user: reaction.user)
 
     broadcast(account, tokens, INTERNAL_CHAT_REACTION_CREATED, reaction_event_data(reaction))
   end

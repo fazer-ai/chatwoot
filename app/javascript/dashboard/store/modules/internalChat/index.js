@@ -2,7 +2,6 @@ import { getters } from './getters';
 import { actions } from './actions';
 import { mutations } from './mutations';
 import messages from './messages';
-import typingStatus from './typingStatus';
 import polls from './polls';
 import drafts from './drafts';
 
@@ -24,7 +23,6 @@ export default {
   mutations,
   modules: {
     messages,
-    typingStatus,
     polls,
     drafts,
   },
