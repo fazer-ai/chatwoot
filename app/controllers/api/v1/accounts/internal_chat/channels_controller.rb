@@ -237,20 +237,16 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def compute_unread_counts(channels)
-    memberships = InternalChat::ChannelMember
-                  .where(internal_chat_channel_id: channels.select(:id), user_id: Current.user.id)
-                  .where.not(last_read_at: nil)
-
-    return {} if memberships.empty?
-
-    counts = {}
-    memberships.each do |m|
-      counts[m.internal_chat_channel_id] = InternalChat::Message
-                                           .where(internal_chat_channel_id: m.internal_chat_channel_id)
-                                           .where('created_at > ?', m.last_read_at)
-                                           .count
-    end
-    counts
+    InternalChat::ChannelMember
+      .joins(
+        'INNER JOIN internal_chat_messages ' \
+        'ON internal_chat_messages.internal_chat_channel_id = internal_chat_channel_members.internal_chat_channel_id ' \
+        'AND internal_chat_messages.created_at > internal_chat_channel_members.last_read_at'
+      )
+      .where(internal_chat_channel_id: channels.select(:id), user_id: Current.user.id)
+      .where.not(last_read_at: nil)
+      .group('internal_chat_channel_members.internal_chat_channel_id')
+      .count('internal_chat_messages.id')
   end
 
   def channel_base_response(channel)
