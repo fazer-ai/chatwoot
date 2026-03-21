@@ -124,6 +124,17 @@ const actions = {
   deleteMessageFromCable: ({ commit }, { channelId, messageId }) => {
     commit('DELETE_MESSAGE', { channelId, messageId });
   },
+
+  addReactionFromCable: ({ commit }, { channelId, messageId, reaction }) => {
+    commit('ADD_REACTION', { channelId, messageId, reaction });
+  },
+
+  removeReactionFromCable: (
+    { commit },
+    { channelId, messageId, reactionId }
+  ) => {
+    commit('REMOVE_REACTION', { channelId, messageId, reactionId });
+  },
 };
 
 const mutations = {

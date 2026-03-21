@@ -19,7 +19,11 @@ const props = defineProps({
 const store = useStore();
 const { t } = useI18n();
 
-const typingUsers = ref([]);
+const typingUsers = computed(() => {
+  return (
+    store.getters['internalChatTypingStatus/getUserList'](props.channelId) || []
+  );
+});
 const editorRef = ref(null);
 
 const currentUser = useMapGetter('getCurrentUser');
@@ -123,6 +127,19 @@ async function handleRemoveReaction({ messageId, reactionId }) {
   }
 }
 
+async function handleLoadMore() {
+  if (!messages.value.length) return;
+  const oldestMessage = messages.value[0];
+  try {
+    await store.dispatch('internalChat/messages/fetchMessages', {
+      channelId: props.channelId,
+      params: { before: oldestMessage.created_at },
+    });
+  } catch {
+    // silently ignore pagination errors
+  }
+}
+
 function handleTyping() {
   InternalChatChannelsAPI.toggleTypingStatus(props.channelId, 'on');
 }
@@ -153,6 +170,7 @@ onMounted(() => {
       @delete="handleDelete"
       @add-reaction="handleAddReaction"
       @remove-reaction="handleRemoveReaction"
+      @load-more="handleLoadMore"
     />
     <TypingIndicator :typing-users="typingUsers" />
     <MessageEditor

@@ -27,7 +27,7 @@ const memberCount = computed(() => {
 });
 
 const isDM = computed(() => {
-  return props.channel.is_dm;
+  return props.channel.channel_type === 'dm';
 });
 
 const isArchived = computed(() => {
@@ -36,7 +36,7 @@ const isArchived = computed(() => {
 
 const channelIcon = computed(() => {
   if (isDM.value) return 'i-lucide-message-circle';
-  if (props.channel.channel_type === 'private') return 'i-lucide-lock';
+  if (props.channel.channel_type === 'private_channel') return 'i-lucide-lock';
   return 'i-lucide-hash';
 });
 </script>

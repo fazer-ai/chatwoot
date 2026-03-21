@@ -57,11 +57,11 @@ const isOwnMessage = computed(() => {
 });
 
 const isEdited = computed(() => {
-  return props.message.edited;
+  return !!props.message.content_attributes?.edited_at;
 });
 
 const isDeleted = computed(() => {
-  return props.message.deleted;
+  return !!props.message.content_attributes?.deleted;
 });
 
 const canEdit = computed(() => {

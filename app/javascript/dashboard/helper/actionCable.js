@@ -261,19 +261,34 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onInternalChatMessageCreated = data => {
-    this.app.$store.dispatch('internalChat/messages/addMessage', data);
-    this.app.$store.dispatch('internalChat/updateChannel', {
-      id: data.internal_chat_channel_id,
-      last_activity_at: data.created_at,
+    this.app.$store.dispatch('internalChat/messages/addMessageFromCable', {
+      channelId: data.internal_chat_channel_id,
+      message: data,
     });
+    const channel = this.app.$store.getters['internalChat/getChannelById'](
+      data.internal_chat_channel_id
+    );
+    if (channel) {
+      this.app.$store.dispatch('internalChat/updateChannel', {
+        id: data.internal_chat_channel_id,
+        unread_count: (channel.unread_count || 0) + 1,
+        last_activity_at: data.created_at,
+      });
+    }
   };
 
   onInternalChatMessageUpdated = data => {
-    this.app.$store.dispatch('internalChat/messages/updateMessage', data);
+    this.app.$store.dispatch('internalChat/messages/updateMessageFromCable', {
+      channelId: data.internal_chat_channel_id,
+      message: data,
+    });
   };
 
   onInternalChatMessageDeleted = data => {
-    this.app.$store.dispatch('internalChat/messages/removeMessage', data);
+    this.app.$store.dispatch('internalChat/messages/deleteMessageFromCable', {
+      channelId: data.internal_chat_channel_id,
+      messageId: data.id,
+    });
   };
 
   onInternalChatTypingOn = ({ channel, user }) => {
@@ -291,11 +306,19 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onInternalChatReactionCreated = data => {
-    this.app.$store.dispatch('internalChat/messages/addReaction', data);
+    this.app.$store.dispatch('internalChat/messages/addReactionFromCable', {
+      channelId: data.internal_chat_channel_id,
+      messageId: data.message_id,
+      reaction: data,
+    });
   };
 
   onInternalChatReactionDeleted = data => {
-    this.app.$store.dispatch('internalChat/messages/removeReaction', data);
+    this.app.$store.dispatch('internalChat/messages/removeReactionFromCable', {
+      channelId: data.internal_chat_channel_id,
+      messageId: data.message_id,
+      reactionId: data.id,
+    });
   };
 }
 

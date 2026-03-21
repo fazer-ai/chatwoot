@@ -245,7 +245,18 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       echo_id: message.echo_id,
       created_at: message.created_at,
       updated_at: message.updated_at,
-      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } }
+      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
+      attachments: message.attachments.map { |a| attachment_response(a) }
+    }
+  end
+
+  def attachment_response(attachment)
+    {
+      id: attachment.id,
+      file_type: attachment.file_type,
+      external_url: attachment.external_url,
+      extension: attachment.extension,
+      file_url: attachment.file.attached? ? url_for(attachment.file) : nil
     }
   end
 

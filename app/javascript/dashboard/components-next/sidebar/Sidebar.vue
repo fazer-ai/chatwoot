@@ -323,6 +323,7 @@ const menuItems = computed(() => {
       icon: 'i-lucide-messages-square',
       to: accountScopedRoute('internal_chat_home'),
       activeOn: [
+        'internal_chat',
         'internal_chat_home',
         'internal_chat_channel',
         'internal_chat_dm',

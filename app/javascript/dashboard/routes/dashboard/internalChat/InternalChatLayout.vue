@@ -20,10 +20,6 @@ const activeChannel = computed(() => {
   return store.getters['internalChat/getChannelById'](activeChannelId.value);
 });
 
-const isDM = computed(() => {
-  return route.name === 'internal_chat_dm';
-});
-
 async function fetchChannels() {
   try {
     await store.dispatch('internalChat/get');
@@ -45,7 +41,6 @@ onMounted(() => {
         v-if="activeChannelId && activeChannel"
         :key="activeChannelId"
         :channel-id="activeChannelId"
-        :is-direct-message="isDM"
       />
       <div v-else class="flex h-full items-center justify-center bg-n-solid-1">
         <div class="text-center">

@@ -69,9 +69,10 @@ const filteredFavoriteChannels = computed(() => {
 });
 
 function navigateToChannel(channel) {
-  const routeName = channel.is_dm
-    ? 'internal_chat_dm'
-    : 'internal_chat_channel';
+  const routeName =
+    channel.channel_type === 'dm'
+      ? 'internal_chat_dm'
+      : 'internal_chat_channel';
   router.push({
     name: routeName,
     params: { accountId: accountId.value, channelId: channel.id },
@@ -79,8 +80,8 @@ function navigateToChannel(channel) {
 }
 
 function getChannelIcon(channel) {
-  if (channel.is_dm) return 'i-lucide-message-circle';
-  if (channel.channel_type === 'private') return 'i-lucide-lock';
+  if (channel.channel_type === 'dm') return 'i-lucide-message-circle';
+  if (channel.channel_type === 'private_channel') return 'i-lucide-lock';
   return 'i-lucide-hash';
 }
 </script>
@@ -173,7 +174,8 @@ function getChannelIcon(channel) {
       <!-- Channels without category (fallback) -->
       <div
         v-if="
-          categories.length === 0 && channels.filter(ch => !ch.is_dm).length > 0
+          categories.length === 0 &&
+          channels.filter(ch => ch.channel_type !== 'dm').length > 0
         "
         class="mb-3"
       >
@@ -183,7 +185,7 @@ function getChannelIcon(channel) {
           {{ t('INTERNAL_CHAT.CHANNELS') }}
         </h3>
         <button
-          v-for="channel in channels.filter(ch => !ch.is_dm)"
+          v-for="channel in channels.filter(ch => ch.channel_type !== 'dm')"
           :key="channel.id"
           class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
           :class="[

@@ -30,6 +30,23 @@ class InternalChatListener < BaseListener
     broadcast(account, tokens, INTERNAL_CHAT_MESSAGE_DELETED, message_data)
   end
 
+  def internal_chat_channel_updated(event)
+    channel = event.data[:channel]
+    account = channel.account
+    tokens = member_tokens(channel)
+
+    broadcast(account, tokens, INTERNAL_CHAT_CHANNEL_UPDATED,
+              {
+                id: channel.id,
+                name: channel.name,
+                description: channel.description,
+                channel_type: channel.channel_type,
+                status: channel.status,
+                category_id: channel.category_id,
+                last_activity_at: channel.last_activity_at
+              })
+  end
+
   def internal_chat_typing_on(event)
     channel = event.data[:channel]
     user = event.data[:user]
@@ -94,7 +111,8 @@ class InternalChatListener < BaseListener
       parent_id: message.parent_id,
       echo_id: message.echo_id,
       created_at: message.created_at,
-      updated_at: message.updated_at
+      updated_at: message.updated_at,
+      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } }
     }
   end
 
