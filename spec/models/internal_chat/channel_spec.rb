@@ -7,9 +7,9 @@ RSpec.describe InternalChat::Channel do
     it { is_expected.to belong_to(:account) }
     it { is_expected.to belong_to(:category).class_name('InternalChat::Category').optional }
     it { is_expected.to belong_to(:created_by).class_name('User').optional }
-    it { is_expected.to have_many(:channel_members).class_name('InternalChat::ChannelMember').dependent(:destroy_async) }
+    it { is_expected.to have_many(:channel_members).class_name('InternalChat::ChannelMember').dependent(:destroy) }
     it { is_expected.to have_many(:members).through(:channel_members).source(:user) }
-    it { is_expected.to have_many(:messages).class_name('InternalChat::Message').dependent(:destroy_async) }
+    it { is_expected.to have_many(:messages).class_name('InternalChat::Message').dependent(:destroy) }
     it { is_expected.to have_many(:message_attachments).through(:messages).source(:attachments) }
   end
 
