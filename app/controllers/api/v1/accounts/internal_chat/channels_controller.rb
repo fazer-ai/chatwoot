@@ -26,7 +26,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       add_initial_members
     end
 
-    render json: channel_show_response(@channel), status: :ok
+    render json: channel_show_response(@channel), status: :created
   end
 
   def update
@@ -148,11 +148,19 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def find_existing_dm(user_ids)
-    Current.account.internal_chat_channels.where(channel_type: :dm).find_each do |ch|
-      member_ids = ch.channel_members.pluck(:user_id).sort
-      return ch if member_ids == user_ids.sort
-    end
-    nil
+    sorted_ids = user_ids.sort
+    member_count = sorted_ids.size
+
+    Current.account.internal_chat_channels
+           .where(channel_type: :dm)
+           .joins(:channel_members)
+           .group('internal_chat_channels.id')
+           .having('COUNT(internal_chat_channel_members.id) = ?', member_count)
+           .having(
+             'ARRAY_AGG(internal_chat_channel_members.user_id ORDER BY internal_chat_channel_members.user_id) = ARRAY[?]::bigint[]',
+             sorted_ids
+           )
+           .first
   end
 
   def dm_member_ids
