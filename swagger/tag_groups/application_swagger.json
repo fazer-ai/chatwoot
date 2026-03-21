@@ -7829,6 +7829,1750 @@
           }
         }
       }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/categories": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Categories"
+        ],
+        "operationId": "list-internal-chat-categories",
+        "summary": "List all categories",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "List all internal chat categories in the account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of categories",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_chat_category"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal Chat Categories"
+        ],
+        "operationId": "create-internal-chat-category",
+        "summary": "Create a category",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Create a new internal chat category (admin only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_category_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_category"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/categories/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_category_id"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Internal Chat Categories"
+        ],
+        "operationId": "update-internal-chat-category",
+        "summary": "Update a category",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Update an internal chat category (admin only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_category_create_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_category"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Categories"
+        ],
+        "operationId": "delete-internal-chat-category",
+        "summary": "Delete a category",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Delete an internal chat category (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "list-internal-chat-channels",
+        "summary": "List all channels",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "List all internal chat channels in the account. Supports filtering by type, status, and category.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "text_channels",
+                "direct_messages"
+              ]
+            },
+            "description": "Filter by channel type"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ]
+            },
+            "description": "Filter by channel status (defaults to active)"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by category ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of channels",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_chat_channel_index"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "create-internal-chat-channel",
+        "summary": "Create a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Create a new internal chat channel or direct message. For DMs, set channel_type to \"dm\" and provide member_ids.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_channel_create_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_show"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "show-internal-chat-channel",
+        "summary": "Get a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Get the details of an internal chat channel including recent messages and members",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_show"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "update-internal-chat-channel",
+        "summary": "Update a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Update an internal chat channel's attributes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_channel_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_show"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "delete-internal-chat-channel",
+        "summary": "Delete a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Delete an internal chat channel (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}/archive": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "archive-internal-chat-channel",
+        "summary": "Archive a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Archive an internal chat channel (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_show"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}/unarchive": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "unarchive-internal-chat-channel",
+        "summary": "Unarchive a channel",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Unarchive an internal chat channel (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_show"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}/toggle_typing_status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "toggle-internal-chat-typing-status",
+        "summary": "Toggle typing status",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Toggle typing status in an internal chat channel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "typing_status": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "The typing status to set"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}/mark_read": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "mark-internal-chat-channel-read",
+        "summary": "Mark channel as read",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Mark all messages in the channel as read for the current user",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{id}/mark_unread": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Channels"
+        ],
+        "operationId": "mark-internal-chat-channel-unread",
+        "summary": "Mark channel as unread",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Mark the channel as unread from a specific message for the current user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "integer",
+                    "description": "The ID of the message to mark as unread from"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/members": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Channel Members"
+        ],
+        "operationId": "list-internal-chat-channel-members",
+        "summary": "List channel members",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "List all members of an internal chat channel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of channel members",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_chat_channel_member"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal Chat Channel Members"
+        ],
+        "operationId": "add-internal-chat-channel-members",
+        "summary": "Add channel members",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Add one or more members to an internal chat channel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_member_create_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of added channel members",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_chat_channel_member"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/members/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_member_id"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Internal Chat Channel Members"
+        ],
+        "operationId": "update-internal-chat-channel-member",
+        "summary": "Update a channel member",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Update a channel member's settings (mute/favorite)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "muted": {
+                    "type": "boolean",
+                    "description": "Whether the channel is muted for this member"
+                  },
+                  "favorited": {
+                    "type": "boolean",
+                    "description": "Whether the channel is favorited by this member"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_channel_member"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Channel Members"
+        ],
+        "operationId": "remove-internal-chat-channel-member",
+        "summary": "Remove a channel member",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Remove a member from an internal chat channel",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/messages": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "list-internal-chat-messages",
+        "summary": "List messages",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "List messages in an internal chat channel with cursor-based pagination",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fetch messages created before this timestamp"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fetch messages created after this timestamp"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "description": "Array of messages",
+                      "items": {
+                        "$ref": "#/components/schemas/internal_chat_message"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "has_more": {
+                          "type": "boolean",
+                          "description": "Whether there are more messages available"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "create-internal-chat-message",
+        "summary": "Create a message",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Create a new message in an internal chat channel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_message_create_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/messages/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer"
+          },
+          "required": true,
+          "description": "The ID of the message"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "update-internal-chat-message",
+        "summary": "Update a message",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Update the content of an internal chat message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "The updated content of the message"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "delete-internal-chat-message",
+        "summary": "Delete a message",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Delete an internal chat message (soft-delete, marks content as deleted)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/messages/{id}/pin": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer"
+          },
+          "required": true,
+          "description": "The ID of the message"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "pin-internal-chat-message",
+        "summary": "Pin a message",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Pin a message in an internal chat channel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/messages/{id}/unpin": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer"
+          },
+          "required": true,
+          "description": "The ID of the message"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "unpin-internal-chat-message",
+        "summary": "Unpin a message",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Unpin a message in an internal chat channel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/messages/{id}/thread": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer"
+          },
+          "required": true,
+          "description": "The ID of the message"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Messages"
+        ],
+        "operationId": "get-internal-chat-message-thread",
+        "summary": "Get message thread",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Get a message and all its threaded replies",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "parent": {
+                      "$ref": "#/components/schemas/internal_chat_message"
+                    },
+                    "replies": {
+                      "type": "array",
+                      "description": "Array of reply messages",
+                      "items": {
+                        "$ref": "#/components/schemas/internal_chat_message"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/messages/{message_id}/reactions": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_message_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Reactions"
+        ],
+        "operationId": "create-internal-chat-reaction",
+        "summary": "Add a reaction",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Add an emoji reaction to an internal chat message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "emoji"
+                ],
+                "properties": {
+                  "emoji": {
+                    "type": "string",
+                    "description": "The emoji to react with"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_reaction"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/messages/{message_id}/reactions/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_message_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_reaction_id"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Internal Chat Reactions"
+        ],
+        "operationId": "delete-internal-chat-reaction",
+        "summary": "Remove a reaction",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Remove an emoji reaction from an internal chat message",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14768,6 +16512,26 @@
     {
       "name": "Help Center",
       "description": "Knowledge base management"
+    },
+    {
+      "name": "Internal Chat Categories",
+      "description": "Internal chat category management APIs"
+    },
+    {
+      "name": "Internal Chat Channels",
+      "description": "Internal chat channel management APIs"
+    },
+    {
+      "name": "Internal Chat Channel Members",
+      "description": "Internal chat channel member management APIs"
+    },
+    {
+      "name": "Internal Chat Messages",
+      "description": "Internal chat message management APIs"
+    },
+    {
+      "name": "Internal Chat Reactions",
+      "description": "Internal chat reaction management APIs"
     }
   ],
   "x-tagGroups": [
@@ -14805,7 +16569,12 @@
         "Teams",
         "Webhooks",
         "Automation Rule",
-        "Help Center"
+        "Help Center",
+        "Internal Chat Categories",
+        "Internal Chat Channels",
+        "Internal Chat Channel Members",
+        "Internal Chat Messages",
+        "Internal Chat Reactions"
       ]
     },
     {

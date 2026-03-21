@@ -91,6 +91,16 @@ tags:
     description: Public conversation APIs
   - name: Messages API
     description: Public message APIs
+  - name: Internal Chat Categories
+    description: Internal chat category management APIs
+  - name: Internal Chat Channels
+    description: Internal chat channel management APIs
+  - name: Internal Chat Channel Members
+    description: Internal chat channel member management APIs
+  - name: Internal Chat Messages
+    description: Internal chat message management APIs
+  - name: Internal Chat Reactions
+    description: Internal chat reaction management APIs
   - name: CSAT Survey Page
     description: Customer satisfaction survey
 x-tagGroups:
@@ -125,6 +135,11 @@ x-tagGroups:
       - Webhooks
       - Automation Rule
       - Help Center
+      - Internal Chat Categories
+      - Internal Chat Channels
+      - Internal Chat Channel Members
+      - Internal Chat Messages
+      - Internal Chat Reactions
   - name: Client
     tags:
       - Contacts API

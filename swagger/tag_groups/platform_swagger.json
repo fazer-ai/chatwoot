@@ -7708,7 +7708,12 @@
         "Teams",
         "Webhooks",
         "Automation Rule",
-        "Help Center"
+        "Help Center",
+        "Internal Chat Categories",
+        "Internal Chat Channels",
+        "Internal Chat Channel Members",
+        "Internal Chat Messages",
+        "Internal Chat Reactions"
       ]
     },
     {
