@@ -19,6 +19,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   def create
     @channel = build_channel
     authorize @channel, :create?
+    created = @channel.new_record?
 
     ActiveRecord::Base.transaction do
       @channel.save!
@@ -26,12 +27,13 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       add_initial_members
     end
 
+    dispatch_channel_event(@channel) if created
     render json: channel_show_response(@channel), status: :created
   end
 
   def update
     authorize @current_channel, :update?
-    @current_channel.update!(channel_params)
+    @current_channel.update!(update_channel_params)
     dispatch_channel_event(@current_channel)
     render json: channel_show_response(@current_channel)
   end
@@ -58,7 +60,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def toggle_typing_status
     authorize @current_channel, :toggle_typing_status?
-    InternalChat::TypingStatusManager.new(channel: @current_channel, user: Current.user, params: params).perform
+    InternalChat::TypingStatusManager.new(
+      channel: @current_channel, user: Current.user, params: { typing_status: typing_status_param }
+    ).perform
     head :ok
   end
 
@@ -127,7 +131,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     if dm_params?
       find_or_build_dm
     else
-      Current.account.internal_chat_channels.build(channel_params.merge(created_by: Current.user))
+      Current.account.internal_chat_channels.build(create_channel_params.except(:member_ids).merge(created_by: Current.user))
     end
   end
 
@@ -164,7 +168,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def dm_member_ids
-    ids = Array(params[:member_ids] || params.dig(:channel, :member_ids)).map(&:to_i)
+    ids = Array(permitted_member_ids).map(&:to_i)
     ids = Current.account.users.where(id: ids).pluck(:id)
     ids << Current.user.id unless ids.include?(Current.user.id)
     ids
@@ -178,7 +182,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def add_initial_members
-    member_ids = Array(params[:member_ids] || params.dig(:channel, :member_ids)).map(&:to_i)
+    member_ids = Array(permitted_member_ids).map(&:to_i)
     member_ids = Current.account.users.where(id: member_ids).pluck(:id)
     member_ids << Current.user.id if @channel.channel_type_dm? && member_ids.exclude?(Current.user.id)
 
@@ -189,8 +193,20 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     end
   end
 
-  def channel_params
-    params.require(:channel).permit(:name, :description, :channel_type, :category_id)
+  def create_channel_params
+    @create_channel_params ||= params.require(:channel).permit(:name, :description, :channel_type, :category_id, member_ids: [])
+  end
+
+  def update_channel_params
+    params.require(:channel).permit(:name, :description, :category_id)
+  end
+
+  def permitted_member_ids
+    params.permit(member_ids: [])[:member_ids] || create_channel_params[:member_ids]
+  end
+
+  def typing_status_param
+    params.permit(:typing_status)[:typing_status]
   end
 
   def channel_base_response(channel)
@@ -208,7 +224,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def channel_index_response(channel)
-    membership = channel.channel_members.find_by(user_id: Current.user.id)
+    membership = channel.channel_members.detect { |member| member.user_id == Current.user.id }
     channel_base_response(channel).merge(
       is_dm: channel.channel_type_dm?,
       muted: membership&.muted || false,
@@ -218,10 +234,12 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     )
   end
 
-  def channel_show_response(channel)
-    membership = channel.channel_members.find_by(user_id: Current.user.id)
-    recent_messages = channel.messages.includes(:sender, :reactions).recent.limit(RECENT_MESSAGES_LIMIT).reverse
-    members = channel.channel_members.includes(:user)
+  def channel_show_response(channel) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    members = channel.channel_members.includes(:user).load
+    membership = members.detect { |member| member.user_id == Current.user.id }
+    recent_messages = channel.messages
+                             .includes(:sender, :reactions, attachments: { file_attachment: :blob })
+                             .recent.limit(RECENT_MESSAGES_LIMIT).reverse
 
     channel_base_response(channel).merge(
       is_dm: channel.channel_type_dm?,
