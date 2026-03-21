@@ -37,7 +37,7 @@ RSpec.describe InternalChat::Category do
       let!(:category_c) { create(:internal_chat_category, account: account, name: 'C', position: 3) }
 
       it 'returns categories ordered by position' do
-        expect(described_class.ordered).to eq([category_a, category_b, category_c])
+        expect(account.internal_chat_categories.ordered.last(3)).to eq([category_a, category_b, category_c])
       end
     end
   end

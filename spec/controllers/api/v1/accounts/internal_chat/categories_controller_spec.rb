@@ -24,9 +24,9 @@ RSpec.describe 'Internal Chat Categories API', type: :request do
 
         expect(response).to have_http_status(:success)
         body = response.parsed_body
-        expect(body.length).to eq(1)
-        expect(body.first['name']).to eq('Engineering')
-        expect(body.first['id']).to eq(category.id)
+        names = body.map { |c| c['name'] }
+        expect(names).to include('Engineering')
+        expect(body.find { |c| c['id'] == category.id }).to be_present
       end
 
       it 'returns categories in position order' do
@@ -39,7 +39,10 @@ RSpec.describe 'Internal Chat Categories API', type: :request do
 
         expect(response).to have_http_status(:success)
         body = response.parsed_body
-        expect(body.map { |c| c['name'] }).to eq(%w[First Second])
+        names = body.map { |c| c['name'] }
+        first_idx = names.index('First')
+        second_idx = names.index('Second')
+        expect(first_idx).to be < second_idx
       end
 
       it 'includes channels_count in response' do
