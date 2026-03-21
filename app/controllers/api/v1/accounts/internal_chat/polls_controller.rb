@@ -1,7 +1,8 @@
 class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::InternalChat::BaseController
   include Events::Types
 
-  before_action :set_poll, only: [:vote, :unvote]
+  before_action :set_poll, only: [:vote]
+  before_action :set_poll_for_unvote, only: [:unvote]
 
   def create
     @channel = Current.account.internal_chat_channels.find(params[:channel_id])
@@ -24,7 +25,9 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   end
 
   def unvote
-    @vote = @option.votes.find_by!(user: Current.user)
+    @vote = InternalChat::PollVote.joins(:option)
+                                  .where(internal_chat_poll_options: { internal_chat_poll_id: @poll.id }, user_id: Current.user.id)
+                                  .first!
     @vote.destroy!
     dispatch_poll_event
 
@@ -36,6 +39,12 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   def set_poll
     @poll = InternalChat::Poll.find(params[:id])
     @option = @poll.options.find(params[:option_id])
+    channel = @poll.message.channel
+    authorize channel, :show?, policy_class: InternalChat::ChannelPolicy
+  end
+
+  def set_poll_for_unvote
+    @poll = InternalChat::Poll.find(params[:id])
     channel = @poll.message.channel
     authorize channel, :show?, policy_class: InternalChat::ChannelPolicy
   end

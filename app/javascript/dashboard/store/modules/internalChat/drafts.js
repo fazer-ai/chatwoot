@@ -16,7 +16,7 @@ const getters = {
   getDraftByChannelId: _state => channelId => {
     return (
       Object.values(_state.records).find(
-        draft => draft.channel_id === channelId
+        draft => draft.internal_chat_channel_id === channelId
       ) || null
     );
   },
