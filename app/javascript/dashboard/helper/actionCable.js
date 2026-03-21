@@ -261,19 +261,19 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onInternalChatMessageCreated = data => {
-    this.app.$store.dispatch('internalChatMessages/addMessage', data);
-    this.app.$store.dispatch('internalChatChannels/updateChannelActivity', {
-      channelId: data.internal_chat_channel_id,
-      lastActivityAt: data.created_at,
+    this.app.$store.dispatch('internalChat/messages/addMessage', data);
+    this.app.$store.dispatch('internalChat/updateChannel', {
+      id: data.internal_chat_channel_id,
+      last_activity_at: data.created_at,
     });
   };
 
   onInternalChatMessageUpdated = data => {
-    this.app.$store.dispatch('internalChatMessages/updateMessage', data);
+    this.app.$store.dispatch('internalChat/messages/updateMessage', data);
   };
 
   onInternalChatMessageDeleted = data => {
-    this.app.$store.dispatch('internalChatMessages/removeMessage', data);
+    this.app.$store.dispatch('internalChat/messages/removeMessage', data);
   };
 
   onInternalChatTypingOn = ({ channel, user }) => {
@@ -291,11 +291,11 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onInternalChatReactionCreated = data => {
-    this.app.$store.dispatch('internalChatMessages/addReaction', data);
+    this.app.$store.dispatch('internalChat/messages/addReaction', data);
   };
 
   onInternalChatReactionDeleted = data => {
-    this.app.$store.dispatch('internalChatMessages/removeReaction', data);
+    this.app.$store.dispatch('internalChat/messages/removeReaction', data);
   };
 }
 
