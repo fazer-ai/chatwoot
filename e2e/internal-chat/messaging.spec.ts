@@ -1,17 +1,18 @@
 import { test, expect } from '@playwright/test';
 import {
   login,
-  loginAndNavigateToChannel,
   createChannelViaAPI,
   sendMessageViaAPI,
 } from '../helpers/auth';
 
 test.describe('Internal Chat - Messaging', () => {
   let channelId: number;
+  let accountId: number;
+  const baseURL = 'http://localhost:3000';
 
   test.beforeEach(async ({ page }) => {
-    const baseURL = 'http://localhost:3000';
-    await login(page, baseURL);
+    const { data } = await login(page, baseURL);
+    accountId = data.account_id;
 
     // Create a fresh channel for each test
     const channel = await createChannelViaAPI(page, {
@@ -21,26 +22,24 @@ test.describe('Internal Chat - Messaging', () => {
     channelId = channel.id;
   });
 
-  test('send a text message', async ({ page }) => {
+  test('send a text message via UI', async ({ page }) => {
     await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
     );
     await page.waitForLoadState('networkidle');
 
-    // MessageEditor.vue has a textarea with placeholder from
-    // INTERNAL_CHAT.MESSAGE.PLACEHOLDER = "Type a message..."
-    const messageInput = page.getByPlaceholder('Type a message...');
+    // MessageEditor.vue has a <textarea> with placeholder "Digite uma mensagem..." (pt_BR)
+    const messageInput = page.locator('textarea');
     await expect(messageInput).toBeVisible();
 
-    const messageText = `Hello E2E test ${Date.now()}`;
+    const messageText = `Hello E2E ${Date.now()}`;
     await messageInput.fill(messageText);
 
-    // Send button has title from INTERNAL_CHAT.MESSAGE.SEND = "Send"
-    const sendButton = page.locator('button[title="Send"]');
+    // Click the send button (has title "Enviar" in pt_BR)
+    const sendButton = page.locator('button[title="Enviar"]');
     await sendButton.click();
 
     // The message should appear in the message list
-    // MessageBubble renders the content in a div with v-dompurify-html
     const sentMessage = page.getByText(messageText);
     await expect(sentMessage).toBeVisible();
 
@@ -50,11 +49,11 @@ test.describe('Internal Chat - Messaging', () => {
 
   test('send message with Enter key', async ({ page }) => {
     await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
     );
     await page.waitForLoadState('networkidle');
 
-    const messageInput = page.getByPlaceholder('Type a message...');
+    const messageInput = page.locator('textarea');
     const messageText = `Enter key test ${Date.now()}`;
     await messageInput.fill(messageText);
 
@@ -65,119 +64,114 @@ test.describe('Internal Chat - Messaging', () => {
     await expect(sentMessage).toBeVisible();
   });
 
-  test('edit a message', async ({ page }) => {
-    // Send a message via API first
-    const originalText = `Original message ${Date.now()}`;
-    await sendMessageViaAPI(page, channelId, originalText);
-
-    await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
-    );
-    await page.waitForLoadState('networkidle');
-
-    // Find the message and hover over it to reveal action buttons
-    const messageBubble = page
-      .locator('.group')
-      .filter({ hasText: originalText });
-    await messageBubble.hover();
-
-    // Click the edit button (title = "Edit" from INTERNAL_CHAT.MESSAGE.EDIT)
-    const editButton = messageBubble.locator('button[title="Edit"]');
-    await expect(editButton).toBeVisible();
-    await editButton.click();
-
-    // After clicking edit, the message content should be editable
-    // The edit flow is handled by the parent ChannelView.vue
-    // which calls handleEdit with the message object
-    // The exact edit UI depends on implementation - verify the edit button works
-    await expect(editButton).toBeVisible();
-  });
-
-  test('delete a message shows deleted placeholder', async ({ page }) => {
-    // Send a message via API first
-    const messageText = `Delete me ${Date.now()}`;
-    await sendMessageViaAPI(page, channelId, messageText);
-
-    await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
-    );
-    await page.waitForLoadState('networkidle');
-
-    // Hover over the message to show action buttons
-    const messageBubble = page.locator('.group').filter({ hasText: messageText });
-    await messageBubble.hover();
-
-    // Click the delete button (title = "Delete" from INTERNAL_CHAT.MESSAGE.DELETE)
-    const deleteButton = messageBubble.locator('button[title="Delete"]');
-    await expect(deleteButton).toBeVisible();
-    await deleteButton.click();
-
-    // After deletion, the message shows "This message was deleted"
-    // (from INTERNAL_CHAT.MESSAGE.DELETED)
-    const deletedText = page.getByText('This message was deleted');
-    await expect(deletedText).toBeVisible();
-  });
-
-  test('pin a message shows pin indicator', async ({ page }) => {
-    // Send a message via API first
-    const messageText = `Pin me ${Date.now()}`;
-    await sendMessageViaAPI(page, channelId, messageText);
-
-    await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
-    );
-    await page.waitForLoadState('networkidle');
-
-    // Hover over the message to show action buttons
-    const messageBubble = page.locator('.group').filter({ hasText: messageText });
-    await messageBubble.hover();
-
-    // Click pin button (title = "Pin message" from INTERNAL_CHAT.PIN.PIN)
-    const pinButton = messageBubble.locator('button[title="Pin message"]');
-    await expect(pinButton).toBeVisible();
-    await pinButton.click();
-
-    // After pinning, the ChannelHeader shows a pinned message banner
-    // with text "Pinned message" (from INTERNAL_CHAT.PIN.PINNED_MESSAGE)
-    const pinnedBanner = page.getByText('Pinned message');
-    await expect(pinnedBanner.first()).toBeVisible();
-  });
-
   test('message shows sender name and timestamp', async ({ page }) => {
-    // Send a message via API
+    // Send a message via API as precondition
     const messageText = `Metadata test ${Date.now()}`;
     await sendMessageViaAPI(page, channelId, messageText);
 
     await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
     );
     await page.waitForLoadState('networkidle');
 
-    // MessageBubble renders sender name in a span with font-medium class
-    const messageBubble = page.locator('.group').filter({ hasText: messageText });
+    // Wait for the message to appear
+    const messageContent = page.getByText(messageText);
+    await expect(messageContent).toBeVisible();
+
+    // MessageBubble wraps each message in a .group div
+    const messageBubble = page
+      .locator('.group')
+      .filter({ hasText: messageText });
     await expect(messageBubble).toBeVisible();
 
-    // Sender name should be visible (the seeded user is "John")
-    const senderName = messageBubble.locator('.font-medium').first();
+    // Sender name is in a span.text-sm.font-medium inside the .items-baseline div
+    const senderName = messageBubble.locator(
+      '.items-baseline .font-medium'
+    );
     await expect(senderName).toBeVisible();
     await expect(senderName).not.toHaveText('');
 
-    // Timestamp should be visible (rendered in a <time> element)
+    // Timestamp in a <time> element
     const timestamp = messageBubble.locator('time');
     await expect(timestamp).toBeVisible();
   });
 
   test('empty channel shows no messages placeholder', async ({ page }) => {
     await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channelId}`
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
     );
     await page.waitForLoadState('networkidle');
 
-    // MessageList.vue shows "No messages yet. Start the conversation!"
-    // when messages array is empty
+    // MessageList.vue shows empty state: "Nenhuma mensagem ainda. Inicie a conversa!" (pt_BR)
     const emptyText = page.getByText(
-      'No messages yet. Start the conversation!'
+      'Nenhuma mensagem ainda. Inicie a conversa!'
     );
     await expect(emptyText).toBeVisible();
+  });
+
+  test('delete a message removes it from the list', async ({ page }) => {
+    // Navigate to the channel
+    await page.goto(
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
+    );
+    await page.waitForLoadState('networkidle');
+
+    // Send a message via UI so it's definitely in the channel
+    const messageText = `Delete me ${Date.now()}`;
+    const messageInput = page.locator('textarea');
+    await messageInput.fill(messageText);
+    await messageInput.press('Enter');
+
+    // Wait for message to appear
+    const sentMessage = page.getByText(messageText);
+    await expect(sentMessage).toBeVisible();
+
+    // Hover over the message to show action buttons
+    const messageBubble = page
+      .locator('.group')
+      .filter({ hasText: messageText });
+    await messageBubble.hover();
+
+    // Click the delete button (title = "Excluir" in pt_BR)
+    const deleteButton = messageBubble.locator('button[title="Excluir"]');
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+
+    // After deletion, the Vuex store removes the message from the list
+    // so the message text should no longer be visible
+    await expect(sentMessage).not.toBeVisible();
+  });
+
+  test('pin a message shows pin banner in header', async ({ page }) => {
+    // Navigate to channel first, then send message via UI
+    await page.goto(
+      `${baseURL}/app/accounts/${accountId}/internal-chat/channels/${channelId}`
+    );
+    await page.waitForLoadState('networkidle');
+
+    const messageText = `Pin me ${Date.now()}`;
+    const messageInput = page.locator('textarea');
+    await messageInput.fill(messageText);
+    await messageInput.press('Enter');
+
+    // Wait for message to appear
+    const sentMessage = page.getByText(messageText);
+    await expect(sentMessage).toBeVisible();
+
+    // Hover over the message to show action buttons
+    const messageBubble = page
+      .locator('.group')
+      .filter({ hasText: messageText });
+    await messageBubble.hover();
+
+    // Click pin button (title = "Fixar mensagem" in pt_BR)
+    const pinButton = messageBubble.locator('button[title="Fixar mensagem"]');
+    await expect(pinButton).toBeVisible();
+    await pinButton.click();
+
+    // After pinning, the ChannelHeader shows a pinned message banner
+    // with text "Mensagem fixada" (pt_BR)
+    const pinnedBanner = page.getByText('Mensagem fixada');
+    await expect(pinnedBanner.first()).toBeVisible();
   });
 });

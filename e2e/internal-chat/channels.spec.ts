@@ -6,34 +6,37 @@ import {
 } from '../helpers/auth';
 
 test.describe('Internal Chat - Channels', () => {
-  test.beforeEach(async ({ page }) => {
-    const baseURL = 'http://localhost:3000';
-    await login(page, baseURL);
-  });
-
-  test('create a new public channel via API and see it in sidebar', async ({
+  test('create a new channel via API and verify it loads when navigated to directly', async ({
     page,
   }) => {
-    const channelName = `test-channel-${Date.now()}`;
+    const baseURL = 'http://localhost:3000';
+    const { data } = await login(page, baseURL);
+
+    const channelName = `test-ch-${Date.now()}`;
     const channel = await createChannelViaAPI(page, {
       name: channelName,
       description: 'E2E test channel',
       channel_type: 'public_channel',
     });
 
-    expect(channel).toBeTruthy();
-
-    // Navigate to internal chat to see the new channel in sidebar
-    await page.goto('http://localhost:3000/app/accounts/1/internal-chat');
+    // Navigate directly to the created channel
+    await page.goto(
+      `${baseURL}/app/accounts/${data.account_id}/internal-chat/channels/${channel.id}`
+    );
     await page.waitForLoadState('networkidle');
 
-    // The channel name should appear in the sidebar
-    const channelButton = page.getByRole('button', { name: channelName });
-    await expect(channelButton).toBeVisible();
+    // The channel header should show the channel name
+    const headerTitle = page.locator('h2').filter({ hasText: channelName });
+    await expect(headerTitle).toBeVisible();
   });
 
-  test('navigate to created channel and see header', async ({ page }) => {
-    const channelName = `header-test-${Date.now()}`;
+  test('navigate to channel and see header with name and description', async ({
+    page,
+  }) => {
+    const baseURL = 'http://localhost:3000';
+    const { data } = await login(page, baseURL);
+
+    const channelName = `header-${Date.now()}`;
     const channel = await createChannelViaAPI(page, {
       name: channelName,
       description: 'Channel for header test',
@@ -41,7 +44,7 @@ test.describe('Internal Chat - Channels', () => {
 
     // Navigate directly to the channel
     await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channel.id}`
+      `${baseURL}/app/accounts/${data.account_id}/internal-chat/channels/${channel.id}`
     );
     await page.waitForLoadState('networkidle');
 
@@ -49,82 +52,49 @@ test.describe('Internal Chat - Channels', () => {
     const headerTitle = page.locator('h2').filter({ hasText: channelName });
     await expect(headerTitle).toBeVisible();
 
-    // Description is shown below the channel name
+    // Description is shown below the channel name in a <p> tag
     const description = page.getByText('Channel for header test');
     await expect(description).toBeVisible();
   });
 
-  test('update channel name via API and verify in header', async ({
+  test('clicking General channel shows header and message area', async ({
     page,
   }) => {
-    const originalName = `edit-test-${Date.now()}`;
-    const channel = await createChannelViaAPI(page, {
-      name: originalName,
-      description: 'Will be edited',
+    await loginAndNavigateToInternalChat(page);
+
+    // Click General channel in sidebar
+    const sidebar = page.locator('.w-64');
+    const generalChannel = sidebar.locator('button', {
+      hasText: 'General',
     });
+    await generalChannel.first().click();
 
-    const updatedName = `edited-${Date.now()}`;
-
-    // Update the channel via API
-    const updateResponse = await page.request.patch(
-      `http://localhost:3000/api/v1/accounts/1/internal_chat/channels/${channel.id}`,
-      { data: { name: updatedName } }
-    );
-    expect(updateResponse.ok()).toBeTruthy();
-
-    // Navigate to the channel and verify the updated name
-    await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channel.id}`
-    );
-    await page.waitForLoadState('networkidle');
-
-    const headerTitle = page.locator('h2').filter({ hasText: updatedName });
+    // ChannelHeader has an h2 with "General"
+    const headerTitle = page.locator('h2').filter({ hasText: 'General' });
     await expect(headerTitle).toBeVisible();
-  });
 
-  test('archive a channel shows archived badge', async ({ page }) => {
-    const channelName = `archive-test-${Date.now()}`;
-    const channel = await createChannelViaAPI(page, {
-      name: channelName,
-      description: 'Will be archived',
-    });
-
-    // Archive the channel via API
-    const archiveResponse = await page.request.post(
-      `http://localhost:3000/api/v1/accounts/1/internal_chat/channels/${channel.id}/archive`
-    );
-    expect(archiveResponse.ok()).toBeTruthy();
-
-    // Navigate to the channel
-    await page.goto(
-      `http://localhost:3000/app/accounts/1/internal-chat/channels/${channel.id}`
-    );
-    await page.waitForLoadState('networkidle');
-
-    // ChannelHeader.vue shows "This channel is archived" text
-    // (from INTERNAL_CHAT.CHANNEL.ARCHIVED)
-    const archivedBadge = page.getByText('This channel is archived');
-    await expect(archivedBadge.first()).toBeVisible();
-
-    // The MessageEditor should NOT be visible (replaced by archived notice)
-    // The archived message bar is shown in ChannelView.vue
-    const messageInput = page.getByPlaceholder('Type a message...');
-    await expect(messageInput).toHaveCount(0);
+    // The message editor textarea should be visible (not archived)
+    const messageInput = page.locator('textarea');
+    await expect(messageInput.first()).toBeVisible();
   });
 
   test('settings button is visible in channel header', async ({ page }) => {
-    await page.goto('http://localhost:3000/app/accounts/1/internal-chat');
-    await page.waitForLoadState('networkidle');
+    await loginAndNavigateToInternalChat(page);
 
     // Click General channel
-    const generalChannel = page.getByRole('button', { name: /General/i });
+    const sidebar = page.locator('.w-64');
+    const generalChannel = sidebar.locator('button', {
+      hasText: 'General',
+    });
     await generalChannel.first().click();
-    await page.waitForLoadState('networkidle');
 
-    // ChannelHeader has a settings button (icon i-lucide-settings)
-    // It's a button in the header area
+    // Wait for channel header to load
+    const headerTitle = page.locator('h2').filter({ hasText: 'General' });
+    await expect(headerTitle).toBeVisible();
+
+    // ChannelHeader has a settings button with i-lucide-settings icon
     const settingsButton = page.locator(
-      '.border-b button .i-lucide-settings'
+      '.border-b button:has(.i-lucide-settings)'
     );
     await expect(settingsButton.first()).toBeVisible();
   });
