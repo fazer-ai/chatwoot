@@ -52,6 +52,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'internal_chat.typing_off': this.onInternalChatTypingOff,
       'internal_chat.reaction.created': this.onInternalChatReactionCreated,
       'internal_chat.reaction.deleted': this.onInternalChatReactionDeleted,
+      'internal_chat.poll.voted': this.onInternalChatPollVoted,
     };
   }
 
@@ -318,6 +319,13 @@ class ActionCableConnector extends BaseActionCableConnector {
       channelId: data.internal_chat_channel_id,
       messageId: data.message_id,
       reactionId: data.id,
+    });
+  };
+
+  onInternalChatPollVoted = data => {
+    this.app.$store.dispatch('internalChat/polls/updatePollFromCable', {
+      channelId: data.internal_chat_channel_id,
+      poll: data,
     });
   };
 }

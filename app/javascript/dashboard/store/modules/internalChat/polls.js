@@ -1,4 +1,4 @@
-import InternalChatMessagesAPI from '../../../api/internalChatMessages';
+import InternalChatPollsAPI from '../../../api/internalChatPolls';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
 
 const state = {
@@ -16,10 +16,10 @@ const actions = {
   createPoll: async ({ commit, dispatch }, { channelId, data }) => {
     commit('SET_UI_FLAG', { isCreating: true });
     try {
-      const response = await InternalChatMessagesAPI.createPoll(
-        channelId,
-        data
-      );
+      const response = await InternalChatPollsAPI.createPoll({
+        channel_id: channelId,
+        ...data,
+      });
       dispatch(
         'internalChat/messages/addMessageFromCable',
         { channelId, message: response.data },
@@ -34,19 +34,10 @@ const actions = {
     }
   },
 
-  vote: async ({ commit, dispatch }, { channelId, messageId, optionId }) => {
+  vote: async ({ commit }, { pollId, optionId }) => {
     commit('SET_UI_FLAG', { isVoting: true });
     try {
-      const response = await InternalChatMessagesAPI.votePoll(
-        channelId,
-        messageId,
-        optionId
-      );
-      dispatch(
-        'internalChat/messages/updateMessageFromCable',
-        { channelId, message: response.data },
-        { root: true }
-      );
+      const response = await InternalChatPollsAPI.vote(pollId, optionId);
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
@@ -56,19 +47,10 @@ const actions = {
     }
   },
 
-  unvote: async ({ commit, dispatch }, { channelId, messageId, optionId }) => {
+  unvote: async ({ commit }, { pollId }) => {
     commit('SET_UI_FLAG', { isVoting: true });
     try {
-      const response = await InternalChatMessagesAPI.unvotePoll(
-        channelId,
-        messageId,
-        optionId
-      );
-      dispatch(
-        'internalChat/messages/updateMessageFromCable',
-        { channelId, message: response.data },
-        { root: true }
-      );
+      const response = await InternalChatPollsAPI.unvote(pollId);
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
@@ -76,6 +58,14 @@ const actions = {
     } finally {
       commit('SET_UI_FLAG', { isVoting: false });
     }
+  },
+
+  updatePollFromCable: ({ dispatch }, { channelId, poll }) => {
+    dispatch(
+      'internalChat/messages/updateMessageFromCable',
+      { channelId, message: poll },
+      { root: true }
+    );
   },
 };
 

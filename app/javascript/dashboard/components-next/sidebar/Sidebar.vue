@@ -327,6 +327,8 @@ const menuItems = computed(() => {
         'internal_chat_home',
         'internal_chat_channel',
         'internal_chat_dm',
+        'internal_chat_thread',
+        'internal_chat_drafts',
       ],
     },
     {

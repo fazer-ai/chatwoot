@@ -40,11 +40,11 @@ const actions = {
     }
   },
 
-  saveDraft: async ({ commit }, { channelId, content }) => {
+  saveDraft: async ({ commit }, { channelId, content, parentId }) => {
     try {
-      const response = await InternalChatDraftsAPI.saveDraft({
-        channel_id: channelId,
+      const response = await InternalChatDraftsAPI.saveDraft(channelId, {
         content,
+        parent_id: parentId,
       });
       commit('SET_DRAFT', response.data);
       return response.data;
@@ -54,9 +54,9 @@ const actions = {
     }
   },
 
-  deleteDraft: async ({ commit }, draftId) => {
+  deleteDraft: async ({ commit }, { channelId, draftId }) => {
     try {
-      await InternalChatDraftsAPI.deleteDraft(draftId);
+      await InternalChatDraftsAPI.deleteDraft(channelId);
       commit('DELETE_DRAFT', draftId);
     } catch (error) {
       throwErrorMessage(error);

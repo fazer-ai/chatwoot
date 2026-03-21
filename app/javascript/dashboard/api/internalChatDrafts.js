@@ -3,19 +3,19 @@ import ApiClient from './ApiClient';
 
 class InternalChatDraftsAPI extends ApiClient {
   constructor() {
-    super('internal_chat/drafts', { accountScoped: true });
+    super('internal_chat', { accountScoped: true });
   }
 
   getDrafts() {
-    return axios.get(this.url);
+    return axios.get(`${this.url}/drafts`);
   }
 
-  saveDraft(data) {
-    return axios.post(this.url, data);
+  saveDraft(channelId, data) {
+    return axios.patch(`${this.url}/channels/${channelId}/draft`, data);
   }
 
-  deleteDraft(draftId) {
-    return axios.delete(`${this.url}/${draftId}`);
+  deleteDraft(channelId) {
+    return axios.delete(`${this.url}/channels/${channelId}/draft`);
   }
 }
 
