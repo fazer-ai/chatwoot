@@ -318,6 +318,17 @@ const menuItems = computed(() => {
       ],
     },
     {
+      name: 'InternalChat',
+      label: t('SIDEBAR.INTERNAL_CHAT'),
+      icon: 'i-lucide-messages-square',
+      to: accountScopedRoute('internal_chat_home'),
+      activeOn: [
+        'internal_chat_home',
+        'internal_chat_channel',
+        'internal_chat_dm',
+      ],
+    },
+    {
       name: 'Kanban',
       label: t('SIDEBAR.KANBAN'),
       icon: 'i-lucide-columns-3',

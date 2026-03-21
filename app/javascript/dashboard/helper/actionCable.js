@@ -45,6 +45,13 @@ class ActionCableConnector extends BaseActionCableConnector {
         this.onRecurringScheduledMessageUpdated,
       'recurring_scheduled_message.deleted':
         this.onRecurringScheduledMessageDeleted,
+      'internal_chat.message.created': this.onInternalChatMessageCreated,
+      'internal_chat.message.updated': this.onInternalChatMessageUpdated,
+      'internal_chat.message.deleted': this.onInternalChatMessageDeleted,
+      'internal_chat.typing_on': this.onInternalChatTypingOn,
+      'internal_chat.typing_off': this.onInternalChatTypingOff,
+      'internal_chat.reaction.created': this.onInternalChatReactionCreated,
+      'internal_chat.reaction.deleted': this.onInternalChatReactionDeleted,
     };
   }
 
@@ -251,6 +258,44 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.app.$store.dispatch('labels/revalidate', { newKey: keys.label });
     this.app.$store.dispatch('inboxes/revalidate', { newKey: keys.inbox });
     this.app.$store.dispatch('teams/revalidate', { newKey: keys.team });
+  };
+
+  onInternalChatMessageCreated = data => {
+    this.app.$store.dispatch('internalChatMessages/addMessage', data);
+    this.app.$store.dispatch('internalChatChannels/updateChannelActivity', {
+      channelId: data.internal_chat_channel_id,
+      lastActivityAt: data.created_at,
+    });
+  };
+
+  onInternalChatMessageUpdated = data => {
+    this.app.$store.dispatch('internalChatMessages/updateMessage', data);
+  };
+
+  onInternalChatMessageDeleted = data => {
+    this.app.$store.dispatch('internalChatMessages/removeMessage', data);
+  };
+
+  onInternalChatTypingOn = ({ channel, user }) => {
+    this.app.$store.dispatch('internalChatTypingStatus/create', {
+      channelId: channel.id,
+      user,
+    });
+  };
+
+  onInternalChatTypingOff = ({ channel, user }) => {
+    this.app.$store.dispatch('internalChatTypingStatus/destroy', {
+      channelId: channel.id,
+      user,
+    });
+  };
+
+  onInternalChatReactionCreated = data => {
+    this.app.$store.dispatch('internalChatMessages/addReaction', data);
+  };
+
+  onInternalChatReactionDeleted = data => {
+    this.app.$store.dispatch('internalChatMessages/removeReaction', data);
   };
 }
 

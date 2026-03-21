@@ -161,6 +161,31 @@ Rails.application.routes.draw do
             end
           end
 
+          namespace :internal_chat do
+            resources :categories, only: [:index, :create, :update, :destroy]
+            resources :channels, only: [:index, :create, :show, :update, :destroy] do
+              member do
+                post :archive
+                post :unarchive
+                post :toggle_typing_status
+                post :mark_read
+                post :mark_unread
+              end
+              resources :members, controller: 'channel_members', only: [:index, :create, :update, :destroy]
+              resources :messages, only: [:index, :create, :update, :destroy] do
+                member do
+                  post :pin
+                  delete :unpin
+                  get :thread
+                end
+              end
+            end
+            resources :messages, only: [] do
+              resources :reactions, only: [:create, :destroy]
+            end
+            resources :drafts, only: [:index]
+          end
+
           resources :search, only: [:index] do
             collection do
               get :conversations

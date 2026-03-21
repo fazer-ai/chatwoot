@@ -1,0 +1,77 @@
+# == Schema Information
+#
+# Table name: internal_chat_messages
+#
+#  id                       :bigint           not null, primary key
+#  content                  :text
+#  content_attributes       :jsonb
+#  content_type             :integer          default("text"), not null
+#  created_at               :datetime         not null
+#  updated_at               :datetime         not null
+#  account_id               :bigint           not null
+#  echo_id                  :string
+#  internal_chat_channel_id :bigint           not null
+#  parent_id                :bigint
+#  sender_id                :bigint           not null
+#
+# Indexes
+#
+#  idx_ic_messages_account_created                           (account_id,created_at)
+#  idx_ic_messages_channel_created                           (internal_chat_channel_id,created_at)
+#  index_internal_chat_messages_on_account_id                (account_id)
+#  index_internal_chat_messages_on_internal_chat_channel_id  (internal_chat_channel_id)
+#  index_internal_chat_messages_on_parent_id                 (parent_id)
+#  index_internal_chat_messages_on_sender_id                 (sender_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (internal_chat_channel_id => internal_chat_channels.id)
+#  fk_rails_...  (parent_id => internal_chat_messages.id)
+#  fk_rails_...  (sender_id => users.id)
+#
+class InternalChat::Message < ApplicationRecord
+  self.table_name = 'internal_chat_messages'
+
+  belongs_to :account
+  belongs_to :channel, class_name: 'InternalChat::Channel', foreign_key: :internal_chat_channel_id,
+                       counter_cache: :messages_count, inverse_of: :messages
+  belongs_to :sender, class_name: 'User'
+  belongs_to :parent, class_name: 'InternalChat::Message', optional: true, inverse_of: :replies
+
+  has_many :replies, class_name: 'InternalChat::Message', foreign_key: :parent_id,
+                     dependent: :destroy_async, inverse_of: :parent
+  has_many :attachments, class_name: 'InternalChat::MessageAttachment', foreign_key: :internal_chat_message_id,
+                         dependent: :destroy_async, inverse_of: :message
+  has_many :reactions, class_name: 'InternalChat::Reaction', foreign_key: :internal_chat_message_id,
+                       dependent: :destroy_async, inverse_of: :message
+
+  enum :content_type, { text: 0, poll: 1, system: 2 }
+
+  validates :content, presence: true, unless: -> { attachments.any? }
+  validates :content, length: { maximum: 150_000 }
+
+  scope :ordered, -> { order(created_at: :asc) }
+  scope :recent, -> { order(created_at: :desc) }
+
+  after_create_commit :update_channel_activity
+
+  def edited?
+    content_attributes&.dig('edited_at').present?
+  end
+
+  def thread?
+    parent_id.present?
+  end
+
+  def thread_replies_count
+    replies.count
+  end
+
+  private
+
+  def update_channel_activity
+    channel.update(last_activity_at: created_at)
+  end
+end
+
+InternalChat::Message.prepend_mod_with('InternalChat::Message')

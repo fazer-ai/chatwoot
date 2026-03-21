@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_18_180001) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_20_000006) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -938,6 +938,94 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_18_180001) do
     t.jsonb "settings", default: {}
   end
 
+  create_table "internal_chat_categories", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "name"], name: "index_internal_chat_categories_on_account_id_and_name", unique: true
+    t.index ["account_id", "position"], name: "index_internal_chat_categories_on_account_id_and_position"
+    t.index ["account_id"], name: "index_internal_chat_categories_on_account_id"
+  end
+
+  create_table "internal_chat_channel_members", force: :cascade do |t|
+    t.bigint "internal_chat_channel_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "role", default: 0, null: false
+    t.boolean "muted", default: false, null: false
+    t.datetime "last_read_at"
+    t.boolean "favorited", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["internal_chat_channel_id", "user_id"], name: "idx_ic_channel_members_channel_user", unique: true
+    t.index ["user_id", "favorited"], name: "idx_ic_channel_members_user_favorited"
+    t.index ["user_id"], name: "index_internal_chat_channel_members_on_user_id"
+  end
+
+  create_table "internal_chat_channels", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "category_id"
+    t.string "name"
+    t.text "description"
+    t.integer "channel_type", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "created_by_id"
+    t.datetime "last_activity_at", null: false
+    t.integer "messages_count", default: 0
+    t.uuid "uuid", default: -> { "gen_random_uuid()" }, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "category_id"], name: "index_internal_chat_channels_on_account_id_and_category_id"
+    t.index ["account_id", "channel_type"], name: "index_internal_chat_channels_on_account_id_and_channel_type"
+    t.index ["account_id", "status"], name: "index_internal_chat_channels_on_account_id_and_status"
+    t.index ["account_id"], name: "index_internal_chat_channels_on_account_id"
+    t.index ["category_id"], name: "index_internal_chat_channels_on_category_id"
+    t.index ["uuid"], name: "index_internal_chat_channels_on_uuid", unique: true
+  end
+
+  create_table "internal_chat_message_attachments", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "internal_chat_message_id", null: false
+    t.integer "file_type", default: 0, null: false
+    t.string "external_url"
+    t.string "extension"
+    t.jsonb "meta", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_internal_chat_message_attachments_on_account_id"
+    t.index ["internal_chat_message_id"], name: "idx_ic_msg_attachments_message"
+  end
+
+  create_table "internal_chat_messages", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "internal_chat_channel_id", null: false
+    t.bigint "sender_id", null: false
+    t.text "content"
+    t.integer "content_type", default: 0, null: false
+    t.bigint "parent_id"
+    t.jsonb "content_attributes", default: {}
+    t.string "echo_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "idx_ic_messages_account_created"
+    t.index ["account_id"], name: "index_internal_chat_messages_on_account_id"
+    t.index ["internal_chat_channel_id", "created_at"], name: "idx_ic_messages_channel_created"
+    t.index ["internal_chat_channel_id"], name: "index_internal_chat_messages_on_internal_chat_channel_id"
+    t.index ["parent_id"], name: "index_internal_chat_messages_on_parent_id"
+    t.index ["sender_id"], name: "index_internal_chat_messages_on_sender_id"
+  end
+
+  create_table "internal_chat_reactions", force: :cascade do |t|
+    t.bigint "internal_chat_message_id", null: false
+    t.bigint "user_id", null: false
+    t.string "emoji", null: false
+    t.datetime "created_at", null: false
+    t.index ["internal_chat_message_id", "user_id", "emoji"], name: "idx_ic_reactions_message_user_emoji", unique: true
+    t.index ["internal_chat_message_id"], name: "index_internal_chat_reactions_on_internal_chat_message_id"
+    t.index ["user_id"], name: "index_internal_chat_reactions_on_user_id"
+  end
+
   create_table "labels", force: :cascade do |t|
     t.string "title"
     t.text "description"
@@ -1376,6 +1464,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_18_180001) do
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "internal_chat_channel_members", "internal_chat_channels"
+  add_foreign_key "internal_chat_channel_members", "users"
+  add_foreign_key "internal_chat_channels", "internal_chat_categories", column: "category_id"
+  add_foreign_key "internal_chat_channels", "users", column: "created_by_id"
+  add_foreign_key "internal_chat_message_attachments", "internal_chat_messages"
+  add_foreign_key "internal_chat_messages", "internal_chat_channels"
+  add_foreign_key "internal_chat_messages", "internal_chat_messages", column: "parent_id"
+  add_foreign_key "internal_chat_messages", "users", column: "sender_id"
+  add_foreign_key "internal_chat_reactions", "internal_chat_messages"
+  add_foreign_key "internal_chat_reactions", "users"
   add_foreign_key "recurring_scheduled_messages", "accounts"
   add_foreign_key "recurring_scheduled_messages", "conversations"
   add_foreign_key "recurring_scheduled_messages", "inboxes"
