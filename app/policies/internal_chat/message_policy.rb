@@ -8,11 +8,11 @@ class InternalChat::MessagePolicy < ApplicationPolicy
   end
 
   def update?
-    administrator? || sender?
+    channel_accessible? && (administrator? || sender?)
   end
 
   def destroy?
-    administrator? || sender?
+    channel_accessible? && (administrator? || sender?)
   end
 
   def pin?

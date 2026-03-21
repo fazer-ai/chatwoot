@@ -88,6 +88,8 @@ const pinnedContent = computed(() => {
         </span>
         <button
           class="flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+          :title="t('INTERNAL_CHAT.CHANNEL.SETTINGS')"
+          :aria-label="t('INTERNAL_CHAT.CHANNEL.SETTINGS')"
           @click="emit('settings')"
         >
           <Icon icon="i-lucide-settings" class="size-4" />

@@ -81,8 +81,8 @@ async function loadDraft() {
     const draft = store.getters['internalChat/drafts/getDraftByChannelId'](
       props.channelId
     );
-    if (draft && editorRef.value) {
-      editorRef.value.setContent(draft.content);
+    if (editorRef.value) {
+      editorRef.value.setContent(draft ? draft.content : '');
     }
   } catch {
     // Silently handle draft load error

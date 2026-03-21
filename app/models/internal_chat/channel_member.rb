@@ -40,7 +40,7 @@ class InternalChat::ChannelMember < ApplicationRecord
   def unread_messages_count
     return 0 if last_read_at.blank?
 
-    channel.messages.where('created_at > ?', last_read_at).count
+    channel.messages.where('created_at > ?', last_read_at).where.not(sender_id: user_id).count
   end
 end
 

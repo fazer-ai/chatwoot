@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
@@ -37,8 +37,6 @@ const emit = defineEmits([
 ]);
 
 const { t } = useI18n();
-
-const isHovered = ref(false);
 
 const senderName = computed(() => {
   return props.message.sender?.name || '';
@@ -152,8 +150,6 @@ function handleUnvote(payload) {
 <template>
   <div
     class="group flex items-start gap-3 px-4 py-1.5 hover:bg-n-alpha-1 transition-colors"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
   >
     <div class="flex-shrink-0 pt-0.5">
       <Avatar :name="senderName" :src="senderAvatar" :size="32" />
@@ -215,8 +211,8 @@ function handleUnvote(payload) {
       </button>
     </div>
     <div
-      v-if="isHovered && !isDeleted"
-      class="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+      v-if="!isDeleted"
+      class="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
     >
       <EmojiReactionPicker @select="handleAddReaction" />
       <button

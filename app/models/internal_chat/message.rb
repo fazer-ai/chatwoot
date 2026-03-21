@@ -72,7 +72,9 @@ class InternalChat::Message < ApplicationRecord
   private
 
   def update_channel_activity
-    channel.update(last_activity_at: created_at)
+    # rubocop:disable Rails/SkipsModelValidations
+    channel.update_column(:last_activity_at, created_at) if channel.last_activity_at.nil? || created_at > channel.last_activity_at
+    # rubocop:enable Rails/SkipsModelValidations
   end
 end
 

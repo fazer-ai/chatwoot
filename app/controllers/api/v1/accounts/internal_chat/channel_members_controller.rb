@@ -10,16 +10,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
 
   def create
     authorize current_channel, :update?, policy_class: InternalChat::ChannelPolicy
-    user_ids = Array(params[:user_ids] || [params[:user_id]]).compact.map(&:to_i)
-    valid_user_ids = Current.account.users.where(id: user_ids).pluck(:id)
-
-    members = ActiveRecord::Base.transaction do
-      valid_user_ids.map do |user_id|
-        current_channel.channel_members.find_or_create_by!(user_id: user_id) do |m|
-          m.role = params[:role] || :member
-        end
-      end
-    end
+    members = create_channel_members(validated_user_ids)
     render json: members.map { |member| member_response(member) }, status: :created
   end
 
@@ -36,6 +27,24 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
   end
 
   private
+
+  def validated_user_ids
+    user_ids = Array(params[:user_ids] || [params[:user_id]]).compact.map(&:to_i)
+    valid_user_ids = Current.account.users.where(id: user_ids).pluck(:id)
+    raise ActionController::BadRequest, 'No valid user IDs provided' if valid_user_ids.empty?
+
+    valid_user_ids
+  end
+
+  def create_channel_members(user_ids)
+    ActiveRecord::Base.transaction do
+      user_ids.map do |user_id|
+        current_channel.channel_members.find_or_create_by!(user_id: user_id) do |m|
+          m.role = params[:role] || :member
+        end
+      end
+    end
+  end
 
   def fetch_member
     @member = current_channel.channel_members.find(params[:id])

@@ -256,11 +256,23 @@ const mutations = {
   },
 
   DELETE_MESSAGE(_state, { channelId, messageId }) {
-    const existing = _state.records[channelId] || [];
-    _state.records = {
-      ..._state.records,
-      [channelId]: existing.filter(m => m.id !== messageId),
-    };
+    const messages = _state.records[channelId];
+    if (!messages) return;
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      const updated = [...messages];
+      updated[index] = {
+        ...updated[index],
+        content_attributes: {
+          ...updated[index].content_attributes,
+          deleted: true,
+        },
+      };
+      _state.records = {
+        ..._state.records,
+        [channelId]: updated,
+      };
+    }
   },
 
   ADD_REACTION(_state, { channelId, messageId, reaction }) {

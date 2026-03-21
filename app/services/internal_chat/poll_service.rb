@@ -3,8 +3,10 @@ class InternalChat::PollService
 
   def vote
     validate_option_belongs_to_poll!
-    validate_vote!
-    option.votes.create!(user: user)
+    ActiveRecord::Base.transaction do
+      validate_vote!
+      option.votes.create!(user: user)
+    end
     poll.reload
   end
 

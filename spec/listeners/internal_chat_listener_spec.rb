@@ -18,9 +18,9 @@ describe InternalChatListener do
       let!(:message) { create(:internal_chat_message, account: account, channel: channel, sender: agent) }
       let!(:event) { Events::Base.new(:'internal_chat.message.created', Time.zone.now, message: message) }
 
-      it 'broadcasts to all account users except the sender' do
+      it 'broadcasts to all account users including the sender' do
         expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-          a_collection_containing_exactly(admin.pubsub_token, other_agent.pubsub_token),
+          a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token, other_agent.pubsub_token),
           'internal_chat.message.created',
           hash_including(
             id: message.id,
@@ -43,9 +43,9 @@ describe InternalChatListener do
         create(:internal_chat_channel_member, channel: channel, user: admin)
       end
 
-      it 'broadcasts only to channel members except the sender' do
+      it 'broadcasts to all channel members including the sender' do
         expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-          a_collection_containing_exactly(admin.pubsub_token),
+          a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
           'internal_chat.message.created',
           hash_including(
             id: message.id,
@@ -107,9 +107,9 @@ describe InternalChatListener do
     let!(:reaction) { create(:internal_chat_reaction, message: message, user: other_agent) }
     let!(:event) { Events::Base.new(:'internal_chat.reaction.created', Time.zone.now, reaction: reaction) }
 
-    it 'broadcasts to all channel members except the reaction creator' do
+    it 'broadcasts to all channel members including the reaction creator' do
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        a_collection_containing_exactly(admin.pubsub_token, agent.pubsub_token),
+        a_collection_containing_exactly(admin.pubsub_token, agent.pubsub_token, other_agent.pubsub_token),
         'internal_chat.reaction.created',
         hash_including(
           id: reaction.id,

@@ -68,6 +68,23 @@ const filteredFavoriteChannels = computed(() => {
   return favs.filter(ch => (ch.name || '').toLowerCase().includes(query));
 });
 
+const uncategorizedChannels = computed(() => {
+  let uncategorized = channels.value.filter(
+    ch => ch.channel_type !== 'dm' && !ch.category_id
+  );
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase();
+    uncategorized = uncategorized.filter(ch =>
+      (ch.name || '').toLowerCase().includes(query)
+    );
+  }
+  return [...uncategorized].sort((a, b) => {
+    if (a.muted && !b.muted) return 1;
+    if (!a.muted && b.muted) return -1;
+    return 0;
+  });
+});
+
 const isDraftsRoute = computed(() => {
   return route.name === 'internal_chat_drafts';
 });
@@ -112,6 +129,7 @@ function getChannelIcon(channel) {
           v-model="searchQuery"
           type="text"
           :placeholder="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
+          :aria-label="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
           class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 py-1.5 pl-8 pr-3 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
         />
       </div>
@@ -198,21 +216,15 @@ function getChannelIcon(channel) {
         </button>
       </div>
 
-      <!-- Channels without category (fallback) -->
-      <div
-        v-if="
-          categories.length === 0 &&
-          channels.filter(ch => ch.channel_type !== 'dm').length > 0
-        "
-        class="mb-3"
-      >
+      <!-- Uncategorized channels -->
+      <div v-if="uncategorizedChannels.length > 0" class="mb-3">
         <h3
           class="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
         >
           {{ t('INTERNAL_CHAT.CHANNELS') }}
         </h3>
         <button
-          v-for="channel in channels.filter(ch => ch.channel_type !== 'dm')"
+          v-for="channel in uncategorizedChannels"
           :key="channel.id"
           class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
           :class="[

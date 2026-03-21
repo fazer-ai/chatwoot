@@ -24,7 +24,8 @@
       "MARK_UNREAD": "Mark as Unread",
       "NO_MESSAGES": "No messages yet. Start the conversation!",
       "ARCHIVED": "This channel is archived",
-      "MEMBER_COUNT": "{count} member | {count} members"
+      "MEMBER_COUNT": "{count} member | {count} members",
+      "SETTINGS": "Channel settings"
     },
     "MESSAGE": {
       "PLACEHOLDER": "Type a message...",
@@ -62,7 +63,8 @@
       "TITLE": "Drafts",
       "NO_DRAFTS": "No drafts yet",
       "DELETE": "Delete draft",
-      "SAVED_AGO": "Saved {time} ago"
+      "SAVED_AGO": "Saved {time} ago",
+      "CHANNEL_LABEL": "Channel #{channelId}"
     },
     "PIN": {
       "PINNED_MESSAGE": "Pinned message",

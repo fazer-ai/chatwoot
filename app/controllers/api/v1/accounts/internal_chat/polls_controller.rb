@@ -32,9 +32,14 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   def unvote
     raise ActionController::BadRequest, 'Poll has expired' if @poll.expired?
 
-    @vote = InternalChat::PollVote.joins(:option)
-                                  .where(internal_chat_poll_options: { internal_chat_poll_id: @poll.id }, user_id: Current.user.id)
-                                  .first!
+    @vote = if params[:option_id].present?
+              option = @poll.options.find(params[:option_id])
+              option.votes.find_by!(user_id: Current.user.id)
+            else
+              InternalChat::PollVote.joins(:option)
+                                    .where(internal_chat_poll_options: { internal_chat_poll_id: @poll.id }, user_id: Current.user.id)
+                                    .first!
+            end
     @vote.destroy!
     dispatch_poll_event
 
@@ -114,7 +119,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
       id: message.id,
       content: message.content,
       content_type: message.content_type,
-      content_attributes: message.content_attributes.merge(poll: poll_response(poll)),
+      content_attributes: (message.content_attributes || {}).merge(poll: poll_response(poll)),
       internal_chat_channel_id: message.internal_chat_channel_id,
       sender: message.sender.push_event_data,
       parent_id: message.parent_id,

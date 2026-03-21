@@ -35,21 +35,28 @@ const { t } = useI18n();
 const threadReplies = ref([]);
 const isLoading = ref(false);
 const isSending = ref(false);
+let activeThreadRequestId = null;
 
 const replyCount = computed(() => threadReplies.value.length);
 
 async function fetchThread() {
+  const requestId = props.parentMessage.id;
+  activeThreadRequestId = requestId;
   isLoading.value = true;
   try {
     const data = await store.dispatch('internalChat/messages/fetchThread', {
       channelId: props.channelId,
       messageId: props.parentMessage.id,
     });
+    if (activeThreadRequestId !== requestId) return;
     threadReplies.value = data.replies || data || [];
   } catch {
+    if (activeThreadRequestId !== requestId) return;
     useAlert(t('INTERNAL_CHAT.ERRORS.FETCH_MESSAGES'));
   } finally {
-    isLoading.value = false;
+    if (activeThreadRequestId === requestId) {
+      isLoading.value = false;
+    }
   }
 }
 

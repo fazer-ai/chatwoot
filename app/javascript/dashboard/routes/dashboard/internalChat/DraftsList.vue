@@ -104,7 +104,11 @@ onMounted(() => {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-n-slate-12 truncate">
-                {{ `Channel #${draft.internal_chat_channel_id}` }}
+                {{
+                  t('INTERNAL_CHAT.DRAFT.CHANNEL_LABEL', {
+                    channelId: draft.internal_chat_channel_id,
+                  })
+                }}
               </span>
               <span class="text-xs text-n-slate-10">
                 {{ timeSince(draft.updated_at) }}

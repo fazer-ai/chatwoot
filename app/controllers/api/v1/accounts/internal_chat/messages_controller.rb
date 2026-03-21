@@ -81,7 +81,11 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def paginated_messages
     messages = apply_time_filters(base_messages_scope)
-    messages.ordered.last(MESSAGES_PER_PAGE)
+    if params[:after].present?
+      messages.ordered.limit(MESSAGES_PER_PAGE)
+    else
+      messages.ordered.last(MESSAGES_PER_PAGE)
+    end
   rescue ArgumentError
     base_messages_scope.ordered.last(MESSAGES_PER_PAGE)
   end
