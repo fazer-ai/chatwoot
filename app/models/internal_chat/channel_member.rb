@@ -4,6 +4,7 @@
 #
 #  id                       :bigint           not null, primary key
 #  favorited                :boolean          default(FALSE), not null
+#  hidden                   :boolean          default(FALSE), not null
 #  last_read_at             :datetime
 #  muted                    :boolean          default(FALSE), not null
 #  role                     :integer          default("member"), not null

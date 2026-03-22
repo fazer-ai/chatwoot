@@ -7,6 +7,7 @@ class InternalChatListener < BaseListener
     account = message.account
     tokens = member_tokens(channel)
 
+    unhide_dm_members(channel) if channel.channel_type_dm?
     broadcast(account, tokens, INTERNAL_CHAT_MESSAGE_CREATED, message_event_data(message))
   end
 
@@ -99,6 +100,10 @@ class InternalChatListener < BaseListener
   end
 
   private
+
+  def unhide_dm_members(channel)
+    channel.channel_members.where(hidden: true).find_each { |m| m.update(hidden: false) }
+  end
 
   def member_tokens(channel, exclude_user: nil)
     users = if channel.channel_type_public_channel?

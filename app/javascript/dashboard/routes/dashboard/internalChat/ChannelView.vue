@@ -306,7 +306,21 @@ async function handleDeleteChannel() {
 
 async function handleCloseDM() {
   try {
-    await store.dispatch('internalChat/archive', props.channelId);
+    const ch = channel.value;
+    const membership = (ch?.members || []).find(
+      m => m.user_id === currentUserId.value
+    );
+    if (membership) {
+      await InternalChatChannelsAPI.updateMember(
+        props.channelId,
+        membership.id,
+        { hidden: true }
+      );
+    }
+    store.commit('internalChat/UPDATE_CHANNEL', {
+      id: props.channelId,
+      hidden: true,
+    });
     showSettings.value = false;
     router.push({
       name: 'internal_chat_home',

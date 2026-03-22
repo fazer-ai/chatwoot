@@ -112,7 +112,7 @@ const filteredChannelsByCategory = computed(() => {
 });
 
 const filteredDMChannels = computed(() => {
-  const dms = dmChannels.value || [];
+  let dms = (dmChannels.value || []).filter(ch => !ch.hidden);
   if (!searchQuery.value) return dms;
   const query = searchQuery.value.toLowerCase();
   return dms.filter(ch => matchesSearch(ch, query));

@@ -309,12 +309,13 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     }
   end
 
-  def channel_index_response(channel) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def channel_index_response(channel) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     membership = channel.channel_members.detect { |member| member.user_id == Current.user.id }
     response = channel_base_response(channel).merge(
       is_dm: channel.channel_type_dm?,
       muted: membership&.muted || false,
       favorited: membership&.favorited || false,
+      hidden: membership&.hidden || false,
       members_count: channel.channel_members.size,
       unread_count: @unread_counts&.dig(channel.id) || 0
     )

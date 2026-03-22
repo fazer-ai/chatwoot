@@ -59,7 +59,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
   end
 
   def member_update_params
-    params.permit(:muted, :favorited)
+    params.permit(:muted, :favorited, :hidden)
   end
 
   def member_response(member)
