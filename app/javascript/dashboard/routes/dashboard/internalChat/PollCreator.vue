@@ -114,9 +114,9 @@ function handleSubmit() {
   };
 
   emit('submit', pollData);
-  dialogRef.value?.close();
   resetForm();
   isSubmitting.value = false;
+  dialogRef.value?.close();
 }
 
 defineExpose({ open });
@@ -153,7 +153,7 @@ defineExpose({ open });
           <div
             v-for="(option, index) in options"
             :key="index"
-            class="flex items-center gap-2"
+            class="flex gap-2"
           >
             <input
               v-model="option.text"
@@ -164,10 +164,10 @@ defineExpose({ open });
             <button
               v-if="options.length > 2"
               type="button"
-              class="flex-shrink-0 flex items-center justify-center rounded p-1.5 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
+              class="flex-shrink-0 flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-transparent text-n-slate-11 hover:border-n-ruby-6 hover:bg-n-ruby-3 hover:text-n-ruby-11"
               @click="removeOption(index)"
             >
-              <Icon icon="i-lucide-x" class="size-3.5" />
+              <Icon icon="i-lucide-x" class="size-4" />
             </button>
           </div>
         </div>
