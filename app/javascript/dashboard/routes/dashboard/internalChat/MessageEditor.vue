@@ -49,14 +49,11 @@ const { t } = useI18n();
 
 const editorRef = ref(null);
 const editorContent = ref(props.initialContent);
-const isSending = ref(false);
 
 let draftTimer = null;
 
 const canSend = computed(() => {
-  return (
-    editorContent.value.trim().length > 0 && !props.disabled && !isSending.value
-  );
+  return editorContent.value.trim().length > 0 && !props.disabled;
 });
 
 function cancelEdit() {
@@ -87,20 +84,15 @@ function focusEditor() {
 
 function handleSend() {
   if (!canSend.value) return;
-  isSending.value = true;
   const content = editorContent.value.trim();
-  emit('send', content, { alsoSendInChannel: alsoSendInChannel.value });
   editorContent.value = '';
   if (draftTimer) {
     clearTimeout(draftTimer);
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  // Allow re-sending after a short guard and refocus
-  setTimeout(() => {
-    isSending.value = false;
-    focusEditor();
-  }, 300);
+  emit('send', content, { alsoSendInChannel: alsoSendInChannel.value });
+  setTimeout(() => focusEditor(), 200);
 }
 
 function handleKeyDown(event) {
