@@ -11,6 +11,8 @@ requestBody:
     application/json:
       schema:
         type: object
+        required:
+          - content
         properties:
           content:
             type: string
