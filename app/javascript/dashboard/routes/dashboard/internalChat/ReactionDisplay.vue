@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { vOnClickOutside } from '@vueuse/components';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
+
 const props = defineProps({
   reactions: {
     type: Array,
@@ -102,19 +104,11 @@ function handleRemove(reactionId) {
           <button
             v-if="user.id === currentUserId"
             type="button"
-            class="flex size-5 flex-shrink-0 items-center justify-center rounded bg-n-alpha-2 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
+            class="flex size-6 flex-shrink-0 items-center justify-center rounded bg-n-alpha-2 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
             :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
             @click.stop="handleRemove(user.reactionId)"
           >
-            <svg
-              class="size-3"
-              viewBox="0 0 12 12"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M2 2l8 8M10 2l-8 8" />
-            </svg>
+            <Icon icon="i-lucide-x" class="size-4" />
           </button>
         </div>
       </div>
