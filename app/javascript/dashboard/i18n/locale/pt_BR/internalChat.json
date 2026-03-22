@@ -66,7 +66,8 @@
       "TITLE": "Conversa",
       "CLOSE": "Fechar conversa",
       "REPLIES": "{count} respostas",
-      "REPLY_PLACEHOLDER": "Responder na conversa..."
+      "REPLY_PLACEHOLDER": "Responder na conversa...",
+      "ALSO_SEND_IN_CHANNEL": "Enviar tamb\u00e9m na conversa"
     },
     "POLL": {
       "CREATE": "Criar Enquete",

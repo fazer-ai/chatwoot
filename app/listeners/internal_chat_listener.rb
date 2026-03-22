@@ -163,8 +163,9 @@ class InternalChatListener < BaseListener
       id: reaction.id,
       emoji: reaction.emoji,
       user_id: reaction.user_id,
-      user: reaction.user.push_event_data,
-      internal_chat_message_id: reaction.internal_chat_message_id,
+      user: { name: reaction.user.name },
+      message_id: reaction.internal_chat_message_id,
+      internal_chat_channel_id: reaction.message.internal_chat_channel_id,
       created_at: reaction.created_at
     }
   end

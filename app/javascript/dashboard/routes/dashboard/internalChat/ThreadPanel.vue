@@ -64,11 +64,6 @@ async function fetchThread() {
   }
 }
 
-const channelName = computed(() => {
-  const channel = store.getters['internalChat/getChannelById'](props.channelId);
-  return channel?.name || '';
-});
-
 async function handleSendReply(content, options = {}) {
   isSending.value = true;
   try {
@@ -252,7 +247,6 @@ onMounted(() => {
       :placeholder="t('INTERNAL_CHAT.THREAD.REPLY_PLACEHOLDER')"
       :show-poll="false"
       show-also-send-in-channel
-      :channel-name="channelName"
       @send="handleSendReply"
       @cancel-edit="handleCancelEdit"
     />

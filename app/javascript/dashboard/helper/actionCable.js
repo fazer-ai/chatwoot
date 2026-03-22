@@ -321,7 +321,7 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onInternalChatReactionDeleted = data => {
     this.app.$store.dispatch('internalChat/messages/removeReactionFromCable', {
-      channelId: data.internal_chat_channel_id,
+      channelId: data.internal_chat_channel_id || data.channel_id,
       messageId: data.message_id,
       reactionId: data.id,
     });

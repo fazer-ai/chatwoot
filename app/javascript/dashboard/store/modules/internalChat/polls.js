@@ -83,6 +83,16 @@ const actions = {
       messageId
     );
     const existingAttrs = existingMessage?.content_attributes || {};
+    const existingPoll = existingAttrs.poll || {};
+    const existingOptions = existingPoll.options || [];
+
+    // Preserve per-user voted flags from local state (cable data is not user-specific)
+    const mergedOptions = (poll.options || []).map(opt => {
+      const existing = existingOptions.find(e => e.id === opt.id);
+      return { ...opt, voted: existing?.voted ?? opt.voted };
+    });
+
+    const mergedPoll = { ...poll, options: mergedOptions };
 
     dispatch(
       'internalChat/messages/updateMessageFromCable',
@@ -90,8 +100,7 @@ const actions = {
         channelId,
         message: {
           id: messageId,
-          poll: { ...poll },
-          content_attributes: { ...existingAttrs, poll: { ...poll } },
+          content_attributes: { ...existingAttrs, poll: mergedPoll },
         },
       },
       { root: true }

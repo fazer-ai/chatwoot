@@ -67,7 +67,7 @@
       "CLOSE": "Close thread",
       "REPLIES": "{count} replies",
       "REPLY_PLACEHOLDER": "Reply in thread...",
-      "ALSO_SEND_IN_CHANNEL": "Also send in #{channel}"
+      "ALSO_SEND_IN_CHANNEL": "Also send to conversation"
     },
     "POLL": {
       "CREATE": "Create Poll",

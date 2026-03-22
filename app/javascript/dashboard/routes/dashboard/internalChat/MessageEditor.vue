@@ -29,10 +29,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  channelName: {
-    type: String,
-    default: '',
-  },
 });
 
 const emit = defineEmits([
@@ -156,11 +152,7 @@ defineExpose({ focus, setContent, getContent });
         type="checkbox"
         class="rounded border-n-slate-6"
       />
-      {{
-        t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL', {
-          channel: channelName,
-        })
-      }}
+      {{ t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL') }}
     </label>
     <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"

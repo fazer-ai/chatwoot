@@ -179,8 +179,14 @@ async function handleRemoveReaction({ messageId, reactionId }) {
   }
 }
 
+let typingOffTimer = null;
+
 function handleTyping() {
   InternalChatChannelsAPI.toggleTypingStatus(props.channelId, 'on');
+  if (typingOffTimer) clearTimeout(typingOffTimer);
+  typingOffTimer = setTimeout(() => {
+    InternalChatChannelsAPI.toggleTypingStatus(props.channelId, 'off');
+  }, 3000);
 }
 
 function handleReply(message) {
