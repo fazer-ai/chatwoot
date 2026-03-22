@@ -49,11 +49,14 @@ const { t } = useI18n();
 
 const editorRef = ref(null);
 const editorContent = ref(props.initialContent);
+const isSending = ref(false);
 
 let draftTimer = null;
 
 const canSend = computed(() => {
-  return editorContent.value.trim().length > 0 && !props.disabled;
+  return (
+    editorContent.value.trim().length > 0 && !props.disabled && !isSending.value
+  );
 });
 
 function cancelEdit() {
@@ -84,6 +87,7 @@ function focusEditor() {
 
 function handleSend() {
   if (!canSend.value) return;
+  isSending.value = true;
   const content = editorContent.value.trim();
   emit('send', content, { alsoSendInChannel: alsoSendInChannel.value });
   editorContent.value = '';
@@ -92,7 +96,11 @@ function handleSend() {
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  setTimeout(() => focusEditor(), 200);
+  // Allow re-sending after a short guard and refocus
+  setTimeout(() => {
+    isSending.value = false;
+    focusEditor();
+  }, 300);
 }
 
 function handleKeyDown(event) {
@@ -157,7 +165,9 @@ defineExpose({ focus, setContent, getContent });
         class="rounded border-n-slate-6"
       />
       {{
-        t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL', { channel: channelName })
+        t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL', {
+          channel: channelName,
+        })
       }}
     </label>
     <div
@@ -170,7 +180,6 @@ defineExpose({ focus, setContent, getContent });
           v-model:model-value="editorContent"
           channel-type="Context::Default"
           :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
-          :disabled="disabled"
           enable-suggestions
           :enable-variables="false"
           :enable-canned-responses="false"
@@ -184,7 +193,6 @@ defineExpose({ focus, setContent, getContent });
       <button
         v-if="showPoll"
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
-        :disabled="disabled"
         :title="t('INTERNAL_CHAT.POLL.CREATE')"
         @click="emit('create-poll')"
       >
