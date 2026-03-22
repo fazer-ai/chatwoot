@@ -219,10 +219,18 @@ defineExpose({ focus, setContent, getContent });
         </div>
         <button
           type="button"
-          class="flex-shrink-0 rounded p-0.5 text-n-slate-10 hover:bg-n-alpha-2 hover:text-n-ruby-11"
+          class="flex size-5 flex-shrink-0 items-center justify-center rounded text-n-slate-10 hover:bg-n-alpha-2 hover:text-n-ruby-11"
           @click="removeFile(index)"
         >
-          <Icon icon="i-lucide-x" class="size-3.5" />
+          <svg
+            class="size-3"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M2 2l8 8M10 2l-8 8" />
+          </svg>
         </button>
       </div>
     </div>
