@@ -73,7 +73,8 @@ class InternalChatListener < BaseListener
     account = message.account
     tokens = member_tokens(channel)
 
-    broadcast(account, tokens, INTERNAL_CHAT_POLL_VOTED, poll_event_data(poll))
+    broadcast(account, tokens, INTERNAL_CHAT_POLL_VOTED,
+              poll_event_data(poll).merge(internal_chat_channel_id: channel.id))
   end
 
   def internal_chat_reaction_created(event)
