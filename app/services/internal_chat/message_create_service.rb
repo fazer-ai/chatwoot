@@ -45,9 +45,20 @@ class InternalChat::MessageCreateService
       @message.attachments.create!(
         account: channel.account,
         file: attachment[:file],
-        file_type: attachment[:file_type] || :file
+        file_type: detect_file_type(attachment)
       )
     end
+  end
+
+  def detect_file_type(attachment)
+    return attachment[:file_type].to_sym if attachment[:file_type].present?
+
+    content_type = attachment[:file]&.content_type || ''
+    return :image if content_type.start_with?('image/')
+    return :audio if content_type.start_with?('audio/')
+    return :video if content_type.start_with?('video/')
+
+    :file
   end
 
   def dispatch_event
