@@ -136,6 +136,15 @@ function filePreviewUrl(file) {
   return URL.createObjectURL(file);
 }
 
+function formatFileSize(file) {
+  const bytes = file.size || 0;
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Math.round(bytes / k ** i)} ${sizes[i]}`;
+}
+
 function focus() {
   focusEditor();
 }
@@ -184,32 +193,36 @@ defineExpose({ focus, setContent, getContent });
       {{ t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL') }}
     </label>
     <!-- Attached files preview -->
-    <div v-if="attachedFiles.length" class="mb-1 flex flex-wrap gap-2 px-1">
+    <div v-if="attachedFiles.length" class="mb-1 flex flex-col gap-1 px-1">
       <div
         v-for="(file, index) in attachedFiles"
         :key="index"
-        class="group relative"
+        class="flex w-60 items-center gap-1.5 rounded-md bg-n-slate-3 p-1.5"
       >
-        <img
-          v-if="file.type?.startsWith('image/')"
-          :src="filePreviewUrl(file)"
-          class="h-16 w-16 rounded-lg border border-n-slate-6 object-cover"
-        />
-        <div
-          v-else
-          class="flex h-16 items-center gap-1 rounded-lg border border-n-slate-6 bg-n-alpha-1 px-3"
-        >
-          <Icon icon="i-lucide-file" class="size-4 text-n-slate-10" />
-          <span class="max-w-24 truncate text-xs text-n-slate-12">
-            {{ file.name }}
+        <div class="flex-shrink-0">
+          <img
+            v-if="file.type?.startsWith('image/')"
+            :src="filePreviewUrl(file)"
+            class="size-8 rounded object-cover"
+          />
+          <span v-else class="flex size-8 items-center justify-center text-lg">
+            📄
           </span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-xs font-medium text-n-slate-12">
+            {{ file.name }}
+          </div>
+          <div class="text-[10px] text-n-slate-10">
+            {{ formatFileSize(file) }}
+          </div>
         </div>
         <button
           type="button"
-          class="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-n-slate-12 text-white hover:bg-n-ruby-9"
+          class="flex-shrink-0 rounded p-0.5 text-n-slate-10 hover:bg-n-alpha-2 hover:text-n-ruby-11"
           @click="removeFile(index)"
         >
-          <Icon icon="i-lucide-x" class="size-2.5" />
+          <Icon icon="i-lucide-x" class="size-3.5" />
         </button>
       </div>
     </div>
