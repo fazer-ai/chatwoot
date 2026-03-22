@@ -48,6 +48,8 @@ const listRef = ref(null);
 const showScrollToBottom = ref(false);
 const previousFirstMessageId = ref(null);
 const savedScrollHeight = ref(0);
+const hasReachedOldest = ref(false);
+const lastMessageCount = ref(0);
 
 const dateSeparatedMessages = computed(() => {
   const groups = [];
@@ -108,12 +110,41 @@ function handleScroll() {
   const { scrollTop, scrollHeight, clientHeight } = listRef.value;
   showScrollToBottom.value = scrollHeight - scrollTop - clientHeight > 100;
 
-  if (scrollTop === 0 && props.messages.length > 0 && !props.isLoading) {
+  if (
+    scrollTop < 100 &&
+    props.messages.length > 0 &&
+    !props.isLoading &&
+    !props.isLoadingMore &&
+    !hasReachedOldest.value
+  ) {
     savedScrollHeight.value = listRef.value.scrollHeight;
     previousFirstMessageId.value = props.messages[0]?.id;
+    lastMessageCount.value = props.messages.length;
     emit('loadMore');
   }
 }
+
+// Detect when loadMore completes with no new messages (reached oldest)
+watch(
+  () => props.isLoadingMore,
+  (loading, wasLoading) => {
+    if (wasLoading && !loading) {
+      if (props.messages.length === lastMessageCount.value) {
+        hasReachedOldest.value = true;
+      }
+    }
+  }
+);
+
+// Reset hasReachedOldest when channel changes (messages array replaced)
+watch(
+  () => props.messages[0]?.id,
+  () => {
+    if (!previousFirstMessageId.value) {
+      hasReachedOldest.value = false;
+    }
+  }
+);
 
 watch(
   () => props.messages.length,

@@ -149,17 +149,11 @@ function handlePin() {
 }
 
 function handleCopyLink() {
-  const accountId = window.location.pathname.match(
-    /\/app\/accounts\/(\d+)/
-  )?.[1];
-  const channelId = window.location.pathname.match(
-    /\/internal-chat\/(\d+)/
-  )?.[1];
-  if (accountId && channelId) {
-    const url = `${window.chatwootConfig.hostURL}/app/accounts/${accountId}/internal-chat/${channelId}?messageId=${props.message.id}`;
-    copyTextToClipboard(url);
-    useAlert(t('INTERNAL_CHAT.MESSAGE.LINK_COPIED'));
-  }
+  const baseUrl = window.chatwootConfig?.hostURL || window.location.origin;
+  const path = window.location.pathname;
+  const url = `${baseUrl}${path}?messageId=${props.message.id}`;
+  copyTextToClipboard(url);
+  useAlert(t('INTERNAL_CHAT.MESSAGE.LINK_COPIED'));
 }
 
 function handleAddReaction(emoji) {

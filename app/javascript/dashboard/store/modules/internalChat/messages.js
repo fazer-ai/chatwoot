@@ -170,7 +170,6 @@ const actions = {
         parentMessageId,
         reply: response.data,
       });
-      commit('INCREMENT_REPLY_COUNT', { channelId, parentMessageId });
       return response.data;
     } catch (error) {
       throwErrorMessage(error);

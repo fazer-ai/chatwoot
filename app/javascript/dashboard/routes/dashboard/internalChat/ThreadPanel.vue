@@ -64,7 +64,12 @@ async function fetchThread() {
   }
 }
 
-async function handleSendReply(content) {
+const channelName = computed(() => {
+  const channel = store.getters['internalChat/getChannelById'](props.channelId);
+  return channel?.name || '';
+});
+
+async function handleSendReply(content, options = {}) {
   isSending.value = true;
   try {
     if (editingMessage.value) {
@@ -80,6 +85,12 @@ async function handleSendReply(content) {
         parentMessageId: props.parentMessage.id,
         data: { content },
       });
+      if (options.alsoSendInChannel) {
+        await store.dispatch('internalChat/messages/sendMessage', {
+          channelId: props.channelId,
+          data: { content },
+        });
+      }
     }
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
@@ -231,6 +242,9 @@ onMounted(() => {
       :disabled="isSending"
       :editing-message="editingMessage"
       :placeholder="t('INTERNAL_CHAT.THREAD.REPLY_PLACEHOLDER')"
+      :show-poll="false"
+      show-also-send-in-channel
+      :channel-name="channelName"
       @send="handleSendReply"
       @cancel-edit="handleCancelEdit"
     />

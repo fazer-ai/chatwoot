@@ -21,6 +21,18 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  showPoll: {
+    type: Boolean,
+    default: true,
+  },
+  showAlsoSendInChannel: {
+    type: Boolean,
+    default: false,
+  },
+  channelName: {
+    type: String,
+    default: '',
+  },
 });
 
 const emit = defineEmits([
@@ -30,6 +42,8 @@ const emit = defineEmits([
   'create-poll',
   'cancelEdit',
 ]);
+
+const alsoSendInChannel = ref(false);
 
 const { t } = useI18n();
 
@@ -64,18 +78,21 @@ watch(editorContent, newContent => {
   }, 3000);
 });
 
+function focusEditor() {
+  editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
+}
+
 function handleSend() {
   if (!canSend.value) return;
-  emit('send', editorContent.value.trim());
+  const content = editorContent.value.trim();
+  emit('send', content, { alsoSendInChannel: alsoSendInChannel.value });
   editorContent.value = '';
   if (draftTimer) {
     clearTimeout(draftTimer);
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  setTimeout(() => {
-    editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
-  }, 100);
+  setTimeout(() => focusEditor(), 200);
 }
 
 function handleKeyDown(event) {
@@ -95,7 +112,7 @@ function handleTypingOn() {
 }
 
 function focus() {
-  editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
+  focusEditor();
 }
 
 function setContent(content) {
@@ -130,6 +147,19 @@ defineExpose({ focus, setContent, getContent });
         <Icon icon="i-lucide-x" class="size-3.5" />
       </button>
     </div>
+    <label
+      v-if="showAlsoSendInChannel"
+      class="flex cursor-pointer items-center gap-1.5 px-1 pb-1 text-xs text-n-slate-10"
+    >
+      <input
+        v-model="alsoSendInChannel"
+        type="checkbox"
+        class="rounded border-n-slate-6"
+      />
+      {{
+        t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL', { channel: channelName })
+      }}
+    </label>
     <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"
       @keydown.capture="handleKeyDown"
@@ -152,6 +182,7 @@ defineExpose({ focus, setContent, getContent });
         />
       </div>
       <button
+        v-if="showPoll"
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :disabled="disabled"
         :title="t('INTERNAL_CHAT.POLL.CREATE')"

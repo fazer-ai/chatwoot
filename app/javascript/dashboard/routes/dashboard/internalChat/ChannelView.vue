@@ -186,6 +186,8 @@ function handleReply(message) {
 
 function handleOpenThread(message) {
   activeThread.value = message;
+  showSettings.value = false;
+  localStorage.setItem('internal_chat_settings_open', 'false');
 }
 
 function closeThread() {
@@ -325,6 +327,7 @@ function saveDraftImmediately() {
 
 function handleToggleSettings() {
   showSettings.value = !showSettings.value;
+  if (showSettings.value) activeThread.value = null;
   localStorage.setItem(
     'internal_chat_settings_open',
     String(showSettings.value)
