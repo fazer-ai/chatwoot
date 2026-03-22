@@ -146,22 +146,23 @@ defineExpose({ open });
           :placeholder="t('INTERNAL_CHAT.CHANNEL.DESCRIPTION')"
         />
       </div>
-      <div class="flex items-center justify-between">
-        <label class="text-sm font-medium text-n-slate-12">
-          {{ t('INTERNAL_CHAT.CHANNEL.PRIVATE') }}
-        </label>
-        <Switch v-model="isPrivate" />
-      </div>
       <div v-if="categories.length > 0" class="flex flex-col gap-1">
         <label class="text-sm font-medium text-n-slate-12">
           {{ t('INTERNAL_CHAT.CATEGORY.NAME') }}
         </label>
         <NextSelect
           v-model="categoryId"
+          class="w-full"
           :options="categoryOptions"
           :placeholder="t('INTERNAL_CHAT.CATEGORY.NONE')"
         />
       </div>
+      <label class="flex cursor-pointer items-center justify-between">
+        <span class="text-sm font-medium text-n-slate-12">
+          {{ t('INTERNAL_CHAT.CHANNEL.PRIVATE') }}
+        </span>
+        <Switch v-model="isPrivate" />
+      </label>
 
       <!-- Public channel info note -->
       <div

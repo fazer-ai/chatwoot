@@ -37,7 +37,9 @@
       "NO_MEMBERS": "No members",
       "ADD_MEMBER": "Add member...",
       "REMOVE_MEMBER": "Remove member",
-      "ALL_AGENTS_NOTE": "All agents will be added automatically",
+      "EDIT_MEMBERS": "Edit members",
+      "ALL_AGENTS_NOTE": "This channel will be visible to all users",
+      "CLOSE_DM": "Close conversation",
       "SELECT_TEAMS": "Select Teams",
       "SELECT_AGENTS": "Select Agents"
     },

@@ -35,7 +35,11 @@
       "ADMIN": "Admin",
       "YOU": "(voc\u00ea)",
       "NO_MEMBERS": "Sem membros",
-      "ALL_AGENTS_NOTE": "Todos os agentes ser\u00e3o adicionados automaticamente",
+      "ADD_MEMBER": "Adicionar membro...",
+      "REMOVE_MEMBER": "Remover membro",
+      "EDIT_MEMBERS": "Editar membros",
+      "ALL_AGENTS_NOTE": "Esse canal ser\u00e1 vis\u00edvel para todos os usu\u00e1rios.",
+      "CLOSE_DM": "Fechar conversa",
       "SELECT_TEAMS": "Selecionar equipes",
       "SELECT_AGENTS": "Selecionar agentes"
     },
@@ -54,7 +58,9 @@
       "CANCEL_EDIT": "Cancelar edi\u00e7\u00e3o",
       "BOLD": "Negrito",
       "ITALIC": "It\u00e1lico",
-      "CODE": "C\u00f3digo"
+      "CODE": "C\u00f3digo",
+      "COPY_LINK": "Copiar link",
+      "LINK_COPIED": "Link da mensagem copiado"
     },
     "THREAD": {
       "TITLE": "Conversa",
@@ -75,7 +81,10 @@
       "PIN": "Fixar enquete",
       "ADD_OPTION": "Adicionar op\u00e7\u00e3o",
       "CANCEL": "Cancelar",
-      "PERCENTAGE": "{value}%"
+      "PERCENTAGE": "{value}%",
+      "DISCARD_TITLE": "Descartar enquete?",
+      "DISCARD_DESCRIPTION": "Voc\u00ea tem altera\u00e7\u00f5es n\u00e3o salvas. Tem certeza que deseja descartar esta enquete?",
+      "DISCARD": "Descartar"
     },
     "DRAFT": {
       "TITLE": "Rascunhos",

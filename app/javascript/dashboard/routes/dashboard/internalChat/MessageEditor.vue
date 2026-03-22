@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import WootWriter from 'dashboard/components/widgets/WootWriter/Editor.vue';
@@ -73,9 +73,9 @@ function handleSend() {
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  nextTick(() => {
+  setTimeout(() => {
     editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
-  });
+  }, 100);
 }
 
 function handleKeyDown(event) {

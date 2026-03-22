@@ -21,29 +21,18 @@ const emit = defineEmits([
   'unmute',
   'favorite',
   'unfavorite',
+  'close-dm',
+  'edit-members',
 ]);
 
 const store = useStore();
 const { t } = useI18n();
 
+const isDM = computed(() => props.channel.channel_type === 'dm');
+
 const showDeleteConfirm = ref(false);
 const members = ref([]);
 const isLoadingMembers = ref(false);
-const memberSearch = ref('');
-
-const allAgents = computed(
-  () => store.getters['agents/getVerifiedAgents'] || []
-);
-
-const filteredAgentsToAdd = computed(() => {
-  const memberUserIds = new Set(members.value.map(m => m.user_id));
-  const query = memberSearch.value.toLowerCase();
-  return allAgents.value.filter(agent => {
-    if (memberUserIds.has(agent.id)) return false;
-    if (!query) return true;
-    return agent.name?.toLowerCase().includes(query);
-  });
-});
 
 async function fetchMembers() {
   if (!props.channel.id) return;
@@ -64,16 +53,6 @@ async function fetchMembers() {
   }
 }
 
-async function addMember(userId) {
-  try {
-    await InternalChatChannelsAPI.addMember(props.channel.id, userId);
-    memberSearch.value = '';
-    fetchMembers();
-  } catch {
-    // silently handle
-  }
-}
-
 async function removeMember(memberId) {
   try {
     await InternalChatChannelsAPI.removeMember(props.channel.id, memberId);
@@ -85,7 +64,6 @@ async function removeMember(memberId) {
 
 onMounted(() => {
   fetchMembers();
-  store.dispatch('agents/get');
 });
 
 watch(() => props.channel.id, fetchMembers);
@@ -231,7 +209,7 @@ function handleDelete() {
               {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
             </span>
             <button
-              v-if="isAdmin && member.user_id !== currentUserId"
+              v-if="isAdmin && !isDM && member.user_id !== currentUserId"
               type="button"
               class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:bg-n-alpha-2 hover:text-n-ruby-11"
               @click="removeMember(member.id)"
@@ -243,35 +221,15 @@ function handleDelete() {
             {{ t('INTERNAL_CHAT.CHANNEL.NO_MEMBERS') }}
           </div>
         </div>
-        <div v-if="isAdmin" class="mt-3">
-          <div class="relative">
-            <input
-              v-model="memberSearch"
-              type="text"
-              class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-1.5 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
-              :placeholder="t('INTERNAL_CHAT.CHANNEL.ADD_MEMBER')"
-            />
-          </div>
-          <div
-            v-if="memberSearch && filteredAgentsToAdd.length > 0"
-            class="mt-1 max-h-32 overflow-y-auto rounded-lg border border-n-slate-6 bg-n-solid-1"
-          >
-            <button
-              v-for="agent in filteredAgentsToAdd"
-              :key="agent.id"
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-2"
-              @click="addMember(agent.id)"
-            >
-              <Avatar
-                :src="agent.thumbnail"
-                :name="agent.name || ''"
-                :size="20"
-              />
-              {{ agent.name }}
-            </button>
-          </div>
-        </div>
+        <button
+          v-if="isAdmin && !isDM"
+          type="button"
+          class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-n-slate-6 px-3 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+          @click="emit('edit-members')"
+        >
+          <Icon icon="i-lucide-user-plus" class="size-4 text-n-slate-11" />
+          {{ t('INTERNAL_CHAT.CHANNEL.EDIT_MEMBERS') }}
+        </button>
       </div>
 
       <!-- Actions -->
@@ -312,59 +270,73 @@ function handleDelete() {
             }}
           </button>
 
+          <!-- DM: Close conversation button -->
           <button
-            v-if="isAdmin"
+            v-if="isDM"
             type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
-            @click="handleArchiveToggle"
+            @click="emit('close-dm')"
           >
-            <Icon
-              :icon="
-                isArchived ? 'i-lucide-archive-restore' : 'i-lucide-archive'
-              "
-              class="size-4 text-n-slate-11"
-            />
-            {{
-              isArchived
-                ? t('INTERNAL_CHAT.CHANNEL.UNARCHIVE')
-                : t('INTERNAL_CHAT.CHANNEL.ARCHIVE')
-            }}
+            <Icon icon="i-lucide-x-circle" class="size-4 text-n-slate-11" />
+            {{ t('INTERNAL_CHAT.CHANNEL.CLOSE_DM') }}
           </button>
 
-          <button
-            v-if="isAdmin"
-            type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-ruby-11 hover:bg-n-ruby-3"
-            @click="handleDelete"
-          >
-            <Icon icon="i-lucide-trash-2" class="size-4" />
-            {{ t('INTERNAL_CHAT.CHANNEL.DELETE') }}
-          </button>
+          <!-- Non-DM: Archive and Delete -->
+          <template v-if="!isDM">
+            <button
+              v-if="isAdmin"
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              @click="handleArchiveToggle"
+            >
+              <Icon
+                :icon="
+                  isArchived ? 'i-lucide-archive-restore' : 'i-lucide-archive'
+                "
+                class="size-4 text-n-slate-11"
+              />
+              {{
+                isArchived
+                  ? t('INTERNAL_CHAT.CHANNEL.UNARCHIVE')
+                  : t('INTERNAL_CHAT.CHANNEL.ARCHIVE')
+              }}
+            </button>
 
-          <div
-            v-if="showDeleteConfirm"
-            class="mt-2 rounded-lg border border-n-ruby-7 bg-n-ruby-2 p-3"
-          >
-            <p class="mb-2 text-sm text-n-ruby-11">
-              {{ t('INTERNAL_CHAT.CHANNEL.CONFIRM_DELETE') }}
-            </p>
-            <div class="flex gap-2">
-              <button
-                type="button"
-                class="rounded-lg bg-n-ruby-9 px-3 py-1.5 text-sm font-medium text-white hover:bg-n-ruby-10"
-                @click="handleDelete"
-              >
-                {{ t('INTERNAL_CHAT.CHANNEL.DELETE') }}
-              </button>
-              <button
-                type="button"
-                class="rounded-lg px-3 py-1.5 text-sm text-n-slate-11 hover:bg-n-alpha-2"
-                @click="showDeleteConfirm = false"
-              >
-                {{ t('INTERNAL_CHAT.POLL.CANCEL') }}
-              </button>
+            <button
+              v-if="isAdmin"
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-ruby-11 hover:bg-n-ruby-3"
+              @click="handleDelete"
+            >
+              <Icon icon="i-lucide-trash-2" class="size-4" />
+              {{ t('INTERNAL_CHAT.CHANNEL.DELETE') }}
+            </button>
+
+            <div
+              v-if="showDeleteConfirm"
+              class="mt-2 rounded-lg border border-n-ruby-7 bg-n-ruby-2 p-3"
+            >
+              <p class="mb-2 text-sm text-n-ruby-11">
+                {{ t('INTERNAL_CHAT.CHANNEL.CONFIRM_DELETE') }}
+              </p>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg bg-n-ruby-9 px-3 py-1.5 text-sm font-medium text-white hover:bg-n-ruby-10"
+                  @click="handleDelete"
+                >
+                  {{ t('INTERNAL_CHAT.CHANNEL.DELETE') }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg px-3 py-1.5 text-sm text-n-slate-11 hover:bg-n-alpha-2"
+                  @click="showDeleteConfirm = false"
+                >
+                  {{ t('INTERNAL_CHAT.POLL.CANCEL') }}
+                </button>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>
