@@ -304,6 +304,19 @@ async function handleDeleteChannel() {
   }
 }
 
+async function handleCloseDM() {
+  try {
+    await store.dispatch('internalChat/archive', props.channelId);
+    showSettings.value = false;
+    router.push({
+      name: 'internal_chat_home',
+      params: { accountId: route.params.accountId },
+    });
+  } catch {
+    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  }
+}
+
 async function handleToggleMute() {
   try {
     await store.dispatch('internalChat/toggleMute', props.channelId);
@@ -475,6 +488,7 @@ onMounted(async () => {
       @unmute="handleToggleMute"
       @favorite="handleToggleFavorite"
       @unfavorite="handleToggleFavorite"
+      @close-dm="handleCloseDM"
     />
 
     <PollCreator ref="pollCreatorRef" @submit="handlePollSubmit" />
