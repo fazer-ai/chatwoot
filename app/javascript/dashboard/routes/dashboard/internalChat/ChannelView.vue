@@ -185,6 +185,8 @@ function handleTyping() {
 
 function handleReply(message) {
   activeThread.value = message;
+  showSettings.value = false;
+  localStorage.setItem('internal_chat_settings_open', 'false');
 }
 
 function handleOpenThread(message) {
