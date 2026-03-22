@@ -219,7 +219,7 @@ defineExpose({ focus, setContent, getContent });
         </div>
         <button
           type="button"
-          class="flex size-6 flex-shrink-0 items-center justify-center rounded text-n-slate-10 hover:bg-n-alpha-2 hover:text-n-ruby-11"
+          class="flex-shrink-0 rounded p-1 text-n-slate-10 hover:bg-n-alpha-2 hover:text-n-ruby-11"
           @click="removeFile(index)"
         >
           <Icon icon="i-lucide-x" class="size-4" />
