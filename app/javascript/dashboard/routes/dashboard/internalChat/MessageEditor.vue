@@ -132,6 +132,10 @@ function removeFile(index) {
   attachedFiles.value.splice(index, 1);
 }
 
+function filePreviewUrl(file) {
+  return URL.createObjectURL(file);
+}
+
 function focus() {
   focusEditor();
 }
@@ -180,20 +184,32 @@ defineExpose({ focus, setContent, getContent });
       {{ t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL') }}
     </label>
     <!-- Attached files preview -->
-    <div v-if="attachedFiles.length" class="mb-1 flex flex-wrap gap-1 px-1">
+    <div v-if="attachedFiles.length" class="mb-1 flex flex-wrap gap-2 px-1">
       <div
         v-for="(file, index) in attachedFiles"
         :key="index"
-        class="flex items-center gap-1 rounded bg-n-alpha-2 px-2 py-1 text-xs text-n-slate-12"
+        class="group relative"
       >
-        <Icon icon="i-lucide-paperclip" class="size-3 text-n-slate-10" />
-        <span class="max-w-32 truncate">{{ file.name }}</span>
+        <img
+          v-if="file.type?.startsWith('image/')"
+          :src="filePreviewUrl(file)"
+          class="h-16 w-16 rounded-lg border border-n-slate-6 object-cover"
+        />
+        <div
+          v-else
+          class="flex h-16 items-center gap-1 rounded-lg border border-n-slate-6 bg-n-alpha-1 px-3"
+        >
+          <Icon icon="i-lucide-file" class="size-4 text-n-slate-10" />
+          <span class="max-w-24 truncate text-xs text-n-slate-12">
+            {{ file.name }}
+          </span>
+        </div>
         <button
           type="button"
-          class="flex-shrink-0 text-n-slate-9 hover:text-n-ruby-11"
+          class="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-n-slate-12 text-white hover:bg-n-ruby-9"
           @click="removeFile(index)"
         >
-          <Icon icon="i-lucide-x" class="size-3" />
+          <Icon icon="i-lucide-x" class="size-2.5" />
         </button>
       </div>
     </div>
