@@ -1,9 +1,10 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import ReactionDisplay from './ReactionDisplay.vue';
 import EmojiReactionPicker from './EmojiReactionPicker.vue';
 import PollDisplay from './PollDisplay.vue';
@@ -127,14 +128,19 @@ const reactions = computed(() => {
   return props.message.reactions || [];
 });
 
+const deleteDialogRef = ref(null);
+
 function handleEdit() {
   emit('edit', props.message);
 }
 
 function handleDelete() {
-  // eslint-disable-next-line no-alert
-  if (!window.confirm(t('INTERNAL_CHAT.MESSAGE.CONFIRM_DELETE'))) return;
+  deleteDialogRef.value?.open();
+}
+
+function confirmDelete() {
   emit('delete', props.message);
+  deleteDialogRef.value?.close();
 }
 
 function handleReply() {
@@ -285,5 +291,14 @@ function handleUnvote(payload) {
         <Icon icon="i-lucide-trash-2" class="size-4" />
       </button>
     </div>
+
+    <Dialog
+      ref="deleteDialogRef"
+      type="alert"
+      :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
+      :description="t('INTERNAL_CHAT.MESSAGE.CONFIRM_DELETE')"
+      :confirm-button-label="t('INTERNAL_CHAT.MESSAGE.DELETE')"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
