@@ -114,9 +114,9 @@ function handleSubmit() {
   };
 
   emit('submit', pollData);
-  setTimeout(() => {
-    isSubmitting.value = false;
-  }, 1000);
+  dialogRef.value?.close();
+  resetForm();
+  isSubmitting.value = false;
 }
 
 defineExpose({ open });
