@@ -229,7 +229,11 @@ async function handleVote({ messageId, optionId }) {
   const pollId = msg?.poll?.id || msg?.content_attributes?.poll?.id;
   if (!pollId) return;
   try {
-    await store.dispatch('internalChat/polls/vote', { pollId, optionId });
+    await store.dispatch('internalChat/polls/vote', {
+      pollId,
+      optionId,
+      channelId: props.channelId,
+    });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }
@@ -243,7 +247,11 @@ async function handleUnvote({ messageId, optionId }) {
   const pollId = msg?.poll?.id || msg?.content_attributes?.poll?.id;
   if (!pollId) return;
   try {
-    await store.dispatch('internalChat/polls/unvote', { pollId, optionId });
+    await store.dispatch('internalChat/polls/unvote', {
+      pollId,
+      optionId,
+      channelId: props.channelId,
+    });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }

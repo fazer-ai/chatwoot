@@ -34,10 +34,17 @@ const actions = {
     }
   },
 
-  vote: async ({ commit }, { pollId, optionId }) => {
+  vote: async ({ commit, dispatch }, { pollId, optionId, channelId }) => {
     commit('SET_UI_FLAG', { isVoting: true });
     try {
       const response = await InternalChatPollsAPI.vote(pollId, optionId);
+      if (channelId && response.data) {
+        dispatch(
+          'internalChat/messages/updateMessageFromCable',
+          { channelId, message: response.data },
+          { root: true }
+        );
+      }
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
@@ -47,10 +54,17 @@ const actions = {
     }
   },
 
-  unvote: async ({ commit }, { pollId, optionId }) => {
+  unvote: async ({ commit, dispatch }, { pollId, optionId, channelId }) => {
     commit('SET_UI_FLAG', { isVoting: true });
     try {
       const response = await InternalChatPollsAPI.unvote(pollId, optionId);
+      if (channelId && response.data) {
+        dispatch(
+          'internalChat/messages/updateMessageFromCable',
+          { channelId, message: response.data },
+          { root: true }
+        );
+      }
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
