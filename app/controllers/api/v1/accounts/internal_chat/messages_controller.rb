@@ -50,6 +50,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def pin
     authorize @message, :pin?, policy_class: InternalChat::MessagePolicy
+    @message.skip_content_validation = true
     @message.update!(content_attributes: (@message.content_attributes || {}).merge('pinned' => true, 'pinned_by' => Current.user.id,
                                                                                    'pinned_at' => Time.current.iso8601))
     dispatch_message_event(INTERNAL_CHAT_MESSAGE_UPDATED, message: @message)
@@ -58,6 +59,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
 
   def unpin
     authorize @message, :unpin?, policy_class: InternalChat::MessagePolicy
+    @message.skip_content_validation = true
     attrs = (@message.content_attributes || {}).except('pinned', 'pinned_by', 'pinned_at')
     @message.update!(content_attributes: attrs)
     dispatch_message_event(INTERNAL_CHAT_MESSAGE_UPDATED, message: @message)

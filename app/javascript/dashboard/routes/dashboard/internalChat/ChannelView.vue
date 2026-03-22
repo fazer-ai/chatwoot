@@ -12,6 +12,7 @@ import TypingIndicator from './TypingIndicator.vue';
 import ThreadPanel from './ThreadPanel.vue';
 import PollCreator from './PollCreator.vue';
 import ChannelSettings from './ChannelSettings.vue';
+import EditMembersModal from './EditMembersModal.vue';
 
 const props = defineProps({
   channelId: {
@@ -34,6 +35,7 @@ const editorRef = ref(null);
 const messageListRef = ref(null);
 const activeThread = ref(null);
 const pollCreatorRef = ref(null);
+const editMembersRef = ref(null);
 const editingMessage = ref(null);
 const showSettings = ref(
   localStorage.getItem('internal_chat_settings_open') === 'true'
@@ -494,7 +496,7 @@ onMounted(async () => {
       :channel="channel"
       :current-user-id="currentUserId"
       :is-admin="isAdmin"
-      @close="showSettings = false"
+      @close="handleToggleSettings"
       @archive="handleArchive"
       @unarchive="handleUnarchive"
       @delete="handleDeleteChannel"
@@ -503,8 +505,10 @@ onMounted(async () => {
       @favorite="handleToggleFavorite"
       @unfavorite="handleToggleFavorite"
       @close-dm="handleCloseDM"
+      @edit-members="editMembersRef?.open()"
     />
 
     <PollCreator ref="pollCreatorRef" @submit="handlePollSubmit" />
+    <EditMembersModal ref="editMembersRef" :channel-id="channelId" />
   </div>
 </template>
