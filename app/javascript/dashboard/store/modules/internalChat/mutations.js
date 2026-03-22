@@ -36,6 +36,10 @@ export const mutations = {
     _state.categories = categories;
   },
 
+  ADD_CATEGORY(_state, category) {
+    _state.categories = [...(_state.categories || []), category];
+  },
+
   SET_UI_FLAG(_state, flags) {
     _state.uiFlags = { ..._state.uiFlags, ...flags };
   },

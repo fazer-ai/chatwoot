@@ -145,7 +145,6 @@ const actions = {
   },
 
   fetchThread: async ({ commit }, { channelId, messageId }) => {
-    commit('SET_UI_FLAG', { isFetching: true });
     try {
       const response = await InternalChatMessagesAPI.getThread(
         channelId,
@@ -157,8 +156,6 @@ const actions = {
     } catch (error) {
       throwErrorMessage(error);
       throw error;
-    } finally {
-      commit('SET_UI_FLAG', { isFetching: false });
     }
   },
 
@@ -173,6 +170,7 @@ const actions = {
         parentMessageId,
         reply: response.data,
       });
+      commit('INCREMENT_REPLY_COUNT', { channelId, parentMessageId });
       return response.data;
     } catch (error) {
       throwErrorMessage(error);
@@ -216,6 +214,11 @@ const actions = {
         parentMessageId: message.parent_id,
         reply: message,
       });
+      commit('INCREMENT_REPLY_COUNT', {
+        channelId,
+        parentMessageId: message.parent_id,
+      });
+      return;
     }
     commit('ADD_MESSAGE', { channelId, message });
   },
@@ -391,6 +394,22 @@ const mutations = {
       _state.threadReplies = {
         ..._state.threadReplies,
         [parentMessageId]: updated,
+      };
+    }
+  },
+
+  INCREMENT_REPLY_COUNT(_state, { channelId, parentMessageId }) {
+    const messages = _state.records[channelId] || [];
+    const index = messages.findIndex(m => m.id === parentMessageId);
+    if (index > -1) {
+      const updated = [...messages];
+      updated[index] = {
+        ...updated[index],
+        replies_count: (updated[index].replies_count || 0) + 1,
+      };
+      _state.records = {
+        ..._state.records,
+        [channelId]: updated,
       };
     }
   },

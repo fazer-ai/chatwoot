@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
-import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
+import MessageSkeleton from './MessageSkeleton.vue';
 import MessageBubble from './MessageBubble.vue';
 
 const props = defineProps({
@@ -88,6 +88,15 @@ function scrollToBottom() {
   listRef.value.scrollTop = listRef.value.scrollHeight;
 }
 
+function scrollToMessage(messageId) {
+  const el = listRef.value?.querySelector(`[data-message-id="${messageId}"]`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('bg-n-amber-2');
+    setTimeout(() => el.classList.remove('bg-n-amber-2'), 2000);
+  }
+}
+
 function handleScroll() {
   if (!listRef.value) return;
   const { scrollTop, scrollHeight, clientHeight } = listRef.value;
@@ -117,16 +126,15 @@ onMounted(async () => {
   await nextTick();
   scrollToBottom();
 });
+
+defineExpose({ scrollToMessage });
 </script>
 
 <template>
   <div class="relative flex-1 overflow-hidden">
     <div ref="listRef" class="h-full overflow-y-auto" @scroll="handleScroll">
-      <div v-if="isLoading" class="flex items-center justify-center py-4">
-        <Spinner :size="16" />
-        <span class="ml-2 text-xs text-n-slate-10">
-          {{ t('INTERNAL_CHAT.LOADING_MESSAGES') }}
-        </span>
+      <div v-if="isLoading">
+        <MessageSkeleton />
       </div>
       <div
         v-if="messages.length === 0 && !isLoading"
@@ -147,22 +155,23 @@ onMounted(async () => {
           </span>
           <div class="flex-1 border-t border-n-slate-5" />
         </div>
-        <MessageBubble
-          v-else
-          :message="item.data"
-          :current-user-id="currentUserId"
-          :is-admin="isAdmin"
-          @edit="emit('edit', $event)"
-          @delete="emit('delete', $event)"
-          @reply="emit('reply', $event)"
-          @open-thread="emit('openThread', $event)"
-          @add-reaction="emit('addReaction', $event)"
-          @remove-reaction="emit('removeReaction', $event)"
-          @pin="emit('pin', $event)"
-          @unpin="emit('unpin', $event)"
-          @vote="emit('vote', $event)"
-          @unvote="emit('unvote', $event)"
-        />
+        <div v-else :data-message-id="item.data.id">
+          <MessageBubble
+            :message="item.data"
+            :current-user-id="currentUserId"
+            :is-admin="isAdmin"
+            @edit="emit('edit', $event)"
+            @delete="emit('delete', $event)"
+            @reply="emit('reply', $event)"
+            @open-thread="emit('openThread', $event)"
+            @add-reaction="emit('addReaction', $event)"
+            @remove-reaction="emit('removeReaction', $event)"
+            @pin="emit('pin', $event)"
+            @unpin="emit('unpin', $event)"
+            @vote="emit('vote', $event)"
+            @unvote="emit('unvote', $event)"
+          />
+        </div>
       </template>
     </div>
     <button

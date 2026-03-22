@@ -10,6 +10,10 @@ class InternalChatChannelsAPI extends ApiClient {
     return axios.get(`${this.url.replace('/channels', '/categories')}`);
   }
 
+  createCategory(data) {
+    return axios.post(`${this.url.replace('/channels', '/categories')}`, data);
+  }
+
   archive(channelId) {
     return axios.post(`${this.url}/${channelId}/archive`);
   }

@@ -13,6 +13,7 @@ const route = useRoute();
 const router = useRouter();
 
 const accountId = computed(() => route.params.accountId);
+const currentUserId = computed(() => store.getters.getCurrentUser?.id);
 
 const drafts = computed(() => {
   return store.getters['internalChat/drafts/getDrafts'] || [];
@@ -38,9 +39,39 @@ function timeSince(dateString) {
   return t('INTERNAL_CHAT.DRAFT.SAVED_AGO', { time: `${days}d` });
 }
 
+function getChannelName(draft) {
+  const channel = store.getters['internalChat/getChannelById'](
+    draft.internal_chat_channel_id
+  );
+  if (!channel) {
+    return t('INTERNAL_CHAT.DRAFT.CHANNEL_LABEL', {
+      channelId: draft.internal_chat_channel_id,
+    });
+  }
+  if (channel.channel_type === 'dm') {
+    const otherMember = (channel.members || []).find(
+      m => m.user_id !== currentUserId.value
+    );
+    return otherMember?.name || channel.name || 'Direct Message';
+  }
+  return (
+    channel.name ||
+    t('INTERNAL_CHAT.DRAFT.CHANNEL_LABEL', {
+      channelId: draft.internal_chat_channel_id,
+    })
+  );
+}
+
 function navigateToChannel(draft) {
+  const channel = store.getters['internalChat/getChannelById'](
+    draft.internal_chat_channel_id
+  );
+  const routeName =
+    channel?.channel_type === 'dm'
+      ? 'internal_chat_dm'
+      : 'internal_chat_channel';
   router.push({
-    name: 'internal_chat_channel',
+    name: routeName,
     params: {
       accountId: accountId.value,
       channelId: draft.internal_chat_channel_id,
@@ -104,11 +135,7 @@ onMounted(() => {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-n-slate-12 truncate">
-                {{
-                  t('INTERNAL_CHAT.DRAFT.CHANNEL_LABEL', {
-                    channelId: draft.internal_chat_channel_id,
-                  })
-                }}
+                {{ getChannelName(draft) }}
               </span>
               <span class="text-xs text-n-slate-10">
                 {{ timeSince(draft.updated_at) }}

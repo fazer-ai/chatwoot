@@ -98,7 +98,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   private
 
   def filtered_channels
-    channels = Current.account.internal_chat_channels.includes(:channel_members, :category)
+    channels = Current.account.internal_chat_channels.includes(channel_members: :user, category: [])
     channels = apply_type_filter(channels)
     channels = apply_category_filter(channels)
     channels = apply_status_filter(channels)
@@ -269,15 +269,21 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     }
   end
 
-  def channel_index_response(channel)
+  def channel_index_response(channel) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     membership = channel.channel_members.detect { |member| member.user_id == Current.user.id }
-    channel_base_response(channel).merge(
+    response = channel_base_response(channel).merge(
       is_dm: channel.channel_type_dm?,
       muted: membership&.muted || false,
       favorited: membership&.favorited || false,
       members_count: channel.channel_members.size,
       unread_count: @unread_counts&.dig(channel.id) || 0
     )
+    if channel.channel_type_dm?
+      response[:members] = channel.channel_members.map do |m|
+        { user_id: m.user_id, name: m.user.name, avatar_url: m.user.avatar_url }
+      end
+    end
+    response
   end
 
   def channel_show_response(channel) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity

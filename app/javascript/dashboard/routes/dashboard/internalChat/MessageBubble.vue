@@ -89,7 +89,11 @@ const canDelete = computed(() => {
 });
 
 const canPin = computed(() => {
-  return (isOwnMessage.value || props.isAdmin) && !isDeleted.value;
+  return (
+    (isOwnMessage.value || props.isAdmin) &&
+    !isDeleted.value &&
+    !props.message.parent_id
+  );
 });
 
 const messageContent = computed(() => {
@@ -97,6 +101,26 @@ const messageContent = computed(() => {
     return t('INTERNAL_CHAT.MESSAGE.DELETED');
   }
   return props.message.content || '';
+});
+
+const renderedContent = computed(() => {
+  if (isDeleted.value) return '';
+  let content = props.message.content || '';
+  // Bold: **text** -> <strong>text</strong>
+  content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic: *text* -> <em>text</em> (but not **)
+  content = content.replace(
+    /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,
+    '<em>$1</em>'
+  );
+  // Code: `text` -> <code>text</code>
+  content = content.replace(
+    /`([^`]+)`/g,
+    '<code class="rounded bg-n-alpha-2 px-1 py-0.5 text-sm font-mono">$1</code>'
+  );
+  // Newlines to <br>
+  content = content.replace(/\n/g, '<br>');
+  return content;
 });
 
 const reactions = computed(() => {
@@ -108,6 +132,8 @@ function handleEdit() {
 }
 
 function handleDelete() {
+  // eslint-disable-next-line no-alert
+  if (!window.confirm(t('INTERNAL_CHAT.MESSAGE.CONFIRM_DELETE'))) return;
   emit('delete', props.message);
 }
 
@@ -184,13 +210,15 @@ function handleUnvote(payload) {
       </div>
 
       <!-- Regular message content -->
-      <div
-        v-else
-        class="mt-0.5 text-sm text-n-slate-12 break-words"
-        :class="{ 'italic text-n-slate-10': isDeleted }"
-      >
-        <div v-if="!isDeleted" v-dompurify-html="messageContent" />
-        <span v-else>{{ messageContent }}</span>
+      <div v-else class="mt-0.5 text-sm text-n-slate-12 break-words">
+        <div
+          v-if="isDeleted"
+          class="flex items-center gap-1.5 rounded-lg bg-n-alpha-1 px-3 py-2 text-n-slate-10"
+        >
+          <Icon icon="i-lucide-trash-2" class="size-3.5 flex-shrink-0" />
+          <span class="italic">{{ messageContent }}</span>
+        </div>
+        <div v-else v-dompurify-html="renderedContent" />
       </div>
 
       <ReactionDisplay
@@ -214,7 +242,12 @@ function handleUnvote(payload) {
       v-if="!isDeleted"
       class="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
     >
-      <EmojiReactionPicker @select="handleAddReaction" />
+      <EmojiReactionPicker
+        :reactions="reactions"
+        :current-user-id="currentUserId"
+        @select="handleAddReaction"
+        @remove="handleRemoveReaction"
+      />
       <button
         class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
         :title="t('INTERNAL_CHAT.MESSAGE.REPLY')"

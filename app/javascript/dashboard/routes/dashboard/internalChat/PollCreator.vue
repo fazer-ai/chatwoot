@@ -12,7 +12,6 @@ const options = ref([{ text: '' }, { text: '' }]);
 const multipleChoice = ref(false);
 const duration = ref('24h');
 const publicResults = ref(true);
-const pinPoll = ref(false);
 const isSubmitting = ref(false);
 
 const DURATION_OPTIONS = [
@@ -45,26 +44,31 @@ function removeOption(index) {
   }
 }
 
+function computeExpiresAt(durationValue) {
+  const now = new Date();
+  const match = durationValue.match(/^(\d+)(h|d)$/);
+  if (!match) return null;
+  const [, amount, unit] = match;
+  if (unit === 'h') now.setHours(now.getHours() + parseInt(amount, 10));
+  else now.setDate(now.getDate() + parseInt(amount, 10));
+  return now.toISOString();
+}
+
 function handleSubmit() {
   if (!canSubmit.value) return;
   isSubmitting.value = true;
 
   const pollData = {
-    content: question.value.trim(),
-    content_type: 'poll',
-    content_attributes: {
-      items: options.value
-        .filter(o => o.text.trim().length > 0)
-        .map(o => ({ text: o.text.trim() })),
-      multiple_choice: multipleChoice.value,
-      duration: duration.value,
-      public_results: publicResults.value,
-      pin: pinPoll.value,
-    },
+    question: question.value.trim(),
+    options: options.value
+      .filter(o => o.text.trim().length > 0)
+      .map(o => ({ text: o.text.trim() })),
+    multiple_choice: multipleChoice.value,
+    public_results: publicResults.value,
+    expires_at: computeExpiresAt(duration.value),
   };
 
   emit('submit', pollData);
-  // Reset after a brief delay to allow parent to process and close
   setTimeout(() => {
     isSubmitting.value = false;
   }, 1000);
@@ -184,22 +188,6 @@ function handleSubmit() {
             <span
               class="absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform"
               :class="{ 'translate-x-4': publicResults }"
-            />
-          </button>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label class="text-sm text-n-slate-12">
-            {{ t('INTERNAL_CHAT.POLL.PIN') }}
-          </label>
-          <button
-            class="relative h-5 w-9 rounded-full transition-colors"
-            :class="pinPoll ? 'bg-n-brand' : 'bg-n-slate-7'"
-            @click="pinPoll = !pinPoll"
-          >
-            <span
-              class="absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform"
-              :class="{ 'translate-x-4': pinPoll }"
             />
           </button>
         </div>

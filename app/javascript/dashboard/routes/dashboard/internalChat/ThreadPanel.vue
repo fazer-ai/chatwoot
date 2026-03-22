@@ -34,6 +34,7 @@ const { t } = useI18n();
 
 const isLoading = ref(false);
 const isSending = ref(false);
+const editingMessage = ref(null);
 let activeThreadRequestId = null;
 
 const threadReplies = computed(() => {
@@ -66,11 +67,20 @@ async function fetchThread() {
 async function handleSendReply(content) {
   isSending.value = true;
   try {
-    await store.dispatch('internalChat/messages/sendThreadReply', {
-      channelId: props.channelId,
-      parentMessageId: props.parentMessage.id,
-      data: { content },
-    });
+    if (editingMessage.value) {
+      await store.dispatch('internalChat/messages/updateMessage', {
+        channelId: props.channelId,
+        messageId: editingMessage.value.id,
+        data: { content },
+      });
+      editingMessage.value = null;
+    } else {
+      await store.dispatch('internalChat/messages/sendThreadReply', {
+        channelId: props.channelId,
+        parentMessageId: props.parentMessage.id,
+        data: { content },
+      });
+    }
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   } finally {
@@ -79,15 +89,11 @@ async function handleSendReply(content) {
 }
 
 function handleEditReply(message) {
-  store
-    .dispatch('internalChat/messages/updateMessage', {
-      channelId: props.channelId,
-      messageId: message.id,
-      data: { content: message.content },
-    })
-    .catch(() => {
-      useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
-    });
+  editingMessage.value = message;
+}
+
+function handleCancelEdit() {
+  editingMessage.value = null;
 }
 
 function handleDeleteReply(message) {
@@ -123,6 +129,30 @@ function handleRemoveReaction({ messageId, reactionId }) {
     .catch(() => {
       // Silently ignore reaction errors
     });
+}
+
+function handleVote({ messageId, optionId }) {
+  const msg = store.getters['internalChat/messages/getMessageById'](
+    props.channelId,
+    messageId
+  );
+  const pollId = msg?.poll?.id || msg?.content_attributes?.poll?.id;
+  if (!pollId) return;
+  store
+    .dispatch('internalChat/polls/vote', { pollId, optionId })
+    .catch(() => {});
+}
+
+function handleUnvote({ messageId, optionId }) {
+  const msg = store.getters['internalChat/messages/getMessageById'](
+    props.channelId,
+    messageId
+  );
+  const pollId = msg?.poll?.id || msg?.content_attributes?.poll?.id;
+  if (!pollId) return;
+  store
+    .dispatch('internalChat/polls/unvote', { pollId, optionId })
+    .catch(() => {});
 }
 
 watch(
@@ -162,6 +192,8 @@ onMounted(() => {
           @delete="handleDeleteReply"
           @add-reaction="handleAddReaction"
           @remove-reaction="handleRemoveReaction"
+          @vote="handleVote"
+          @unvote="handleUnvote"
         />
       </div>
 
@@ -189,14 +221,18 @@ onMounted(() => {
           @delete="handleDeleteReply"
           @add-reaction="handleAddReaction"
           @remove-reaction="handleRemoveReaction"
+          @vote="handleVote"
+          @unvote="handleUnvote"
         />
       </div>
     </div>
 
     <MessageEditor
       :disabled="isSending"
+      :editing-message="editingMessage"
       :placeholder="t('INTERNAL_CHAT.THREAD.REPLY_PLACEHOLDER')"
       @send="handleSendReply"
+      @cancel-edit="handleCancelEdit"
     />
   </div>
 </template>

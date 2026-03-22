@@ -2,23 +2,32 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import { useMapGetter } from 'dashboard/composables/store';
 
 const props = defineProps({
   channel: {
     type: Object,
     default: () => ({}),
   },
-  pinnedMessage: {
-    type: Object,
-    default: null,
+  pinnedMessages: {
+    type: Array,
+    default: () => [],
   },
 });
 
-const emit = defineEmits(['settings']);
+const emit = defineEmits(['settings', 'scrollToPinned']);
 
 const { t } = useI18n();
 
+const currentUser = useMapGetter('getCurrentUser');
+
 const channelName = computed(() => {
+  if (props.channel.channel_type === 'dm' && props.channel.members?.length) {
+    const otherMember = props.channel.members.find(
+      m => m.user_id !== currentUser.value?.id
+    );
+    return otherMember?.name || props.channel.name || 'Direct Message';
+  }
   return props.channel.name || '';
 });
 
@@ -45,9 +54,14 @@ const channelIcon = computed(() => {
 });
 
 const pinnedContent = computed(() => {
-  if (!props.pinnedMessage) return '';
-  const content = props.pinnedMessage.content || '';
+  if (!props.pinnedMessages.length) return '';
+  const content = props.pinnedMessages[0].content || '';
   return content.length > 100 ? `${content.substring(0, 100)}...` : content;
+});
+
+const pinnedCountLabel = computed(() => {
+  if (props.pinnedMessages.length <= 1) return '';
+  return `(${props.pinnedMessages.length})`;
 });
 </script>
 
@@ -99,8 +113,9 @@ const pinnedContent = computed(() => {
 
     <!-- Pinned message banner -->
     <div
-      v-if="pinnedMessage"
-      class="flex items-center gap-2 border-b border-n-slate-5 bg-n-amber-2 px-4 py-2"
+      v-if="pinnedMessages.length > 0"
+      class="flex items-center gap-2 border-b border-n-slate-5 bg-n-amber-2 px-4 py-2 cursor-pointer hover:bg-n-amber-3 transition-colors"
+      @click="emit('scrollToPinned', pinnedMessages[0])"
     >
       <Icon
         icon="i-lucide-pin"
@@ -108,6 +123,9 @@ const pinnedContent = computed(() => {
       />
       <span class="text-xs font-medium text-n-amber-11">
         {{ t('INTERNAL_CHAT.PIN.PINNED_MESSAGE') }}
+        <span v-if="pinnedCountLabel" class="ml-1">
+          {{ pinnedCountLabel }}
+        </span>
       </span>
       <span class="truncate text-xs text-n-slate-12">
         {{ pinnedContent }}

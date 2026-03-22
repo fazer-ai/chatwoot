@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 
@@ -16,9 +16,19 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  editingMessage: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['send', 'typing', 'draftUpdate', 'create-poll']);
+const emit = defineEmits([
+  'send',
+  'typing',
+  'draftUpdate',
+  'create-poll',
+  'cancelEdit',
+]);
 
 const { t } = useI18n();
 
@@ -38,6 +48,43 @@ function autoResize() {
   textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
 }
 
+function cancelEdit() {
+  messageContent.value = '';
+  if (textareaRef.value) textareaRef.value.style.height = 'auto';
+  emit('cancelEdit');
+}
+
+function wrapSelection(marker) {
+  const textarea = textareaRef.value;
+  if (!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = messageContent.value;
+  const selected = text.substring(start, end);
+  const wrapped = `${marker}${selected}${marker}`;
+  messageContent.value =
+    text.substring(0, start) + wrapped + text.substring(end);
+  nextTick(() => {
+    textarea.focus();
+    textarea.selectionStart = start + marker.length;
+    textarea.selectionEnd = end + marker.length;
+  });
+}
+
+watch(
+  () => props.editingMessage,
+  msg => {
+    if (msg) {
+      messageContent.value = msg.content || '';
+      nextTick(() => {
+        autoResize();
+        textareaRef.value?.focus();
+      });
+    }
+  },
+  { immediate: true }
+);
+
 function handleSend() {
   if (!canSend.value) return;
   emit('send', messageContent.value.trim());
@@ -56,6 +103,9 @@ function handleKeyDown(event) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     handleSend();
+  }
+  if (event.key === 'Escape' && props.editingMessage) {
+    cancelEdit();
   }
 }
 
@@ -85,18 +135,58 @@ defineExpose({ focus, setContent });
 <template>
   <div class="border-t border-n-slate-5 bg-n-solid-2 px-4 py-3">
     <div
+      v-if="editingMessage"
+      class="flex items-center justify-between px-3 py-1.5 text-xs text-n-brand border-b border-n-slate-5"
+    >
+      <span class="flex items-center gap-1">
+        <Icon icon="i-lucide-pencil" class="size-3" />
+        {{ t('INTERNAL_CHAT.MESSAGE.EDITING') }}
+      </span>
+      <button class="text-n-slate-11 hover:text-n-slate-12" @click="cancelEdit">
+        <Icon icon="i-lucide-x" class="size-3.5" />
+      </button>
+    </div>
+    <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"
     >
-      <textarea
-        ref="textareaRef"
-        v-model="messageContent"
-        :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
-        :disabled="disabled"
-        rows="1"
-        class="flex-1 resize-none bg-transparent text-sm text-n-slate-12 placeholder-n-slate-10 outline-none"
-        @keydown="handleKeyDown"
-        @input="handleInput"
-      />
+      <div class="flex-1">
+        <div class="flex items-center gap-0.5 px-1 pb-1">
+          <button
+            type="button"
+            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+            :title="t('INTERNAL_CHAT.MESSAGE.BOLD')"
+            @click="wrapSelection('**')"
+          >
+            <Icon icon="i-lucide-bold" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+            :title="t('INTERNAL_CHAT.MESSAGE.ITALIC')"
+            @click="wrapSelection('*')"
+          >
+            <Icon icon="i-lucide-italic" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+            :title="t('INTERNAL_CHAT.MESSAGE.CODE')"
+            @click="wrapSelection('`')"
+          >
+            <Icon icon="i-lucide-code" class="size-3.5" />
+          </button>
+        </div>
+        <textarea
+          ref="textareaRef"
+          v-model="messageContent"
+          :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
+          :disabled="disabled"
+          rows="1"
+          class="w-full resize-none bg-transparent text-sm text-n-slate-12 placeholder-n-slate-10 outline-none"
+          @keydown="handleKeyDown"
+          @input="handleInput"
+        />
+      </div>
       <button
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :disabled="disabled"

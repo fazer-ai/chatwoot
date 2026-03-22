@@ -133,6 +133,18 @@ export const actions = {
     }
   },
 
+  createCategory: async ({ commit }, categoryData) => {
+    try {
+      const response =
+        await InternalChatChannelsAPI.createCategory(categoryData);
+      commit('ADD_CATEGORY', response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    }
+  },
+
   setActiveChannel: ({ commit }, channelId) => {
     commit('SET_ACTIVE_CHANNEL', channelId);
   },

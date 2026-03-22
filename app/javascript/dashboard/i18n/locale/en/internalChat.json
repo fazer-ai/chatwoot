@@ -16,6 +16,7 @@
       "PRIVATE": "Private",
       "MEMBERS": "Members",
       "ARCHIVE": "Archive Channel",
+      "UNARCHIVE": "Unarchive Channel",
       "DELETE": "Delete Channel",
       "MUTE": "Mute Channel",
       "UNMUTE": "Unmute Channel",
@@ -25,7 +26,15 @@
       "NO_MESSAGES": "No messages yet. Start the conversation!",
       "ARCHIVED": "This channel is archived",
       "MEMBER_COUNT": "{count} member | {count} members",
-      "SETTINGS": "Channel settings"
+      "SETTINGS": "Channel settings",
+      "INFO": "Channel Info",
+      "CREATED_AT": "Created",
+      "CONFIRM_DELETE": "Are you sure you want to delete this channel?",
+      "ACTIONS": "Actions",
+      "CREATED": "Channel created successfully",
+      "ADMIN": "Admin",
+      "YOU": "(you)",
+      "NO_MEMBERS": "No members"
     },
     "MESSAGE": {
       "PLACEHOLDER": "Type a message...",
@@ -37,7 +46,12 @@
       "DELETED": "This message was deleted",
       "SEND": "Send",
       "UPLOAD_FILE": "Upload File",
-      "CONFIRM_DELETE": "Are you sure you want to delete this message?"
+      "CONFIRM_DELETE": "Are you sure you want to delete this message?",
+      "EDITING": "Editing message",
+      "CANCEL_EDIT": "Cancel editing",
+      "BOLD": "Bold",
+      "ITALIC": "Italic",
+      "CODE": "Code"
     },
     "THREAD": {
       "TITLE": "Thread",
@@ -79,6 +93,12 @@
     "DM": {
       "NEW": "New Direct Message",
       "SELECT_AGENTS": "Select agents"
+    },
+    "CATEGORY": {
+      "CREATE": "Create Category",
+      "NAME": "Category Name",
+      "NAME_PLACEHOLDER": "Enter category name",
+      "CREATED": "Category created successfully"
     },
     "ERRORS": {
       "FETCH_CHANNELS": "Failed to load channels",

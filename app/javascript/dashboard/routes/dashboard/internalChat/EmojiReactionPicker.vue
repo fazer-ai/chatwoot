@@ -3,7 +3,18 @@ import { ref } from 'vue';
 import { vOnClickOutside } from '@vueuse/components';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 
-const emit = defineEmits(['select', 'close']);
+const props = defineProps({
+  reactions: {
+    type: Array,
+    default: () => [],
+  },
+  currentUserId: {
+    type: Number,
+    default: null,
+  },
+});
+
+const emit = defineEmits(['select', 'remove', 'close']);
 
 const QUICK_EMOJIS = [
   { emoji: '\uD83D\uDC4D', label: 'thumbs up' },
@@ -23,7 +34,14 @@ function toggle() {
 }
 
 function selectEmoji(emoji) {
-  emit('select', emoji);
+  const existingReaction = props.reactions.find(
+    r => r.emoji === emoji && r.user_id === props.currentUserId
+  );
+  if (existingReaction) {
+    emit('remove', existingReaction.id);
+  } else {
+    emit('select', emoji);
+  }
   isOpen.value = false;
 }
 
