@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 
@@ -18,8 +18,21 @@ const emit = defineEmits(['vote', 'unvote']);
 
 const { t } = useI18n();
 
+const now = ref(new Date());
+let timerInterval = null;
+
+onMounted(() => {
+  timerInterval = setInterval(() => {
+    now.value = new Date();
+  }, 60000);
+});
+
+onBeforeUnmount(() => {
+  if (timerInterval) clearInterval(timerInterval);
+});
+
 const pollData = computed(() => {
-  return props.message.poll || props.message.content_attributes?.poll || {};
+  return props.message.content_attributes?.poll || props.message.poll || {};
 });
 
 const pollItems = computed(() => {
@@ -37,16 +50,36 @@ const isPublicResults = computed(() => {
 const isExpired = computed(() => {
   const expiresAt = pollData.value.expires_at;
   if (!expiresAt) return false;
-  return new Date(expiresAt) < new Date();
+  return new Date(expiresAt) < now.value;
+});
+
+const timeRemaining = computed(() => {
+  const expiresAt = pollData.value.expires_at;
+  if (!expiresAt) return '';
+  const diff = new Date(expiresAt) - now.value;
+  if (diff <= 0) return '';
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d left`;
+  }
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
 });
 
 const totalVotes = computed(() => {
-  return pollItems.value.reduce((sum, item) => {
-    return sum + (item.votes_count || 0);
-  }, 0);
+  return pollItems.value.reduce(
+    (sum, item) => sum + (item.votes_count || 0),
+    0
+  );
 });
 
 const canSeeResults = computed(() => {
+  return isPublicResults.value || props.isAdmin;
+});
+
+const canSeeVoters = computed(() => {
   return isPublicResults.value || props.isAdmin;
 });
 
@@ -59,12 +92,17 @@ function hasAnyVote() {
 }
 
 const shouldShowResults = computed(() => {
-  return hasAnyVote() || isPublicResults.value || isExpired.value;
+  return hasAnyVote() || isExpired.value;
 });
 
 function votePercentage(item) {
   if (totalVotes.value === 0) return 0;
   return Math.round(((item.votes_count || 0) / totalVotes.value) * 100);
+}
+
+function voterNames(item) {
+  if (!item.voters || !item.voters.length) return '';
+  return item.voters.map(v => v.name).join(', ');
 }
 
 function handleVote(item) {
@@ -90,21 +128,31 @@ function handleVote(item) {
       >
         {{ t('INTERNAL_CHAT.POLL.EXPIRED') }}
       </span>
+      <span
+        v-else-if="timeRemaining"
+        class="ml-2 flex-shrink-0 flex items-center gap-1 text-xs text-n-slate-10"
+      >
+        <Icon icon="i-lucide-clock" class="size-3" />
+        {{ timeRemaining }}
+      </span>
     </div>
 
     <div class="space-y-2">
-      <button
+      <component
+        :is="isExpired ? 'div' : 'button'"
         v-for="item in pollItems"
         :key="item.id"
         class="group relative w-full overflow-hidden rounded-lg border p-2.5 text-left text-sm transition-colors"
         :class="[
           hasUserVoted(item)
             ? 'border-n-brand bg-n-brand/5'
-            : 'border-n-slate-6 hover:border-n-slate-8',
-          isExpired ? 'cursor-default' : 'cursor-pointer',
+            : 'border-n-slate-6',
+          isExpired
+            ? 'cursor-default'
+            : 'cursor-pointer hover:border-n-slate-8',
         ]"
-        :disabled="isExpired"
-        @click="handleVote(item)"
+        v-bind="isExpired ? {} : { type: 'button' }"
+        @click="!isExpired && handleVote(item)"
       >
         <div
           v-if="shouldShowResults && canSeeResults"
@@ -132,7 +180,13 @@ function handleVote(item) {
             }}
           </span>
         </div>
-      </button>
+        <div
+          v-if="canSeeVoters && voterNames(item)"
+          class="relative mt-1 text-xs text-n-slate-9"
+        >
+          {{ voterNames(item) }}
+        </div>
+      </component>
     </div>
 
     <div class="mt-2 flex items-center gap-2 text-xs text-n-slate-10">

@@ -330,7 +330,8 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     members = channel.channel_members.includes(:user).load
     membership = members.detect { |member| member.user_id == Current.user.id }
     recent_messages = channel.messages
-                             .includes(:sender, :reactions, :replies, :poll, attachments: { file_attachment: :blob })
+                             .includes(:sender, :reactions, :replies, { poll: { options: { votes: :user } } },
+                                       attachments: { file_attachment: :blob })
                              .recent.limit(RECENT_MESSAGES_LIMIT).reverse
 
     channel_base_response(channel).merge(
@@ -358,13 +359,15 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     }
   end
 
-  def message_response(message)
+  def message_response(message) # rubocop:disable Metrics/CyclomaticComplexity
     deleted = message.content_attributes&.dig('deleted')
+    attrs = message.content_attributes || {}
+    attrs = attrs.merge(poll: poll_response_for(message.poll)) if message.poll.present?
     {
       id: message.id,
       content: message.content,
       content_type: message.content_type,
-      content_attributes: message.content_attributes,
+      content_attributes: attrs,
       sender: message.sender&.push_event_data,
       parent_id: message.parent_id,
       echo_id: message.echo_id,
@@ -374,6 +377,33 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       reactions: reaction_responses(message),
       attachments: deleted ? [] : message.attachments.map { |a| attachment_response(a) }
     }
+  end
+
+  def poll_response_for(poll)
+    {
+      id: poll.id,
+      question: poll.question,
+      multiple_choice: poll.multiple_choice,
+      public_results: poll.public_results,
+      allow_revote: poll.allow_revote,
+      expires_at: poll.expires_at,
+      internal_chat_message_id: poll.internal_chat_message_id,
+      options: poll.options.ordered.includes(votes: :user).map { |opt| poll_option_response(opt, poll) },
+      total_votes: poll.total_votes_count,
+      created_at: poll.created_at,
+      updated_at: poll.updated_at
+    }
+  end
+
+  def poll_option_response(option, poll)
+    response = {
+      id: option.id,
+      text: option.text,
+      votes_count: option.votes.size,
+      voted: option.votes.any? { |v| v.user_id == Current.user.id }
+    }
+    response[:voters] = option.votes.map { |v| { id: v.user_id, name: v.user.name } } if poll.public_results
+    response
   end
 
   def reaction_responses(message)
