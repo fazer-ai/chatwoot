@@ -93,11 +93,7 @@ const canDelete = computed(() => {
 });
 
 const canPin = computed(() => {
-  return (
-    (isOwnMessage.value || props.isAdmin) &&
-    !isDeleted.value &&
-    !props.message.parent_id
-  );
+  return !isDeleted.value && !props.message.parent_id;
 });
 
 const messageContent = computed(() => {
