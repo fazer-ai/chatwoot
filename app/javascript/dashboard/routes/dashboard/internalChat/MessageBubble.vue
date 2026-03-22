@@ -117,6 +117,16 @@ const reactions = computed(() => {
   return props.message.reactions || [];
 });
 
+function attachmentFileName(attachment) {
+  if (attachment.file_url) {
+    const url = attachment.file_url.split('?')[0];
+    const name = decodeURIComponent(url.split('/').pop());
+    if (name && name !== 'null') return name;
+  }
+  const ext = attachment.extension ? `.${attachment.extension}` : '';
+  return `${attachment.file_type || 'file'}${ext}`;
+}
+
 const attachments = computed(() => {
   if (isDeleted.value) return [];
   return props.message.attachments || [];
@@ -258,7 +268,7 @@ function handleUnvote(payload) {
           >
             <Icon icon="i-lucide-paperclip" class="size-3.5 text-n-slate-10" />
             <span class="max-w-48 truncate">
-              {{ attachment.file_url?.split('/').pop() || 'File' }}
+              {{ attachmentFileName(attachment) }}
             </span>
           </a>
         </template>

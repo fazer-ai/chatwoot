@@ -123,14 +123,14 @@ class InternalChatListener < BaseListener
     data
   end
 
-  def base_message_data(message) # rubocop:disable Metrics/AbcSize
+  def base_message_data(message)
     {
       id: message.id, content: message.content, content_type: message.content_type,
       content_attributes: message.content_attributes, internal_chat_channel_id: message.internal_chat_channel_id,
       sender: message.sender.push_event_data, parent_id: message.parent_id, echo_id: message.echo_id,
       replies_count: message.replies.size, created_at: message.created_at, updated_at: message.updated_at,
       reactions: message.reactions.includes(:user).map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id, user: { name: r.user&.name } } },
-      attachments: message.attachments.map { |a| { id: a.id, file_type: a.file_type, external_url: a.external_url, extension: a.extension } }
+      attachments: message.attachments.map { |a| attachment_event_data(a) }
     }
   end
 
@@ -161,6 +161,16 @@ class InternalChatListener < BaseListener
     }
     data[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
     data
+  end
+
+  def attachment_event_data(attachment)
+    {
+      id: attachment.id,
+      file_type: attachment.file_type,
+      external_url: attachment.external_url,
+      extension: attachment.extension,
+      file_url: attachment.file.attached? ? Rails.application.routes.url_helpers.url_for(attachment.file) : nil
+    }
   end
 
   def reaction_event_data(reaction)
