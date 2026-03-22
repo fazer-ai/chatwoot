@@ -113,7 +113,7 @@ function deleteDraftForChannel() {
   }
 }
 
-async function handleSend(content) {
+async function handleSend(content, options = {}) {
   try {
     if (editingMessage.value) {
       await store.dispatch('internalChat/messages/updateMessage', {
@@ -126,11 +126,11 @@ async function handleSend(content) {
       await store.dispatch('internalChat/messages/sendMessage', {
         channelId: props.channelId,
         data: { content },
+        files: options.files || [],
       });
       markRead();
       deleteDraftForChannel();
     }
-    // Editor refocuses itself after send
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }

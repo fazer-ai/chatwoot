@@ -10,8 +10,18 @@ class InternalChatMessagesAPI extends ApiClient {
     return axios.get(`${this.url}/${channelId}/messages`, { params });
   }
 
-  createMessage(channelId, data) {
-    return axios.post(`${this.url}/${channelId}/messages`, data);
+  createMessage(channelId, data, files = []) {
+    if (files.length === 0) {
+      return axios.post(`${this.url}/${channelId}/messages`, data);
+    }
+    const formData = new FormData();
+    if (data.content) formData.append('content', data.content);
+    if (data.parent_id) formData.append('parent_id', data.parent_id);
+    if (data.echo_id) formData.append('echo_id', data.echo_id);
+    files.forEach(file => {
+      formData.append('attachments[][file]', file);
+    });
+    return axios.post(`${this.url}/${channelId}/messages`, formData);
   }
 
   updateMessage(channelId, messageId, data) {

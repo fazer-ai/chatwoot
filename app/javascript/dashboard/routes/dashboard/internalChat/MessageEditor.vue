@@ -44,16 +44,22 @@ const alsoSendInChannel = ref(false);
 const { t } = useI18n();
 
 const editorRef = ref(null);
+const fileInputRef = ref(null);
 const editorContent = ref(props.initialContent);
+const attachedFiles = ref([]);
 
 let draftTimer = null;
 
 const canSend = computed(() => {
-  return editorContent.value.trim().length > 0 && !props.disabled;
+  return (
+    (editorContent.value.trim().length > 0 || attachedFiles.value.length > 0) &&
+    !props.disabled
+  );
 });
 
 function cancelEdit() {
   editorContent.value = '';
+  attachedFiles.value = [];
   emit('cancelEdit');
 }
 
@@ -81,13 +87,18 @@ function focusEditor() {
 function handleSend() {
   if (!canSend.value) return;
   const content = editorContent.value.trim();
+  const files = [...attachedFiles.value];
   editorContent.value = '';
+  attachedFiles.value = [];
   if (draftTimer) {
     clearTimeout(draftTimer);
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  emit('send', content, { alsoSendInChannel: alsoSendInChannel.value });
+  emit('send', content, {
+    alsoSendInChannel: alsoSendInChannel.value,
+    files,
+  });
   setTimeout(() => focusEditor(), 200);
 }
 
@@ -105,6 +116,20 @@ function handleKeyDown(event) {
 
 function handleTypingOn() {
   emit('typing');
+}
+
+function openFilePicker() {
+  fileInputRef.value?.click();
+}
+
+function handleFileChange(event) {
+  const files = Array.from(event.target.files || []);
+  attachedFiles.value = [...attachedFiles.value, ...files];
+  if (fileInputRef.value) fileInputRef.value.value = '';
+}
+
+function removeFile(index) {
+  attachedFiles.value.splice(index, 1);
 }
 
 function focus() {
@@ -133,7 +158,7 @@ defineExpose({ focus, setContent, getContent });
   <div class="border-t border-n-slate-5 bg-n-solid-2 px-4 py-3">
     <div
       v-if="editingMessage"
-      class="flex items-center justify-between px-3 py-1.5 text-xs text-n-brand border-b border-n-slate-5"
+      class="flex items-center justify-between border-b border-n-slate-5 px-3 py-1.5 text-xs text-n-brand"
     >
       <span class="flex items-center gap-1">
         <Icon icon="i-lucide-pencil" class="size-3" />
@@ -154,6 +179,24 @@ defineExpose({ focus, setContent, getContent });
       />
       {{ t('INTERNAL_CHAT.THREAD.ALSO_SEND_IN_CHANNEL') }}
     </label>
+    <!-- Attached files preview -->
+    <div v-if="attachedFiles.length" class="mb-1 flex flex-wrap gap-1 px-1">
+      <div
+        v-for="(file, index) in attachedFiles"
+        :key="index"
+        class="flex items-center gap-1 rounded bg-n-alpha-2 px-2 py-1 text-xs text-n-slate-12"
+      >
+        <Icon icon="i-lucide-paperclip" class="size-3 text-n-slate-10" />
+        <span class="max-w-32 truncate">{{ file.name }}</span>
+        <button
+          type="button"
+          class="flex-shrink-0 text-n-slate-9 hover:text-n-ruby-11"
+          @click="removeFile(index)"
+        >
+          <Icon icon="i-lucide-x" class="size-3" />
+        </button>
+      </div>
+    </div>
     <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"
       @keydown.capture="handleKeyDown"
@@ -174,8 +217,24 @@ defineExpose({ focus, setContent, getContent });
           @typing-on="handleTypingOn"
         />
       </div>
+      <input
+        ref="fileInputRef"
+        type="file"
+        multiple
+        class="hidden"
+        @change="handleFileChange"
+      />
+      <button
+        type="button"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        :title="t('INTERNAL_CHAT.MESSAGE.UPLOAD_FILE')"
+        @click="openFilePicker"
+      >
+        <Icon icon="i-lucide-paperclip" class="size-4" />
+      </button>
       <button
         v-if="showPoll"
+        type="button"
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.POLL.CREATE')"
         @click="emit('create-poll')"
@@ -183,6 +242,7 @@ defineExpose({ focus, setContent, getContent });
         <Icon icon="i-lucide-bar-chart-2" class="size-4" />
       </button>
       <button
+        type="button"
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 transition-colors"
         :class="
           canSend

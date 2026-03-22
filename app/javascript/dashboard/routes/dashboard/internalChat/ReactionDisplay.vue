@@ -85,38 +85,31 @@ function handleRemove(reactionId) {
     <div
       v-if="showPopover"
       v-on-click-outside="closePopover"
-      class="absolute bottom-full left-0 z-50 mb-1 min-w-48 max-w-64 rounded-lg border border-n-slate-6 bg-n-solid-2 p-3 shadow-lg"
+      class="absolute bottom-full left-0 z-50 mb-1 min-w-48 rounded-lg border border-n-slate-6 bg-n-solid-2 p-2 shadow-lg"
     >
       <div
-        v-for="group in groupedReactions"
+        v-for="(group, groupIdx) in groupedReactions"
         :key="group.emoji"
-        class="mb-2 last:mb-0"
+        :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
       >
-        <div class="mb-1 flex items-center gap-1.5">
-          <span class="text-base">{{ group.emoji }}</span>
-          <span class="text-xs font-medium text-n-slate-10">
-            {{ group.count }}
+        <div
+          v-for="user in group.users"
+          :key="user.reactionId"
+          class="flex h-7 items-center gap-2 rounded px-1"
+        >
+          <span class="w-5 text-center text-sm">{{ group.emoji }}</span>
+          <span class="flex-1 truncate text-xs text-n-slate-12">
+            {{ user.name }}
           </span>
-        </div>
-        <div class="space-y-0.5 pl-1">
-          <div
-            v-for="user in group.users"
-            :key="user.reactionId"
-            class="flex items-center justify-between gap-2"
+          <button
+            v-if="user.id === currentUserId"
+            type="button"
+            class="flex size-5 flex-shrink-0 items-center justify-center rounded text-n-slate-9 hover:bg-n-ruby-3 hover:text-n-ruby-11"
+            :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
+            @click.stop="handleRemove(user.reactionId)"
           >
-            <span class="truncate text-xs text-n-slate-12">
-              {{ user.name }}
-            </span>
-            <button
-              v-if="user.id === currentUserId"
-              type="button"
-              class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:bg-n-ruby-3 hover:text-n-ruby-11"
-              :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
-              @click.stop="handleRemove(user.reactionId)"
-            >
-              <Icon icon="i-lucide-x" class="size-3" />
-            </button>
-          </div>
+            <Icon icon="i-lucide-x" class="size-3" />
+          </button>
         </div>
       </div>
     </div>

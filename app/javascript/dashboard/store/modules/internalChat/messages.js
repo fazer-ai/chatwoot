@@ -54,12 +54,13 @@ const actions = {
     }
   },
 
-  sendMessage: async ({ commit }, { channelId, data }) => {
+  sendMessage: async ({ commit }, { channelId, data, files = [] }) => {
     commit('SET_UI_FLAG', { isSending: true });
     try {
       const response = await InternalChatMessagesAPI.createMessage(
         channelId,
-        data
+        data,
+        files
       );
       commit('ADD_MESSAGE', { channelId, message: response.data });
       return response.data;
