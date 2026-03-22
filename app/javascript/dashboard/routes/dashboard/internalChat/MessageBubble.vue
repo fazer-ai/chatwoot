@@ -231,7 +231,6 @@ function handleUnvote(payload) {
       <ReactionDisplay
         :reactions="reactions"
         :current-user-id="currentUserId"
-        @add="handleAddReaction"
         @remove="handleRemoveReaction"
       />
 
