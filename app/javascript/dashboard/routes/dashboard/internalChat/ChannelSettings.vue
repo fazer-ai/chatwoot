@@ -29,6 +29,9 @@ const store = useStore();
 const { t } = useI18n();
 
 const isDM = computed(() => props.channel.channel_type === 'dm');
+const isPrivate = computed(
+  () => props.channel.channel_type === 'private_channel'
+);
 
 const showDeleteConfirm = ref(false);
 const members = ref([]);
@@ -209,7 +212,7 @@ function handleDelete() {
               {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
             </span>
             <button
-              v-if="isAdmin && !isDM && member.user_id !== currentUserId"
+              v-if="isAdmin && isPrivate && member.user_id !== currentUserId"
               type="button"
               class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:bg-n-alpha-2 hover:text-n-ruby-11"
               @click="removeMember(member.id)"
@@ -222,7 +225,7 @@ function handleDelete() {
           </div>
         </div>
         <button
-          v-if="isAdmin && !isDM"
+          v-if="isAdmin && isPrivate"
           type="button"
           class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-n-slate-6 px-3 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-2"
           @click="emit('edit-members')"

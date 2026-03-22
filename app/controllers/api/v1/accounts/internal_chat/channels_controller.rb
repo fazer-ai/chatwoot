@@ -371,9 +371,15 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       replies_count: message.respond_to?(:replies) ? message.replies.size : 0,
       created_at: message.created_at,
       updated_at: message.updated_at,
-      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
+      reactions: reaction_responses(message),
       attachments: deleted ? [] : message.attachments.map { |a| attachment_response(a) }
     }
+  end
+
+  def reaction_responses(message)
+    message.reactions.includes(:user).map do |r|
+      { id: r.id, emoji: r.emoji, user_id: r.user_id, user: { name: r.user&.name } }
+    end
   end
 
   def attachment_response(attachment)

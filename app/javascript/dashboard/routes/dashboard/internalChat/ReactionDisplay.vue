@@ -54,6 +54,12 @@ function handleClick(group) {
           ? 'border-n-brand bg-n-alpha-2 text-n-brand'
           : 'border-n-slate-6 bg-n-alpha-1 text-n-slate-12 hover:bg-n-alpha-2'
       "
+      :title="
+        group.users
+          .map(u => u?.name || '')
+          .filter(Boolean)
+          .join(', ')
+      "
       @click="handleClick(group)"
     >
       <span>{{ group.emoji }}</span>
