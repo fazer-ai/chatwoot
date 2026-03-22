@@ -52,7 +52,9 @@ function getChannelName(draft) {
     const otherMember = (channel.members || []).find(
       m => m.user_id !== currentUserId.value
     );
-    return otherMember?.name || channel.name || 'Direct Message';
+    return (
+      otherMember?.name || channel.name || t('INTERNAL_CHAT.DIRECT_MESSAGES')
+    );
   }
   return (
     channel.name ||

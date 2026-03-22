@@ -93,7 +93,9 @@ function handleDelete() {
         {{ t('INTERNAL_CHAT.CHANNEL.SETTINGS') }}
       </h3>
       <button
+        type="button"
         class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+        :aria-label="t('INTERNAL_CHAT.THREAD.CLOSE')"
         @click="emit('close')"
       >
         <Icon icon="i-lucide-x" class="size-4" />
@@ -174,6 +176,7 @@ function handleDelete() {
         </h4>
         <div class="space-y-1">
           <button
+            type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
             @click="handleMuteToggle"
           >
@@ -189,6 +192,7 @@ function handleDelete() {
           </button>
 
           <button
+            type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
             @click="handleFavoriteToggle"
           >
@@ -205,6 +209,7 @@ function handleDelete() {
 
           <button
             v-if="isAdmin"
+            type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
             @click="handleArchiveToggle"
           >
@@ -223,6 +228,7 @@ function handleDelete() {
 
           <button
             v-if="isAdmin"
+            type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-ruby-11 hover:bg-n-ruby-3"
             @click="handleDelete"
           >
@@ -239,12 +245,14 @@ function handleDelete() {
             </p>
             <div class="flex gap-2">
               <button
+                type="button"
                 class="rounded-lg bg-n-ruby-9 px-3 py-1.5 text-sm font-medium text-white hover:bg-n-ruby-10"
                 @click="handleDelete"
               >
                 {{ t('INTERNAL_CHAT.CHANNEL.DELETE') }}
               </button>
               <button
+                type="button"
                 class="rounded-lg px-3 py-1.5 text-sm text-n-slate-11 hover:bg-n-alpha-2"
                 @click="showDeleteConfirm = false"
               >

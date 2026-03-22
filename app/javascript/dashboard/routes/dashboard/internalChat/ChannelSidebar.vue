@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { useStore } from 'dashboard/composables/store';
+import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import CreateChannelModal from './CreateChannelModal.vue';
@@ -12,6 +12,9 @@ const store = useStore();
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+
+const currentRole = useMapGetter('getCurrentRole');
+const isAdmin = computed(() => currentRole.value === 'administrator');
 
 const searchQuery = ref('');
 const showCategoryInput = ref(false);
@@ -276,7 +279,7 @@ async function submitCategory() {
       </div>
 
       <!-- Create Category -->
-      <div class="mb-3 px-2">
+      <div v-if="isAdmin" class="mb-3 px-2">
         <button
           class="flex items-center gap-1 text-xs text-n-slate-10 hover:text-n-slate-12 transition-colors"
           @click="toggleCategoryInput"
@@ -310,6 +313,7 @@ async function submitCategory() {
             {{ t('INTERNAL_CHAT.CHANNELS') }}
           </span>
           <button
+            v-if="isAdmin"
             class="text-n-slate-10 hover:text-n-slate-12 transition-colors"
             @click="openCreateChannel"
           >
@@ -354,6 +358,7 @@ async function submitCategory() {
             {{ t('INTERNAL_CHAT.DIRECT_MESSAGES') }}
           </span>
           <button
+            v-if="isAdmin"
             class="text-n-slate-10 hover:text-n-slate-12 transition-colors"
             @click="openCreateDM"
           >

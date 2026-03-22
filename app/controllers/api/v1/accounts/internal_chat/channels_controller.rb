@@ -230,7 +230,9 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   def create_dm_with_lock
     lock_key = "internal_chat_dm_#{Current.account.id}_#{dm_member_ids.sort.join('_')}"
     ActiveRecord::Base.transaction do
-      ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(#{Zlib.crc32(lock_key)})")
+      ActiveRecord::Base.connection.execute(
+        ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_xact_lock(?)', Zlib.crc32(lock_key)])
+      )
       existing = find_existing_dm(dm_member_ids)
       if existing
         @channel = existing

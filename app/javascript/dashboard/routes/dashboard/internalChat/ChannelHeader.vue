@@ -112,9 +112,10 @@ const pinnedCountLabel = computed(() => {
     </div>
 
     <!-- Pinned message banner -->
-    <div
+    <button
       v-if="pinnedMessages.length > 0"
-      class="flex items-center gap-2 border-b border-n-slate-5 bg-n-amber-2 px-4 py-2 cursor-pointer hover:bg-n-amber-3 transition-colors"
+      type="button"
+      class="flex w-full items-center gap-2 border-b border-n-slate-5 bg-n-amber-2 px-4 py-2 cursor-pointer hover:bg-n-amber-3 transition-colors"
       @click="emit('scrollToPinned', pinnedMessages[0])"
     >
       <Icon
@@ -130,6 +131,6 @@ const pinnedCountLabel = computed(() => {
       <span class="truncate text-xs text-n-slate-12">
         {{ pinnedContent }}
       </span>
-    </div>
+    </button>
   </div>
 </template>
