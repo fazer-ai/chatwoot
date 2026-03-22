@@ -111,8 +111,9 @@ defineExpose({ open });
           v-model="categoryId"
           class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2 text-sm text-n-slate-12 outline-none focus:border-n-brand"
         >
-          <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
-          <option value="">--</option>
+          <option value="">
+            {{ t('INTERNAL_CHAT.CATEGORY.NONE') }}
+          </option>
           <option v-for="cat in categories" :key="cat.id" :value="cat.id">
             {{ cat.name }}
           </option>

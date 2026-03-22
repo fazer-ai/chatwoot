@@ -100,7 +100,7 @@ function handleSend() {
 }
 
 function handleKeyDown(event) {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
     handleSend();
   }

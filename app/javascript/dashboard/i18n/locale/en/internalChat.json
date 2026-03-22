@@ -98,6 +98,7 @@
       "CREATE": "Create Category",
       "NAME": "Category Name",
       "NAME_PLACEHOLDER": "Enter category name",
+      "NONE": "None",
       "CREATED": "Category created successfully"
     },
     "ERRORS": {

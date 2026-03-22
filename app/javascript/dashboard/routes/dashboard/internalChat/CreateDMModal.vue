@@ -50,7 +50,7 @@ async function handleConfirm() {
   isCreating.value = true;
   try {
     const result = await store.dispatch('internalChat/create', {
-      channel_type: 'dm',
+      channel: { channel_type: 'dm' },
       member_ids: [selectedAgentId.value],
     });
     dialogRef.value?.close();
