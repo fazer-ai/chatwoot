@@ -164,10 +164,10 @@ defineExpose({ open });
             <button
               v-if="options.length > 2"
               type="button"
-              class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
+              class="flex-shrink-0 flex items-center justify-center rounded p-1.5 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
               @click="removeOption(index)"
             >
-              <Icon icon="i-lucide-x" class="size-4" />
+              <Icon icon="i-lucide-x" class="size-3.5" />
             </button>
           </div>
         </div>
