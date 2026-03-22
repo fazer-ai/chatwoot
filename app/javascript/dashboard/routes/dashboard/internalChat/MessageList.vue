@@ -102,7 +102,9 @@ function scrollToMessage(messageId) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('bg-n-amber-2');
     setTimeout(() => el.classList.remove('bg-n-amber-2'), 2000);
+    return true;
   }
+  return false;
 }
 
 function handleScroll() {

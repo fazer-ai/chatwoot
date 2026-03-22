@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import InternalChatChannelsAPI from 'dashboard/api/internalChatChannels';
@@ -21,6 +22,8 @@ const props = defineProps({
 
 const store = useStore();
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 
 const typingUsers = computed(() => {
   return (
@@ -362,10 +365,27 @@ watch(
   }
 );
 
-onMounted(() => {
-  fetchMessages();
+async function scrollToLinkedMessage() {
+  const { messageId } = route.query;
+  if (!messageId) return;
+
+  await nextTick();
+  const scrolled = messageListRef.value?.scrollToMessage(Number(messageId));
+  if (!scrolled) {
+    // Message not in DOM yet, wait a bit for render
+    setTimeout(() => {
+      messageListRef.value?.scrollToMessage(Number(messageId));
+    }, 500);
+  }
+  // Clean the query param
+  router.replace({ query: {} });
+}
+
+onMounted(async () => {
+  await fetchMessages();
   markRead();
   loadDraft();
+  scrollToLinkedMessage();
 });
 </script>
 
