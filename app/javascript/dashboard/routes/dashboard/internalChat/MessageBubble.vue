@@ -93,7 +93,7 @@ const canDelete = computed(() => {
 });
 
 const canPin = computed(() => {
-  return !isDeleted.value && !props.message.parent_id;
+  return !isDeleted.value;
 });
 
 const messageContent = computed(() => {
@@ -210,6 +210,14 @@ function handleUnvote(payload) {
         >
           <Icon icon="i-lucide-pin" class="size-3" />
         </span>
+        <button
+          v-if="message.parent_id"
+          class="flex items-center gap-1 text-xs text-n-brand hover:underline"
+          @click="emit('openThread', { id: message.parent_id })"
+        >
+          <Icon icon="i-lucide-message-square" class="size-3" />
+          {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
+        </button>
       </div>
 
       <!-- Poll content -->
