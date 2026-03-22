@@ -114,7 +114,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
     params.permit(:content)
   end
 
-  def message_response(message) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+  def message_response(message) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     deleted = message.content_attributes&.dig('deleted')
     response = {
       id: message.id,
@@ -128,7 +128,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       replies_count: message.replies.size,
       created_at: message.created_at,
       updated_at: message.updated_at,
-      reactions: message.reactions.map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id } },
+      reactions: message.reactions.includes(:user).map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id, user: { name: r.user&.name } } },
       attachments: deleted ? [] : message.attachments.map { |a| attachment_response(a) }
     }
     response[:poll] = poll_data(message.poll) if !deleted && message.poll?

@@ -117,6 +117,11 @@ const reactions = computed(() => {
   return props.message.reactions || [];
 });
 
+const attachments = computed(() => {
+  if (isDeleted.value) return [];
+  return props.message.attachments || [];
+});
+
 const deleteDialogRef = ref(null);
 
 function handleEdit() {
@@ -226,6 +231,23 @@ function handleUnvote(payload) {
           v-dompurify-html="renderedContent"
           class="prose prose-bubble"
         />
+      </div>
+
+      <!-- Attachments -->
+      <div v-if="attachments.length" class="mt-1.5 flex flex-wrap gap-2">
+        <a
+          v-for="attachment in attachments"
+          :key="attachment.id"
+          :href="attachment.file_url || attachment.external_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center gap-1.5 rounded-lg border border-n-slate-6 bg-n-alpha-1 px-2.5 py-1.5 text-xs text-n-slate-12 hover:bg-n-alpha-2"
+        >
+          <Icon icon="i-lucide-paperclip" class="size-3.5 text-n-slate-10" />
+          <span class="max-w-48 truncate">
+            {{ attachment.file_url?.split('/').pop() || 'File' }}
+          </span>
+        </a>
       </div>
 
       <ReactionDisplay

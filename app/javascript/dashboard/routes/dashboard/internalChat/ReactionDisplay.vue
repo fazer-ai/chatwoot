@@ -104,7 +104,7 @@ function handleRemove(reactionId) {
           <button
             v-if="user.id === currentUserId"
             type="button"
-            class="flex size-5 flex-shrink-0 items-center justify-center rounded text-n-slate-9 hover:bg-n-ruby-3 hover:text-n-ruby-11"
+            class="flex size-5 flex-shrink-0 items-center justify-center rounded bg-n-alpha-2 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
             :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
             @click.stop="handleRemove(user.reactionId)"
           >
