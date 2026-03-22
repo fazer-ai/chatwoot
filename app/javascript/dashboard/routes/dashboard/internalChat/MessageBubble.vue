@@ -3,6 +3,8 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
 import MessageFormatter from 'shared/helpers/MessageFormatter';
+import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import { useAlert } from 'dashboard/composables';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -146,6 +148,20 @@ function handlePin() {
   }
 }
 
+function handleCopyLink() {
+  const accountId = window.location.pathname.match(
+    /\/app\/accounts\/(\d+)/
+  )?.[1];
+  const channelId = window.location.pathname.match(
+    /\/internal-chat\/(\d+)/
+  )?.[1];
+  if (accountId && channelId) {
+    const url = `${window.chatwootConfig.hostURL}/app/accounts/${accountId}/internal-chat/${channelId}?messageId=${props.message.id}`;
+    copyTextToClipboard(url);
+    useAlert(t('INTERNAL_CHAT.MESSAGE.LINK_COPIED'));
+  }
+}
+
 function handleAddReaction(emoji) {
   emit('addReaction', { messageId: props.message.id, emoji });
 }
@@ -251,6 +267,13 @@ function handleUnvote(payload) {
         @click="handleReply"
       >
         <Icon icon="i-lucide-reply" class="size-4" />
+      </button>
+      <button
+        class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
+        :title="t('INTERNAL_CHAT.MESSAGE.COPY_LINK')"
+        @click="handleCopyLink"
+      >
+        <Icon icon="i-lucide-link" class="size-4" />
       </button>
       <button
         v-if="canPin"

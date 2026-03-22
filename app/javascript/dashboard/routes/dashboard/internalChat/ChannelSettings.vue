@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'dashboard/composables/store';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import InternalChatChannelsAPI from 'dashboard/api/internalChatChannels';
@@ -22,11 +23,27 @@ const emit = defineEmits([
   'unfavorite',
 ]);
 
+const store = useStore();
 const { t } = useI18n();
 
 const showDeleteConfirm = ref(false);
 const members = ref([]);
 const isLoadingMembers = ref(false);
+const memberSearch = ref('');
+
+const allAgents = computed(
+  () => store.getters['agents/getVerifiedAgents'] || []
+);
+
+const filteredAgentsToAdd = computed(() => {
+  const memberUserIds = new Set(members.value.map(m => m.user_id));
+  const query = memberSearch.value.toLowerCase();
+  return allAgents.value.filter(agent => {
+    if (memberUserIds.has(agent.id)) return false;
+    if (!query) return true;
+    return agent.name?.toLowerCase().includes(query);
+  });
+});
 
 async function fetchMembers() {
   if (!props.channel.id) return;
@@ -35,6 +52,11 @@ async function fetchMembers() {
   try {
     const { data } = await InternalChatChannelsAPI.getMembers(props.channel.id);
     members.value = data;
+    // Update the store so mute/favorite actions can find the member
+    store.commit('internalChat/UPDATE_CHANNEL', {
+      id: props.channel.id,
+      members: data,
+    });
   } catch {
     // silently handle
   } finally {
@@ -42,7 +64,29 @@ async function fetchMembers() {
   }
 }
 
-onMounted(fetchMembers);
+async function addMember(userId) {
+  try {
+    await InternalChatChannelsAPI.addMember(props.channel.id, userId);
+    memberSearch.value = '';
+    fetchMembers();
+  } catch {
+    // silently handle
+  }
+}
+
+async function removeMember(memberId) {
+  try {
+    await InternalChatChannelsAPI.removeMember(props.channel.id, memberId);
+    fetchMembers();
+  } catch {
+    // silently handle
+  }
+}
+
+onMounted(() => {
+  fetchMembers();
+  store.dispatch('agents/get');
+});
 
 watch(() => props.channel.id, fetchMembers);
 
@@ -171,7 +215,7 @@ function handleDelete() {
               :name="member.name || ''"
               :size="24"
             />
-            <span class="text-sm text-n-slate-12">
+            <span class="flex-1 truncate text-sm text-n-slate-12">
               {{ member.name }}
             </span>
             <span
@@ -186,9 +230,46 @@ function handleDelete() {
             >
               {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
             </span>
+            <button
+              v-if="isAdmin && member.user_id !== currentUserId"
+              type="button"
+              class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:bg-n-alpha-2 hover:text-n-ruby-11"
+              @click="removeMember(member.id)"
+            >
+              <Icon icon="i-lucide-x" class="size-3.5" />
+            </button>
           </div>
           <div v-if="members.length === 0" class="text-sm text-n-slate-10">
             {{ t('INTERNAL_CHAT.CHANNEL.NO_MEMBERS') }}
+          </div>
+        </div>
+        <div v-if="isAdmin" class="mt-3">
+          <div class="relative">
+            <input
+              v-model="memberSearch"
+              type="text"
+              class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-1.5 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
+              :placeholder="t('INTERNAL_CHAT.CHANNEL.ADD_MEMBER')"
+            />
+          </div>
+          <div
+            v-if="memberSearch && filteredAgentsToAdd.length > 0"
+            class="mt-1 max-h-32 overflow-y-auto rounded-lg border border-n-slate-6 bg-n-solid-1"
+          >
+            <button
+              v-for="agent in filteredAgentsToAdd"
+              :key="agent.id"
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              @click="addMember(agent.id)"
+            >
+              <Avatar
+                :src="agent.thumbnail"
+                :name="agent.name || ''"
+                :size="20"
+              />
+              {{ agent.name }}
+            </button>
           </div>
         </div>
       </div>

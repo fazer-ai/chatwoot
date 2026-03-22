@@ -22,6 +22,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isLoadingMore: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -42,6 +46,8 @@ const { t } = useI18n();
 
 const listRef = ref(null);
 const showScrollToBottom = ref(false);
+const previousFirstMessageId = ref(null);
+const savedScrollHeight = ref(0);
 
 const dateSeparatedMessages = computed(() => {
   const groups = [];
@@ -103,6 +109,8 @@ function handleScroll() {
   showScrollToBottom.value = scrollHeight - scrollTop - clientHeight > 100;
 
   if (scrollTop === 0 && props.messages.length > 0 && !props.isLoading) {
+    savedScrollHeight.value = listRef.value.scrollHeight;
+    previousFirstMessageId.value = props.messages[0]?.id;
     emit('loadMore');
   }
 }
@@ -111,6 +119,19 @@ watch(
   () => props.messages.length,
   async (newLen, oldLen) => {
     if (newLen > oldLen) {
+      const firstMessageId = props.messages[0]?.id;
+      const wasPrepend =
+        previousFirstMessageId.value &&
+        firstMessageId !== previousFirstMessageId.value;
+
+      if (wasPrepend && listRef.value) {
+        await nextTick();
+        const newScrollHeight = listRef.value.scrollHeight;
+        listRef.value.scrollTop = newScrollHeight - savedScrollHeight.value;
+        previousFirstMessageId.value = firstMessageId;
+        return;
+      }
+
       const lastMsg = props.messages[props.messages.length - 1];
       const isOwnMessage = lastMsg?.sender?.id === props.currentUserId;
 
@@ -133,8 +154,14 @@ defineExpose({ scrollToMessage });
 <template>
   <div class="relative flex-1 overflow-hidden">
     <div ref="listRef" class="h-full overflow-y-auto" @scroll="handleScroll">
-      <div v-if="isLoading">
+      <div v-if="isLoading && messages.length === 0">
         <MessageSkeleton />
+      </div>
+      <div v-if="isLoadingMore" class="flex justify-center py-2">
+        <Icon
+          icon="i-lucide-loader-2"
+          class="size-4 animate-spin text-n-slate-10"
+        />
       </div>
       <div
         v-if="messages.length === 0 && !isLoading"

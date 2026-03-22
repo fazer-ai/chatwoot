@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import WootWriter from 'dashboard/components/widgets/WootWriter/Editor.vue';
@@ -33,6 +33,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
+const editorRef = ref(null);
 const editorContent = ref(props.initialContent);
 
 let draftTimer = null;
@@ -72,16 +73,17 @@ function handleSend() {
     draftTimer = null;
   }
   emit('draftUpdate', '');
+  nextTick(() => {
+    editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
+  });
 }
 
 function handleKeyDown(event) {
-  if (
-    (event.metaKey || event.ctrlKey) &&
-    event.key === 'Enter' &&
-    !event.isComposing
-  ) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
+    event.stopPropagation();
     handleSend();
+    return;
   }
   if (event.key === 'Escape' && props.editingMessage) {
     cancelEdit();
@@ -93,11 +95,15 @@ function handleTypingOn() {
 }
 
 function focus() {
-  // WootWriter focuses on mount by default
+  editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
 }
 
 function setContent(content) {
   editorContent.value = content;
+}
+
+function getContent() {
+  return editorContent.value;
 }
 
 onBeforeUnmount(() => {
@@ -107,7 +113,7 @@ onBeforeUnmount(() => {
   }
 });
 
-defineExpose({ focus, setContent });
+defineExpose({ focus, setContent, getContent });
 </script>
 
 <template>
@@ -126,15 +132,16 @@ defineExpose({ focus, setContent });
     </div>
     <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"
-      @keydown="handleKeyDown"
+      @keydown.capture="handleKeyDown"
     >
       <div class="flex-1 min-w-0">
         <WootWriter
+          ref="editorRef"
           v-model:model-value="editorContent"
           channel-type="Context::Default"
           :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
           :disabled="disabled"
-          :enable-suggestions="false"
+          enable-suggestions
           :enable-variables="false"
           :enable-canned-responses="false"
           :enable-captain-tools="false"

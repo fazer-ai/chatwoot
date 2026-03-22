@@ -22,7 +22,6 @@ const createChannelModalRef = ref(null);
 const createDMModalRef = ref(null);
 const createCategoryModalRef = ref(null);
 
-// Issue 4: Collapsible sections
 const collapsedSections = ref(
   new Set(
     JSON.parse(localStorage.getItem('internal_chat_collapsed_sections') || '[]')
@@ -145,7 +144,6 @@ const isDraftsRoute = computed(() => {
   return route.name === 'internal_chat_drafts';
 });
 
-// Issue 5: Writable local refs for draggable
 const localUncategorizedChannels = ref([]);
 const localCategoryChannels = ref({});
 
@@ -228,28 +226,24 @@ function openCreateCategory() {
 
 <template>
   <div class="flex h-full w-64 flex-col border-r border-n-slate-5 bg-n-solid-2">
-    <!-- Issue 1: Reduced gap (px-3 pt-3 pb-1, mb-2) -->
     <div class="px-3 pt-3 pb-1">
       <h1 class="mb-2 text-base font-semibold text-n-slate-12">
         {{ t('INTERNAL_CHAT.TITLE') }}
       </h1>
       <div class="relative">
-        <!-- Issue 2: left-2 instead of left-2.5 -->
         <Icon
           icon="i-lucide-search"
-          class="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-n-slate-10"
+          class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-n-slate-10"
         />
-        <!-- Issue 2: pl-8 instead of pl-9 -->
         <input
           v-model="searchQuery"
           type="text"
           :placeholder="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
           :aria-label="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
-          class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 py-1.5 pl-8 pr-3 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
+          class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 py-1.5 pl-9 pr-3 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
         />
       </div>
     </div>
-    <!-- Issue 1: pb-1 instead of pb-2 -->
     <div class="px-1.5 pb-1">
       <button
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
@@ -376,7 +370,6 @@ function openCreateCategory() {
         </div>
       </div>
 
-      <!-- Issue 3: Create Category button opens modal -->
       <div v-if="isAdmin" class="mb-3 px-2">
         <button
           class="flex items-center gap-1 text-xs text-n-slate-10 transition-colors hover:text-n-slate-12"

@@ -5,6 +5,8 @@ import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import Switch from 'dashboard/components-next/switch/Switch.vue';
+import NextSelect from 'dashboard/components-next/select/Select.vue';
 
 const store = useStore();
 const { t } = useI18n();
@@ -40,7 +42,17 @@ const filteredAgents = computed(() => {
   );
 });
 
-const isPrivate = computed(() => channelType.value === 'private_channel');
+const isPrivate = computed({
+  get: () => channelType.value === 'private_channel',
+  set: val => {
+    channelType.value = val ? 'private_channel' : 'public_channel';
+  },
+});
+
+const categoryOptions = computed(() => [
+  { value: '', label: t('INTERNAL_CHAT.CATEGORY.NONE') },
+  ...categories.value.map(cat => ({ value: cat.id, label: cat.name })),
+]);
 
 const isFormValid = computed(() => channelName.value.trim().length > 0);
 
@@ -134,37 +146,21 @@ defineExpose({ open });
           :placeholder="t('INTERNAL_CHAT.CHANNEL.DESCRIPTION')"
         />
       </div>
-      <div class="flex flex-col gap-1">
+      <div class="flex items-center justify-between">
         <label class="text-sm font-medium text-n-slate-12">
-          {{ t('INTERNAL_CHAT.CHANNEL.TYPE') }}
+          {{ t('INTERNAL_CHAT.CHANNEL.PRIVATE') }}
         </label>
-        <select
-          v-model="channelType"
-          class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2 text-sm text-n-slate-12 outline-none focus:border-n-brand"
-        >
-          <option value="public_channel">
-            {{ t('INTERNAL_CHAT.CHANNEL.PUBLIC') }}
-          </option>
-          <option value="private_channel">
-            {{ t('INTERNAL_CHAT.CHANNEL.PRIVATE') }}
-          </option>
-        </select>
+        <Switch v-model="isPrivate" />
       </div>
       <div v-if="categories.length > 0" class="flex flex-col gap-1">
         <label class="text-sm font-medium text-n-slate-12">
           {{ t('INTERNAL_CHAT.CATEGORY.NAME') }}
         </label>
-        <select
+        <NextSelect
           v-model="categoryId"
-          class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2 text-sm text-n-slate-12 outline-none focus:border-n-brand"
-        >
-          <option value="">
-            {{ t('INTERNAL_CHAT.CATEGORY.NONE') }}
-          </option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-            {{ cat.name }}
-          </option>
-        </select>
+          :options="categoryOptions"
+          :placeholder="t('INTERNAL_CHAT.CATEGORY.NONE')"
+        />
       </div>
 
       <!-- Public channel info note -->

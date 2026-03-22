@@ -35,6 +35,8 @@
       "ADMIN": "Admin",
       "YOU": "(you)",
       "NO_MEMBERS": "No members",
+      "ADD_MEMBER": "Add member...",
+      "REMOVE_MEMBER": "Remove member",
       "ALL_AGENTS_NOTE": "All agents will be added automatically",
       "SELECT_TEAMS": "Select Teams",
       "SELECT_AGENTS": "Select Agents"
@@ -54,7 +56,9 @@
       "CANCEL_EDIT": "Cancel editing",
       "BOLD": "Bold",
       "ITALIC": "Italic",
-      "CODE": "Code"
+      "CODE": "Code",
+      "COPY_LINK": "Copy link",
+      "LINK_COPIED": "Message link copied to clipboard"
     },
     "THREAD": {
       "TITLE": "Thread",
@@ -75,7 +79,10 @@
       "PIN": "Pin poll",
       "ADD_OPTION": "Add option",
       "CANCEL": "Cancel",
-      "PERCENTAGE": "{value}%"
+      "PERCENTAGE": "{value}%",
+      "DISCARD_TITLE": "Discard poll?",
+      "DISCARD_DESCRIPTION": "You have unsaved changes. Are you sure you want to discard this poll?",
+      "DISCARD": "Discard"
     },
     "DRAFT": {
       "TITLE": "Drafts",

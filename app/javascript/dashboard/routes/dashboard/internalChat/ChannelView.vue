@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -30,9 +30,12 @@ const typingUsers = computed(() => {
 const editorRef = ref(null);
 const messageListRef = ref(null);
 const activeThread = ref(null);
-const showPollCreator = ref(false);
+const pollCreatorRef = ref(null);
 const editingMessage = ref(null);
-const showSettings = ref(false);
+const showSettings = ref(
+  localStorage.getItem('internal_chat_settings_open') === 'true'
+);
+const isLoadingMore = ref(false);
 
 const currentUser = useMapGetter('getCurrentUser');
 const currentRole = useMapGetter('getCurrentRole');
@@ -124,6 +127,7 @@ async function handleSend(content) {
       markRead();
       deleteDraftForChannel();
     }
+    nextTick(() => editorRef.value?.focus());
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }
@@ -169,19 +173,6 @@ async function handleRemoveReaction({ messageId, reactionId }) {
     });
   } catch {
     // Silently ignore reaction errors
-  }
-}
-
-async function handleLoadMore() {
-  if (!messages.value.length) return;
-  const oldestMessage = messages.value[0];
-  try {
-    await store.dispatch('internalChat/messages/fetchMessages', {
-      channelId: props.channelId,
-      params: { before: oldestMessage.created_at },
-    });
-  } catch {
-    // silently ignore pagination errors
   }
 }
 
@@ -257,7 +248,7 @@ async function handlePollSubmit(pollData) {
       channelId: props.channelId,
       data: pollData,
     });
-    showPollCreator.value = false;
+    // Dialog closes itself after submit
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
   }
@@ -265,10 +256,6 @@ async function handlePollSubmit(pollData) {
 
 function handleScrollToPinned(message) {
   messageListRef.value?.scrollToMessage(message.id);
-}
-
-function handleToggleSettings() {
-  showSettings.value = !showSettings.value;
 }
 
 async function handleArchive() {
@@ -324,15 +311,51 @@ async function handleDraftUpdate(content) {
   }
 }
 
+function saveDraftImmediately() {
+  const content = editorRef.value?.getContent?.() || '';
+  if (content.trim()) {
+    store
+      .dispatch('internalChat/drafts/saveDraft', {
+        channelId: props.channelId,
+        content,
+      })
+      .catch(() => {});
+  }
+}
+
+function handleToggleSettings() {
+  showSettings.value = !showSettings.value;
+  localStorage.setItem(
+    'internal_chat_settings_open',
+    String(showSettings.value)
+  );
+}
+
+async function handleLoadMore() {
+  if (!messages.value.length) return;
+  const oldestMessage = messages.value[0];
+  isLoadingMore.value = true;
+  try {
+    await store.dispatch('internalChat/messages/fetchMessages', {
+      channelId: props.channelId,
+      params: { before: oldestMessage.created_at },
+    });
+  } catch {
+    // silently ignore pagination errors
+  } finally {
+    isLoadingMore.value = false;
+  }
+}
+
 watch(
   () => props.channelId,
-  () => {
+  (newId, oldId) => {
+    if (oldId) saveDraftImmediately();
     fetchMessages();
     markRead();
     loadDraft();
     activeThread.value = null;
     editingMessage.value = null;
-    showSettings.value = false;
   }
 );
 
@@ -358,6 +381,7 @@ onMounted(() => {
         :current-user-id="currentUserId"
         :is-admin="isAdmin"
         :is-loading="messagesUIFlags.isFetching"
+        :is-loading-more="isLoadingMore"
         @edit="handleEdit"
         @delete="handleDelete"
         @reply="handleReply"
@@ -379,7 +403,7 @@ onMounted(() => {
         @send="handleSend"
         @typing="handleTyping"
         @draft-update="handleDraftUpdate"
-        @create-poll="showPollCreator = true"
+        @create-poll="pollCreatorRef?.open()"
         @cancel-edit="handleCancelEdit"
       />
       <div
@@ -414,10 +438,6 @@ onMounted(() => {
       @unfavorite="handleToggleFavorite"
     />
 
-    <PollCreator
-      v-if="showPollCreator"
-      @submit="handlePollSubmit"
-      @close="showPollCreator = false"
-    />
+    <PollCreator ref="pollCreatorRef" @submit="handlePollSubmit" />
   </div>
 </template>

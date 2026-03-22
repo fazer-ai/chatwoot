@@ -4,7 +4,7 @@
 
 <template>
   <div class="space-y-4 px-4 py-3">
-    <div v-for="i in 4" :key="i" class="flex items-start gap-3 animate-pulse">
+    <div v-for="i in 2" :key="i" class="flex items-start gap-3 animate-pulse">
       <div class="size-8 flex-shrink-0 rounded-full bg-n-slate-4" />
       <div class="flex-1 space-y-2">
         <div class="flex items-center gap-2">
