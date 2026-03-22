@@ -34,7 +34,10 @@
       "CREATED": "Channel created successfully",
       "ADMIN": "Admin",
       "YOU": "(you)",
-      "NO_MEMBERS": "No members"
+      "NO_MEMBERS": "No members",
+      "ALL_AGENTS_NOTE": "All agents will be added automatically",
+      "SELECT_TEAMS": "Select Teams",
+      "SELECT_AGENTS": "Select Agents"
     },
     "MESSAGE": {
       "PLACEHOLDER": "Type a message...",

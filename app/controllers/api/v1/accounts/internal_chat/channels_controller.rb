@@ -29,6 +29,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
         @channel.save!
         add_creator_as_admin
         add_initial_members
+        add_channel_type_members
       end
     end
 
@@ -143,7 +144,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     if dm_params?
       find_or_build_dm
     else
-      attrs = create_channel_params.except(:member_ids)
+      attrs = create_channel_params.except(:member_ids, :team_ids)
       validate_category!(attrs[:category_id])
       Current.account.internal_chat_channels.build(attrs.merge(created_by: Current.user))
     end
@@ -207,8 +208,40 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     end
   end
 
+  def add_channel_type_members
+    return if @channel.channel_type_dm?
+
+    if @channel.channel_type_public_channel?
+      add_all_agents_as_members
+    else
+      add_team_members
+    end
+  end
+
+  def add_all_agents_as_members
+    agent_ids = Current.account.agents.where.not(id: Current.user.id).pluck(:id)
+    agent_ids.each do |uid|
+      @channel.channel_members.find_or_create_by!(user_id: uid) { |m| m.role = :member }
+    end
+  end
+
+  def add_team_members
+    team_ids = permitted_team_ids
+    return if team_ids.blank?
+
+    team_ids.each do |team_id|
+      team = Current.account.teams.find_by(id: team_id)
+      next unless team
+
+      @channel.channel_teams.find_or_create_by!(team: team)
+      team.members.each do |user|
+        @channel.channel_members.find_or_create_by!(user_id: user.id) { |m| m.role = :member }
+      end
+    end
+  end
+
   def create_channel_params
-    @create_channel_params ||= params.require(:channel).permit(:name, :description, :channel_type, :category_id, member_ids: [])
+    @create_channel_params ||= params.require(:channel).permit(:name, :description, :channel_type, :category_id, member_ids: [], team_ids: [])
   end
 
   def update_channel_params
@@ -217,6 +250,11 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def permitted_member_ids
     params.permit(member_ids: [])[:member_ids] || create_channel_params[:member_ids]
+  end
+
+  def permitted_team_ids
+    ids = params.permit(team_ids: [])[:team_ids] || create_channel_params[:team_ids]
+    Array(ids).map(&:to_i).compact_blank
   end
 
   def mark_unread_params

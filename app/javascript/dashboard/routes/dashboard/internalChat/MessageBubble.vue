@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
+import MessageFormatter from 'shared/helpers/MessageFormatter';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -106,22 +107,8 @@ const messageContent = computed(() => {
 
 const renderedContent = computed(() => {
   if (isDeleted.value) return '';
-  let content = props.message.content || '';
-  // Bold: **text** -> <strong>text</strong>
-  content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Italic: *text* -> <em>text</em> (but not **)
-  content = content.replace(
-    /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,
-    '<em>$1</em>'
-  );
-  // Code: `text` -> <code>text</code>
-  content = content.replace(
-    /`([^`]+)`/g,
-    '<code class="rounded bg-n-alpha-2 px-1 py-0.5 text-sm font-mono">$1</code>'
-  );
-  // Newlines to <br>
-  content = content.replace(/\n/g, '<br>');
-  return content;
+  const formatter = new MessageFormatter(props.message.content || '');
+  return formatter.formattedMessage;
 });
 
 const reactions = computed(() => {
@@ -224,7 +211,11 @@ function handleUnvote(payload) {
           <Icon icon="i-lucide-trash-2" class="size-3.5 flex-shrink-0" />
           <span class="italic">{{ messageContent }}</span>
         </div>
-        <div v-else v-dompurify-html="renderedContent" />
+        <div
+          v-else
+          v-dompurify-html="renderedContent"
+          class="prose prose-bubble"
+        />
       </div>
 
       <ReactionDisplay

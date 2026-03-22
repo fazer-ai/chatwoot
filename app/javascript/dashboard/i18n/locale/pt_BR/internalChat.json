@@ -16,6 +16,7 @@
       "PRIVATE": "Privado",
       "MEMBERS": "Membros",
       "ARCHIVE": "Arquivar Canal",
+      "UNARCHIVE": "Desarquivar Canal",
       "DELETE": "Excluir Canal",
       "MUTE": "Silenciar Canal",
       "UNMUTE": "Reativar Notifica\u00e7\u00f5es",
@@ -24,7 +25,19 @@
       "MARK_UNREAD": "Marcar como N\u00e3o Lida",
       "NO_MESSAGES": "Nenhuma mensagem ainda. Inicie a conversa!",
       "ARCHIVED": "Este canal est\u00e1 arquivado",
-      "MEMBER_COUNT": "{count} membro | {count} membros"
+      "MEMBER_COUNT": "{count} membro | {count} membros",
+      "SETTINGS": "Configura\u00e7\u00f5es do Canal",
+      "INFO": "Informa\u00e7\u00f5es do Canal",
+      "CREATED_AT": "Criado em",
+      "CONFIRM_DELETE": "Tem certeza que deseja excluir este canal?",
+      "ACTIONS": "A\u00e7\u00f5es",
+      "CREATED": "Canal criado com sucesso",
+      "ADMIN": "Admin",
+      "YOU": "(voc\u00ea)",
+      "NO_MEMBERS": "Sem membros",
+      "ALL_AGENTS_NOTE": "Todos os agentes ser\u00e3o adicionados automaticamente",
+      "SELECT_TEAMS": "Selecionar equipes",
+      "SELECT_AGENTS": "Selecionar agentes"
     },
     "MESSAGE": {
       "PLACEHOLDER": "Digite uma mensagem...",
@@ -36,10 +49,16 @@
       "DELETED": "Esta mensagem foi exclu\u00edda",
       "SEND": "Enviar",
       "UPLOAD_FILE": "Enviar Arquivo",
-      "CONFIRM_DELETE": "Tem certeza que deseja excluir esta mensagem?"
+      "CONFIRM_DELETE": "Tem certeza que deseja excluir esta mensagem?",
+      "EDITING": "Editando mensagem",
+      "CANCEL_EDIT": "Cancelar edi\u00e7\u00e3o",
+      "BOLD": "Negrito",
+      "ITALIC": "It\u00e1lico",
+      "CODE": "C\u00f3digo"
     },
     "THREAD": {
       "TITLE": "Conversa",
+      "CLOSE": "Fechar conversa",
       "REPLIES": "{count} respostas",
       "REPLY_PLACEHOLDER": "Responder na conversa..."
     },
@@ -54,7 +73,7 @@
       "VOTES": "{count} votos",
       "EXPIRED": "Expirada",
       "PIN": "Fixar enquete",
-      "ADD_OPTION": "Adicionar opção",
+      "ADD_OPTION": "Adicionar op\u00e7\u00e3o",
       "CANCEL": "Cancelar",
       "PERCENTAGE": "{value}%"
     },
@@ -62,7 +81,8 @@
       "TITLE": "Rascunhos",
       "NO_DRAFTS": "Nenhum rascunho ainda",
       "DELETE": "Excluir rascunho",
-      "SAVED_AGO": "Salvo h\u00e1 {time}"
+      "SAVED_AGO": "Salvo h\u00e1 {time}",
+      "CHANNEL_LABEL": "Canal #{channelId}"
     },
     "PIN": {
       "PINNED_MESSAGE": "Mensagem fixada",
@@ -76,6 +96,13 @@
     "DM": {
       "NEW": "Nova Mensagem Direta",
       "SELECT_AGENTS": "Selecionar agentes"
+    },
+    "CATEGORY": {
+      "CREATE": "Criar Categoria",
+      "NAME": "Nome da Categoria",
+      "NAME_PLACEHOLDER": "Digite o nome da categoria",
+      "NONE": "Nenhuma",
+      "CREATED": "Categoria criada com sucesso"
     },
     "ERRORS": {
       "FETCH_CHANNELS": "Falha ao carregar canais",

@@ -1,8 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import InternalChatChannelsAPI from 'dashboard/api/internalChatChannels';
 
 const props = defineProps({
   channel: { type: Object, required: true },
@@ -24,8 +25,26 @@ const emit = defineEmits([
 const { t } = useI18n();
 
 const showDeleteConfirm = ref(false);
+const members = ref([]);
+const isLoadingMembers = ref(false);
 
-const members = computed(() => props.channel.members || []);
+async function fetchMembers() {
+  if (!props.channel.id) return;
+
+  isLoadingMembers.value = true;
+  try {
+    const { data } = await InternalChatChannelsAPI.getMembers(props.channel.id);
+    members.value = data;
+  } catch {
+    // silently handle
+  } finally {
+    isLoadingMembers.value = false;
+  }
+}
+
+onMounted(fetchMembers);
+
+watch(() => props.channel.id, fetchMembers);
 
 const isMuted = computed(() => props.channel.muted);
 const isFavorited = computed(() => props.channel.favorited);
@@ -136,7 +155,12 @@ function handleDelete() {
             ({{ members.length }})
           </span>
         </h4>
-        <div class="space-y-2">
+        <div v-if="isLoadingMembers" class="flex justify-center py-4">
+          <span class="text-sm text-n-slate-10">
+            {{ t('INTERNAL_CHAT.LOADING_MESSAGES') }}
+          </span>
+        </div>
+        <div v-else class="space-y-2">
           <div
             v-for="member in members"
             :key="member.user_id"

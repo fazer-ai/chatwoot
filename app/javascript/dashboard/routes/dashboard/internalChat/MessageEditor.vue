@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import WootWriter from 'dashboard/components/widgets/WootWriter/Editor.vue';
 
 const props = defineProps({
   disabled: {
@@ -32,75 +33,53 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const messageContent = ref(props.initialContent);
+const editorContent = ref(props.initialContent);
 
 let draftTimer = null;
-const textareaRef = ref(null);
 
 const canSend = computed(() => {
-  return messageContent.value.trim().length > 0 && !props.disabled;
+  return editorContent.value.trim().length > 0 && !props.disabled;
 });
 
-function autoResize() {
-  const textarea = textareaRef.value;
-  if (!textarea) return;
-  textarea.style.height = 'auto';
-  textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
-}
-
 function cancelEdit() {
-  messageContent.value = '';
-  if (textareaRef.value) textareaRef.value.style.height = 'auto';
+  editorContent.value = '';
   emit('cancelEdit');
-}
-
-function wrapSelection(marker) {
-  const textarea = textareaRef.value;
-  if (!textarea) return;
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = messageContent.value;
-  const selected = text.substring(start, end);
-  const wrapped = `${marker}${selected}${marker}`;
-  messageContent.value =
-    text.substring(0, start) + wrapped + text.substring(end);
-  nextTick(() => {
-    textarea.focus();
-    textarea.selectionStart = start + marker.length;
-    textarea.selectionEnd = end + marker.length;
-  });
 }
 
 watch(
   () => props.editingMessage,
   msg => {
     if (msg) {
-      messageContent.value = msg.content || '';
-      nextTick(() => {
-        autoResize();
-        textareaRef.value?.focus();
-      });
+      editorContent.value = msg.content || '';
     }
   },
   { immediate: true }
 );
 
+watch(editorContent, newContent => {
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    emit('draftUpdate', newContent);
+  }, 3000);
+});
+
 function handleSend() {
   if (!canSend.value) return;
-  emit('send', messageContent.value.trim());
-  messageContent.value = '';
+  emit('send', editorContent.value.trim());
+  editorContent.value = '';
   if (draftTimer) {
     clearTimeout(draftTimer);
     draftTimer = null;
   }
   emit('draftUpdate', '');
-  if (textareaRef.value) {
-    textareaRef.value.style.height = 'auto';
-  }
 }
 
 function handleKeyDown(event) {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+  if (
+    (event.metaKey || event.ctrlKey) &&
+    event.key === 'Enter' &&
+    !event.isComposing
+  ) {
     event.preventDefault();
     handleSend();
   }
@@ -109,25 +88,24 @@ function handleKeyDown(event) {
   }
 }
 
-function handleInput() {
+function handleTypingOn() {
   emit('typing');
-  autoResize();
-  if (draftTimer) {
-    clearTimeout(draftTimer);
-  }
-  draftTimer = setTimeout(() => {
-    emit('draftUpdate', messageContent.value);
-  }, 3000);
 }
 
 function focus() {
-  textareaRef.value?.focus();
+  // WootWriter focuses on mount by default
 }
 
 function setContent(content) {
-  messageContent.value = content;
-  autoResize();
+  editorContent.value = content;
 }
+
+onBeforeUnmount(() => {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+});
 
 defineExpose({ focus, setContent });
 </script>
@@ -148,43 +126,22 @@ defineExpose({ focus, setContent });
     </div>
     <div
       class="flex items-end gap-2 rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2"
+      @keydown="handleKeyDown"
     >
-      <div class="flex-1">
-        <div class="flex items-center gap-0.5 px-1 pb-1">
-          <button
-            type="button"
-            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
-            :title="t('INTERNAL_CHAT.MESSAGE.BOLD')"
-            @click="wrapSelection('**')"
-          >
-            <Icon icon="i-lucide-bold" class="size-3.5" />
-          </button>
-          <button
-            type="button"
-            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
-            :title="t('INTERNAL_CHAT.MESSAGE.ITALIC')"
-            @click="wrapSelection('*')"
-          >
-            <Icon icon="i-lucide-italic" class="size-3.5" />
-          </button>
-          <button
-            type="button"
-            class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
-            :title="t('INTERNAL_CHAT.MESSAGE.CODE')"
-            @click="wrapSelection('`')"
-          >
-            <Icon icon="i-lucide-code" class="size-3.5" />
-          </button>
-        </div>
-        <textarea
-          ref="textareaRef"
-          v-model="messageContent"
+      <div class="flex-1 min-w-0">
+        <WootWriter
+          v-model:model-value="editorContent"
+          channel-type="Context::Default"
           :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
           :disabled="disabled"
-          rows="1"
-          class="w-full resize-none bg-transparent text-sm text-n-slate-12 placeholder-n-slate-10 outline-none"
-          @keydown="handleKeyDown"
-          @input="handleInput"
+          :enable-suggestions="false"
+          :enable-variables="false"
+          :enable-canned-responses="false"
+          :enable-captain-tools="false"
+          :enable-copilot="false"
+          :allow-signature="false"
+          focus-on-mount
+          @typing-on="handleTypingOn"
         />
       </div>
       <button

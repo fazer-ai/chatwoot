@@ -43,6 +43,12 @@ class InternalChat::Channel < ApplicationRecord
            dependent: :destroy,
            inverse_of: :channel
   has_many :members, through: :channel_members, source: :user
+  has_many :channel_teams,
+           class_name: 'InternalChat::ChannelTeam',
+           foreign_key: :internal_chat_channel_id,
+           dependent: :destroy,
+           inverse_of: :channel
+  has_many :teams, through: :channel_teams
   has_many :messages,
            class_name: 'InternalChat::Message',
            foreign_key: :internal_chat_channel_id,

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 
 const store = useStore();
 const { t } = useI18n();
@@ -14,18 +15,63 @@ const channelDescription = ref('');
 const channelType = ref('public_channel');
 const categoryId = ref('');
 const isCreating = ref(false);
+const selectedTeamIds = ref([]);
+const selectedAgentIds = ref([]);
+const memberSearchQuery = ref('');
 
 const categories = computed(
   () => store.getters['internalChat/getCategories'] || []
 );
 
+const currentUserId = computed(() => store.getters.getCurrentUser?.id);
+
+const teams = computed(() => store.getters['teams/getTeams'] || []);
+
+const agents = computed(() => {
+  const allAgents = store.getters['agents/getAgents'] || [];
+  return allAgents.filter(agent => agent.id !== currentUserId.value);
+});
+
+const filteredAgents = computed(() => {
+  if (!memberSearchQuery.value) return agents.value;
+  const query = memberSearchQuery.value.toLowerCase();
+  return agents.value.filter(agent =>
+    (agent.name || '').toLowerCase().includes(query)
+  );
+});
+
+const isPrivate = computed(() => channelType.value === 'private_channel');
+
 const isFormValid = computed(() => channelName.value.trim().length > 0);
+
+function toggleTeam(teamId) {
+  const idx = selectedTeamIds.value.indexOf(teamId);
+  if (idx === -1) {
+    selectedTeamIds.value.push(teamId);
+  } else {
+    selectedTeamIds.value.splice(idx, 1);
+  }
+}
+
+function toggleAgent(agentId) {
+  const idx = selectedAgentIds.value.indexOf(agentId);
+  if (idx === -1) {
+    selectedAgentIds.value.push(agentId);
+  } else {
+    selectedAgentIds.value.splice(idx, 1);
+  }
+}
 
 function open() {
   channelName.value = '';
   channelDescription.value = '';
   channelType.value = 'public_channel';
   categoryId.value = '';
+  selectedTeamIds.value = [];
+  selectedAgentIds.value = [];
+  memberSearchQuery.value = '';
+  store.dispatch('teams/get');
+  store.dispatch('agents/get');
   dialogRef.value?.open();
 }
 
@@ -40,8 +86,9 @@ async function handleConfirm() {
         description: channelDescription.value.trim(),
         channel_type: channelType.value,
         category_id: categoryId.value || null,
-        member_ids: [],
       },
+      member_ids: isPrivate.value ? selectedAgentIds.value : [],
+      team_ids: isPrivate.value ? selectedTeamIds.value : [],
     });
     useAlert(t('INTERNAL_CHAT.CHANNEL.CREATED'));
     dialogRef.value?.close();
@@ -119,6 +166,83 @@ defineExpose({ open });
           </option>
         </select>
       </div>
+
+      <!-- Public channel info note -->
+      <div
+        v-if="!isPrivate"
+        class="rounded-lg bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-10"
+      >
+        {{ t('INTERNAL_CHAT.CHANNEL.ALL_AGENTS_NOTE') }}
+      </div>
+
+      <!-- Private channel: team + agent selection -->
+      <template v-if="isPrivate">
+        <!-- Team selection -->
+        <div v-if="teams.length > 0" class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-n-slate-12">
+            {{ t('INTERNAL_CHAT.CHANNEL.SELECT_TEAMS') }}
+          </label>
+          <div
+            class="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-n-slate-6 p-2"
+          >
+            <label
+              v-for="team in teams"
+              :key="team.id"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-1"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedTeamIds.includes(team.id)"
+                class="rounded border-n-slate-6"
+                @change="toggleTeam(team.id)"
+              />
+              <span class="truncate">{{ team.name }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Agent selection -->
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-n-slate-12">
+            {{ t('INTERNAL_CHAT.CHANNEL.SELECT_AGENTS') }}
+          </label>
+          <input
+            v-model="memberSearchQuery"
+            type="text"
+            class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 px-3 py-2 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
+            :placeholder="t('INTERNAL_CHAT.DM.SELECT_AGENTS')"
+          />
+          <div
+            class="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-n-slate-6 p-2"
+          >
+            <label
+              v-for="agent in filteredAgents"
+              :key="agent.id"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-1"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedAgentIds.includes(agent.id)"
+                class="rounded border-n-slate-6"
+                @change="toggleAgent(agent.id)"
+              />
+              <Avatar
+                :name="agent.name || ''"
+                :src="agent.thumbnail || ''"
+                :size="24"
+                rounded-full
+              />
+              <span class="truncate">{{ agent.name }}</span>
+            </label>
+            <p
+              v-if="filteredAgents.length === 0"
+              class="px-2 py-3 text-center text-sm text-n-slate-10"
+            >
+              {{ t('INTERNAL_CHAT.DM.SELECT_AGENTS') }}
+            </p>
+          </div>
+        </div>
+      </template>
     </div>
   </Dialog>
 </template>

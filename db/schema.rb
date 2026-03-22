@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_20_000011) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_20_000012) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -965,6 +965,15 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_20_000011) do
     t.index ["user_id"], name: "index_internal_chat_channel_members_on_user_id"
   end
 
+  create_table "internal_chat_channel_teams", force: :cascade do |t|
+    t.bigint "internal_chat_channel_id", null: false
+    t.bigint "team_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["internal_chat_channel_id", "team_id"], name: "idx_ic_channel_teams_channel_team", unique: true
+    t.index ["team_id"], name: "index_internal_chat_channel_teams_on_team_id"
+  end
+
   create_table "internal_chat_channels", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.bigint "category_id"
@@ -1633,6 +1642,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_20_000011) do
   add_foreign_key "inboxes", "portals"
   add_foreign_key "internal_chat_channel_members", "internal_chat_channels"
   add_foreign_key "internal_chat_channel_members", "users"
+  add_foreign_key "internal_chat_channel_teams", "internal_chat_channels"
+  add_foreign_key "internal_chat_channel_teams", "teams"
   add_foreign_key "internal_chat_channels", "internal_chat_categories", column: "category_id"
   add_foreign_key "internal_chat_channels", "users", column: "created_by_id"
   add_foreign_key "internal_chat_drafts", "internal_chat_channels"
