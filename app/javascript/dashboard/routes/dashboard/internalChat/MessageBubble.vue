@@ -25,6 +25,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  inThread: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -211,9 +215,9 @@ function handleUnvote(payload) {
           <Icon icon="i-lucide-pin" class="size-3" />
         </span>
         <button
-          v-if="message.parent_id"
+          v-if="message.parent_id && !inThread"
           class="flex items-center gap-1 text-xs text-n-brand hover:underline"
-          @click="emit('openThread', { id: message.parent_id })"
+          @click="emit('openThread', message)"
         >
           <Icon icon="i-lucide-message-square" class="size-3" />
           {{ t('INTERNAL_CHAT.THREAD.TITLE') }}

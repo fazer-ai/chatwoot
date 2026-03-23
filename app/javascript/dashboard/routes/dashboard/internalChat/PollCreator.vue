@@ -6,7 +6,7 @@ import NextSelect from 'dashboard/components-next/select/Select.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 
-const emit = defineEmits(['submit', 'close']);
+const emit = defineEmits(['submit']);
 
 const { t } = useI18n();
 
@@ -89,13 +89,12 @@ function handleClose() {
     confirmDiscardRef.value?.open();
     return;
   }
-  emit('close');
-  dialogRef.value?.close();
+  resetForm();
 }
 
 function confirmDiscard() {
   confirmDiscardRef.value?.close();
-  emit('close');
+  resetForm();
   dialogRef.value?.close();
 }
 

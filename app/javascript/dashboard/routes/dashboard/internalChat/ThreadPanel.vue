@@ -202,6 +202,7 @@ onMounted(() => {
           :message="parentMessage"
           :current-user-id="currentUserId"
           :is-admin="isAdmin"
+          in-thread
           @edit="handleEditReply"
           @delete="handleDeleteReply"
           @add-reaction="handleAddReaction"
@@ -231,6 +232,7 @@ onMounted(() => {
           :message="reply"
           :current-user-id="currentUserId"
           :is-admin="isAdmin"
+          in-thread
           @edit="handleEditReply"
           @delete="handleDeleteReply"
           @add-reaction="handleAddReaction"

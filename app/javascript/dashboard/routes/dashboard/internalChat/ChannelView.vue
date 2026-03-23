@@ -198,7 +198,23 @@ function handleReply(message) {
 }
 
 function handleOpenThread(message) {
-  activeThread.value = message;
+  // If message has parent_id, find the parent message to open its thread
+  const parentId = message.parent_id;
+  if (parentId) {
+    const parent = messages.value.find(m => m.id === parentId);
+    if (parent) {
+      activeThread.value = parent;
+    } else {
+      // Parent not in local messages, use the message itself as a stub
+      activeThread.value = {
+        id: parentId,
+        content: '',
+        sender: message.sender,
+      };
+    }
+  } else {
+    activeThread.value = message;
+  }
   showSettings.value = false;
   localStorage.setItem('internal_chat_settings_open', 'false');
 }
