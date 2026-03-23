@@ -20,12 +20,12 @@ const duration = ref('24h');
 const publicResults = ref(true);
 const isSubmitting = ref(false);
 
-const DURATION_OPTIONS = [
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-  { value: '14d', label: '14 days' },
-  { value: '30d', label: '30 days' },
-];
+const durationOptions = computed(() => [
+  { value: '24h', label: t('INTERNAL_CHAT.POLL.DURATION_24H') },
+  { value: '7d', label: t('INTERNAL_CHAT.POLL.DURATION_7D') },
+  { value: '14d', label: t('INTERNAL_CHAT.POLL.DURATION_14D') },
+  { value: '30d', label: t('INTERNAL_CHAT.POLL.DURATION_30D') },
+]);
 
 const MAX_OPTIONS = 10;
 
@@ -181,26 +181,26 @@ defineExpose({ open });
         </button>
       </div>
 
-      <div class="flex items-center justify-between">
-        <label class="text-sm text-n-slate-12">
+      <label class="flex cursor-pointer items-center justify-between">
+        <span class="text-sm text-n-slate-12">
           {{ t('INTERNAL_CHAT.POLL.MULTIPLE_CHOICE') }}
-        </label>
+        </span>
         <Switch v-model="multipleChoice" />
-      </div>
+      </label>
 
       <div class="flex flex-col gap-1">
         <label class="text-sm font-medium text-n-slate-12">
           {{ t('INTERNAL_CHAT.POLL.DURATION') }}
         </label>
-        <NextSelect v-model="duration" :options="DURATION_OPTIONS" />
+        <NextSelect v-model="duration" :options="durationOptions" />
       </div>
 
-      <div class="flex items-center justify-between">
-        <label class="text-sm text-n-slate-12">
+      <label class="flex cursor-pointer items-center justify-between">
+        <span class="text-sm text-n-slate-12">
           {{ t('INTERNAL_CHAT.POLL.PUBLIC_RESULTS') }}
-        </label>
+        </span>
         <Switch v-model="publicResults" />
-      </div>
+      </label>
     </div>
   </Dialog>
 
