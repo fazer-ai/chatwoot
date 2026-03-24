@@ -270,6 +270,10 @@ const isDraftsRoute = computed(() => {
   return route.name === 'internal_chat_drafts';
 });
 
+const draftCount = computed(() => {
+  return (store.getters['internalChat/drafts/getDrafts'] || []).length;
+});
+
 const localUncategorizedChannels = ref([]);
 const localCategoryChannels = ref({});
 
@@ -587,6 +591,12 @@ async function handleDeleteCategory() {
         <span class="flex-1 text-left">{{
           t('INTERNAL_CHAT.DRAFT.TITLE')
         }}</span>
+        <span
+          v-if="draftCount > 0"
+          class="flex-shrink-0 rounded-full bg-n-slate-8 px-1.5 py-0.5 text-xs font-medium text-white"
+        >
+          {{ draftCount }}
+        </span>
       </button>
     </div>
     <div v-show="!isSearchMode" class="flex-1 overflow-y-auto px-1.5">
