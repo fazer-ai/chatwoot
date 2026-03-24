@@ -1,0 +1,45 @@
+type: object
+required:
+  - question
+  - options
+  - channel_id
+properties:
+  channel_id:
+    type: integer
+    description: The ID of the channel to create the poll in
+  question:
+    type: string
+    description: The poll question
+  options:
+    type: array
+    description: The poll options (minimum 2)
+    items:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: The option text
+        emoji:
+          type: string
+          description: Optional emoji for the option
+        image_url:
+          type: string
+          description: Optional image URL for the option
+  multiple_choice:
+    type: boolean
+    default: false
+    description: Whether multiple options can be selected
+  public_results:
+    type: boolean
+    default: true
+    description: Whether vote results are publicly visible
+  allow_revote:
+    type: boolean
+    default: true
+    description: Whether users can change their vote
+  expires_at:
+    type: string
+    format: date-time
+    description: When the poll expires (ISO 8601 format)

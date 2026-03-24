@@ -102,7 +102,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   private
 
   def filtered_channels
-    channels = Current.account.internal_chat_channels.includes(channel_members: :user, category: [])
+    channels = Current.account.internal_chat_channels.includes(channel_members: { user: :account_users }, category: [])
     channels = apply_type_filter(channels)
     channels = apply_category_filter(channels)
     channels = apply_status_filter(channels)

@@ -4,16 +4,6 @@ describe InternalChat::DefaultChannelSetupService do
   let(:account) { create(:account) }
 
   describe '#perform' do
-    it 'creates a default category' do
-      described_class.new(account: account).perform
-
-      category = account.internal_chat_categories.find_by(
-        name: I18n.t('internal_chat.default_category_name', default: 'Channels')
-      )
-      expect(category).to be_present
-      expect(category.position).to eq(0)
-    end
-
     it 'creates a default public channel' do
       described_class.new(account: account).perform
 
@@ -43,23 +33,21 @@ describe InternalChat::DefaultChannelSetupService do
 
     it 'is idempotent and does not duplicate on re-run' do
       described_class.new(account: account).perform
-      initial_category_count = account.internal_chat_categories.count
       initial_channel_count = account.internal_chat_channels.count
 
       described_class.new(account: account).perform
 
-      expect(account.internal_chat_categories.count).to eq(initial_category_count)
       expect(account.internal_chat_channels.count).to eq(initial_channel_count)
     end
 
     context 'when account has a custom locale' do
       let(:account) { create(:account, locale: 'fr') }
 
-      it 'uses the account locale for names' do
+      it 'uses the account locale for channel name' do
         described_class.new(account: account).perform
-        expected_name = I18n.with_locale(:fr) { I18n.t('internal_chat.default_category_name', default: 'Channels') }
-        category = account.internal_chat_categories.find_by(name: expected_name)
-        expect(category).to be_present
+        expected_name = I18n.with_locale(:fr) { I18n.t('internal_chat.default_channel_name', default: 'General') }
+        channel = account.internal_chat_channels.find_by(name: expected_name)
+        expect(channel).to be_present
       end
     end
   end

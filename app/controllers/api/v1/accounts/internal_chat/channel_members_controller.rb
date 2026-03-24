@@ -6,7 +6,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
 
   def index
     authorize current_channel, :show?, policy_class: InternalChat::ChannelPolicy
-    @members = current_channel.channel_members.includes(:user)
+    @members = current_channel.channel_members.includes(user: :account_users)
     render json: @members.map { |member| member_response(member) }
   end
 
@@ -90,6 +90,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
       last_read_at: member.last_read_at,
       name: member.user.name,
       avatar_url: member.user.avatar_url,
+      availability_status: member.user.availability_status,
       created_at: member.created_at,
       updated_at: member.updated_at
     }

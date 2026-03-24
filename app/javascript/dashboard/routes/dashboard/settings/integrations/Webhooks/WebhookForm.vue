@@ -25,6 +25,10 @@ const SUPPORTED_WEBHOOK_EVENTS = [
   'conversation_typing_on',
   'conversation_typing_off',
   'provider_event_received',
+  'internal_chat_message_created',
+  'internal_chat_message_updated',
+  'internal_chat_message_deleted',
+  'internal_chat_channel_updated',
 ];
 
 const localhostUrl = value => {

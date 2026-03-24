@@ -21,6 +21,7 @@ const isAdmin = computed(() => currentRole.value === 'administrator');
 
 const searchQuery = ref('');
 let searchDebounceTimer = null;
+const isSearchPending = ref(false);
 const createChannelModalRef = ref(null);
 const createDMModalRef = ref(null);
 const createCategoryModalRef = ref(null);
@@ -41,7 +42,8 @@ const accountId = computed(() => {
   return route.params.accountId;
 });
 
-const isSearchMode = computed(() => searchQuery.value.trim().length >= 2);
+const isSearchMode = computed(() => searchQuery.value.trim().length >= 1);
+const isSearchReady = computed(() => searchQuery.value.trim().length >= 3);
 
 const hasSearchResults = computed(
   () =>
@@ -53,11 +55,14 @@ const hasSearchResults = computed(
 watch(searchQuery, newVal => {
   clearTimeout(searchDebounceTimer);
   const trimmed = newVal.trim();
-  if (trimmed.length < 2) {
+  if (trimmed.length < 3) {
+    isSearchPending.value = false;
     store.dispatch('internalChat/search/clearSearch');
     return;
   }
+  isSearchPending.value = true;
   searchDebounceTimer = setTimeout(() => {
+    isSearchPending.value = false;
     store.dispatch('internalChat/search/search', {
       query: trimmed,
       page: 1,
@@ -163,6 +168,8 @@ function toggleSection(key) {
 function isSectionCollapsed(key) {
   return collapsedSections.value.has(key);
 }
+
+const uiFlags = computed(() => store.getters['internalChat/getUIFlags']);
 
 const channels = computed(() => {
   return store.getters['internalChat/getChannels'] || [];
@@ -401,23 +408,57 @@ async function handleDeleteCategory() {
     </div>
     <!-- Search Results -->
     <div v-if="isSearchMode" class="flex-1 overflow-y-auto px-1.5">
-      <!-- Loading -->
+      <!-- Min characters hint -->
       <div
-        v-if="searchUIFlags.isFetching && !hasSearchResults"
-        class="flex items-center justify-center py-8"
+        v-if="!isSearchReady"
+        class="flex flex-col items-center justify-center gap-1 px-4 py-12 text-center"
       >
-        <p class="text-sm text-n-slate-10">
-          {{ t('INTERNAL_CHAT.SEARCH.SEARCHING') }}
+        <fluent-icon icon="search" size="32" class="text-n-slate-8" />
+        <p class="text-xs text-n-slate-9">
+          {{ t('INTERNAL_CHAT.SEARCH.MIN_CHARS_HINT') }}
         </p>
+      </div>
+      <!-- Loading skeleton -->
+      <div
+        v-else-if="
+          isSearchPending || (searchUIFlags.isFetching && !hasSearchResults)
+        "
+        class="space-y-4 pt-2"
+      >
+        <div v-for="section in 3" :key="section">
+          <div class="mb-1 px-2 py-1">
+            <div class="h-3 w-20 animate-pulse rounded bg-n-alpha-2" />
+          </div>
+          <div
+            v-for="i in section === 3 ? 3 : 2"
+            :key="i"
+            class="flex animate-pulse items-center gap-2 rounded-lg px-2 py-1.5"
+          >
+            <div
+              class="size-4 flex-shrink-0 bg-n-alpha-2"
+              :class="section === 3 ? 'rounded-full' : 'rounded'"
+            />
+            <div
+              class="h-3.5 flex-1 rounded bg-n-alpha-2"
+              :style="{ maxWidth: `${50 + (i % 3) * 15}%` }"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- No results -->
       <div
-        v-else-if="!searchUIFlags.isFetching && !hasSearchResults"
-        class="flex items-center justify-center py-8"
+        v-else-if="
+          !isSearchPending && !searchUIFlags.isFetching && !hasSearchResults
+        "
+        class="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center"
       >
-        <p class="text-sm text-n-slate-10">
+        <fluent-icon icon="search" size="32" class="text-n-slate-8" />
+        <p class="text-sm font-medium text-n-slate-11">
           {{ t('INTERNAL_CHAT.SEARCH.NO_RESULTS') }}
+        </p>
+        <p class="text-xs text-n-slate-9">
+          {{ t('INTERNAL_CHAT.SEARCH.NO_RESULTS_SUBTITLE') }}
         </p>
       </div>
 
@@ -865,9 +906,27 @@ async function handleDeleteCategory() {
         </div>
       </div>
 
+      <!-- Loading skeleton -->
+      <div
+        v-if="uiFlags.isFetching && channels.length === 0"
+        class="space-y-1 px-2"
+      >
+        <div
+          v-for="i in 6"
+          :key="i"
+          class="flex animate-pulse items-center gap-2 rounded-lg px-2 py-1.5"
+        >
+          <div class="size-4 flex-shrink-0 rounded bg-n-alpha-2" />
+          <div
+            class="h-3.5 flex-1 rounded bg-n-alpha-2"
+            :style="{ maxWidth: `${60 + (i % 3) * 20}%` }"
+          />
+        </div>
+      </div>
+
       <!-- Empty state -->
       <div
-        v-if="channels.length === 0"
+        v-else-if="!uiFlags.isFetching && channels.length === 0"
         class="flex items-center justify-center py-8"
       >
         <p class="text-sm text-n-slate-10">

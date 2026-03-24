@@ -11408,6 +11408,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "content"
+                ],
                 "properties": {
                   "content": {
                     "type": "string",
@@ -11858,6 +11861,448 @@
           },
           "404": {
             "description": "Reaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/polls": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Polls"
+        ],
+        "operationId": "create-internal-chat-poll",
+        "summary": "Create a poll",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Create a new poll message in an internal chat channel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_poll_create_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g. missing options)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/polls/{id}/vote": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_poll_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Internal Chat Polls"
+        ],
+        "operationId": "vote-internal-chat-poll",
+        "summary": "Vote on a poll",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Cast a vote on a poll option. For single-choice polls, any existing vote is replaced. For multiple-choice polls, a new vote is added.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "option_id"
+                ],
+                "properties": {
+                  "option_id": {
+                    "type": "integer",
+                    "description": "The ID of the poll option to vote for"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g. poll expired, already voted, revoting not allowed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Poll or option not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Polls"
+        ],
+        "operationId": "unvote-internal-chat-poll",
+        "summary": "Remove a vote from a poll",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Remove the current user's vote from a poll. Optionally specify an option_id to remove a specific vote in multiple-choice polls.",
+        "parameters": [
+          {
+            "name": "option_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the poll option to unvote (optional, for multiple-choice polls)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g. poll expired)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Poll or vote not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/drafts": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Drafts"
+        ],
+        "operationId": "list-internal-chat-drafts",
+        "summary": "List all drafts",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "List all message drafts for the current user across accessible channels",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of drafts",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_chat_draft"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/draft": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/internal_chat_channel_id_path"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Internal Chat Drafts"
+        ],
+        "operationId": "save-internal-chat-draft",
+        "summary": "Save a draft",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Create or update a message draft for the current user in the specified channel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_chat_draft_save_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_draft"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Internal Chat Drafts"
+        ],
+        "operationId": "delete-internal-chat-draft",
+        "summary": "Delete a draft",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Delete a message draft for the current user in the specified channel",
+        "parameters": [
+          {
+            "name": "parent_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The parent message ID (for thread drafts)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Draft not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/internal_chat/search": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Internal Chat Search"
+        ],
+        "operationId": "search-internal-chat",
+        "summary": "Search internal chat",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Search across channels, direct messages, and messages in the account's internal chat",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query (minimum 2 characters)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for message results pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_chat_search_result"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
@@ -15172,6 +15617,278 @@
           }
         }
       },
+      "internal_chat_draft": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the draft"
+          },
+          "content": {
+            "type": "string",
+            "description": "The draft message content"
+          },
+          "internal_chat_channel_id": {
+            "type": "integer",
+            "description": "The ID of the channel this draft belongs to"
+          },
+          "parent_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The parent message ID (for thread drafts)"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the draft was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the draft was last updated"
+          }
+        }
+      },
+      "internal_chat_poll": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the poll"
+          },
+          "question": {
+            "type": "string",
+            "description": "The poll question"
+          },
+          "multiple_choice": {
+            "type": "boolean",
+            "description": "Whether multiple options can be selected"
+          },
+          "public_results": {
+            "type": "boolean",
+            "description": "Whether vote results are publicly visible"
+          },
+          "allow_revote": {
+            "type": "boolean",
+            "description": "Whether users can change their vote"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the poll expires"
+          },
+          "internal_chat_message_id": {
+            "type": "integer",
+            "description": "The ID of the message this poll belongs to"
+          },
+          "options": {
+            "type": "array",
+            "description": "The poll options",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The option ID"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The option text"
+                },
+                "emoji": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional emoji for the option"
+                },
+                "image_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional image URL for the option"
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Display order position"
+                },
+                "votes_count": {
+                  "type": "integer",
+                  "description": "Number of votes for this option"
+                },
+                "voted": {
+                  "type": "boolean",
+                  "description": "Whether the current user voted for this option"
+                },
+                "voters": {
+                  "type": "array",
+                  "description": "Voters (only present when public_results is true)",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "total_votes": {
+            "type": "integer",
+            "description": "Total number of votes across all options"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the poll was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time at which the poll was last updated"
+          }
+        }
+      },
+      "internal_chat_search_result": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "description": "Matching channels",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The channel ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The channel name"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The channel description"
+                },
+                "channel_type": {
+                  "type": "string",
+                  "description": "The channel type"
+                }
+              }
+            }
+          },
+          "dms": {
+            "type": "array",
+            "description": "Matching direct message channels",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The channel ID"
+                },
+                "channel_type": {
+                  "type": "string",
+                  "description": "The channel type"
+                },
+                "peer": {
+                  "type": "object",
+                  "properties": {
+                    "user_id": {
+                      "type": "integer",
+                      "description": "The peer user ID"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The peer user name"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "messages": {
+            "type": "array",
+            "description": "Matching messages",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The message ID"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The message content"
+                },
+                "channel_id": {
+                  "type": "integer",
+                  "description": "The channel ID"
+                },
+                "channel_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The channel name"
+                },
+                "channel_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The channel type"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The time at which the message was created"
+                },
+                "sender": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "description": "The message sender",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "avatar_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "messages_page": {
+                "type": "integer",
+                "description": "Current page of message results"
+              },
+              "messages_has_more": {
+                "type": "boolean",
+                "description": "Whether there are more message results"
+              }
+            }
+          }
+        }
+      },
       "account_create_update_payload": {
         "type": "object",
         "properties": {
@@ -16710,6 +17427,84 @@
               "member"
             ],
             "description": "The role to assign to the new members"
+          }
+        }
+      },
+      "internal_chat_draft_save_payload": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The draft message content"
+          },
+          "parent_id": {
+            "type": "integer",
+            "description": "The parent message ID (for thread drafts)"
+          }
+        }
+      },
+      "internal_chat_poll_create_payload": {
+        "type": "object",
+        "required": [
+          "question",
+          "options",
+          "channel_id"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "integer",
+            "description": "The ID of the channel to create the poll in"
+          },
+          "question": {
+            "type": "string",
+            "description": "The poll question"
+          },
+          "options": {
+            "type": "array",
+            "description": "The poll options (minimum 2)",
+            "items": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The option text"
+                },
+                "emoji": {
+                  "type": "string",
+                  "description": "Optional emoji for the option"
+                },
+                "image_url": {
+                  "type": "string",
+                  "description": "Optional image URL for the option"
+                }
+              }
+            }
+          },
+          "multiple_choice": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether multiple options can be selected"
+          },
+          "public_results": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether vote results are publicly visible"
+          },
+          "allow_revote": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether users can change their vote"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the poll expires (ISO 8601 format)"
           }
         }
       },
@@ -18848,6 +19643,15 @@
         },
         "required": true,
         "description": "The ID of the reaction"
+      },
+      "internal_chat_poll_id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "description": "The ID of the poll"
       }
     },
     "securitySchemes": {
@@ -19005,6 +19809,18 @@
       "description": "Internal chat reaction management APIs"
     },
     {
+      "name": "Internal Chat Polls",
+      "description": "Internal chat poll management APIs"
+    },
+    {
+      "name": "Internal Chat Drafts",
+      "description": "Internal chat draft management APIs"
+    },
+    {
+      "name": "Internal Chat Search",
+      "description": "Internal chat search APIs"
+    },
+    {
       "name": "CSAT Survey Page",
       "description": "Customer satisfaction survey"
     }
@@ -19049,7 +19865,10 @@
         "Internal Chat Channels",
         "Internal Chat Channel Members",
         "Internal Chat Messages",
-        "Internal Chat Reactions"
+        "Internal Chat Reactions",
+        "Internal Chat Polls",
+        "Internal Chat Drafts",
+        "Internal Chat Search"
       ]
     },
     {

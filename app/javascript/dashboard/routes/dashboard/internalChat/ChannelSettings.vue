@@ -34,7 +34,7 @@ const isPrivate = computed(
 );
 
 const showDeleteConfirm = ref(false);
-const members = ref([]);
+const members = computed(() => props.channel.members || []);
 const isLoadingMembers = ref(false);
 const isEditingName = ref(false);
 const editedName = ref('');
@@ -43,11 +43,9 @@ const nameInputRef = ref(null);
 async function fetchMembers() {
   if (!props.channel.id) return;
 
-  isLoadingMembers.value = true;
+  if (!members.value.length) isLoadingMembers.value = true;
   try {
     const { data } = await InternalChatChannelsAPI.getMembers(props.channel.id);
-    members.value = data;
-    // Update the store so mute/favorite actions can find the member
     store.commit('internalChat/UPDATE_CHANNEL', {
       id: props.channel.id,
       members: data,
@@ -60,10 +58,15 @@ async function fetchMembers() {
 }
 
 onMounted(() => {
-  fetchMembers();
+  if (!members.value.length) fetchMembers();
 });
 
-watch(() => props.channel.id, fetchMembers);
+watch(
+  () => props.channel.id,
+  () => {
+    if (!members.value.length) fetchMembers();
+  }
+);
 // Refetch members when ActionCable broadcasts updated member list
 watch(() => props.channel.member_user_ids, fetchMembers);
 
@@ -185,7 +188,7 @@ defineExpose({ fetchMembers });
               ref="nameInputRef"
               v-model="editedName"
               type="text"
-              class="flex-1 border-b border-n-brand bg-transparent p-0 text-sm text-n-slate-12 outline-none"
+              class="reset-base flex-1 border-b border-n-brand bg-transparent text-sm text-n-slate-12 outline-none"
               @keydown.enter="saveName"
               @keydown.escape="isEditingName = false"
               @blur="saveName"
@@ -228,10 +231,15 @@ defineExpose({ fetchMembers });
             ({{ members.length }})
           </span>
         </h4>
-        <div v-if="isLoadingMembers" class="flex justify-center py-4">
-          <span class="text-sm text-n-slate-10">
-            {{ t('INTERNAL_CHAT.LOADING_MESSAGES') }}
-          </span>
+        <div v-if="isLoadingMembers" class="space-y-2">
+          <div
+            v-for="i in channel.members_count || 4"
+            :key="i"
+            class="flex animate-pulse items-center gap-2"
+          >
+            <div class="size-6 flex-shrink-0 rounded-full bg-n-alpha-2" />
+            <div class="h-3.5 flex-1 rounded bg-n-alpha-2" />
+          </div>
         </div>
         <div v-else class="space-y-2">
           <div
@@ -242,7 +250,9 @@ defineExpose({ fetchMembers });
             <Avatar
               :src="member.avatar_url"
               :name="member.name || ''"
+              :status="member.availability_status"
               :size="24"
+              rounded-full
             />
             <span class="flex-1 truncate text-sm text-n-slate-12">
               {{ member.name }}

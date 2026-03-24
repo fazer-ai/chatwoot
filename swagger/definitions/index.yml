@@ -114,6 +114,12 @@ internal_chat_message:
   $ref: ./resource/internal_chat/message.yml
 internal_chat_reaction:
   $ref: ./resource/internal_chat/reaction.yml
+internal_chat_draft:
+  $ref: ./resource/internal_chat/draft.yml
+internal_chat_poll:
+  $ref: ./resource/internal_chat/poll.yml
+internal_chat_search_result:
+  $ref: ./resource/internal_chat/search_result.yml
 
 ## ---------- REQUEST ------------- ##
 ## -------------------------------- ##
@@ -214,6 +220,10 @@ internal_chat_message_create_payload:
   $ref: ./request/internal_chat/message_create_payload.yml
 internal_chat_member_create_payload:
   $ref: ./request/internal_chat/member_create_payload.yml
+internal_chat_draft_save_payload:
+  $ref: ./request/internal_chat/draft_save_payload.yml
+internal_chat_poll_create_payload:
+  $ref: ./request/internal_chat/poll_create_payload.yml
 
 ## public requests
 public_contact_create_update_payload:

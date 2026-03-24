@@ -3,23 +3,15 @@ class InternalChat::DefaultChannelSetupService
 
   def perform
     ActiveRecord::Base.transaction do
-      category = find_or_create_default_category
-      channel = find_or_create_default_channel(category)
+      channel = find_or_create_default_channel
       sync_members(channel)
     end
   end
 
   private
 
-  def find_or_create_default_category
-    account.internal_chat_categories.find_or_create_by!(name: default_category_name) do |cat|
-      cat.position = 0
-    end
-  end
-
-  def find_or_create_default_channel(category)
-    category.channels.find_or_create_by!(
-      account: account,
+  def find_or_create_default_channel
+    account.internal_chat_channels.find_or_create_by!(
       name: default_channel_name,
       channel_type: :public_channel
     ) do |ch|
@@ -33,10 +25,6 @@ class InternalChat::DefaultChannelSetupService
         m.role = account_user.administrator? ? :admin : :member
       end
     end
-  end
-
-  def default_category_name
-    I18n.with_locale(account_locale) { I18n.t('internal_chat.default_category_name', default: 'Channels') }
   end
 
   def default_channel_name

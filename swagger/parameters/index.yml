@@ -75,3 +75,6 @@ internal_chat_category_id:
 
 internal_chat_reaction_id:
   $ref: ./internal_chat_reaction_id.yml
+
+internal_chat_poll_id:
+  $ref: ./internal_chat_poll_id.yml

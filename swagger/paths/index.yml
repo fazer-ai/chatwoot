@@ -1023,6 +1023,43 @@
   delete:
     $ref: ./application/internal_chat/reactions/delete.yml
 
+# Internal Chat Polls
+/api/v1/accounts/{account_id}/internal_chat/polls:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  post:
+    $ref: ./application/internal_chat/polls/create.yml
+/api/v1/accounts/{account_id}/internal_chat/polls/{id}/vote:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/internal_chat_poll_id'
+  post:
+    $ref: ./application/internal_chat/polls/vote.yml
+  delete:
+    $ref: ./application/internal_chat/polls/unvote.yml
+
+# Internal Chat Drafts
+/api/v1/accounts/{account_id}/internal_chat/drafts:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/internal_chat/drafts/index.yml
+/api/v1/accounts/{account_id}/internal_chat/channels/{channel_id}/draft:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/internal_chat_channel_id_path'
+  patch:
+    $ref: ./application/internal_chat/drafts/update.yml
+  delete:
+    $ref: ./application/internal_chat/drafts/delete.yml
+
+# Internal Chat Search
+/api/v1/accounts/{account_id}/internal_chat/search:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/internal_chat/search/show.yml
+
 # ------------ end of Internal Chat routes ------------ #
 
 # Conversations Messages

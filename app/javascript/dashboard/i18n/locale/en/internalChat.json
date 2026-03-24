@@ -12,8 +12,10 @@
       "DIRECT_MESSAGES": "Direct Messages",
       "MESSAGES": "Messages",
       "NO_RESULTS": "No results found",
+      "NO_RESULTS_SUBTITLE": "Try a different search term or check the spelling.",
       "LOAD_MORE": "Load more messages",
-      "SEARCHING": "Searching..."
+      "SEARCHING": "Searching...",
+      "MIN_CHARS_HINT": "Type at least 3 characters to search."
     },
     "NO_CHANNELS": "No channels found",
     "CHANNEL": {

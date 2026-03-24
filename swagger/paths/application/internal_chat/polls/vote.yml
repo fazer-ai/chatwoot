@@ -1,0 +1,44 @@
+tags:
+  - Internal Chat Polls
+operationId: vote-internal-chat-poll
+summary: Vote on a poll
+security:
+  - userApiKey: []
+description: Cast a vote on a poll option. For single-choice polls, any existing vote is replaced. For multiple-choice polls, a new vote is added.
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - option_id
+        properties:
+          option_id:
+            type: integer
+            description: The ID of the poll option to vote for
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_message'
+  '400':
+    description: Bad request (e.g. poll expired, already voted, revoting not allowed)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Poll or option not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

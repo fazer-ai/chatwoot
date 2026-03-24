@@ -32,12 +32,15 @@ export const actions = {
     }
   },
 
-  update: async ({ commit }, { channelId, ...data }) => {
+  update: async ({ commit, getters }, { channelId, ...data }) => {
+    const previous = { ...getters.getChannelById(channelId) };
+    commit('UPDATE_CHANNEL', { id: channelId, ...data.channel });
     try {
       const response = await InternalChatChannelsAPI.update(channelId, data);
       commit('UPDATE_CHANNEL', response.data);
       return response.data;
     } catch (error) {
+      commit('UPDATE_CHANNEL', previous);
       throwErrorMessage(error);
       throw error;
     }

@@ -11,7 +11,7 @@ class InternalChat::SearchService
   end
 
   def perform
-    return empty_results if @query.length < 2
+    return empty_results if @query.length < 3
 
     {
       channels: search_channels,

@@ -1,0 +1,24 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the draft
+  content:
+    type: string
+    description: The draft message content
+  internal_chat_channel_id:
+    type: integer
+    description: The ID of the channel this draft belongs to
+  parent_id:
+    type:
+      - integer
+      - 'null'
+    description: The parent message ID (for thread drafts)
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the draft was created
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the draft was last updated
