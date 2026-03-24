@@ -6,7 +6,15 @@
     "FAVORITES": "Favoritos",
     "NEW_CHANNEL": "Novo Canal",
     "NEW_DM": "Nova Mensagem",
-    "SEARCH_PLACEHOLDER": "Buscar canais...",
+    "SEARCH_PLACEHOLDER": "Buscar no chat...",
+    "SEARCH": {
+      "CHANNELS": "Canais",
+      "DIRECT_MESSAGES": "Mensagens Diretas",
+      "MESSAGES": "Mensagens",
+      "NO_RESULTS": "Nenhum resultado encontrado",
+      "LOAD_MORE": "Carregar mais mensagens",
+      "SEARCHING": "Buscando..."
+    },
     "NO_CHANNELS": "Nenhum canal encontrado",
     "CHANNEL": {
       "NAME": "Nome do Canal",
@@ -23,7 +31,8 @@
       "FAVORITE": "Adicionar aos Favoritos",
       "UNFAVORITE": "Remover dos Favoritos",
       "MARK_UNREAD": "Marcar como N\u00e3o Lida",
-      "NO_MESSAGES": "Nenhuma mensagem ainda. Inicie a conversa!",
+      "NO_MESSAGES": "Nenhuma mensagem ainda",
+      "NO_MESSAGES_SUBTITLE": "Seja o primeiro a dizer algo neste canal.",
       "ARCHIVED": "Este canal est\u00e1 arquivado",
       "MEMBER_COUNT": "{count} membro | {count} membros",
       "SETTINGS": "Configura\u00e7\u00f5es do Canal",
@@ -38,6 +47,8 @@
       "ADD_MEMBER": "Adicionar membro...",
       "REMOVE_MEMBER": "Remover membro",
       "EDIT_MEMBERS": "Editar membros",
+      "SAVE_MEMBERS": "Salvar",
+      "MEMBERS_UPDATED": "Membros atualizados com sucesso",
       "ALL_AGENTS_NOTE": "Esse canal ser\u00e1 vis\u00edvel para todos os usu\u00e1rios.",
       "CLOSE_DM": "Fechar conversa",
       "SELECT_TEAMS": "Selecionar equipes",
@@ -60,7 +71,8 @@
       "ITALIC": "It\u00e1lico",
       "CODE": "C\u00f3digo",
       "COPY_LINK": "Copiar link",
-      "LINK_COPIED": "Link da mensagem copiado"
+      "LINK_COPIED": "Link da mensagem copiado",
+      "DELETED_USER": "Usuário excluído"
     },
     "THREAD": {
       "TITLE": "Conversa",
@@ -93,7 +105,9 @@
     },
     "DRAFT": {
       "TITLE": "Rascunhos",
+      "LABEL": "Rascunho",
       "NO_DRAFTS": "Nenhum rascunho ainda",
+      "NO_DRAFTS_SUBTITLE": "Rascunhos são salvos automaticamente quando você começa a digitar em um canal.",
       "DELETE": "Excluir rascunho",
       "SAVED_AGO": "Salvo h\u00e1 {time}",
       "CHANNEL_LABEL": "Canal #{channelId}"
@@ -116,7 +130,9 @@
       "NAME": "Nome da Categoria",
       "NAME_PLACEHOLDER": "Digite o nome da categoria",
       "NONE": "Nenhuma",
-      "CREATED": "Categoria criada com sucesso"
+      "CREATED": "Categoria criada com sucesso",
+      "DELETE": "Excluir Categoria",
+      "DELETE_DESCRIPTION": "Os canais desta categoria ser\u00e3o movidos para sem categoria."
     },
     "ERRORS": {
       "FETCH_CHANNELS": "Falha ao carregar canais",
@@ -130,6 +146,23 @@
     },
     "SCROLL_TO_BOTTOM": "Ir para o final",
     "NEW_MESSAGES": "Novas mensagens",
-    "LOADING_MESSAGES": "Carregando mensagens..."
+    "LOADING_MESSAGES": "Carregando mensagens...",
+    "MENTION_BADGE": "@",
+    "EMPTY_STATE": {
+      "TITLE": "Bem-vindo ao Chat Interno",
+      "SUBTITLE": "Escolha um canal ou conversa na barra lateral para começar."
+    },
+    "CONVERSATION_MENTION": {
+      "NO_RESULTS": "Nenhuma conversa encontrada",
+      "HEADER": "Conversas",
+      "PREFIX": "#",
+      "NO_ACCESS": "Você não tem acesso a esta conversa",
+      "STATUS": {
+        "OPEN": "Aberta",
+        "RESOLVED": "Resolvida",
+        "PENDING": "Pendente",
+        "SNOOZED": "Adiada"
+      }
+    }
   }
 }

@@ -9,6 +9,7 @@ class InternalChatListener < BaseListener
 
     unhide_dm_members(channel) if channel.channel_type_dm?
     broadcast(account, tokens, INTERNAL_CHAT_MESSAGE_CREATED, message_event_data(message))
+    broadcast_typing_off(account, channel, message.sender)
   end
 
   def internal_chat_message_updated(event)
@@ -45,7 +46,8 @@ class InternalChatListener < BaseListener
                 channel_type: channel.channel_type,
                 status: channel.status,
                 category_id: channel.category_id,
-                last_activity_at: channel.last_activity_at
+                last_activity_at: channel.last_activity_at,
+                member_user_ids: channel.channel_members.pluck(:user_id)
               })
   end
 
@@ -100,6 +102,11 @@ class InternalChatListener < BaseListener
   end
 
   private
+
+  def broadcast_typing_off(account, channel, user)
+    tokens = member_tokens(channel, exclude_user: user)
+    broadcast(account, tokens, INTERNAL_CHAT_TYPING_OFF, { channel: { id: channel.id }, user: user.push_event_data })
+  end
 
   def unhide_dm_members(channel)
     channel.channel_members.where(hidden: true).find_each { |m| m.update(hidden: false) }

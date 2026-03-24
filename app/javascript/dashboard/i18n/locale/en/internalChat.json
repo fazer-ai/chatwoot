@@ -6,7 +6,15 @@
     "FAVORITES": "Favorites",
     "NEW_CHANNEL": "New Channel",
     "NEW_DM": "New Message",
-    "SEARCH_PLACEHOLDER": "Search channels...",
+    "SEARCH_PLACEHOLDER": "Find in chat...",
+    "SEARCH": {
+      "CHANNELS": "Channels",
+      "DIRECT_MESSAGES": "Direct Messages",
+      "MESSAGES": "Messages",
+      "NO_RESULTS": "No results found",
+      "LOAD_MORE": "Load more messages",
+      "SEARCHING": "Searching..."
+    },
     "NO_CHANNELS": "No channels found",
     "CHANNEL": {
       "NAME": "Channel Name",
@@ -23,7 +31,8 @@
       "FAVORITE": "Add to Favorites",
       "UNFAVORITE": "Remove from Favorites",
       "MARK_UNREAD": "Mark as Unread",
-      "NO_MESSAGES": "No messages yet. Start the conversation!",
+      "NO_MESSAGES": "No messages yet",
+      "NO_MESSAGES_SUBTITLE": "Be the first to say something in this channel.",
       "ARCHIVED": "This channel is archived",
       "MEMBER_COUNT": "{count} member | {count} members",
       "SETTINGS": "Channel settings",
@@ -38,6 +47,8 @@
       "ADD_MEMBER": "Add member...",
       "REMOVE_MEMBER": "Remove member",
       "EDIT_MEMBERS": "Edit members",
+      "SAVE_MEMBERS": "Save",
+      "MEMBERS_UPDATED": "Members updated successfully",
       "ALL_AGENTS_NOTE": "This channel will be visible to all users",
       "CLOSE_DM": "Close conversation",
       "SELECT_TEAMS": "Select Teams",
@@ -60,7 +71,8 @@
       "ITALIC": "Italic",
       "CODE": "Code",
       "COPY_LINK": "Copy link",
-      "LINK_COPIED": "Message link copied to clipboard"
+      "LINK_COPIED": "Message link copied to clipboard",
+      "DELETED_USER": "Deleted User"
     },
     "THREAD": {
       "TITLE": "Thread",
@@ -93,7 +105,9 @@
     },
     "DRAFT": {
       "TITLE": "Drafts",
+      "LABEL": "Draft",
       "NO_DRAFTS": "No drafts yet",
+      "NO_DRAFTS_SUBTITLE": "Drafts are saved automatically when you start typing in a channel.",
       "DELETE": "Delete draft",
       "SAVED_AGO": "Saved {time} ago",
       "CHANNEL_LABEL": "Channel #{channelId}"
@@ -116,7 +130,9 @@
       "NAME": "Category Name",
       "NAME_PLACEHOLDER": "Enter category name",
       "NONE": "None",
-      "CREATED": "Category created successfully"
+      "CREATED": "Category created successfully",
+      "DELETE": "Delete Category",
+      "DELETE_DESCRIPTION": "Channels in this category will be moved to uncategorized."
     },
     "ERRORS": {
       "FETCH_CHANNELS": "Failed to load channels",
@@ -130,6 +146,23 @@
     },
     "SCROLL_TO_BOTTOM": "Scroll to bottom",
     "NEW_MESSAGES": "New messages",
-    "LOADING_MESSAGES": "Loading messages..."
+    "LOADING_MESSAGES": "Loading messages...",
+    "MENTION_BADGE": "@",
+    "EMPTY_STATE": {
+      "TITLE": "Welcome to Internal Chat",
+      "SUBTITLE": "Pick a channel or conversation from the sidebar to get started."
+    },
+    "CONVERSATION_MENTION": {
+      "NO_RESULTS": "No conversations found",
+      "HEADER": "Conversations",
+      "PREFIX": "#",
+      "NO_ACCESS": "You don't have access to this conversation",
+      "STATUS": {
+        "OPEN": "Open",
+        "RESOLVED": "Resolved",
+        "PENDING": "Pending",
+        "SNOOZED": "Snoozed"
+      }
+    }
   }
 }

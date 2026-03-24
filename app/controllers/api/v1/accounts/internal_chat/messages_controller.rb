@@ -82,6 +82,8 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def paginated_messages
+    return fetch_around_messages if params[:around].present?
+
     messages = apply_time_filters(base_messages_scope)
     if params[:after].present?
       messages.ordered.limit(MESSAGES_PER_PAGE)
@@ -90,6 +92,18 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
     end
   rescue ArgumentError
     base_messages_scope.ordered.last(MESSAGES_PER_PAGE)
+  end
+
+  def fetch_around_messages
+    target = current_channel.messages.find_by(id: params[:around])
+    return base_messages_scope.ordered.last(MESSAGES_PER_PAGE) unless target
+
+    half = MESSAGES_PER_PAGE / 2
+    before_msgs = base_messages_scope.where('internal_chat_messages.created_at <= ?', target.created_at)
+                                     .ordered.last(half)
+    after_msgs = base_messages_scope.where('internal_chat_messages.created_at > ?', target.created_at)
+                                    .ordered.limit(half)
+    (before_msgs + after_msgs).uniq(&:id).sort_by(&:created_at)
   end
 
   def base_messages_scope

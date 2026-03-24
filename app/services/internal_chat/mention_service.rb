@@ -11,6 +11,8 @@ class InternalChat::MentionService
 
   def extract_mentioned_user_ids
     user_ids = message.content.scan(%r{\(mention://user/(\d+)/(.+?)\)}).map(&:first).uniq
+    team_ids = message.content.scan(%r{\(mention://team/(\d+)/(.+?)\)}).map(&:first).uniq
+    user_ids += expand_team_mentions(team_ids) if team_ids.present?
 
     if mentions_all?
       return [] unless sender_is_admin?
@@ -19,7 +21,15 @@ class InternalChat::MentionService
     end
 
     user_ids -= [message.sender_id.to_s]
-    valid_user_ids(user_ids)
+    valid_user_ids(user_ids.uniq)
+  end
+
+  def expand_team_mentions(team_ids)
+    message.account.teams
+           .joins(:team_members)
+           .where(id: team_ids)
+           .pluck('team_members.user_id')
+           .map(&:to_s)
   end
 
   def mentions_all?

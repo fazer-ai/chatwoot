@@ -17,7 +17,6 @@ const channelDescription = ref('');
 const channelType = ref('public_channel');
 const categoryId = ref('');
 const isCreating = ref(false);
-const selectedTeamIds = ref([]);
 const selectedAgentIds = ref([]);
 const memberSearchQuery = ref('');
 
@@ -26,8 +25,6 @@ const categories = computed(
 );
 
 const currentUserId = computed(() => store.getters.getCurrentUser?.id);
-
-const teams = computed(() => store.getters['teams/getTeams'] || []);
 
 const agents = computed(() => {
   const allAgents = store.getters['agents/getAgents'] || [];
@@ -56,15 +53,6 @@ const categoryOptions = computed(() => [
 
 const isFormValid = computed(() => channelName.value.trim().length > 0);
 
-function toggleTeam(teamId) {
-  const idx = selectedTeamIds.value.indexOf(teamId);
-  if (idx === -1) {
-    selectedTeamIds.value.push(teamId);
-  } else {
-    selectedTeamIds.value.splice(idx, 1);
-  }
-}
-
 function toggleAgent(agentId) {
   const idx = selectedAgentIds.value.indexOf(agentId);
   if (idx === -1) {
@@ -79,10 +67,8 @@ function open() {
   channelDescription.value = '';
   channelType.value = 'public_channel';
   categoryId.value = '';
-  selectedTeamIds.value = [];
   selectedAgentIds.value = [];
   memberSearchQuery.value = '';
-  store.dispatch('teams/get');
   store.dispatch('agents/get');
   dialogRef.value?.open();
 }
@@ -100,7 +86,6 @@ async function handleConfirm() {
         category_id: categoryId.value || null,
       },
       member_ids: isPrivate.value ? selectedAgentIds.value : [],
-      team_ids: isPrivate.value ? selectedTeamIds.value : [],
     });
     useAlert(t('INTERNAL_CHAT.CHANNEL.CREATED'));
     dialogRef.value?.close();
@@ -172,32 +157,8 @@ defineExpose({ open });
         {{ t('INTERNAL_CHAT.CHANNEL.ALL_AGENTS_NOTE') }}
       </div>
 
-      <!-- Private channel: team + agent selection -->
+      <!-- Private channel: agent selection -->
       <template v-if="isPrivate">
-        <!-- Team selection -->
-        <div v-if="teams.length > 0" class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-n-slate-12">
-            {{ t('INTERNAL_CHAT.CHANNEL.SELECT_TEAMS') }}
-          </label>
-          <div
-            class="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-n-slate-6 p-2"
-          >
-            <label
-              v-for="team in teams"
-              :key="team.id"
-              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-1"
-            >
-              <input
-                type="checkbox"
-                :checked="selectedTeamIds.includes(team.id)"
-                class="rounded border-n-slate-6"
-                @change="toggleTeam(team.id)"
-              />
-              <span class="truncate">{{ team.name }}</span>
-            </label>
-          </div>
-        </div>
-
         <!-- Agent selection -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-n-slate-12">

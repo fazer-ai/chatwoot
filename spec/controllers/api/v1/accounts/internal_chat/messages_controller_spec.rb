@@ -111,6 +111,24 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
         body = response.parsed_body
         expect(body['messages'].first['sender']).to be_present
       end
+
+      it 'returns messages centered around a target message with around parameter' do
+        messages = Array.new(10) do |i|
+          create(:internal_chat_message, account: account, channel: channel, sender: agent,
+                                         content: "msg-#{i}", created_at: (10 - i).minutes.ago)
+        end
+        target = messages[5]
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
+            params: { around: target.id },
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        message_ids = body['messages'].map { |m| m['id'] }
+        expect(message_ids).to include(target.id)
+      end
     end
   end
 

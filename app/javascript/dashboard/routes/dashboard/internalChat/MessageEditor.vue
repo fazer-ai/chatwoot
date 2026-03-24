@@ -47,6 +47,8 @@ const editorRef = ref(null);
 const fileInputRef = ref(null);
 const editorContent = ref(props.initialContent);
 const attachedFiles = ref([]);
+const isMentionMenuOpen = ref(false);
+const isConversationMenuOpen = ref(false);
 
 let draftTimer = null;
 
@@ -102,8 +104,17 @@ function handleSend() {
   setTimeout(() => focusEditor(), 200);
 }
 
+function handleToggleUserMention(isOpen) {
+  isMentionMenuOpen.value = isOpen;
+}
+
+function handleToggleConversationMention(isOpen) {
+  isConversationMenuOpen.value = isOpen;
+}
+
 function handleKeyDown(event) {
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    if (isMentionMenuOpen.value || isConversationMenuOpen.value) return;
     event.preventDefault();
     event.stopPropagation();
     handleSend();
@@ -161,6 +172,8 @@ onBeforeUnmount(() => {
   if (draftTimer) {
     clearTimeout(draftTimer);
     draftTimer = null;
+    // Flush pending draft before unmounting
+    emit('draftUpdate', editorContent.value);
   }
 });
 
@@ -237,6 +250,8 @@ defineExpose({ focus, setContent, getContent });
           channel-type="Context::Default"
           :placeholder="placeholder || t('INTERNAL_CHAT.MESSAGE.PLACEHOLDER')"
           enable-suggestions
+          enable-mention-dropdown
+          enable-conversation-mention
           :enable-variables="false"
           :enable-canned-responses="false"
           :enable-captain-tools="false"
@@ -244,6 +259,8 @@ defineExpose({ focus, setContent, getContent });
           :allow-signature="false"
           focus-on-mount
           @typing-on="handleTypingOn"
+          @toggle-user-mention="handleToggleUserMention"
+          @toggle-conversation-mention="handleToggleConversationMention"
         />
       </div>
       <input

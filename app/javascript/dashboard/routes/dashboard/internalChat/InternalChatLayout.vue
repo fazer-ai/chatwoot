@@ -4,6 +4,7 @@ import { useStore } from 'dashboard/composables/store';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import ChannelSidebar from './ChannelSidebar.vue';
 import ChannelView from './ChannelView.vue';
 
@@ -34,6 +35,8 @@ async function fetchChannels() {
 
 onMounted(() => {
   fetchChannels();
+  store.dispatch('agents/get');
+  store.dispatch('teams/get');
 });
 </script>
 
@@ -47,12 +50,17 @@ onMounted(() => {
         :channel-id="activeChannelId"
       />
       <router-view v-else-if="isDraftsRoute" />
-      <div v-else class="flex h-full items-center justify-center bg-n-solid-1">
-        <div class="text-center">
-          <p class="text-sm text-n-slate-10">
-            {{ t('INTERNAL_CHAT.CHANNEL.NO_MESSAGES') }}
-          </p>
-        </div>
+      <div
+        v-else
+        class="flex h-full flex-col items-center justify-center gap-2 bg-n-solid-1"
+      >
+        <Icon icon="i-lucide-messages-square" class="size-10 text-n-slate-8" />
+        <p class="text-sm font-medium text-n-slate-12">
+          {{ t('INTERNAL_CHAT.EMPTY_STATE.TITLE') }}
+        </p>
+        <p class="text-xs text-n-slate-10">
+          {{ t('INTERNAL_CHAT.EMPTY_STATE.SUBTITLE') }}
+        </p>
       </div>
     </div>
   </div>

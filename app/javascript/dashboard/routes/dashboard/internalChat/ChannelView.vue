@@ -1,5 +1,12 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
@@ -36,11 +43,14 @@ const messageListRef = ref(null);
 const activeThread = ref(null);
 const pollCreatorRef = ref(null);
 const editMembersRef = ref(null);
+const channelSettingsRef = ref(null);
 const editingMessage = ref(null);
 const showSettings = ref(
   localStorage.getItem('internal_chat_settings_open') === 'true'
 );
 const isLoadingMore = ref(false);
+const isViewingHistory = ref(false);
+const firstUnreadMessageId = ref(null);
 
 const currentUser = useMapGetter('getCurrentUser');
 const currentRole = useMapGetter('getCurrentRole');
@@ -73,6 +83,12 @@ const pinnedMessages = computed(() => {
   return messages.value.filter(m => m.content_attributes?.pinned);
 });
 
+const threadDraftParentIds = computed(() => {
+  return store.getters['internalChat/drafts/getThreadDraftParentIds'](
+    props.channelId
+  );
+});
+
 function markRead() {
   store.dispatch('internalChat/markRead', props.channelId);
 }
@@ -87,17 +103,22 @@ async function fetchMessages() {
   }
 }
 
-async function loadDraft() {
-  try {
-    await store.dispatch('internalChat/drafts/fetchDrafts');
-    const draft = store.getters['internalChat/drafts/getDraftByChannelId'](
-      props.channelId
-    );
-    if (editorRef.value) {
-      editorRef.value.setContent(draft ? draft.content : '');
-    }
-  } catch {
-    // Silently handle draft load error
+function computeFirstUnreadId(unreadCount) {
+  if (unreadCount > 0 && messages.value.length > 0) {
+    const idx = Math.max(0, messages.value.length - unreadCount);
+    firstUnreadMessageId.value = messages.value[idx]?.id || null;
+  } else {
+    firstUnreadMessageId.value = null;
+  }
+}
+
+function loadDraft() {
+  // Set editor content immediately from store (no network wait)
+  const draft = store.getters['internalChat/drafts/getDraftByChannelId'](
+    props.channelId
+  );
+  if (editorRef.value) {
+    editorRef.value.setContent(draft ? draft.content : '');
   }
 }
 
@@ -366,7 +387,10 @@ async function handleToggleFavorite() {
 }
 
 async function handleDraftUpdate(content) {
-  if (!content || !content.trim()) return;
+  if (!content || !content.trim()) {
+    deleteDraftForChannel();
+    return;
+  }
   try {
     await store.dispatch('internalChat/drafts/saveDraft', {
       channelId: props.channelId,
@@ -386,6 +410,8 @@ function saveDraftImmediately() {
         content,
       })
       .catch(() => {});
+  } else {
+    deleteDraftForChannel();
   }
 }
 
@@ -416,37 +442,84 @@ async function handleLoadMore() {
 
 watch(
   () => props.channelId,
-  (newId, oldId) => {
+  async (newId, oldId) => {
     if (oldId) saveDraftImmediately();
-    fetchMessages();
-    markRead();
-    loadDraft();
     activeThread.value = null;
     editingMessage.value = null;
+    isViewingHistory.value = false;
+    firstUnreadMessageId.value = null;
+    const unreadCount = channel.value?.unread_count || 0;
+    await fetchMessages();
+    computeFirstUnreadId(unreadCount);
+    markRead();
+    loadDraft();
   }
 );
 
 async function scrollToLinkedMessage() {
-  const { messageId } = route.query;
+  const { messageId, openThread } = route.query;
   if (!messageId) return;
 
   await nextTick();
   const scrolled = messageListRef.value?.scrollToMessage(Number(messageId));
+
   if (!scrolled) {
-    // Message not in DOM yet, wait a bit for render
-    setTimeout(() => {
-      messageListRef.value?.scrollToMessage(Number(messageId));
-    }, 500);
+    try {
+      // Tell MessageList to scroll to this message when the new messages arrive,
+      // instead of auto-scrolling to bottom.
+      messageListRef.value?.scrollToMessageOnLoad(Number(messageId));
+      await store.dispatch('internalChat/messages/fetchMessages', {
+        channelId: props.channelId,
+        params: { around: messageId },
+      });
+      isViewingHistory.value = true;
+    } catch {
+      // Message may not exist
+    }
   }
-  // Clean the query param
-  router.replace({ query: {} });
+
+  if (openThread) {
+    const msg = messages.value.find(m => m.id === Number(messageId));
+    if (msg) {
+      activeThread.value = msg;
+      showSettings.value = false;
+    }
+  }
+}
+
+async function handleLoadNewer() {
+  if (!messages.value.length) return;
+  const newestMessage = messages.value[messages.value.length - 1];
+  try {
+    const result = await store.dispatch('internalChat/messages/fetchMessages', {
+      channelId: props.channelId,
+      params: { after: newestMessage.created_at },
+    });
+    if (!result || result.length === 0) {
+      isViewingHistory.value = false;
+    }
+  } catch {
+    // silently ignore
+  }
+}
+
+function handleJumpToLatest() {
+  isViewingHistory.value = false;
+  fetchMessages();
 }
 
 onMounted(async () => {
+  store.dispatch('internalChat/drafts/fetchDrafts').catch(() => {});
+  const unreadCount = channel.value?.unread_count || 0;
   await fetchMessages();
+  computeFirstUnreadId(unreadCount);
   markRead();
   loadDraft();
   scrollToLinkedMessage();
+});
+
+onBeforeUnmount(() => {
+  saveDraftImmediately();
 });
 </script>
 
@@ -461,11 +534,15 @@ onMounted(async () => {
       />
       <MessageList
         ref="messageListRef"
+        :channel-id="channelId"
         :messages="messages"
         :current-user-id="currentUserId"
         :is-admin="isAdmin"
         :is-loading="messagesUIFlags.isFetching"
         :is-loading-more="isLoadingMore"
+        :is-viewing-history="isViewingHistory"
+        :first-unread-message-id="firstUnreadMessageId"
+        :thread-draft-parent-ids="threadDraftParentIds"
         @edit="handleEdit"
         @delete="handleDelete"
         @reply="handleReply"
@@ -477,6 +554,8 @@ onMounted(async () => {
         @vote="handleVote"
         @unvote="handleUnvote"
         @load-more="handleLoadMore"
+        @load-newer="handleLoadNewer"
+        @jump-to-latest="handleJumpToLatest"
       />
       <TypingIndicator :typing-users="typingUsers" />
       <MessageEditor
@@ -509,6 +588,7 @@ onMounted(async () => {
 
     <ChannelSettings
       v-if="showSettings"
+      ref="channelSettingsRef"
       :channel="channel"
       :current-user-id="currentUserId"
       :is-admin="isAdmin"
@@ -525,6 +605,10 @@ onMounted(async () => {
     />
 
     <PollCreator ref="pollCreatorRef" @submit="handlePollSubmit" />
-    <EditMembersModal ref="editMembersRef" :channel-id="channelId" />
+    <EditMembersModal
+      ref="editMembersRef"
+      :channel-id="channelId"
+      @updated="channelSettingsRef?.fetchMembers()"
+    />
   </div>
 </template>

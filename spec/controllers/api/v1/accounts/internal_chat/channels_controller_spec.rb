@@ -85,7 +85,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         expect(body.map { |c| c['id'] }).not_to include(public_channel.id)
       end
 
-      it 'includes members_count and unread_count in response' do
+      it 'includes members_count, unread_count, and has_unread_mention in response' do
         get "/api/v1/accounts/#{account.id}/internal_chat/channels",
             headers: agent.create_new_auth_token,
             as: :json
@@ -94,6 +94,55 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         body = response.parsed_body
         expect(body.first).to have_key('members_count')
         expect(body.first).to have_key('unread_count')
+        expect(body.first).to have_key('has_unread_mention')
+      end
+
+      it 'returns has_unread_mention true when an unread message mentions the user' do
+        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
+                                       content_attributes: { 'mentioned_user_ids' => [agent.id] })
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        mentioned_channel = body.find { |c| c['id'] == public_channel.id }
+        expect(mentioned_channel['has_unread_mention']).to be(true)
+      end
+
+      it 'returns has_unread_mention true when an unread message mentions a team the user belongs to' do
+        team = create(:team, account: account)
+        create(:team_member, user: agent, team: team)
+        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        # Simulate what message_create_service does: expand team mention to member IDs
+        create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
+                                       content_attributes: { 'mentioned_user_ids' => [agent.id] })
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        mentioned_channel = body.find { |c| c['id'] == public_channel.id }
+        expect(mentioned_channel['has_unread_mention']).to be(true)
+      end
+
+      it 'returns has_unread_mention false when no unread messages mention the user' do
+        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
+                                       content: 'no mentions here')
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        channel_data = body.find { |c| c['id'] == public_channel.id }
+        expect(channel_data['has_unread_mention']).to be(false)
       end
     end
 
@@ -111,6 +160,42 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         channel_names = body.map { |c| c['name'] }
         expect(channel_names).to include('general')
         expect(channel_names).to include('secret')
+      end
+
+      it 'includes DMs the admin is a member of' do
+        dm = create(:internal_chat_channel, :dm, account: account)
+        create(:internal_chat_channel_member, channel: dm, user: administrator)
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels",
+            headers: administrator.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        expect(body.map { |c| c['id'] }).to include(dm.id)
+      end
+
+      it 'does not include DMs the admin is not a member of' do
+        other_agent1 = create(:user, account: account, role: :agent)
+        other_agent2 = create(:user, account: account, role: :agent)
+        other_dm = create(:internal_chat_channel, :dm, account: account)
+        create(:internal_chat_channel_member, channel: other_dm, user: other_agent1)
+        create(:internal_chat_channel_member, channel: other_dm, user: other_agent2)
+
+        create(:internal_chat_channel, :public_channel, account: account, name: 'visible-public')
+        create(:internal_chat_channel, :private_channel, account: account, name: 'visible-private')
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels",
+            headers: administrator.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        channel_ids = body.map { |c| c['id'] }
+        expect(channel_ids).not_to include(other_dm.id)
+        channel_names = body.map { |c| c['name'] }
+        expect(channel_names).to include('visible-public')
+        expect(channel_names).to include('visible-private')
       end
     end
   end
@@ -411,6 +496,19 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         expect(response).to have_http_status(:success)
         body = response.parsed_body
         expect(body['status']).to eq('archived')
+      end
+
+      it 'rejects archiving a DM channel' do
+        dm_channel = create(:internal_chat_channel, :dm, account: account)
+        create(:internal_chat_channel_member, channel: dm_channel, user: administrator)
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels/#{dm_channel.id}/archive",
+             headers: administrator.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        dm_channel.reload
+        expect(dm_channel.status).to eq('active')
       end
     end
   end

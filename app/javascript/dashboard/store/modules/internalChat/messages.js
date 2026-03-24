@@ -38,7 +38,9 @@ const actions = {
         params
       );
       const messages = response.data.messages || response.data;
-      if (params.before) {
+      if (params.around) {
+        commit('SET_MESSAGES', { channelId, messages });
+      } else if (params.before) {
         commit('PREPEND_MESSAGES', { channelId, messages });
       } else if (params.after) {
         commit('APPEND_MESSAGES', { channelId, messages });

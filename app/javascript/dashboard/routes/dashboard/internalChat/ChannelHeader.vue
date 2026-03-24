@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import { useMapGetter } from 'dashboard/composables/store';
 
 const props = defineProps({
@@ -21,12 +22,35 @@ const { t } = useI18n();
 
 const currentUser = useMapGetter('getCurrentUser');
 
+const isDM = computed(() => {
+  return props.channel.channel_type === 'dm';
+});
+
+const dmPeer = computed(() => {
+  if (!isDM.value) return null;
+  const members = props.channel.members || [];
+  return members.find(m => m.user_id !== currentUser.value?.id) || null;
+});
+
+// Member to use for avatar display: peer for regular DMs, self for self-DMs, null for deleted-user DMs
+const dmDisplayMember = computed(() => {
+  if (dmPeer.value) return dmPeer.value;
+  if (props.channel.name) return null;
+  return (props.channel.members || [])[0] || null;
+});
+
+const isDeletedUserDM = computed(() => {
+  return isDM.value && !dmPeer.value && !!props.channel.name;
+});
+
 const channelName = computed(() => {
-  if (props.channel.channel_type === 'dm' && props.channel.members?.length) {
-    const otherMember = props.channel.members.find(
-      m => m.user_id !== currentUser.value?.id
+  if (isDM.value) {
+    if (dmPeer.value) return dmPeer.value.name;
+    return (
+      props.channel.name ||
+      (props.channel.members || [])[0]?.name ||
+      'Direct Message'
     );
-    return otherMember?.name || props.channel.name || 'Direct Message';
   }
   return props.channel.name || '';
 });
@@ -37,10 +61,6 @@ const channelDescription = computed(() => {
 
 const memberCount = computed(() => {
   return props.channel.members_count || 0;
-});
-
-const isDM = computed(() => {
-  return props.channel.channel_type === 'dm';
 });
 
 const isArchived = computed(() => {
@@ -68,10 +88,20 @@ const pinnedCountLabel = computed(() => {
 <template>
   <div>
     <div
-      class="flex items-center gap-3 border-b border-n-slate-5 bg-n-solid-2 px-4 py-3"
+      class="flex h-[53px] items-center gap-3 border-b border-n-slate-5 bg-n-solid-2 px-4"
     >
       <div class="flex items-center gap-2 min-w-0 flex-1">
+        <Avatar
+          v-if="isDM"
+          :name="channelName"
+          :src="dmDisplayMember?.avatar_url || ''"
+          :status="dmDisplayMember?.availability_status"
+          :size="28"
+          rounded-full
+          hide-offline-status
+        />
         <Icon
+          v-else
           :icon="channelIcon"
           class="size-5 text-n-slate-11 flex-shrink-0"
         />
@@ -80,6 +110,12 @@ const pinnedCountLabel = computed(() => {
             <h2 class="truncate text-sm font-semibold text-n-slate-12">
               {{ channelName }}
             </h2>
+            <span
+              v-if="isDeletedUserDM"
+              class="flex-shrink-0 text-xs italic text-n-slate-9"
+            >
+              ({{ t('INTERNAL_CHAT.MESSAGE.DELETED_USER') }})
+            </span>
             <span
               v-if="isArchived"
               class="flex-shrink-0 rounded bg-n-slate-4 px-1.5 py-0.5 text-xs text-n-slate-10"

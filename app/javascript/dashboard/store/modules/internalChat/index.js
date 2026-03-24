@@ -4,6 +4,7 @@ import { mutations } from './mutations';
 import messages from './messages';
 import polls from './polls';
 import drafts from './drafts';
+import search from './search';
 
 const state = {
   records: {},
@@ -25,5 +26,6 @@ export default {
     messages,
     polls,
     drafts,
+    search,
   },
 };

@@ -40,6 +40,12 @@ export const mutations = {
     _state.categories = [...(_state.categories || []), category];
   },
 
+  REMOVE_CATEGORY(_state, categoryId) {
+    _state.categories = (_state.categories || []).filter(
+      c => c.id !== categoryId
+    );
+  },
+
   SET_UI_FLAG(_state, flags) {
     _state.uiFlags = { ..._state.uiFlags, ...flags };
   },

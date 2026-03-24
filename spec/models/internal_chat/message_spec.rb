@@ -6,7 +6,7 @@ RSpec.describe InternalChat::Message do
   describe 'associations' do
     it { is_expected.to belong_to(:account) }
     it { is_expected.to belong_to(:channel).class_name('InternalChat::Channel') }
-    it { is_expected.to belong_to(:sender).class_name('User') }
+    it { is_expected.to belong_to(:sender).class_name('User').optional }
     it { is_expected.to belong_to(:parent).class_name('InternalChat::Message').optional }
     it { is_expected.to have_many(:replies).class_name('InternalChat::Message').dependent(:destroy) }
     it { is_expected.to have_many(:attachments).class_name('InternalChat::MessageAttachment').dependent(:destroy) }

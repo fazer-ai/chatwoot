@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue';
+import { computed, ref, nextTick, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -36,6 +36,9 @@ const isPrivate = computed(
 const showDeleteConfirm = ref(false);
 const members = ref([]);
 const isLoadingMembers = ref(false);
+const isEditingName = ref(false);
+const editedName = ref('');
+const nameInputRef = ref(null);
 
 async function fetchMembers() {
   if (!props.channel.id) return;
@@ -56,20 +59,13 @@ async function fetchMembers() {
   }
 }
 
-async function removeMember(memberId) {
-  try {
-    await InternalChatChannelsAPI.removeMember(props.channel.id, memberId);
-    fetchMembers();
-  } catch {
-    // silently handle
-  }
-}
-
 onMounted(() => {
   fetchMembers();
 });
 
 watch(() => props.channel.id, fetchMembers);
+// Refetch members when ActionCable broadcasts updated member list
+watch(() => props.channel.member_user_ids, fetchMembers);
 
 const isMuted = computed(() => props.channel.muted);
 const isFavorited = computed(() => props.channel.favorited);
@@ -118,6 +114,30 @@ function handleArchiveToggle() {
   }
 }
 
+async function startEditName() {
+  editedName.value = props.channel.name || '';
+  isEditingName.value = true;
+  await nextTick();
+  nameInputRef.value?.focus();
+}
+
+async function saveName() {
+  const trimmed = editedName.value.trim();
+  if (!trimmed || trimmed === props.channel.name) {
+    isEditingName.value = false;
+    return;
+  }
+  try {
+    await store.dispatch('internalChat/update', {
+      channelId: props.channel.id,
+      channel: { name: trimmed },
+    });
+  } catch {
+    // silently handle
+  }
+  isEditingName.value = false;
+}
+
 function handleDelete() {
   if (!showDeleteConfirm.value) {
     showDeleteConfirm.value = true;
@@ -126,12 +146,14 @@ function handleDelete() {
   emit('delete');
   showDeleteConfirm.value = false;
 }
+
+defineExpose({ fetchMembers });
 </script>
 
 <template>
   <div class="flex h-full w-80 flex-col border-l border-n-slate-5 bg-n-solid-1">
     <div
-      class="flex items-center justify-between border-b border-n-slate-5 px-4 py-3"
+      class="flex h-[53px] items-center justify-between border-b border-n-slate-5 px-4"
     >
       <h3 class="text-sm font-semibold text-n-slate-12">
         {{ t('INTERNAL_CHAT.CHANNEL.SETTINGS') }}
@@ -154,10 +176,36 @@ function handleDelete() {
         </h4>
         <div class="space-y-2">
           <div class="flex items-center gap-2">
-            <Icon :icon="channelTypeIcon" class="size-4 text-n-slate-10" />
-            <span class="text-sm text-n-slate-12">
+            <Icon
+              :icon="channelTypeIcon"
+              class="size-4 flex-shrink-0 text-n-slate-10"
+            />
+            <input
+              v-if="isEditingName"
+              ref="nameInputRef"
+              v-model="editedName"
+              type="text"
+              class="flex-1 border-b border-n-brand bg-transparent p-0 text-sm text-n-slate-12 outline-none"
+              @keydown.enter="saveName"
+              @keydown.escape="isEditingName = false"
+              @blur="saveName"
+            />
+            <span
+              v-else
+              class="flex-1 truncate text-sm text-n-slate-12"
+              :class="{ 'cursor-pointer hover:text-n-brand': !isDM && isAdmin }"
+              @click="!isDM && isAdmin && startEditName()"
+            >
               {{ channel.name }}
             </span>
+            <button
+              v-if="isAdmin && !isDM && !isEditingName"
+              type="button"
+              class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:text-n-slate-12"
+              @click="startEditName"
+            >
+              <Icon icon="i-lucide-pencil" class="size-3.5" />
+            </button>
           </div>
           <div v-if="channel.description" class="text-sm text-n-slate-10">
             {{ channel.description }}
@@ -211,14 +259,6 @@ function handleDelete() {
             >
               {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
             </span>
-            <button
-              v-if="isAdmin && isPrivate && member.user_id !== currentUserId"
-              type="button"
-              class="flex-shrink-0 rounded p-0.5 text-n-slate-9 hover:bg-n-alpha-2 hover:text-n-ruby-11"
-              @click="removeMember(member.id)"
-            >
-              <Icon icon="i-lucide-x" class="size-3.5" />
-            </button>
           </div>
           <div v-if="members.length === 0" class="text-sm text-n-slate-10">
             {{ t('INTERNAL_CHAT.CHANNEL.NO_MEMBERS') }}

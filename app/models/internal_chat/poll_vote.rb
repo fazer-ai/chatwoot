@@ -16,7 +16,7 @@
 # Foreign Keys
 #
 #  fk_rails_...  (internal_chat_poll_option_id => internal_chat_poll_options.id)
-#  fk_rails_...  (user_id => users.id)
+#  fk_rails_...  (user_id => users.id) ON DELETE => cascade
 #
 class InternalChat::PollVote < ApplicationRecord
   self.table_name = 'internal_chat_poll_votes'

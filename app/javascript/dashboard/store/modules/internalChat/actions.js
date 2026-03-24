@@ -118,7 +118,11 @@ export const actions = {
   markRead: async ({ commit }, channelId) => {
     try {
       await InternalChatChannelsAPI.markRead(channelId);
-      commit('UPDATE_CHANNEL', { id: channelId, unread_count: 0 });
+      commit('UPDATE_CHANNEL', {
+        id: channelId,
+        unread_count: 0,
+        has_unread_mention: false,
+      });
     } catch (error) {
       throwErrorMessage(error);
     }
@@ -139,6 +143,22 @@ export const actions = {
         await InternalChatChannelsAPI.createCategory(categoryData);
       commit('ADD_CATEGORY', response.data);
       return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    }
+  },
+
+  deleteCategory: async ({ commit, state }, categoryId) => {
+    try {
+      await InternalChatChannelsAPI.deleteCategory(categoryId);
+      commit('REMOVE_CATEGORY', categoryId);
+      // Move channels from deleted category to uncategorized
+      Object.values(state.records).forEach(channel => {
+        if (channel.category_id === categoryId) {
+          commit('UPDATE_CHANNEL', { id: channel.id, category_id: null });
+        }
+      });
     } catch (error) {
       throwErrorMessage(error);
       throw error;

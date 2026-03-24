@@ -14,6 +14,12 @@ class InternalChatChannelsAPI extends ApiClient {
     return axios.post(`${this.url.replace('/channels', '/categories')}`, data);
   }
 
+  deleteCategory(categoryId) {
+    return axios.delete(
+      `${this.url.replace('/channels', '/categories')}/${categoryId}`
+    );
+  }
+
   archive(channelId) {
     return axios.post(`${this.url}/${channelId}/archive`);
   }
@@ -52,6 +58,10 @@ class InternalChatChannelsAPI extends ApiClient {
     return axios.post(`${this.url}/${channelId}/mark_unread`, {
       message_id: messageId,
     });
+  }
+
+  search(params) {
+    return axios.get(`${this.url.replace('/channels', '/search')}`, { params });
   }
 }
 

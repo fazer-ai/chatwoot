@@ -45,6 +45,7 @@ class ActionCableConnector extends BaseActionCableConnector {
         this.onRecurringScheduledMessageUpdated,
       'recurring_scheduled_message.deleted':
         this.onRecurringScheduledMessageDeleted,
+      'internal_chat.channel.updated': this.onInternalChatChannelUpdated,
       'internal_chat.message.created': this.onInternalChatMessageCreated,
       'internal_chat.message.updated': this.onInternalChatMessageUpdated,
       'internal_chat.message.deleted': this.onInternalChatMessageDeleted,
@@ -270,14 +271,23 @@ class ActionCableConnector extends BaseActionCableConnector {
       data.internal_chat_channel_id
     );
     if (channel) {
+      const currentUserId = this.app.$store.getters.getCurrentUser?.id;
+      const isOwnMessage = data.sender?.id === currentUserId;
       const activeChannelId =
         this.app.$store.getters['internalChat/getActiveChannelId'];
       const isActiveChannel = activeChannelId === data.internal_chat_channel_id;
+      const mentionedIds = data.content_attributes?.mentioned_user_ids || [];
+      const isMentioned = mentionedIds.includes(currentUserId);
       this.app.$store.dispatch('internalChat/updateChannel', {
         id: data.internal_chat_channel_id,
-        unread_count: isActiveChannel
-          ? channel.unread_count || 0
-          : (channel.unread_count || 0) + 1,
+        unread_count:
+          isActiveChannel || isOwnMessage
+            ? channel.unread_count || 0
+            : (channel.unread_count || 0) + 1,
+        has_unread_mention:
+          isActiveChannel || isOwnMessage
+            ? false
+            : channel.has_unread_mention || isMentioned,
         last_activity_at: data.created_at,
       });
     }
@@ -325,6 +335,29 @@ class ActionCableConnector extends BaseActionCableConnector {
       messageId: data.message_id,
       reactionId: data.id,
     });
+  };
+
+  onInternalChatChannelUpdated = data => {
+    const currentUserId = this.app.$store.getters.getCurrentUser?.id;
+    const memberIds = data.member_user_ids;
+
+    if (memberIds && currentUserId && data.channel_type === 'private_channel') {
+      if (!memberIds.includes(currentUserId)) {
+        // Current user was removed from channel
+        this.app.$store.commit('internalChat/DELETE_CHANNEL', data.id);
+        return;
+      }
+      // Current user was added: if channel not in store, refetch channels
+      const existing = this.app.$store.getters['internalChat/getChannelById'](
+        data.id
+      );
+      if (!existing) {
+        this.app.$store.dispatch('internalChat/get');
+        return;
+      }
+    }
+
+    this.app.$store.dispatch('internalChat/updateChannel', data);
   };
 
   onInternalChatPollVoted = data => {

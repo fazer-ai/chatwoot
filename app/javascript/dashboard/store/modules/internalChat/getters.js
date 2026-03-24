@@ -47,6 +47,7 @@ export const getters = {
 
   getUnreadCount: _state => {
     return Object.values(_state.records).reduce((total, channel) => {
+      if (channel.muted) return total;
       return total + (channel.unread_count || 0);
     }, 0);
   },

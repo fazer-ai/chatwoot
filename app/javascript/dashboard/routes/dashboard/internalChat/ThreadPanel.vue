@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -35,6 +35,7 @@ const { t } = useI18n();
 const isLoading = ref(false);
 const isSending = ref(false);
 const editingMessage = ref(null);
+const threadEditorRef = ref(null);
 let activeThreadRequestId = null;
 
 const threadReplies = computed(() => {
@@ -64,6 +65,22 @@ async function fetchThread() {
   }
 }
 
+function deleteThreadDraft(parentId = props.parentMessage.id) {
+  const draft = store.getters['internalChat/drafts/getThreadDraft'](
+    props.channelId,
+    parentId
+  );
+  if (draft) {
+    store
+      .dispatch('internalChat/drafts/deleteDraft', {
+        channelId: props.channelId,
+        draftId: draft.id,
+        parentId,
+      })
+      .catch(() => {});
+  }
+}
+
 async function handleSendReply(content, options = {}) {
   isSending.value = true;
   try {
@@ -80,6 +97,7 @@ async function handleSendReply(content, options = {}) {
         parentMessageId: props.parentMessage.id,
         data: { content },
       });
+      deleteThreadDraft();
       if (options.alsoSendInChannel) {
         await store.dispatch('internalChat/messages/sendMessage', {
           channelId: props.channelId,
@@ -169,20 +187,70 @@ function handleUnvote({ messageId, optionId }) {
     .catch(() => {});
 }
 
+function loadThreadDraft() {
+  const draft = store.getters['internalChat/drafts/getThreadDraft'](
+    props.channelId,
+    props.parentMessage.id
+  );
+  if (threadEditorRef.value) {
+    threadEditorRef.value.setContent(draft ? draft.content : '');
+  }
+}
+
+async function handleThreadDraftUpdate(content) {
+  if (!content || !content.trim()) {
+    deleteThreadDraft();
+    return;
+  }
+  try {
+    await store.dispatch('internalChat/drafts/saveDraft', {
+      channelId: props.channelId,
+      content,
+      parentId: props.parentMessage.id,
+    });
+  } catch {
+    // Silently handle
+  }
+}
+
+function saveThreadDraftImmediately(parentId = props.parentMessage.id) {
+  const content = threadEditorRef.value?.getContent?.() || '';
+  if (content.trim()) {
+    store
+      .dispatch('internalChat/drafts/saveDraft', {
+        channelId: props.channelId,
+        content,
+        parentId,
+      })
+      .catch(() => {});
+  } else {
+    deleteThreadDraft(parentId);
+  }
+}
+
 watch(
   () => props.parentMessage.id,
-  () => fetchThread()
+  (newId, oldId) => {
+    if (oldId) saveThreadDraftImmediately(oldId);
+    fetchThread();
+    loadThreadDraft();
+  }
 );
 
 onMounted(() => {
   fetchThread();
+  loadThreadDraft();
+});
+
+onBeforeUnmount(() => {
+  saveThreadDraftImmediately();
 });
 </script>
 
 <template>
   <div class="flex h-full w-96 flex-col border-l border-n-slate-5 bg-n-solid-1">
     <div
-      class="flex items-center justify-between border-b border-n-slate-5 px-4 py-3"
+      class="flex h-[53px] items-center justify-between border-b border-n-slate-5 px-4"
     >
       <h3 class="text-sm font-semibold text-n-slate-12">
         {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
@@ -244,6 +312,7 @@ onMounted(() => {
     </div>
 
     <MessageEditor
+      ref="threadEditorRef"
       :disabled="isSending"
       :editing-message="editingMessage"
       :placeholder="t('INTERNAL_CHAT.THREAD.REPLY_PLACEHOLDER')"
@@ -251,6 +320,7 @@ onMounted(() => {
       show-also-send-in-channel
       @send="handleSendReply"
       @cancel-edit="handleCancelEdit"
+      @draft-update="handleThreadDraftUpdate"
     />
   </div>
 </template>

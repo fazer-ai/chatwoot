@@ -9,6 +9,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     authorize InternalChat::Channel, :index?
     @channels = filtered_channels
     @unread_counts = compute_unread_counts(@channels)
+    @mention_channel_ids = compute_mention_channel_ids(@channels)
     render json: @channels.map { |channel| channel_index_response(channel) }
   end
 
@@ -58,6 +59,8 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def archive
     authorize @current_channel, :archive?
+    head(:unprocessable_entity) and return if @current_channel.channel_type_dm?
+
     @current_channel.archived!
     dispatch_channel_event(@current_channel)
     render json: channel_show_response(@current_channel)
@@ -134,10 +137,11 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   def apply_visibility_filter(channels)
-    return channels if Current.account_user&.administrator?
+    user_channels = channels.where(id: Current.user.internal_chat_channels.select(:id))
 
-    channels.where(channel_type: :public_channel)
-            .or(channels.where(id: Current.user.internal_chat_channels.select(:id)))
+    return channels.where(channel_type: %i[public_channel private_channel]).or(user_channels) if Current.account_user&.administrator?
+
+    channels.where(channel_type: :public_channel).or(user_channels)
   end
 
   def build_channel
@@ -281,6 +285,21 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     end
   end
 
+  def compute_mention_channel_ids(channels)
+    user_id = Current.user.id
+    InternalChat::ChannelMember
+      .joins(
+        'INNER JOIN internal_chat_messages ' \
+        'ON internal_chat_messages.internal_chat_channel_id = internal_chat_channel_members.internal_chat_channel_id ' \
+        'AND internal_chat_messages.created_at > internal_chat_channel_members.last_read_at'
+      )
+      .where(internal_chat_channel_id: channels.select(:id), user_id: user_id)
+      .where.not(last_read_at: nil)
+      .where.not('internal_chat_messages.sender_id' => user_id)
+      .where("internal_chat_messages.content_attributes->'mentioned_user_ids' @> ?", [user_id].to_json)
+      .pluck(Arel.sql('DISTINCT internal_chat_channel_members.internal_chat_channel_id'))
+  end
+
   def compute_unread_counts(channels)
     InternalChat::ChannelMember
       .joins(
@@ -317,11 +336,12 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       favorited: membership&.favorited || false,
       hidden: membership&.hidden || false,
       members_count: channel.channel_members.size,
-      unread_count: @unread_counts&.dig(channel.id) || 0
+      unread_count: @unread_counts&.dig(channel.id) || 0,
+      has_unread_mention: @mention_channel_ids&.include?(channel.id) || false
     )
     if channel.channel_type_dm?
       response[:members] = channel.channel_members.map do |m|
-        { user_id: m.user_id, name: m.user.name, avatar_url: m.user.avatar_url }
+        { user_id: m.user_id, name: m.user.name, avatar_url: m.user.avatar_url, availability_status: m.user.availability_status }
       end
     end
     response

@@ -66,9 +66,12 @@ class InternalChat::MessageCreateService
   end
 
   def process_mentions
-    return unless @message.content.present? && @message.content.match?(%r{\(mention://user/\d+/.+?\)|@all})
+    return unless @message.content.present? && @message.content.match?(%r{\(mention://(user|team)/\d+/.+?\)|@all})
 
-    InternalChat::MentionService.new(message: @message).perform
+    mentioned_ids = InternalChat::MentionService.new(message: @message).perform
+    return if mentioned_ids.blank?
+
+    @message.update!(content_attributes: @message.content_attributes.merge('mentioned_user_ids' => mentioned_ids.map(&:to_i)))
   end
 
   def process_notifications

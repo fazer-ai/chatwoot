@@ -142,6 +142,96 @@ RSpec.describe InternalChat::MentionService do
       expect(result).to be_empty
     end
 
+    it 'expands team mentions to team member user IDs' do
+      sender = create(:user, account: account, role: :agent)
+      member1 = create(:user, account: account, role: :agent)
+      member2 = create(:user, account: account, role: :agent)
+      team = create(:team, account: account)
+      create(:team_member, user: member1, team: team)
+      create(:team_member, user: member2, team: team)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://team/#{team.id}/#{team.name}) please review"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to contain_exactly(member1.id.to_s, member2.id.to_s)
+    end
+
+    it 'deduplicates when user is mentioned directly and via team' do
+      sender = create(:user, account: account, role: :agent)
+      user1 = create(:user, account: account, role: :agent)
+      user2 = create(:user, account: account, role: :agent)
+      team = create(:team, account: account)
+      create(:team_member, user: user1, team: team)
+      create(:team_member, user: user2, team: team)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://user/#{user1.id}/User1) and (mention://team/#{team.id}/#{team.name})"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to contain_exactly(user1.id.to_s, user2.id.to_s)
+    end
+
+    it 'excludes sender from team mention expansion' do
+      sender = create(:user, account: account, role: :agent)
+      member = create(:user, account: account, role: :agent)
+      team = create(:team, account: account)
+      create(:team_member, user: sender, team: team)
+      create(:team_member, user: member, team: team)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://team/#{team.id}/#{team.name})"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to contain_exactly(member.id.to_s)
+      expect(result).not_to include(sender.id.to_s)
+    end
+
+    it 'returns empty for empty team mentions' do
+      sender = create(:user, account: account, role: :agent)
+      empty_team = create(:team, account: account)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://team/#{empty_team.id}/#{empty_team.name})"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to be_empty
+    end
+
+    it 'ignores team mentions from other accounts' do
+      sender = create(:user, account: account, role: :agent)
+      other_account = create(:account)
+      other_team = create(:team, account: other_account)
+      other_user = create(:user, account: other_account, role: :agent)
+      create(:team_member, user: other_user, team: other_team)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://team/#{other_team.id}/OtherTeam)"
+      )
+
+      result = described_class.new(message: message).perform
+
+      expect(result).to be_empty
+    end
+
     it 'handles mixed @all and individual mentions for admin sender' do
       admin = create(:user, account: account, role: :administrator)
       member1 = create(:user, account: account, role: :agent)

@@ -1,5 +1,6 @@
-// Process [@mention](mention://user/1/Pranav) and [@mention](mention://contact/1/Name)
-const USER_MENTIONS_REGEX = /mention:\/\/(user|team|contact)\/(\d+)\/(.+)/gm;
+// Process [@mention](mention://user/1/Pranav), [@mention](mention://contact/1/Name), and [#42](mention://conversation/42/42)
+const USER_MENTIONS_REGEX =
+  /mention:\/\/(user|team|contact|conversation)\/(\d+)\/(.+)/gm;
 
 const buildMentionTokens = () => (state, silent) => {
   var label;
@@ -51,7 +52,9 @@ const buildMentionTokens = () => (state, silent) => {
     token = state.push('mention', '');
     token.href = href;
     token.content = label;
-    const mentionMatch = href.match(/mention:\/\/(user|team|contact)\//);
+    const mentionMatch = href.match(
+      /mention:\/\/(user|team|contact|conversation)\//
+    );
     token.mentionType = mentionMatch ? mentionMatch[1] : 'user';
   }
 
@@ -63,6 +66,10 @@ const buildMentionTokens = () => (state, silent) => {
 
 const renderMentions = () => (tokens, idx) => {
   const token = tokens[idx];
+  if (token.mentionType === 'conversation') {
+    const displayId = token.content.replace(/^@/, '');
+    return `<span class="prosemirror-mention-node prosemirror-mention-conversation" data-conversation-id="${displayId}" role="link" tabindex="0">#${displayId}</span>`;
+  }
   if (token.mentionType === 'contact') {
     return `<span class="prosemirror-mention-node prosemirror-mention-contact">${token.content}</span>`;
   }

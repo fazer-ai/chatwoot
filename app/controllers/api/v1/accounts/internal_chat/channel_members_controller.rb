@@ -1,4 +1,6 @@
 class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accounts::InternalChat::BaseController
+  include Events::Types
+
   before_action :current_channel
   before_action :fetch_member, only: [:update, :destroy]
 
@@ -11,6 +13,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
   def create
     authorize current_channel, :update?, policy_class: InternalChat::ChannelPolicy
     members = create_channel_members(validated_user_ids)
+    dispatch_member_update
     render json: members.map { |member| member_response(member) }, status: :created
   end
 
@@ -22,7 +25,9 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
 
   def destroy
     authorize_member_destroy!
+    removed_user = @member.user
     @member.destroy!
+    dispatch_member_update(removed_user: removed_user)
     head :ok
   end
 
@@ -56,6 +61,19 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
 
   def authorize_member_destroy!
     raise Pundit::NotAuthorizedError unless @member.user_id == Current.user.id || Current.account_user&.administrator?
+  end
+
+  def dispatch_member_update(removed_user: nil)
+    # Capture tokens before the broadcast so the removed user also receives the event
+    tokens = current_channel.members.pluck(:pubsub_token)
+    tokens << removed_user.pubsub_token if removed_user.present?
+
+    Rails.configuration.dispatcher.dispatch(
+      INTERNAL_CHAT_CHANNEL_UPDATED,
+      Time.zone.now,
+      channel: current_channel,
+      member_tokens: tokens.uniq
+    )
   end
 
   def member_update_params

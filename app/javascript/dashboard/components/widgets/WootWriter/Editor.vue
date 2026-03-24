@@ -17,6 +17,7 @@ import TagAgents from '../conversation/TagAgents.vue';
 import TagGroupMembers from '../conversation/TagGroupMembers.vue';
 import VariableList from '../conversation/VariableList.vue';
 import TagTools from '../conversation/TagTools.vue';
+import TagConversations from '../conversation/TagConversations.vue';
 import CopilotMenuBar from './CopilotMenuBar.vue';
 
 import { useEmitter } from 'dashboard/composables/emitter';
@@ -101,6 +102,8 @@ const props = defineProps({
   isGroupConversation: { type: Boolean, default: false },
   groupContactId: { type: [Number, String], default: null },
   inboxPhoneNumber: { type: String, default: null },
+  enableMentionDropdown: { type: Boolean, default: false },
+  enableConversationMention: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -116,6 +119,7 @@ const emit = defineEmits([
   'input',
   'update:modelValue',
   'executeCopilotAction',
+  'toggleConversationMention',
 ]);
 
 const { t } = useI18n();
@@ -204,6 +208,8 @@ const toolSearchKey = ref('');
 const cannedSearchTerm = ref('');
 const variableSearchTerm = ref('');
 const emojiSearchTerm = ref('');
+const showConversationMenu = ref(false);
+const conversationSearchKey = ref('');
 const range = ref(null);
 const isImageNodeSelected = ref(false);
 const toolbarPosition = ref({ top: 0, left: 0 });
@@ -325,6 +331,13 @@ const plugins = computed(() => {
       showMenu: showEmojiMenu,
       searchTerm: emojiSearchTerm,
     }),
+    createSuggestionPlugin({
+      trigger: '#',
+      minChars: 0,
+      showMenu: showConversationMenu,
+      searchTerm: conversationSearchKey,
+      isAllowed: () => props.enableConversationMention,
+    }),
   ];
 });
 
@@ -365,7 +378,10 @@ const formattedSignature = computed(() => {
 watch(showUserMentions, updatedValue => {
   emit(
     'toggleUserMention',
-    (props.isPrivate || props.isGroupConversation) && updatedValue
+    (props.isPrivate ||
+      props.isGroupConversation ||
+      props.enableMentionDropdown) &&
+      updatedValue
   );
 });
 watch(showCannedMenu, updatedValue => {
@@ -376,6 +392,13 @@ watch(showVariables, updatedValue => {
 });
 watch(showToolsMenu, updatedValue => {
   emit('toggleToolsMenu', props.enableCaptainTools && updatedValue);
+});
+
+watch(showConversationMenu, updatedValue => {
+  emit(
+    'toggleConversationMention',
+    props.enableConversationMention && updatedValue
+  );
 });
 
 function focusEditorInputField(pos = 'end') {
@@ -843,8 +866,9 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       @select-agent="content => insertSpecialContent('mention', content)"
     />
     <TagAgents
-      v-if="showUserMentions && isPrivate"
+      v-if="showUserMentions && (isPrivate || enableMentionDropdown)"
       :search-key="mentionSearchKey"
+      :exclude-user-id="enableMentionDropdown ? currentUser?.id : null"
       @select-agent="content => insertSpecialContent('mention', content)"
     />
     <CannedResponse
@@ -866,6 +890,11 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       v-if="showToolsMenu"
       :search-key="toolSearchKey"
       @select-tool="content => insertSpecialContent('tool', content)"
+    />
+    <TagConversations
+      v-if="showConversationMenu && enableConversationMention"
+      :search-key="conversationSearchKey"
+      @select-conversation="content => insertSpecialContent('mention', content)"
     />
     <CopilotMenuBar
       v-if="showSelectionMenu"
@@ -1080,6 +1109,15 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
         @apply text-n-slate-12;
       }
     }
+  }
+}
+
+.prosemirror-mention-node[mention-type='conversation'] {
+  font-size: 0;
+
+  &::before {
+    font-size: 0.875rem;
+    content: '#' attr(mention-user-full-name);
   }
 }
 

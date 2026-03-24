@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_23_000003) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1006,7 +1006,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_internal_chat_drafts_on_account_id"
     t.index ["internal_chat_channel_id"], name: "idx_ic_drafts_channel"
-    t.index ["user_id", "internal_chat_channel_id"], name: "idx_ic_drafts_user_channel", unique: true
+    t.index ["user_id", "internal_chat_channel_id", "parent_id"], name: "idx_ic_drafts_user_channel_thread", unique: true, where: "(parent_id IS NOT NULL)"
+    t.index ["user_id", "internal_chat_channel_id"], name: "idx_ic_drafts_user_channel_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["user_id", "updated_at"], name: "idx_ic_drafts_user_updated"
     t.index ["user_id"], name: "index_internal_chat_drafts_on_user_id"
   end
@@ -1027,7 +1028,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
   create_table "internal_chat_messages", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.bigint "internal_chat_channel_id", null: false
-    t.bigint "sender_id", null: false
+    t.bigint "sender_id"
     t.text "content"
     t.integer "content_type", default: 0, null: false
     t.bigint "parent_id"
@@ -1037,6 +1038,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
     t.datetime "updated_at", null: false
     t.index ["account_id", "created_at"], name: "idx_ic_messages_account_created"
     t.index ["account_id"], name: "index_internal_chat_messages_on_account_id"
+    t.index ["content"], name: "idx_ic_messages_content_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["internal_chat_channel_id", "created_at"], name: "idx_ic_messages_channel_created"
     t.index ["internal_chat_channel_id"], name: "index_internal_chat_messages_on_internal_chat_channel_id"
     t.index ["parent_id"], name: "index_internal_chat_messages_on_parent_id"
@@ -1642,7 +1644,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"
   add_foreign_key "internal_chat_channel_members", "internal_chat_channels"
-  add_foreign_key "internal_chat_channel_members", "users"
+  add_foreign_key "internal_chat_channel_members", "users", on_delete: :cascade
   add_foreign_key "internal_chat_channel_teams", "internal_chat_channels"
   add_foreign_key "internal_chat_channel_teams", "teams"
   add_foreign_key "internal_chat_channels", "internal_chat_categories", column: "category_id"
@@ -1652,13 +1654,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_22_202708) do
   add_foreign_key "internal_chat_message_attachments", "internal_chat_messages"
   add_foreign_key "internal_chat_messages", "internal_chat_channels"
   add_foreign_key "internal_chat_messages", "internal_chat_messages", column: "parent_id"
-  add_foreign_key "internal_chat_messages", "users", column: "sender_id"
+  add_foreign_key "internal_chat_messages", "users", column: "sender_id", on_delete: :nullify
   add_foreign_key "internal_chat_poll_options", "internal_chat_polls"
   add_foreign_key "internal_chat_poll_votes", "internal_chat_poll_options"
-  add_foreign_key "internal_chat_poll_votes", "users"
+  add_foreign_key "internal_chat_poll_votes", "users", on_delete: :cascade
   add_foreign_key "internal_chat_polls", "internal_chat_messages"
   add_foreign_key "internal_chat_reactions", "internal_chat_messages"
-  add_foreign_key "internal_chat_reactions", "users"
+  add_foreign_key "internal_chat_reactions", "users", on_delete: :cascade
   add_foreign_key "kanban_account_user_preferences", "account_users"
   add_foreign_key "kanban_audit_events", "accounts"
   add_foreign_key "kanban_audit_events", "kanban_tasks", column: "task_id"

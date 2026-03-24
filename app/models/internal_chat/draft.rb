@@ -14,7 +14,8 @@
 # Indexes
 #
 #  idx_ic_drafts_channel                     (internal_chat_channel_id)
-#  idx_ic_drafts_user_channel                (user_id,internal_chat_channel_id) UNIQUE
+#  idx_ic_drafts_user_channel_root           (user_id,internal_chat_channel_id) UNIQUE WHERE (parent_id IS NULL)
+#  idx_ic_drafts_user_channel_thread         (user_id,internal_chat_channel_id,parent_id) UNIQUE WHERE (parent_id IS NOT NULL)
 #  idx_ic_drafts_user_updated                (user_id,updated_at)
 #  index_internal_chat_drafts_on_account_id  (account_id)
 #  index_internal_chat_drafts_on_user_id     (user_id)
@@ -33,7 +34,7 @@ class InternalChat::Draft < ApplicationRecord
   belongs_to :parent, class_name: 'InternalChat::Message', optional: true
 
   validates :content, presence: true
-  validates :user_id, uniqueness: { scope: [:internal_chat_channel_id, :parent_id] } # rubocop:disable Rails/UniqueValidationWithoutIndex
+  validates :user_id, uniqueness: { scope: [:internal_chat_channel_id, :parent_id] }
 
   scope :recent, -> { order(updated_at: :desc) }
 end

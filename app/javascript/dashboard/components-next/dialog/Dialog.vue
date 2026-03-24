@@ -118,22 +118,25 @@ defineExpose({ open, close });
   <TeleportWithDirection to="body">
     <dialog
       ref="dialogRef"
-      class="w-full transition-all duration-300 ease-in-out shadow-xl rounded-xl"
+      class="w-full max-h-[90vh] transition-all duration-300 ease-in-out shadow-xl rounded-xl"
       :class="[
         maxWidthClass,
         positionClass,
-        overflowYAuto ? 'overflow-y-auto' : 'overflow-visible',
+        overflowYAuto ? 'overflow-y-auto' : 'overflow-hidden',
       ]"
       @close.prevent="handleDialogClose"
     >
       <OnClickOutside @trigger="handleClickOutside">
         <form
           ref="dialogContentRef"
-          class="flex flex-col w-full h-auto gap-6 p-6 overflow-visible text-start align-middle transition-all duration-300 ease-in-out transform bg-n-alpha-3 backdrop-blur-[100px] shadow-xl rounded-xl"
+          class="flex flex-col w-full max-h-[90vh] gap-6 p-6 overflow-hidden text-start align-middle transition-all duration-300 ease-in-out transform bg-n-alpha-3 backdrop-blur-[100px] shadow-xl rounded-xl"
           @submit.prevent="confirm"
           @click.stop
         >
-          <div v-if="title || description" class="flex flex-col gap-2">
+          <div
+            v-if="title || description"
+            class="flex flex-col gap-2 flex-shrink-0"
+          >
             <h3 class="text-base font-medium leading-6 text-n-slate-12">
               {{ title }}
             </h3>
@@ -143,12 +146,14 @@ defineExpose({ open, close });
               </p>
             </slot>
           </div>
-          <slot v-if="isOpen" />
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            <slot v-if="isOpen" />
+          </div>
           <!-- Dialog content will be injected here -->
           <slot name="footer">
             <div
               v-if="showCancelButton || showConfirmButton"
-              class="flex items-center justify-between w-full gap-3"
+              class="flex items-center justify-between w-full gap-3 flex-shrink-0"
             >
               <Button
                 v-if="showCancelButton"

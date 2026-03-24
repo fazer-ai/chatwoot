@@ -49,12 +49,10 @@ function getChannelName(draft) {
     });
   }
   if (channel.channel_type === 'dm') {
-    const otherMember = (channel.members || []).find(
-      m => m.user_id !== currentUserId.value
-    );
-    return (
-      otherMember?.name || channel.name || t('INTERNAL_CHAT.DIRECT_MESSAGES')
-    );
+    const members = channel.members || [];
+    const peer =
+      members.find(m => m.user_id !== currentUserId.value) || members[0];
+    return peer?.name || channel.name || t('INTERNAL_CHAT.DIRECT_MESSAGES');
   }
   return (
     channel.name ||
@@ -72,12 +70,16 @@ function navigateToChannel(draft) {
     channel?.channel_type === 'dm'
       ? 'internal_chat_dm'
       : 'internal_chat_channel';
+  const query = draft.parent_id
+    ? { messageId: draft.parent_id, openThread: 1 }
+    : {};
   router.push({
     name: routeName,
     params: {
       accountId: accountId.value,
       channelId: draft.internal_chat_channel_id,
     },
+    query,
   });
 }
 
@@ -86,6 +88,7 @@ async function handleDelete(draft) {
     await store.dispatch('internalChat/drafts/deleteDraft', {
       channelId: draft.internal_chat_channel_id,
       draftId: draft.id,
+      parentId: draft.parent_id,
     });
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
@@ -102,7 +105,7 @@ onMounted(() => {
 <template>
   <div class="flex h-full flex-col bg-n-solid-1">
     <div
-      class="flex items-center border-b border-n-slate-5 bg-n-solid-2 px-4 py-3"
+      class="flex h-[53px] items-center border-b border-n-slate-5 bg-n-solid-2 px-4"
     >
       <Icon icon="i-lucide-file-edit" class="mr-2 size-5 text-n-slate-11" />
       <h2 class="text-sm font-semibold text-n-slate-12">
@@ -120,10 +123,14 @@ onMounted(() => {
 
       <div
         v-else-if="drafts.length === 0"
-        class="flex h-full items-center justify-center"
+        class="flex h-full flex-col items-center justify-center gap-2"
       >
-        <p class="text-sm text-n-slate-10">
+        <Icon icon="i-lucide-file-edit" class="size-10 text-n-slate-8" />
+        <p class="text-sm font-medium text-n-slate-12">
           {{ t('INTERNAL_CHAT.DRAFT.NO_DRAFTS') }}
+        </p>
+        <p class="text-xs text-n-slate-10">
+          {{ t('INTERNAL_CHAT.DRAFT.NO_DRAFTS_SUBTITLE') }}
         </p>
       </div>
 
@@ -138,6 +145,13 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-n-slate-12 truncate">
                 {{ getChannelName(draft) }}
+              </span>
+              <span
+                v-if="draft.parent_id"
+                class="flex items-center gap-0.5 text-xs text-n-slate-10"
+              >
+                <Icon icon="i-lucide-message-square" class="size-3" />
+                {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
               </span>
               <span class="text-xs text-n-slate-10">
                 {{ timeSince(draft.updated_at) }}

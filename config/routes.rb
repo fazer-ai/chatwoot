@@ -162,6 +162,7 @@ Rails.application.routes.draw do
           end
 
           namespace :internal_chat do
+            resource :search, only: [:show], controller: 'search'
             resources :categories, only: [:index, :create, :update, :destroy]
             resources :channels, only: [:index, :create, :show, :update, :destroy] do
               member do

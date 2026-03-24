@@ -19,8 +19,7 @@ const isCreating = ref(false);
 const currentUserId = computed(() => store.getters.getCurrentUser?.id);
 
 const agents = computed(() => {
-  const allAgents = store.getters['agents/getAgents'] || [];
-  return allAgents.filter(agent => agent.id !== currentUserId.value);
+  return store.getters['agents/getAgents'] || [];
 });
 
 const filteredAgents = computed(() => {
@@ -103,7 +102,12 @@ defineExpose({ open });
             :size="28"
             rounded-full
           />
-          <span class="flex-1 truncate">{{ agent.name }}</span>
+          <span class="flex-1 truncate">
+            {{ agent.name }}
+            <span v-if="agent.id === currentUserId" class="text-n-slate-10">
+              {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
+            </span>
+          </span>
         </button>
         <p
           v-if="filteredAgents.length === 0"

@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import CreateChannelModal from './CreateChannelModal.vue';
 import CreateDMModal from './CreateDMModal.vue';
 import CreateCategoryModal from './CreateCategoryModal.vue';
+import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Draggable from 'vuedraggable';
 
 const store = useStore();
@@ -18,9 +20,125 @@ const currentRole = useMapGetter('getCurrentRole');
 const isAdmin = computed(() => currentRole.value === 'administrator');
 
 const searchQuery = ref('');
+let searchDebounceTimer = null;
 const createChannelModalRef = ref(null);
 const createDMModalRef = ref(null);
 const createCategoryModalRef = ref(null);
+
+// Search store
+const searchChannels = computed(
+  () => store.getters['internalChat/search/getChannels']
+);
+const searchDMs = computed(() => store.getters['internalChat/search/getDMs']);
+const searchMessages = computed(
+  () => store.getters['internalChat/search/getMessages']
+);
+const searchUIFlags = computed(
+  () => store.getters['internalChat/search/getUIFlags']
+);
+
+const accountId = computed(() => {
+  return route.params.accountId;
+});
+
+const isSearchMode = computed(() => searchQuery.value.trim().length >= 2);
+
+const hasSearchResults = computed(
+  () =>
+    searchChannels.value.length > 0 ||
+    searchDMs.value.length > 0 ||
+    searchMessages.value.length > 0
+);
+
+watch(searchQuery, newVal => {
+  clearTimeout(searchDebounceTimer);
+  const trimmed = newVal.trim();
+  if (trimmed.length < 2) {
+    store.dispatch('internalChat/search/clearSearch');
+    return;
+  }
+  searchDebounceTimer = setTimeout(() => {
+    store.dispatch('internalChat/search/search', {
+      query: trimmed,
+      page: 1,
+    });
+  }, 300);
+});
+
+function clearSearch() {
+  searchQuery.value = '';
+  store.dispatch('internalChat/search/clearSearch');
+}
+
+function loadMoreMessages() {
+  const nextPage = searchUIFlags.value.currentPage + 1;
+  store.dispatch('internalChat/search/search', {
+    query: searchQuery.value.trim(),
+    page: nextPage,
+  });
+}
+
+function navigateToMessage(message) {
+  const routeName =
+    message.channel_type === 'dm'
+      ? 'internal_chat_dm'
+      : 'internal_chat_channel';
+  router.push({
+    name: routeName,
+    params: { accountId: accountId.value, channelId: message.channel_id },
+    query: { messageId: message.id },
+  });
+}
+
+function stripMarkup(text) {
+  if (!text) return '';
+  // Convert mention links [@Name](mention://...) to just @Name
+  let clean = text.replace(/\[@([^\]]*)\]\(mention:\/\/[^)]*\)/g, '@$1');
+  // Strip remaining markdown links [text](url) to just text
+  clean = clean.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // Strip any remaining HTML tags
+  clean = clean.replace(/<[^>]+>/g, '');
+  return clean;
+}
+
+function truncateAroundMatch(text, query, maxLen = 120) {
+  if (!text) return '';
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(query.toLowerCase());
+  if (idx === -1 || text.length <= maxLen) return text;
+  const start = Math.max(0, idx - Math.floor(maxLen / 2));
+  const end = Math.min(text.length, start + maxLen);
+  let snippet = text.slice(start, end);
+  if (start > 0) snippet = `...${snippet}`;
+  if (end < text.length) snippet = `${snippet}...`;
+  return snippet;
+}
+
+function highlightMatch(text, query) {
+  if (!query || !text) return text || '';
+  const clean = stripMarkup(text);
+  const snippet = truncateAroundMatch(clean, query);
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return snippet.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+}
+
+function formatMessageTime(createdAt) {
+  const date =
+    typeof createdAt === 'number'
+      ? new Date(createdAt * 1000)
+      : new Date(createdAt);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 const collapsedSections = ref(
   new Set(
@@ -66,17 +184,43 @@ const activeChannelId = computed(() => {
   return Number(route.params.channelId) || null;
 });
 
-const accountId = computed(() => {
-  return route.params.accountId;
-});
+function getDMPeerMember(channel) {
+  if (channel.channel_type !== 'dm') return null;
+  const currentUserId = store.getters.getCurrentUser?.id;
+  const members = channel.members || [];
+  return members.find(m => m.user_id !== currentUserId) || null;
+}
+
+// Returns the member to use for avatar/name display in DM sidebar items
+function getDMDisplayMember(channel) {
+  if (channel.channel_type !== 'dm') return null;
+  const peer = getDMPeerMember(channel);
+  if (peer) return peer;
+  // Self-DM: use first member (self). Deleted-user DM: no member to display.
+  if (channel.name) return null;
+  return (channel.members || [])[0] || null;
+}
+
+function isDeletedUserDM(channel) {
+  if (channel.channel_type !== 'dm') return false;
+  return !getDMPeerMember(channel) && !!channel.name;
+}
 
 function getDMDisplayName(channel) {
   if (channel.channel_type !== 'dm') return channel.name || '';
+  const peer = getDMPeerMember(channel);
+  if (peer) return peer.name;
+  // No peer: either self-DM or deleted user DM (name stored on channel)
+  return channel.name || (channel.members || [])[0]?.name || 'Direct Message';
+}
+
+function isSelfDM(channel) {
+  if (channel.channel_type !== 'dm') return false;
+  // DMs with a stored name are from deleted users, not self-DMs
+  if (channel.name) return false;
   const currentUserId = store.getters.getCurrentUser?.id;
-  const otherMember = (channel.members || []).find(
-    m => m.user_id !== currentUserId
-  );
-  return otherMember?.name || channel.name || 'Direct Message';
+  const members = channel.members || [];
+  return members.length > 0 && members.every(m => m.user_id === currentUserId);
 }
 
 function getDisplayName(channel) {
@@ -84,25 +228,10 @@ function getDisplayName(channel) {
   return channel.name || '';
 }
 
-function matchesSearch(ch, query) {
-  const name = getDisplayName(ch).toLowerCase();
-  if (name.includes(query)) return true;
-  if (ch.channel_type !== 'dm' && ch.description) {
-    return ch.description.toLowerCase().includes(query);
-  }
-  return false;
-}
-
 const filteredChannelsByCategory = computed(() => {
   return categoryId => {
-    let categoryChannels =
+    const categoryChannels =
       store.getters['internalChat/getChannelsByCategory'](categoryId) || [];
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase();
-      categoryChannels = categoryChannels.filter(ch =>
-        matchesSearch(ch, query)
-      );
-    }
     return [...categoryChannels].sort((a, b) => {
       if (a.muted && !b.muted) return 1;
       if (!a.muted && b.muted) return -1;
@@ -112,27 +241,17 @@ const filteredChannelsByCategory = computed(() => {
 });
 
 const filteredDMChannels = computed(() => {
-  let dms = (dmChannels.value || []).filter(ch => !ch.hidden);
-  if (!searchQuery.value) return dms;
-  const query = searchQuery.value.toLowerCase();
-  return dms.filter(ch => matchesSearch(ch, query));
+  return (dmChannels.value || []).filter(ch => !ch.hidden);
 });
 
 const filteredFavoriteChannels = computed(() => {
-  const favs = favoriteChannels.value || [];
-  if (!searchQuery.value) return favs;
-  const query = searchQuery.value.toLowerCase();
-  return favs.filter(ch => matchesSearch(ch, query));
+  return favoriteChannels.value || [];
 });
 
 const uncategorizedChannels = computed(() => {
-  let uncategorized = channels.value.filter(
+  const uncategorized = channels.value.filter(
     ch => ch.channel_type !== 'dm' && !ch.category_id
   );
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    uncategorized = uncategorized.filter(ch => matchesSearch(ch, query));
-  }
   return [...uncategorized].sort((a, b) => {
     if (a.muted && !b.muted) return 1;
     if (!a.muted && b.muted) return -1;
@@ -156,11 +275,15 @@ watch(
 );
 
 watch(
-  [categories, () => filteredChannelsByCategory.value],
-  () => {
+  () =>
+    categories.value.map(cat => ({
+      id: cat.id,
+      channels: filteredChannelsByCategory.value(cat.id),
+    })),
+  newVal => {
     const map = {};
-    categories.value.forEach(cat => {
-      map[cat.id] = [...filteredChannelsByCategory.value(cat.id)];
+    newVal.forEach(({ id, channels: catChannels }) => {
+      map[id] = [...catChannels];
     });
     localCategoryChannels.value = map;
   },
@@ -222,6 +345,28 @@ function openCreateDM() {
 function openCreateCategory() {
   createCategoryModalRef.value?.open();
 }
+
+const deleteCategoryDialogRef = ref(null);
+const pendingDeleteCategoryId = ref(null);
+
+function confirmDeleteCategory(categoryId) {
+  pendingDeleteCategoryId.value = categoryId;
+  deleteCategoryDialogRef.value?.open();
+}
+
+async function handleDeleteCategory() {
+  if (!pendingDeleteCategoryId.value) return;
+  try {
+    await store.dispatch(
+      'internalChat/deleteCategory',
+      pendingDeleteCategoryId.value
+    );
+  } catch {
+    // error handled in store
+  }
+  pendingDeleteCategoryId.value = null;
+  deleteCategoryDialogRef.value?.close();
+}
 </script>
 
 <template>
@@ -230,21 +375,164 @@ function openCreateCategory() {
       <h1 class="mb-2 text-base font-semibold text-n-slate-12">
         {{ t('INTERNAL_CHAT.TITLE') }}
       </h1>
-      <div class="relative">
+      <div
+        class="flex h-7 items-center gap-1.5 rounded-lg bg-n-alpha-1 px-2 py-1"
+      >
         <Icon
           icon="i-lucide-search"
-          class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-n-slate-10"
+          class="size-3.5 flex-shrink-0 text-n-slate-9"
         />
         <input
           v-model="searchQuery"
           type="text"
           :placeholder="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
           :aria-label="t('INTERNAL_CHAT.SEARCH_PLACEHOLDER')"
-          class="w-full rounded-lg border border-n-slate-6 bg-n-solid-1 py-1.5 pl-9 pr-3 text-sm text-n-slate-12 placeholder-n-slate-10 outline-none focus:border-n-brand"
+          class="reset-base min-w-0 flex-1 bg-transparent text-sm text-n-slate-12 placeholder-n-slate-10 outline-none"
         />
+        <button
+          v-if="searchQuery"
+          type="button"
+          class="flex-shrink-0 rounded p-0.5 text-n-slate-10 hover:text-n-slate-12"
+          @click="clearSearch"
+        >
+          <Icon icon="i-lucide-x" class="size-3.5" />
+        </button>
       </div>
     </div>
-    <div class="px-1.5 pb-1">
+    <!-- Search Results -->
+    <div v-if="isSearchMode" class="flex-1 overflow-y-auto px-1.5">
+      <!-- Loading -->
+      <div
+        v-if="searchUIFlags.isFetching && !hasSearchResults"
+        class="flex items-center justify-center py-8"
+      >
+        <p class="text-sm text-n-slate-10">
+          {{ t('INTERNAL_CHAT.SEARCH.SEARCHING') }}
+        </p>
+      </div>
+
+      <!-- No results -->
+      <div
+        v-else-if="!searchUIFlags.isFetching && !hasSearchResults"
+        class="flex items-center justify-center py-8"
+      >
+        <p class="text-sm text-n-slate-10">
+          {{ t('INTERNAL_CHAT.SEARCH.NO_RESULTS') }}
+        </p>
+      </div>
+
+      <template v-else>
+        <!-- Channel results -->
+        <div v-if="searchChannels.length > 0" class="mb-3">
+          <h3
+            class="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
+          >
+            {{ t('INTERNAL_CHAT.SEARCH.CHANNELS') }}
+          </h3>
+          <button
+            v-for="channel in searchChannels"
+            :key="`sc-${channel.id}`"
+            class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
+            :class="
+              activeChannelId === channel.id
+                ? 'bg-n-alpha-2 text-n-slate-12'
+                : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12'
+            "
+            @click="
+              navigateToChannel({
+                id: channel.id,
+                channel_type: channel.channel_type,
+              })
+            "
+          >
+            <Icon
+              :icon="getChannelIcon(channel)"
+              class="size-4 flex-shrink-0"
+            />
+            <span class="flex-1 truncate text-left">{{ channel.name }}</span>
+          </button>
+        </div>
+
+        <!-- DM results -->
+        <div v-if="searchDMs.length > 0" class="mb-3">
+          <h3
+            class="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
+          >
+            {{ t('INTERNAL_CHAT.SEARCH.DIRECT_MESSAGES') }}
+          </h3>
+          <button
+            v-for="dm in searchDMs"
+            :key="`sd-${dm.id}`"
+            class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
+            :class="
+              activeChannelId === dm.id
+                ? 'bg-n-alpha-2 text-n-slate-12'
+                : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12'
+            "
+            @click="
+              navigateToChannel({ id: dm.id, channel_type: dm.channel_type })
+            "
+          >
+            <Avatar :name="dm.peer?.name || ''" :size="20" rounded-full />
+            <span class="flex-1 truncate text-left">
+              {{ dm.peer?.name || '' }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Message results -->
+        <div v-if="searchMessages.length > 0" class="mb-3">
+          <h3
+            class="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
+          >
+            {{ t('INTERNAL_CHAT.SEARCH.MESSAGES') }}
+          </h3>
+          <button
+            v-for="message in searchMessages"
+            :key="`sm-${message.id}`"
+            class="flex w-full flex-col gap-1 rounded-lg px-2 py-2 text-left transition-colors hover:bg-n-alpha-1"
+            @click="navigateToMessage(message)"
+          >
+            <div class="flex items-center gap-2">
+              <Avatar
+                :name="message.sender?.name || ''"
+                :src="message.sender?.avatar_url || ''"
+                :size="16"
+                rounded-full
+              />
+              <span class="flex-1 truncate text-sm font-medium text-n-slate-12">
+                {{ message.sender?.name || '' }}
+              </span>
+              <span class="flex-shrink-0 text-xs text-n-slate-9">
+                {{ formatMessageTime(message.created_at) }}
+              </span>
+            </div>
+            <span
+              class="line-clamp-2 text-xs text-n-slate-10"
+              v-html="highlightMatch(message.content, searchQuery.trim())"
+            />
+            <span class="text-xs text-n-slate-9">
+              {{
+                message.channel_type === 'dm'
+                  ? message.channel_name || ''
+                  : `${t('INTERNAL_CHAT.CONVERSATION_MENTION.PREFIX')}${message.channel_name || ''}`
+              }}
+            </span>
+          </button>
+          <button
+            v-if="searchUIFlags.hasMoreMessages"
+            class="mt-1 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs text-n-slate-10 transition-colors hover:bg-n-alpha-1 hover:text-n-slate-12"
+            :disabled="searchUIFlags.isFetching"
+            @click="loadMoreMessages"
+          >
+            {{ t('INTERNAL_CHAT.SEARCH.LOAD_MORE') }}
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <!-- Normal sidebar content -->
+    <div v-show="!isSearchMode" class="px-1.5 pb-1">
       <button
         class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
         :class="
@@ -260,7 +548,7 @@ function openCreateCategory() {
         }}</span>
       </button>
     </div>
-    <div class="flex-1 overflow-y-auto px-1.5">
+    <div v-show="!isSearchMode" class="flex-1 overflow-y-auto px-1.5">
       <!-- Favorites -->
       <div v-if="filteredFavoriteChannels.length > 0" class="mb-3">
         <h3
@@ -290,17 +578,40 @@ function openCreateCategory() {
             "
             @click="navigateToChannel(channel)"
           >
+            <Avatar
+              v-if="channel.channel_type === 'dm'"
+              :name="getDMDisplayName(channel)"
+              :src="getDMDisplayMember(channel)?.avatar_url || ''"
+              :status="getDMDisplayMember(channel)?.availability_status"
+              :size="20"
+              rounded-full
+              hide-offline-status
+            />
             <Icon
+              v-else
               :icon="getChannelIcon(channel)"
               class="size-4 flex-shrink-0"
             />
-            <span class="flex-1 truncate text-left">{{
-              getDisplayName(channel)
-            }}</span>
+            <span class="flex-1 truncate text-left">
+              {{ getDisplayName(channel) }}
+              <span v-if="isSelfDM(channel)" class="text-xs text-n-slate-10">
+                {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
+              </span>
+              <span
+                v-else-if="isDeletedUserDM(channel)"
+                class="text-xs text-n-slate-9 italic"
+              >
+                ({{ t('INTERNAL_CHAT.MESSAGE.DELETED_USER') }})
+              </span>
+            </span>
             <span
               v-if="channel.unread_count > 0"
-              class="flex-shrink-0 rounded-full bg-n-brand px-1.5 py-0.5 text-xs font-medium text-white"
+              class="flex-shrink-0 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+              :class="channel.has_unread_mention ? 'bg-n-ruby-9' : 'bg-n-brand'"
             >
+              <span v-if="channel.has_unread_mention">{{
+                t('INTERNAL_CHAT.MENTION_BADGE')
+              }}</span>
               {{ channel.unread_count }}
             </span>
           </button>
@@ -310,18 +621,27 @@ function openCreateCategory() {
       <!-- Categories -->
       <div v-for="category in categories" :key="category.id" class="mb-3">
         <h3
-          class="flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
+          class="group/cat flex cursor-pointer items-center justify-between px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
           @click="toggleSection(`category-${category.id}`)"
         >
-          <Icon
-            :icon="
-              isSectionCollapsed(`category-${category.id}`)
-                ? 'i-lucide-chevron-right'
-                : 'i-lucide-chevron-down'
-            "
-            class="size-3"
-          />
-          {{ category.name }}
+          <span class="flex items-center gap-1.5">
+            <Icon
+              :icon="
+                isSectionCollapsed(`category-${category.id}`)
+                  ? 'i-lucide-chevron-right'
+                  : 'i-lucide-chevron-down'
+              "
+              class="size-3"
+            />
+            {{ category.name }}
+          </span>
+          <button
+            v-if="isAdmin"
+            class="text-n-slate-9 opacity-0 transition-opacity hover:text-n-ruby-11 group-hover/cat:opacity-100"
+            @click.stop="confirmDeleteCategory(category.id)"
+          >
+            <Icon icon="i-lucide-trash-2" class="size-3" />
+          </button>
         </h3>
         <div v-show="!isSectionCollapsed(`category-${category.id}`)">
           <Draggable
@@ -350,18 +670,24 @@ function openCreateCategory() {
                   :icon="getChannelIcon(channel)"
                   class="size-4 flex-shrink-0"
                 />
-                <span class="flex-1 truncate text-left">{{
-                  channel.name
-                }}</span>
                 <Icon
                   v-if="channel.muted"
                   icon="i-lucide-bell-off"
                   class="size-3 flex-shrink-0 text-n-slate-9"
                 />
+                <span class="flex-1 truncate text-left">{{
+                  channel.name
+                }}</span>
                 <span
-                  v-if="channel.unread_count > 0 && !channel.muted"
-                  class="flex-shrink-0 rounded-full bg-n-brand px-1.5 py-0.5 text-xs font-medium text-white"
+                  v-if="channel.unread_count > 0"
+                  class="flex-shrink-0 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+                  :class="
+                    channel.has_unread_mention ? 'bg-n-ruby-9' : 'bg-n-brand'
+                  "
                 >
+                  <span v-if="channel.has_unread_mention">{{
+                    t('INTERNAL_CHAT.MENTION_BADGE')
+                  }}</span>
                   {{ channel.unread_count }}
                 </span>
               </button>
@@ -445,9 +771,15 @@ function openCreateCategory() {
                   channel.name
                 }}</span>
                 <span
-                  v-if="channel.unread_count > 0 && !channel.muted"
-                  class="flex-shrink-0 rounded-full bg-n-brand px-1.5 py-0.5 text-xs font-medium text-white"
+                  v-if="channel.unread_count > 0"
+                  class="flex-shrink-0 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+                  :class="
+                    channel.has_unread_mention ? 'bg-n-ruby-9' : 'bg-n-brand'
+                  "
                 >
+                  <span v-if="channel.has_unread_mention">{{
+                    t('INTERNAL_CHAT.MENTION_BADGE')
+                  }}</span>
                   {{ channel.unread_count }}
                 </span>
               </button>
@@ -475,7 +807,6 @@ function openCreateCategory() {
             {{ t('INTERNAL_CHAT.DIRECT_MESSAGES') }}
           </span>
           <button
-            v-if="isAdmin"
             class="text-n-slate-10 transition-colors hover:text-n-slate-12"
             @click.stop="openCreateDM"
           >
@@ -487,21 +818,47 @@ function openCreateCategory() {
             v-for="channel in filteredDMChannels"
             :key="`dm-${channel.id}`"
             class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
-            :class="
+            :class="[
               activeChannelId === channel.id
                 ? 'bg-n-alpha-2 text-n-slate-12'
-                : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12'
-            "
+                : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12',
+              { 'opacity-50': channel.muted },
+            ]"
             @click="navigateToChannel(channel)"
           >
-            <Icon icon="i-lucide-message-circle" class="size-4 flex-shrink-0" />
-            <span class="flex-1 truncate text-left">{{
-              getDMDisplayName(channel)
-            }}</span>
+            <Avatar
+              :name="getDMDisplayName(channel)"
+              :src="getDMDisplayMember(channel)?.avatar_url || ''"
+              :status="getDMDisplayMember(channel)?.availability_status"
+              :size="20"
+              rounded-full
+              hide-offline-status
+            />
+            <Icon
+              v-if="channel.muted"
+              icon="i-lucide-bell-off"
+              class="size-3 flex-shrink-0 text-n-slate-9"
+            />
+            <span class="flex-1 truncate text-left">
+              {{ getDMDisplayName(channel) }}
+              <span v-if="isSelfDM(channel)" class="text-xs text-n-slate-10">
+                {{ t('INTERNAL_CHAT.CHANNEL.YOU') }}
+              </span>
+              <span
+                v-else-if="isDeletedUserDM(channel)"
+                class="text-xs text-n-slate-9 italic"
+              >
+                ({{ t('INTERNAL_CHAT.MESSAGE.DELETED_USER') }})
+              </span>
+            </span>
             <span
               v-if="channel.unread_count > 0"
-              class="flex-shrink-0 rounded-full bg-n-brand px-1.5 py-0.5 text-xs font-medium text-white"
+              class="flex-shrink-0 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+              :class="channel.has_unread_mention ? 'bg-n-ruby-9' : 'bg-n-brand'"
             >
+              <span v-if="channel.has_unread_mention">{{
+                t('INTERNAL_CHAT.MENTION_BADGE')
+              }}</span>
               {{ channel.unread_count }}
             </span>
           </button>
@@ -522,5 +879,13 @@ function openCreateCategory() {
     <CreateChannelModal ref="createChannelModalRef" />
     <CreateDMModal ref="createDMModalRef" />
     <CreateCategoryModal ref="createCategoryModalRef" />
+    <Dialog
+      ref="deleteCategoryDialogRef"
+      type="alert"
+      :title="t('INTERNAL_CHAT.CATEGORY.DELETE')"
+      :description="t('INTERNAL_CHAT.CATEGORY.DELETE_DESCRIPTION')"
+      :confirm-button-label="t('INTERNAL_CHAT.CATEGORY.DELETE')"
+      @confirm="handleDeleteCategory"
+    />
   </div>
 </template>

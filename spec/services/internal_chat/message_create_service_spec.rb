@@ -60,6 +60,35 @@ describe InternalChat::MessageCreateService do
       end
     end
 
+    context 'when message contains mentions' do
+      let(:mentioned_user) { create(:user, account: account, role: :agent) }
+
+      it 'stores mentioned user IDs in content_attributes' do
+        params = { content: "Hey (mention://user/#{mentioned_user.id}/#{mentioned_user.name}) check this" }
+
+        message = described_class.new(channel: channel, sender: user, params: params).perform
+        expect(message.reload.content_attributes['mentioned_user_ids']).to contain_exactly(mentioned_user.id)
+      end
+
+      it 'stores team mention expanded user IDs in content_attributes' do
+        team = create(:team, account: account)
+        team_member = create(:user, account: account, role: :agent)
+        create(:team_member, user: team_member, team: team)
+
+        params = { content: "Hey (mention://team/#{team.id}/#{team.name}) check this" }
+
+        message = described_class.new(channel: channel, sender: user, params: params).perform
+        expect(message.reload.content_attributes['mentioned_user_ids']).to contain_exactly(team_member.id)
+      end
+
+      it 'does not store mentioned_user_ids when no mentions exist' do
+        params = { content: 'Just a regular message' }
+
+        message = described_class.new(channel: channel, sender: user, params: params).perform
+        expect(message.content_attributes['mentioned_user_ids']).to be_nil
+      end
+    end
+
     context 'when content_type is specified' do
       it 'uses the provided content_type' do
         params = { content: 'System message', content_type: :system }

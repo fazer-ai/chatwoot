@@ -1,9 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
+import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
 import MessageFormatter from 'shared/helpers/MessageFormatter';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
 import { useAlert } from 'dashboard/composables';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -11,6 +14,7 @@ import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import ReactionDisplay from './ReactionDisplay.vue';
 import EmojiReactionPicker from './EmojiReactionPicker.vue';
 import PollDisplay from './PollDisplay.vue';
+import ConversationPreviewCard from './ConversationPreviewCard.vue';
 
 const props = defineProps({
   message: {
@@ -26,6 +30,14 @@ const props = defineProps({
     default: false,
   },
   inThread: {
+    type: Boolean,
+    default: false,
+  },
+  groupWithPrevious: {
+    type: Boolean,
+    default: false,
+  },
+  hasThreadDraft: {
     type: Boolean,
     default: false,
   },
@@ -45,13 +57,23 @@ const emit = defineEmits([
 ]);
 
 const { t } = useI18n();
+const store = useStore();
+const router = useRouter();
+const accountId = useMapGetter('getCurrentAccountId');
 
 const senderName = computed(() => {
-  return props.message.sender?.name || '';
+  return props.message.sender?.name || t('INTERNAL_CHAT.MESSAGE.DELETED_USER');
 });
 
 const senderAvatar = computed(() => {
   return props.message.sender?.avatar_url || '';
+});
+
+const senderAvailability = computed(() => {
+  const senderId = props.message.sender?.id;
+  if (!senderId) return null;
+  const agent = store.getters['agents/getAgentById'](senderId);
+  return agent?.availability_status || null;
 });
 
 const timestamp = computed(() => {
@@ -116,6 +138,29 @@ const renderedContent = computed(() => {
 const reactions = computed(() => {
   return props.message.reactions || [];
 });
+
+const conversationRefs = computed(() => {
+  if (isDeleted.value || !props.message.content) return [];
+  const matches = props.message.content.matchAll(
+    /mention:\/\/conversation\/(\d+)\//g
+  );
+  return [...new Set([...matches].map(m => m[1]))];
+});
+
+function handleContentClick(event) {
+  const mention = event.target.closest('.prosemirror-mention-conversation');
+  if (!mention) return;
+  const displayId = mention.dataset.conversationId;
+  if (!displayId) return;
+  const url = frontendURL(
+    conversationUrl({ accountId: accountId.value, id: displayId })
+  );
+  if (event.ctrlKey || event.metaKey) {
+    window.open(url, '_blank');
+  } else {
+    router.push(url);
+  }
+}
 
 function attachmentFileName(attachment) {
   if (attachment.file_url) {
@@ -193,13 +238,21 @@ function handleUnvote(payload) {
 
 <template>
   <div
-    class="group flex items-start gap-3 px-4 py-1.5 hover:bg-n-alpha-1 transition-colors"
+    class="group relative flex items-start gap-3 px-4 hover:bg-n-alpha-1 transition-colors"
+    :class="groupWithPrevious ? 'py-0.5' : 'py-1.5'"
   >
-    <div class="flex-shrink-0 pt-0.5">
-      <Avatar :name="senderName" :src="senderAvatar" :size="32" />
+    <div v-if="!groupWithPrevious" class="flex-shrink-0 pt-0.5">
+      <Avatar
+        :name="senderName"
+        :src="senderAvatar"
+        :size="32"
+        :status="senderAvailability"
+        hide-offline-status
+      />
     </div>
+    <div v-else class="w-8 flex-shrink-0" />
     <div class="flex-1 min-w-0">
-      <div class="flex items-baseline gap-2">
+      <div v-if="!groupWithPrevious" class="flex items-baseline gap-2">
         <span class="text-sm font-medium text-n-slate-12">
           {{ senderName }}
         </span>
@@ -236,7 +289,11 @@ function handleUnvote(payload) {
       </div>
 
       <!-- Regular message content -->
-      <div v-else class="mt-0.5 text-sm text-n-slate-12 break-words">
+      <div
+        v-else
+        class="text-sm text-n-slate-12 break-words"
+        :class="groupWithPrevious ? '' : 'mt-0.5'"
+      >
         <div
           v-if="isDeleted"
           class="flex items-center gap-1.5 rounded-lg bg-n-alpha-1 px-3 py-2 text-n-slate-10"
@@ -246,8 +303,26 @@ function handleUnvote(payload) {
         </div>
         <div
           v-else
-          v-dompurify-html="renderedContent"
-          class="prose prose-bubble"
+          class="inline [&_.prosemirror-mention-node]:font-semibold [&_.prosemirror-mention-node]:text-n-brand [&_.prosemirror-mention-conversation]:cursor-pointer [&_.prosemirror-mention-conversation]:underline"
+          @click="handleContentClick"
+        >
+          <div
+            v-dompurify-html="renderedContent"
+            class="prose prose-bubble inline"
+          />
+          <span
+            v-if="groupWithPrevious && isEdited"
+            class="ml-1 text-xs text-n-slate-10"
+          >
+            {{ t('INTERNAL_CHAT.MESSAGE.EDITED') }}
+          </span>
+        </div>
+        <!-- Conversation mention preview cards -->
+        <ConversationPreviewCard
+          v-for="displayId in conversationRefs"
+          :key="`conv-${displayId}`"
+          :display-id="displayId"
+          :account-id="accountId"
         />
       </div>
 
@@ -289,18 +364,31 @@ function handleUnvote(payload) {
       />
 
       <!-- Thread reply count -->
-      <button
-        v-if="threadReplyCount > 0"
-        class="mt-1 flex items-center gap-1 text-xs font-medium text-n-brand hover:underline"
-        @click="handleOpenThread"
+      <div
+        v-if="(threadReplyCount > 0 || hasThreadDraft) && !inThread"
+        class="mt-1 flex items-center gap-2"
       >
-        <Icon icon="i-lucide-message-square" class="size-3" />
-        {{ t('INTERNAL_CHAT.THREAD.REPLIES', { count: threadReplyCount }) }}
-      </button>
+        <button
+          v-if="threadReplyCount > 0"
+          class="flex items-center gap-1 text-xs font-medium text-n-brand hover:underline"
+          @click="handleOpenThread"
+        >
+          <Icon icon="i-lucide-message-square" class="size-3" />
+          {{ t('INTERNAL_CHAT.THREAD.REPLIES', { count: threadReplyCount }) }}
+        </button>
+        <button
+          v-if="hasThreadDraft"
+          class="flex items-center gap-1 text-xs font-medium text-n-amber-11 hover:underline"
+          @click="handleOpenThread"
+        >
+          <Icon icon="i-lucide-file-edit" class="size-3" />
+          {{ t('INTERNAL_CHAT.DRAFT.LABEL') }}
+        </button>
+      </div>
     </div>
     <div
       v-if="!isDeleted"
-      class="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+      class="absolute right-2 top-0 flex items-center gap-0.5 rounded-md bg-n-solid-2 border border-n-slate-5 shadow-sm px-0.5 py-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-10"
     >
       <EmojiReactionPicker
         :reactions="reactions"

@@ -330,6 +330,9 @@ const menuItems = computed(() => {
         'internal_chat_thread',
         'internal_chat_drafts',
       ],
+      getterKeys: {
+        count: 'internalChat/getUnreadCount',
+      },
     },
     {
       name: 'Kanban',

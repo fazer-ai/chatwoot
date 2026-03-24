@@ -12,12 +12,13 @@
 #  echo_id                  :string
 #  internal_chat_channel_id :bigint           not null
 #  parent_id                :bigint
-#  sender_id                :bigint           not null
+#  sender_id                :bigint
 #
 # Indexes
 #
 #  idx_ic_messages_account_created                           (account_id,created_at)
 #  idx_ic_messages_channel_created                           (internal_chat_channel_id,created_at)
+#  idx_ic_messages_content_trgm                              (content) USING gin
 #  index_internal_chat_messages_on_account_id                (account_id)
 #  index_internal_chat_messages_on_internal_chat_channel_id  (internal_chat_channel_id)
 #  index_internal_chat_messages_on_parent_id                 (parent_id)
@@ -27,7 +28,7 @@
 #
 #  fk_rails_...  (internal_chat_channel_id => internal_chat_channels.id)
 #  fk_rails_...  (parent_id => internal_chat_messages.id)
-#  fk_rails_...  (sender_id => users.id)
+#  fk_rails_...  (sender_id => users.id) ON DELETE => nullify
 #
 class InternalChat::Message < ApplicationRecord
   self.table_name = 'internal_chat_messages'
@@ -35,7 +36,7 @@ class InternalChat::Message < ApplicationRecord
   belongs_to :account
   belongs_to :channel, class_name: 'InternalChat::Channel', foreign_key: :internal_chat_channel_id,
                        counter_cache: :messages_count, inverse_of: :messages
-  belongs_to :sender, class_name: 'User'
+  belongs_to :sender, class_name: 'User', optional: true
   belongs_to :parent, class_name: 'InternalChat::Message', optional: true, inverse_of: :replies
 
   has_many :replies, class_name: 'InternalChat::Message', foreign_key: :parent_id,
