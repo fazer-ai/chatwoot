@@ -138,11 +138,19 @@ class Api::V1::Accounts::Kanban::TasksController < Api::V1::Accounts::Kanban::Ba
   def apply_filters(scope) # rubocop:disable Metrics/AbcSize
     if params[:assigned_agent_ids].present?
       agent_ids = Array(params[:assigned_agent_ids]).map(&:to_i)
-      scope = scope.joins(:task_agents).where(kanban_task_agents: { agent_id: agent_ids })
+      scope = scope.where('EXISTS (SELECT 1 FROM kanban_task_agents WHERE kanban_task_agents.task_id = kanban_tasks.id ' \
+                          'AND kanban_task_agents.agent_id IN (?))', agent_ids)
     end
 
-    scope = scope.joins(:task_agents).where(kanban_task_agents: { agent_id: params[:agent_id] }) if params[:agent_id].present?
-    scope = scope.joins(conversations: :inbox).where(inboxes: { id: params[:inbox_id] }) if params[:inbox_id].present?
+    if params[:agent_id].present?
+      scope = scope.where('EXISTS (SELECT 1 FROM kanban_task_agents WHERE kanban_task_agents.task_id = kanban_tasks.id ' \
+                          'AND kanban_task_agents.agent_id = ?)', params[:agent_id])
+    end
+
+    if params[:inbox_id].present?
+      scope = scope.where('EXISTS (SELECT 1 FROM conversations WHERE conversations.kanban_task_id = kanban_tasks.id ' \
+                          'AND conversations.inbox_id = ?)', params[:inbox_id])
+    end
 
     direct_filter_columns.each do |column|
       value = params[column]

@@ -62,13 +62,13 @@ class FazerAi::Kanban::ApplicationPolicy < ApplicationPolicy
     return scoped if admin?
     return scoped.none unless agent? && user
 
-    scoped.left_outer_joins(board: :board_agents)
-          .left_outer_joins(:task_agents)
-          .where(
-            'kanban_board_agents.agent_id = :user_id OR ' \
-            'kanban_task_agents.agent_id = :user_id OR ' \
-            'kanban_tasks.created_by_id = :user_id',
-            user_id: user.id
-          ).distinct
+    scoped.where(
+      'EXISTS (SELECT 1 FROM kanban_board_agents WHERE kanban_board_agents.board_id = kanban_tasks.board_id ' \
+      'AND kanban_board_agents.agent_id = :user_id) OR ' \
+      'EXISTS (SELECT 1 FROM kanban_task_agents WHERE kanban_task_agents.task_id = kanban_tasks.id ' \
+      'AND kanban_task_agents.agent_id = :user_id) OR ' \
+      'kanban_tasks.created_by_id = :user_id',
+      user_id: user.id
+    )
   end
 end

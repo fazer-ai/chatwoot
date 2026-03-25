@@ -29,7 +29,7 @@ RSpec.configure do |config|
       stub_request(:post, FazerAiHub::PING_URL)
         .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
       # Also stub ChatwootHub ping called when enabling kanban feature
-      stub_request(:post, "#{ChatwootHub::BASE_URL}/ping")
+      stub_request(:post, ChatwootHub.ping_url)
         .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
     end
 

@@ -174,6 +174,44 @@ RSpec.describe 'Api::V1::Accounts::Kanban::Tasks' do
         expect(task_ids).to eq([task_urgent.id, task_low.id, task_nil.id])
       end
     end
+
+    context 'when agent with scoped access sorts tasks' do
+      let(:agent) { create(:user, account: account) }
+      let(:agent_headers) { agent.create_new_auth_token }
+
+      before do
+        create(:kanban_board_agent, board: board, agent: agent)
+      end
+
+      def agent_preference
+        agent.account_users.find_by(account_id: account.id).kanban_preference
+      end
+
+      it 'sorts by position without error' do
+        task1 = create(:kanban_task, account: account, board: board, board_step: board_step)
+        task2 = create(:kanban_task, account: account, board: board, board_step: board_step)
+
+        preference = agent.account_users.find_by(account_id: account.id).create_kanban_preference
+        preference.update_tasks_order!(board_step.id, [task2.id, task1.id])
+
+        get base_path, params: { board_step_id: board_step.id, page: 1, per_page: 10 }, headers: agent_headers
+
+        expect(response).to have_http_status(:ok)
+        task_ids = response.parsed_body['tasks'].pluck('id')
+        expect(task_ids).to eq([task2.id, task1.id])
+      end
+
+      it 'sorts by priority without error' do
+        create(:kanban_task, account: account, board: board, board_step: board_step, priority: 'low')
+        create(:kanban_task, account: account, board: board, board_step: board_step, priority: 'urgent')
+
+        get base_path, params: { sort: 'priority', order: 'desc', board_id: board.id }, headers: agent_headers
+
+        expect(response).to have_http_status(:ok)
+        priorities = response.parsed_body['tasks'].pluck('priority')
+        expect(priorities).to eq(%w[urgent low])
+      end
+    end
   end
 
   describe 'GET /api/v1/accounts/:account_id/kanban/tasks/:id' do
