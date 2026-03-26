@@ -32,7 +32,7 @@
     "LOADING_CONVERSATIONS": "Carregando conversas",
     "CANNOT_REPLY": "Você não pode responder porque",
     "24_HOURS_WINDOW": "Restrições de janela de mensagem de 24 horas",
-    "48_HOURS_WINDOW": "Restrição de janela de mensagem de 48 horas",
+    "48_HOURS_WINDOW": "Restrição da janela de mensagens de 48 horas",
     "API_HOURS_WINDOW": "Você só pode responder a esta conversa em {hours} horas",
     "NOT_ASSIGNED_TO_YOU": "Esta conversa não está atribuída a você. Gostaria de atribuir esta conversa a você mesmo?",
     "ASSIGN_TO_ME": "Atribuir a mim",
@@ -43,6 +43,11 @@
     "BOT_HANDOFF_ERROR": "Falha ao resolver conversas. Por favor, tente novamente.",
     "TWILIO_WHATSAPP_CAN_REPLY": "Você só pode responder a esta conversa usando um modelo de mensagem devido a",
     "TWILIO_WHATSAPP_24_HOURS_WINDOW": "Restrições de janela de mensagem de 24 horas",
+    "ANNOUNCEMENT_MODE_BANNER": "Apenas administradores têm permissão para enviar mensagens neste grupo",
+    "GROUP_LEFT_BANNER": "Você não faz mais parte deste grupo e não pode enviar mensagens nele",
+    "GROUPS_DISABLED_BANNER": "As mensagens de grupo estão desativadas. Ative o suporte completo a grupos (gratuito) para ver e enviar mensagens.",
+    "GROUPS_DISABLED_BANNER_NON_ADMIN": "As mensagens de grupo estão desativadas. Entre em contato com o administrador para ativar o suporte completo a grupos.",
+    "GROUPS_DISABLED_CTA": "Saiba como ativar (gratuito)",
     "OLD_INSTAGRAM_INBOX_REPLY_BANNER": "Esta conta do Instagram foi migrada para a nova caixa de entrada do canal do Instagram. Todas as novas mensagens serão mostradas lá. Você não poderá mais enviar mensagens desta conversa.",
     "REPLYING_TO": "Você está respondendo a:",
     "REMOVE_SELECTION": "Remover seleção",
@@ -62,6 +67,7 @@
     "UNSUPPORTED_MESSAGE_WHATSAPP": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo do WhatsApp.",
     "UNSUPPORTED_MESSAGE_FACEBOOK": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo Facebook Messenger.",
     "UNSUPPORTED_MESSAGE_INSTAGRAM": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo do Instagram.",
+    "UNSUPPORTED_MESSAGE_TIKTOK": "Esta mensagem não é compatível. Você pode visualizá-la no aplicativo do TikTok.",
     "SUCCESS_DELETE_MESSAGE": "Mensagem excluída com sucesso",
     "FAIL_DELETE_MESSSAGE": "Não foi possível excluir a mensagem! Tente novamente",
     "NO_RESPONSE": "Sem resposta",
@@ -174,6 +180,10 @@
           "SUCCESFUL": "Etiqueta #{labelName} atribuída para a conversa {conversationId}",
           "FAILED": "Não foi possível atribuir etiqueta. Por favor, tente novamente."
         },
+        "LABEL_REMOVAL": {
+          "SUCCESFUL": "Etiqueta #{labelName} removida da conversa com id {conversationId}",
+          "FAILED": "Não foi possível remover a etiqueta. Por favor, tente novamente."
+        },
         "TEAM_ASSIGNMENT": {
           "SUCCESFUL": "Time {team} atribuído para o id de conversa {conversationId}",
           "FAILED": "Não foi possível atribuir time. Por favor, tente novamente."
@@ -190,16 +200,23 @@
       "SIGNATURE_LABEL_BOTTOM_TOOLTIP": "A assinatura será enviada no final da mensagem",
       "MSG_INPUT": "Shift + enter para nova linha. Digite '/' para selecionar uma Resposta Pronta.",
       "PRIVATE_MSG_INPUT": "A mensagem será visível apenas para agentes",
+      "MESSAGING_RESTRICTED": "Você não pode responder esta conversa",
+      "MESSAGING_RESTRICTED_WHATSAPP": "Você só pode responder usando uma mensagem de modelo devido à restrição da janela de 24 horas",
+      "MESSAGING_RESTRICTED_API": "Você só pode responder usando uma mensagem de template devido à restrição da janela de mensagens",
       "MESSAGE_SIGNATURE_NOT_CONFIGURED": "A assinatura da mensagem não está configurada. Por favor, configure-a nas configurações do perfil.",
+      "COPILOT_MSG_INPUT": "Forneça instruções adicionais ao Copiloto ou pergunte algo mais... Pressione Enter para enviar",
       "CLICK_HERE": "Clique aqui para atualizar",
-      "WHATSAPP_TEMPLATES": "Templates do Whatsapp"
+      "WHATSAPP_TEMPLATES": "Modelos do Whatsapp",
+      "ANNOUNCEMENT_MODE_RESTRICTED": "Apenas administradores têm permissão para enviar mensagens neste grupo",
+      "GROUP_LEFT_RESTRICTED": "Você não faz mais parte deste grupo e não pode enviar mensagens nele",
+      "GROUPS_DISABLED_RESTRICTED": "As mensagens de grupo estão desativadas — ative gratuitamente"
     },
     "REPLYBOX": {
       "REPLY": "Responder",
       "PRIVATE_NOTE": "Mensagem Privada",
       "SEND": "Enviar",
       "CREATE": "Enviar",
-      "INSERT_READ_MORE": "Saiba mais",
+      "INSERT_READ_MORE": "Ler mais",
       "DISMISS_REPLY": "Dispensar resposta",
       "REPLYING_TO": "Respondendo a:",
       "TIP_EMOJI_ICON": "Mostrar seletor de emoji",
@@ -211,7 +228,7 @@
       "DRAG_DROP": "Arraste e solte aqui para anexar",
       "START_AUDIO_RECORDING": "Iniciar gravação de áudio",
       "STOP_AUDIO_RECORDING": "Parar gravação de áudio",
-      "": "",
+      "COPILOT_THINKING": "O Copiloto está pensando",
       "EMAIL_HEAD": {
         "TO": "Para",
         "ADD_BCC": "Adicionar cco",
@@ -254,10 +271,13 @@
     "SUCCESS_DELETE_CONVERSATION": "Conversa excluída com sucesso",
     "FAIL_DELETE_CONVERSATION": "Não foi possível excluir a conversa! Tente novamente",
     "FILE_SIZE_LIMIT": "O arquivo excede os {MAXIMUM_SUPPORTED_FILE_UPLOAD_SIZE} MB do limite para anexos",
+    "FILE_TYPE_NOT_SUPPORTED": "O tipo de arquivo {fileName} não é suportado nesta conversa",
     "MESSAGE_ERROR": "Não foi possível enviar esta mensagem, por favor, tente novamente mais tarde",
     "SENT_BY": "Enviado por:",
     "BOT": "Robôs",
     "WHATSAPP": "WhatsApp",
+    "NATIVE_APP": "Aplicativo nativo",
+    "NATIVE_APP_ADVISORY": "Esta mensagem foi enviada a partir do aplicativo nativo. Responda pelo Chatwoot para manter a janela de mensagens ativa.",
     "SEND_FAILED": "Não foi possível enviar a mensagem! Tente novamente",
     "TRY_AGAIN": "tentar novamente",
     "ASSIGNMENT": {
@@ -320,6 +340,7 @@
     "CANCEL": "Cancelar",
     "SEND_EMAIL_SUCCESS": "A transcrição do chat foi enviada com sucesso",
     "SEND_EMAIL_ERROR": "Ocorreu um erro, por favor tente novamente",
+    "SEND_EMAIL_PAYMENT_REQUIRED": "A transcrição de e-mail não está disponível no seu plano atual. Por favor, atualize para usar este recurso.",
     "FORM": {
       "SEND_TO_CONTACT": "Envie a transcrição para o cliente",
       "SEND_TO_AGENT": "Envie a transcrição para o agente designado",
@@ -376,25 +397,25 @@
       "PREVIOUS_CONVERSATION": "Conversas anteriores",
       "MACROS": "Macros",
       "LINEAR_ISSUES": "Problemas do Linear vinculados",
-      "SHOPIFY_ORDERS": "Shopify Orders"
+      "SHOPIFY_ORDERS": "Pedidos do Shopify"
     },
     "SHOPIFY": {
-      "ORDER_ID": "Order #{id}",
-      "ERROR": "Error loading orders",
-      "NO_SHOPIFY_ORDERS": "No orders found",
+      "ORDER_ID": "Pedido #{id}",
+      "ERROR": "Erro ao carregar pedidos",
+      "NO_SHOPIFY_ORDERS": "Nenhum pedido encontrado",
       "FINANCIAL_STATUS": {
         "PENDING": "Pendentes",
-        "AUTHORIZED": "Authorized",
-        "PARTIALLY_PAID": "Partially Paid",
-        "PAID": "Paid",
-        "PARTIALLY_REFUNDED": "Partially Refunded",
-        "REFUNDED": "Refunded",
-        "VOIDED": "Voided"
+        "AUTHORIZED": "Autorizado",
+        "PARTIALLY_PAID": "Parcialmente pago",
+        "PAID": "Pago",
+        "PARTIALLY_REFUNDED": "Parcialmente Reembolsado",
+        "REFUNDED": "Reembolsado",
+        "VOIDED": "Anulado"
       },
       "FULFILLMENT_STATUS": {
-        "FULFILLED": "Fulfilled",
-        "PARTIALLY_FULFILLED": "Partially Fulfilled",
-        "UNFULFILLED": "Unfulfilled"
+        "FULFILLED": "Concluído",
+        "PARTIALLY_FULFILLED": "Parcialmente Concluído",
+        "UNFULFILLED": "Não concluído"
       }
     }
   },
@@ -417,7 +438,10 @@
       "ATTACHMENT_LABEL": "Anexo: {filename}",
       "EMPTY_PREVIEW": "Sem conteúdo",
       "EXPAND": "Expandir",
-      "COLLAPSE": "Recolher"
+      "COLLAPSE": "Recolher",
+      "GO_TO_MESSAGE": "Ir para a mensagem",
+      "SEARCHING_MESSAGE": "Buscando mensagem...",
+      "MESSAGE_NOT_FOUND": "A mensagem vinculada não foi encontrada. Ela pode ter sido excluída."
     },
     "MODAL": {
       "TITLE_NEW": "Agendar mensagem",
@@ -425,8 +449,6 @@
       "MESSAGE_LABEL": "Mensagem",
       "MESSAGE_PLACEHOLDER": "Escreva sua mensagem...",
       "DATETIME_LABEL": "Data e hora de envio",
-      "DATETIME_PLACEHOLDER": "Selecione data e hora",
-      "DATETIME_FORMAT": "D [de] MMM, YYYY HH:mm",
       "ATTACHMENT_LABEL": "Anexo",
       "ATTACHMENT_ADD": "Anexar arquivo",
       "ATTACHMENT_CURRENT": "Anexo atual: {filename}",
@@ -435,7 +457,18 @@
       "TEMPLATE_ACTION": "Agendar mensagem",
       "CANCEL": "Cancelar",
       "SAVE_DRAFT": "Salvar como rascunho",
-      "SCHEDULE": "Agendar"
+      "SCHEDULE": "Agendar",
+      "SHORTCUTS": {
+        "TOMORROW_MORNING": "Amanhã de manhã",
+        "TOMORROW_AFTERNOON": "Amanhã à tarde",
+        "MONDAY_MORNING": "Segunda-feira de manhã",
+        "CUSTOM": "Digitar data e hora"
+      },
+      "CUSTOM_INPUT_PLACEHOLDER": "ex: amanhã às 14h, próxima sexta de manhã",
+      "CUSTOM_INPUT_HINT": "Tente: amanhã às 15h, próxima segunda, 20 de março às 10h",
+      "PARSED_DATE_IN_PAST": "Esta data já passou",
+      "DATEPICKER_TOOLTIP": "Escolher no calendário",
+      "SCHEDULE_LABEL": "Programar envio"
     },
     "CONFIRM_CLOSE": {
       "TITLE": "Alterações não salvas",
@@ -464,6 +497,88 @@
       "AUTHOR_YOU": "{name} (Você)",
       "AUTOMATION": "Automação",
       "UNKNOWN_AUTHOR": "Desconhecido"
+    },
+    "RECURRENCE": {
+      "SECTION_TITLE": "Recorrências",
+      "NO_REPEAT": "Não se repete",
+      "DAILY": "Todos os dias",
+      "WEEKLY": "Semanal: cada {day}",
+      "MONTHLY_NTH": "Mensal no(a) {nth} {day}",
+      "MONTHLY_LAST": "Mensal no(a) último(a) {day}",
+      "YEARLY": "Anual em {dayNum} de {month}",
+      "WEEKDAYS": "Todos os dias úteis (seg-sex)",
+      "CUSTOM": "Personalizado...",
+      "CUSTOM_MODAL": {
+        "TITLE": "Recorrência personalizada",
+        "REPEAT_EVERY": "Repetir a cada",
+        "FREQ_DAILY": "dia(s)",
+        "FREQ_WEEKLY": "semana(s)",
+        "FREQ_MONTHLY": "mês(es)",
+        "FREQ_YEARLY": "ano(s)",
+        "UNIT_DAY": "dia | dias",
+        "UNIT_WEEK": "semana | semanas",
+        "UNIT_MONTH": "mês | meses",
+        "UNIT_YEAR": "ano | anos",
+        "REPEAT_ON": "Repetir em",
+        "MONTHLY_ON_DAY": "Dia do mês",
+        "MONTHLY_ON_WEEKDAY": "Dia da semana",
+        "ENDS": "Termina",
+        "ENDS_NEVER": "Nunca",
+        "ENDS_ON_DATE": "Em data",
+        "ENDS_AFTER": "Após",
+        "ENDS_OCCURRENCES": "ocorrências",
+        "DONE": "Concluir",
+        "CANCEL": "Cancelar"
+      },
+      "STATUS_ACTIVE": "Ativa",
+      "STATUS_DRAFT": "Rascunho",
+      "STATUS_COMPLETED": "Concluída",
+      "STATUS_CANCELLED": "Cancelada",
+      "OCCURRENCES_SENT": "{count} enviadas",
+      "NEXT_SEND": "Próxima: {time}",
+      "EXPAND": "Expandir histórico",
+      "COLLAPSE": "Recolher histórico",
+      "STOP": "Parar recorrência",
+      "STOP_CONFIRM": {
+        "TITLE": "Parar recorrência",
+        "MESSAGE": "A mensagem pendente será removida e a recorrência será encerrada permanentemente.",
+        "CONFIRM": "Parar",
+        "CANCEL": "Cancelar"
+      },
+      "EDIT": "Editar recorrência",
+      "EDIT_WARNING": "Próximo envio: {oldDate} → {newDate}",
+      "WEEKDAYS_SHORT": {
+        "SUN": "D",
+        "MON": "S",
+        "TUE": "T",
+        "WED": "Q",
+        "THU": "Q",
+        "FRI": "S",
+        "SAT": "S"
+      },
+      "ORDINALS": {
+        "FIRST": "1º",
+        "SECOND": "2º",
+        "THIRD": "3º",
+        "FOURTH": "4º",
+        "FIFTH": "5º",
+        "LAST": "último(a)"
+      },
+      "DESCRIPTION": {
+        "DAILY_ONE": "Todos os dias",
+        "DAILY_OTHER": "A cada {count} dias",
+        "WEEKLY_ONE": "Semanal",
+        "WEEKLY_OTHER": "A cada {count} semanas",
+        "WEEKLY_ON": "{prefix}: {days}",
+        "MONTHLY_ONE": "Mensal",
+        "MONTHLY_OTHER": "A cada {count} meses",
+        "MONTHLY_ON_WEEKDAY": "{prefix} no(a) {ordinal} {weekday}",
+        "YEARLY_ONE": "Anual",
+        "YEARLY_OTHER": "A cada {count} anos",
+        "UNTIL_DATE": "até {date}",
+        "AFTER_COUNT": "{count} ocorrências"
+      },
+      "RESOLVED_WARNING": "Mensagens agendadas não serão enviadas enquanto a conversa estiver resolvida. Reabra a conversa para retomar o envio."
     }
   },
   "CONVERSATION_CUSTOM_ATTRIBUTES": {

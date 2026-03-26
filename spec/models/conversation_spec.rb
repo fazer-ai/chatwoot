@@ -313,6 +313,47 @@ RSpec.describe Conversation do
     end
   end
 
+  describe '#bot_handoff!' do
+    let(:conversation) { create(:conversation, status: :pending) }
+
+    before do
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+    end
+
+    context 'when waiting_since is blank' do
+      before { conversation.update(waiting_since: nil) }
+
+      it 'sets waiting_since to current time' do
+        freeze_time do
+          conversation.bot_handoff!
+          expect(conversation.reload.waiting_since).to eq(Time.current)
+        end
+      end
+    end
+
+    context 'when waiting_since is already set' do
+      let(:original_time) { 1.hour.ago }
+
+      before { conversation.update(waiting_since: original_time) }
+
+      it 'preserves existing waiting_since' do
+        conversation.bot_handoff!
+        expect(conversation.reload.waiting_since).to be_within(1.second).of(original_time)
+      end
+    end
+
+    it 'changes status to open' do
+      conversation.bot_handoff!
+      expect(conversation.reload.status).to eq('open')
+    end
+
+    it 'dispatches CONVERSATION_BOT_HANDOFF event' do
+      expect(Rails.configuration.dispatcher).to receive(:dispatch)
+        .with(described_class::CONVERSATION_BOT_HANDOFF, anything, hash_including(conversation: conversation))
+      conversation.bot_handoff!
+    end
+  end
+
   describe '#toggle_priority' do
     it 'defaults priority to nil when created' do
       conversation = create(:conversation, status: 'open')
@@ -589,7 +630,8 @@ RSpec.describe Conversation do
         updated_at: conversation.updated_at.to_f,
         waiting_since: conversation.waiting_since.to_i,
         priority: nil,
-        unread_count: 0
+        unread_count: 0,
+        group_type: 'individual'
       }
     end
 
@@ -1082,6 +1124,16 @@ RSpec.describe Conversation do
         # Reply time should be 1 hour (from customer message 2 to agent reply)
         expect(reply_events.first.value).to be_within(60).of(3600)
       end
+    end
+  end
+
+  describe 'group_type' do
+    it 'provides type check methods' do
+      individual_conversation = create(:conversation, group_type: :individual)
+      group_conversation = create(:conversation, group_type: :group)
+
+      expect(individual_conversation).to be_group_type_individual
+      expect(group_conversation).to be_group_type_group
     end
   end
 end

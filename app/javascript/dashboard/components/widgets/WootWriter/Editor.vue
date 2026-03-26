@@ -14,6 +14,7 @@ import {
 import CannedResponse from '../conversation/CannedResponse.vue';
 import KeyboardEmojiSelector from './keyboardEmojiSelector.vue';
 import TagAgents from '../conversation/TagAgents.vue';
+import TagGroupMembers from '../conversation/TagGroupMembers.vue';
 import VariableList from '../conversation/VariableList.vue';
 import TagTools from '../conversation/TagTools.vue';
 import CopilotMenuBar from './CopilotMenuBar.vue';
@@ -27,6 +28,7 @@ import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useAlert } from 'dashboard/composables';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import { vOnClickOutside } from '@vueuse/components';
 
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
@@ -96,6 +98,9 @@ const props = defineProps({
   showImageResizeToolbar: { type: Boolean, default: false }, // A kill switch to show or hide the image toolbar
   focusOnMount: { type: Boolean, default: true },
   enableCopilot: { type: Boolean, default: true },
+  isGroupConversation: { type: Boolean, default: false },
+  groupContactId: { type: [Number, String], default: null },
+  inboxPhoneNumber: { type: String, default: null },
 });
 
 const emit = defineEmits([
@@ -212,6 +217,11 @@ const editorRoot = useTemplateRef('editorRoot');
 const imageUpload = useTemplateRef('imageUpload');
 const editor = useTemplateRef('editor');
 
+const isEditorMenuPopover = computed(
+  () =>
+    editorRoot.value?.classList.contains('popover-prosemirror-menu') ?? false
+);
+
 const handleCopilotAction = actionKey => {
   if (actionKey === 'improve_selection' && editorView?.state) {
     const { from, to } = editorView.state.selection;
@@ -221,7 +231,7 @@ const handleCopilotAction = actionKey => {
       emit('executeCopilotAction', 'improve', selectedText);
     }
   } else {
-    emit('executeCopilotAction', actionKey);
+    emit('executeCopilotAction', actionKey, props.modelValue);
   }
 
   showSelectionMenu.value = false;
@@ -292,7 +302,10 @@ const plugins = computed(() => {
       trigger: '@',
       showMenu: showUserMentions,
       searchTerm: mentionSearchKey,
-      isAllowed: () => props.isPrivate || !props.enableCaptainTools,
+      isAllowed: () =>
+        props.isPrivate ||
+        props.isGroupConversation ||
+        !props.enableCaptainTools,
     }),
     createSuggestionPlugin({
       trigger: '/',
@@ -350,7 +363,10 @@ const formattedSignature = computed(() => {
 });
 
 watch(showUserMentions, updatedValue => {
-  emit('toggleUserMention', props.isPrivate && updatedValue);
+  emit(
+    'toggleUserMention',
+    (props.isPrivate || props.isGroupConversation) && updatedValue
+  );
 });
 watch(showCannedMenu, updatedValue => {
   emit('toggleCannedMenu', !props.isPrivate && updatedValue);
@@ -468,6 +484,7 @@ function setToolbarPosition() {
 function setMenubarPosition({ selection } = {}) {
   const wrapper = editorRoot.value;
   if (!selection || !wrapper) return;
+  if (!isEditorMenuPopover.value) return;
 
   const rect = wrapper.getBoundingClientRect();
   const isRtl = getComputedStyle(wrapper).direction === 'rtl';
@@ -818,6 +835,13 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       'opacity-50 cursor-not-allowed pointer-events-none': disabled,
     }"
   >
+    <TagGroupMembers
+      v-if="showUserMentions && isGroupConversation && !isPrivate"
+      :search-key="mentionSearchKey"
+      :group-contact-id="groupContactId"
+      :exclude-phone-number="inboxPhoneNumber"
+      @select-agent="content => insertSpecialContent('mention', content)"
+    />
     <TagAgents
       v-if="showUserMentions && isPrivate"
       :search-key="mentionSearchKey"
@@ -847,8 +871,12 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
       v-if="showSelectionMenu"
       v-on-click-outside="handleClickOutside"
       :has-selection="isTextSelected"
+      :is-editor-menu-popover="isEditorMenuPopover"
+      :editor-content="modelValue"
+      :conversation-id="conversationId"
       :show-selection-menu="showSelectionMenu"
       :show-general-menu="false"
+      class="copilot-editor-menu"
       @execute-copilot-action="handleCopilotAction"
     />
     <input
@@ -1013,11 +1041,15 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
   @apply overflow-auto min-h-[5rem] max-h-[7.5rem];
 }
 
+.ProseMirror-prompt-backdrop::backdrop {
+  @apply bg-n-alpha-black1 backdrop-blur-[4px];
+}
+
 .ProseMirror-prompt {
-  @apply z-[9999] bg-n-alpha-3 backdrop-blur-[100px] border border-n-strong p-6 shadow-xl rounded-xl;
+  @apply bg-n-alpha-3 border border-n-strong p-6 shadow-xl rounded-xl w-96 !important;
 
   h5 {
-    @apply text-n-slate-12 mb-1.5;
+    @apply text-n-slate-12 mb-3;
   }
 
   .ProseMirror-prompt-buttons {
@@ -1069,6 +1101,17 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
 
 .editor-warning__message {
   @apply text-n-ruby-9 dark:text-n-ruby-9 font-normal text-sm pt-1 pb-0 px-0;
+}
+
+// Default copilot menu position (non-popover editors like components-next/Editor)
+// When popover-prosemirror-menu is NOT on the wrapper, anchor below the menubar
+:not(.popover-prosemirror-menu) > .copilot-editor-menu {
+  top: 1.5rem !important;
+
+  [dir='rtl'] & {
+    left: auto !important;
+    right: 0 !important;
+  }
 }
 
 // Float editor menu

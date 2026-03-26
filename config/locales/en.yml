@@ -48,6 +48,9 @@ en:
     inbox_deletetion_response: Your inbox deletion request will be processed in some time.
 
   errors:
+    account:
+      reporting_timezone:
+        invalid: is not a valid timezone
     validations:
       presence: must not be blank
     webhook:
@@ -114,6 +117,11 @@ en:
         host_unreachable_error: Host unreachable, Please check the IMAP address, IMAP port and try again.
         connection_timed_out_error: Connection timed out for %{address}:%{port}
         connection_closed_error: Connection closed.
+      smtp:
+        authentication_error: SMTP authentication failed. Please verify your login credentials.
+        connection_error: Could not connect to SMTP server. Please check the server address and port.
+        ssl_error: SSL/TLS error. Please verify your encryption settings.
+        smtp_error: SMTP server error. Please check your configuration and try again.
       validations:
         name: should not start or end with symbols, and it should not have < > / \ @ characters.
       channel:
@@ -126,6 +134,7 @@ en:
       invalid_query_operator: Query operator must be either "AND" or "OR".
       invalid_value: Invalid value. The values provided for %{attribute_name} are invalid
     custom_attribute_definition:
+      attribute_key_format: must only contain letters, numbers, underscores, hyphens, and dots
       key_conflict: The provided key is not allowed as it might conflict with default attributes.
     mfa:
       already_enabled: MFA is already enabled
@@ -238,7 +247,11 @@ en:
     activity:
       captain:
         resolved: 'Conversation was marked resolved by %{user_name} due to inactivity'
+        resolved_with_reason: 'Conversation was marked resolved by %{user_name} (%{reason})'
+        resolved_by_tool: 'Conversation was marked resolved by %{user_name}: %{reason}'
         open: 'Conversation was marked open by %{user_name}'
+        open_with_reason: 'Conversation was marked open by %{user_name} (%{reason})'
+        auto_opened_after_agent_reply: 'Conversation was marked open automatically after an agent reply'
       agent_bot:
         error_moved_to_open: 'Conversation was marked open by system due to an error with the agent bot.'
       status:
@@ -273,12 +286,47 @@ en:
         issue_created: 'Linear issue %{issue_id} was created by %{user_name}'
         issue_linked: 'Linear issue %{issue_id} was linked by %{user_name}'
         issue_unlinked: 'Linear issue %{issue_id} was unlinked by %{user_name}'
+      group_participants:
+        add:
+          single: '%{author_name} added %{contact_name} to the group'
+          multiple: '%{author_name} added %{contact_names} and %{last_contact_name} to the group'
+        join: '%{contact_name} joined using the group invite link'
+        leave: '%{contact_name} left the group'
+        remove:
+          single: '%{author_name} removed %{contact_name} from the group'
+          multiple: '%{author_name} removed %{contact_names} and %{last_contact_name} from the group'
+        promote:
+          single: '%{author_name} promoted %{contact_name} to admin'
+          multiple: '%{author_name} promoted %{contact_names} and %{last_contact_name} to admin'
+        demote:
+          single: '%{author_name} demoted %{contact_name} to member'
+          multiple: '%{author_name} demoted %{contact_names} and %{last_contact_name} to member'
+      groups_update:
+        subject_changed: '%{author_name} changed the group name to "%{value}"'
+        description_changed: '%{author_name} changed the group description'
+        description_removed: '%{author_name} removed the group description'
+        restrict_enabled: '%{author_name} changed the settings so only admins can edit the group settings'
+        restrict_disabled: '%{author_name} changed the settings so all members can edit the group settings'
+        announce_enabled: "%{author_name} changed this group's settings to allow only admins to send messages to this group"
+        announce_disabled: "%{author_name} changed this group's settings to allow all members to send messages to this group"
+        member_add_mode_enabled: "%{author_name} changed this group's setting to allow all members to add others to this group"
+        member_add_mode_disabled: "%{author_name} changed this group's setting to allow only admins to add others to this group"
+        join_approval_mode_enabled: '%{author_name} turned on admin approval to join this group'
+        join_approval_mode_disabled: '%{author_name} turned off admin approval to join this group'
+        invite_link_reset: "%{author_name} reset this group's invite link"
+        membership_request_created: '%{contact_name} wants to join the group'
+        membership_request_revoked: '%{contact_name} no longer wants to join the group'
+        icon_changed: '%{author_name} changed the group image'
       csat:
         not_sent_due_to_messaging_window: 'CSAT survey not sent due to outgoing message restrictions'
       auto_resolve:
         not_sent_due_to_messaging_window: 'Auto-resolve message not sent due to outgoing message restrictions'
       muted: '%{user_name} has muted the conversation'
       unmuted: '%{user_name} has unmuted the conversation'
+      recurring_message_failed: 'Recurring scheduled message failed to send. Next occurrence scheduled for %{next_date}.'
+      recurring_message_completed: 'Recurring scheduled message series completed after %{count} occurrences.'
+      recurring_message_cancelled: 'Recurring scheduled message has been stopped by %{agent}.'
+      unknown_agent: 'Unknown'
       auto_resolution_message: 'Resolving the conversation as it has been inactive for a while. Please start a new conversation if you need further assistance.'
     templates:
       greeting_message_body: '%{account_name} typically replies in a few hours.'
@@ -304,6 +352,11 @@ en:
   contacts:
     online:
       delete: '%{contact_name} is Online, please try again later'
+    sync_group:
+      not_a_group: 'Contact is not a group'
+      no_identifier: 'Contact does not have a group identifier'
+      no_supported_inbox: 'No inbox with group sync support found for this contact'
+      metadata_unavailable: 'Could not retrieve group metadata from the provider'
   integration_apps:
     # Note: webhooks and dashboard_apps don't need short_description as they use different modal components
     dashboard_apps:
@@ -441,6 +494,9 @@ en:
     seconds:
       one: '%{count} second'
       other: '%{count} seconds'
+  auto_assignment:
+    default_policy_name: 'Default Policy'
+    policy_actor: 'Automation System via %{policy_name}'
   automation:
     system_name: 'Automation System'
   crm:
@@ -474,3 +530,30 @@ en:
       subject: 'Finish setting up %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Custom domain is not configured'
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: "Every day"
+        other: "Every %{count} days"
+      weekly:
+        one: "Every week"
+        other: "Every %{count} weeks"
+      weekly_on: "%{prefix} on %{days}"
+      monthly:
+        one: "Monthly"
+        other: "Every %{count} months"
+      monthly_on_weekday: "%{prefix} on the %{ordinal} %{weekday}"
+      yearly:
+        one: "Every year"
+        other: "Every %{count} years"
+      until_date: "until %{date}"
+      after_count:
+        one: "%{count} occurrence"
+        other: "%{count} occurrences"
+      ordinals:
+        first: "first"
+        second: "second"
+        third: "third"
+        fourth: "fourth"
+        fifth: "fifth"
+        last: "last"

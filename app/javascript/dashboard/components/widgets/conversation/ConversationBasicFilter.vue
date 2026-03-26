@@ -25,6 +25,7 @@ const { updateUISettings } = useUISettings();
 
 const chatStatusFilter = useMapGetter('getChatStatusFilter');
 const chatSortFilter = useMapGetter('getChatSortFilter');
+const chatGroupTypeFilter = useMapGetter('getChatGroupTypeFilter');
 
 const [showActionsDropdown, toggleDropdown] = useToggle();
 
@@ -37,6 +38,8 @@ const currentSortBy = computed(() => {
     chatSortFilter.value || wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC
   );
 });
+
+const currentGroupType = computed(() => chatGroupTypeFilter.value || '');
 
 const chatStatusOptions = computed(() => [
   {
@@ -87,6 +90,10 @@ const chatSortOptions = computed(() => [
     value: 'priority_asc',
   },
   {
+    label: t('CHAT_LIST.SORT_ORDER_ITEMS.priority_desc_created_at_asc.TEXT'),
+    value: 'priority_desc_created_at_asc',
+  },
+  {
     label: t('CHAT_LIST.SORT_ORDER_ITEMS.waiting_since_asc.TEXT'),
     value: 'waiting_since_asc',
   },
@@ -94,6 +101,12 @@ const chatSortOptions = computed(() => [
     label: t('CHAT_LIST.SORT_ORDER_ITEMS.waiting_since_desc.TEXT'),
     value: 'waiting_since_desc',
   },
+]);
+
+const chatGroupTypeOptions = computed(() => [
+  { label: t('GROUP.FILTER.ALL'), value: '' },
+  { label: t('GROUP.FILTER.INDIVIDUAL'), value: 'individual' },
+  { label: t('GROUP.FILTER.GROUP'), value: 'group' },
 ]);
 
 const activeChatStatusLabel = computed(
@@ -108,11 +121,18 @@ const activeChatSortLabel = computed(
     ''
 );
 
+const activeGroupTypeLabel = computed(
+  () =>
+    chatGroupTypeOptions.value.find(m => m.value === chatGroupTypeFilter.value)
+      ?.label || t('GROUP.FILTER.ALL')
+);
+
 const saveSelectedFilter = (type, value) => {
   updateUISettings({
     conversations_filter_by: {
       status: type === 'status' ? value : currentStatusFilter.value,
       order_by: type === 'sort' ? value : currentSortBy.value,
+      group_type: type === 'group_type' ? value : currentGroupType.value,
     },
   });
 };
@@ -127,6 +147,12 @@ const handleSortChange = value => {
   emit('changeFilter', value, 'sort');
   store.dispatch('setChatSortFilter', value);
   saveSelectedFilter('sort', value);
+};
+
+const handleGroupTypeChange = value => {
+  emit('changeFilter', value, 'group_type');
+  store.dispatch('setChatGroupTypeFilter', value);
+  saveSelectedFilter('group_type', value);
 };
 </script>
 
@@ -143,13 +169,13 @@ const handleSortChange = value => {
     <div
       v-if="showActionsDropdown"
       v-on-click-outside="() => toggleDropdown()"
-      class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 absolute z-40 top-full"
+      class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 absolute z-40 top-full flex flex-col gap-4"
       :class="{
         'ltr:left-0 rtl:right-0': !isOnExpandedLayout,
         'ltr:right-0 rtl:left-0': isOnExpandedLayout,
       }"
     >
-      <div class="flex items-center justify-between last:mt-4 gap-2">
+      <div class="flex items-center justify-between gap-2">
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('CHAT_LIST.CHAT_SORT.STATUS') }}
         </span>
@@ -161,7 +187,7 @@ const handleSortChange = value => {
           @update:model-value="handleStatusChange"
         />
       </div>
-      <div class="flex items-center justify-between last:mt-4 gap-2">
+      <div class="flex items-center justify-between gap-2">
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
         </span>
@@ -171,6 +197,18 @@ const handleSortChange = value => {
           :label="activeChatSortLabel"
           :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
           @update:model-value="handleSortChange"
+        />
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-sm truncate text-n-slate-12">
+          {{ $t('GROUP.FILTER.TYPE_LABEL') }}
+        </span>
+        <SelectMenu
+          :model-value="chatGroupTypeFilter"
+          :options="chatGroupTypeOptions"
+          :label="activeGroupTypeLabel"
+          :sub-menu-position="isOnExpandedLayout ? 'left' : 'right'"
+          @update:model-value="handleGroupTypeChange"
         />
       </div>
     </div>

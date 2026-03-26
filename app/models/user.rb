@@ -19,7 +19,7 @@
 #  message_signature      :text
 #  name                   :string           not null
 #  otp_backup_codes       :text
-#  otp_required_for_login :boolean          default(FALSE)
+#  otp_required_for_login :boolean          default(FALSE), not null
 #  otp_secret             :string
 #  provider               :string           default("email"), not null
 #  pubsub_token           :string
@@ -102,6 +102,7 @@ class User < ApplicationRecord
   has_many :invitees, through: :account_users, class_name: 'User', foreign_key: 'inviter_id', source: :inviter, dependent: :nullify
 
   has_many :scheduled_messages, as: :author, dependent: :nullify
+  has_many :recurring_scheduled_messages, as: :author, dependent: :nullify
 
   has_many :custom_filters, dependent: :destroy_async
   has_many :dashboard_apps, dependent: :nullify
@@ -193,6 +194,25 @@ class User < ApplicationRecord
 
   def mfa_feature_available?
     Chatwoot.mfa_enabled?
+  end
+
+  # Workaround for Devise 4.9.x race condition vulnerability (GHSA-57hq-95w6-v4fc).
+  #
+  # The Confirmable module's reconfirmable flow has a race condition where concurrent
+  # email change requests can desynchronize confirmation tokens, allowing an attacker
+  # to confirm an email they don't own. Fixed in Devise 5.0.3 by persisting
+  # unconfirmed_email before regenerating the confirmation token.
+  #
+  # We can't upgrade to Devise 5.0.3 because devise-two-factor only added Devise 5
+  # support in v6.4.0, which simultaneously raised its Rails minimum to 7.2+.
+  # No released version supports both Devise 5 and Rails 7.1.
+  #
+  # This override applies the same fix locally: force-mark unconfirmed_email
+  # as dirty before assignment so ActiveRecord always writes it, keeping it
+  # in sync with the regenerated confirmation token. Remove once on Devise 5+.
+  def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+    unconfirmed_email_will_change!
+    super
   end
 
   def signature_position

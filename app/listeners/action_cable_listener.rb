@@ -78,6 +78,30 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     broadcast(account, tokens, SCHEDULED_MESSAGE_DELETED, scheduled_message.push_event_data)
   end
 
+  def recurring_scheduled_message_created(event)
+    recurring = event.data[:recurring_scheduled_message]
+    account = recurring.account
+    tokens = user_tokens(account, recurring.conversation.inbox.members)
+
+    broadcast(account, tokens, RECURRING_SCHEDULED_MESSAGE_CREATED, recurring.push_event_data)
+  end
+
+  def recurring_scheduled_message_updated(event)
+    recurring = event.data[:recurring_scheduled_message]
+    account = recurring.account
+    tokens = user_tokens(account, recurring.conversation.inbox.members)
+
+    broadcast(account, tokens, RECURRING_SCHEDULED_MESSAGE_UPDATED, recurring.push_event_data)
+  end
+
+  def recurring_scheduled_message_deleted(event)
+    recurring = event.data[:recurring_scheduled_message]
+    account = recurring.account
+    tokens = user_tokens(account, recurring.conversation.inbox.members)
+
+    broadcast(account, tokens, RECURRING_SCHEDULED_MESSAGE_DELETED, recurring.push_event_data)
+  end
+
   def first_reply_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
@@ -190,6 +214,18 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     broadcast(account, [account_token(account)], CONTACT_DELETED, contact_data)
   end
 
+  def contact_group_synced(event)
+    contact, account = extract_contact_and_account(event)
+    inbox_phone = contact.group_channel&.phone_number
+    payload = contact.push_event_data.merge(
+      group_members: group_members_data(contact, account),
+      inbox_phone_number: inbox_phone,
+      is_inbox_admin: inbox_admin_in_group?(contact, inbox_phone)
+    )
+
+    broadcast(account, [account_token(account)], CONTACT_GROUP_SYNCED, payload)
+  end
+
   def conversation_mentioned(event)
     conversation, account = extract_conversation_and_account(event)
     user = event.data[:user]
@@ -204,8 +240,14 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   end
 
   def typing_event_listener_tokens(account, conversation, user)
-    current_user_token = user.is_a?(Contact) ? conversation.contact_inbox.pubsub_token : user.pubsub_token
-    (user_tokens(account, conversation.inbox.members) + [conversation.contact_inbox.pubsub_token]) - [current_user_token]
+    current_user_token = if user.is_a?(Contact)
+                           conversation.contact_inbox.pubsub_token
+                         elsif user.respond_to?(:pubsub_token)
+                           user.pubsub_token
+                         end
+
+    tokens = user_tokens(account, conversation.inbox.members) + [conversation.contact_inbox.pubsub_token]
+    current_user_token.present? ? tokens - [current_user_token] : tokens
   end
 
   def user_tokens(account, agents)
@@ -226,6 +268,27 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     contact = contact_inbox.contact
 
     contact_inbox.hmac_verified? ? contact.contact_inboxes.where(hmac_verified: true).filter_map(&:pubsub_token) : [contact_inbox.pubsub_token]
+  end
+
+  def group_members_data(contact, _account)
+    GroupMember.active.where(group_contact: contact).includes(:contact).map do |member|
+      {
+        id: member.id, role: member.role, is_active: member.is_active, group_contact_id: member.group_contact_id,
+        contact: { id: member.contact.id, name: member.contact.name, phone_number: member.contact.phone_number,
+                   identifier: member.contact.identifier, thumbnail: member.contact.avatar_url }
+      }
+    end
+  end
+
+  def inbox_admin_in_group?(contact, inbox_phone)
+    return false if inbox_phone.blank?
+
+    clean = inbox_phone.delete('+')
+    GroupMember.active
+               .where(group_contact: contact, role: :admin)
+               .joins(:contact)
+               .exists?(['REPLACE(contacts.phone_number, \'+\', \'\') = ? OR RIGHT(REPLACE(contacts.phone_number, \'+\', \'\'), 8) = RIGHT(?, 8)',
+                         clean, clean])
   end
 
   def broadcast(account, tokens, event_name, data)
