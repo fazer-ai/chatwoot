@@ -445,3 +445,6 @@ pt_BR:
       subject: 'Termine de configurar %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Domínio personalizado não está configurado'
+  devise_token_auth:
+    sessions:
+      bad_credentials: "O e-mail ou a senha estão incorretos. Por favor, tente novamente."

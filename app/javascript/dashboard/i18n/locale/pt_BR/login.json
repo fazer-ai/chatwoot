@@ -1,8 +1,8 @@
 {
   "LOGIN": {
-    "TITLE": "Entrar no Chatwoot",
+    "TITLE": "Entrar na Doctoriza",
     "EMAIL": {
-      "LABEL": "e-mail",
+      "LABEL": "E-mail",
       "PLACEHOLDER": "nome{'@'}empresa.com.br",
       "ERROR": "Digite um endereço de endereço eletrônico válido"
     },
@@ -20,7 +20,7 @@
       "BUSINESS_ACCOUNTS_ONLY": "Use o endereço de endereço eletrônico da empresa para fazer ‘login’",
       "NO_ACCOUNT_FOUND": "Não encontramos uma conta para seu endereço de correio eletrônico."
     },
-    "FORGOT_PASSWORD": "Esqueceu-se da sua senha?",
+    "FORGOT_PASSWORD": "Esqueceu a senha?",
     "CREATE_NEW_ACCOUNT": "Criar nova conta",
     "SUBMIT": "Entrar",
     "SAML": {
