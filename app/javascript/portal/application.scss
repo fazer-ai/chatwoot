@@ -4,12 +4,12 @@
 @import 'tailwindcss/utilities';
 
 @import 'widget/assets/scss/reset';
-@import 'shared/assets/fonts/InterDisplay/inter-display';
+@import 'shared/assets/fonts/poppins';
 
 html,
 body {
   font-family:
-    'InterDisplay',
+    'Poppins',
     -apple-system,
     system-ui,
     BlinkMacSystemFont,

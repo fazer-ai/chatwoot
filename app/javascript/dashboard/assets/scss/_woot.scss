@@ -3,8 +3,7 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
-@import 'shared/assets/fonts/InterDisplay/inter-display';
-@import 'shared/assets/fonts/inter';
+@import 'shared/assets/fonts/poppins';
 
 // Next Colors
 @import 'next-colors';
@@ -19,7 +18,7 @@
 html,
 body {
   font-family:
-    'Inter',
+    'Poppins',
     -apple-system,
     system-ui,
     BlinkMacSystemFont,

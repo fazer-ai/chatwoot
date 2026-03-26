@@ -28,6 +28,9 @@ importers:
       '@chatwoot/utils':
         specifier: ^0.0.51
         version: 0.0.51
+      '@fontsource/poppins':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@formkit/core':
         specifier: ^1.6.7
         version: 1.6.7
@@ -876,6 +879,9 @@ packages:
 
   '@floating-ui/utils@0.2.7':
     resolution: {integrity: sha512-X8R8Oj771YRl/w+c1HqAC1szL8zWQRwFvgDwT129k9ACdBoud/+/rX9V0qiMl6LWUdP9voC2nDVZYPMQQsb6eA==}
+
+  '@fontsource/poppins@5.2.7':
+    resolution: {integrity: sha512-6uQyPmseo4FgI97WIhA4yWRlNaoLk4vSDK/PyRwdqqZb5zAEuc+Kunt8JTMcsHYUEGYBtN15SNkMajMdqUSUmg==}
 
   '@formkit/core@1.6.7':
     resolution: {integrity: sha512-wEoWK7crcCPRV5KJfEGLjjIS+qwbuD8I5Ur0zTtKRQrdO4oRL6kVoubxQOpgnq1l8sWfcRY8Wpf22Wna2LD20Q==}
@@ -5384,6 +5390,8 @@ snapshots:
       '@floating-ui/core': 1.6.7
 
   '@floating-ui/utils@0.2.7': {}
+
+  '@fontsource/poppins@5.2.7': {}
 
   '@formkit/core@1.6.7':
     dependencies:
