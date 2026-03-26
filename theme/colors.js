@@ -146,7 +146,7 @@ export const colors = {
       8: 'rgb(var(--blue-8) / <alpha-value>)',
       9: 'rgb(var(--blue-9) / <alpha-value>)',
       10: 'rgb(var(--blue-10) / <alpha-value>)',
-      11: 'rgb(var(--blue-11) / <alpha-value>)',
+      11: '#7261D6',
       12: 'rgb(var(--blue-12) / <alpha-value>)',
     },
 
@@ -226,7 +226,7 @@ export const colors = {
     },
 
     black: '#000000',
-    brand: '#2781F6',
+    brand: '#7261D6',
     background: 'rgb(var(--background-color) / <alpha-value>)',
     'input-background': 'rgba(var(--background-input-box))',
     surface: {

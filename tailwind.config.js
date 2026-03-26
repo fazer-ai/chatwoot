@@ -38,6 +38,12 @@ const tailwindConfig = {
   ],
   theme: {
     extend: {
+      backgroundImage: {
+        'login-mesh': [
+          'radial-gradient(ellipse at 100% 0%, rgb(var(--solid-blue) / 0.25) 0%, transparent 55%)',
+          'radial-gradient(ellipse at 0% 100%, rgb(var(--solid-purple) / 0.25) 0%, transparent 55%)',
+        ].join(', '),
+      },
       fontFamily: {
         sans: ['Poppins', ...defaultSansFonts],
         inter: ['Poppins', ...defaultSansFonts],
@@ -243,6 +249,16 @@ const tailwindConfig = {
         '50%': { transform: 'translateX(-0.234375rem)' },
         '75%': { transform: 'translateX(0.234375rem)' },
       },
+      'mesh-movement': {
+        '0%, 100%': { backgroundPosition: '0% 0%' },
+        '50%': { backgroundPosition: '100% 100%' },
+      },
+      'blob-bounce': {
+        '0%': { transform: 'translate(0px, 0px) scale(1)' },
+        '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+        '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+        '100%': { transform: 'translate(0px, 0px) scale(1)' },
+      },
     },
     animation: {
       ...defaultTheme.animation,
@@ -251,6 +267,8 @@ const tailwindConfig = {
       'loader-pulse': 'loader-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       'card-select': 'card-select 0.25s ease-in-out',
       shake: 'shake 0.3s ease-in-out 0s 2',
+      'mesh-movement': 'mesh-movement 15s ease infinite',
+      'blob-bounce': 'blob-bounce 10s infinite alternate',
     },
   },
   plugins: [

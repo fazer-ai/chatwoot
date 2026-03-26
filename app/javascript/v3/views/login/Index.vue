@@ -220,33 +220,18 @@ export default {
 
 <template>
   <main
-    class="flex flex-col w-full min-h-screen py-20 bg-n-brand/5 dark:bg-n-background sm:px-6 lg:px-8"
+    class="relative flex flex-col justify-center items-center w-full min-h-screen px-4 py-8 bg-n-brand/5 bg-login-mesh dark:bg-n-background sm:px-6 lg:px-8 overflow-hidden bg-[length:200%_200%] animate-mesh-movement"
   >
-    <section class="max-w-5xl mx-auto">
-      <img
-        :src="globalConfig.logo"
-        :alt="globalConfig.installationName"
-        class="block w-auto h-8 mx-auto dark:hidden"
-      />
-      <img
-        v-if="globalConfig.logoDark"
-        :src="globalConfig.logoDark"
-        :alt="globalConfig.installationName"
-        class="hidden w-auto h-8 mx-auto dark:block"
-      />
-      <h2 class="mt-6 text-3xl font-medium text-center text-n-slate-12">
-        {{ replaceInstallationName($t('LOGIN.TITLE')) }}
-      </h2>
-      <p v-if="showSignupLink" class="mt-3 text-sm text-center text-n-slate-11">
-        {{ $t('COMMON.OR') }}
-        <router-link to="auth/signup" class="lowercase text-link text-n-brand">
-          {{ $t('LOGIN.CREATE_NEW_ACCOUNT') }}
-        </router-link>
-      </p>
-    </section>
-
+    <div
+      class="absolute -top-32 -left-32 w-[36rem] h-[36rem] rounded-full bg-n-brand/20 dark:bg-n-brand/15 blur-[120px] pointer-events-none animate-blob-bounce"
+      aria-hidden="true"
+    />
+    <div
+      class="absolute -bottom-32 -right-32 w-[36rem] h-[36rem] rounded-full bg-n-violet-9/20 dark:bg-n-violet-9/15 blur-[120px] pointer-events-none animate-blob-bounce [animation-delay:2s]"
+      aria-hidden="true"
+    />
     <!-- MFA Verification Section -->
-    <section v-if="mfaRequired" class="mt-11">
+    <section v-if="mfaRequired" class="w-full sm:max-w-lg">
       <MfaVerification
         :mfa-token="mfaToken"
         @verified="handleMfaVerified"
@@ -257,12 +242,36 @@ export default {
     <!-- Regular Login Section -->
     <section
       v-else
-      class="bg-white shadow sm:mx-auto mt-11 sm:w-full sm:max-w-lg dark:bg-n-solid-2 p-11 sm:shadow-lg sm:rounded-lg"
+      class="w-full bg-white shadow sm:mx-auto sm:w-full sm:max-w-lg dark:bg-n-solid-2 p-11 sm:shadow-lg sm:rounded-lg"
       :class="{
-        'mb-8 mt-15': !showGoogleOAuth,
         'animate-wiggle': loginApi.hasErrored,
       }"
     >
+      <section class="max-w-5xl mx-auto mb-5">
+        <img
+          :src="globalConfig.logo"
+          :alt="globalConfig.installationName"
+          class="block w-auto h-8 mx-auto dark:hidden"
+        />
+        <img
+          v-if="globalConfig.logoDark"
+          :src="globalConfig.logoDark"
+          :alt="globalConfig.installationName"
+          class="hidden w-auto h-8 mx-auto dark:block"
+        />
+        <p
+          v-if="showSignupLink"
+          class="mt-3 text-sm text-center text-n-slate-11"
+        >
+          {{ $t('COMMON.OR') }}
+          <router-link
+            to="auth/signup"
+            class="lowercase text-link text-n-brand"
+          >
+            {{ $t('LOGIN.CREATE_NEW_ACCOUNT') }}
+          </router-link>
+        </p>
+      </section>
       <div v-if="!email">
         <div class="flex flex-col gap-4">
           <GoogleOAuthButton v-if="showGoogleOAuth" />
@@ -337,21 +346,5 @@ export default {
         <Spinner color-scheme="primary" size="" />
       </div>
     </section>
-    <!-- eslint-disable vue/no-bare-strings-in-template @intlify/vue-i18n/no-raw-text -->
-    <p
-      v-if="globalConfig.displayManifest"
-      class="mt-8 text-center text-xs text-n-slate-10"
-    >
-      powered by
-      <a
-        href="https://fazer.ai"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-n-slate-11 hover:text-n-brand"
-      >
-        fazer.ai
-      </a>
-    </p>
-    <!-- eslint-enable vue/no-bare-strings-in-template @intlify/vue-i18n/no-raw-text -->
   </main>
 </template>
