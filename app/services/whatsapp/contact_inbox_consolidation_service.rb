@@ -80,8 +80,9 @@ class Whatsapp::ContactInboxConsolidationService
 
       lid_contact_inbox.destroy!
 
+      # Reassign message sender references before destroying to prevent dependent: :destroy_async from deleting history
       # Clean up orphaned LID contact if it has no remaining contact_inboxes
-      lid_contact.destroy! if lid_contact.contact_inboxes.reload.empty?
+      reassign_sender_and_destroy(lid_contact, phone_contact)
 
       # Update phone contact_inbox to use LID as source_id and set identifier on the canonical contact
       phone_contact_inbox.update!(source_id: @lid)
@@ -160,7 +161,7 @@ class Whatsapp::ContactInboxConsolidationService
 
       phone_contact.update!(identifier: @identifier)
 
-      lid_contact.destroy! if lid_contact.contact_inboxes.reload.empty?
+      reassign_sender_and_destroy(lid_contact, phone_contact)
     end
   end
 
@@ -185,5 +186,14 @@ class Whatsapp::ContactInboxConsolidationService
   def phone_conflict?(existing_contact)
     conflicting = @inbox.account.contacts.find_by(phone_number: "+#{@phone}")
     conflicting.present? && conflicting.id != existing_contact.id
+  end
+
+  # Reassign message sender references from source to target contact, then destroy source if orphaned.
+  # Prevents dependent: :destroy_async on Contact#messages from deleting message history.
+  def reassign_sender_and_destroy(source_contact, target_contact)
+    return unless source_contact.contact_inboxes.reload.empty?
+
+    Message.where(sender: source_contact).update_all(sender_id: target_contact.id) # rubocop:disable Rails/SkipsModelValidations
+    source_contact.destroy!
   end
 end

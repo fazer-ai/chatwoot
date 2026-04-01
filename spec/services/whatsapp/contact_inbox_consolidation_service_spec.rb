@@ -64,8 +64,9 @@ describe Whatsapp::ContactInboxConsolidationService do
         let!(:lid_contact) { create(:contact, account: inbox.account, identifier: identifier) }
         let!(:lid_contact_inbox) { create(:contact_inbox, inbox: inbox, contact: lid_contact, source_id: lid) }
 
-        it 'adopts the lid contact_inbox and transfers it to the phone contact' do
+        it 'adopts the lid contact_inbox, reassigns messages, and transfers it to the phone contact' do
           lid_conversation = create(:conversation, inbox: inbox, contact: lid_contact, contact_inbox: lid_contact_inbox)
+          lid_message = create(:message, conversation: lid_conversation, sender: lid_contact, inbox: inbox, account: inbox.account)
 
           service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
           service.perform
@@ -73,6 +74,7 @@ describe Whatsapp::ContactInboxConsolidationService do
           expect(lid_contact_inbox.reload.contact_id).to eq(phone_contact.id)
           expect(phone_contact.reload.identifier).to eq(identifier)
           expect(lid_conversation.reload.contact_id).to eq(phone_contact.id)
+          expect(lid_message.reload.sender).to eq(phone_contact)
           expect(Contact.exists?(lid_contact.id)).to be(false)
         end
       end
