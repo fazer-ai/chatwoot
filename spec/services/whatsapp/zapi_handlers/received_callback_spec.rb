@@ -428,6 +428,122 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
     end
 
+    context 'when phone contact exists without contact_inbox and a separate LID contact exists (provider conversion)' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: 'old_baileys_lid@lid',
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:lid_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the conflict and uses the phone contact' do
+        service.perform
+
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+
+      context 'when the LID contact has a contact_inbox in this inbox' do
+        let!(:lid_contact_inbox) do
+          create(:contact_inbox, inbox: inbox, contact: lid_contact, source_id: '123456789')
+        end
+
+        it 'adopts the contact_inbox and uses the phone contact for the message' do
+          service.perform
+
+          expect(lid_contact_inbox.reload.contact_id).to eq(phone_contact.id)
+          expect(phone_contact.reload.identifier).to eq('123456789@lid')
+          message = Message.last
+          expect(message.sender).to eq(phone_contact)
+        end
+      end
+    end
+
+    context 'when phone contact has contact_inbox with phone as source_id and a separate LID contact exists' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: nil,
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:phone_contact_inbox) do
+        create(:contact_inbox, inbox: inbox, contact: phone_contact, source_id: '5511987654321')
+      end
+      let!(:lid_contact) do # rubocop:disable RSpec/LetSetup
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the identifier conflict, migrates the contact_inbox, and uses the phone contact' do
+        service.perform
+
+        expect(phone_contact_inbox.reload.source_id).to eq('123456789')
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+    end
+
+    context 'when phone contact has contact_inbox with old source_id and a separate LID contact exists' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: 'old_lid@lid',
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:old_contact_inbox) do
+        create(:contact_inbox, inbox: inbox, contact: phone_contact, source_id: '999999999')
+      end
+      let!(:lid_contact) do # rubocop:disable RSpec/LetSetup
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the identifier conflict, updates the contact_inbox, and uses the phone contact' do
+        service.perform
+
+        expect(old_contact_inbox.reload.source_id).to eq('123456789')
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+    end
+
     context 'when handling avatar' do
       let(:params) do
         base_params.merge(

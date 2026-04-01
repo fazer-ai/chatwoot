@@ -92,8 +92,9 @@ class Whatsapp::ContactInboxConsolidationService
   def migrate_phone_to_lid(phone_contact_inbox)
     existing_contact = phone_contact_inbox.contact
 
-    return if identifier_conflict?(existing_contact)
     return if phone_conflict?(existing_contact)
+
+    transfer_identifier_to(existing_contact)
 
     ActiveRecord::Base.transaction do
       phone_contact_inbox.update!(source_id: @lid)
@@ -108,7 +109,14 @@ class Whatsapp::ContactInboxConsolidationService
     return unless existing_contact
 
     existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox_id: @inbox.id)
-    return unless existing_contact_inbox
+
+    unless existing_contact_inbox
+      # Contact exists by phone but has no contact_inbox in this inbox (e.g., after provider conversion).
+      # Must still resolve identifier conflicts so the builder finds the phone-based contact
+      # instead of a stale LID-only contact, which would cause "Phone number has already been taken".
+      adopt_or_resolve_lid_contact(existing_contact)
+      return
+    end
 
     # If a LID contact_inbox already exists, route into the merge logic instead of early-returning
     lid_contact_inbox = find_lid_contact_inbox
@@ -117,11 +125,57 @@ class Whatsapp::ContactInboxConsolidationService
 
       return consolidate_different_contacts(existing_contact_inbox, lid_contact_inbox)
     end
-    return if identifier_conflict?(existing_contact)
+    transfer_identifier_to(existing_contact)
 
     ActiveRecord::Base.transaction do
       existing_contact.update!(identifier: @identifier)
       existing_contact_inbox.update!(source_id: @lid)
+    end
+  end
+
+  # When the phone-based contact has no contact_inbox in this inbox, handle
+  # any conflicting LID contact that would otherwise intercept the builder lookup.
+  def adopt_or_resolve_lid_contact(phone_contact)
+    lid_contact_inbox = find_lid_contact_inbox
+
+    if lid_contact_inbox && lid_contact_inbox.contact_id != phone_contact.id
+      adopt_lid_contact_inbox(phone_contact, lid_contact_inbox)
+    else
+      transfer_identifier_to(phone_contact)
+    end
+  end
+
+  # Transfer a LID contact_inbox (and its conversations) from the LID contact to the phone contact.
+  def adopt_lid_contact_inbox(phone_contact, lid_ci)
+    lid_contact = lid_ci.contact
+
+    ActiveRecord::Base.transaction do
+      lid_cleanup = {}
+      lid_cleanup[:identifier] = nil if lid_contact.identifier == @identifier
+      lid_cleanup[:phone_number] = nil if lid_contact.phone_number == "+#{@phone}"
+      lid_contact.update!(lid_cleanup) if lid_cleanup.present?
+
+      lid_ci.conversations.find_each do |conversation|
+        conversation.update!(contact_id: phone_contact.id)
+      end
+      lid_ci.update!(contact_id: phone_contact.id)
+
+      phone_contact.update!(identifier: @identifier)
+
+      lid_contact.destroy! if lid_contact.contact_inboxes.reload.empty?
+    end
+  end
+
+  # Resolve identifier conflict by transferring the identifier to the phone-based contact.
+  def transfer_identifier_to(target_contact)
+    return if target_contact.identifier == @identifier
+
+    conflicting = @inbox.account.contacts.find_by(identifier: @identifier)
+    return unless conflicting && conflicting.id != target_contact.id
+
+    ActiveRecord::Base.transaction do
+      conflicting.update!(identifier: nil)
+      target_contact.update!(identifier: @identifier)
     end
   end
 
