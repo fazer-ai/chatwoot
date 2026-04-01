@@ -67,11 +67,7 @@ class Whatsapp::ContactInboxConsolidationService
     lid_contact = lid_contact_inbox.contact
 
     ActiveRecord::Base.transaction do
-      # Clear identifier and phone from LID contact to avoid uniqueness conflicts when updating the canonical contact
-      lid_cleanup = {}
-      lid_cleanup[:identifier] = nil if lid_contact.identifier == @identifier
-      lid_cleanup[:phone_number] = nil if lid_contact.phone_number == "+#{@phone}"
-      lid_contact.update!(lid_cleanup) if lid_cleanup.present?
+      lid_contact.update!(phone_number: nil) if lid_contact.phone_number == "+#{@phone}"
 
       # Move conversations from LID contact_inbox to the phone contact
       lid_contact_inbox.conversations.find_each do |conversation|
@@ -79,12 +75,10 @@ class Whatsapp::ContactInboxConsolidationService
       end
 
       lid_contact_inbox.destroy!
-
-      # Reassign message sender references before destroying to prevent dependent: :destroy_async from deleting history
-      # Clean up orphaned LID contact if it has no remaining contact_inboxes
       reassign_sender_and_destroy(lid_contact, phone_contact)
 
-      # Update phone contact_inbox to use LID as source_id and set identifier on the canonical contact
+      # Resolve identifier conflicts account-wide, then update the canonical contact
+      transfer_identifier_to(phone_contact)
       phone_contact_inbox.update!(source_id: @lid)
       phone_contact.update!(identifier: @identifier, phone_number: "+#{@phone}")
     end
@@ -149,16 +143,15 @@ class Whatsapp::ContactInboxConsolidationService
     lid_contact = lid_ci.contact
 
     ActiveRecord::Base.transaction do
-      lid_cleanup = {}
-      lid_cleanup[:identifier] = nil if lid_contact.identifier == @identifier
-      lid_cleanup[:phone_number] = nil if lid_contact.phone_number == "+#{@phone}"
-      lid_contact.update!(lid_cleanup) if lid_cleanup.present?
+      lid_contact.update!(phone_number: nil) if lid_contact.phone_number == "+#{@phone}"
 
       lid_ci.conversations.find_each do |conversation|
         conversation.update!(contact_id: phone_contact.id)
       end
       lid_ci.update!(contact_id: phone_contact.id)
 
+      # Resolve identifier conflicts account-wide, not just with lid_contact
+      transfer_identifier_to(phone_contact)
       phone_contact.update!(identifier: @identifier)
 
       reassign_sender_and_destroy(lid_contact, phone_contact)
