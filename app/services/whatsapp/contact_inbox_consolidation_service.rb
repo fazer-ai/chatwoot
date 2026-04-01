@@ -67,6 +67,7 @@ class Whatsapp::ContactInboxConsolidationService
     lid_contact = lid_contact_inbox.contact
 
     ActiveRecord::Base.transaction do
+      moved_conversation_ids = lid_contact_inbox.conversations.pluck(:id)
       lid_contact.update!(phone_number: nil) if lid_contact.phone_number == "+#{@phone}"
 
       # Move conversations from LID contact_inbox to the phone contact
@@ -75,7 +76,7 @@ class Whatsapp::ContactInboxConsolidationService
       end
 
       lid_contact_inbox.destroy!
-      reassign_sender_and_destroy(lid_contact, phone_contact)
+      reassign_sender_and_destroy(lid_contact, phone_contact, conversation_ids: moved_conversation_ids)
 
       # Resolve identifier conflicts account-wide, then update the canonical contact
       transfer_identifier_to(phone_contact)
@@ -143,6 +144,7 @@ class Whatsapp::ContactInboxConsolidationService
     lid_contact = lid_ci.contact
 
     ActiveRecord::Base.transaction do
+      moved_conversation_ids = lid_ci.conversations.pluck(:id)
       lid_contact.update!(phone_number: nil) if lid_contact.phone_number == "+#{@phone}"
 
       lid_ci.conversations.find_each do |conversation|
@@ -154,7 +156,7 @@ class Whatsapp::ContactInboxConsolidationService
       transfer_identifier_to(phone_contact)
       phone_contact.update!(identifier: @identifier)
 
-      reassign_sender_and_destroy(lid_contact, phone_contact)
+      reassign_sender_and_destroy(lid_contact, phone_contact, conversation_ids: moved_conversation_ids)
     end
   end
 
@@ -181,12 +183,12 @@ class Whatsapp::ContactInboxConsolidationService
     conflicting.present? && conflicting.id != existing_contact.id
   end
 
-  # Reassign message sender references from source to target contact, then destroy source if orphaned.
+  # Reassign message sender references for moved conversations, then destroy source contact if orphaned.
+  # Scoped to conversation_ids to avoid touching messages in other inboxes the source contact may still own.
   # Prevents dependent: :destroy_async on Contact#messages from deleting message history.
-  def reassign_sender_and_destroy(source_contact, target_contact)
-    return unless source_contact.contact_inboxes.reload.empty?
-
-    Message.where(sender: source_contact).update_all(sender_id: target_contact.id) # rubocop:disable Rails/SkipsModelValidations
-    source_contact.destroy!
+  def reassign_sender_and_destroy(source_contact, target_contact, conversation_ids:)
+    Message.where(sender: source_contact, conversation_id: conversation_ids)
+           .update_all(sender_id: target_contact.id) # rubocop:disable Rails/SkipsModelValidations
+    source_contact.destroy! if source_contact.contact_inboxes.reload.empty?
   end
 end
