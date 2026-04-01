@@ -94,9 +94,8 @@ class Whatsapp::ContactInboxConsolidationService
 
     return if phone_conflict?(existing_contact)
 
-    transfer_identifier_to(existing_contact)
-
     ActiveRecord::Base.transaction do
+      transfer_identifier_to(existing_contact)
       phone_contact_inbox.update!(source_id: @lid)
       existing_contact.update!(identifier: @identifier, phone_number: "+#{@phone}")
     end
@@ -125,9 +124,8 @@ class Whatsapp::ContactInboxConsolidationService
 
       return consolidate_different_contacts(existing_contact_inbox, lid_contact_inbox)
     end
-    transfer_identifier_to(existing_contact)
-
     ActiveRecord::Base.transaction do
+      transfer_identifier_to(existing_contact)
       existing_contact.update!(identifier: @identifier)
       existing_contact_inbox.update!(source_id: @lid)
     end
