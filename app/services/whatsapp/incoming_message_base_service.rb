@@ -166,15 +166,12 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     attachment_file = download_attachment_file(attachment_payload)
     return if attachment_file.blank?
 
-    filename = message_type == 'document' ? attachment_payload[:filename].presence : nil
-    filename ||= attachment_file.original_filename
-
     @message.attachments.new(
       account_id: @message.account_id,
       file_type: file_content_type(message_type),
       file: {
         io: attachment_file,
-        filename: filename,
+        filename: attachment_payload[:filename].presence || attachment_file.original_filename,
         content_type: attachment_file.content_type
       },
       meta: ({ is_recorded_audio: true } if attachment_payload[:voice])
