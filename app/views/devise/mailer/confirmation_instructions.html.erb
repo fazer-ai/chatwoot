@@ -1,21 +1,21 @@
-<p><%== t('mailer.common.hi', name: @resource.name) %>,</p>
+<p><%= t('mailer.common.hi', name: @resource.name) %>,</p>
 
 <% account_user = @resource&.account_users&.first %>
 <% brand_name = global_config['BRAND_NAME'] || 'Chatwoot' %>
 
 <% if account_user&.inviter.present? && @resource.unconfirmed_email.blank? %>
-  <p><%== t('mailer.devise.confirmation_instructions.invited', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
+  <p><%= t('mailer.devise.confirmation_instructions.invited_html', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
 <% end %>
 
 <% if @resource.confirmed? %>
-  <p><%== t('mailer.devise.confirmation_instructions.login_message', brand_name: brand_name) %></p>
+  <p><%= t('mailer.devise.confirmation_instructions.login_message_html', brand_name: brand_name) %></p>
 <% else %>
   <% if account_user&.inviter.blank? %>
   <p>
-    <%== t('mailer.devise.confirmation_instructions.welcome', brand_name: brand_name) %>
+    <%= t('mailer.devise.confirmation_instructions.welcome_html', brand_name: brand_name) %>
   </p>
   <% end %>
-  <p><%== t('mailer.devise.confirmation_instructions.activate') %></p>
+  <p><%= t('mailer.devise.confirmation_instructions.activate_html') %></p>
 <% end %>
 
 

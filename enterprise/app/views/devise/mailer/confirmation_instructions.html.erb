@@ -1,4 +1,4 @@
-<p><%== t('mailer.common.hi', name: @resource.name) %>,</p>
+<p><%= t('mailer.common.hi', name: @resource.name) %>,</p>
 
 <% account_user = @resource&.account_users&.first %>
 <% is_saml_account = account_user&.account&.saml_enabled? %>
@@ -6,23 +6,23 @@
 
 <% if account_user&.inviter.present? && @resource.unconfirmed_email.blank? %>
   <% if is_saml_account %>
-    <p><%== t('mailer.devise.confirmation_instructions.invited_sso', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
-    <p><%== t('mailer.devise.confirmation_instructions.sso_no_password') %></p>
+    <p><%= t('mailer.devise.confirmation_instructions.invited_sso_html', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
+    <p><%= t('mailer.devise.confirmation_instructions.sso_no_password_html') %></p>
   <% else %>
-    <p><%== t('mailer.devise.confirmation_instructions.invited', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
+    <p><%= t('mailer.devise.confirmation_instructions.invited_html', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
   <% end %>
 <% end %>
 
 <% if @resource.confirmed? %>
-  <p><%== t('mailer.devise.confirmation_instructions.login_message', brand_name: brand_name) %></p>
+  <p><%= t('mailer.devise.confirmation_instructions.login_message_html', brand_name: brand_name) %></p>
 <% else %>
   <% if account_user&.inviter.blank? %>
   <p>
-    <%== t('mailer.devise.confirmation_instructions.welcome', brand_name: brand_name) %>
+    <%= t('mailer.devise.confirmation_instructions.welcome_html', brand_name: brand_name) %>
   </p>
   <% end %>
   <% unless is_saml_account %>
-  <p><%== t('mailer.devise.confirmation_instructions.activate') %></p>
+  <p><%= t('mailer.devise.confirmation_instructions.activate_html') %></p>
   <% end %>
 <% end %>
 
@@ -31,13 +31,13 @@
   <p><%= link_to t('mailer.devise.confirmation_instructions.confirm_account'), frontend_url('auth/confirmation', confirmation_token: @token) %></p>
 <% elsif @resource.confirmed? %>
   <% if is_saml_account %>
-    <p><%== t('mailer.devise.confirmation_instructions.sso_login') %></p>
+    <p><%= t('mailer.devise.confirmation_instructions.sso_login_html') %></p>
   <% else %>
     <p><%= link_to t('mailer.devise.confirmation_instructions.login_account'), frontend_url('auth/sign_in') %></p>
   <% end %>
 <% elsif account_user&.inviter.present? %>
   <% if is_saml_account %>
-    <p><%== t('mailer.devise.confirmation_instructions.sso_access') %></p>
+    <p><%= t('mailer.devise.confirmation_instructions.sso_access_html') %></p>
   <% else %>
     <p><%= link_to t('mailer.devise.confirmation_instructions.confirm_account'), frontend_url('auth/password/edit', reset_password_token: @resource.send(:set_reset_password_token)) %></p>
   <% end %>

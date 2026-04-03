@@ -1,6 +1,5 @@
 class AdministratorNotifications::AccountNotificationMailer < AdministratorNotifications::BaseMailer
   def account_deletion_user_initiated(account, reason)
-    brand_name = GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
     subject = I18n.t('mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.subject', brand_name: brand_name)
     action_url = settings_url('general')
     meta = {
@@ -13,7 +12,6 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
   end
 
   def account_deletion_for_inactivity(account, reason)
-    brand_name = GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
     subject = I18n.t('mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.subject', brand_name: brand_name)
     action_url = settings_url('general')
     meta = {
@@ -61,6 +59,10 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
   end
 
   private
+
+  def brand_name
+    GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
+  end
 
   def format_deletion_date(deletion_date_str)
     return 'Unknown' if deletion_date_str.blank?

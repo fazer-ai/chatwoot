@@ -566,7 +566,7 @@ en:
       click_here: "Click <a href=\"%{url}\">here</a>"
       powered_by: "Powered by"
       you: "You"
-      attachment_click_to_view: "Attachment [<a href=\"%{url}\" _target=\"blank\">Click here to view</a>]"
+      attachment_click_to_view: "Attachment [<a href=\"%{url}\" target=\"_blank\">Click here to view</a>]"
       click_here_to_get_cracking: "Click <a href=\"%{url}\">here</a> to get cracking."
       the_chatwoot_team: "The %{brand_name} Team"
     agent_notifications:
@@ -590,14 +590,17 @@ en:
       sla_missed_first_response:
         subject: "Conversation [ID - %{conversation_id}] missed SLA for first response"
         body: "has missed the SLA for first response under policy"
+        full_body: "Conversation #%{conversation_id} in %{inbox_name} has missed the SLA for first response under policy %{sla_policy_name}."
         action: "Please address immediately."
       sla_missed_next_response:
         subject: "Conversation [ID - %{conversation_id}] missed SLA for next response"
         body: "has missed the SLA for next response under policy"
+        full_body: "Conversation #%{conversation_id} in %{inbox_name} has missed the SLA for next response under policy %{sla_policy_name}."
         action: "Please address immediately."
       sla_missed_resolution:
         subject: "Conversation [ID - %{conversation_id}] missed SLA for resolution time"
         body: "has missed the SLA for resolution time under policy"
+        full_body: "Conversation #%{conversation_id} in %{inbox_name} has missed the SLA for resolution time under policy %{sla_policy_name}."
         action: "Please address immediately."
     administrator_notifications:
       channel_notifications:
@@ -615,6 +618,11 @@ en:
           subject: "Your Instagram connection has expired"
           body: "Your Instagram Inbox Access has expired."
           action: "Please reconnect Instagram to continue receiving messages."
+          click_to_reconnect: "Click <a href=\"%{url}\">here</a> to re-connect."
+        tiktok_disconnect:
+          subject: "Your TikTok connection has expired"
+          body: "Your TikTok Inbox Access has expired."
+          action: "Please reconnect TikTok to continue receiving messages."
           click_to_reconnect: "Click <a href=\"%{url}\">here</a> to re-connect."
         email_disconnect:
           subject: "Your email inbox has been disconnected. Please update the credentials for SMTP/IMAP"
@@ -700,28 +708,28 @@ en:
         support_message: "If you have any questions or need help, feel free to reach out to our support team. We're here to assist you."
     devise:
       confirmation_instructions:
-        invited: "%{inviter_name}, with %{account_name}, has invited you to try out %{brand_name}."
-        login_message: "You can login to your %{brand_name} account through the link below:"
-        welcome: "Welcome to %{brand_name}! We have a suite of powerful tools ready for you to explore. Before that we quickly need to verify your email address to know it's really you."
-        activate: "Please take a moment and click the link below and activate your account."
+        invited_html: "%{inviter_name}, with %{account_name}, has invited you to try out %{brand_name}."
+        login_message_html: "You can login to your %{brand_name} account through the link below:"
+        welcome_html: "Welcome to %{brand_name}! We have a suite of powerful tools ready for you to explore. Before that we quickly need to verify your email address to know it's really you."
+        activate_html: "Please take a moment and click the link below and activate your account."
         confirm_account: "Confirm my account"
         login_account: "Login to my account"
-        invited_sso: "%{inviter_name}, with %{account_name}, has invited you to access %{brand_name} via Single Sign-On (SSO)."
-        sso_no_password: "Your organization uses SSO for secure authentication. You will not need a password to access your account."
-        sso_login: "You can now access your account by logging in through your organization's SSO portal."
-        sso_access: "You can access your account by logging in through your organization's SSO portal."
+        invited_sso_html: "%{inviter_name}, with %{account_name}, has invited you to access %{brand_name} via Single Sign-On (SSO)."
+        sso_no_password_html: "Your organization uses SSO for secure authentication. You will not need a password to access your account."
+        sso_login_html: "You can now access your account by logging in through your organization's SSO portal."
+        sso_access_html: "You can access your account by logging in through your organization's SSO portal."
       reset_password_instructions:
-        greeting: "Hello %{name}!"
-        body: "Someone has requested a link to change your password. You can do this through the link below."
+        greeting_html: "Hello %{name}!"
+        body_html: "Someone has requested a link to change your password. You can do this through the link below."
         action: "Change my password"
-        copy_paste: "Copy and paste the URL into your browser if the link above doesn't work:"
-        ignore: "If you didn't request this, please ignore this email."
-        no_change: "Your password won't change until you access the link above and create a new one."
+        copy_paste_html: "Copy and paste the URL into your browser if the link above doesn't work:"
+        ignore_html: "If you didn't request this, please ignore this email."
+        no_change_html: "Your password won't change until you access the link above and create a new one."
       password_change:
-        greeting: "Hello %{name}!"
-        body: "We're contacting you to notify you that your password has been changed."
+        greeting_html: "Hello %{name}!"
+        body_html: "We're contacting you to notify you that your password has been changed."
       unlock_instructions:
-        greeting: "Hello %{name}!"
-        body: "Your account has been locked due to an excessive number of unsuccessful sign in attempts."
-        action_prompt: "Click the link below to unlock your account:"
+        greeting_html: "Hello %{name}!"
+        body_html: "Your account has been locked due to an excessive number of unsuccessful sign in attempts."
+        action_prompt_html: "Click the link below to unlock your account:"
         unlock_account: "Unlock my account"

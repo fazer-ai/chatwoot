@@ -1,7 +1,7 @@
-<p><%== t('mailer.devise.unlock_instructions.greeting', name: @resource.name) %></p>
+<p><%= t('mailer.devise.unlock_instructions.greeting_html', name: @resource.name) %></p>
 
-<p><%== t('mailer.devise.unlock_instructions.body') %></p>
+<p><%= t('mailer.devise.unlock_instructions.body_html') %></p>
 
-<p><%== t('mailer.devise.unlock_instructions.action_prompt') %></p>
+<p><%= t('mailer.devise.unlock_instructions.action_prompt_html') %></p>
 
 <p><%= link_to t('mailer.devise.unlock_instructions.unlock_account'), unlock_url(@resource, unlock_token: @token) %></p>

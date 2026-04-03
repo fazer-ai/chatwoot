@@ -10,7 +10,7 @@ class AdministratorNotifications::ChannelNotificationsMailer < AdministratorNoti
   end
 
   def tiktok_disconnect(inbox)
-    subject = 'Your TikTok connection has expired'
+    subject = I18n.t('mailer.administrator_notifications.channel_notifications.tiktok_disconnect.subject')
     send_notification(subject, action_url: inbox_url(inbox))
   end
 
