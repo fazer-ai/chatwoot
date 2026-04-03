@@ -1,7 +1,7 @@
-<p>Hello,</p>
+<p>{{ 'mailer.common.hello' | t }}</p>
 
-<p>Your Slack integration has expired. To continue receiving messages on Slack, please delete the integration and connect your workspace again. </p>
+<p>{{ 'mailer.administrator_notifications.integrations_notifications.slack_disconnect.body' | t }}</p>
 
 <p>
-Click <a href="{{action_url}}">here</a> to re-connect.
+{{ 'mailer.administrator_notifications.integrations_notifications.slack_disconnect.click_to_reconnect' | t: 'url', action_url }}
 </p>

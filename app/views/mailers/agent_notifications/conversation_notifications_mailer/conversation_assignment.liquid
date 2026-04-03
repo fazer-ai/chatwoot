@@ -1,12 +1,12 @@
-<p>Hi {{user.available_name}},</p>
+<p>{{ 'mailer.common.hi' | t: 'name', user.available_name }},</p>
 
-<p>Time to save the world. A new conversation has been assigned to you</p>
+<p>{{ 'mailer.agent_notifications.conversation_assignment.body' | t }}</p>
 
 {% for chat_message in conversation.recent_messages %}
   <div>
     <h4 style="margin: 0;">
       {% if chat_message.sender == user.available_name %}
-        You
+        {{ 'mailer.common.you' | t }}
       {% else %}
         {{chat_message.sender}}
       {% endif %}
@@ -20,12 +20,12 @@
 
     {% if chat_message.attachments %}
       {% for attachment in chat_message.attachments %}
-        Attachment [<a href="{{ attachment }}" _target="blank">Click here to view</a>]
+        {{ 'mailer.common.attachment_click_to_view' | t: 'url', attachment }}
       {% endfor %}
     {% endif %}
   </div>
 {% endfor %}
 
 <p>
-Click <a href="{{action_url}}">here</a> to get cracking.
+{{ 'mailer.common.click_here_to_get_cracking' | t: 'url', action_url }}
 </p>

@@ -1,10 +1,10 @@
-<p>Hi {{user.available_name}},</p>
+<p>{{ 'mailer.common.hi' | t: 'name', user.available_name }},</p>
 
 <p>
-  Conversation #{{conversation.display_id}} in {{ inbox.name }} 
-  has missed the SLA for resolution time under policy {{ sla_policy.name }}.
+  Conversation #{{conversation.display_id}} in {{ inbox.name }}
+  {{ 'mailer.agent_notifications.sla_missed_resolution.body' | t }} {{ sla_policy.name }}.
 </p>
 
 <p>
-<a href="{{action_url}}">Please address immediately.</a>
+<a href="{{action_url}}">{{ 'mailer.agent_notifications.sla_missed_resolution.action' | t }}</a>
 </p>
