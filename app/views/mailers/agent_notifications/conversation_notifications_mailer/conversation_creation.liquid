@@ -1,15 +1,14 @@
-<p>Hi {{user.available_name}}</p>
+<p>{{ 'mailer.common.hi' | t: 'name', user.available_name }}</p>
 
 <p>
-  A new conversation (<a href="{{ action_url }}">#{{conversation.display_id}}</a>) has been created in {{ inbox.name }}.
-  <strong>{{ conversation.contact_name }}</strong> wrote:
+  {{ 'mailer.agent_notifications.conversation_creation.body' | t: 'url', action_url, 'conversation_id', conversation.display_id, 'inbox_name', inbox.name, 'contact_name', conversation.contact_name }}
 </p>
 
 {% for chat_message in conversation.recent_messages %}
   <div>
     <h4 style="margin: 0;">
       {% if chat_message.sender == user.available_name %}
-        You
+        {{ 'mailer.common.you' | t }}
       {% else %}
         {{chat_message.sender}}
       {% endif %}
@@ -23,7 +22,7 @@
 
     {% if chat_message.attachments %}
       {% for attachment in chat_message.attachments %}
-        Attachment [<a href="{{ attachment }}" _target="blank">Click here to view</a>]
+        {{ 'mailer.common.attachment_click_to_view' | t: 'url', attachment }}
       {% endfor %}
     {% endif %}
   </div>

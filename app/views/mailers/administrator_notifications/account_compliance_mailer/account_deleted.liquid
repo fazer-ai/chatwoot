@@ -1,30 +1,30 @@
-<p>Hello,</p>
+<p>{{ 'mailer.common.hello' | t }}</p>
 
-<p>This is a notification to inform you that an account has been permanently deleted from your Chatwoot instance.</p>
+<p>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.body' | t: 'brand_name', global_config['BRAND_NAME'] }}</p>
 
 <p>
-  <strong>Chatwoot Installation:</strong> {{ meta.instance_url }}<br>
-  <strong>Account ID:</strong> {{ meta.account_id }}<br>
-  <strong>Account Name:</strong> {{ meta.account_name }}<br>
-  <strong>Deletion due at:</strong> {{ meta.marked_for_deletion_at }}<br>
-  <strong>Deleted At:</strong> {{ meta.deleted_at }}<br>
-  <strong>Deletion Reason:</strong> {{ meta.deletion_reason }}
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.installation' | t: 'brand_name', global_config['BRAND_NAME'] }}</strong> {{ meta.instance_url }}<br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.account_id' | t }}</strong> {{ meta.account_id }}<br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.account_name' | t }}</strong> {{ meta.account_name }}<br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.deletion_due_at' | t }}</strong> {{ meta.marked_for_deletion_at }}<br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.deleted_at' | t }}</strong> {{ meta.deleted_at }}<br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.deletion_reason' | t }}</strong> {{ meta.deletion_reason }}
 </p>
 
 {% if meta.deleted_user_count > 0 %}
 <p>
-  <strong>Deleted Users ({{ meta.deleted_user_count }}):</strong><br>
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.deleted_users' | t: 'count', meta.deleted_user_count }}</strong><br>
   {% for user in meta.soft_deleted_users %}
-    User ID: {{ user.user_id }}, Email: {{ user.user_email }}{% unless forloop.last %}<br>{% endunless %}
+    {{ 'mailer.administrator_notifications.account_compliance.account_deleted.user_id' | t }} {{ user.user_id }}, Email: {{ user.user_email }}{% unless forloop.last %}<br>{% endunless %}
   {% endfor %}
 </p>
 {% else %}
 <p>
-  <strong>Deleted Users:</strong> None
+  <strong>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.deleted_users_none' | t }}</strong>
 </p>
 {% endif %}
 
-<p>This email serves as a record for compliance purposes.</p>
+<p>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.compliance_notice' | t }}</p>
 
-<p>Thank you,<br>
-Chatwoot System</p>
+<p>{{ 'mailer.administrator_notifications.account_compliance.account_deleted.thank_you' | t }}<br>
+{{ 'mailer.administrator_notifications.account_compliance.account_deleted.system_name' | t: 'brand_name', global_config['BRAND_NAME'] }}</p>

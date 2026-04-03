@@ -1,6 +1,7 @@
 class AdministratorNotifications::AccountNotificationMailer < AdministratorNotifications::BaseMailer
   def account_deletion_user_initiated(account, reason)
-    subject = 'Your Chatwoot account deletion has been scheduled'
+    brand_name = GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.subject', brand_name: brand_name)
     action_url = settings_url('general')
     meta = {
       'account_name' => account.name,
@@ -12,7 +13,8 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
   end
 
   def account_deletion_for_inactivity(account, reason)
-    subject = 'Your Chatwoot account is scheduled for deletion due to inactivity'
+    brand_name = GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.subject', brand_name: brand_name)
     action_url = settings_url('general')
     meta = {
       'account_name' => account.name,
@@ -24,7 +26,7 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
   end
 
   def contact_import_complete(resource)
-    subject = 'Contact Import Completed'
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.contact_import_complete.subject')
 
     action_url = if resource.failed_records.attached?
                    Rails.application.routes.url_helpers.rails_blob_url(resource.failed_records)
@@ -41,17 +43,17 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
   end
 
   def contact_import_failed
-    subject = 'Contact Import Failed'
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.contact_import_failed.subject')
     send_notification(subject)
   end
 
   def contact_export_complete(file_url, email_to)
-    subject = "Your contact's export file is available to download."
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.contact_export_complete.subject')
     send_notification(subject, to: email_to, action_url: file_url)
   end
 
   def automation_rule_disabled(rule)
-    subject = 'Automation rule disabled due to validation errors.'
+    subject = I18n.t('mailer.administrator_notifications.account_notifications.automation_rule_disabled.subject')
     action_url = settings_url('automation/list')
     meta = { 'rule_name' => rule.name }
 
