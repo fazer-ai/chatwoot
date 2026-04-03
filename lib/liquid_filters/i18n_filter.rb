@@ -1,9 +1,9 @@
 module LiquidFilters::I18nFilter
   def t(key, *args)
-    result = I18n.t(key, default: key)
+    options = { default: key }
     args.each_slice(2) do |placeholder, value|
-      result = result.gsub("%{#{placeholder}}", value.to_s) if placeholder
+      options[placeholder.to_sym] = ERB::Util.html_escape(value.to_s) if placeholder
     end
-    result
+    I18n.t(key, **options)
   end
 end
