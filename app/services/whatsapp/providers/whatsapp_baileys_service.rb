@@ -4,6 +4,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   class MessageContentTypeNotSupported < StandardError; end
   class ProviderUnavailableError < StandardError; end
   class GroupParticipantNotAllowedError < StandardError; end
+  class MessageAlreadyProcessingError < StandardError; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
@@ -567,10 +568,13 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         jid: remote_jid,
-        messageContent: @message_content
-      }.to_json
+        messageContent: @message_content,
+        chatwootMessageId: @message.id
+      }.to_json,
+      timeout: 120
     )
 
+    raise MessageAlreadyProcessingError if response.code == 409
     raise ProviderUnavailableError unless process_response(response)
 
     update_external_created_at(response)
@@ -816,6 +820,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
       define_method(method_name) do |*args, **kwargs, &block|
         original_method.bind_call(self, *args, **kwargs, &block)
+      rescue MessageAlreadyProcessingError
+        raise
       rescue StandardError => e
         handle_channel_error
         raise e
