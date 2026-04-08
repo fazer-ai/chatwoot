@@ -627,11 +627,15 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         stub_request(:post, request_path)
           .to_return(status: 409, body: 'Message is already being processed')
 
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
         expect do
           service.send_message(test_send_phone_number, message)
-        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::MessageAlreadyProcessingError)
+        end.to(raise_error do |error|
+          expect(error.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::MessageAlreadyProcessingError')
+        end)
 
-        expect(whatsapp_channel.reload.provider_config['provider_connection']).not_to eq({ 'connection' => 'close' })
+        expect(WebMock).not_to have_requested(:post, setup_url)
       end
     end
   end

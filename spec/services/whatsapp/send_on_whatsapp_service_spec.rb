@@ -456,7 +456,7 @@ describe Whatsapp::SendOnWhatsappService do
                  .then
                  .to_return(status: 200, body: success_body, headers: { 'Content-Type' => 'application/json' })
 
-          expect { SendReplyJob.perform_now(message.id) }.to raise_error(Net::ReadTimeout)
+          expect { SendReplyJob.perform_now(message.id) }.to(raise_error { |e| expect(e.class.name).to eq('Net::ReadTimeout') })
           expect(message.reload.source_id).to be_nil
 
           SendReplyJob.perform_now(message.id)
