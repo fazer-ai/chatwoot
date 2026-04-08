@@ -452,6 +452,7 @@ describe Whatsapp::SendOnWhatsappService do
           message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
 
           stub = stub_request(:post, send_message_url)
+                 .with { |req| JSON.parse(req.body)['chatwootMessageId'] == message.id }
                  .to_raise(Net::ReadTimeout.new('Net::ReadTimeout'))
                  .then
                  .to_return(status: 200, body: success_body, headers: { 'Content-Type' => 'application/json' })

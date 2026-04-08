@@ -35,7 +35,7 @@ module BaileysHelper
 
     yield
   ensure
-    baileys_clear_channel_lock_on_outgoing_message(channel_id)
+    baileys_clear_channel_lock_on_outgoing_message(channel_id) if lock_acquired
   end
 
   private
