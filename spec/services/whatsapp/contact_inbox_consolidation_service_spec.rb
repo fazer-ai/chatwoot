@@ -38,10 +38,54 @@ describe Whatsapp::ContactInboxConsolidationService do
     end
 
     context 'when no phone-based contact_inbox exists' do
-      it 'does nothing' do
+      it 'does nothing when no contacts exist' do
         service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
 
         expect { service.perform }.not_to change(ContactInbox, :count)
+      end
+    end
+
+    context 'when contact exists by phone but has no contact_inbox in this inbox' do
+      let!(:phone_contact) { create(:contact, account: inbox.account, phone_number: "+#{phone}") }
+
+      context 'when another contact has the target identifier (provider conversion scenario)' do
+        let!(:lid_contact) { create(:contact, account: inbox.account, identifier: identifier) }
+
+        it 'transfers identifier from the conflicting contact to the phone contact' do
+          service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
+          service.perform
+
+          expect(phone_contact.reload.identifier).to eq(identifier)
+          expect(lid_contact.reload.identifier).to be_nil
+        end
+      end
+
+      context 'when another contact has the identifier AND a lid contact_inbox in this inbox' do
+        let!(:lid_contact) { create(:contact, account: inbox.account, identifier: identifier) }
+        let!(:lid_contact_inbox) { create(:contact_inbox, inbox: inbox, contact: lid_contact, source_id: lid) }
+
+        it 'adopts the lid contact_inbox, reassigns messages, and transfers it to the phone contact' do
+          lid_conversation = create(:conversation, inbox: inbox, contact: lid_contact, contact_inbox: lid_contact_inbox)
+          lid_message = create(:message, conversation: lid_conversation, sender: lid_contact, inbox: inbox, account: inbox.account)
+
+          service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
+          service.perform
+
+          expect(lid_contact_inbox.reload.contact_id).to eq(phone_contact.id)
+          expect(phone_contact.reload.identifier).to eq(identifier)
+          expect(lid_conversation.reload.contact_id).to eq(phone_contact.id)
+          expect(lid_message.reload.sender).to eq(phone_contact)
+          expect(Contact.exists?(lid_contact.id)).to be(false)
+        end
+      end
+
+      context 'when no identifier conflict exists' do
+        it 'does not change contacts' do
+          service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
+          service.perform
+
+          expect(phone_contact.reload.identifier).to be_nil
+        end
       end
     end
 
@@ -59,13 +103,15 @@ describe Whatsapp::ContactInboxConsolidationService do
       end
 
       context 'when there is an identifier conflict with a different contact' do
-        let!(:conflicting_contact) { create(:contact, account: inbox.account, identifier: identifier) } # rubocop:disable RSpec/LetSetup
+        let!(:conflicting_contact) { create(:contact, account: inbox.account, identifier: identifier) }
 
-        it 'does not migrate' do
+        it 'resolves the conflict and migrates' do
           service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
           service.perform
 
-          expect(phone_contact_inbox.reload.source_id).to eq(phone)
+          expect(phone_contact_inbox.reload.source_id).to eq(lid)
+          expect(contact.reload.identifier).to eq(identifier)
+          expect(conflicting_contact.reload.identifier).to be_nil
         end
       end
 
@@ -214,14 +260,15 @@ describe Whatsapp::ContactInboxConsolidationService do
       end
 
       context 'when another contact already has the same identifier' do
-        let!(:conflicting_contact) { create(:contact, account: inbox.account, identifier: identifier) } # rubocop:disable RSpec/LetSetup
+        let!(:conflicting_contact) { create(:contact, account: inbox.account, identifier: identifier) }
 
-        it 'does not update to avoid identifier conflict' do
+        it 'resolves the conflict and updates' do
           service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
           service.perform
 
-          expect(old_contact_inbox.reload.source_id).to eq('999999999')
-          expect(contact.reload.identifier).not_to eq(identifier)
+          expect(old_contact_inbox.reload.source_id).to eq(lid)
+          expect(contact.reload.identifier).to eq(identifier)
+          expect(conflicting_contact.reload.identifier).to be_nil
         end
       end
     end

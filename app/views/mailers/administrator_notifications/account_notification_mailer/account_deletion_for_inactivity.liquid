@@ -1,21 +1,19 @@
-<p>Hello there,</p>
+<p>{{ 'mailer.common.hello_there' | t }}</p>
 
-<p>We've noticed that your Chatwoot account <strong>{{ meta.account_name }}</strong> has been inactive for some time. Because of this, it's scheduled for deletion on <strong>{{ meta.deletion_date }}</strong>.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.body' | t: 'brand_name', global_config['BRAND_NAME'], 'account_name', meta.account_name, 'deletion_date', meta.deletion_date }}</p>
 
-<p><strong>How do I keep my account?</strong></p>
+<p><strong>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.how_to_keep' | t }}</strong></p>
 
-<p>Log in to your Chatwoot account before <strong>{{ meta.deletion_date }}</strong>. From your account settings, you can <a href="{{ action_url }}">cancel the deletion</a> and continue using your account.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.how_to_keep_body' | t: 'brand_name', global_config['BRAND_NAME'], 'deletion_date', meta.deletion_date, 'url', action_url }}</p>
 
-<p><strong>What happens if I don't cancel?</strong></p>
+<p><strong>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.what_if_no_cancel' | t }}</strong></p>
 
-<p>Unless you cancel the account deletion before <strong>{{ meta.deletion_date }}</strong>, your account and all associated data — including conversations, contacts, reports, and settings — will be permanently deleted.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.what_if_no_cancel_body' | t: 'deletion_date', meta.deletion_date }}</p>
 
-<p><strong>Why are we doing this?</strong></p>
+<p><strong>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.why_doing_this' | t }}</strong></p>
 
-<p>To keep things secure and efficient, we regularly remove inactive accounts so our systems remain optimized for active teams.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.why_doing_this_body' | t }}</p>
 
-<p>If you have any questions, feel free to reach us at <a href="mailto:hello@chatwoot.com">hello@chatwoot.com</a>.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_for_inactivity.contact_us' | t: 'email', 'hello@chatwoot.com' }}</p>
 
-<p>— The Chatwoot Team</p>
-
-
+<p>{{ 'mailer.common.the_chatwoot_team' | t: 'brand_name', global_config['BRAND_NAME'] }}</p>

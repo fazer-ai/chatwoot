@@ -13,7 +13,7 @@ class TeamNotifications::AutomationNotificationMailer < ApplicationMailer
   private
 
   def send_an_email_to_team
-    subject = 'This email has been sent via automation rule actions.'
+    subject = I18n.t('mailer.team_notifications.automation.subject')
     @action_url = app_account_conversation_url(account_id: @conversation.account_id, id: @conversation.display_id)
     @agent_emails = @agents.collect(&:user).pluck(:email)
     send_mail_with_liquid(to: @agent_emails, subject: subject) and return

@@ -1,6 +1,6 @@
 module BaileysHelper
   CHANNEL_LOCK_ON_OUTGOING_MESSAGE_KEY = 'BAILEYS::CHANNEL_LOCK_ON_OUTGOING_MESSAGE::%<channel_id>s'.freeze
-  CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT = 60.seconds
+  CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT = 130.seconds
 
   def baileys_extract_message_timestamp(timestamp)
     # NOTE: Timestamp might be in this format {"low"=>1748003165, "high"=>0, "unsigned"=>true}
@@ -35,7 +35,7 @@ module BaileysHelper
 
     yield
   ensure
-    baileys_clear_channel_lock_on_outgoing_message(channel_id)
+    baileys_clear_channel_lock_on_outgoing_message(channel_id) if lock_acquired
   end
 
   private

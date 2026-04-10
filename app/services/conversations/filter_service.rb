@@ -47,6 +47,12 @@ class Conversations::FilterService < FilterService
   end
 
   def conversations
-    @conversations.sort_on_last_activity_at.page(current_page)
+    @conversations.sort_on_last_activity_at.page(current_page).per(per_page)
+  end
+
+  def per_page
+    default = ENV.fetch('CONVERSATION_RESULTS_PER_PAGE', '25').to_i
+    requested = (@params[:per_page] || default).to_i
+    [requested, 100].min
   end
 end

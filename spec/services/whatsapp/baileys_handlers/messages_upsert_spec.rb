@@ -157,6 +157,39 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         end
       end
 
+      context 'when phone contact has contact_inbox with phone source_id and a separate LID contact exists (provider conversion)' do
+        it 'resolves the identifier conflict and uses the phone contact' do
+          phone_contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: nil, name: 'Phone Contact')
+          phone_ci = create(:contact_inbox, inbox: inbox, contact: phone_contact, source_id: phone)
+          create(:contact, account: inbox.account, identifier: identifier, phone_number: nil, name: 'LID Contact')
+
+          raw_message = {
+            key: { id: 'msg_conv_123', remoteJid: "#{lid}@lid", remoteJidAlt: "#{phone}@s.whatsapp.net", fromMe: false,
+                   addressingMode: 'lid' },
+            pushName: 'Phone Contact',
+            messageTimestamp: timestamp,
+            message: { conversation: 'Hello after conversion' }
+          }
+          params = {
+            webhookVerifyToken: webhook_verify_token,
+            event: 'messages.upsert',
+            data: { type: 'notify', messages: [raw_message] }
+          }
+
+          expect do
+            Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+          end.not_to raise_error
+
+          expect(phone_ci.reload.source_id).to eq(source_id)
+          expect(phone_contact.reload.identifier).to eq(identifier)
+          expect(phone_contact.phone_number).to eq("+#{phone}")
+
+          message = inbox.messages.find_by(source_id: 'msg_conv_123')
+          expect(message).to be_present
+          expect(message.sender).to eq(phone_contact)
+        end
+      end
+
       context 'when updating the same contact (no conflict)' do
         it 'successfully updates the contact' do
           contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: nil)

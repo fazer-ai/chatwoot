@@ -432,6 +432,40 @@ describe Whatsapp::SendOnWhatsappService do
 
         expect(message.reload.source_id).to eq('msg_group')
       end
+
+      describe 'duplicate send on Net::ReadTimeout retry' do
+        let(:send_message_url) do
+          "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"
+        end
+        let(:setup_url) do
+          "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+        end
+        let(:success_body) { { data: { key: { id: 'wa_msg_123' }, messageTimestamp: '123' } }.to_json }
+
+        before do
+          conversation.contact.update!(phone_number: '+123456789')
+          create(:message, message_type: :incoming, content: 'hi', conversation: conversation)
+          stub_request(:post, setup_url).to_return(status: 200, body: '', headers: {})
+        end
+
+        it 'sends the message twice when first attempt times out and job is retried' do
+          message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
+
+          stub = stub_request(:post, send_message_url)
+                 .with { |req| JSON.parse(req.body)['chatwootMessageId'] == message.id }
+                 .to_raise(Net::ReadTimeout.new('Net::ReadTimeout'))
+                 .then
+                 .to_return(status: 200, body: success_body, headers: { 'Content-Type' => 'application/json' })
+
+          expect { SendReplyJob.perform_now(message.id) }.to(raise_error { |e| expect(e.class.name).to eq('Net::ReadTimeout') })
+          expect(message.reload.source_id).to be_nil
+
+          SendReplyJob.perform_now(message.id)
+          expect(message.reload.source_id).to eq('wa_msg_123')
+
+          expect(stub).to have_been_requested.twice
+        end
+      end
     end
 
     context 'when provider is zapi' do

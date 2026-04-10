@@ -48,8 +48,14 @@ class Api::V1::Profile::InboxSignaturesController < Api::BaseController
   end
 
   def validate_inbox_access
-    inbox_id = params[:inbox_id]
-    return if InboxMember.exists?(user_id: @user.id, inbox_id: inbox_id)
+    inbox = Inbox.find_by(id: params[:inbox_id])
+    return head :not_found unless inbox
+
+    account_user = @user.account_users.find_by(account_id: inbox.account_id)
+    return head :unauthorized unless account_user
+
+    return if account_user.administrator?
+    return if InboxMember.exists?(user_id: @user.id, inbox_id: inbox.id)
 
     head :unauthorized
   end

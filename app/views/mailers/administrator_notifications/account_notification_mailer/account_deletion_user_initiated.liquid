@@ -1,16 +1,14 @@
-<p>Hello there,</p>
+<p>{{ 'mailer.common.hello_there' | t }}</p>
 
-<p>An account administrator has requested deletion of the Chatwoot account <strong>{{ meta.account_name }}</strong>. The account is scheduled for deletion on <strong>{{ meta.deletion_date }}</strong>.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.body' | t: 'brand_name', global_config['BRAND_NAME'], 'account_name', meta.account_name, 'deletion_date', meta.deletion_date }}</p>
 
-<p><strong>What happens next?</strong></p>
+<p><strong>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.what_happens_next' | t }}</strong></p>
 
 <ul>
-  <li>The account will remain accessible until the scheduled deletion date.</li>
-  <li>After that, all data including conversations, contacts, integrations, and settings will be permanently removed.</li>
-  </ul>
+  <li>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.remains_accessible' | t }}</li>
+  <li>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.data_permanently_removed' | t }}</li>
+</ul>
 
-<p>If you change your mind before the deletion date, you can <a href="{{ action_url }}">cancel this request</a> by visiting your account settings.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.account_deletion_user_initiated.cancel_request' | t: 'url', action_url }}</p>
 
-<p>— The Chatwoot Team</p>
-
-
+<p>{{ 'mailer.common.the_chatwoot_team' | t: 'brand_name', global_config['BRAND_NAME'] }}</p>

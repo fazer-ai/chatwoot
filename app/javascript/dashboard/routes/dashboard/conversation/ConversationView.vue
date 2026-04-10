@@ -194,9 +194,13 @@ export default {
               emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE, { messageId });
             });
         } else {
-          this.$store.dispatch('setActiveChat', {
-            data: selectedConversation,
-          });
+          this.$store
+            .dispatch('setActiveChat', {
+              data: selectedConversation,
+            })
+            .then(() => {
+              emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
+            });
         }
       } else {
         this.$store.dispatch('clearSelectedState');

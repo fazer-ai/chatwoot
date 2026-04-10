@@ -10,10 +10,12 @@ class ApplicationRecord < ActiveRecord::Base
   end
 
   # ModelDrop class should exist in app/drops
+  # Walks the STI hierarchy so subclasses (e.g. SuperAdmin < User) resolve to the matching Drop
   def to_drop
-    return unless droppables.include?(self.class.name)
+    drop_class = self.class.ancestors.find { |k| k.is_a?(Class) && droppables.include?(k.name) }
+    return unless drop_class
 
-    "#{self.class.name}Drop".constantize.new(self)
+    "#{drop_class.name}Drop".constantize.new(self)
   end
 
   private

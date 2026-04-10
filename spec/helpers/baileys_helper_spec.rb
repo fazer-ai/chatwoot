@@ -74,7 +74,7 @@ RSpec.describe BaileysHelper do
       end
 
       context 'when lock is not acquired within timeout' do
-        it 'still executes the block and clears the lock' do
+        it 'still executes the block but does not clear the lock' do
           freeze_time
           allow(Redis::Alfred).to receive(:set).and_return(false)
           allow(self).to receive(:sleep) { travel_to 1.second.from_now }
@@ -83,7 +83,7 @@ RSpec.describe BaileysHelper do
           expect(Redis::Alfred).to have_received(:set)
             .with(lock_key, 1, nx: true, ex: timeout)
             .exactly(BaileysHelper::CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT.to_i)
-          expect(Redis::Alfred).to have_received(:delete).once.with(lock_key)
+          expect(Redis::Alfred).not_to have_received(:delete)
         end
       end
     end
