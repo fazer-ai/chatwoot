@@ -104,9 +104,3 @@ CLAUDE.local.md
 .pnpm-store/*
 local/
 Procfile.worktree
-
-# Playwright
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
