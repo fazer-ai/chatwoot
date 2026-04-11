@@ -5,9 +5,9 @@
 # `CREATE FUNCTION`, so without this hook `db:schema:load` would fail trying to
 # create indexes that reference the non-existent `f_unaccent` function.
 #
-# Declared as a prerequisite of `db:schema:load` via Rake task augmentation
-# (re-opening `db:schema:load` to add the dependency), so this works regardless
-# of the order in which Rake files are loaded by Rails.
+# This task is wired as a prerequisite of `db:schema:load` from the Rakefile
+# (after `Rails.application.load_tasks`), so both task definitions are
+# guaranteed to be present when the prereq is added.
 
 namespace :db do
   namespace :internal_chat do
@@ -40,9 +40,5 @@ namespace :db do
     ensure
       ActiveRecord::Base.establish_connection(original_db_config) if original_db_config
     end
-  end
-
-  namespace :schema do
-    task load: 'db:internal_chat:ensure_search_functions'
   end
 end
