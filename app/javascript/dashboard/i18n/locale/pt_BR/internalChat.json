@@ -66,6 +66,8 @@
       "DELETED": "Esta mensagem foi exclu\u00edda",
       "SEND": "Enviar",
       "UPLOAD_FILE": "Enviar Arquivo",
+      "MENTION_USER": "Mencionar um usu\u00e1rio",
+      "MENTION_CONVERSATION": "Mencionar uma conversa",
       "CONFIRM_DELETE": "Tem certeza que deseja excluir esta mensagem?",
       "EDITING": "Editando mensagem",
       "CANCEL_EDIT": "Cancelar edi\u00e7\u00e3o",
@@ -156,6 +158,7 @@
     },
     "CONVERSATION_MENTION": {
       "NO_RESULTS": "Nenhuma conversa encontrada",
+      "TYPE_TO_SEARCH": "Digite o ID da conversa ou nome do contato",
       "HEADER": "Conversas",
       "PREFIX": "#",
       "NO_ACCESS": "Você não tem acesso a esta conversa",
@@ -165,6 +168,20 @@
         "PENDING": "Pendente",
         "SNOOZED": "Adiada"
       }
+    },
+    "ARCHIVED": {
+      "TITLE": "Arquivados",
+      "EMPTY": "Nenhum canal arquivado"
+    },
+    "PRO": {
+      "TITLE": "Faça upgrade para Pro",
+      "POLLS_DESCRIPTION": "A criação de enquetes está disponível na versão Pro.",
+      "PRIVATE_CHANNELS_DESCRIPTION": "Você atingiu o limite de {limit} canais privados. Faça upgrade para Pro e tenha canais privados ilimitados.",
+      "SEARCH_DESCRIPTION": "A busca está limitada aos últimos {days} dias. Faça upgrade para Pro e tenha histórico de busca ilimitado.",
+      "SEARCH_LIMITED_NOTE": "Resultados dos últimos {days} dias",
+      "UPGRADE_NOW": "Fazer upgrade",
+      "ADMIN_MESSAGE": "Este recurso não está disponível no seu plano atual. Entre em contato com o administrador da plataforma para fazer upgrade.",
+      "AGENT_MESSAGE": "Este recurso não está disponível no seu plano atual. Entre em contato com o administrador para fazer upgrade."
     }
   }
 }

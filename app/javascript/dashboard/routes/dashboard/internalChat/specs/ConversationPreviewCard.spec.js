@@ -20,17 +20,26 @@ vi.mock('dashboard/helper/URLHelper', () => ({
     `accounts/${accountId}/conversations/${id}`,
 }));
 
-vi.mock('shared/helpers/timeHelper', () => ({
-  dynamicTime: ts => `${ts} ago`,
-}));
+vi.mock('date-fns', async () => {
+  const actual = await vi.importActual('date-fns');
+  return {
+    ...actual,
+    formatDistanceToNow: date => `${Math.floor(date.getTime() / 1000)} ago`,
+  };
+});
 
 vi.mock('dashboard/composables/store', () => ({
-  useMapGetter: () => ({
-    value: [
-      { title: 'billing', color: '#ff6b6b' },
-      { title: 'vip', color: '#ffd43b' },
-    ],
-  }),
+  useMapGetter: getter => {
+    if (getter === 'inboxes/getInboxes') {
+      return { value: [{ id: 5, name: 'Support Inbox' }] };
+    }
+    return {
+      value: [
+        { title: 'billing', color: '#ff6b6b' },
+        { title: 'vip', color: '#ffd43b' },
+      ],
+    };
+  },
 }));
 
 vi.mock('@chatwoot/utils', () => ({

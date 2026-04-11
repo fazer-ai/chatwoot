@@ -8,11 +8,13 @@ import search from './search';
 
 const state = {
   records: {},
+  archivedRecords: {},
   categories: [],
   activeChannelId: null,
   uiFlags: {
     isFetching: false,
     isCreating: false,
+    isFetchingArchived: false,
   },
 };
 

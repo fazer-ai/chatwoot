@@ -30,3 +30,9 @@ responses:
       application/json:
         schema:
           $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable entity (e.g., attempting to archive a direct message)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

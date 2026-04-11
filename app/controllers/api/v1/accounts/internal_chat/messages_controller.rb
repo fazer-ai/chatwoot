@@ -107,7 +107,9 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def base_messages_scope
-    current_channel.messages.includes(:sender, :reactions, :replies, :attachments, :poll)
+    current_channel.messages
+                   .includes(:sender, :reactions, :replies, :attachments, :poll)
+                   .where("parent_id IS NULL OR (content_attributes->>'also_send_in_channel')::boolean = true")
   end
 
   def apply_time_filters(messages)
@@ -123,7 +125,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def message_params
-    params.permit(:content, :content_type, :parent_id, :echo_id, attachments: [:file, :file_type])
+    params.permit(:content, :content_type, :parent_id, :echo_id, :also_send_in_channel, attachments: [:file, :file_type])
   end
 
   def update_params

@@ -66,6 +66,8 @@
       "DELETED": "This message was deleted",
       "SEND": "Send",
       "UPLOAD_FILE": "Upload File",
+      "MENTION_USER": "Mention a user",
+      "MENTION_CONVERSATION": "Mention a conversation",
       "CONFIRM_DELETE": "Are you sure you want to delete this message?",
       "EDITING": "Editing message",
       "CANCEL_EDIT": "Cancel editing",
@@ -156,6 +158,7 @@
     },
     "CONVERSATION_MENTION": {
       "NO_RESULTS": "No conversations found",
+      "TYPE_TO_SEARCH": "Type a conversation ID or contact name",
       "HEADER": "Conversations",
       "PREFIX": "#",
       "NO_ACCESS": "You don't have access to this conversation",
@@ -165,6 +168,20 @@
         "PENDING": "Pending",
         "SNOOZED": "Snoozed"
       }
+    },
+    "ARCHIVED": {
+      "TITLE": "Archived",
+      "EMPTY": "No archived channels"
+    },
+    "PRO": {
+      "TITLE": "Upgrade to Pro",
+      "POLLS_DESCRIPTION": "Poll creation is available in the Pro version.",
+      "PRIVATE_CHANNELS_DESCRIPTION": "You've reached the limit of {limit} private channels. Upgrade to Pro for unlimited private channels.",
+      "SEARCH_DESCRIPTION": "Search is limited to the last {days} days. Upgrade to Pro for unlimited search history.",
+      "SEARCH_LIMITED_NOTE": "Results from the last {days} days",
+      "UPGRADE_NOW": "Upgrade now",
+      "ADMIN_MESSAGE": "This feature is not available on your current plan. Please reach out to your platform administrator to upgrade.",
+      "AGENT_MESSAGE": "This feature is not available on your current plan. Please reach out to your administrator to upgrade."
     }
   }
 }

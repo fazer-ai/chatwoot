@@ -20,6 +20,8 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def create
     @channel = build_channel
+    return if enforce_private_channel_limit(@channel)
+
     authorize @channel, :create?
     created = @channel.new_record?
 
@@ -68,6 +70,8 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def unarchive
     authorize @current_channel, :unarchive?
+    return if enforce_private_channel_limit(@current_channel)
+
     @current_channel.active!
     dispatch_channel_event(@current_channel)
     render json: channel_show_response(@current_channel)
@@ -100,6 +104,16 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   end
 
   private
+
+  def enforce_private_channel_limit(channel)
+    return unless channel.channel_type_private_channel?
+
+    max = InternalChat::Limits.max_private_channels
+    return if max.blank?
+
+    count = Current.account.internal_chat_channels.where(channel_type: :private_channel).active.count
+    render_pro_required('private_channels') if count >= max
+  end
 
   def filtered_channels
     channels = Current.account.internal_chat_channels.includes(channel_members: { user: :account_users }, category: [])

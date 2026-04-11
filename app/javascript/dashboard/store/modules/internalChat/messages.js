@@ -169,11 +169,15 @@ const actions = {
         ...data,
         parent_id: parentMessageId,
       });
+      const message = response.data;
       commit('ADD_THREAD_REPLY', {
         parentMessageId,
-        reply: response.data,
+        reply: message,
       });
-      return response.data;
+      if (message.content_attributes?.also_send_in_channel) {
+        commit('ADD_MESSAGE', { channelId, message });
+      }
+      return message;
     } catch (error) {
       throwErrorMessage(error);
       throw error;
@@ -220,6 +224,9 @@ const actions = {
         channelId,
         parentMessageId: message.parent_id,
       });
+      if (message.content_attributes?.also_send_in_channel) {
+        commit('ADD_MESSAGE', { channelId, message });
+      }
       return;
     }
     commit('ADD_MESSAGE', { channelId, message });
@@ -318,37 +325,60 @@ const mutations = {
   },
 
   ADD_REACTION(_state, { channelId, messageId, reaction }) {
+    const applyAdd = message => {
+      const currentReactions = message.reactions || [];
+      if (currentReactions.some(r => r.id === reaction.id)) return message;
+      return { ...message, reactions: [...currentReactions, reaction] };
+    };
+
     const existing = _state.records[channelId] || [];
     const index = existing.findIndex(m => m.id === messageId);
     if (index > -1) {
-      const message = existing[index];
-      const currentReactions = message.reactions || [];
-      if (currentReactions.some(r => r.id === reaction.id)) return;
-      const reactions = [...currentReactions, reaction];
       const updated = [...existing];
-      updated[index] = { ...message, reactions };
-      _state.records = {
-        ..._state.records,
-        [channelId]: updated,
-      };
+      updated[index] = applyAdd(existing[index]);
+      _state.records = { ..._state.records, [channelId]: updated };
     }
+
+    const nextThreadReplies = { ..._state.threadReplies };
+    let threadReplyChanged = false;
+    Object.keys(nextThreadReplies).forEach(parentId => {
+      const replies = nextThreadReplies[parentId] || [];
+      const replyIndex = replies.findIndex(r => r.id === messageId);
+      if (replyIndex === -1) return;
+      const updatedReplies = [...replies];
+      updatedReplies[replyIndex] = applyAdd(replies[replyIndex]);
+      nextThreadReplies[parentId] = updatedReplies;
+      threadReplyChanged = true;
+    });
+    if (threadReplyChanged) _state.threadReplies = nextThreadReplies;
   },
 
   REMOVE_REACTION(_state, { channelId, messageId, reactionId }) {
+    const applyRemove = message => ({
+      ...message,
+      reactions: (message.reactions || []).filter(r => r.id !== reactionId),
+    });
+
     const existing = _state.records[channelId] || [];
     const index = existing.findIndex(m => m.id === messageId);
     if (index > -1) {
-      const message = existing[index];
-      const reactions = (message.reactions || []).filter(
-        r => r.id !== reactionId
-      );
       const updated = [...existing];
-      updated[index] = { ...message, reactions };
-      _state.records = {
-        ..._state.records,
-        [channelId]: updated,
-      };
+      updated[index] = applyRemove(existing[index]);
+      _state.records = { ..._state.records, [channelId]: updated };
     }
+
+    const nextThreadReplies = { ..._state.threadReplies };
+    let threadReplyChanged = false;
+    Object.keys(nextThreadReplies).forEach(parentId => {
+      const replies = nextThreadReplies[parentId] || [];
+      const replyIndex = replies.findIndex(r => r.id === messageId);
+      if (replyIndex === -1) return;
+      const updatedReplies = [...replies];
+      updatedReplies[replyIndex] = applyRemove(replies[replyIndex]);
+      nextThreadReplies[parentId] = updatedReplies;
+      threadReplyChanged = true;
+    });
+    if (threadReplyChanged) _state.threadReplies = nextThreadReplies;
   },
 
   SET_THREAD_REPLIES(_state, { parentMessageId, replies }) {

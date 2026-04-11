@@ -17,7 +17,7 @@ class InternalChat::SearchService
       channels: search_channels,
       dms: search_dms,
       messages: search_messages,
-      meta: { messages_page: @page, messages_has_more: messages_has_more? }
+      meta: { messages_page: @page, messages_has_more: messages_has_more?, search_limited: InternalChat::Limits.search_history_days.present? }
     }
   end
 
@@ -25,32 +25,45 @@ class InternalChat::SearchService
 
   def search_channels
     channels = accessible_channels.text_channels.active
-    channels = channels.where('internal_chat_channels.name ILIKE :q OR internal_chat_channels.description ILIKE :q', q: "%#{sanitized_query}%")
+    channels = channels.where(
+      'f_unaccent(internal_chat_channels.name) ILIKE f_unaccent(:q) ' \
+      'OR f_unaccent(internal_chat_channels.description) ILIKE f_unaccent(:q)',
+      q: "%#{sanitized_query}%"
+    )
     channels.limit(CHANNELS_LIMIT).select(:id, :name, :description, :channel_type).map do |ch|
       { id: ch.id, name: ch.name, description: ch.description, channel_type: ch.channel_type }
     end
   end
 
   def search_dms
-    dm_channels = @current_account.internal_chat_channels.direct_messages.active
-                                  .joins(:channel_members)
-                                  .where(internal_chat_channel_members: { user_id: @current_user.id, hidden: false })
+    results = dm_search_scope.limit(DMS_LIMIT).to_a
+    users_by_id = User.where(id: results.map(&:peer_user_id)).index_by(&:id)
+    results.map { |ch| serialize_dm(ch, users_by_id[ch.peer_user_id]) }
+  end
 
-    dm_channels = dm_channels
-                  .joins('INNER JOIN internal_chat_channel_members peer_members ON peer_members.internal_chat_channel_id = internal_chat_channels.id')
-                  .joins('INNER JOIN users ON users.id = peer_members.user_id')
-                  .where.not(users: { id: @current_user.id })
-                  .where('users.name ILIKE :q', q: "%#{sanitized_query}%")
-                  .select('internal_chat_channels.id, internal_chat_channels.channel_type, users.id AS peer_user_id, users.name AS peer_name')
-                  .distinct
+  def dm_search_scope
+    peer_join = 'INNER JOIN internal_chat_channel_members peer_members ' \
+                'ON peer_members.internal_chat_channel_id = internal_chat_channels.id'
+    select_cols = 'internal_chat_channels.id, internal_chat_channels.channel_type, ' \
+                  'users.id AS peer_user_id, users.name AS peer_name'
 
-    dm_channels.limit(DMS_LIMIT).map do |ch|
-      {
-        id: ch.id,
-        channel_type: ch.channel_type,
-        peer: { user_id: ch.peer_user_id, name: ch.peer_name }
-      }
-    end
+    @current_account.internal_chat_channels.direct_messages.active
+                    .joins(:channel_members)
+                    .where(internal_chat_channel_members: { user_id: @current_user.id, hidden: false })
+                    .joins(peer_join)
+                    .joins('INNER JOIN users ON users.id = peer_members.user_id')
+                    .where.not(users: { id: @current_user.id })
+                    .where('f_unaccent(users.name) ILIKE f_unaccent(:q)', q: "%#{sanitized_query}%")
+                    .select(select_cols)
+                    .distinct
+  end
+
+  def serialize_dm(channel, user)
+    {
+      id: channel.id,
+      channel_type: channel.channel_type,
+      peer: { user_id: channel.peer_user_id, name: channel.peer_name, avatar_url: user&.avatar_url }
+    }
   end
 
   def search_messages
@@ -62,8 +75,9 @@ class InternalChat::SearchService
     messages = InternalChat::Message
                .where(account_id: @current_account.id)
                .where(internal_chat_channel_id: accessible_channel_ids)
-               .where('internal_chat_messages.content ILIKE :q', q: "%#{sanitized_query}%")
+               .where('f_unaccent(internal_chat_messages.content) ILIKE f_unaccent(:q)', q: "%#{sanitized_query}%")
                .where(not_deleted, 'true')
+               .then { |msgs| apply_search_history_limit(msgs) }
                .includes(:sender, :channel)
                .order(created_at: :desc)
                .offset((@page - 1) * MESSAGES_PER_PAGE)
@@ -86,6 +100,7 @@ class InternalChat::SearchService
       channel_id: msg.internal_chat_channel_id,
       channel_name: msg.channel&.name,
       channel_type: msg.channel&.channel_type,
+      parent_id: msg.parent_id,
       created_at: msg.created_at,
       sender: msg.sender ? { id: msg.sender.id, name: msg.sender.name, avatar_url: msg.sender.avatar_url } : nil
     }
@@ -105,6 +120,13 @@ class InternalChat::SearchService
 
   def accessible_channel_ids
     @accessible_channel_ids ||= accessible_channels.pluck(:id)
+  end
+
+  def apply_search_history_limit(messages)
+    days = InternalChat::Limits.search_history_days
+    return messages if days.blank?
+
+    messages.where('internal_chat_messages.created_at >= ?', days.days.ago)
   end
 
   def sanitized_query

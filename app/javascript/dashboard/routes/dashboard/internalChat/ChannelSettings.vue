@@ -275,7 +275,7 @@ defineExpose({ fetchMembers });
           </div>
         </div>
         <button
-          v-if="isAdmin && isPrivate"
+          v-if="isAdmin && isPrivate && !isArchived"
           type="button"
           class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-n-slate-6 px-3 py-1.5 text-sm text-n-slate-12 hover:bg-n-alpha-2"
           @click="emit('edit-members')"
@@ -291,48 +291,50 @@ defineExpose({ fetchMembers });
           {{ t('INTERNAL_CHAT.CHANNEL.ACTIONS') }}
         </h4>
         <div class="space-y-1">
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
-            @click="handleMuteToggle"
-          >
-            <Icon
-              :icon="isMuted ? 'i-lucide-bell' : 'i-lucide-bell-off'"
-              class="size-4 text-n-slate-11"
-            />
-            {{
-              isMuted
-                ? t('INTERNAL_CHAT.CHANNEL.UNMUTE')
-                : t('INTERNAL_CHAT.CHANNEL.MUTE')
-            }}
-          </button>
+          <template v-if="!isArchived">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              @click="handleMuteToggle"
+            >
+              <Icon
+                :icon="isMuted ? 'i-lucide-bell' : 'i-lucide-bell-off'"
+                class="size-4 text-n-slate-11"
+              />
+              {{
+                isMuted
+                  ? t('INTERNAL_CHAT.CHANNEL.UNMUTE')
+                  : t('INTERNAL_CHAT.CHANNEL.MUTE')
+              }}
+            </button>
 
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
-            @click="handleFavoriteToggle"
-          >
-            <Icon
-              :icon="isFavorited ? 'i-lucide-star-off' : 'i-lucide-star'"
-              class="size-4 text-n-slate-11"
-            />
-            {{
-              isFavorited
-                ? t('INTERNAL_CHAT.CHANNEL.UNFAVORITE')
-                : t('INTERNAL_CHAT.CHANNEL.FAVORITE')
-            }}
-          </button>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              @click="handleFavoriteToggle"
+            >
+              <Icon
+                :icon="isFavorited ? 'i-lucide-star-off' : 'i-lucide-star'"
+                class="size-4 text-n-slate-11"
+              />
+              {{
+                isFavorited
+                  ? t('INTERNAL_CHAT.CHANNEL.UNFAVORITE')
+                  : t('INTERNAL_CHAT.CHANNEL.FAVORITE')
+              }}
+            </button>
 
-          <!-- DM: Close conversation button -->
-          <button
-            v-if="isDM"
-            type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
-            @click="emit('close-dm')"
-          >
-            <Icon icon="i-lucide-x-circle" class="size-4 text-n-slate-11" />
-            {{ t('INTERNAL_CHAT.CHANNEL.CLOSE_DM') }}
-          </button>
+            <!-- DM: Close conversation button -->
+            <button
+              v-if="isDM"
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-n-slate-12 hover:bg-n-alpha-2"
+              @click="emit('close-dm')"
+            >
+              <Icon icon="i-lucide-x-circle" class="size-4 text-n-slate-11" />
+              {{ t('INTERNAL_CHAT.CHANNEL.CLOSE_DM') }}
+            </button>
+          </template>
 
           <!-- Non-DM: Archive and Delete -->
           <template v-if="!isDM">

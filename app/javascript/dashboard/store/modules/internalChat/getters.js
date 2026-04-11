@@ -8,7 +8,9 @@ export const getters = {
   },
 
   getChannelById: _state => channelId => {
-    return _state.records[channelId] || null;
+    return (
+      _state.records[channelId] || _state.archivedRecords[channelId] || null
+    );
   },
 
   getChannelsByCategory: _state => categoryId => {
@@ -39,6 +41,14 @@ export const getters = {
     return Object.values(_state.records).filter(
       channel => channel.muted && channel.status !== 'archived'
     );
+  },
+
+  getArchivedChannels: _state => {
+    return Object.values(_state.archivedRecords).sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
   },
 
   getCategories: _state => {

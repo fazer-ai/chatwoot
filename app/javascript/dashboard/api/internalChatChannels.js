@@ -6,6 +6,10 @@ class InternalChatChannelsAPI extends ApiClient {
     super('internal_chat/channels', { accountScoped: true });
   }
 
+  getWithParams(params) {
+    return axios.get(this.url, { params });
+  }
+
   getCategories() {
     return axios.get(`${this.url.replace('/channels', '/categories')}`);
   }

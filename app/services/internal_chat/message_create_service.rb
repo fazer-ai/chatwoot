@@ -26,8 +26,15 @@ class InternalChat::MessageCreateService
       content_type: params[:content_type] || :text,
       parent_id: params[:parent_id],
       echo_id: params[:echo_id],
+      content_attributes: build_content_attributes,
       skip_content_validation: params[:attachments].present?
     )
+  end
+
+  def build_content_attributes
+    return {} unless params[:parent_id].present? && ActiveModel::Type::Boolean.new.cast(params[:also_send_in_channel])
+
+    { 'also_send_in_channel' => true }
   end
 
   def post_create_hooks

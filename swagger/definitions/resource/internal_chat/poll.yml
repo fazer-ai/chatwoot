@@ -57,9 +57,14 @@ properties:
           description: Whether the current user voted for this option
         voters:
           type: array
-          description: Voters (only present when public_results is true)
+          description: Voters (only present when public_results is true). Minimal user payload with id and name.
           items:
             type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
   total_votes:
     type: integer
     description: Total number of votes across all options

@@ -16,6 +16,12 @@ allOf:
       unread_count:
         type: integer
         description: The number of unread messages for the current user
+      muted:
+        type: boolean
+        description: Whether the current user muted this channel
+      favorited:
+        type: boolean
+        description: Whether the current user favorited this channel
       members:
         type: array
         description: Array of channel members

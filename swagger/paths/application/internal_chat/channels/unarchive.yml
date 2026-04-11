@@ -18,6 +18,12 @@ responses:
       application/json:
         schema:
           $ref: '#/components/schemas/bad_request_error'
+  '402':
+    description: Pro feature required (private channel limit reached)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
   '403':
     description: Access denied
     content:

@@ -18,6 +18,8 @@
 #
 # Indexes
 #
+#  idx_ic_channels_description_unaccent_trgm                    (f_unaccent(description) gin_trgm_ops) USING gin
+#  idx_ic_channels_name_unaccent_trgm                           (f_unaccent((name)::text) gin_trgm_ops) USING gin
 #  index_internal_chat_channels_on_account_id                   (account_id)
 #  index_internal_chat_channels_on_account_id_and_category_id   (account_id,category_id)
 #  index_internal_chat_channels_on_account_id_and_channel_type  (account_id,channel_type)

@@ -30,6 +30,12 @@ responses:
       application/json:
         schema:
           $ref: '#/components/schemas/bad_request_error'
+  '402':
+    description: Pro feature required (poll creation disabled on current plan)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
   '404':
     description: Channel not found
     content:

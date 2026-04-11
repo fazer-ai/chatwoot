@@ -98,7 +98,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
       end
 
       it 'returns has_unread_mention true when an unread message mentions the user' do
-        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        public_channel.channel_members.find_or_create_by!(user: agent).update!(last_read_at: 1.hour.ago)
         create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
                                        content_attributes: { 'mentioned_user_ids' => [agent.id] })
 
@@ -115,7 +115,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
       it 'returns has_unread_mention true when an unread message mentions a team the user belongs to' do
         team = create(:team, account: account)
         create(:team_member, user: agent, team: team)
-        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        public_channel.channel_members.find_or_create_by!(user: agent).update!(last_read_at: 1.hour.ago)
         # Simulate what message_create_service does: expand team mention to member IDs
         create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
                                        content_attributes: { 'mentioned_user_ids' => [agent.id] })
@@ -131,7 +131,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
       end
 
       it 'returns has_unread_mention false when no unread messages mention the user' do
-        create(:internal_chat_channel_member, channel: public_channel, user: agent, last_read_at: 1.hour.ago)
+        public_channel.channel_members.find_or_create_by!(user: agent).update!(last_read_at: 1.hour.ago)
         create(:internal_chat_message, account: account, channel: public_channel, sender: administrator,
                                        content: 'no mentions here')
 
@@ -277,6 +277,32 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         expect(body['channel_type']).to eq('private_channel')
       end
 
+      it 'returns payment_required when private channel limit is reached' do
+        create_list(:internal_chat_channel, 2, :private_channel, account: account)
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels",
+             params: { channel: { name: 'third-private', channel_type: 'private_channel' } },
+             headers: administrator.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:payment_required)
+        body = response.parsed_body
+        expect(body['error']).to eq('pro_feature_required')
+        expect(body['feature']).to eq('private_channels')
+      end
+
+      it 'does not count archived private channels toward the limit' do
+        create(:internal_chat_channel, :private_channel, account: account)
+        create(:internal_chat_channel, :private_channel, :archived, account: account)
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels",
+             params: { channel: { name: 'second-active-private', channel_type: 'private_channel' } },
+             headers: administrator.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:created)
+      end
+
       it 'adds the creator as admin member' do
         post "/api/v1/accounts/#{account.id}/internal_chat/channels",
              params: { channel: { name: 'new-channel', channel_type: 'public_channel' } },
@@ -405,7 +431,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
 
     context 'when it is a channel admin (not account administrator)' do
       it 'updates the channel' do
-        create(:internal_chat_channel_member, channel: channel, user: agent, role: :admin)
+        channel.channel_members.find_or_create_by!(user: agent).update!(role: :admin)
 
         patch "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}",
               params: { channel: { name: 'updated-name' } },
@@ -526,6 +552,20 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
         body = response.parsed_body
         expect(body['status']).to eq('active')
       end
+
+      it 'returns payment_required when unarchiving a private channel would exceed the limit' do
+        create_list(:internal_chat_channel, 2, :private_channel, account: account)
+        archived_private = create(:internal_chat_channel, :private_channel, :archived, account: account, name: 'old-private')
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels/#{archived_private.id}/unarchive",
+             headers: administrator.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:payment_required)
+        body = response.parsed_body
+        expect(body['error']).to eq('pro_feature_required')
+        expect(body['feature']).to eq('private_channels')
+      end
     end
   end
 
@@ -542,7 +582,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
 
     context 'when it is an authenticated agent who is a member' do
       before do
-        create(:internal_chat_channel_member, channel: channel, user: agent)
+        channel.channel_members.find_or_create_by!(user: agent)
       end
 
       it 'marks the channel as read' do
@@ -561,7 +601,7 @@ RSpec.describe 'Internal Chat Channels API', type: :request do
     let!(:channel) { create(:internal_chat_channel, :public_channel, account: account, name: 'general') }
 
     context 'when it is an authenticated agent who is a member' do
-      let!(:membership) { create(:internal_chat_channel_member, channel: channel, user: agent, last_read_at: Time.current) }
+      let!(:membership) { channel.channel_members.find_or_create_by!(user: agent).tap { |m| m.update!(last_read_at: Time.current) } }
       let!(:message) { create(:internal_chat_message, account: account, channel: channel, sender: agent, content: 'test') }
 
       it 'marks the channel as unread from a specific message' do

@@ -105,7 +105,7 @@ const onItemSelect = index => {
     <ul
       v-if="items.length"
       ref="listRef"
-      class="vertical dropdown menu mention--box bg-n-solid-1 p-1 rounded-xl text-sm overflow-auto absolute w-full z-20 shadow-md left-0 leading-[1.2] bottom-full max-h-[12.5rem] border border-solid border-n-strong"
+      class="vertical dropdown menu mention--box bg-n-solid-1 p-1 rounded-xl text-sm overflow-auto absolute w-[28rem] max-w-[calc(100vw-2rem)] z-20 shadow-md left-0 leading-[1.2] bottom-full max-h-[12.5rem] border border-solid border-n-strong"
       role="listbox"
     >
       <li
@@ -144,11 +144,15 @@ const onItemSelect = index => {
       </li>
     </ul>
     <ul
-      v-else-if="!loading && searchKey?.trim()"
-      class="vertical dropdown menu mention--box bg-n-solid-1 p-1 rounded-xl text-sm overflow-auto absolute w-full z-20 shadow-md left-0 leading-[1.2] bottom-full max-h-[12.5rem] border border-solid border-n-strong"
+      v-else-if="!loading"
+      class="vertical dropdown menu mention--box bg-n-solid-1 p-1 rounded-xl text-sm overflow-auto absolute w-[28rem] max-w-[calc(100vw-2rem)] z-20 shadow-md left-0 leading-[1.2] bottom-full max-h-[12.5rem] border border-solid border-n-strong"
     >
       <li class="px-2 py-2 text-xs text-n-slate-10">
-        {{ t('INTERNAL_CHAT.CONVERSATION_MENTION.NO_RESULTS') }}
+        {{
+          searchKey?.trim()
+            ? t('INTERNAL_CHAT.CONVERSATION_MENTION.NO_RESULTS')
+            : t('INTERNAL_CHAT.CONVERSATION_MENTION.TYPE_TO_SEARCH')
+        }}
       </li>
     </ul>
   </div>

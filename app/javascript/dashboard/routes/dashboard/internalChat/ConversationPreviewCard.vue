@@ -2,10 +2,11 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { formatDistanceToNow, fromUnixTime } from 'date-fns';
+import { enUS, ptBR } from 'date-fns/locale';
 import { useMapGetter } from 'dashboard/composables/store';
 import { getContrastingTextColor } from '@chatwoot/utils';
 import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
-import { dynamicTime } from 'shared/helpers/timeHelper';
 import ConversationAPI from 'dashboard/api/conversations';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -21,9 +22,12 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const router = useRouter();
 const allLabels = useMapGetter('labels/getLabels');
+const allInboxes = useMapGetter('inboxes/getInboxes');
+
+const dateFnsLocales = { pt_BR: ptBR };
 
 // Module-level cache shared across all instances
 const conversationCache = new Map();
@@ -39,7 +43,8 @@ const contactThumbnail = computed(
 );
 const inboxName = computed(() => {
   const inboxId = conversation.value?.inbox_id;
-  return inboxId ? `Inbox #${inboxId}` : '';
+  if (!inboxId) return '';
+  return allInboxes.value?.find(inbox => inbox.id === inboxId)?.name || '';
 });
 const assigneeName = computed(
   () => conversation.value?.meta?.assignee?.name || ''
@@ -47,7 +52,11 @@ const assigneeName = computed(
 const status = computed(() => conversation.value?.status || '');
 const lastActivityAt = computed(() => {
   const ts = conversation.value?.last_activity_at;
-  return ts ? dynamicTime(ts) : '';
+  if (!ts) return '';
+  return formatDistanceToNow(fromUnixTime(ts), {
+    addSuffix: true,
+    locale: dateFnsLocales[locale.value] || enUS,
+  });
 });
 const lastMessageObj = computed(() => {
   return (

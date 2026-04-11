@@ -18,6 +18,31 @@ export const actions = {
     }
   },
 
+  show: async ({ commit }, channelId) => {
+    try {
+      const response = await InternalChatChannelsAPI.show(channelId);
+      commit('ADD_CHANNEL', response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      throw error;
+    }
+  },
+
+  fetchArchived: async ({ commit }) => {
+    commit('SET_UI_FLAG', { isFetchingArchived: true });
+    try {
+      const response = await InternalChatChannelsAPI.getWithParams({
+        status: 'archived',
+      });
+      commit('SET_ARCHIVED_CHANNELS', response.data);
+    } catch (error) {
+      throwErrorMessage(error);
+    } finally {
+      commit('SET_UI_FLAG', { isFetchingArchived: false });
+    }
+  },
+
   create: async ({ commit }, channelData) => {
     commit('SET_UI_FLAG', { isCreating: true });
     try {
@@ -25,6 +50,7 @@ export const actions = {
       commit('ADD_CHANNEL', response.data);
       return response.data;
     } catch (error) {
+      if (error?.response?.status === 402) throw error;
       throwErrorMessage(error);
       throw error;
     } finally {
@@ -60,6 +86,7 @@ export const actions = {
     try {
       const response = await InternalChatChannelsAPI.archive(channelId);
       commit('UPDATE_CHANNEL', response.data);
+      commit('ADD_ARCHIVED_CHANNEL', response.data);
     } catch (error) {
       throwErrorMessage(error);
       throw error;
@@ -69,8 +96,10 @@ export const actions = {
   unarchive: async ({ commit }, channelId) => {
     try {
       const response = await InternalChatChannelsAPI.unarchive(channelId);
-      commit('UPDATE_CHANNEL', response.data);
+      commit('ADD_CHANNEL', response.data);
+      commit('REMOVE_ARCHIVED_CHANNEL', channelId);
     } catch (error) {
+      if (error?.response?.status === 402) throw error;
       throwErrorMessage(error);
       throw error;
     }

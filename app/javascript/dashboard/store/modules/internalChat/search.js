@@ -5,6 +5,7 @@ const state = {
   channels: [],
   dms: [],
   messages: [],
+  searchLimited: false,
   uiFlags: {
     isFetching: false,
     hasMoreMessages: false,
@@ -18,6 +19,7 @@ const getters = {
   getDMs: _state => _state.dms,
   getMessages: _state => _state.messages,
   getUIFlags: _state => _state.uiFlags,
+  isSearchLimited: _state => _state.searchLimited,
 };
 
 const actions = {
@@ -58,6 +60,7 @@ const mutations = {
     _state.channels = data.channels || [];
     _state.dms = data.dms || [];
     _state.messages = data.messages || [];
+    _state.searchLimited = data.meta?.search_limited || false;
   },
   APPEND_MESSAGES(_state, messages) {
     _state.messages = [..._state.messages, ...messages];
@@ -67,6 +70,7 @@ const mutations = {
     _state.channels = [];
     _state.dms = [];
     _state.messages = [];
+    _state.searchLimited = false;
   },
   SET_UI_FLAG(_state, flags) {
     _state.uiFlags = { ..._state.uiFlags, ...flags };

@@ -12,14 +12,20 @@ requestBody:
       schema:
         $ref: '#/components/schemas/internal_chat_channel_create_payload'
 responses:
-  '200':
-    description: Success
+  '201':
+    description: Created
     content:
       application/json:
         schema:
           $ref: '#/components/schemas/internal_chat_channel_show'
   '401':
     description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '402':
+    description: Pro feature required (e.g. private channel limit reached)
     content:
       application/json:
         schema:

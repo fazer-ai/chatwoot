@@ -18,6 +18,14 @@ properties:
   favorited:
     type: boolean
     description: Whether the channel is favorited by this member
+  hidden:
+    type: boolean
+    description: Whether the channel is hidden for this member (used to close DMs)
+  availability_status:
+    type:
+      - string
+      - 'null'
+    description: Availability status of the member's user
   last_read_at:
     type:
       - string

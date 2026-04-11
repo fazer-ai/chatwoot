@@ -86,6 +86,10 @@ function focusEditor() {
   editorRef.value?.$el?.querySelector('.ProseMirror')?.focus();
 }
 
+function insertMentionTrigger(char) {
+  editorRef.value?.insertMentionTrigger?.(char);
+}
+
 function handleSend() {
   if (!canSend.value) return;
   const content = editorContent.value.trim();
@@ -277,6 +281,22 @@ defineExpose({ focus, setContent, getContent });
         @click="openFilePicker"
       >
         <Icon icon="i-lucide-paperclip" class="size-4" />
+      </button>
+      <button
+        type="button"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        :title="t('INTERNAL_CHAT.MESSAGE.MENTION_USER')"
+        @click="insertMentionTrigger('@')"
+      >
+        <Icon icon="i-lucide-at-sign" class="size-4" />
+      </button>
+      <button
+        type="button"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        :title="t('INTERNAL_CHAT.MESSAGE.MENTION_CONVERSATION')"
+        @click="insertMentionTrigger('#')"
+      >
+        <Icon icon="i-lucide-hash" class="size-4" />
       </button>
       <button
         v-if="showPoll"

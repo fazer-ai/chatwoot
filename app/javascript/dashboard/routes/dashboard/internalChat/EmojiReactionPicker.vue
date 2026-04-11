@@ -62,7 +62,7 @@ function close() {
     <div
       v-if="isOpen"
       v-on-click-outside="close"
-      class="absolute bottom-full right-0 z-50 mb-1 flex items-center gap-1 rounded-lg border border-n-slate-6 bg-n-solid-2 p-2 shadow-lg"
+      class="absolute bottom-full right-0 z-50 mb-1 grid w-max max-w-[11rem] grid-cols-4 gap-1 rounded-lg border border-n-slate-6 bg-n-solid-2 p-2 shadow-lg"
     >
       <button
         v-for="item in QUICK_EMOJIS"

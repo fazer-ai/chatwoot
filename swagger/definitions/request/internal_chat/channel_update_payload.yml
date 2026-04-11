@@ -9,12 +9,6 @@ properties:
       description:
         type: string
         description: The description of the channel
-      channel_type:
-        type: string
-        enum:
-          - public_channel
-          - private_channel
-        description: The type of channel
       category_id:
         type: integer
         description: The ID of the category to assign the channel to

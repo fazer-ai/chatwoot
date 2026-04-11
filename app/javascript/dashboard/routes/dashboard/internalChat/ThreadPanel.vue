@@ -1,5 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -25,6 +32,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  highlightMessageId: {
+    type: Number,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['close']);
@@ -36,7 +47,32 @@ const isLoading = ref(false);
 const isSending = ref(false);
 const editingMessage = ref(null);
 const threadEditorRef = ref(null);
+const scrollContainerRef = ref(null);
 let activeThreadRequestId = null;
+
+const HIGHLIGHT_CLASSES = [
+  'bg-n-amber-3',
+  'ring-1',
+  'ring-n-amber-7',
+  'rounded-lg',
+];
+
+function scrollToBottom() {
+  const el = scrollContainerRef.value;
+  if (!el) return;
+  el.scrollTop = el.scrollHeight;
+}
+
+function scrollToMessage(messageId) {
+  const container = scrollContainerRef.value;
+  if (!container) return false;
+  const el = container.querySelector(`[data-message-id="${messageId}"]`);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add(...HIGHLIGHT_CLASSES);
+  setTimeout(() => el.classList.remove(...HIGHLIGHT_CLASSES), 3000);
+  return true;
+}
 
 const threadReplies = computed(() => {
   return store.getters['internalChat/messages/getThreadReplies'](
@@ -55,6 +91,14 @@ async function fetchThread() {
       channelId: props.channelId,
       messageId: props.parentMessage.id,
     });
+    if (activeThreadRequestId !== requestId) return;
+    isLoading.value = false;
+    await nextTick();
+    if (props.highlightMessageId) {
+      scrollToMessage(props.highlightMessageId);
+    } else {
+      scrollToBottom();
+    }
   } catch {
     if (activeThreadRequestId !== requestId) return;
     useAlert(t('INTERNAL_CHAT.ERRORS.FETCH_MESSAGES'));
@@ -95,15 +139,11 @@ async function handleSendReply(content, options = {}) {
       await store.dispatch('internalChat/messages/sendThreadReply', {
         channelId: props.channelId,
         parentMessageId: props.parentMessage.id,
-        data: { content },
+        data: { content, also_send_in_channel: !!options.alsoSendInChannel },
       });
       deleteThreadDraft();
-      if (options.alsoSendInChannel) {
-        await store.dispatch('internalChat/messages/sendMessage', {
-          channelId: props.channelId,
-          data: { content },
-        });
-      }
+      await nextTick();
+      scrollToBottom();
     }
   } catch {
     useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
@@ -237,6 +277,18 @@ watch(
   }
 );
 
+async function jumpToReply(messageId) {
+  if (!messageId) return;
+  await nextTick();
+  if (!scrollToMessage(messageId)) {
+    await fetchThread();
+    await nextTick();
+    scrollToMessage(messageId);
+  }
+}
+
+defineExpose({ jumpToReply });
+
 onMounted(() => {
   fetchThread();
   loadThreadDraft();
@@ -248,7 +300,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full w-96 flex-col border-l border-n-slate-5 bg-n-solid-1">
+  <div
+    class="flex h-full w-96 flex-col overflow-x-clip border-l border-n-slate-5 bg-n-solid-1"
+  >
     <div
       class="flex h-[53px] items-center justify-between border-b border-n-slate-5 px-4"
     >
@@ -264,8 +318,11 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="flex-1 overflow-y-auto">
-      <div class="border-b border-n-slate-5 pb-2">
+    <div ref="scrollContainerRef" class="flex-1 overflow-y-auto">
+      <div
+        class="border-b border-n-slate-5 pb-2"
+        :data-message-id="parentMessage.id"
+      >
         <MessageBubble
           :message="parentMessage"
           :current-user-id="currentUserId"
@@ -294,20 +351,24 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else>
-        <MessageBubble
+        <div
           v-for="reply in threadReplies"
           :key="reply.id"
-          :message="reply"
-          :current-user-id="currentUserId"
-          :is-admin="isAdmin"
-          in-thread
-          @edit="handleEditReply"
-          @delete="handleDeleteReply"
-          @add-reaction="handleAddReaction"
-          @remove-reaction="handleRemoveReaction"
-          @vote="handleVote"
-          @unvote="handleUnvote"
-        />
+          :data-message-id="reply.id"
+        >
+          <MessageBubble
+            :message="reply"
+            :current-user-id="currentUserId"
+            :is-admin="isAdmin"
+            in-thread
+            @edit="handleEditReply"
+            @delete="handleDeleteReply"
+            @add-reaction="handleAddReaction"
+            @remove-reaction="handleRemoveReaction"
+            @vote="handleVote"
+            @unvote="handleUnvote"
+          />
+        </div>
       </div>
     </div>
 

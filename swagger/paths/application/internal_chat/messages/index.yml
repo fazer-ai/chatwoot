@@ -18,6 +18,11 @@ parameters:
       type: string
       format: date-time
     description: Fetch messages created after this timestamp
+  - name: around
+    in: query
+    schema:
+      type: integer
+    description: Fetch a window of messages centered around a given message ID
 responses:
   '200':
     description: Success

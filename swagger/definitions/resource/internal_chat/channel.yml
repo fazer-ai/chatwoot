@@ -20,6 +20,9 @@ properties:
       - private_channel
       - dm
     description: The type of channel
+  is_dm:
+    type: boolean
+    description: Whether this channel is a direct message
   status:
     type: string
     enum:

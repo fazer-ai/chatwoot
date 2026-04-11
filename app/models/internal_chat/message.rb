@@ -19,6 +19,7 @@
 #  idx_ic_messages_account_created                           (account_id,created_at)
 #  idx_ic_messages_channel_created                           (internal_chat_channel_id,created_at)
 #  idx_ic_messages_content_trgm                              (content) USING gin
+#  idx_ic_messages_content_unaccent_trgm                     (f_unaccent(content) gin_trgm_ops) USING gin
 #  index_internal_chat_messages_on_account_id                (account_id)
 #  index_internal_chat_messages_on_internal_chat_channel_id  (internal_chat_channel_id)
 #  index_internal_chat_messages_on_parent_id                 (parent_id)

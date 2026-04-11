@@ -19,8 +19,28 @@ properties:
       category_id:
         type: integer
         description: The ID of the category to assign the channel to
+      member_ids:
+        type: array
+        items:
+          type: integer
+        description: IDs of users to add as initial members (nested)
+      team_ids:
+        type: array
+        items:
+          type: integer
+        description: IDs of teams whose members are added as initial members (nested)
+  channel_type:
+    type: string
+    enum:
+      - dm
+    description: Top-level shortcut to request a direct message channel
   member_ids:
     type: array
     items:
       type: integer
-    description: IDs of users to add as initial members
+    description: IDs of users to add as initial members (top-level fallback)
+  team_ids:
+    type: array
+    items:
+      type: integer
+    description: IDs of teams whose members are added as initial members (top-level fallback)

@@ -17,9 +17,11 @@ RSpec.describe InternalChat::ChannelMember do
       let!(:channel_member) { create(:internal_chat_channel_member) }
 
       it 'does not allow the same user to be added to the same channel twice' do
-        duplicate = build(:internal_chat_channel_member,
-                          channel: channel_member.channel,
-                          user: channel_member.user)
+        duplicate = described_class.new(
+          channel: channel_member.channel,
+          user: channel_member.user,
+          role: :member
+        )
         expect(duplicate).not_to be_valid
         expect(duplicate.errors[:user_id]).to include('has already been taken')
       end

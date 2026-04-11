@@ -10451,8 +10451,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -10463,6 +10463,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Pro feature required (e.g. private channel limit reached)",
             "content": {
               "application/json": {
                 "schema": {
@@ -10713,6 +10723,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Unprocessable entity (e.g., attempting to archive a direct message)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
           }
         }
       }
@@ -10751,6 +10771,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Pro feature required (private channel limit reached)",
             "content": {
               "application/json": {
                 "schema": {
@@ -11041,8 +11071,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -11126,6 +11156,10 @@
                   "favorited": {
                     "type": "boolean",
                     "description": "Whether the channel is favorited by this member"
+                  },
+                  "hidden": {
+                    "type": "boolean",
+                    "description": "Whether the channel is hidden for this member (used to close DMs)"
                   }
                 }
               }
@@ -11263,6 +11297,14 @@
               "format": "date-time"
             },
             "description": "Fetch messages created after this timestamp"
+          },
+          {
+            "name": "around",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Fetch a window of messages centered around a given message ID"
           }
         ],
         "responses": {
@@ -11931,6 +11973,16 @@
               }
             }
           },
+          "402": {
+            "description": "Pro feature required (poll creation disabled on current plan)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Channel not found",
             "content": {
@@ -12278,7 +12330,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Search query (minimum 2 characters)"
+            "description": "Search query (minimum 3 characters, case- and accent-insensitive)"
           },
           {
             "name": "page",
@@ -14977,6 +15029,10 @@
             ],
             "description": "The type of channel"
           },
+          "is_dm": {
+            "type": "boolean",
+            "description": "Whether this channel is a direct message"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -15044,6 +15100,10 @@
                 ],
                 "description": "The type of channel"
               },
+              "is_dm": {
+                "type": "boolean",
+                "description": "Whether this channel is a direct message"
+              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -15089,6 +15149,49 @@
               "unread_count": {
                 "type": "integer",
                 "description": "The number of unread messages for the current user"
+              },
+              "has_unread_mention": {
+                "type": "boolean",
+                "description": "Whether the current user has unread mentions in the channel"
+              },
+              "muted": {
+                "type": "boolean",
+                "description": "Whether the current user muted this channel"
+              },
+              "favorited": {
+                "type": "boolean",
+                "description": "Whether the current user favorited this channel"
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether the current user hid this channel (used to close DMs)"
+              },
+              "members": {
+                "type": "array",
+                "description": "Lightweight members list, only returned for direct message channels",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "user_id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "avatar_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "availability_status": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
               }
             }
           }
@@ -15125,6 +15228,10 @@
                   "dm"
                 ],
                 "description": "The type of channel"
+              },
+              "is_dm": {
+                "type": "boolean",
+                "description": "Whether this channel is a direct message"
               },
               "status": {
                 "type": "string",
@@ -15183,6 +15290,14 @@
                 "type": "integer",
                 "description": "The number of unread messages for the current user"
               },
+              "muted": {
+                "type": "boolean",
+                "description": "Whether the current user muted this channel"
+              },
+              "favorited": {
+                "type": "boolean",
+                "description": "Whether the current user favorited this channel"
+              },
               "members": {
                 "type": "array",
                 "description": "Array of channel members",
@@ -15212,6 +15327,17 @@
                     "favorited": {
                       "type": "boolean",
                       "description": "Whether the channel is favorited by this member"
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Whether the channel is hidden for this member (used to close DMs)"
+                    },
+                    "availability_status": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Availability status of the member's user"
                     },
                     "last_read_at": {
                       "type": [
@@ -15330,6 +15456,19 @@
                             "type": "integer",
                             "description": "The ID of the user who reacted"
                           },
+                          "user": {
+                            "type": "object",
+                            "description": "Minimal user payload for the reacting user",
+                            "properties": {
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Display name of the reacting user"
+                              }
+                            }
+                          },
                           "internal_chat_message_id": {
                             "type": "integer",
                             "description": "The ID of the message this reaction belongs to"
@@ -15385,6 +15524,115 @@
                           }
                         }
                       }
+                    },
+                    "poll": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "The ID of the poll"
+                        },
+                        "question": {
+                          "type": "string",
+                          "description": "The poll question"
+                        },
+                        "multiple_choice": {
+                          "type": "boolean",
+                          "description": "Whether multiple options can be selected"
+                        },
+                        "public_results": {
+                          "type": "boolean",
+                          "description": "Whether vote results are publicly visible"
+                        },
+                        "allow_revote": {
+                          "type": "boolean",
+                          "description": "Whether users can change their vote"
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the poll expires"
+                        },
+                        "internal_chat_message_id": {
+                          "type": "integer",
+                          "description": "The ID of the message this poll belongs to"
+                        },
+                        "options": {
+                          "type": "array",
+                          "description": "The poll options",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "The option ID"
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "The option text"
+                              },
+                              "emoji": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional emoji for the option"
+                              },
+                              "image_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional image URL for the option"
+                              },
+                              "position": {
+                                "type": "integer",
+                                "description": "Display order position"
+                              },
+                              "votes_count": {
+                                "type": "integer",
+                                "description": "Number of votes for this option"
+                              },
+                              "voted": {
+                                "type": "boolean",
+                                "description": "Whether the current user voted for this option"
+                              },
+                              "voters": {
+                                "type": "array",
+                                "description": "Voters (only present when public_results is true). Minimal user payload with id and name.",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "total_votes": {
+                          "type": "integer",
+                          "description": "Total number of votes across all options"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The time at which the poll was created"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The time at which the poll was last updated"
+                        }
+                      }
                     }
                   }
                 }
@@ -15419,6 +15667,17 @@
           "favorited": {
             "type": "boolean",
             "description": "Whether the channel is favorited by this member"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Whether the channel is hidden for this member (used to close DMs)"
+          },
+          "availability_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Availability status of the member's user"
           },
           "last_read_at": {
             "type": [
@@ -15533,6 +15792,19 @@
                   "type": "integer",
                   "description": "The ID of the user who reacted"
                 },
+                "user": {
+                  "type": "object",
+                  "description": "Minimal user payload for the reacting user",
+                  "properties": {
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Display name of the reacting user"
+                    }
+                  }
+                },
                 "internal_chat_message_id": {
                   "type": "integer",
                   "description": "The ID of the message this reaction belongs to"
@@ -15588,6 +15860,115 @@
                 }
               }
             }
+          },
+          "poll": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ID of the poll"
+              },
+              "question": {
+                "type": "string",
+                "description": "The poll question"
+              },
+              "multiple_choice": {
+                "type": "boolean",
+                "description": "Whether multiple options can be selected"
+              },
+              "public_results": {
+                "type": "boolean",
+                "description": "Whether vote results are publicly visible"
+              },
+              "allow_revote": {
+                "type": "boolean",
+                "description": "Whether users can change their vote"
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the poll expires"
+              },
+              "internal_chat_message_id": {
+                "type": "integer",
+                "description": "The ID of the message this poll belongs to"
+              },
+              "options": {
+                "type": "array",
+                "description": "The poll options",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The option ID"
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The option text"
+                    },
+                    "emoji": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional emoji for the option"
+                    },
+                    "image_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional image URL for the option"
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "Display order position"
+                    },
+                    "votes_count": {
+                      "type": "integer",
+                      "description": "Number of votes for this option"
+                    },
+                    "voted": {
+                      "type": "boolean",
+                      "description": "Whether the current user voted for this option"
+                    },
+                    "voters": {
+                      "type": "array",
+                      "description": "Voters (only present when public_results is true). Minimal user payload with id and name.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "total_votes": {
+                "type": "integer",
+                "description": "Total number of votes across all options"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the poll was created"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the poll was last updated"
+              }
+            }
           }
         }
       },
@@ -15605,6 +15986,19 @@
           "user_id": {
             "type": "integer",
             "description": "The ID of the user who reacted"
+          },
+          "user": {
+            "type": "object",
+            "description": "Minimal user payload for the reacting user",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Display name of the reacting user"
+              }
+            }
           },
           "internal_chat_message_id": {
             "type": "integer",
@@ -15728,9 +16122,17 @@
                 },
                 "voters": {
                   "type": "array",
-                  "description": "Voters (only present when public_results is true)",
+                  "description": "Voters (only present when public_results is true). Minimal user payload with id and name.",
                   "items": {
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -15807,6 +16209,13 @@
                     "name": {
                       "type": "string",
                       "description": "The peer user name"
+                    },
+                    "avatar_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The peer user avatar URL"
                     }
                   }
                 }
@@ -15826,6 +16235,13 @@
                 "content": {
                   "type": "string",
                   "description": "The message content"
+                },
+                "parent_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "The parent message ID (when the hit is a thread reply)"
                 },
                 "channel_id": {
                   "type": "integer",
@@ -15884,6 +16300,10 @@
               "messages_has_more": {
                 "type": "boolean",
                 "description": "Whether there are more message results"
+              },
+              "search_limited": {
+                "type": "boolean",
+                "description": "Whether the search history is capped for the current plan"
               }
             }
           }
@@ -17319,15 +17739,43 @@
               "category_id": {
                 "type": "integer",
                 "description": "The ID of the category to assign the channel to"
+              },
+              "member_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of users to add as initial members (nested)"
+              },
+              "team_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "IDs of teams whose members are added as initial members (nested)"
               }
             }
+          },
+          "channel_type": {
+            "type": "string",
+            "enum": [
+              "dm"
+            ],
+            "description": "Top-level shortcut to request a direct message channel"
           },
           "member_ids": {
             "type": "array",
             "items": {
               "type": "integer"
             },
-            "description": "IDs of users to add as initial members"
+            "description": "IDs of users to add as initial members (top-level fallback)"
+          },
+          "team_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "IDs of teams whose members are added as initial members (top-level fallback)"
           }
         }
       },
@@ -17344,14 +17792,6 @@
               "description": {
                 "type": "string",
                 "description": "The description of the channel"
-              },
-              "channel_type": {
-                "type": "string",
-                "enum": [
-                  "public_channel",
-                  "private_channel"
-                ],
-                "description": "The type of channel"
               },
               "category_id": {
                 "type": "integer",
@@ -17379,6 +17819,10 @@
           "echo_id": {
             "type": "string",
             "description": "Client-generated ID for optimistic updates"
+          },
+          "also_send_in_channel": {
+            "type": "boolean",
+            "description": "When sending a thread reply, also mirror it into the main channel view"
           },
           "attachments": {
             "type": "array",

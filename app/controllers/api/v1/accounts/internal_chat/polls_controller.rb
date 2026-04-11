@@ -5,6 +5,8 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
   before_action :set_poll_for_unvote, only: [:unvote]
 
   def create
+    return render_pro_required('polls') unless InternalChat::Limits.polls_enabled?
+
     @channel = Current.account.internal_chat_channels.find(params[:channel_id])
     authorize @channel, :show?, policy_class: InternalChat::ChannelPolicy
     raise ActionController::BadRequest, 'Options are required' if poll_params[:options].blank?

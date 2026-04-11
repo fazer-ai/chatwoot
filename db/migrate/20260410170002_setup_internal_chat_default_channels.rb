@@ -1,4 +1,4 @@
-class SetupInternalChatDefaultChannels < ActiveRecord::Migration[7.0]
+class SetupInternalChatDefaultChannels < ActiveRecord::Migration[7.1]
   def up
     Account.find_each do |account|
       InternalChat::DefaultChannelSetupService.new(account: account).perform

@@ -66,7 +66,7 @@ RSpec.describe User do
 
   describe 'channel memberships' do
     it 'removes channel memberships for the deleted user' do
-      expect { user.destroy }.to change(InternalChat::ChannelMember, :count).by(-1)
+      expect { user.destroy }.to change { InternalChat::ChannelMember.where(user_id: user.id).count }.to(0)
     end
 
     it 'does not remove other users memberships' do

@@ -848,6 +848,22 @@ onMounted(() => {
 // Components using this
 // 1. SearchPopover.vue
 useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
+
+function insertMentionTrigger(char) {
+  if (!editorView) return;
+  focusEditorInputField('end');
+  const editorState = editorView.state;
+  const { from, to } = editorState.selection;
+  const textBefore =
+    from > 0
+      ? editorState.doc.textBetween(Math.max(0, from - 1), from, '\0', '\0')
+      : '';
+  const prefix = textBefore && !/\s/.test(textBefore) ? ' ' : '';
+  const tr = editorState.tr.insertText(`${prefix}${char}`, from, to);
+  editorView.dispatch(tr);
+}
+
+defineExpose({ insertMentionTrigger });
 </script>
 
 <template>

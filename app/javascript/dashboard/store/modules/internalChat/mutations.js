@@ -1,6 +1,12 @@
 export const mutations = {
   SET_CHANNELS(_state, channels) {
     const records = {};
+    // Preserve archived channels already loaded (e.g. via show)
+    Object.values(_state.records).forEach(existing => {
+      if (existing.status === 'archived') {
+        records[existing.id] = existing;
+      }
+    });
     channels.forEach(channel => {
       records[channel.id] = channel;
     });
@@ -30,6 +36,26 @@ export const mutations = {
     if (_state.activeChannelId === channelId) {
       _state.activeChannelId = null;
     }
+  },
+
+  SET_ARCHIVED_CHANNELS(_state, channels) {
+    const records = {};
+    channels.forEach(channel => {
+      records[channel.id] = channel;
+    });
+    _state.archivedRecords = records;
+  },
+
+  ADD_ARCHIVED_CHANNEL(_state, channel) {
+    _state.archivedRecords = {
+      ..._state.archivedRecords,
+      [channel.id]: channel,
+    };
+  },
+
+  REMOVE_ARCHIVED_CHANNEL(_state, channelId) {
+    const { [channelId]: _, ...rest } = _state.archivedRecords;
+    _state.archivedRecords = rest;
   },
 
   SET_CATEGORIES(_state, categories) {

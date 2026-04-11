@@ -82,3 +82,9 @@ properties:
             - string
             - 'null'
           description: URL to download the attached file
+  poll:
+    type:
+      - object
+      - 'null'
+    description: Poll data, present when the message carries a poll
+    $ref: ./poll.yml

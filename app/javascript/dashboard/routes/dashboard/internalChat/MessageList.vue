@@ -95,6 +95,7 @@ function shouldGroup(a, b) {
   if (!a || !b) return false;
   const sameSender = a.sender?.id && a.sender.id === b.sender?.id;
   if (!sameSender) return false;
+  if ((a.parent_id || null) !== (b.parent_id || null)) return false;
   return (
     Math.floor(getMessageTimestamp(a) / 60) ===
     Math.floor(getMessageTimestamp(b) / 60)
@@ -415,6 +416,7 @@ defineExpose({ scrollToMessage, scrollToMessageOnLoad });
               :current-user-id="currentUserId"
               :is-admin="isAdmin"
               :group-with-previous="item.groupWithPrevious"
+              :group-with-next="item.groupWithNext"
               :has-thread-draft="threadDraftParentIds.has(item.data.id)"
               @edit="emit('edit', $event)"
               @delete="emit('delete', $event)"

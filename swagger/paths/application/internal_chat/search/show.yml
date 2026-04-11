@@ -11,7 +11,7 @@ parameters:
     required: true
     schema:
       type: string
-    description: Search query (minimum 2 characters)
+    description: Search query (minimum 3 characters, case- and accent-insensitive)
   - name: page
     in: query
     schema:

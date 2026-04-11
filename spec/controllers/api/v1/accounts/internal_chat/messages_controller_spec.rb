@@ -129,6 +129,36 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
         message_ids = body['messages'].map { |m| m['id'] }
         expect(message_ids).to include(target.id)
       end
+
+      it 'excludes thread replies from the main listing by default' do
+        parent = create(:internal_chat_message, account: account, channel: channel, sender: agent, content: 'parent msg')
+        thread_reply = create(:internal_chat_message, account: account, channel: channel, sender: agent,
+                                                      content: 'thread only reply', parent: parent)
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        body = response.parsed_body
+        ids = body['messages'].map { |m| m['id'] }
+        expect(ids).to include(parent.id)
+        expect(ids).not_to include(thread_reply.id)
+      end
+
+      it 'includes thread replies marked with also_send_in_channel in the main listing' do
+        parent = create(:internal_chat_message, account: account, channel: channel, sender: agent, content: 'parent msg')
+        broadcast_reply = create(:internal_chat_message, account: account, channel: channel, sender: agent,
+                                                         content: 'broadcast reply', parent: parent,
+                                                         content_attributes: { 'also_send_in_channel' => true })
+
+        get "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        body = response.parsed_body
+        ids = body['messages'].map { |m| m['id'] }
+        expect(ids).to include(broadcast_reply.id)
+      end
     end
   end
 
@@ -177,6 +207,31 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
         expect(response).to have_http_status(:created)
         body = response.parsed_body
         expect(body['parent_id']).to eq(parent.id)
+      end
+
+      it 'stores also_send_in_channel flag in content_attributes for thread replies' do
+        parent = create(:internal_chat_message, account: account, channel: channel, sender: agent, content: 'parent')
+
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
+             params: { content: 'broadcast reply', parent_id: parent.id, also_send_in_channel: true },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:created)
+        body = response.parsed_body
+        expect(body['parent_id']).to eq(parent.id)
+        expect(body['content_attributes']).to include('also_send_in_channel' => true)
+      end
+
+      it 'ignores also_send_in_channel when there is no parent_id' do
+        post "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages",
+             params: { content: 'plain message', also_send_in_channel: true },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:created)
+        body = response.parsed_body
+        expect(body['content_attributes'] || {}).not_to have_key('also_send_in_channel')
       end
 
       it 'returns unauthorized for a private channel the agent is not a member of' do
@@ -313,7 +368,7 @@ RSpec.describe 'Internal Chat Messages API', type: :request do
 
     context 'when it is a channel admin member' do
       it 'pins the message' do
-        create(:internal_chat_channel_member, channel: channel, user: agent, role: :admin)
+        channel.channel_members.find_or_create_by!(user: agent).update!(role: :admin)
 
         post "/api/v1/accounts/#{account.id}/internal_chat/channels/#{channel.id}/messages/#{message.id}/pin",
              headers: agent.create_new_auth_token,

@@ -10,6 +10,8 @@ import CreateDMModal from './CreateDMModal.vue';
 import CreateCategoryModal from './CreateCategoryModal.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Draggable from 'vuedraggable';
+import { emitter } from 'shared/helpers/mitt';
+import ProFeatureNudge from './ProFeatureNudge.vue';
 
 const store = useStore();
 const { t } = useI18n();
@@ -37,10 +39,25 @@ const searchMessages = computed(
 const searchUIFlags = computed(
   () => store.getters['internalChat/search/getUIFlags']
 );
+const isSearchLimited = computed(
+  () => store.getters['internalChat/search/isSearchLimited']
+);
 
 const accountId = computed(() => {
   return route.params.accountId;
 });
+
+const showArchived = ref(false);
+const archivedChannels = computed(
+  () => store.getters['internalChat/getArchivedChannels']
+);
+
+function toggleArchivedSection() {
+  showArchived.value = !showArchived.value;
+  if (showArchived.value) {
+    store.dispatch('internalChat/fetchArchived');
+  }
+}
 
 const isSearchMode = computed(() => searchQuery.value.trim().length >= 1);
 const isSearchReady = computed(() => searchQuery.value.trim().length >= 3);
@@ -88,10 +105,17 @@ function navigateToMessage(message) {
     message.channel_type === 'dm'
       ? 'internal_chat_dm'
       : 'internal_chat_channel';
+  const query = { messageId: message.id };
+  if (message.parent_id) query.parentId = message.parent_id;
   router.push({
     name: routeName,
     params: { accountId: accountId.value, channelId: message.channel_id },
-    query: { messageId: message.id },
+    query,
+  });
+  emitter.emit('internal-chat:jump-to-message', {
+    channelId: message.channel_id,
+    messageId: message.id,
+    parentId: message.parent_id || null,
   });
 }
 
@@ -106,10 +130,16 @@ function stripMarkup(text) {
   return clean;
 }
 
+function normalizeText(value) {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
 function truncateAroundMatch(text, query, maxLen = 120) {
   if (!text) return '';
-  const lower = text.toLowerCase();
-  const idx = lower.indexOf(query.toLowerCase());
+  const idx = normalizeText(text).indexOf(normalizeText(query));
   if (idx === -1 || text.length <= maxLen) return text;
   const start = Math.max(0, idx - Math.floor(maxLen / 2));
   const end = Math.min(text.length, start + maxLen);
@@ -123,8 +153,22 @@ function highlightMatch(text, query) {
   if (!query || !text) return text || '';
   const clean = stripMarkup(text);
   const snippet = truncateAroundMatch(clean, query);
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return snippet.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+  const normSnippet = normalizeText(snippet);
+  const normQuery = normalizeText(query);
+  if (!normQuery) return snippet;
+
+  const parts = [];
+  let start = 0;
+  let idx = normSnippet.indexOf(normQuery);
+  while (idx !== -1) {
+    if (idx > start) parts.push(snippet.slice(start, idx));
+    const matchEnd = idx + normQuery.length;
+    parts.push(`<mark>${snippet.slice(idx, matchEnd)}</mark>`);
+    start = matchEnd;
+    idx = normSnippet.indexOf(normQuery, start);
+  }
+  if (start < snippet.length) parts.push(snippet.slice(start));
+  return parts.join('');
 }
 
 function formatMessageTime(createdAt) {
@@ -257,7 +301,8 @@ const filteredFavoriteChannels = computed(() => {
 
 const uncategorizedChannels = computed(() => {
   const uncategorized = channels.value.filter(
-    ch => ch.channel_type !== 'dm' && !ch.category_id
+    ch =>
+      ch.channel_type !== 'dm' && !ch.category_id && ch.status !== 'archived'
   );
   return [...uncategorized].sort((a, b) => {
     if (a.muted && !b.muted) return 1;
@@ -518,7 +563,12 @@ async function handleDeleteCategory() {
               navigateToChannel({ id: dm.id, channel_type: dm.channel_type })
             "
           >
-            <Avatar :name="dm.peer?.name || ''" :size="20" rounded-full />
+            <Avatar
+              :name="dm.peer?.name || ''"
+              :src="dm.peer?.avatar_url || ''"
+              :size="20"
+              rounded-full
+            />
             <span class="flex-1 truncate text-left">
               {{ dm.peer?.name || '' }}
             </span>
@@ -532,6 +582,9 @@ async function handleDeleteCategory() {
           >
             {{ t('INTERNAL_CHAT.SEARCH.MESSAGES') }}
           </h3>
+          <div v-if="isSearchLimited" class="px-2 pb-2">
+            <ProFeatureNudge feature="search" inline />
+          </div>
           <button
             v-for="message in searchMessages"
             :key="`sm-${message.id}`"
@@ -713,13 +766,21 @@ async function handleDeleteCategory() {
                   activeChannelId === channel.id
                     ? 'bg-n-alpha-2 text-n-slate-12'
                     : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12',
-                  { 'opacity-50': channel.muted },
+                  {
+                    'opacity-50':
+                      channel.muted || channel.status === 'archived',
+                  },
                 ]"
                 @click="navigateToChannel(channel)"
               >
                 <Icon
                   :icon="getChannelIcon(channel)"
                   class="size-4 flex-shrink-0"
+                />
+                <Icon
+                  v-if="channel.status === 'archived'"
+                  icon="i-lucide-archive"
+                  class="size-3 flex-shrink-0 text-n-slate-9"
                 />
                 <Icon
                   v-if="channel.muted"
@@ -805,13 +866,21 @@ async function handleDeleteCategory() {
                   activeChannelId === channel.id
                     ? 'bg-n-alpha-2 text-n-slate-12'
                     : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12',
-                  { 'opacity-50': channel.muted },
+                  {
+                    'opacity-50':
+                      channel.muted || channel.status === 'archived',
+                  },
                 ]"
                 @click="navigateToChannel(channel)"
               >
                 <Icon
                   :icon="getChannelIcon(channel)"
                   class="size-4 flex-shrink-0"
+                />
+                <Icon
+                  v-if="channel.status === 'archived'"
+                  icon="i-lucide-archive"
+                  class="size-3 flex-shrink-0 text-n-slate-9"
                 />
                 <Icon
                   v-if="channel.muted"
@@ -886,6 +955,11 @@ async function handleDeleteCategory() {
               hide-offline-status
             />
             <Icon
+              v-if="channel.status === 'archived'"
+              icon="i-lucide-archive"
+              class="size-3 flex-shrink-0 text-n-slate-9"
+            />
+            <Icon
               v-if="channel.muted"
               icon="i-lucide-bell-off"
               class="size-3 flex-shrink-0 text-n-slate-9"
@@ -913,6 +987,68 @@ async function handleDeleteCategory() {
               {{ channel.unread_count }}
             </span>
           </button>
+        </div>
+      </div>
+
+      <!-- Archived channels -->
+      <div class="mb-3">
+        <h3
+          class="flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
+          @click="toggleArchivedSection"
+        >
+          <Icon
+            :icon="
+              showArchived ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'
+            "
+            class="size-3"
+          />
+          <Icon icon="i-lucide-archive" class="size-3" />
+          {{ t('INTERNAL_CHAT.ARCHIVED.TITLE') }}
+        </h3>
+        <div v-if="showArchived">
+          <div v-if="uiFlags.isFetchingArchived" class="space-y-1 px-2">
+            <div
+              v-for="i in 3"
+              :key="`arch-skel-${i}`"
+              class="flex animate-pulse items-center gap-2 rounded-lg px-2 py-1.5"
+            >
+              <div class="size-4 flex-shrink-0 rounded bg-n-alpha-2" />
+              <div
+                class="h-3.5 flex-1 rounded bg-n-alpha-2"
+                :style="{ maxWidth: `${60 + (i % 3) * 20}%` }"
+              />
+            </div>
+          </div>
+          <div v-else-if="archivedChannels.length === 0" class="px-4 py-2">
+            <p class="text-xs text-n-slate-9">
+              {{ t('INTERNAL_CHAT.ARCHIVED.EMPTY') }}
+            </p>
+          </div>
+          <template v-else>
+            <button
+              v-for="channel in archivedChannels"
+              :key="`arch-${channel.id}`"
+              class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm opacity-50 transition-colors"
+              :class="[
+                activeChannelId === channel.id
+                  ? 'bg-n-alpha-2 text-n-slate-12'
+                  : 'text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12',
+              ]"
+              @click="navigateToChannel(channel)"
+            >
+              <Icon
+                :icon="getChannelIcon(channel)"
+                class="size-4 flex-shrink-0"
+              />
+              <Icon
+                icon="i-lucide-archive"
+                class="size-3 flex-shrink-0 text-n-slate-9"
+              />
+              <span class="flex-1 truncate text-left">{{
+                channel.name || getDMDisplayName(channel)
+              }}</span>
+            </button>
+          </template>
         </div>
       </div>
 

@@ -12,4 +12,8 @@ class Api::V1::Accounts::InternalChat::BaseController < Api::V1::Accounts::BaseC
   def channel_member?
     current_channel.channel_type_public_channel? || current_membership.present?
   end
+
+  def render_pro_required(feature)
+    render json: { error: 'pro_feature_required', feature: feature }, status: :payment_required
+  end
 end

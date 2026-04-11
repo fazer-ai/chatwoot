@@ -18,6 +18,9 @@ requestBody:
           favorited:
             type: boolean
             description: Whether the channel is favorited by this member
+          hidden:
+            type: boolean
+            description: Whether the channel is hidden for this member (used to close DMs)
 responses:
   '200':
     description: Success

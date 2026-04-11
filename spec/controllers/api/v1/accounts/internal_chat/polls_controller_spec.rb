@@ -28,7 +28,23 @@ RSpec.describe 'Internal Chat Polls API', type: :request do
       end
     end
 
+    context 'when polls are disabled (CE default)' do
+      it 'returns payment_required' do
+        post "/api/v1/accounts/#{account.id}/internal_chat/polls",
+             params: valid_params,
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:payment_required)
+        body = response.parsed_body
+        expect(body['error']).to eq('pro_feature_required')
+        expect(body['feature']).to eq('polls')
+      end
+    end
+
     context 'when it is an authenticated agent' do
+      before { allow(InternalChat::Limits).to receive(:polls_enabled?).and_return(true) }
+
       it 'creates a poll with options' do
         post "/api/v1/accounts/#{account.id}/internal_chat/polls",
              params: valid_params,

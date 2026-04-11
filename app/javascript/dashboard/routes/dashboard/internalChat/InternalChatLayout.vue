@@ -33,8 +33,12 @@ async function fetchChannels() {
   }
 }
 
-onMounted(() => {
-  fetchChannels();
+onMounted(async () => {
+  await fetchChannels();
+  // If navigated directly to a channel not in the store (e.g. archived), fetch it
+  if (activeChannelId.value && !activeChannel.value) {
+    store.dispatch('internalChat/show', activeChannelId.value).catch(() => {});
+  }
   store.dispatch('agents/get');
   store.dispatch('teams/get');
 });

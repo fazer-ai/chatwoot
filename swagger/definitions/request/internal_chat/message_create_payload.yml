@@ -12,6 +12,9 @@ properties:
   echo_id:
     type: string
     description: Client-generated ID for optimistic updates
+  also_send_in_channel:
+    type: boolean
+    description: When sending a thread reply, also mirror it into the main channel view
   attachments:
     type: array
     description: File attachments to include with the message

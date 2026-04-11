@@ -37,6 +37,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  groupWithNext: {
+    type: Boolean,
+    default: false,
+  },
   hasThreadDraft: {
     type: Boolean,
     default: false,
@@ -211,7 +215,11 @@ function handlePin() {
 function handleCopyLink() {
   const baseUrl = window.chatwootConfig?.hostURL || window.location.origin;
   const path = window.location.pathname;
-  const url = `${baseUrl}${path}?messageId=${props.message.id}`;
+  const params = [`messageId=${props.message.id}`];
+  if (props.message.parent_id) {
+    params.push(`parentId=${props.message.parent_id}`);
+  }
+  const url = `${baseUrl}${path}?${params.join('&')}`;
   copyTextToClipboard(url);
   useAlert(t('INTERNAL_CHAT.MESSAGE.LINK_COPIED'));
 }
@@ -267,14 +275,6 @@ function handleUnvote(payload) {
         >
           <Icon icon="i-lucide-pin" class="size-3" />
         </span>
-        <button
-          v-if="message.parent_id && !inThread"
-          class="flex items-center gap-1 text-xs text-n-brand hover:underline"
-          @click="emit('openThread', message)"
-        >
-          <Icon icon="i-lucide-message-square" class="size-3" />
-          {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
-        </button>
       </div>
 
       <!-- Poll content -->
@@ -363,13 +363,26 @@ function handleUnvote(payload) {
         @remove="handleRemoveReaction"
       />
 
-      <!-- Thread reply count -->
+      <!-- Thread link / reply count -->
       <div
-        v-if="(threadReplyCount > 0 || hasThreadDraft) && !inThread"
+        v-if="
+          !inThread &&
+          ((message.parent_id && !groupWithNext) ||
+            threadReplyCount > 0 ||
+            hasThreadDraft)
+        "
         class="mt-1 flex items-center gap-2"
       >
         <button
-          v-if="threadReplyCount > 0"
+          v-if="message.parent_id && !groupWithNext"
+          class="flex items-center gap-1 text-xs font-medium text-n-brand hover:underline"
+          @click="handleOpenThread"
+        >
+          <Icon icon="i-lucide-message-square" class="size-3" />
+          {{ t('INTERNAL_CHAT.THREAD.TITLE') }}
+        </button>
+        <button
+          v-else-if="threadReplyCount > 0"
           class="flex items-center gap-1 text-xs font-medium text-n-brand hover:underline"
           @click="handleOpenThread"
         >
@@ -397,6 +410,7 @@ function handleUnvote(payload) {
         @remove="handleRemoveReaction"
       />
       <button
+        v-if="!inThread"
         class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
         :title="t('INTERNAL_CHAT.MESSAGE.REPLY')"
         @click="handleReply"
@@ -411,7 +425,7 @@ function handleUnvote(payload) {
         <Icon icon="i-lucide-link" class="size-4" />
       </button>
       <button
-        v-if="canPin"
+        v-if="canPin && !inThread"
         class="flex items-center justify-center rounded p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
         :title="
           isPinned ? t('INTERNAL_CHAT.PIN.UNPIN') : t('INTERNAL_CHAT.PIN.PIN')

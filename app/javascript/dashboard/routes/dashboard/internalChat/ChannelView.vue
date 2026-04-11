@@ -11,6 +11,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
+import { emitter } from 'shared/helpers/mitt';
 import InternalChatChannelsAPI from 'dashboard/api/internalChatChannels';
 import ChannelHeader from './ChannelHeader.vue';
 import MessageList from './MessageList.vue';
@@ -20,6 +21,8 @@ import ThreadPanel from './ThreadPanel.vue';
 import PollCreator from './PollCreator.vue';
 import ChannelSettings from './ChannelSettings.vue';
 import EditMembersModal from './EditMembersModal.vue';
+import ProFeatureNudge from './ProFeatureNudge.vue';
+import { useInternalChatPro } from 'dashboard/composables/useInternalChatPro';
 
 const props = defineProps({
   channelId: {
@@ -41,9 +44,14 @@ const typingUsers = computed(() => {
 const editorRef = ref(null);
 const messageListRef = ref(null);
 const activeThread = ref(null);
+const threadHighlightMessageId = ref(null);
+const threadPanelRef = ref(null);
 const pollCreatorRef = ref(null);
 const editMembersRef = ref(null);
 const channelSettingsRef = ref(null);
+const proNudgeRef = ref(null);
+const proNudgeFeature = ref('polls');
+const { pollsEnabled } = useInternalChatPro();
 const editingMessage = ref(null);
 const showSettings = ref(
   localStorage.getItem('internal_chat_settings_open') === 'true'
@@ -218,6 +226,15 @@ function handleReply(message) {
   localStorage.setItem('internal_chat_settings_open', 'false');
 }
 
+function handleCreatePoll() {
+  if (!pollsEnabled.value) {
+    proNudgeFeature.value = 'polls';
+    proNudgeRef.value?.open();
+    return;
+  }
+  pollCreatorRef.value?.open();
+}
+
 function handleOpenThread(message) {
   // If message has parent_id, find the parent message to open its thread
   const parentId = message.parent_id;
@@ -242,6 +259,7 @@ function handleOpenThread(message) {
 
 function closeThread() {
   activeThread.value = null;
+  threadHighlightMessageId.value = null;
 }
 
 async function handlePin(message) {
@@ -329,8 +347,13 @@ async function handleArchive() {
 async function handleUnarchive() {
   try {
     await store.dispatch('internalChat/unarchive', props.channelId);
-  } catch {
-    useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+  } catch (error) {
+    if (error?.response?.status === 402) {
+      proNudgeFeature.value = 'private_channels';
+      proNudgeRef.value?.open();
+    } else {
+      useAlert(t('INTERNAL_CHAT.ERRORS.SEND_MESSAGE'));
+    }
   }
 }
 
@@ -456,17 +479,44 @@ watch(
   }
 );
 
-async function scrollToLinkedMessage() {
-  const { messageId, openThread } = route.query;
+async function scrollToLinkedMessage(override = null) {
+  const messageId = override?.messageId ?? route.query.messageId;
+  const parentId = override?.parentId ?? route.query.parentId;
   if (!messageId) return;
 
   await nextTick();
+
+  if (parentId) {
+    const numericParentId = Number(parentId);
+    const numericMessageId = Number(messageId);
+    if (activeThread.value?.id === numericParentId) {
+      threadPanelRef.value?.jumpToReply(numericMessageId);
+      return;
+    }
+    try {
+      const response = await store.dispatch(
+        'internalChat/messages/fetchThread',
+        {
+          channelId: props.channelId,
+          messageId: numericParentId,
+        }
+      );
+      if (response?.parent) {
+        threadHighlightMessageId.value = numericMessageId;
+        activeThread.value = response.parent;
+        showSettings.value = false;
+        localStorage.setItem('internal_chat_settings_open', 'false');
+      }
+    } catch {
+      // Thread may not exist
+    }
+    return;
+  }
+
   const scrolled = messageListRef.value?.scrollToMessage(Number(messageId));
 
   if (!scrolled) {
     try {
-      // Tell MessageList to scroll to this message when the new messages arrive,
-      // instead of auto-scrolling to bottom.
       messageListRef.value?.scrollToMessageOnLoad(Number(messageId));
       await store.dispatch('internalChat/messages/fetchMessages', {
         channelId: props.channelId,
@@ -475,14 +525,6 @@ async function scrollToLinkedMessage() {
       isViewingHistory.value = true;
     } catch {
       // Message may not exist
-    }
-  }
-
-  if (openThread) {
-    const msg = messages.value.find(m => m.id === Number(messageId));
-    if (msg) {
-      activeThread.value = msg;
-      showSettings.value = false;
     }
   }
 }
@@ -518,7 +560,26 @@ onMounted(async () => {
   scrollToLinkedMessage();
 });
 
+watch(
+  () => [route.query.messageId, route.query.parentId],
+  ([newMessageId]) => {
+    if (!newMessageId) return;
+    scrollToLinkedMessage();
+  }
+);
+
+function handleJumpToMessage(payload) {
+  if (!payload || payload.channelId !== props.channelId) return;
+  scrollToLinkedMessage({
+    messageId: payload.messageId,
+    parentId: payload.parentId,
+  });
+}
+
+emitter.on('internal-chat:jump-to-message', handleJumpToMessage);
+
 onBeforeUnmount(() => {
+  emitter.off('internal-chat:jump-to-message', handleJumpToMessage);
   saveDraftImmediately();
 });
 </script>
@@ -566,7 +627,7 @@ onBeforeUnmount(() => {
         @send="handleSend"
         @typing="handleTyping"
         @draft-update="handleDraftUpdate"
-        @create-poll="pollCreatorRef?.open()"
+        @create-poll="handleCreatePoll"
         @cancel-edit="handleCancelEdit"
       />
       <div
@@ -579,10 +640,12 @@ onBeforeUnmount(() => {
 
     <ThreadPanel
       v-if="activeThread"
+      ref="threadPanelRef"
       :channel-id="channelId"
       :parent-message="activeThread"
       :current-user-id="currentUserId"
       :is-admin="isAdmin"
+      :highlight-message-id="threadHighlightMessageId"
       @close="closeThread"
     />
 
@@ -605,6 +668,7 @@ onBeforeUnmount(() => {
     />
 
     <PollCreator ref="pollCreatorRef" @submit="handlePollSubmit" />
+    <ProFeatureNudge ref="proNudgeRef" :feature="proNudgeFeature" />
     <EditMembersModal
       ref="editMembersRef"
       :channel-id="channelId"

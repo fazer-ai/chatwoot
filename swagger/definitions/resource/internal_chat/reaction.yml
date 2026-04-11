@@ -9,6 +9,15 @@ properties:
   user_id:
     type: integer
     description: The ID of the user who reacted
+  user:
+    type: object
+    description: Minimal user payload for the reacting user
+    properties:
+      name:
+        type:
+          - string
+          - 'null'
+        description: Display name of the reacting user
   internal_chat_message_id:
     type: integer
     description: The ID of the message this reaction belongs to
