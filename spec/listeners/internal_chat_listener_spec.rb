@@ -19,7 +19,9 @@ describe InternalChatListener do
       let!(:event) { Events::Base.new(:'internal_chat.message.created', Time.zone.now, message: message) }
 
       it 'broadcasts to all account users including the sender' do
-        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        allow(ActionCableBroadcastJob).to receive(:perform_later)
+        listener.internal_chat_message_created(event)
+        expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
           a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token, other_agent.pubsub_token),
           'internal_chat.message.created',
           hash_including(
@@ -29,7 +31,6 @@ describe InternalChatListener do
             account_id: account.id
           )
         )
-        listener.internal_chat_message_created(event)
       end
     end
 
@@ -44,7 +45,9 @@ describe InternalChatListener do
       end
 
       it 'broadcasts to all channel members including the sender' do
-        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        allow(ActionCableBroadcastJob).to receive(:perform_later)
+        listener.internal_chat_message_created(event)
+        expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
           a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
           'internal_chat.message.created',
           hash_including(
@@ -53,14 +56,16 @@ describe InternalChatListener do
             account_id: account.id
           )
         )
-        listener.internal_chat_message_created(event)
       end
 
       it 'does not broadcast to non-members' do
-        expect(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, _data|
-          expect(tokens).not_to include(other_agent.pubsub_token)
-        end
+        allow(ActionCableBroadcastJob).to receive(:perform_later)
         listener.internal_chat_message_created(event)
+        expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
+          satisfy { |tokens| tokens.exclude?(other_agent.pubsub_token) },
+          'internal_chat.message.created',
+          anything
+        )
       end
     end
   end
@@ -114,7 +119,7 @@ describe InternalChatListener do
         hash_including(
           id: reaction.id,
           emoji: reaction.emoji,
-          internal_chat_message_id: message.id,
+          message_id: message.id,
           account_id: account.id
         )
       )
