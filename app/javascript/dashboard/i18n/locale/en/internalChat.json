@@ -103,6 +103,11 @@
       "ADD_OPTION": "Add option",
       "CANCEL": "Cancel",
       "PERCENTAGE": "{value}%",
+      "TIME_LEFT": {
+        "DAYS": "{count}d left",
+        "HOURS_MINUTES": "{hours}h {minutes}m left",
+        "MINUTES": "{count}m left"
+      },
       "DISCARD_TITLE": "Discard poll?",
       "DISCARD_DESCRIPTION": "You have unsaved changes. Are you sure you want to discard this poll?",
       "DISCARD": "Discard"

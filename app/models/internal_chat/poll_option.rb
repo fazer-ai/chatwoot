@@ -7,6 +7,7 @@
 #  image_url             :string
 #  position              :integer          default(0), not null
 #  text                  :string           not null
+#  votes_count           :integer          default(0), not null
 #  created_at            :datetime         not null
 #  internal_chat_poll_id :bigint           not null
 #
@@ -30,10 +31,6 @@ class InternalChat::PollOption < ApplicationRecord
   validates :text, presence: true
 
   scope :ordered, -> { order(position: :asc) }
-
-  def votes_count
-    votes.count
-  end
 end
 
 InternalChat::PollOption.prepend_mod_with('InternalChat::PollOption')

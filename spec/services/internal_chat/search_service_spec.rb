@@ -191,4 +191,36 @@ RSpec.describe InternalChat::SearchService do
       expect(result[:meta][:search_limited]).to be false
     end
   end
+
+  describe 'search history limit' do
+    before { user }
+
+    let(:channel) { create(:internal_chat_channel, :public_channel, account: account) }
+
+    it 'excludes messages older than the limit when one is configured' do
+      allow(InternalChat::Limits).to receive(:search_history_days).and_return(90)
+
+      old_message = create(:internal_chat_message, account: account, channel: channel, sender: user, content: 'historical reunion record')
+      old_message.update_columns(created_at: 91.days.ago, updated_at: 91.days.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      recent = create(:internal_chat_message, account: account, channel: channel, sender: user, content: 'recent reunion update')
+
+      result = perform_search('reunion')
+
+      contents = result[:messages].map { |m| m[:content] }
+      expect(contents).to include(recent.content)
+      expect(contents).not_to include(old_message.content)
+    end
+
+    it 'returns messages of any age when no limit is set' do
+      allow(InternalChat::Limits).to receive(:search_history_days).and_return(nil)
+
+      old_message = create(:internal_chat_message, account: account, channel: channel, sender: user, content: 'ancient archived note')
+      old_message.update_columns(created_at: 2.years.ago, updated_at: 2.years.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      result = perform_search('ancient')
+
+      expect(result[:messages].map { |m| m[:content] }).to include(old_message.content)
+    end
+  end
 end

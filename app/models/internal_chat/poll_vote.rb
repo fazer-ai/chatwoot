@@ -21,7 +21,8 @@
 class InternalChat::PollVote < ApplicationRecord
   self.table_name = 'internal_chat_poll_votes'
 
-  belongs_to :option, class_name: 'InternalChat::PollOption', foreign_key: :internal_chat_poll_option_id, inverse_of: :votes
+  belongs_to :option, class_name: 'InternalChat::PollOption', foreign_key: :internal_chat_poll_option_id,
+                      inverse_of: :votes, counter_cache: :votes_count
   belongs_to :user
 
   validates :user_id, uniqueness: { scope: :internal_chat_poll_option_id }

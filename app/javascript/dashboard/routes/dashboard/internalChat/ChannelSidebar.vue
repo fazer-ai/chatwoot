@@ -149,25 +149,34 @@ function truncateAroundMatch(text, query, maxLen = 120) {
   return snippet;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function highlightMatch(text, query) {
-  if (!query || !text) return text || '';
+  if (!query || !text) return escapeHtml(text || '');
   const clean = stripMarkup(text);
   const snippet = truncateAroundMatch(clean, query);
   const normSnippet = normalizeText(snippet);
   const normQuery = normalizeText(query);
-  if (!normQuery) return snippet;
+  if (!normQuery) return escapeHtml(snippet);
 
   const parts = [];
   let start = 0;
   let idx = normSnippet.indexOf(normQuery);
   while (idx !== -1) {
-    if (idx > start) parts.push(snippet.slice(start, idx));
+    if (idx > start) parts.push(escapeHtml(snippet.slice(start, idx)));
     const matchEnd = idx + normQuery.length;
-    parts.push(`<mark>${snippet.slice(idx, matchEnd)}</mark>`);
+    parts.push(`<mark>${escapeHtml(snippet.slice(idx, matchEnd))}</mark>`);
     start = matchEnd;
     idx = normSnippet.indexOf(normQuery, start);
   }
-  if (start < snippet.length) parts.push(snippet.slice(start));
+  if (start < snippet.length) parts.push(escapeHtml(snippet.slice(start)));
   return parts.join('');
 }
 

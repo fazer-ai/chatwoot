@@ -580,6 +580,10 @@ emitter.on('internal-chat:jump-to-message', handleJumpToMessage);
 
 onBeforeUnmount(() => {
   emitter.off('internal-chat:jump-to-message', handleJumpToMessage);
+  if (typingOffTimer) {
+    clearTimeout(typingOffTimer);
+    typingOffTimer = null;
+  }
   saveDraftImmediately();
 });
 </script>

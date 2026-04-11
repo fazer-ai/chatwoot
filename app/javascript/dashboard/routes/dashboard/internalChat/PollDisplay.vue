@@ -61,11 +61,17 @@ const timeRemaining = computed(() => {
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
   if (hours >= 24) {
-    const days = Math.floor(hours / 24);
-    return `${days}d left`;
+    return t('INTERNAL_CHAT.POLL.TIME_LEFT.DAYS', {
+      count: Math.floor(hours / 24),
+    });
   }
-  if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
+  if (hours > 0) {
+    return t('INTERNAL_CHAT.POLL.TIME_LEFT.HOURS_MINUTES', {
+      hours,
+      minutes,
+    });
+  }
+  return t('INTERNAL_CHAT.POLL.TIME_LEFT.MINUTES', { count: minutes });
 });
 
 const totalVotes = computed(() => {

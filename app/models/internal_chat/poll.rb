@@ -37,7 +37,9 @@ class InternalChat::Poll < ApplicationRecord
   end
 
   def total_votes_count
-    votes.count
+    return options.sum(&:votes_count) if options.loaded?
+
+    options.sum(:votes_count)
   end
 end
 

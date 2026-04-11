@@ -143,7 +143,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
       sender: message.sender&.push_event_data,
       parent_id: message.parent_id,
       echo_id: message.echo_id,
-      replies_count: message.replies.size,
+      replies_count: message.replies_count,
       created_at: message.created_at,
       updated_at: message.updated_at,
       reactions: message.reactions.includes(:user).map { |r| { id: r.id, emoji: r.emoji, user_id: r.user_id, user: { name: r.user&.name } } },
@@ -169,7 +169,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
   end
 
   def poll_option_data(option, poll)
-    data = { id: option.id, text: option.text, emoji: option.emoji, votes_count: option.votes.size,
+    data = { id: option.id, text: option.text, emoji: option.emoji, votes_count: option.votes_count,
              voted: option.votes.any? { |v| v.user_id == Current.user.id } }
     data[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results
     data

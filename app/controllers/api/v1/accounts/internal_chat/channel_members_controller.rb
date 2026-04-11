@@ -12,7 +12,7 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
 
   def create
     authorize current_channel, :update?, policy_class: InternalChat::ChannelPolicy
-    members = create_channel_members(validated_user_ids)
+    members = create_channel_members(validated_user_ids, requested_role)
     dispatch_member_update
     render json: members.map { |member| member_response(member) }, status: :created
   end
@@ -41,14 +41,23 @@ class Api::V1::Accounts::InternalChat::ChannelMembersController < Api::V1::Accou
     valid_user_ids
   end
 
-  def create_channel_members(user_ids)
+  def create_channel_members(user_ids, role)
     ActiveRecord::Base.transaction do
       user_ids.map do |user_id|
         current_channel.channel_members.find_or_create_by!(user_id: user_id) do |m|
-          m.role = params[:role] || :member
+          m.role = role
         end
       end
     end
+  end
+
+  # Only account administrators can promote a new member to channel admin via params.
+  # Channel admins (without account-admin) always create plain members.
+  def requested_role
+    return :member unless Current.account_user&.administrator?
+    return :member if params[:role].blank?
+
+    InternalChat::ChannelMember.roles.key?(params[:role].to_s) ? params[:role] : :member
   end
 
   def fetch_member

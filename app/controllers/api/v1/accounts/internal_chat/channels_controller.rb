@@ -4,6 +4,8 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
   before_action :current_channel, only: [:show, :update, :destroy, :archive, :unarchive, :toggle_typing_status, :mark_read, :mark_unread]
 
   RECENT_MESSAGES_LIMIT = 20
+  # Arbitrary 32-bit namespace for the private-channel limit advisory lock; paired with account id.
+  PRIVATE_CHANNEL_LOCK_KEY = 0x49434C4D # 'ICLM'
 
   def index
     authorize InternalChat::Channel, :index?
@@ -20,19 +22,21 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def create
     @channel = build_channel
-    return if enforce_private_channel_limit(@channel)
-
     authorize @channel, :create?
     created = @channel.new_record?
 
     if dm_params? && created
       create_dm_with_lock
     else
-      ActiveRecord::Base.transaction do
-        @channel.save!
-        add_creator_as_admin
-        add_initial_members
-        add_channel_type_members
+      with_private_channel_limit_lock(@channel) do
+        return if enforce_private_channel_limit(@channel)
+
+        ActiveRecord::Base.transaction do
+          @channel.save!
+          add_creator_as_admin
+          add_initial_members
+          add_channel_type_members
+        end
       end
     end
 
@@ -70,9 +74,13 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
   def unarchive
     authorize @current_channel, :unarchive?
-    return if enforce_private_channel_limit(@current_channel)
 
-    @current_channel.active!
+    with_private_channel_limit_lock(@current_channel) do
+      return if enforce_private_channel_limit(@current_channel)
+
+      @current_channel.active!
+    end
+
     dispatch_channel_event(@current_channel)
     render json: channel_show_response(@current_channel)
   end
@@ -113,6 +121,19 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
 
     count = Current.account.internal_chat_channels.where(channel_type: :private_channel).active.count
     render_pro_required('private_channels') if count >= max
+  end
+
+  # Postgres advisory transaction lock keyed by account so concurrent create/unarchive
+  # cannot bypass the private-channel limit by racing between count and save.
+  def with_private_channel_limit_lock(channel)
+    return yield unless channel.channel_type_private_channel? && InternalChat::Limits.max_private_channels.present?
+
+    ActiveRecord::Base.transaction do
+      ActiveRecord::Base.connection.execute(
+        ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_xact_lock(?, ?)', PRIVATE_CHANNEL_LOCK_KEY, Current.account.id])
+      )
+      yield
+    end
   end
 
   def filtered_channels
@@ -394,7 +415,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     }
   end
 
-  def message_response(message) # rubocop:disable Metrics/CyclomaticComplexity
+  def message_response(message)
     deleted = message.content_attributes&.dig('deleted')
     attrs = message.content_attributes || {}
     attrs = attrs.merge(poll: poll_response_for(message.poll)) if message.poll.present?
@@ -406,7 +427,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
       sender: message.sender&.push_event_data,
       parent_id: message.parent_id,
       echo_id: message.echo_id,
-      replies_count: message.respond_to?(:replies) ? message.replies.size : 0,
+      replies_count: message.replies_count,
       created_at: message.created_at,
       updated_at: message.updated_at,
       reactions: reaction_responses(message),
@@ -434,7 +455,7 @@ class Api::V1::Accounts::InternalChat::ChannelsController < Api::V1::Accounts::I
     response = {
       id: option.id,
       text: option.text,
-      votes_count: option.votes.size,
+      votes_count: option.votes_count,
       voted: option.votes.any? { |v| v.user_id == Current.user.id }
     }
     response[:voters] = option.votes.map { |v| { id: v.user_id, name: v.user.name } } if poll.public_results

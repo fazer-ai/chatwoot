@@ -160,7 +160,7 @@ class Api::V1::Accounts::InternalChat::PollsController < Api::V1::Accounts::Inte
       emoji: option.emoji,
       image_url: option.image_url,
       position: option.position,
-      votes_count: option.votes.size,
+      votes_count: option.votes_count,
       voted: option.votes.any? { |v| v.user_id == Current.user.id }
     }
     response[:voters] = option.votes.map { |v| v.user.push_event_data } if poll.public_results

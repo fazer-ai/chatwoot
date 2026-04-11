@@ -49,12 +49,13 @@ class CreateInternalChatTables < ActiveRecord::Migration[7.1]
     end
 
     create_table :internal_chat_messages do |t|
-      t.references :account, null: false, index: true
+      t.references :account, null: false, index: true, foreign_key: { on_delete: :cascade }
       t.references :internal_chat_channel, null: false, foreign_key: true
       t.bigint :sender_id
       t.text :content
       t.integer :content_type, null: false, default: 0
       t.bigint :parent_id
+      t.integer :replies_count, null: false, default: 0
       t.jsonb :content_attributes, default: {}
       t.string :echo_id
       t.timestamps
@@ -101,6 +102,7 @@ class CreateInternalChatTables < ActiveRecord::Migration[7.1]
       t.string :emoji
       t.string :image_url
       t.integer :position, null: false, default: 0
+      t.integer :votes_count, null: false, default: 0
       t.datetime :created_at, null: false
       t.index [:internal_chat_poll_id, :position], name: 'idx_ic_poll_options_poll_pos'
     end

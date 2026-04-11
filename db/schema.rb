@@ -582,7 +582,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_170003) do
     t.datetime "message_templates_last_updated", precision: nil
     t.jsonb "provider_connection", default: {}
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
-    t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[]))", using: :gin
+    t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text]))", using: :gin
   end
 
   create_table "companies", force: :cascade do |t|
@@ -1037,6 +1037,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_170003) do
     t.string "echo_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "replies_count", default: 0, null: false
     t.index "f_unaccent(content) gin_trgm_ops", name: "idx_ic_messages_content_unaccent_trgm", using: :gin
     t.index ["account_id", "created_at"], name: "idx_ic_messages_account_created"
     t.index ["account_id"], name: "index_internal_chat_messages_on_account_id"
@@ -1053,6 +1054,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_170003) do
     t.string "image_url"
     t.integer "position", default: 0, null: false
     t.datetime "created_at", null: false
+    t.integer "votes_count", default: 0, null: false
     t.index ["internal_chat_poll_id", "position"], name: "idx_ic_poll_options_poll_pos"
     t.index ["internal_chat_poll_id"], name: "idx_ic_poll_options_poll"
   end
@@ -1537,6 +1539,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_170003) do
   add_foreign_key "internal_chat_drafts", "internal_chat_channels"
   add_foreign_key "internal_chat_drafts", "users"
   add_foreign_key "internal_chat_message_attachments", "internal_chat_messages"
+  add_foreign_key "internal_chat_messages", "accounts", on_delete: :cascade
   add_foreign_key "internal_chat_messages", "internal_chat_channels"
   add_foreign_key "internal_chat_messages", "internal_chat_messages", column: "parent_id"
   add_foreign_key "internal_chat_messages", "users", column: "sender_id", on_delete: :nullify

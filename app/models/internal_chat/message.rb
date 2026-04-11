@@ -6,6 +6,7 @@
 #  content                  :text
 #  content_attributes       :jsonb
 #  content_type             :integer          default("text"), not null
+#  replies_count            :integer          default(0), not null
 #  created_at               :datetime         not null
 #  updated_at               :datetime         not null
 #  account_id               :bigint           not null
@@ -18,7 +19,6 @@
 #
 #  idx_ic_messages_account_created                           (account_id,created_at)
 #  idx_ic_messages_channel_created                           (internal_chat_channel_id,created_at)
-#  idx_ic_messages_content_trgm                              (content) USING gin
 #  idx_ic_messages_content_unaccent_trgm                     (f_unaccent(content) gin_trgm_ops) USING gin
 #  index_internal_chat_messages_on_account_id                (account_id)
 #  index_internal_chat_messages_on_internal_chat_channel_id  (internal_chat_channel_id)
@@ -27,6 +27,7 @@
 #
 # Foreign Keys
 #
+#  fk_rails_...  (account_id => accounts.id) ON DELETE => cascade
 #  fk_rails_...  (internal_chat_channel_id => internal_chat_channels.id)
 #  fk_rails_...  (parent_id => internal_chat_messages.id)
 #  fk_rails_...  (sender_id => users.id) ON DELETE => nullify
@@ -38,7 +39,7 @@ class InternalChat::Message < ApplicationRecord
   belongs_to :channel, class_name: 'InternalChat::Channel', foreign_key: :internal_chat_channel_id,
                        counter_cache: :messages_count, inverse_of: :messages
   belongs_to :sender, class_name: 'User', optional: true
-  belongs_to :parent, class_name: 'InternalChat::Message', optional: true, inverse_of: :replies
+  belongs_to :parent, class_name: 'InternalChat::Message', optional: true, inverse_of: :replies, counter_cache: :replies_count
 
   has_many :replies, class_name: 'InternalChat::Message', foreign_key: :parent_id,
                      dependent: :destroy, inverse_of: :parent
@@ -70,14 +71,18 @@ class InternalChat::Message < ApplicationRecord
   end
 
   def thread_replies_count
-    replies.count
+    replies_count
   end
 
   private
 
+  # Atomic compare-and-set so concurrent message creates can never regress
+  # last_activity_at to an older timestamp.
   def update_channel_activity
     # rubocop:disable Rails/SkipsModelValidations
-    channel.update_column(:last_activity_at, created_at) if channel.last_activity_at.nil? || created_at > channel.last_activity_at
+    InternalChat::Channel.where(id: internal_chat_channel_id)
+                         .where('last_activity_at IS NULL OR last_activity_at < ?', created_at)
+                         .update_all(last_activity_at: created_at)
     # rubocop:enable Rails/SkipsModelValidations
   end
 end
