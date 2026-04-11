@@ -6269,7 +6269,7 @@
               "admin",
               "member"
             ],
-            "description": "The role to assign to the new members"
+            "description": "Role to assign to the new members. Only account administrators can\npromote a new member to `admin` via this field; for any other caller\nthe role is silently coerced to `member`.\n"
           }
         }
       },
