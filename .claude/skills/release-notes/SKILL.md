@@ -10,21 +10,25 @@ Every release cut from `fazer-ai/chatwoot` must embed bilingual user-notes block
 
 ## Required blocks (bilingual, both mandatory)
 
+The release body must contain both an English block and a Portuguese block, in this order. Use H2 headings with country flags **outside** the blocks to separate the two sections visually on GitHub. The fazer.ai page only renders the content **inside** the `<!-- user-notes:xx:start -->` / `<!-- user-notes:xx:end -->` markers, so the H2 headings, the flags, and any commit list above are invisible there.
+
 ```markdown
-<!-- user-notes:pt-BR:start -->
-... markdown em português ...
-<!-- user-notes:pt-BR:end -->
+## 🇺🇸 English
 
 <!-- user-notes:en:start -->
 ... markdown in english ...
 <!-- user-notes:en:end -->
+
+## 🇧🇷 Português
+
+<!-- user-notes:pt-BR:start -->
+... markdown em português ...
+<!-- user-notes:pt-BR:end -->
 ```
 
 The two versions must be **equivalent in content**, written naturally in each language. They are **not** literal translations:
-- pt-BR: "Agora você pode arrastar conversas entre colunas mais rápido."
 - en: "Drag conversations between columns faster."
-
-If you cannot write a real equivalent in one of the locales, write a **generic line in both** instead of leaving one missing or pasting raw Google Translate output.
+- pt-BR: "Agora você pode arrastar conversas entre colunas mais rápido."
 
 ## Audience and tone
 
@@ -42,22 +46,17 @@ Write for an **end user, not a developer**. Readers do not read code, do not kno
 | `### ⚡ Melhorias` | `### ⚡ Improvements` | Refinements to existing features (perf, UX, polish) |
 | `### 🐛 Correções` | `### 🐛 Fixes`   | Bugs the user might have noticed                      |
 
-## Format inside each block
+## Full release body example
+
+The release body should preserve the auto-generated `## Changes` commit list at the top and append both locale sections after it:
 
 ```markdown
-<!-- user-notes:pt-BR:start -->
-### ✨ Novidades
+## Changes
 
-- **Chat interno entre agentes.** Sua equipe agora troca mensagens diretamente dentro do Chatwoot, sem precisar de outra ferramenta.
+- feat(internal-chat): implement internal chat system for agents (#247)
+- fix(signatures): allow admins to manage inbox signatures without explicit membership (#260)
 
-### ⚡ Melhorias
-
-- **Navegação mais rápida em conexões lentas.** A troca entre conversas ficou mais responsiva.
-
-### 🐛 Correções
-
-- **Assinaturas de caixas de entrada.** Administradores conseguem gerenciar assinaturas mesmo sem participar da caixa.
-<!-- user-notes:pt-BR:end -->
+## 🇺🇸 English
 
 <!-- user-notes:en:start -->
 ### ✨ What's new
@@ -72,6 +71,22 @@ Write for an **end user, not a developer**. Readers do not read code, do not kno
 
 - **Inbox signatures.** Admins can manage signatures without having to be a member of the inbox.
 <!-- user-notes:en:end -->
+
+## 🇧🇷 Português
+
+<!-- user-notes:pt-BR:start -->
+### ✨ Novidades
+
+- **Chat interno entre agentes.** Sua equipe agora troca mensagens diretamente dentro do Chatwoot, sem precisar de outra ferramenta.
+
+### ⚡ Melhorias
+
+- **Navegação mais rápida em conexões lentas.** A troca entre conversas ficou mais responsiva.
+
+### 🐛 Correções
+
+- **Assinaturas de caixas de entrada.** Administradores conseguem gerenciar assinaturas mesmo sem participar da caixa.
+<!-- user-notes:pt-BR:end -->
 ```
 
 Bold the change name, then a single short sentence describing the user benefit. Keep each item to 1 or 2 lines.
@@ -79,20 +94,25 @@ Bold the change name, then a single short sentence describing the user benefit. 
 If a release has nothing user-visible, write a single generic line in both locales rather than dumping a PR list:
 
 ```markdown
-<!-- user-notes:pt-BR:start -->
-Correções de bugs e melhorias internas.
-<!-- user-notes:pt-BR:end -->
+## 🇺🇸 English
 
 <!-- user-notes:en:start -->
 Bug fixes and internal improvements.
 <!-- user-notes:en:end -->
+
+## 🇧🇷 Português
+
+<!-- user-notes:pt-BR:start -->
+Correções de bugs e melhorias internas.
+<!-- user-notes:pt-BR:end -->
 ```
 
 ## Quality checklist (run before publishing)
 
 Run this checklist on **both** locale blocks:
 
-- [ ] Both `pt-BR` and `en` blocks are present, with the exact tag spelling shown above.
+- [ ] Both `en` and `pt-BR` blocks are present, with the exact tag spelling shown above, and the `en` block comes first.
+- [ ] Both sections are wrapped by `## 🇺🇸 English` / `## 🇧🇷 Português` H2 headings outside the markers.
 - [ ] Both blocks contain equivalent content (same items, same order, same themes), written naturally in each language. Not a literal translation.
 - [ ] Headers use the localized header table above. Omit empty themes consistently across locales.
 - [ ] Every item leads with a user benefit, not an implementation detail.
@@ -120,8 +140,15 @@ When invoked for a release (new or backfill):
 1. Read the current release body via `gh release view <tag> --json body -q .body` (or the source commits via `git log <prev-tag>..<tag> --oneline`) to understand what shipped.
 2. Filter the changes through "would a non-technical operator notice or care about this?". Drop everything that fails the filter.
 3. Group what survived into Novidades / Melhorias / Correções.
-4. Draft the **pt-BR** block first. Write naturally, lead with benefit.
+4. Draft the **pt-BR** block first as the source language. Write naturally, lead with benefit.
 5. Draft the **en** block. Equivalent content, natural English, not a word-for-word translation.
-6. Run the quality checklist on both blocks.
-7. Show the proposed blocks to the user for approval **before** editing the release.
-8. Only after approval, edit the release with `gh release edit <tag> --notes-file <file>` (preserve any existing technical body content above/below the blocks if present, or replace as the user instructs).
+6. Assemble the full release body: keep the `## Changes` commit list at the top, then `## 🇺🇸 English` + the `en` block, then `## 🇧🇷 Português` + the `pt-BR` block. The `en` section always comes first in the rendered release body.
+7. Run the quality checklist on both blocks.
+8. Show the full proposed body to the user for approval **before** editing the release.
+9. Only after approval, write the body to a temp file and apply it:
+   - **For new releases**, pass the file via `gh release create <tag> --notes-file <file>`.
+   - **For backfills / edits**, this version of `gh` does not have a `release edit` subcommand. Use the API directly:
+     ```bash
+     RELEASE_ID=$(gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.id')
+     gh api -X PATCH "repos/<owner>/<repo>/releases/$RELEASE_ID" -F body=@<file>
+     ```
