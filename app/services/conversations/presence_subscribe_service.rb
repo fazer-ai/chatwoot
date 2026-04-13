@@ -8,7 +8,11 @@ class Conversations::PresenceSubscribeService
     return if @conversation_ids.blank?
 
     jids_by_channel = collect_jids
-    jids_by_channel.each { |channel, jids| channel.presence_subscribe(jids) }
+    jids_by_channel.each do |channel, jids|
+      channel.presence_subscribe(jids)
+    rescue StandardError => e
+      Rails.logger.error "PresenceSubscribeService: failed for channel #{channel.id}: #{e.message}"
+    end
   end
 
   private
