@@ -3,7 +3,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include DateRangeHelper
   include HmacConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter]
+  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -32,6 +32,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
                                 .order(created_at: :desc)
                                 .page(attachment_params[:page])
                                 .per(ATTACHMENT_RESULTS_PER_PAGE)
+  end
+
+  def presence_subscribe_bulk
+    Conversations::PresenceSubscribeService.new(Current.account, params[:conversation_ids]).perform
+    head :ok
   end
 
   def show; end
@@ -109,6 +114,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def toggle_typing_status
     typing_status_manager = ::Conversations::TypingStatusManager.new(@conversation, Current.user, params)
     typing_status_manager.toggle_typing_status
+    head :ok
+  end
+
+  def presence_subscribe
+    Conversations::PresenceSubscribeService.new(Current.account, [@conversation.display_id]).perform
     head :ok
   end
 

@@ -172,6 +172,7 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   delegate :setup_channel_provider, to: :provider_service
+  delegate :presence_subscribe, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_template, to: :provider_service
   delegate :sync_templates, to: :provider_service

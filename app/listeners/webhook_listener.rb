@@ -114,6 +114,10 @@ class WebhookListener < BaseListener
     handle_typing_status(__method__.to_s, event)
   end
 
+  def conversation_recording(event)
+    handle_typing_status(__method__.to_s, event)
+  end
+
   %i[internal_chat_message_created internal_chat_message_updated internal_chat_message_deleted].each do |event_name|
     define_method(event_name) do |event|
       message = event.data[:message]

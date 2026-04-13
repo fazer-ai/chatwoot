@@ -8,6 +8,7 @@ import {
   computed,
   watch,
   onMounted,
+  onBeforeUnmount,
   defineEmits,
 } from 'vue';
 import { useStore } from 'vuex';
@@ -47,6 +48,7 @@ import { useConversationRequiredAttributes } from 'dashboard/composables/useConv
 
 import { emitter } from 'shared/helpers/mitt';
 
+import ConversationAPI from 'dashboard/api/inbox/conversation';
 import wootConstants from 'dashboard/constants/globals';
 import advancedFilterOptions from './widgets/conversation/advancedFilterItems';
 import filterQueryGenerator from '../helper/filterQueryGenerator.js';
@@ -804,6 +806,13 @@ useEmitter('fetch_conversation_stats', () => {
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
+const subscribePresenceForTopChats = () => {
+  const ids = conversationList.value.slice(0, 10).map(c => c.id);
+  if (ids.length) ConversationAPI.presenceSubscribeBulk(ids).catch(() => {});
+};
+
+let presenceInterval = null;
+
 onMounted(() => {
   store.dispatch('setChatListFilters', conversationFilters.value);
   setFiltersFromUISettings();
@@ -814,6 +823,13 @@ onMounted(() => {
   if (hasActiveFolders.value) {
     store.dispatch('campaigns/get');
   }
+  presenceInterval = setInterval(subscribePresenceForTopChats, 60000);
+});
+
+watch(conversationList, subscribePresenceForTopChats);
+
+onBeforeUnmount(() => {
+  if (presenceInterval) clearInterval(presenceInterval);
 });
 
 const deleteConversationDialogRef = ref(null);

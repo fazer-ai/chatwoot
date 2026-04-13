@@ -46,8 +46,9 @@ class ChannelListener < BaseListener
   private
 
   def handle_typing_event(event)
-    is_private, conversation = event.data.values_at(:is_private, :conversation)
+    is_private, conversation, user = event.data.values_at(:is_private, :conversation, :user)
     return if is_private
+    return if user.is_a?(Contact)
 
     channel = conversation.inbox.channel
     return unless channel.respond_to?(:toggle_typing_status)

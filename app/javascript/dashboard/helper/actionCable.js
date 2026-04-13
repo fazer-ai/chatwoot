@@ -23,6 +23,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'assignee.changed': this.onAssigneeChanged,
       'conversation.typing_on': this.onTypingOn,
       'conversation.typing_off': this.onTypingOff,
+      'conversation.recording': this.onRecording,
       'conversation.contact_changed': this.onConversationContactChange,
       'presence.update': this.onPresenceUpdate,
       'contact.deleted': this.onContactDelete,
@@ -176,7 +177,18 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.clearTimer(conversationId);
     this.app.$store.dispatch('conversationTypingStatus/create', {
       conversationId,
-      user,
+      user: { ...user, recording: false },
+    });
+    this.initTimer({ conversation, user });
+  };
+
+  onRecording = ({ conversation, user }) => {
+    const conversationId = conversation.id;
+
+    this.clearTimer(conversationId);
+    this.app.$store.dispatch('conversationTypingStatus/create', {
+      conversationId,
+      user: { ...user, recording: true },
     });
     this.initTimer({ conversation, user });
   };

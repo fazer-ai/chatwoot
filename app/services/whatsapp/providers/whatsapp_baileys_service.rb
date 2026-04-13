@@ -47,7 +47,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        autoPresenceSubscribe: whatsapp_channel.provider_config['presence_subscribe'] || false
       }.compact.to_json
     )
 
@@ -309,6 +310,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     raise ProviderUnavailableError unless process_response(response)
 
     true
+  end
+
+  def presence_subscribe(jids)
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/presence-subscribe",
+      headers: api_headers,
+      body: { jids: Array(jids) }.to_json
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    response.parsed_response&.dig('data')
   end
 
   def update_presence(status)
@@ -848,6 +861,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :disconnect_channel_provider,
                       :send_message,
                       :toggle_typing_status,
+                      :presence_subscribe,
                       :update_presence,
                       :read_messages,
                       :unread_message,

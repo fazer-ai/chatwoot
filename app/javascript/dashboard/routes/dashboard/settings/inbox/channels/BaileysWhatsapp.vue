@@ -22,6 +22,7 @@ const apiKey = ref('');
 const providerUrl = ref('');
 const showAdvancedOptions = ref(false);
 const markAsRead = ref(true);
+const presenceSubscribe = ref(false);
 
 const uiFlags = computed(() => store.getters['inboxes/getUIFlags']);
 
@@ -51,6 +52,7 @@ const createChannel = async () => {
   try {
     const providerConfig = {
       mark_as_read: markAsRead.value,
+      presence_subscribe: presenceSubscribe.value,
     };
 
     if (apiKey.value || providerUrl.value) {
@@ -166,6 +168,17 @@ const setShowAdvancedOptions = () => {
               {{ $t('INBOX_MGMT.ADD.WHATSAPP.MARK_AS_READ.LABEL') }}
             </span>
             <Switch id="markAsRead" v-model="markAsRead" />
+          </div>
+        </label>
+      </div>
+
+      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+        <label>
+          <div class="flex mb-2 items-center">
+            <span class="mr-2 text-sm">
+              {{ $t('INBOX_MGMT.ADD.WHATSAPP.PRESENCE_SUBSCRIBE.LABEL') }}
+            </span>
+            <Switch id="presenceSubscribe" v-model="presenceSubscribe" />
           </div>
         </label>
       </div>

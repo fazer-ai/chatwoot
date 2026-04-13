@@ -204,6 +204,7 @@ const actions = {
         // Ignore error
       }
     }
+    ConversationApi.presenceSubscribe(data.id).catch(() => {});
   },
 
   assignAgent: async ({ dispatch }, { conversationId, agentId }) => {

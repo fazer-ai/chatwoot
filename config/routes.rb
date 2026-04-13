@@ -127,6 +127,7 @@ Rails.application.routes.draw do
               get :meta
               get :search
               post :filter
+              post :presence_subscribe_bulk
             end
             scope module: :conversations do
               resources :messages, only: [:index, :create, :destroy, :update] do
@@ -152,6 +153,7 @@ Rails.application.routes.draw do
               post :toggle_status
               post :toggle_priority
               post :toggle_typing_status
+              post :presence_subscribe
               post :update_last_seen
               post :unread
               post :custom_attributes

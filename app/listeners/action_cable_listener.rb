@@ -154,6 +154,22 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     )
   end
 
+  def conversation_recording(event)
+    conversation = event.data[:conversation]
+    account = conversation.account
+    user = event.data[:user]
+    tokens = typing_event_listener_tokens(account, conversation, user)
+
+    broadcast(
+      account,
+      tokens,
+      CONVERSATION_RECORDING,
+      conversation: conversation.push_event_data,
+      user: user.push_event_data,
+      is_private: event.data[:is_private] || false
+    )
+  end
+
   def conversation_typing_off(event)
     conversation = event.data[:conversation]
     account = conversation.account

@@ -56,6 +56,7 @@ export default {
       baileysProviderUrl: '',
       showLinkDeviceModal: false,
       markAsRead: true,
+      presenceSubscribe: false,
       zapiInstanceId: '',
       zapiToken: '',
       zapiClientToken: '',
@@ -116,6 +117,8 @@ export default {
       });
       this.baileysProviderUrl = this.inbox.provider_config?.provider_url ?? '';
       this.markAsRead = this.inbox.provider_config?.mark_as_read ?? true;
+      this.presenceSubscribe =
+        this.inbox.provider_config?.presence_subscribe ?? false;
       this.zapiInstanceId = this.inbox.provider_config?.instance_id ?? '';
       this.zapiToken = this.inbox.provider_config?.token ?? '';
       this.zapiClientToken = this.inbox.provider_config?.client_token ?? '';
@@ -245,6 +248,24 @@ export default {
             provider_config: {
               ...this.inbox.provider_config,
               mark_as_read: this.markAsRead,
+            },
+          },
+        };
+        await this.$store.dispatch('inboxes/updateInbox', payload);
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+      } catch (error) {
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+      }
+    },
+    async updatePresenceSubscribe() {
+      try {
+        const payload = {
+          id: this.inbox.id,
+          formData: false,
+          channel: {
+            provider_config: {
+              ...this.inbox.provider_config,
+              presence_subscribe: this.presenceSubscribe,
             },
           },
         };
@@ -713,6 +734,27 @@ export default {
           />
           <label for="markAsRead">
             {{ $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MARK_AS_READ_LABEL') }}
+          </label>
+        </div>
+      </SettingsSection>
+      <SettingsSection
+        :title="
+          $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_PRESENCE_SUBSCRIBE_TITLE')
+        "
+        :sub-title="
+          $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER')
+        "
+      >
+        <div class="flex items-center gap-2">
+          <Switch
+            id="presenceSubscribe"
+            v-model="presenceSubscribe"
+            @change="updatePresenceSubscribe"
+          />
+          <label for="presenceSubscribe">
+            {{
+              $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_PRESENCE_SUBSCRIBE_LABEL')
+            }}
           </label>
         </div>
       </SettingsSection>

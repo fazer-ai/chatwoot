@@ -299,6 +299,9 @@
         "MARK_AS_READ": {
           "LABEL": "Enviar confirmações de leitura"
         },
+        "PRESENCE_SUBSCRIBE": {
+          "LABEL": "Mostrar indicadores de digitação do contato"
+        },
         "INSTANCE_ID": {
           "LABEL": "ID da instância",
           "PLACEHOLDER": "Por favor, insira o ID da sua instância",
@@ -833,6 +836,9 @@
       "WHATSAPP_MARK_AS_READ_TITLE": "Confirmações de leitura",
       "WHATSAPP_MARK_AS_READ_SUBHEADER": "Se essa opção estiver desativada, ao visualizar uma mensagem pelo Chatwoot, não será enviada uma confirmação de leitura para o remetente. As suas mensagens ainda poderão receber confirmações de leitura.",
       "WHATSAPP_MARK_AS_READ_LABEL": "Enviar confirmações de leitura",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_TITLE": "Indicadores de digitação do contato",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "Quando ativado, você verá indicadores de digitação na conversa quando um contato do WhatsApp estiver digitando ou gravando áudio. Requer reconectar o canal para entrar em vigor.",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_LABEL": "Mostrar indicadores de digitação do contato",
       "WHATSAPP_INSTANCE_ID_TITLE": "ID da Instância",
       "WHATSAPP_INSTANCE_ID_SUBHEADER": "Seu ID da Instância Z-API.",
       "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Atualizar ID da Instância",

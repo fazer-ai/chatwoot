@@ -90,6 +90,16 @@ class ConversationApi extends ApiClient {
     });
   }
 
+  presenceSubscribe(conversationId) {
+    return axios.post(`${this.url}/${conversationId}/presence_subscribe`);
+  }
+
+  presenceSubscribeBulk(conversationIds) {
+    return axios.post(`${this.url}/presence_subscribe_bulk`, {
+      conversation_ids: conversationIds,
+    });
+  }
+
   mute(conversationId) {
     return axios.post(`${this.url}/${conversationId}/mute`);
   }

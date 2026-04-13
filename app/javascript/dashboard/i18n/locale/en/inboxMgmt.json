@@ -299,6 +299,9 @@
         "MARK_AS_READ": {
           "LABEL": "Send read receipts"
         },
+        "PRESENCE_SUBSCRIBE": {
+          "LABEL": "Show contact typing indicators"
+        },
         "INSTANCE_ID": {
           "LABEL": "Instance ID",
           "PLACEHOLDER": "Please enter your instance ID",
@@ -845,6 +848,9 @@
       "WHATSAPP_MARK_AS_READ_TITLE": "Read receipts",
       "WHATSAPP_MARK_AS_READ_SUBHEADER": "If turned off, when a message is viewed in Chatwoot, a read receipt will not be sent to the sender. Your messages will still be able to receive read receipts from the sender.",
       "WHATSAPP_MARK_AS_READ_LABEL": "Send read receipts",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_TITLE": "Contact typing indicators",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "When enabled, you will see typing indicators in the conversation when a WhatsApp contact is typing or recording audio. Requires reconnecting the channel to take effect.",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_LABEL": "Show contact typing indicators",
       "WHATSAPP_INSTANCE_ID_TITLE": "Instance ID",
       "WHATSAPP_INSTANCE_ID_SUBHEADER": "Your Z-API Instance ID.",
       "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Update Instance ID",
