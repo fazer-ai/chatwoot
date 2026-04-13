@@ -806,9 +806,13 @@ useEmitter('fetch_conversation_stats', () => {
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
+let lastSubscribedIds = '';
 const subscribePresenceForTopChats = () => {
   const ids = conversationList.value.slice(0, 10).map(c => c.id);
-  if (ids.length) ConversationAPI.presenceSubscribeBulk(ids).catch(() => {});
+  const key = ids.join(',');
+  if (!ids.length || key === lastSubscribedIds) return;
+  lastSubscribedIds = key;
+  ConversationAPI.presenceSubscribeBulk(ids).catch(() => {});
 };
 
 let presenceInterval = null;

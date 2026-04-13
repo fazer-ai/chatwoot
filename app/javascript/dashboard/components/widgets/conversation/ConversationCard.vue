@@ -114,9 +114,12 @@ const isInboxNameVisible = computed(() => !activeInbox.value);
 const lastMessageInChat = computed(() => getLastMessage(props.chat));
 
 const { t } = useI18n();
-const typingUsersList = computed(() =>
-  store.getters['conversationTypingStatus/getUserList'](props.chat.id)
-);
+const typingUsersList = computed(() => {
+  const users = store.getters['conversationTypingStatus/getUserList'](
+    props.chat.id
+  );
+  return users.filter(u => u.type === 'contact');
+});
 const isAnyoneTyping = computed(() => typingUsersList.value.length > 0);
 const typingPreviewText = computed(() => {
   if (!isAnyoneTyping.value) return '';
