@@ -16,8 +16,10 @@ module Whatsapp::BaileysHandlers::PresenceUpdate
   end
 
   def extract_presence_identifiers(data)
-    lid = extract_jid_user(data[:id]) if data[:id]&.include?('@lid')
-    phone = extract_jid_user(data[:jidAlt]) if data[:jidAlt].present?
+    jid = data[:id]
+    lid = extract_jid_user(jid) if jid&.include?('@lid')
+    phone = extract_jid_user(jid) if jid&.include?('@s.whatsapp.net')
+    phone ||= extract_jid_user(data[:jidAlt]) if data[:jidAlt].present?
     [lid, phone]
   end
 
