@@ -316,7 +316,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/presence-subscribe",
       headers: api_headers,
-      body: { jids: Array(jids) }.to_json
+      body: { jids: Array(jids) }.to_json,
+      timeout: 10
     )
 
     raise ProviderUnavailableError unless process_response(response)
