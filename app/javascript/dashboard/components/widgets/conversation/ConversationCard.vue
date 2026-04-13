@@ -370,6 +370,7 @@ const deleteConversation = () => {
         v-else-if="isAnyoneTyping"
         key="typing-preview"
         class="text-green-500 text-sm font-medium my-0 mx-2 leading-6 h-6 flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+        :class="messagePreviewClass"
       >
         {{ typingPreviewText }}
       </p>

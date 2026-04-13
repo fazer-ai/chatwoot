@@ -14,22 +14,21 @@ describe Conversations::PresenceSubscribeService do
   let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345') }
   let!(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox) }
 
+  let(:presence_subscribe_url) { "https://baileys.api/connections/#{whatsapp_channel.phone_number}/presence-subscribe" }
+  let(:setup_url) { "https://baileys.api/connections/#{whatsapp_channel.phone_number}" }
+  let(:json_headers) { { 'Content-Type' => 'application/json' } }
+
   before do
-    stub_request(:post, "https://baileys.api/connections/#{whatsapp_channel.phone_number}")
-      .to_return(status: 200, body: {}.to_json)
+    stub_request(:post, setup_url).to_return(status: 200, body: {}.to_json)
+    stub_request(:post, presence_subscribe_url)
+      .to_return(status: 200, body: { data: { subscribed: [], skipped: [] } }.to_json, headers: json_headers)
   end
 
   describe '#perform' do
     context 'when presence_subscribe is enabled' do
       let(:presence_enabled) { true }
 
-      let(:presence_subscribe_url) { "https://baileys.api/connections/#{whatsapp_channel.phone_number}/presence-subscribe" }
-      let(:json_headers) { { 'Content-Type' => 'application/json' } }
-
-      it 'calls presence_subscribe on the channel with the contact JID' do
-        stub_request(:post, presence_subscribe_url)
-          .to_return(status: 200, body: { data: { subscribed: ['12345@lid'], skipped: [] } }.to_json, headers: json_headers)
-
+      it 'calls presence_subscribe with the contact JID' do
         described_class.new(account, [conversation.display_id]).perform
 
         expect(WebMock).to have_requested(:post, presence_subscribe_url)
@@ -38,9 +37,6 @@ describe Conversations::PresenceSubscribeService do
 
       it 'falls back to phone JID when identifier is blank' do
         contact.update!(identifier: nil)
-        stub_request(:post, presence_subscribe_url)
-          .to_return(status: 200, body: { data: { subscribed: [], skipped: [] } }.to_json, headers: json_headers)
-
         described_class.new(account, [conversation.display_id]).perform
 
         expect(WebMock).to have_requested(:post, presence_subscribe_url)
@@ -49,8 +45,9 @@ describe Conversations::PresenceSubscribeService do
 
       it 'skips contacts with no identifier or phone' do
         contact.update!(identifier: nil, phone_number: nil)
-        expect(whatsapp_channel).not_to receive(:presence_subscribe)
         described_class.new(account, [conversation.display_id]).perform
+
+        expect(WebMock).not_to have_requested(:post, presence_subscribe_url)
       end
 
       it 'limits to 10 conversation IDs' do
@@ -64,8 +61,9 @@ describe Conversations::PresenceSubscribeService do
       let(:presence_enabled) { false }
 
       it 'does not call presence_subscribe' do
-        expect(whatsapp_channel).not_to receive(:presence_subscribe)
         described_class.new(account, [conversation.display_id]).perform
+
+        expect(WebMock).not_to have_requested(:post, presence_subscribe_url)
       end
     end
 
@@ -79,17 +77,19 @@ describe Conversations::PresenceSubscribeService do
       end
 
       it 'skips non-WhatsApp conversations' do
-        expect(whatsapp_channel).not_to receive(:presence_subscribe)
         described_class.new(account, [web_conversation.display_id]).perform
+
+        expect(WebMock).not_to have_requested(:post, presence_subscribe_url)
       end
     end
 
     context 'with blank conversation_ids' do
       let(:presence_enabled) { true }
 
-      it 'returns early' do
-        expect(whatsapp_channel).not_to receive(:presence_subscribe)
+      it 'returns early without any HTTP calls' do
         described_class.new(account, []).perform
+
+        expect(WebMock).not_to have_requested(:post, presence_subscribe_url)
       end
     end
   end
