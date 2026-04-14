@@ -161,11 +161,17 @@ const showLabelsSection = computed(() => {
   return props.chat.labels?.length > 0 || hasSlaPolicyId.value;
 });
 
+const messagePreviewPaddingClass = computed(() => {
+  return [
+    !props.compact && hasUnread.value ? 'ltr:pr-4 rtl:pl-4' : '',
+    props.compact && hasUnread.value ? 'ltr:pr-6 rtl:pl-6' : '',
+  ];
+});
+
 const messagePreviewClass = computed(() => {
   return [
     hasUnread.value ? 'font-medium text-n-slate-12' : 'text-n-slate-11',
-    !props.compact && hasUnread.value ? 'ltr:pr-4 rtl:pl-4' : '',
-    props.compact && hasUnread.value ? 'ltr:pr-6 rtl:pl-6' : '',
+    ...messagePreviewPaddingClass.value,
   ];
 });
 
@@ -370,7 +376,7 @@ const deleteConversation = () => {
         v-else-if="isAnyoneTyping"
         key="typing-preview"
         class="text-green-500 text-sm font-medium my-0 mx-2 leading-6 h-6 flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-        :class="messagePreviewClass"
+        :class="messagePreviewPaddingClass"
       >
         {{ typingPreviewText }}
       </p>
