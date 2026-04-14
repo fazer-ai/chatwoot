@@ -1,6 +1,7 @@
 module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
   extend ActiveSupport::Concern
   include Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
+  include Events::Types
 
   private
 
@@ -30,9 +31,23 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
 
       set_conversation
       handle_create_message
+      dispatch_incoming_typing_off
     end
   ensure
     clear_message_source_id_from_redis if @lock_acquired
+  end
+
+  def dispatch_incoming_typing_off
+    return unless incoming?
+    return unless @conversation && @contact
+
+    Rails.configuration.dispatcher.dispatch(
+      CONVERSATION_TYPING_OFF,
+      Time.zone.now,
+      conversation: @conversation,
+      user: @contact,
+      is_private: false
+    )
   end
 
   def set_contact
