@@ -1397,13 +1397,21 @@ RSpec.describe 'Inboxes API', type: :request do
     end
 
     context 'when authenticated as an administrator' do
-      it 'converts the channel to the new provider' do
+      it 'converts the channel to the new provider' do # rubocop:disable RSpec/MultipleExpectations
         post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
              headers: admin.create_new_auth_token,
              params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
              as: :json
 
         expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body['provider']).to eq('whatsapp_cloud')
+        expect(body['provider_config']).to include(
+          'api_key' => 'new_cloud_key',
+          'phone_number_id' => 'new_phone_id',
+          'business_account_id' => 'new_waba_id'
+        )
+        expect(body['provider_config']).not_to have_key('provider_url')
         channel.reload
         expect(channel.provider).to eq('whatsapp_cloud')
         expect(channel.provider_config).to include(
