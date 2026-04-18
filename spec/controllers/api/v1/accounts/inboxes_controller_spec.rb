@@ -1414,6 +1414,7 @@ RSpec.describe 'Inboxes API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to match(/does not support provider conversion/i)
       end
 
       it 'returns 422 when the new provider config is invalid' do
@@ -1426,6 +1427,7 @@ RSpec.describe 'Inboxes API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/invalid credentials/i)
       end
     end
   end
