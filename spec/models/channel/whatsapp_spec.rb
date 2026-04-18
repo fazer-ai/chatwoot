@@ -726,6 +726,66 @@ RSpec.describe Channel::Whatsapp do
       expect(fresh_channel.message_templates_last_updated).to be_nil
       expect(Rails.logger).to have_received(:error).with(/Post-conversion template sync failed.*boom/)
     end
+
+    context 'when converting from whatsapp_cloud to baileys' do
+      let(:cloud_channel) do
+        create(:channel_whatsapp,
+               provider: 'whatsapp_cloud',
+               provider_config: {
+                 'source' => 'embedded_signup',
+                 'api_key' => 'old_key',
+                 'phone_number_id' => 'old_phone_id',
+                 'business_account_id' => 'old_waba_id'
+               },
+               validate_provider_config: false,
+               sync_templates: false)
+      end
+      let(:new_baileys_config) { { 'provider_url' => 'https://baileys.api', 'api_key' => 'new_baileys_key' } }
+
+      before do
+        stub_request(:delete, %r{https://baileys\.api/connections/.*})
+          .to_return(status: 200)
+      end
+
+      it 'invokes WebhookTeardownService on the old cloud channel before swapping' do
+        teardown_service = instance_double(Whatsapp::WebhookTeardownService, perform: nil)
+        allow(Whatsapp::WebhookTeardownService).to receive(:new).with(cloud_channel).and_return(teardown_service)
+
+        cloud_channel.convert_provider!(new_provider: 'baileys', new_provider_config: new_baileys_config)
+
+        expect(Whatsapp::WebhookTeardownService).to have_received(:new).with(cloud_channel)
+        expect(teardown_service).to have_received(:perform)
+      end
+
+      it 'swallows and logs errors raised by pre-conversion webhook teardown' do
+        teardown_service = instance_double(Whatsapp::WebhookTeardownService)
+        allow(Whatsapp::WebhookTeardownService).to receive(:new).with(cloud_channel).and_return(teardown_service)
+        allow(teardown_service).to receive(:perform).and_raise(StandardError, 'teardown boom')
+        allow(Rails.logger).to receive(:error)
+
+        expect do
+          cloud_channel.convert_provider!(new_provider: 'baileys', new_provider_config: new_baileys_config)
+        end.not_to raise_error
+
+        cloud_channel.reload
+        expect(cloud_channel.provider).to eq('baileys')
+        expect(Rails.logger).to have_received(:error).with(/Pre-conversion webhook teardown failed.*teardown boom/)
+      end
+
+      it 'resets the teardown guard so a subsequent destroy still tears down webhooks' do
+        teardown_service = instance_double(Whatsapp::WebhookTeardownService, perform: nil)
+        allow(Whatsapp::WebhookTeardownService).to receive(:new).and_return(teardown_service)
+
+        cloud_channel.convert_provider!(new_provider: 'baileys', new_provider_config: new_baileys_config)
+        # The convert path no longer matches the teardown branch (provider is
+        # now baileys), so destroy! hitting teardown_webhooks again proves the
+        # `@webhook_teardown_initiated` guard was reset by the ensure block.
+        cloud_channel.destroy!
+
+        # One teardown from the pre-conversion branch, one from destroy.
+        expect(teardown_service).to have_received(:perform).twice
+      end
+    end
   end
 
   describe '#sync_group' do
