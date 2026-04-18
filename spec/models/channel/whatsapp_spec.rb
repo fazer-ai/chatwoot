@@ -570,6 +570,8 @@ RSpec.describe Channel::Whatsapp do
         .to_return(status: 200)
       stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+//?message_templates})
         .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
+      stub_request(:delete, %r{graph\.facebook\.com/v\d+\.\d+/.*/subscribed_apps})
+        .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
       webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
       allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
     end
@@ -668,16 +670,19 @@ RSpec.describe Channel::Whatsapp do
     end
 
     it 'rejects no-op conversions targeting the current provider' do
+      original_templates_count = channel.message_templates.count
+
       expect do
         channel.convert_provider!(new_provider: 'baileys', new_provider_config: channel.provider_config)
       end.to(raise_error { |error| expect(error.class.name).to eq('ActiveRecord::RecordInvalid') })
 
       channel.reload
       expect(channel.provider_connection).to eq('connection' => 'open')
-      expect(channel.message_templates).to be_present
+      expect(channel.message_templates.count).to eq(original_templates_count)
     end
 
     it 'aborts and does not persist the new provider when the disconnect fails' do
+      original_templates_count = channel.message_templates.count
       baileys_service = instance_double(Whatsapp::Providers::WhatsappBaileysService)
       allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).and_return(baileys_service)
       allow(baileys_service).to receive(:disconnect_channel_provider).and_raise(StandardError, 'boom')
@@ -688,7 +693,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.reload
       expect(channel.provider).to eq('baileys')
-      expect(channel.message_templates).to be_present
+      expect(channel.message_templates.count).to eq(original_templates_count)
     end
 
     it 'swallows and logs errors raised by post-conversion template sync' do

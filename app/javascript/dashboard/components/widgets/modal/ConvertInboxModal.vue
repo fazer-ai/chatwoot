@@ -33,6 +33,7 @@ const localShow = computed({
 
 const closeModal = () => {
   value.value = '';
+  v$.value.$reset();
   emit('onClose');
 };
 

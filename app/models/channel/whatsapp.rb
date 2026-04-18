@@ -128,7 +128,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
-  def convert_provider!(new_provider:, new_provider_config:) # rubocop:disable Metrics/MethodLength
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def convert_provider!(new_provider:, new_provider_config:)
     # Snapshot the old state so we can restore it while running the disconnect
     # against the previous provider's endpoint.
     previous_provider = provider
@@ -154,6 +155,17 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     # disconnect propagates and aborts the conversion instead of silently
     # leaving the old session alive while the inbox points at the new provider.
     assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
+    # When converting away from whatsapp_cloud, mirror the destroy-time cleanup
+    # so the Meta webhook subscription is torn down (embedded_signup source);
+    # manual-setup channels follow the same no-op behavior as on destruction.
+    # A teardown failure on a best-effort cleanup should not abort the swap.
+    if previous_provider == 'whatsapp_cloud'
+      begin
+        teardown_webhooks
+      rescue StandardError => e
+        Rails.logger.error "[WHATSAPP] Pre-conversion webhook teardown failed: #{e.message}"
+      end
+    end
     provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
 
     transaction do
@@ -177,6 +189,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
     self
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
   def received_messages(messages, conversation)
     return unless provider_service.respond_to?(:received_messages)
