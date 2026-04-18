@@ -30,6 +30,7 @@ import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue'
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import SpinnerLoader from 'dashboard/components-next/spinner/Spinner.vue';
+import ConvertInboxModal from 'dashboard/components/widgets/modal/ConvertInboxModal.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
@@ -61,6 +62,7 @@ export default {
     GoogleReauthorize,
     NextButton,
     SpinnerLoader,
+    ConvertInboxModal,
     InstagramReauthorize,
     TiktokReauthorize,
     WhatsappReauthorize,
@@ -106,6 +108,7 @@ export default {
       widgetBubblePosition: 'right',
       widgetBubbleType: 'standard',
       widgetBubbleLauncherTitle: '',
+      showConvertGate: false,
     };
   },
   computed: {
@@ -138,6 +141,9 @@ export default {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI');
       }
       return '';
+    },
+    isConvertibleWhatsAppChannel() {
+      return this.isAWhatsAppChannel && !this.isATwilioWhatsAppChannel;
     },
     tabs() {
       let visibleToAllChannelTabs = [
@@ -599,6 +605,19 @@ export default {
     toggleLockToSingleConversation(value) {
       this.locktoSingleConversation = value;
     },
+    openConvertGate() {
+      this.showConvertGate = true;
+    },
+    closeConvertGate() {
+      this.showConvertGate = false;
+    },
+    goToConvert() {
+      this.showConvertGate = false;
+      this.$router.push({
+        name: 'settings_inbox_convert',
+        params: { inboxId: this.inbox.id },
+      });
+    },
   },
   validations: {
     webhookUrl: {
@@ -786,12 +805,21 @@ export default {
               v-if="isAWhatsAppChannel"
               :label="$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.LABEL')"
             >
-              <input
-                v-model="whatsAppAPIProviderName"
-                type="text"
-                disabled
-                class="!mb-0"
-              />
+              <div class="flex items-center gap-2 w-full">
+                <input
+                  v-model="whatsAppAPIProviderName"
+                  type="text"
+                  disabled
+                  class="!mb-0 flex-1"
+                />
+                <NextButton
+                  v-if="isConvertibleWhatsAppChannel"
+                  amber
+                  sm
+                  :label="$t('INBOX_MGMT.CONVERT.BUTTON')"
+                  @click="openConvertGate"
+                />
+              </div>
             </SettingsFieldSection>
 
             <SettingsFieldSection
@@ -1244,5 +1272,13 @@ export default {
         </div>
       </div>
     </section>
+    <ConvertInboxModal
+      v-if="showConvertGate"
+      v-model:show="showConvertGate"
+      :inbox-name="inbox.name"
+      :current-provider="whatsAppAPIProviderName"
+      @on-confirm="goToConvert"
+      @on-close="closeConvertGate"
+    />
   </div>
 </template>

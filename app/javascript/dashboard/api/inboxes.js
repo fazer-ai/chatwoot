@@ -72,6 +72,13 @@ class Inboxes extends CacheEnabledApiClient {
   disconnectChannelProvider(inboxId) {
     return axios.post(`${this.url}/${inboxId}/disconnect_channel_provider`);
   }
+
+  convertProvider(inboxId, { provider, providerConfig }) {
+    return axios.post(`${this.url}/${inboxId}/convert_provider`, {
+      provider,
+      provider_config: providerConfig,
+    });
+  }
 }
 
 export default new Inboxes();

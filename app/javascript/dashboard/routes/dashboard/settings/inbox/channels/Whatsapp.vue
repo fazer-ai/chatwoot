@@ -11,6 +11,20 @@ import BaileysWhatsapp from './BaileysWhatsapp.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
 import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
 
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: value => ['create', 'convert'].includes(value),
+  },
+  inbox: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isConvertMode = computed(() => props.mode === 'convert');
+
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
@@ -38,6 +52,29 @@ const selectedProvider = computed(() => route.query.provider);
 const showProviderSelection = computed(() => !selectedProvider.value);
 
 const showConfiguration = computed(() => Boolean(selectedProvider.value));
+
+const INBOX_PROVIDER_TO_KEY = {
+  whatsapp_cloud: PROVIDER_TYPES.WHATSAPP,
+  default: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+  baileys: PROVIDER_TYPES.BAILEYS,
+  zapi: PROVIDER_TYPES.ZAPI,
+};
+
+const currentProviderKey = computed(() => {
+  if (!props.inbox?.provider) return null;
+  return INBOX_PROVIDER_TO_KEY[props.inbox.provider] || null;
+});
+
+const currentProviderLabel = computed(() => {
+  if (!isConvertMode.value || !props.inbox) return '';
+  const map = {
+    whatsapp_cloud: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
+    default: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
+    baileys: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
+    zapi: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI'),
+  };
+  return map[props.inbox.provider] || '';
+});
 
 const availableProviders = computed(() => {
   const providers = [
@@ -67,7 +104,12 @@ const availableProviders = computed(() => {
     },
   ];
 
-  return providers;
+  if (!isConvertMode.value) return providers;
+  // In convert mode, Twilio lives on a different channel model and the current
+  // provider cannot be "converted to itself".
+  return providers.filter(
+    p => p.key !== PROVIDER_TYPES.TWILIO && p.key !== currentProviderKey.value
+  );
 });
 
 const selectProvider = providerValue => {
@@ -81,7 +123,8 @@ const selectProvider = providerValue => {
 const shouldShowCloudWhatsapp = provider => {
   return (
     provider === PROVIDER_TYPES.WHATSAPP_MANUAL ||
-    (provider === PROVIDER_TYPES.WHATSAPP && !hasWhatsappAppId.value)
+    (provider === PROVIDER_TYPES.WHATSAPP &&
+      (!hasWhatsappAppId.value || isConvertMode.value))
   );
 };
 
@@ -95,10 +138,21 @@ const handleManualLinkClick = () => {
     <div v-if="showProviderSelection">
       <div class="mb-10 text-left">
         <h1 class="mb-2 text-lg font-medium text-n-slate-12">
-          {{ $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.TITLE') }}
+          {{
+            isConvertMode
+              ? $t('INBOX_MGMT.CONVERT.SELECT_PROVIDER_TITLE')
+              : $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.TITLE')
+          }}
         </h1>
         <p class="text-sm leading-relaxed text-n-slate-11">
-          {{ $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION') }}
+          {{
+            isConvertMode
+              ? $t('INBOX_MGMT.CONVERT.SELECT_PROVIDER_DESCRIPTION', {
+                  inboxName: inbox?.name,
+                  currentProvider: currentProviderLabel,
+                })
+              : $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION')
+          }}
         </p>
       </div>
 
@@ -113,7 +167,7 @@ const handleManualLinkClick = () => {
         />
       </div>
 
-      <div class="mt-6 relative overflow-visible">
+      <div v-if="!isConvertMode" class="mt-6 relative overflow-visible">
         <img
           src="~dashboard/assets/images/curved-arrow.svg"
           alt=""
@@ -142,7 +196,9 @@ const handleManualLinkClick = () => {
         <!-- Show embedded signup if app ID is configured -->
         <div
           v-if="
-            hasWhatsappAppId && selectedProvider === PROVIDER_TYPES.WHATSAPP
+            !isConvertMode &&
+            hasWhatsappAppId &&
+            selectedProvider === PROVIDER_TYPES.WHATSAPP
           "
         >
           <WhatsappEmbeddedSignup />
@@ -172,7 +228,11 @@ const handleManualLinkClick = () => {
         </div>
 
         <!-- Show manual setup -->
-        <CloudWhatsapp v-else-if="shouldShowCloudWhatsapp(selectedProvider)" />
+        <CloudWhatsapp
+          v-else-if="shouldShowCloudWhatsapp(selectedProvider)"
+          :mode="mode"
+          :inbox="inbox"
+        />
 
         <!-- Other providers -->
         <Twilio
@@ -181,14 +241,24 @@ const handleManualLinkClick = () => {
         />
         <ThreeSixtyDialogWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.THREE_SIXTY_DIALOG"
+          :mode="mode"
+          :inbox="inbox"
         />
         <CloudWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.WHATSAPP"
+          :mode="mode"
+          :inbox="inbox"
         />
         <BaileysWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.BAILEYS"
+          :mode="mode"
+          :inbox="inbox"
         />
-        <ZapiWhatsapp v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI" />
+        <ZapiWhatsapp
+          v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI"
+          :mode="mode"
+          :inbox="inbox"
+        />
       </div>
     </div>
   </div>

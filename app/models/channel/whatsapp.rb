@@ -128,6 +128,33 @@ class Channel::Whatsapp < ApplicationRecord
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
+  def convert_provider!(new_provider:, new_provider_config:)
+    transaction do
+      # Disconnect the current provider session before swapping credentials so
+      # the disconnect call still has access to the old provider_config.
+      disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+
+      assign_attributes(
+        provider: new_provider,
+        provider_config: new_provider_config || {},
+        provider_connection: {},
+        message_templates: {},
+        message_templates_last_updated: nil
+      )
+      save!
+    end
+
+    setup_webhooks if should_auto_setup_webhooks?
+
+    begin
+      sync_templates
+    rescue StandardError => e
+      Rails.logger.error "[WHATSAPP] Post-conversion template sync failed: #{e.message}"
+    end
+
+    self
+  end
+
   def received_messages(messages, conversation)
     return unless provider_service.respond_to?(:received_messages)
 

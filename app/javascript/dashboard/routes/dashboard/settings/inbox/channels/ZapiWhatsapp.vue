@@ -11,12 +11,28 @@ import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
 
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: value => ['create', 'convert'].includes(value),
+  },
+  inbox: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isConvertMode = computed(() => props.mode === 'convert');
+
 const router = useRouter();
 const store = useStore();
 const { t } = useI18n();
 
-const inboxName = ref('');
-const phoneNumber = ref('');
+const inboxName = ref(isConvertMode.value ? props.inbox?.name || '' : '');
+const phoneNumber = ref(
+  isConvertMode.value ? props.inbox?.phone_number || '' : ''
+);
 const instanceId = ref('');
 const token = ref('');
 const clientToken = ref('');
@@ -43,6 +59,12 @@ const v$ = useVuelidate(rules, {
   clientToken,
 });
 
+const buildProviderConfig = () => ({
+  instance_id: instanceId.value,
+  token: token.value,
+  client_token: clientToken.value,
+});
+
 const createChannel = async () => {
   v$.value.$touch();
   if (v$.value.$invalid) {
@@ -50,17 +72,28 @@ const createChannel = async () => {
   }
 
   try {
+    if (isConvertMode.value) {
+      await store.dispatch('inboxes/convertProvider', {
+        inboxId: props.inbox.id,
+        provider: 'zapi',
+        providerConfig: buildProviderConfig(),
+      });
+
+      useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
+      router.replace({
+        name: 'settings_inbox_show',
+        params: { inboxId: props.inbox.id },
+      });
+      return;
+    }
+
     const whatsappChannel = await store.dispatch('inboxes/createChannel', {
       name: inboxName.value,
       channel: {
         type: 'whatsapp',
         phone_number: phoneNumber.value,
         provider: 'zapi',
-        provider_config: {
-          instance_id: instanceId.value,
-          token: token.value,
-          client_token: clientToken.value,
-        },
+        provider_config: buildProviderConfig(),
       },
     });
 
@@ -72,14 +105,21 @@ const createChannel = async () => {
       },
     });
   } catch (error) {
-    useAlert(error.message || t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'));
+    useAlert(
+      error.message ||
+        t(
+          isConvertMode.value
+            ? 'INBOX_MGMT.CONVERT.API.ERROR_MESSAGE'
+            : 'INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'
+        )
+    );
   }
 };
 </script>
 
 <template>
   <form class="flex flex-wrap mx-0" @submit.prevent="createChannel()">
-    <div class="w-full mb-6">
+    <div v-if="!isConvertMode" class="w-full mb-6">
       <PromoBanner
         :title="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.TITLE')"
         :description="
@@ -100,6 +140,7 @@ const createChannel = async () => {
         <input
           v-model="inboxName"
           type="text"
+          :disabled="isConvertMode"
           :placeholder="$t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.PLACEHOLDER')"
           @blur="v$.inboxName.$touch"
         />
@@ -115,6 +156,7 @@ const createChannel = async () => {
         <input
           v-model="phoneNumber"
           type="text"
+          :disabled="isConvertMode"
           :placeholder="$t('INBOX_MGMT.ADD.WHATSAPP.PHONE_NUMBER.PLACEHOLDER')"
           @blur="v$.phoneNumber.$touch"
         />
@@ -171,11 +213,15 @@ const createChannel = async () => {
 
     <div class="w-full">
       <NextButton
-        :is-loading="uiFlags.isCreating"
+        :is-loading="uiFlags.isCreating || uiFlags.isUpdating"
         type="submit"
         solid
         blue
-        :label="$t('INBOX_MGMT.ADD.WHATSAPP.SUBMIT_BUTTON')"
+        :label="
+          isConvertMode
+            ? $t('INBOX_MGMT.CONVERT.SUBMIT_BUTTON')
+            : $t('INBOX_MGMT.ADD.WHATSAPP.SUBMIT_BUTTON')
+        "
       />
     </div>
   </form>

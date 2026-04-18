@@ -1349,6 +1349,80 @@ RSpec.describe 'Inboxes API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/convert_provider' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:inbox) { channel.inbox }
+    let(:new_cloud_config) do
+      { api_key: 'new_cloud_key', phone_number_id: 'new_phone_id', business_account_id: 'new_waba_id' }
+    end
+
+    before do
+      stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
+        .to_return(status: 200)
+      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*/message_templates.*})
+        .to_return(status: 200, body: { data: [] }.to_json)
+      webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
+      allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
+    end
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config }
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated as an agent' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: agent.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated as an administrator' do
+      it 'converts the channel to the new provider' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+        channel.reload
+        expect(channel.provider).to eq('whatsapp_cloud')
+        expect(channel.provider_config).to include('api_key' => 'new_cloud_key')
+      end
+
+      it 'returns 422 when the channel does not support conversion' do
+        other_inbox = create(:inbox, account: account)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{other_inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'returns 422 when the new provider config is invalid' do
+        cloud_service = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: false)
+        allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: { api_key: 'bad' } },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/on_whatsapp' do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }

@@ -682,6 +682,29 @@
         "AVATAR_ERROR_MESSAGE": "Could not delete the inbox avatar. Please try again later."
       }
     },
+    "CONVERT": {
+      "BUTTON": "Convert",
+      "CONFIRM": {
+        "TITLE": "Convert inbox provider",
+        "INTRO": "You are about to change the WhatsApp provider for '{inboxName}' (currently {currentProvider}). Before continuing, review what will happen:",
+        "EFFECT_DISCONNECT": "The current session with {currentProvider} will be disconnected.",
+        "EFFECT_TEMPLATES": "Message templates will be cleared and must be resynced on the new provider.",
+        "EFFECT_CONNECTION": "Provider connection state will be reset.",
+        "EFFECT_PRESERVED": "Conversations, messages, contacts, agent assignments and history are preserved.",
+        "EFFECT_IDENTITY": "Inbox name and phone number stay the same.",
+        "CONFIRM_PROMPT": "To confirm, type the inbox name below:",
+        "PLACE_HOLDER": "Type {inboxName} to continue",
+        "CONTINUE": "Continue to convert",
+        "CANCEL": "Cancel"
+      },
+      "SELECT_PROVIDER_TITLE": "Select the new provider",
+      "SELECT_PROVIDER_DESCRIPTION": "Converting '{inboxName}' from {currentProvider}. The current provider is hidden from the list below.",
+      "SUBMIT_BUTTON": "Convert inbox",
+      "API": {
+        "SUCCESS_MESSAGE": "Inbox successfully converted",
+        "ERROR_MESSAGE": "Could not convert inbox. Please check the credentials and try again."
+      }
+    },
     "TABS": {
       "SETTINGS": "Settings",
       "COLLABORATORS": "Collaborators",

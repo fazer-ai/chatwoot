@@ -552,6 +552,89 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe '#convert_provider!' do
+    let(:channel) do
+      create(:channel_whatsapp,
+             provider: 'baileys',
+             provider_connection: { 'connection' => 'open' },
+             validate_provider_config: false,
+             sync_templates: false)
+    end
+
+    let(:new_cloud_config) do
+      { 'api_key' => 'new_cloud_key', 'phone_number_id' => 'new_phone_id', 'business_account_id' => 'new_waba_id' }
+    end
+
+    before do
+      stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
+        .to_return(status: 200)
+      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+//?message_templates})
+        .to_return(status: 200, body: { data: [] }.to_json)
+      webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
+      allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
+    end
+
+    it 'swaps provider and provider_config atomically' do
+      channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+
+      channel.reload
+      expect(channel.provider).to eq('whatsapp_cloud')
+      expect(channel.provider_config).to include(new_cloud_config)
+    end
+
+    it 'clears provider_connection and message_templates' do
+      channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+
+      channel.reload
+      expect(channel.provider_connection).to eq({})
+      expect(channel.message_templates).to eq({})
+      expect(channel.message_templates_last_updated).to be_nil
+    end
+
+    it 'calls disconnect on the old provider when supported' do
+      disconnect_url = "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}"
+
+      channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+
+      expect(WebMock).to have_requested(:delete, disconnect_url)
+    end
+
+    it 'does not raise when the old provider has no disconnect method' do
+      cloud_channel = create(:channel_whatsapp,
+                             provider: 'whatsapp_cloud',
+                             provider_config: {
+                               'source' => 'embedded_signup',
+                               'api_key' => 'old_key',
+                               'phone_number_id' => 'old_phone_id',
+                               'business_account_id' => 'old_waba_id'
+                             },
+                             validate_provider_config: false,
+                             sync_templates: false)
+
+      expect do
+        cloud_channel.convert_provider!(
+          new_provider: 'baileys',
+          new_provider_config: { 'provider_url' => 'https://baileys.api', 'api_key' => 'k' }
+        )
+      end.not_to raise_error
+    end
+
+    it 'rolls back and raises when the new provider config is invalid' do
+      # The factory installs a singleton `validate_provider_config` stub that
+      # bypasses validation; reload from DB to get a clean instance.
+      fresh_channel = described_class.find(channel.id)
+      cloud_service = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: false)
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
+
+      expect do
+        fresh_channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: { 'api_key' => 'bad' })
+      end.to raise_error(ActiveRecord::RecordInvalid)
+
+      fresh_channel.reload
+      expect(fresh_channel.provider).to eq('baileys')
+    end
+  end
+
   describe '#sync_group' do
     it 'delegates to provider_service when it supports sync_group' do
       channel = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)

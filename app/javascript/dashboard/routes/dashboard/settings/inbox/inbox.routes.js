@@ -10,6 +10,7 @@ import InboxChannel from './InboxChannels.vue';
 import ChannelList from './ChannelList.vue';
 import AddAgents from './AddAgents.vue';
 import FinishSetup from './FinishSetup.vue';
+import InboxConvert from './InboxConvert.vue';
 
 export default {
   routes: [
@@ -92,6 +93,15 @@ export default {
               component: AddAgents,
             },
           ],
+        },
+        {
+          path: ':inboxId/convert',
+          name: 'settings_inbox_convert',
+          component: InboxConvert,
+          meta: {
+            featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
+            permissions: ['administrator'],
+          },
         },
         {
           path: ':inboxId/:tab?',

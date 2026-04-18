@@ -682,6 +682,29 @@
         "AVATAR_ERROR_MESSAGE": "Não foi possível excluir o perfil da caixa de entrada. Por favor, tente novamente mais tarde."
       }
     },
+    "CONVERT": {
+      "BUTTON": "Converter",
+      "CONFIRM": {
+        "TITLE": "Converter provedor da caixa de entrada",
+        "INTRO": "Você está prestes a trocar o provedor de WhatsApp de '{inboxName}' (atualmente {currentProvider}). Antes de continuar, revise o que vai acontecer:",
+        "EFFECT_DISCONNECT": "A sessão atual com {currentProvider} será desconectada.",
+        "EFFECT_TEMPLATES": "Modelos de mensagem serão limpos e precisarão ser re-sincronizados no novo provedor.",
+        "EFFECT_CONNECTION": "O estado de conexão do provedor será resetado.",
+        "EFFECT_PRESERVED": "Conversas, mensagens, contatos, atribuições de agentes e histórico são preservados.",
+        "EFFECT_IDENTITY": "O nome da caixa de entrada e o número de telefone permanecem os mesmos.",
+        "CONFIRM_PROMPT": "Para confirmar, digite o nome da caixa de entrada abaixo:",
+        "PLACE_HOLDER": "Digite {inboxName} para continuar",
+        "CONTINUE": "Continuar conversão",
+        "CANCEL": "Cancelar"
+      },
+      "SELECT_PROVIDER_TITLE": "Selecione o novo provedor",
+      "SELECT_PROVIDER_DESCRIPTION": "Convertendo '{inboxName}' de {currentProvider}. O provedor atual está oculto na lista abaixo.",
+      "SUBMIT_BUTTON": "Converter caixa de entrada",
+      "API": {
+        "SUCCESS_MESSAGE": "Caixa de entrada convertida com sucesso",
+        "ERROR_MESSAGE": "Não foi possível converter a caixa de entrada. Verifique as credenciais e tente novamente."
+      }
+    },
     "TABS": {
       "SETTINGS": "Configurações",
       "COLLABORATORS": "Agentes",

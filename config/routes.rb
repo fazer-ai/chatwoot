@@ -276,6 +276,7 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             post :setup_channel_provider, on: :member
             post :disconnect_channel_provider, on: :member
+            post :convert_provider, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
             get :health, on: :member

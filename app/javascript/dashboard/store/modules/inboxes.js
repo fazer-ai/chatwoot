@@ -296,6 +296,24 @@ export const actions = {
       throwErrorMessage(error);
     }
   },
+  convertProvider: async (
+    { commit },
+    { inboxId, provider, providerConfig }
+  ) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: true });
+    try {
+      const response = await InboxesAPI.convertProvider(inboxId, {
+        provider,
+        providerConfig,
+      });
+      commit(types.default.EDIT_INBOXES, response.data);
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return response.data;
+    } catch (error) {
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return throwErrorMessage(error);
+    }
+  },
   updateInboxIMAP: async ({ commit }, { id, ...inboxParams }) => {
     commit(types.default.SET_INBOXES_UI_FLAG, { isUpdatingIMAP: true });
     try {
