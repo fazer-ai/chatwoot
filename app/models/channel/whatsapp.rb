@@ -128,52 +128,56 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
-  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/BlockLength
   def convert_provider!(new_provider:, new_provider_config:)
-    # Snapshot the old state so we can restore it while running the disconnect
-    # against the previous provider's endpoint.
-    previous_provider = provider
-    previous_provider_config = provider_config.deep_dup
-    normalized_new_config = new_provider_config || {}
+    # Serialize concurrent conversions of the same inbox. Without the lock,
+    # two admin requests could both pass pre-validation, race the disconnect
+    # and save, and leave webhooks/templates mismatched with the persisted
+    # provider. `with_lock` issues SELECT FOR UPDATE and wraps the block in
+    # a transaction; the loser waits until the winner commits.
+    with_lock do
+      previous_provider = provider
+      previous_provider_config = provider_config.deep_dup
+      normalized_new_config = new_provider_config || {}
 
-    if new_provider == previous_provider
-      errors.add(:provider, 'must be different from the current provider')
-      raise ActiveRecord::RecordInvalid, self
-    end
-
-    # Pre-validate the new config without persisting, so we never terminate
-    # the current provider session for a known-bad target config.
-    assign_attributes(provider: new_provider, provider_config: normalized_new_config)
-    unless valid?
-      assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
-      raise ActiveRecord::RecordInvalid, self
-    end
-    # Snapshot provider_config AFTER valid? so we keep any fields populated by
-    # before_validation callbacks (e.g. ensure_webhook_verify_token). The final
-    # persist uses save!(validate: false), so we must not rely on a second
-    # validation pass to replay those callbacks.
-    validated_new_config = provider_config.deep_dup
-
-    # Validation passed. Restore the old state briefly so the disconnect call
-    # talks to the correct (old) endpoint, then reapply and persist the new
-    # state in a single transaction. We call the service directly so a failed
-    # disconnect propagates and aborts the conversion instead of silently
-    # leaving the old session alive while the inbox points at the new provider.
-    assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
-    # When converting away from whatsapp_cloud, mirror the destroy-time cleanup
-    # so the Meta webhook subscription is torn down (embedded_signup source);
-    # manual-setup channels follow the same no-op behavior as on destruction.
-    # A teardown failure on a best-effort cleanup should not abort the swap.
-    if previous_provider == 'whatsapp_cloud'
-      begin
-        teardown_webhooks
-      rescue StandardError => e
-        Rails.logger.error "[WHATSAPP] Pre-conversion webhook teardown failed: #{e.message}"
+      if new_provider == previous_provider
+        errors.add(:provider, 'must be different from the current provider')
+        raise ActiveRecord::RecordInvalid, self
       end
-    end
-    provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
 
-    transaction do
+      # Pre-validate the new config without persisting, so we never terminate
+      # the current provider session for a known-bad target config.
+      assign_attributes(provider: new_provider, provider_config: normalized_new_config)
+      unless valid?
+        assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
+        raise ActiveRecord::RecordInvalid, self
+      end
+      # Snapshot provider_config AFTER valid? so we keep any fields populated
+      # by before_validation callbacks (e.g. ensure_webhook_verify_token). The
+      # final persist uses save!(validate: false), so we must not rely on a
+      # second validation pass to replay those callbacks.
+      validated_new_config = provider_config.deep_dup
+
+      # Validation passed. Restore the old state briefly so the disconnect
+      # call talks to the correct (old) endpoint, then reapply and persist
+      # the new state. We call the service directly so a failed disconnect
+      # propagates and aborts the conversion instead of silently leaving the
+      # old session alive while the inbox points at the new provider.
+      assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
+      # When converting away from whatsapp_cloud, mirror the destroy-time
+      # cleanup so the Meta webhook subscription is torn down (embedded_signup
+      # source); manual-setup channels follow the same no-op behavior as on
+      # destruction. A teardown failure on a best-effort cleanup should not
+      # abort the swap.
+      if previous_provider == 'whatsapp_cloud'
+        begin
+          teardown_webhooks
+        rescue StandardError => e
+          Rails.logger.error "[WHATSAPP] Pre-conversion webhook teardown failed: #{e.message}"
+        end
+      end
+      provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+
       assign_attributes(
         provider: new_provider,
         provider_config: validated_new_config,
@@ -186,19 +190,19 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       # API and a transient failure could roll back the transaction after we
       # already disconnected the old session.
       save!(validate: false)
-    end
 
-    setup_webhooks if should_auto_setup_webhooks?
+      setup_webhooks if should_auto_setup_webhooks?
 
-    begin
-      sync_templates
-    rescue StandardError => e
-      Rails.logger.error "[WHATSAPP] Post-conversion template sync failed: #{e.message}"
+      begin
+        sync_templates
+      rescue StandardError => e
+        Rails.logger.error "[WHATSAPP] Post-conversion template sync failed: #{e.message}"
+      end
     end
 
     self
   end
-  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/BlockLength
 
   def received_messages(messages, conversation)
     return unless provider_service.respond_to?(:received_messages)
