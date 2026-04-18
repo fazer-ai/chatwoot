@@ -174,6 +174,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
           teardown_webhooks
         rescue StandardError => e
           Rails.logger.error "[WHATSAPP] Pre-conversion webhook teardown failed: #{e.message}"
+        ensure
+          # Reset the destroy-time guard so a later destroy! or subsequent
+          # conversion on the same instance doesn't skip webhook removal.
+          @webhook_teardown_initiated = false
         end
       end
       provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
