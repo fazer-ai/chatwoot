@@ -1470,6 +1470,16 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['message']).to match(/provider conversion failed/i)
       end
+
+      it 'returns 422 when converting to the same provider' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: channel.provider, provider_config: {} },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/must be different/i)
+      end
     end
   end
 
