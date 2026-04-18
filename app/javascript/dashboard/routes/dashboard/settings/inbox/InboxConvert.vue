@@ -5,6 +5,15 @@ import { useStore } from 'vuex';
 import Whatsapp from './channels/Whatsapp.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 
+// Mirrors Settings.vue's `isConvertibleWhatsAppChannel` so a direct visit to
+// /convert cannot bypass the provider allowlist exposed by the Convert button.
+const CONVERTIBLE_WHATSAPP_PROVIDERS = [
+  'whatsapp_cloud',
+  'default',
+  'baileys',
+  'zapi',
+];
+
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -23,7 +32,10 @@ const redirectBackIfInvalid = () => {
     });
     return;
   }
-  if (inbox.value.channel_type !== INBOX_TYPES.WHATSAPP) {
+  const isConvertible =
+    inbox.value.channel_type === INBOX_TYPES.WHATSAPP &&
+    CONVERTIBLE_WHATSAPP_PROVIDERS.includes(inbox.value.provider);
+  if (!isConvertible) {
     router.replace({
       name: 'settings_inbox_show',
       params: {
