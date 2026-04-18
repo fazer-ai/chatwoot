@@ -61,17 +61,6 @@ const currentProviderKey = computed(() => {
   return INBOX_PROVIDER_TO_KEY[props.inbox.provider] || null;
 });
 
-const currentProviderLabel = computed(() => {
-  if (!isConvertMode.value || !props.inbox) return '';
-  const map = {
-    whatsapp_cloud: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
-    default: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
-    baileys: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
-    zapi: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI'),
-  };
-  return map[props.inbox.provider] || '';
-});
-
 const PROVIDER_CATALOG = computed(() => [
   {
     key: PROVIDER_TYPES.WHATSAPP,
@@ -127,6 +116,14 @@ const availableProviders = computed(() => {
   return PROVIDER_CATALOG.value
     .filter(p => allowed.includes(p.key))
     .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
+});
+
+const currentProviderLabel = computed(() => {
+  if (!isConvertMode.value || !currentProviderKey.value) return '';
+  return (
+    PROVIDER_CATALOG.value.find(({ key }) => key === currentProviderKey.value)
+      ?.title || ''
+  );
 });
 
 const isValidSelectedProvider = computed(() => {

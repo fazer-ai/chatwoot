@@ -582,6 +582,7 @@ RSpec.describe Channel::Whatsapp do
       channel.reload
       expect(channel.provider).to eq('whatsapp_cloud')
       expect(channel.provider_config).to include(new_cloud_config)
+      expect(channel.provider_config).not_to have_key('provider_url')
     end
 
     it 'clears provider_connection and message_templates' do
@@ -712,6 +713,9 @@ RSpec.describe Channel::Whatsapp do
         fresh_channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
       end.not_to raise_error
 
+      fresh_channel.reload
+      expect(fresh_channel.provider).to eq('whatsapp_cloud')
+      expect(fresh_channel.provider_connection).to eq({})
       expect(Rails.logger).to have_received(:error).with(/Post-conversion template sync failed.*boom/)
     end
   end

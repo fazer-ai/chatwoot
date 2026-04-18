@@ -1395,7 +1395,12 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:ok)
         channel.reload
         expect(channel.provider).to eq('whatsapp_cloud')
-        expect(channel.provider_config).to include('api_key' => 'new_cloud_key')
+        expect(channel.provider_config).to include(
+          'api_key' => 'new_cloud_key',
+          'phone_number_id' => 'new_phone_id',
+          'business_account_id' => 'new_waba_id'
+        )
+        expect(channel.provider_config).not_to have_key('provider_url')
         expect(channel.provider_connection).to be_blank
         expect(channel.message_templates).to be_blank
       end
