@@ -200,6 +200,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       begin
         sync_templates
       rescue StandardError => e
+        # Some provider sync_templates implementations stamp
+        # `message_templates_last_updated` before the remote fetch. If the
+        # fetch blows up, reset both columns so the inbox doesn't look
+        # synced with zero templates and the scheduler will retry.
+        update_columns(message_templates: {}, message_templates_last_updated: nil) # rubocop:disable Rails/SkipsModelValidations
         Rails.logger.error "[WHATSAPP] Post-conversion template sync failed: #{e.message}"
       end
     end

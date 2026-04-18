@@ -706,7 +706,13 @@ RSpec.describe Channel::Whatsapp do
         validate_provider_config?: true
       )
       allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
-      allow(fresh_channel).to receive(:sync_templates).and_raise(StandardError, 'boom')
+      # Some provider services stamp `message_templates_last_updated` before
+      # the remote fetch; emulate that by setting the timestamp right before
+      # the raise, so the rescue must reset it to avoid a "synced" state.
+      allow(fresh_channel).to receive(:sync_templates) do
+        fresh_channel.mark_message_templates_updated
+        raise StandardError, 'boom'
+      end
       allow(Rails.logger).to receive(:error)
 
       expect do
@@ -716,6 +722,8 @@ RSpec.describe Channel::Whatsapp do
       fresh_channel.reload
       expect(fresh_channel.provider).to eq('whatsapp_cloud')
       expect(fresh_channel.provider_connection).to eq({})
+      expect(fresh_channel.message_templates).to eq({})
+      expect(fresh_channel.message_templates_last_updated).to be_nil
       expect(Rails.logger).to have_received(:error).with(/Post-conversion template sync failed.*boom/)
     end
   end
