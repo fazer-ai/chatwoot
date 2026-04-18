@@ -81,7 +81,10 @@ export default {
           useAlert(this.$t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
           router.replace({
             name: 'settings_inbox_show',
-            params: { inboxId: this.inbox.id },
+            params: {
+              accountId: router.currentRoute.value.params.accountId,
+              inboxId: this.inbox.id,
+            },
           });
           return;
         }

@@ -82,7 +82,10 @@ const createChannel = async () => {
       useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
       router.replace({
         name: 'settings_inbox_show',
-        params: { inboxId: props.inbox.id },
+        params: {
+          accountId: router.currentRoute.value.params.accountId,
+          inboxId: props.inbox.id,
+        },
       });
       return;
     }
