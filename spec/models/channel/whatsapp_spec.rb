@@ -568,7 +568,7 @@ RSpec.describe Channel::Whatsapp do
     before do
       stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
         .to_return(status: 200)
-      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+//?message_templates})
+      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*message_templates})
         .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
       stub_request(:delete, %r{graph\.facebook\.com/v\d+\.\d+/.*/subscribed_apps})
         .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
