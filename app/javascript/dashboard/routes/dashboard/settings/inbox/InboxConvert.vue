@@ -17,13 +17,19 @@ const redirectBackIfInvalid = () => {
     // Inbox not found even after the store fetch: bounce to the inboxes list
     // rather than leaving the page blank waiting for a payload that is not
     // coming.
-    router.replace({ name: 'settings_inbox_list' });
+    router.replace({
+      name: 'settings_inbox_list',
+      params: { accountId: route.params.accountId },
+    });
     return;
   }
   if (inbox.value.channel_type !== INBOX_TYPES.WHATSAPP) {
     router.replace({
       name: 'settings_inbox_show',
-      params: { inboxId: inboxId.value },
+      params: {
+        accountId: route.params.accountId,
+        inboxId: inboxId.value,
+      },
     });
   }
 };

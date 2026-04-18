@@ -1383,6 +1383,17 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:unauthorized)
       end
+
+      it 'returns unauthorized even when the agent is assigned to the inbox' do
+        create(:inbox_member, user: agent, inbox: inbox)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: agent.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
 
     context 'when authenticated as an administrator' do
@@ -1438,6 +1449,18 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['message']).to match(/invalid credentials/i)
+      end
+
+      it 'returns 422 with a fallback message when conversion raises a generic error' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:convert_provider!).and_raise(StandardError, 'boom') # rubocop:disable RSpec/AnyInstance
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/provider conversion failed/i)
       end
     end
   end
