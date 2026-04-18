@@ -1360,7 +1360,7 @@ RSpec.describe 'Inboxes API', type: :request do
       stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
         .to_return(status: 200)
       stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*/message_templates.*})
-        .to_return(status: 200, body: { data: [] }.to_json)
+        .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
       webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
       allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
     end
@@ -1396,6 +1396,8 @@ RSpec.describe 'Inboxes API', type: :request do
         channel.reload
         expect(channel.provider).to eq('whatsapp_cloud')
         expect(channel.provider_config).to include('api_key' => 'new_cloud_key')
+        expect(channel.provider_connection).to be_blank
+        expect(channel.message_templates).to be_blank
       end
 
       it 'returns 422 when the channel does not support conversion' do

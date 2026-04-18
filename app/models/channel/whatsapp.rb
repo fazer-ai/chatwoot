@@ -139,9 +139,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     # the current provider session for a known-bad target config.
     assign_attributes(provider: new_provider, provider_config: normalized_new_config)
     unless valid?
-      errors_snapshot = errors.dup
       assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
-      errors.merge!(errors_snapshot)
       raise ActiveRecord::RecordInvalid, self
     end
 

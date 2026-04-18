@@ -108,21 +108,18 @@ const availableProviders = computed(() => {
   );
 });
 
-const isValidConvertProvider = computed(
-  () =>
-    !!selectedProvider.value &&
-    availableProviders.value.some(({ key }) => key === selectedProvider.value)
-);
-
-const showProviderSelection = computed(() => {
-  if (isConvertMode.value) return !isValidConvertProvider.value;
-  return !selectedProvider.value;
+const isValidSelectedProvider = computed(() => {
+  if (!selectedProvider.value) return false;
+  // `whatsapp_manual` is not part of the picker, but the embedded-signup
+  // fallback link can set it. Allow it explicitly in both modes.
+  if (selectedProvider.value === PROVIDER_TYPES.WHATSAPP_MANUAL) return true;
+  return availableProviders.value.some(
+    ({ key }) => key === selectedProvider.value
+  );
 });
 
-const showConfiguration = computed(() => {
-  if (isConvertMode.value) return isValidConvertProvider.value;
-  return Boolean(selectedProvider.value);
-});
+const showProviderSelection = computed(() => !isValidSelectedProvider.value);
+const showConfiguration = computed(() => isValidSelectedProvider.value);
 
 const selectProvider = providerValue => {
   router.push({

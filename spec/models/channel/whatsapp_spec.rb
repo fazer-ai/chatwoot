@@ -629,7 +629,7 @@ RSpec.describe Channel::Whatsapp do
 
       expect do
         fresh_channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: { 'api_key' => 'bad' })
-      end.to raise_error(ActiveRecord::RecordInvalid)
+      end.to(raise_error { |error| expect(error.class.name).to eq('ActiveRecord::RecordInvalid') })
 
       fresh_channel.reload
       expect(fresh_channel.provider).to eq('baileys')
