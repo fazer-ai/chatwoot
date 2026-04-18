@@ -148,6 +148,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
       raise ActiveRecord::RecordInvalid, self
     end
+    # Snapshot provider_config AFTER valid? so we keep any fields populated by
+    # before_validation callbacks (e.g. ensure_webhook_verify_token). The final
+    # persist uses save!(validate: false), so we must not rely on a second
+    # validation pass to replay those callbacks.
+    validated_new_config = provider_config.deep_dup
 
     # Validation passed. Restore the old state briefly so the disconnect call
     # talks to the correct (old) endpoint, then reapply and persist the new
@@ -171,12 +176,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     transaction do
       assign_attributes(
         provider: new_provider,
-        provider_config: normalized_new_config,
+        provider_config: validated_new_config,
         provider_connection: {},
         message_templates: {},
         message_templates_last_updated: nil
       )
-      save!
+      # Skip revalidation: the pre-flight valid? above is authoritative. A
+      # second validate_provider_config? call here would re-hit the external
+      # API and a transient failure could roll back the transaction after we
+      # already disconnected the old session.
+      save!(validate: false)
     end
 
     setup_webhooks if should_auto_setup_webhooks?
