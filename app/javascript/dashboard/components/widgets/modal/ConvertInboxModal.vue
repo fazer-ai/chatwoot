@@ -108,7 +108,7 @@ export default {
           @click.prevent="closeModal"
         />
         <NextButton
-          amber
+          ruby
           type="submit"
           :label="$t('INBOX_MGMT.CONVERT.CONFIRM.CONTINUE')"
           :disabled="v$.value.$invalid"

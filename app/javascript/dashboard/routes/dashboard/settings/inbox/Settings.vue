@@ -814,7 +814,7 @@ export default {
                 />
                 <NextButton
                   v-if="isConvertibleWhatsAppChannel"
-                  amber
+                  slate
                   sm
                   :label="$t('INBOX_MGMT.CONVERT.BUTTON')"
                   @click="openConvertGate"

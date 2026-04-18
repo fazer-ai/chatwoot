@@ -698,7 +698,7 @@
         "CANCEL": "Cancel"
       },
       "SELECT_PROVIDER_TITLE": "Select the new provider",
-      "SELECT_PROVIDER_DESCRIPTION": "Converting '{inboxName}' from {currentProvider}. The current provider is hidden from the list below.",
+      "SELECT_PROVIDER_DESCRIPTION": "Converting '{inboxName}' from {currentProvider}.",
       "SUBMIT_BUTTON": "Convert inbox",
       "API": {
         "SUCCESS_MESSAGE": "Inbox successfully converted",

@@ -698,7 +698,7 @@
         "CANCEL": "Cancelar"
       },
       "SELECT_PROVIDER_TITLE": "Selecione o novo provedor",
-      "SELECT_PROVIDER_DESCRIPTION": "Convertendo '{inboxName}' de {currentProvider}. O provedor atual está oculto na lista abaixo.",
+      "SELECT_PROVIDER_DESCRIPTION": "Convertendo '{inboxName}' de {currentProvider}.",
       "SUBMIT_BUTTON": "Converter caixa de entrada",
       "API": {
         "SUCCESS_MESSAGE": "Caixa de entrada convertida com sucesso",

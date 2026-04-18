@@ -633,6 +633,56 @@ RSpec.describe Channel::Whatsapp do
       fresh_channel.reload
       expect(fresh_channel.provider).to eq('baileys')
     end
+
+    it 'triggers webhook setup on the new provider when auto-setup applies' do
+      webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
+      allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
+
+      channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+
+      expect(Whatsapp::WebhookSetupService).to have_received(:new).with(channel, 'new_waba_id', 'new_cloud_key')
+      expect(webhook_setup_service).to have_received(:perform)
+    end
+
+    it 'does not trigger webhook setup when the new provider does not auto-setup' do
+      cloud_channel = create(:channel_whatsapp,
+                             provider: 'whatsapp_cloud',
+                             provider_config: {
+                               'source' => 'embedded_signup',
+                               'api_key' => 'old_key',
+                               'phone_number_id' => 'old_phone_id',
+                               'business_account_id' => 'old_waba_id'
+                             },
+                             validate_provider_config: false,
+                             sync_templates: false)
+      allow(Whatsapp::WebhookSetupService).to receive(:new)
+
+      cloud_channel.convert_provider!(
+        new_provider: 'baileys',
+        new_provider_config: { 'provider_url' => 'https://baileys.api', 'api_key' => 'k' }
+      )
+
+      expect(Whatsapp::WebhookSetupService).not_to have_received(:new)
+    end
+
+    it 'swallows and logs errors raised by post-conversion template sync' do
+      # Bypass both the factory's singleton `sync_templates` stub and validation,
+      # so we can observe the rescue branch on the real instance.
+      fresh_channel = described_class.find(channel.id)
+      cloud_service = instance_double(
+        Whatsapp::Providers::WhatsappCloudService,
+        validate_provider_config?: true
+      )
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
+      allow(fresh_channel).to receive(:sync_templates).and_raise(StandardError, 'boom')
+      allow(Rails.logger).to receive(:error)
+
+      expect do
+        fresh_channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+      end.not_to raise_error
+
+      expect(Rails.logger).to have_received(:error).with(/Post-conversion template sync failed.*boom/)
+    end
   end
 
   describe '#sync_group' do
