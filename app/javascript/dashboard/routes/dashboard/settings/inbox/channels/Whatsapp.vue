@@ -72,47 +72,72 @@ const currentProviderLabel = computed(() => {
   return map[props.inbox.provider] || '';
 });
 
-const availableProviders = computed(() => {
-  const providers = [
-    {
-      key: PROVIDER_TYPES.WHATSAPP,
-      title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
-      description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD_DESC'),
-      icon: 'i-woot-whatsapp',
-    },
-    {
-      key: PROVIDER_TYPES.TWILIO,
-      title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO'),
-      description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO_DESC'),
-      icon: 'i-woot-twilio',
-    },
-    {
-      key: PROVIDER_TYPES.BAILEYS,
-      title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
-      description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS_DESC'),
-      icon: 'i-woot-baileys',
-    },
-    {
-      key: PROVIDER_TYPES.ZAPI,
-      title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI'),
-      description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI_DESC'),
-      icon: 'i-woot-zapi',
-    },
-  ];
+const PROVIDER_CATALOG = computed(() => [
+  {
+    key: PROVIDER_TYPES.WHATSAPP,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
+    key: PROVIDER_TYPES.TWILIO,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO_DESC'),
+    icon: 'i-woot-twilio',
+  },
+  {
+    key: PROVIDER_TYPES.BAILEYS,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS_DESC'),
+    icon: 'i-woot-baileys',
+  },
+  {
+    key: PROVIDER_TYPES.ZAPI,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI_DESC'),
+    icon: 'i-woot-zapi',
+  },
+  {
+    key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+]);
 
-  if (!isConvertMode.value) return providers;
-  // In convert mode, Twilio lives on a different channel model and the current
-  // provider cannot be "converted to itself".
-  return providers.filter(
-    p => p.key !== PROVIDER_TYPES.TWILIO && p.key !== currentProviderKey.value
-  );
+// Keys shown in the picker. 360Dialog is intentionally hidden in create mode
+// (URL-reachable only) but offered in convert mode where it is a valid target.
+const CREATE_PICKER_KEYS = [
+  PROVIDER_TYPES.WHATSAPP,
+  PROVIDER_TYPES.TWILIO,
+  PROVIDER_TYPES.BAILEYS,
+  PROVIDER_TYPES.ZAPI,
+];
+const CONVERT_PICKER_KEYS = [
+  PROVIDER_TYPES.WHATSAPP,
+  PROVIDER_TYPES.BAILEYS,
+  PROVIDER_TYPES.ZAPI,
+  PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+];
+
+const availableProviders = computed(() => {
+  const allowed = isConvertMode.value
+    ? CONVERT_PICKER_KEYS
+    : CREATE_PICKER_KEYS;
+  return PROVIDER_CATALOG.value
+    .filter(p => allowed.includes(p.key))
+    .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
 });
 
 const isValidSelectedProvider = computed(() => {
   if (!selectedProvider.value) return false;
-  // `whatsapp_manual` is not part of the picker, but the embedded-signup
-  // fallback link can set it. Allow it explicitly in both modes.
-  if (selectedProvider.value === PROVIDER_TYPES.WHATSAPP_MANUAL) return true;
+  // In create mode, allow the embedded-signup manual fallback link and the
+  // legacy-URL path to 360Dialog even though neither is in the picker.
+  if (!isConvertMode.value) {
+    if (selectedProvider.value === PROVIDER_TYPES.WHATSAPP_MANUAL) return true;
+    if (selectedProvider.value === PROVIDER_TYPES.THREE_SIXTY_DIALOG)
+      return true;
+  }
   return availableProviders.value.some(
     ({ key }) => key === selectedProvider.value
   );

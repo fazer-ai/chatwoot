@@ -13,7 +13,13 @@ const inboxId = computed(() => Number(route.params.inboxId));
 const inbox = computed(() => store.getters['inboxes/getInbox'](inboxId.value));
 
 const redirectBackIfInvalid = () => {
-  if (!inbox.value?.id) return;
+  if (!inbox.value?.id) {
+    // Inbox not found even after the store fetch: bounce to the inboxes list
+    // rather than leaving the page blank waiting for a payload that is not
+    // coming.
+    router.replace({ name: 'settings_inbox_list' });
+    return;
+  }
   if (inbox.value.channel_type !== INBOX_TYPES.WHATSAPP) {
     router.replace({
       name: 'settings_inbox_show',

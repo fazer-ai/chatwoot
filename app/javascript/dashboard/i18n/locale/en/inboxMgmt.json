@@ -248,6 +248,7 @@
           "WHATSAPP_CLOUD_DESC": "Quick setup through Meta",
           "TWILIO_DESC": "Connect via Twilio credentials",
           "360_DIALOG": "360Dialog",
+          "360_DIALOG_DESC": "Connect via 360Dialog credentials",
           "BAILEYS": "Baileys",
           "BAILEYS_DESC": "Connect via non-official API Baileys",
           "ZAPI": "Z-API",

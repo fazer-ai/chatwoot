@@ -569,7 +569,7 @@ RSpec.describe Channel::Whatsapp do
       stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
         .to_return(status: 200)
       stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+//?message_templates})
-        .to_return(status: 200, body: { data: [] }.to_json)
+        .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
       webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
       allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
     end

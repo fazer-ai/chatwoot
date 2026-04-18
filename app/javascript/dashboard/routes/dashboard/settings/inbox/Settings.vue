@@ -143,7 +143,12 @@ export default {
       return '';
     },
     isConvertibleWhatsAppChannel() {
-      return this.isAWhatsAppChannel && !this.isATwilioWhatsAppChannel;
+      return (
+        this.isAWhatsAppCloudChannel ||
+        this.isAWhatsAppBaileysChannel ||
+        this.isAWhatsAppZapiChannel ||
+        this.is360DialogWhatsAppChannel
+      );
     },
     tabs() {
       let visibleToAllChannelTabs = [
@@ -807,7 +812,7 @@ export default {
             >
               <div class="flex items-center gap-2 w-full">
                 <input
-                  v-model="whatsAppAPIProviderName"
+                  :value="whatsAppAPIProviderName"
                   type="text"
                   disabled
                   class="!mb-0 flex-1"
