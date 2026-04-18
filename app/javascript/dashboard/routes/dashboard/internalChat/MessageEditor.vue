@@ -49,8 +49,10 @@ const editorContent = ref(props.initialContent);
 const attachedFiles = ref([]);
 const isMentionMenuOpen = ref(false);
 const isConversationMenuOpen = ref(false);
+const isDragging = ref(false);
 
 let draftTimer = null;
+let dragCounter = 0;
 
 const canSend = computed(() => {
   return (
@@ -147,6 +149,53 @@ function removeFile(index) {
   attachedFiles.value.splice(index, 1);
 }
 
+function addFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f && f.size > 0);
+  if (!files.length) return;
+  attachedFiles.value = [...attachedFiles.value, ...files];
+}
+
+function handlePaste(event) {
+  const files = event.clipboardData?.files;
+  if (!files?.length) return;
+  event.preventDefault();
+  addFiles(files);
+}
+
+function hasFileDrag(event) {
+  return event.dataTransfer?.types?.includes('Files');
+}
+
+function handleDragEnter(event) {
+  if (!hasFileDrag(event)) return;
+  event.preventDefault();
+  dragCounter += 1;
+  isDragging.value = true;
+}
+
+function handleDragOver(event) {
+  if (!hasFileDrag(event)) return;
+  event.preventDefault();
+}
+
+function handleDragLeave(event) {
+  if (!hasFileDrag(event)) return;
+  event.preventDefault();
+  dragCounter -= 1;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    isDragging.value = false;
+  }
+}
+
+function handleDrop(event) {
+  if (!hasFileDrag(event)) return;
+  event.preventDefault();
+  dragCounter = 0;
+  isDragging.value = false;
+  addFiles(event.dataTransfer?.files);
+}
+
 function filePreviewUrl(file) {
   return URL.createObjectURL(file);
 }
@@ -185,7 +234,25 @@ defineExpose({ focus, setContent, getContent });
 </script>
 
 <template>
-  <div class="border-t border-n-slate-5 bg-n-solid-2 px-4 py-3">
+  <div
+    class="relative border-t border-n-slate-5 bg-n-solid-2 px-4 py-3"
+    @paste="handlePaste"
+    @dragenter="handleDragEnter"
+    @dragover="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop="handleDrop"
+  >
+    <transition name="modal-fade">
+      <div
+        v-show="isDragging"
+        class="pointer-events-none absolute inset-0 z-20 m-2 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-n-brand bg-n-solid-2/90 text-n-brand"
+      >
+        <Icon icon="i-lucide-upload-cloud" class="size-6" />
+        <span class="text-sm font-medium">
+          {{ t('INTERNAL_CHAT.MESSAGE.DRAG_DROP') }}
+        </span>
+      </div>
+    </transition>
     <div
       v-if="editingMessage"
       class="flex items-center justify-between border-b border-n-slate-5 px-3 py-1.5 text-xs text-n-brand"
