@@ -106,7 +106,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     end
 
     new_provider = params.require(:provider)
-    new_provider_config = params.fetch(:provider_config, {}).permit!.to_h
+    new_provider_config = (params.permit(provider_config: {})[:provider_config] || {}).to_h
 
     channel.convert_provider!(new_provider: new_provider, new_provider_config: new_provider_config)
     render :show

@@ -1,58 +1,45 @@
-<script>
+<script setup>
+import { computed, ref } from 'vue';
 import { required } from '@vuelidate/validators';
 import { useVuelidate } from '@vuelidate/core';
 import Modal from '../../Modal.vue';
-
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-export default {
-  components: {
-    Modal,
-    NextButton,
-  },
-  props: {
-    show: { type: Boolean, default: false },
-    inboxName: { type: String, required: true },
-    currentProvider: { type: String, default: '' },
-  },
-  emits: ['onClose', 'onConfirm', 'update:show'],
-  setup() {
-    return { v$: useVuelidate() };
-  },
-  data() {
-    return {
-      value: '',
-    };
-  },
-  validations: {
-    value: {
-      required,
-      isEqual(value) {
-        const normalizedInput = (value || '').trim();
-        const normalizedTarget = (this.inboxName || '').trim();
-        return normalizedInput === normalizedTarget;
-      },
+const props = defineProps({
+  show: { type: Boolean, default: false },
+  inboxName: { type: String, required: true },
+  currentProvider: { type: String, default: '' },
+});
+
+const emit = defineEmits(['onClose', 'onConfirm', 'update:show']);
+
+const value = ref('');
+
+const validations = {
+  value: {
+    required,
+    isEqual(input) {
+      return (input || '').trim() === (props.inboxName || '').trim();
     },
   },
-  computed: {
-    localShow: {
-      get() {
-        return this.show;
-      },
-      set(value) {
-        this.$emit('update:show', value);
-      },
-    },
-  },
-  methods: {
-    closeModal() {
-      this.value = '';
-      this.$emit('onClose');
-    },
-    onConfirm() {
-      this.$emit('onConfirm');
-    },
-  },
+};
+
+const v$ = useVuelidate(validations, { value });
+
+const localShow = computed({
+  get: () => props.show,
+  set: next => emit('update:show', next),
+});
+
+const closeModal = () => {
+  value.value = '';
+  emit('onClose');
+};
+
+const onConfirm = () => {
+  v$.value.$touch();
+  if (v$.value.$invalid) return;
+  emit('onConfirm');
 };
 </script>
 

@@ -619,12 +619,13 @@ RSpec.describe Channel::Whatsapp do
       end.not_to raise_error
     end
 
-    it 'rolls back and raises when the new provider config is invalid' do
+    it 'rolls back and raises when the new provider config is invalid, leaving the old provider session untouched' do
       # The factory installs a singleton `validate_provider_config` stub that
       # bypasses validation; reload from DB to get a clean instance.
       fresh_channel = described_class.find(channel.id)
       cloud_service = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: false)
       allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
+      disconnect_url = "#{fresh_channel.provider_config['provider_url']}/connections/#{fresh_channel.phone_number}"
 
       expect do
         fresh_channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: { 'api_key' => 'bad' })
@@ -632,6 +633,7 @@ RSpec.describe Channel::Whatsapp do
 
       fresh_channel.reload
       expect(fresh_channel.provider).to eq('baileys')
+      expect(WebMock).not_to have_requested(:delete, disconnect_url)
     end
 
     it 'triggers webhook setup on the new provider when auto-setup applies' do

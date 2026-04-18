@@ -49,10 +49,6 @@ const hasWhatsappAppId = computed(() => {
 
 const selectedProvider = computed(() => route.query.provider);
 
-const showProviderSelection = computed(() => !selectedProvider.value);
-
-const showConfiguration = computed(() => Boolean(selectedProvider.value));
-
 const INBOX_PROVIDER_TO_KEY = {
   whatsapp_cloud: PROVIDER_TYPES.WHATSAPP,
   default: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
@@ -110,6 +106,22 @@ const availableProviders = computed(() => {
   return providers.filter(
     p => p.key !== PROVIDER_TYPES.TWILIO && p.key !== currentProviderKey.value
   );
+});
+
+const isValidConvertProvider = computed(
+  () =>
+    !!selectedProvider.value &&
+    availableProviders.value.some(({ key }) => key === selectedProvider.value)
+);
+
+const showProviderSelection = computed(() => {
+  if (isConvertMode.value) return !isValidConvertProvider.value;
+  return !selectedProvider.value;
+});
+
+const showConfiguration = computed(() => {
+  if (isConvertMode.value) return isValidConvertProvider.value;
+  return Boolean(selectedProvider.value);
 });
 
 const selectProvider = providerValue => {
@@ -241,11 +253,6 @@ const handleManualLinkClick = () => {
         />
         <ThreeSixtyDialogWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.THREE_SIXTY_DIALOG"
-          :mode="mode"
-          :inbox="inbox"
-        />
-        <CloudWhatsapp
-          v-else-if="selectedProvider === PROVIDER_TYPES.WHATSAPP"
           :mode="mode"
           :inbox="inbox"
         />

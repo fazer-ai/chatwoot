@@ -22,9 +22,9 @@ const redirectBackIfInvalid = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   if (!inbox.value?.id) {
-    store.dispatch('inboxes/get');
+    await store.dispatch('inboxes/get');
   }
   redirectBackIfInvalid();
 });

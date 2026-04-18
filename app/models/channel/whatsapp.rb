@@ -21,7 +21,7 @@
 #
 # rubocop:enable Layout/LineLength
 
-class Channel::Whatsapp < ApplicationRecord
+class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Channelable
   include Reauthorizable
 
@@ -128,15 +128,33 @@ class Channel::Whatsapp < ApplicationRecord
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
-  def convert_provider!(new_provider:, new_provider_config:)
-    transaction do
-      # Disconnect the current provider session before swapping credentials so
-      # the disconnect call still has access to the old provider_config.
-      disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+  def convert_provider!(new_provider:, new_provider_config:) # rubocop:disable Metrics/MethodLength
+    # Snapshot the old state so we can restore it while running the disconnect
+    # against the previous provider's endpoint.
+    previous_provider = provider
+    previous_provider_config = provider_config.deep_dup
+    normalized_new_config = new_provider_config || {}
 
+    # Pre-validate the new config without persisting, so we never terminate
+    # the current provider session for a known-bad target config.
+    assign_attributes(provider: new_provider, provider_config: normalized_new_config)
+    unless valid?
+      errors_snapshot = errors.dup
+      assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
+      errors.merge!(errors_snapshot)
+      raise ActiveRecord::RecordInvalid, self
+    end
+
+    # Validation passed. Restore the old state briefly so the disconnect call
+    # talks to the correct (old) endpoint, then reapply and persist the new
+    # state in a single transaction.
+    assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
+    disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+
+    transaction do
       assign_attributes(
         provider: new_provider,
-        provider_config: new_provider_config || {},
+        provider_config: normalized_new_config,
         provider_connection: {},
         message_templates: {},
         message_templates_last_updated: nil
