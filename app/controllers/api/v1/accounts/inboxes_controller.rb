@@ -110,6 +110,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
     channel.convert_provider!(new_provider: new_provider, new_provider_config: new_provider_config)
     render :show
+  rescue ActionController::ParameterMissing => e
+    render json: { message: e.message }, status: :bad_request
   rescue ActiveRecord::RecordInvalid => e
     render json: { message: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
   rescue StandardError => e

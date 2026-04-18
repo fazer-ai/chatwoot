@@ -1417,6 +1417,16 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response.parsed_body['error']).to match(/does not support provider conversion/i)
       end
 
+      it 'returns 400 when the provider param is missing' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:bad_request)
+        expect(response.parsed_body['message']).to match(/provider/i)
+      end
+
       it 'returns 422 when the new provider config is invalid' do
         cloud_service = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: false)
         allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
