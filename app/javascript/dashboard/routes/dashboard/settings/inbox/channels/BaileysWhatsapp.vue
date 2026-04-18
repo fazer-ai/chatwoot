@@ -67,7 +67,7 @@ const buildProviderConfig = () => {
 
   if (apiKey.value || providerUrl.value) {
     providerConfig.api_key = apiKey.value;
-    providerConfig.url = providerUrl.value;
+    providerConfig.provider_url = providerUrl.value;
   }
 
   return providerConfig;
