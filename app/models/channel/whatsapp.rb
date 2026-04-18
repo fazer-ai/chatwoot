@@ -135,6 +135,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     previous_provider_config = provider_config.deep_dup
     normalized_new_config = new_provider_config || {}
 
+    if new_provider == previous_provider
+      errors.add(:provider, 'must be different from the current provider')
+      raise ActiveRecord::RecordInvalid, self
+    end
+
     # Pre-validate the new config without persisting, so we never terminate
     # the current provider session for a known-bad target config.
     assign_attributes(provider: new_provider, provider_config: normalized_new_config)
@@ -145,9 +150,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
     # Validation passed. Restore the old state briefly so the disconnect call
     # talks to the correct (old) endpoint, then reapply and persist the new
-    # state in a single transaction.
+    # state in a single transaction. We call the service directly so a failed
+    # disconnect propagates and aborts the conversion instead of silently
+    # leaving the old session alive while the inbox points at the new provider.
     assign_attributes(provider: previous_provider, provider_config: previous_provider_config)
-    disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+    provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
 
     transaction do
       assign_attributes(

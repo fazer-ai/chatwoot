@@ -667,6 +667,30 @@ RSpec.describe Channel::Whatsapp do
       expect(Whatsapp::WebhookSetupService).not_to have_received(:new)
     end
 
+    it 'rejects no-op conversions targeting the current provider' do
+      expect do
+        channel.convert_provider!(new_provider: 'baileys', new_provider_config: channel.provider_config)
+      end.to(raise_error { |error| expect(error.class.name).to eq('ActiveRecord::RecordInvalid') })
+
+      channel.reload
+      expect(channel.provider_connection).to eq('connection' => 'open')
+      expect(channel.message_templates).to be_present
+    end
+
+    it 'aborts and does not persist the new provider when the disconnect fails' do
+      baileys_service = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).and_return(baileys_service)
+      allow(baileys_service).to receive(:disconnect_channel_provider).and_raise(StandardError, 'boom')
+
+      expect do
+        channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+      end.to(raise_error { |error| expect(error.class.name).to eq('StandardError') })
+
+      channel.reload
+      expect(channel.provider).to eq('baileys')
+      expect(channel.message_templates).to be_present
+    end
+
     it 'swallows and logs errors raised by post-conversion template sync' do
       # Bypass both the factory's singleton `sync_templates` stub and validation,
       # so we can observe the rescue branch on the real instance.
