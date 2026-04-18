@@ -620,7 +620,10 @@ export default {
       this.showConvertGate = false;
       this.$router.push({
         name: 'settings_inbox_convert',
-        params: { inboxId: this.inbox.id },
+        params: {
+          accountId: this.$route.params.accountId,
+          inboxId: this.inbox.id,
+        },
       });
     },
   },

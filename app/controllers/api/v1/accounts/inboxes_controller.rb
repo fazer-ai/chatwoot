@@ -112,6 +112,10 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     render :show
   rescue ActiveRecord::RecordInvalid => e
     render json: { message: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP] Provider conversion failed for inbox #{@inbox.id}: #{e.class}: #{e.message}"
+    render json: { message: 'Provider conversion failed. Please check your credentials and the previous provider session, then try again.' },
+           status: :unprocessable_entity
   end
 
   def destroy
