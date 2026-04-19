@@ -17,7 +17,7 @@ class Api::V1::Accounts::InternalChat::ReactionsController < Api::V1::Accounts::
     reaction_data = {
       id: @reaction.id,
       message_id: @reaction.internal_chat_message_id,
-      channel_id: @message.internal_chat_channel_id,
+      internal_chat_channel_id: @message.internal_chat_channel_id,
       account_id: @message.account_id,
       user_id: @reaction.user_id,
       emoji: @reaction.emoji

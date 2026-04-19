@@ -40,7 +40,7 @@ class Api::V1::Accounts::InternalChat::MessagesController < Api::V1::Accounts::I
     authorize @message, :destroy?, policy_class: InternalChat::MessagePolicy
     message_data = {
       id: @message.id,
-      channel_id: @message.internal_chat_channel_id,
+      internal_chat_channel_id: @message.internal_chat_channel_id,
       account_id: @message.account_id
     }
     @message.update!(content: I18n.t('internal_chat.messages.deleted'), content_attributes: { deleted: true })

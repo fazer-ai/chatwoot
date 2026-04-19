@@ -24,7 +24,7 @@ class InternalChatListener < BaseListener
   def internal_chat_message_deleted(event)
     message_data = event.data[:message_data]
     account = Account.find_by(id: message_data[:account_id])
-    channel = InternalChat::Channel.find_by(id: message_data[:channel_id])
+    channel = InternalChat::Channel.find_by(id: message_data[:internal_chat_channel_id])
     return if account.blank? || channel.blank?
     return unless channel.account_id == account.id
 
@@ -93,7 +93,7 @@ class InternalChatListener < BaseListener
   def internal_chat_reaction_deleted(event)
     reaction_data = event.data[:reaction_data]
     account = Account.find_by(id: reaction_data[:account_id])
-    channel = InternalChat::Channel.find_by(id: reaction_data[:channel_id])
+    channel = InternalChat::Channel.find_by(id: reaction_data[:internal_chat_channel_id])
     return if account.blank? || channel.blank?
     return unless channel.account_id == account.id
 
