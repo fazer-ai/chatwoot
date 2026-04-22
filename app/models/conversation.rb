@@ -24,7 +24,7 @@
 #  assignee_agent_bot_id  :bigint
 #  assignee_id            :integer
 #  campaign_id            :bigint
-#  contact_id             :bigint
+#  contact_id             :bigint           not null
 #  contact_inbox_id       :bigint
 #  display_id             :integer          not null
 #  inbox_id               :integer          not null

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_18_020000) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_170000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -704,7 +704,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_18_020000) do
     t.integer "assignee_id"
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
-    t.bigint "contact_id"
+    t.bigint "contact_id", null: false
     t.integer "display_id", null: false
     t.datetime "contact_last_seen_at", precision: nil
     t.datetime "agent_last_seen_at", precision: nil
@@ -1565,6 +1565,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_18_020000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "conversations", "contacts", on_delete: :cascade
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"
