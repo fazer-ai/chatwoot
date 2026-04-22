@@ -1,27 +1,19 @@
 class EnforceContactFkOnConversations < ActiveRecord::Migration[7.1]
   def up
-    orphan_count = select_value(<<~SQL.squish).to_i
-      SELECT COUNT(*) FROM conversations
-      WHERE contact_id IS NULL
-         OR NOT EXISTS (SELECT 1 FROM contacts WHERE contacts.id = conversations.contact_id)
-    SQL
+    orphan_scope = Conversation.where(contact_id: nil).or(
+      Conversation.where('NOT EXISTS (SELECT 1 FROM contacts WHERE contacts.id = conversations.contact_id)')
+    )
 
-    if orphan_count.positive?
-      say "Deleting #{orphan_count} orphan conversations (contact_id NULL or pointing to missing contact)"
-      execute <<~SQL.squish
-        DELETE FROM conversations
-        WHERE contact_id IS NULL
-           OR NOT EXISTS (SELECT 1 FROM contacts WHERE contacts.id = conversations.contact_id)
-      SQL
+    count = orphan_scope.count
+    if count.positive?
+      say "Destroying #{count} orphan conversations via Rails so dependent associations are cleaned up"
+      orphan_scope.find_each(&:destroy!)
     end
 
     change_column_null :conversations, :contact_id, false
-    add_foreign_key :conversations, :contacts, on_delete: :cascade, validate: false
-    validate_foreign_key :conversations, :contacts
   end
 
   def down
-    remove_foreign_key :conversations, :contacts
     change_column_null :conversations, :contact_id, true
   end
 end
