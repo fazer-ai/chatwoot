@@ -26,9 +26,10 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   def process_messages
     @lock_acquired = false
 
-    # We don't support reactions & ephemeral message now, we need to skip processing the message
-    # if the webhook event is a reaction or an ephermal message or an unsupported message.
-    return if unprocessable_message_type?(message_type)
+    # We don't support ephemeral message now, we need to skip processing the message
+    # if the webhook event is an ephermal message or an unsupported message.
+    # Reactions removed by the user arrive with an empty emoji and are skipped to match Baileys behavior.
+    return if skip_message?
 
     # Multiple webhook event can be received against the same message due to misconfigurations in the Meta
     # business manager account. While we have not found the core reason yet, the following line ensure that
@@ -57,6 +58,10 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     # Clear lock AFTER transaction commits to prevent race conditions where another request
     # acquires the lock before this transaction is visible to other connections
     clear_message_source_id_from_redis if @lock_acquired
+  end
+
+  def skip_message?
+    unprocessable_message_type?(message_type) || reaction_removal?
   end
 
   # For regular messages the contact phone is in :from; for echoes it's in :to.
@@ -168,7 +173,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def attach_files
-    return if %w[text button interactive location contacts].include?(message_type)
+    return if %w[text button interactive location contacts reaction].include?(message_type)
 
     attachment_payload = messages_data.first[message_type.to_sym]
     @message.content ||= attachment_payload[:caption]
@@ -202,10 +207,6 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def create_message(message, source_id: nil)
-    content_attrs = outgoing_echo ? { external_echo: true } : {}
-    content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
-    content_attrs[:external_created_at] = message[:timestamp].to_i
-
     @message = @conversation.messages.build(
       content: message_content(message),
       account_id: @inbox.account_id,
@@ -215,8 +216,16 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
       status: outgoing_echo ? :delivered : :sent,
       sender: outgoing_echo ? nil : @contact,
       source_id: (source_id || message[:id]).to_s,
-      content_attributes: content_attrs
+      content_attributes: build_content_attributes(message)
     )
+  end
+
+  def build_content_attributes(message)
+    content_attrs = outgoing_echo ? { external_echo: true } : {}
+    content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
+    content_attrs[:external_created_at] = message[:timestamp].to_i
+    content_attrs[:is_reaction] = true if message_type == 'reaction'
+    content_attrs
   end
 
   def attach_contact(contact)

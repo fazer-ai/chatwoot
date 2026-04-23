@@ -30,7 +30,8 @@ module Whatsapp::IncomingMessageServiceHelpers
       message.dig(:button, :text) ||
       message.dig(:interactive, :button_reply, :title) ||
       message.dig(:interactive, :list_reply, :title) ||
-      message.dig(:name, :formatted_name)
+      message.dig(:name, :formatted_name) ||
+      message.dig(:reaction, :emoji)
   end
 
   def file_content_type(file_type)
@@ -44,7 +45,11 @@ module Whatsapp::IncomingMessageServiceHelpers
   end
 
   def unprocessable_message_type?(message_type)
-    %w[reaction ephemeral unsupported request_welcome].include?(message_type)
+    %w[ephemeral unsupported request_welcome].include?(message_type)
+  end
+
+  def reaction_removal?
+    message_type == 'reaction' && messages_data.first.dig(:reaction, :emoji).blank?
   end
 
   def processed_waid(waid)
@@ -61,6 +66,7 @@ module Whatsapp::IncomingMessageServiceHelpers
 
   def process_in_reply_to(message)
     @in_reply_to_external_id = message['context']&.[]('id')
+    @in_reply_to_external_id = message.dig(:reaction, :message_id) if message[:type] == 'reaction'
   end
 
   def find_message_by_source_id(source_id)

@@ -258,6 +258,82 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         end
       end
     end
+
+    context 'when message is a reaction' do
+      let(:reaction_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Gabriel Jablonski' }, wa_id: '553499503261' }],
+                messages: [{
+                  from: '553499503261',
+                  id: 'wamid.REACTION_MESSAGE_ID',
+                  timestamp: '1776974260',
+                  type: 'reaction',
+                  reaction: {
+                    message_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                    emoji: '❤️'
+                  }
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      context 'when the reacted message exists in Chatwoot' do
+        it 'creates a reaction message linked to the original message' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          original_message = create(:message,
+                                    conversation: conversation,
+                                    source_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                                    content: 'Original message')
+
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_params).perform
+
+          reaction_message = whatsapp_channel.inbox.messages.find_by(source_id: 'wamid.REACTION_MESSAGE_ID')
+          expect(reaction_message).to be_present
+          expect(reaction_message.content).to eq('❤️')
+          expect(reaction_message.message_type).to eq('incoming')
+          expect(reaction_message.attachments).to be_empty
+          expect(reaction_message.content_attributes['is_reaction']).to be true
+          expect(reaction_message.content_attributes['in_reply_to']).to eq(original_message.id)
+          expect(reaction_message.content_attributes['in_reply_to_external_id']).to eq('wamid.ORIGINAL_MESSAGE_ID')
+        end
+      end
+
+      context 'when the reacted message does not exist in Chatwoot' do
+        it 'still creates the reaction message but discards the reply reference' do
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_params).perform
+
+          reaction_message = whatsapp_channel.inbox.messages.find_by(source_id: 'wamid.REACTION_MESSAGE_ID')
+          expect(reaction_message).to be_present
+          expect(reaction_message.content).to eq('❤️')
+          expect(reaction_message.content_attributes['is_reaction']).to be true
+          expect(reaction_message.content_attributes['in_reply_to']).to be_nil
+          expect(reaction_message.content_attributes['in_reply_to_external_id']).to be_nil
+        end
+      end
+
+      context 'when the reaction emoji is blank (reaction removed)' do
+        let(:reaction_removal_params) do
+          reaction_params.deep_dup.tap do |payload|
+            payload[:entry][0][:changes][0][:value][:messages][0][:reaction][:emoji] = ''
+          end
+        end
+
+        it 'does not create a message' do
+          expect do
+            described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          end.not_to(change { whatsapp_channel.inbox.messages.count })
+        end
+      end
+    end
   end
 
   # Métodos auxiliares para reduzir o tamanho do exemplo
