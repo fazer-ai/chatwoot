@@ -30,6 +30,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   # default at the moment is 360dialog lets change later.
   PROVIDERS = %w[default whatsapp_cloud baileys zapi].freeze
+  REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi].freeze
   before_validation :ensure_webhook_verify_token
 
   validates :provider, inclusion: { in: PROVIDERS }
@@ -45,6 +46,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   def name
     'Whatsapp'
+  end
+
+  def supports_reactions?
+    REACTION_SUPPORTED_PROVIDERS.include?(provider)
   end
 
   def provider_service

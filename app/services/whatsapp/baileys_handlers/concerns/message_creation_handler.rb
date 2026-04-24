@@ -4,6 +4,8 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
   private
 
   def build_and_save_message(conversation:, sender:, attach_media: false)
+    return mark_existing_reaction_as_removed(conversation: conversation, sender: sender) if reaction_removal?
+
     @message = conversation.messages.build(
       content: message_content,
       account_id: inbox.account_id,
@@ -21,6 +23,42 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
     inbox.channel.received_messages([@message], conversation) if incoming?
 
     @message
+  end
+
+  # WhatsApp delivers a reaction removal as a fresh message with empty text.
+  # Our schema keeps a single Message row per (target, sender) and toggles
+  # `deleted` on it, so we look up that row and mark it removed instead of
+  # creating a duplicate empty Message that the chat list would have to filter.
+  # Outbound echoes are skipped because the local controller already updated
+  # the row when the agent toggled off from the Chatwoot UI.
+  def mark_existing_reaction_as_removed(conversation:, sender:)
+    return unless incoming?
+
+    target_external_id = unwrap_ephemeral_message(@raw_message[:message]).dig(:reactionMessage, :key, :id)
+    return if target_external_id.blank?
+
+    existing = find_existing_reaction(conversation, sender, target_external_id)
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    # Refresh the chat list snapshot of `last_non_activity_message`; the cable
+    # MESSAGE_UPDATED event only refreshes chat.messages on the client, so
+    # without this the preview can stay pointed at the pre-removal reaction.
+    # Touch updated_at so the frontend out-of-order guard can drop stale cables.
+    conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    conversation.dispatch_conversation_updated_event
+    existing
+  end
+
+  def find_existing_reaction(conversation, sender, target_external_id)
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    conversation.messages
+                .where(sender: sender)
+                .where("#{json_path}->>'is_reaction' = 'true'")
+                .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+                .reorder(created_at: :desc)
+                .first
   end
 
   def build_message_content_attributes

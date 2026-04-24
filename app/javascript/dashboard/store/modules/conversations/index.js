@@ -216,6 +216,14 @@ export const mutations = {
 
     const pendingMessageIndex = findPendingMessageIndex(chat, message);
     if (pendingMessageIndex !== -1) {
+      // MESSAGE_UPDATED cables can arrive out of order when the user toggles a
+      // reaction quickly: each Sidekiq job reads the message at run time, so a
+      // late-arriving cable for an older state would clobber the fresher one.
+      // Drop updates that are older than what we already have.
+      const existing = chat.messages[pendingMessageIndex];
+      const incomingTs = new Date(message.updated_at).getTime();
+      const existingTs = new Date(existing?.updated_at).getTime();
+      if (incomingTs && existingTs && incomingTs < existingTs) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
       chat.messages.push(message);

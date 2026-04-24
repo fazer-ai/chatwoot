@@ -27,14 +27,11 @@ json.meta do
 end
 
 json.id conversation.display_id
-if conversation.messages.where(account_id: conversation.account_id).last.blank?
-  json.messages []
-else
-  json.messages [
-    conversation.messages.where(account_id: conversation.account_id)
-                .includes([{ attachments: [{ file_attachment: [:blob] }] }]).last.try(:push_event_data)
-  ]
-end
+last_card_message = conversation.messages.where(account_id: conversation.account_id)
+                                .hide_removed_reactions
+                                .includes([{ attachments: [{ file_attachment: [:blob] }] }])
+                                .last
+json.messages last_card_message ? [last_card_message.push_event_data] : []
 
 json.account_id conversation.account_id
 json.uuid conversation.uuid
@@ -54,7 +51,23 @@ json.updated_at conversation.updated_at.to_f
 json.timestamp conversation.last_activity_at.to_i
 json.first_reply_created_at conversation.first_reply_created_at.to_i
 json.unread_count conversation.unread_incoming_messages.count
-json.last_non_activity_message conversation.messages.where(account_id: conversation.account_id).non_activity_messages.first.try(:push_event_data)
+last_non_activity = conversation.messages
+                                .where(account_id: conversation.account_id)
+                                .non_activity_messages
+                                .hide_removed_reactions
+                                .first
+if last_non_activity
+  json.last_non_activity_message do
+    json.merge! last_non_activity.push_event_data
+    if last_non_activity.reaction?
+      target_id = last_non_activity.content_attributes['in_reply_to']
+      target = target_id.present? ? conversation.messages.find_by(id: target_id) : nil
+      json.in_reply_to_snippet target.content.truncate(60) if target&.content.present?
+    end
+  end
+else
+  json.last_non_activity_message nil
+end
 json.last_activity_at conversation.last_activity_at.to_i
 json.group_type conversation.group_type
 json.priority conversation.priority

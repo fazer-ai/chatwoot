@@ -69,4 +69,48 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(presenter.webhook_data[:messages]).to eq([])
     end
   end
+
+  describe '#push_data last_non_activity_message' do
+    it 'is nil when the conversation has no non-activity messages' do
+      expect(presenter.push_data[:last_non_activity_message]).to be_nil
+    end
+
+    it 'returns the last regular non-activity message' do
+      message = create(:message, conversation: conversation, account: conversation.account,
+                                 message_type: :outgoing, content: 'Hello there')
+
+      data = presenter.push_data[:last_non_activity_message]
+
+      expect(data[:id]).to eq(message.id)
+      expect(data[:content]).to eq('Hello there')
+    end
+
+    it 'skips reactions whose user-facing state is removed' do
+      regular = create(:message, conversation: conversation, account: conversation.account,
+                                 message_type: :outgoing, content: 'A real message')
+      # A more recent reaction that has been toggled off should not become the
+      # snapshot — otherwise the chat list preview shows a "ghost" reaction.
+      create(:message, conversation: conversation, account: conversation.account,
+                       message_type: :incoming, content: '',
+                       content_attributes: { is_reaction: true, deleted: true,
+                                             in_reply_to_external_id: 'ext_999' })
+
+      data = presenter.push_data[:last_non_activity_message]
+
+      expect(data[:id]).to eq(regular.id)
+    end
+
+    it 'enriches reactions with in_reply_to_snippet from the targeted message' do
+      target = create(:message, conversation: conversation, account: conversation.account,
+                                message_type: :incoming, content: 'Original message body that we expect to see in the snippet')
+      reaction = create(:message, conversation: conversation, account: conversation.account,
+                                  message_type: :incoming, content: '👍',
+                                  content_attributes: { is_reaction: true, in_reply_to: target.id })
+
+      data = presenter.push_data[:last_non_activity_message]
+
+      expect(data[:id]).to eq(reaction.id)
+      expect(data[:in_reply_to_snippet]).to start_with('Original message body')
+    end
+  end
 end

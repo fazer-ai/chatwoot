@@ -583,7 +583,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         jid: remote_jid,
         messageContent: @message_content,
-        chatwootMessageId: @message.id
+        # baileys-api uses this as an idempotency key. Reactions UPDATE a single
+        # Message row in place across toggle/replace/remove cycles, so reusing
+        # only `id` would make every follow-up send hit the cached response and
+        # never reach WhatsApp. Suffixing with updated_at gives each send a fresh
+        # key while still letting Sidekiq retries of the same attempt dedupe.
+        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}"
       }.to_json,
       timeout: 120
     )

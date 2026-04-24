@@ -61,7 +61,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def skip_message?
-    unprocessable_message_type?(message_type) || reaction_removal?
+    unprocessable_message_type?(message_type)
   end
 
   # For regular messages the contact phone is in :from; for echoes it's in :to.
@@ -98,7 +98,36 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
     process_in_reply_to(message)
 
+    return mark_existing_reaction_as_removed if reaction_removal?
+
     message_type == 'contacts' ? create_contact_messages(message) : create_regular_message(message)
+  end
+
+  # Cloud delivers a reaction removal as a webhook with empty emoji. Our schema
+  # keeps a single Message row per (target, sender) with `deleted` toggled on it,
+  # so we update that row in place. Outbound echoes are skipped because the local
+  # controller already mutated the row when the agent toggled off from Chatwoot.
+  def mark_existing_reaction_as_removed
+    return if outgoing_echo
+    return if @in_reply_to_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    existing = @conversation.messages
+                            .where(sender: @contact)
+                            .where("#{json_path}->>'is_reaction' = 'true'")
+                            .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+                            .reorder(created_at: :desc)
+                            .first
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
+    # chat.messages on the client, so the conversation card preview stays stale
+    # without an explicit conversation.updated dispatch. Touch updated_at so
+    # the frontend out-of-order guard can drop stale cables.
+    @conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    @conversation.dispatch_conversation_updated_event
   end
 
   def create_contact_messages(message)

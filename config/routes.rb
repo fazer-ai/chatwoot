@@ -142,6 +142,9 @@ Rails.application.routes.draw do
                   patch :edit_content
                 end
                 resources :attachments, only: [:update]
+                scope module: :messages do
+                  resource :reactions, only: [:create]
+                end
               end
               resources :scheduled_messages, only: [:index, :create, :update, :destroy]
               resources :recurring_scheduled_messages, only: [:index, :create, :update, :destroy]

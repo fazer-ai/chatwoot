@@ -314,6 +314,13 @@
       "CONTACT": "Contatos",
       "COPILOT": "Copiloto"
     },
+    "REACTIONS": {
+      "ADD_REACTION": "Adicionar reação",
+      "MORE_EMOJIS": "Mais emojis",
+      "FAILED": "Não foi possível atualizar a reação. Tente novamente.",
+      "YOU": "Você",
+      "CLICK_TO_REMOVE": "Clique para remover"
+    },
     "VOICE_WIDGET": {
       "INCOMING_CALL": "Chamada recebida",
       "OUTGOING_CALL": "Chamada realizada",

@@ -314,6 +314,13 @@
       "CONTACT": "Contact",
       "COPILOT": "Copilot"
     },
+    "REACTIONS": {
+      "ADD_REACTION": "Add reaction",
+      "MORE_EMOJIS": "More emojis",
+      "FAILED": "Couldn't update reaction. Try again.",
+      "YOU": "You",
+      "CLICK_TO_REMOVE": "Click to remove"
+    },
     "VOICE_WIDGET": {
       "INCOMING_CALL": "Incoming call",
       "OUTGOING_CALL": "Outgoing call",

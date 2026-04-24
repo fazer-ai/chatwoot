@@ -1,4 +1,11 @@
 class MessageFinder
+  PAGE_LIMIT = 20
+
+  # `messages.content_attributes` is `json` but the model stores it as a
+  # double-encoded string (legacy `store coder: JSON`), so `->>` can't traverse
+  # it directly — `#>>'{}'` unwraps the outer encoding into proper jsonb.
+  NON_REACTION_CLAUSE = "((content_attributes#>>'{}')::jsonb->>'is_reaction') IS DISTINCT FROM 'true'".freeze
+
   def initialize(conversation, params)
     @conversation = conversation
     @params = params
@@ -37,7 +44,7 @@ class MessageFinder
   end
 
   def messages_before(before_id)
-    messages.reorder('created_at desc').where('id < ?', before_id).limit(20).reverse
+    page_window(messages.where('id < ?', before_id))
   end
 
   def messages_between(after_id, before_id)
@@ -45,6 +52,21 @@ class MessageFinder
   end
 
   def messages_latest
-    messages.reorder('created_at desc').limit(20).reverse
+    page_window(messages)
+  end
+
+  # Reactions don't count toward the page limit — otherwise a heavily-reacted
+  # message can flood the latest page and hide regular messages from the UI on
+  # initial load. Pick the most recent non-reactions, then widen the id window
+  # to include any reactions in that range so chips still render alongside
+  # their parents.
+  def page_window(scope)
+    # Drop `includes(:sender, ...)` for the id-only probe to avoid Rails trying
+    # to eager-load the polymorphic sender association (which would error).
+    bare = scope.except(:includes)
+    oldest_id = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc').limit(PAGE_LIMIT).minimum(:id)
+    return scope.none if oldest_id.nil?
+
+    scope.where('id >= ?', oldest_id).reorder('created_at asc')
   end
 end

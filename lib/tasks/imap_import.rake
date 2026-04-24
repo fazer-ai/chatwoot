@@ -223,4 +223,43 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
     puts "  Time:     #{format_duration(elapsed)}"
     puts '=' * 60
   end
+
+  desc 'Dry-run: count how many emails imap:import would import (no changes)'
+  task :scan, %i[inbox_id days folder] => :environment do |_task, args|
+    inbox_id = args[:inbox_id]
+    days = (args[:days] || 7).to_i
+    folder = args[:folder] || 'INBOX'
+
+    if inbox_id.blank?
+      puts 'Usage: rails imap:scan[<inbox_id>,<days>,<folder>]'
+      puts '  days:   how far back to look (default: 7)'
+      puts '  folder: IMAP folder (default: INBOX)'
+      next
+    end
+
+    inbox, channel = validate_inbox(inbox_id)
+
+    puts "Inbox:    #{inbox.name} (ID: #{inbox.id})"
+    puts "Email:    #{channel.email}"
+    puts "Folder:   #{folder}"
+    puts "Lookback: #{days} days"
+    puts '-' * 60
+
+    imap = connect_imap(channel, folder)
+    since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
+
+    puts "Searching emails since #{since_date}..."
+    uids = imap.uid_search(['SINCE', since_date])
+    puts "Found #{uids.length} emails in #{folder}."
+
+    new_uids, skipped = scan_new_email_uids(imap, channel, uids)
+    imap.logout
+
+    puts ''
+    puts '=' * 60
+    puts 'Scan complete (no changes made).'
+    puts "  Would import: #{new_uids.size}"
+    puts "  Would skip:   #{skipped} (already present)"
+    puts '=' * 60
+  end
 end

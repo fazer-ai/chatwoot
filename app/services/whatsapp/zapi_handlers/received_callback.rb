@@ -122,11 +122,46 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   end
 
   def handle_create_message
+    return mark_existing_reaction_as_removed if reaction_removal?
+
     if message_type == 'contact'
       create_contact_message
     else
       create_message(attach_media: %w[image sticker file video audio].include?(message_type))
     end
+  end
+
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
+  end
+
+  # Z-API delivers a reaction removal as a webhook with empty value. Our schema
+  # keeps a single Message row per (target, sender) toggling `deleted` on it,
+  # so we update that row in place. Outbound echoes are skipped because the
+  # local controller already mutated the row when the agent toggled off.
+  def mark_existing_reaction_as_removed
+    return unless incoming_message?
+
+    target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
+    return if target_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    existing = @conversation.messages
+                            .where(sender: @contact)
+                            .where("#{json_path}->>'is_reaction' = 'true'")
+                            .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+                            .reorder(created_at: :desc)
+                            .first
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
+    # chat.messages on the client, so the conversation card preview stays stale
+    # without an explicit conversation.updated dispatch. Touch updated_at so
+    # the frontend out-of-order guard can drop stale cables.
+    @conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    @conversation.dispatch_conversation_updated_event
   end
 
   def create_contact_message
