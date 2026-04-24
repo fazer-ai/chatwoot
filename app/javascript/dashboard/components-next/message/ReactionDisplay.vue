@@ -21,6 +21,10 @@ const props = defineProps({
     default: 'left',
     validator: value => ['left', 'right'].includes(value),
   },
+  readOnly: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['toggle']);
@@ -73,6 +77,7 @@ function closePopover() {
 
 function handleRowClick(emoji, user) {
   if (!user.isMine) return;
+  if (props.readOnly) return;
   emit('toggle', emoji);
   closePopover();
 }
@@ -112,12 +117,14 @@ function handleRowClick(emoji, user) {
         :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
       >
         <component
-          :is="user.isMine ? 'button' : 'div'"
+          :is="user.isMine && !readOnly ? 'button' : 'div'"
           v-for="(user, userIdx) in group.users"
           :key="`${group.emoji}-${user.id ?? userIdx}`"
-          :type="user.isMine ? 'button' : null"
+          :type="user.isMine && !readOnly ? 'button' : null"
           class="flex w-full items-center gap-2 rounded px-1 py-1 text-left"
-          :class="user.isMine ? 'cursor-pointer hover:bg-n-alpha-2' : ''"
+          :class="
+            user.isMine && !readOnly ? 'cursor-pointer hover:bg-n-alpha-2' : ''
+          "
           @click="handleRowClick(group.emoji, user)"
         >
           <span class="w-5 text-center text-sm">{{ group.emoji }}</span>
@@ -125,7 +132,10 @@ function handleRowClick(emoji, user) {
             <div class="text-xs text-n-slate-12 truncate">
               {{ user.isMine ? t('CONVERSATION.REACTIONS.YOU') : user.name }}
             </div>
-            <div v-if="user.isMine" class="text-[10px] text-n-slate-11">
+            <div
+              v-if="user.isMine && !readOnly"
+              class="text-[10px] text-n-slate-11"
+            >
               {{ t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE') }}
             </div>
           </div>

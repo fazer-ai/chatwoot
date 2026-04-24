@@ -150,7 +150,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   # live in an older/resolved thread, while `set_conversation` could have
   # picked (or created) a different one for this webhook. Find the row first,
   # then operate on its real `existing.conversation`.
-  def mark_existing_reaction_as_removed # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength
     target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
     return if target_external_id.blank?
 
@@ -165,12 +165,13 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
                 base.where(sender_id: nil, sender_type: nil)
                     .where(message_type: Message.message_types[:outgoing])
               end
-    # Prefer the newest active row so a stale deleted echo doesn't get
-    # re-deleted (no-op) while leaving the visible reaction untouched.
+    # Active-only: when the only matches are already deleted, return nil so
+    # the caller no-ops instead of re-deleting and bumping the conversation
+    # for an echoed Chatwoot-originated removal.
     existing = matches.where.not(content: '')
                       .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
                       .reorder(created_at: :desc)
-                      .first || matches.reorder(created_at: :desc).first
+                      .first
     return if existing.nil?
 
     new_attrs = existing.content_attributes.merge('deleted' => true)

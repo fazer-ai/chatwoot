@@ -55,6 +55,7 @@ last_non_activity = conversation.messages
                                 .where(account_id: conversation.account_id)
                                 .non_activity_messages
                                 .hide_removed_reactions
+                                .reorder(created_at: :desc)
                                 .first
 if last_non_activity
   json.last_non_activity_message do

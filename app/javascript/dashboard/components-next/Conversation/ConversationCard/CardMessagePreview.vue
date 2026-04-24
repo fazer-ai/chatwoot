@@ -29,8 +29,15 @@ const isRemovedReaction = msg =>
 // message instead of rendering "<sender> reagiu <>".
 const previewMessage = computed(() => {
   const { lastNonActivityMessage, messages = [] } = props.conversation;
-  if (lastNonActivityMessage && !isRemovedReaction(lastNonActivityMessage)) {
-    return lastNonActivityMessage;
+  // The same row gets mutated in place when a reaction is toggled or echoed
+  // from another device, so the snapshot may be stale. Resolve by id against
+  // the live messages array first to pick up the freshest copy.
+  const storeVersion = lastNonActivityMessage?.id
+    ? messages.find(message => message.id === lastNonActivityMessage.id)
+    : null;
+  const refreshedCandidate = storeVersion || lastNonActivityMessage;
+  if (refreshedCandidate && !isRemovedReaction(refreshedCandidate)) {
+    return refreshedCandidate;
   }
   return (
     [...messages]

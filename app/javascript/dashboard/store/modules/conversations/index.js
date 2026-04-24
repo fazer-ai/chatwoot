@@ -221,9 +221,13 @@ export const mutations = {
       // late-arriving cable for an older state would clobber the fresher one.
       // Drop updates that are older than what we already have.
       const existing = chat.messages[pendingMessageIndex];
-      const incomingTs = new Date(message.updated_at).getTime();
-      const existingTs = new Date(existing?.updated_at).getTime();
-      if (incomingTs && existingTs && incomingTs < existingTs) return;
+      const incomingTs = Date.parse(message.updated_at);
+      const existingTs = Date.parse(existing?.updated_at);
+      const hasIncomingTs = Number.isFinite(incomingTs);
+      const hasExistingTs = Number.isFinite(existingTs);
+      // If the incoming timestamp is unparseable, treat it as stale so a
+      // malformed cable can't clobber the local row.
+      if (hasExistingTs && (!hasIncomingTs || incomingTs < existingTs)) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
       chat.messages.push(message);

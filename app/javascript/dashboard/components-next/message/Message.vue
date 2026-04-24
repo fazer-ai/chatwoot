@@ -768,6 +768,7 @@ provideMessageContext({
             :current-user-id="currentUserId"
             :pending-emojis="pendingEmojis"
             :alignment="orientation === ORIENTATION.RIGHT ? 'right' : 'left'"
+            :read-only="!inboxSupportsReactions"
             @toggle="handleToggleReaction"
           />
         </div>

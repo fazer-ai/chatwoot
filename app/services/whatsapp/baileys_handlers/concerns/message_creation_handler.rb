@@ -27,16 +27,18 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
   # Our schema keeps a single Message row per (target, sender) and toggles
   # `deleted` on it, so we look up that row and mark it removed instead of
   # creating a duplicate empty Message that the chat list would have to filter.
-  # Outbound echoes are skipped because the local controller already updated
-  # the row when the agent toggled off from the Chatwoot UI.
   #
+  # `fromMe` removals can come from two paths and we want both handled:
+  # - Chatwoot-originated echo: the controller already toggled the row to
+  #   deleted, so the active-only lookup finds nothing and this no-ops.
+  # - Multi-device removal (agent un-reacts from the connected phone): the
+  #   row is still active and stored sender-less outgoing, so we mark it
+  #   deleted.
   # Lookup is intentionally NOT scoped to the inbound conversation: the
   # original reaction may live in an older/resolved thread, while the inbound
-  # flow could have picked (or created) a different one. Find the row via the
-  # sender globally, then operate on its real `existing.conversation`.
+  # flow could have picked (or created) a different one. Find the row first,
+  # then operate on its real `existing.conversation`.
   def mark_existing_reaction_as_removed(sender:)
-    return unless incoming?
-
     target_external_id = unwrap_ephemeral_message(@raw_message[:message]).dig(:reactionMessage, :key, :id)
     return if target_external_id.blank?
 
@@ -57,15 +59,23 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
 
   def find_existing_reaction(sender, target_external_id)
     json_path = "(content_attributes#>>'{}')::jsonb"
-    matches = Message.where(sender: sender)
-                     .where("#{json_path}->>'is_reaction' = 'true'")
-                     .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
-    # Prefer the newest active row so a stale deleted echo doesn't get
-    # re-deleted (no-op) while leaving the visible reaction untouched.
+    base = Message.where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+    matches = if incoming?
+                base.where(sender: sender)
+              else
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              end
+    # Active-only: when the only matches are already deleted, this returns nil
+    # so the caller no-ops instead of re-deleting and bumping the conversation
+    # for an echoed Chatwoot-originated removal.
     matches.where.not(content: '')
            .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
            .reorder(created_at: :desc)
-           .first || matches.reorder(created_at: :desc).first
+           .first
   end
 
   def build_message_content_attributes
