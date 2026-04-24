@@ -126,7 +126,7 @@ export default {
     <span v-else-if="message.content">
       {{ parsedLastMessage }}
     </span>
-    <span v-else-if="message.attachments">
+    <span v-else-if="message.attachments?.length">
       <fluent-icon
         v-if="attachmentIcon && showMessageType"
         size="16"

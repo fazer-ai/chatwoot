@@ -59,7 +59,11 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
 
   def find_existing_reaction(sender, target_external_id)
     json_path = "(content_attributes#>>'{}')::jsonb"
-    base = Message.where("#{json_path}->>'is_reaction' = 'true'")
+    # Scope by inbox: the senderless outgoing branch would otherwise match any
+    # reaction with the same provider message id, and two inboxes that ever
+    # receive colliding WhatsApp ids would step on each other's rows.
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
                   .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
     matches = if incoming?
                 base.where(sender: sender)

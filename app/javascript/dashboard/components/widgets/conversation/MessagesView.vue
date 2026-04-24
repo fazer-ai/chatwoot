@@ -688,13 +688,20 @@ export default {
         return m.message_type === 1 && senderId == null;
       });
       // Prefer active rows so we never resurrect a stale deleted echo when
-      // there is a fresher live reaction sitting next to it.
-      const byRecency = (a, b) => (b.created_at || 0) - (a.created_at || 0);
+      // there is a fresher live reaction sitting next to it. created_at is
+      // second-resolution, so a sort can keep the older entry first on ties.
+      // Reduce with >= so that, all else equal, the later iteration wins —
+      // giving a deterministic "newest" pick even for two toggles in the same
+      // second.
+      const pickLatest = list =>
+        list.reduce((latest, candidate) => {
+          if (!latest) return candidate;
+          return (candidate.created_at || 0) >= (latest.created_at || 0)
+            ? candidate
+            : latest;
+        }, null);
       const isActive = r => !!r.content && !r.content_attributes?.deleted;
-      return (
-        matches.filter(isActive).sort(byRecency)[0] ||
-        matches.sort(byRecency)[0]
-      );
+      return pickLatest(matches.filter(isActive)) || pickLatest(matches);
     },
     buildOptimisticReaction(messageId, emoji) {
       // Use the echo_id as the temporary id so findPendingMessageIndex matches

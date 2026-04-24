@@ -150,12 +150,16 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   # live in an older/resolved thread, while `set_conversation` could have
   # picked (or created) a different one for this webhook. Find the row first,
   # then operate on its real `existing.conversation`.
-  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
     target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
     return if target_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
-    base = Message.where("#{json_path}->>'is_reaction' = 'true'")
+    # Scope by inbox: the senderless outgoing branch would otherwise match any
+    # reaction with the same provider message id, and two inboxes that ever
+    # receive colliding WhatsApp ids would step on each other's rows.
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
                   .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
     matches = if incoming_message?
                 base.where(sender: @contact)

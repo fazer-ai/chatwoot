@@ -102,7 +102,10 @@ const reactionsByMessageId = computed(() => {
       ? `${originalId}|self|self`
       : `${originalId}|${senderType}|${senderId}`;
     const prev = latestPerKey.get(key);
-    if (!prev || (prev.createdAt ?? 0) < (msg.createdAt ?? 0)) {
+    // Use <= so a later iteration wins on timestamp ties. Cable payloads carry
+    // second-resolution createdAt, so two toggles in the same second need a
+    // deterministic later-wins rule to avoid pinning the chip to a stale row.
+    if (!prev || (prev.createdAt ?? 0) <= (msg.createdAt ?? 0)) {
       latestPerKey.set(key, msg);
     }
   });

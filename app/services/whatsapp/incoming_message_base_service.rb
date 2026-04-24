@@ -124,7 +124,10 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     return if @in_reply_to_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
-    matches = Message.where(sender: @contact)
+    # Scope by inbox so a colliding WhatsApp id from another inbox can't match
+    # here and hand us back the wrong row.
+    matches = Message.where(inbox_id: inbox.id)
+                     .where(sender: @contact)
                      .where("#{json_path}->>'is_reaction' = 'true'")
                      .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
     # Active-only: when the only matches are already deleted, return nil so
