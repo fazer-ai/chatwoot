@@ -63,7 +63,12 @@ if last_non_activity
     if last_non_activity.reaction?
       target_id = last_non_activity.content_attributes['in_reply_to']
       target = target_id.present? ? conversation.messages.find_by(id: target_id) : nil
-      json.in_reply_to_snippet target.content.truncate(60) if target&.content.present?
+      # strip_tags so the preview of an HTML/email target doesn't render as
+      # literal "<p>..." markup in the chat list card.
+      if target&.content.present?
+        plain_snippet = ActionController::Base.helpers.strip_tags(target.content)
+        json.in_reply_to_snippet plain_snippet.truncate(60)
+      end
     end
   end
 else

@@ -56,7 +56,11 @@ function closePopover() {
 function handleRowClick(user) {
   if (!user.isMine) return;
   emit('remove', user.reactionId);
-  if (props.reactions.length <= 1) closePopover();
+  // `reactions.length` is still the pre-removal count here. Close when the
+  // post-removal state would leave at most one reaction left: at that point
+  // the popover's list view collapses to a single user and stops being
+  // useful, so dropping it avoids a dangling open panel.
+  if (props.reactions.length - 1 <= 1) closePopover();
 }
 </script>
 

@@ -50,7 +50,12 @@ class Conversations::EventDataPresenter < SimpleDelegator
     if msg.reaction?
       target_id = msg.content_attributes['in_reply_to']
       target = target_id.present? ? messages.find_by(id: target_id) : nil
-      data[:in_reply_to_snippet] = target.content.truncate(60) if target&.content.present?
+      # Strip HTML before truncating so email/HTML messages don't leak
+      # "<p>..." markup into the chat-list preview as literal text.
+      if target&.content.present?
+        plain_snippet = ActionController::Base.helpers.strip_tags(target.content)
+        data[:in_reply_to_snippet] = plain_snippet.truncate(60)
+      end
     end
     data
   end

@@ -71,6 +71,7 @@ useEventListener(window, 'blur', close);
       type="button"
       class="flex items-center justify-center rounded-full p-1 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
       :title="t('CONVERSATION.REACTIONS.ADD_REACTION')"
+      :aria-label="t('CONVERSATION.REACTIONS.ADD_REACTION')"
       @click="toggle"
     >
       <Icon icon="i-lucide-smile-plus" class="size-4" />
@@ -100,6 +101,7 @@ useEventListener(window, 'blur', close);
         type="button"
         class="flex size-7 items-center justify-center rounded-full text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12"
         :title="t('CONVERSATION.REACTIONS.MORE_EMOJIS')"
+        :aria-label="t('CONVERSATION.REACTIONS.MORE_EMOJIS')"
         @click="openFullPicker"
       >
         <Icon icon="i-lucide-plus" class="size-4" />
