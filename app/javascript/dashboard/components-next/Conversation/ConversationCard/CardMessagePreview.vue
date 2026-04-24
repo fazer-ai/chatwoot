@@ -31,11 +31,16 @@ const previewMessage = computed(() => {
   const { lastNonActivityMessage, messages = [] } = props.conversation;
   // The same row gets mutated in place when a reaction is toggled or echoed
   // from another device, so the snapshot may be stale. Resolve by id against
-  // the live messages array first to pick up the freshest copy.
+  // the live messages array first to pick up the freshest copy, then merge the
+  // store fields onto the API snapshot so jbuilder-only fields like
+  // `in_reply_to_snippet` survive the refresh (replacing would regress the
+  // CHAT_LIST.REACTED_TO_SNIPPET preview to the generic fallback).
   const storeVersion = lastNonActivityMessage?.id
     ? messages.find(message => message.id === lastNonActivityMessage.id)
     : null;
-  const refreshedCandidate = storeVersion || lastNonActivityMessage;
+  const refreshedCandidate = storeVersion
+    ? { ...lastNonActivityMessage, ...storeVersion }
+    : lastNonActivityMessage;
   if (refreshedCandidate && !isRemovedReaction(refreshedCandidate)) {
     return refreshedCandidate;
   }

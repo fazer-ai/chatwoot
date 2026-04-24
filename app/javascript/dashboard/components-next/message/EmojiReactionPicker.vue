@@ -93,6 +93,12 @@ useEventListener(window, 'blur', close);
             ? t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE')
             : t(item.labelKey)
         "
+        :aria-label="
+          item.emoji === currentUserEmoji
+            ? t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE')
+            : t(item.labelKey)
+        "
+        :aria-pressed="item.emoji === currentUserEmoji"
         @click="pickEmoji(item.emoji)"
       >
         {{ item.emoji }}
