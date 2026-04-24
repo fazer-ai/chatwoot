@@ -123,7 +123,12 @@ const reactionsByMessageId = computed(() => {
   latestPerKey.forEach(reaction => {
     if (reaction.contentAttributes?.deleted) return;
     if (!reaction.content) return;
-    const originalId = reaction.contentAttributes.inReplyTo;
+    // Mirror the first pass: an echoed reaction may carry only
+    // inReplyToExternalId, so resolve via the sourceId lookup before giving up.
+    const originalId =
+      reaction.contentAttributes.inReplyTo ??
+      messageIdBySourceId.get(reaction.contentAttributes?.inReplyToExternalId);
+    if (!originalId) return;
     if (!map.has(originalId)) map.set(originalId, []);
     map.get(originalId).push({
       id: reaction.id,

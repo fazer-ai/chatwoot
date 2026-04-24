@@ -638,12 +638,15 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
 
         it 'skips reaction removal for outgoing echoes so the local controller update is not clobbered' do
+          # Mirror the post-controller state: the Chatwoot reactions controller
+          # already toggled the senderless outgoing row to deleted, so the
+          # echoed fromMe webhook should hit the active-only filter and no-op.
           existing_reaction = create(:message,
                                      conversation: message.conversation,
-                                     sender: message.conversation.contact_inbox.contact,
-                                     message_type: :incoming,
-                                     content: '👍',
-                                     content_attributes: { is_reaction: true, in_reply_to_external_id: message.source_id })
+                                     sender: nil,
+                                     message_type: :outgoing,
+                                     content: '',
+                                     content_attributes: { is_reaction: true, in_reply_to_external_id: message.source_id, deleted: true })
           raw_message[:key][:id] = 'outgoing_echo_removal'
           raw_message[:key][:fromMe] = true
           raw_message[:message] = {
@@ -652,12 +655,11 @@ describe Whatsapp::IncomingMessageBaileysService do
               text: ''
             }
           }
-
           described_class.new(inbox: inbox, params: params).perform
 
           existing_reaction.reload
-          expect(existing_reaction.content).to eq('👍')
-          expect(existing_reaction.content_attributes['deleted']).to be_nil
+          expect(existing_reaction.content).to eq('')
+          expect(existing_reaction.content_attributes['deleted']).to be(true)
         end
       end
 
