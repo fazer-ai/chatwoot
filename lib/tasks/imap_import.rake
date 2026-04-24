@@ -20,6 +20,19 @@ def connect_imap(channel, folder)
   imap
 end
 
+# Logout can raise Net::IMAP::Error when the server has already closed the
+# connection (eg. a transient network blip mid-scan). Mirror the
+# `terminate_imap_connection` pattern used by the IMAP fetch service: log and
+# fall back to a plain disconnect so ensure blocks never fail the whole task.
+def safe_close_imap(imap)
+  return if imap.nil?
+
+  imap.logout
+rescue Net::IMAP::Error => e
+  warn "  [IMAP] logout failed: #{e.message}; disconnecting"
+  imap.disconnect
+end
+
 def format_duration(seconds)
   seconds = seconds.to_i
   if seconds < 60
@@ -131,7 +144,7 @@ def import_worker(channel, folder, uid_batch, progress) # rubocop:disable Metric
         warn "\n  [ERROR] uid #{uid}: #{e.message}"
       end
     ensure
-      imap&.logout
+      safe_close_imap(imap)
     end
   end
 rescue StandardError => e
@@ -191,7 +204,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
 
       new_uids, skipped = scan_new_email_uids(imap, channel, uids)
     ensure
-      imap&.logout
+      safe_close_imap(imap)
     end
 
     if new_uids.empty?
@@ -258,7 +271,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
 
       new_uids, skipped = scan_new_email_uids(imap, channel, uids)
     ensure
-      imap&.logout
+      safe_close_imap(imap)
     end
 
     puts ''

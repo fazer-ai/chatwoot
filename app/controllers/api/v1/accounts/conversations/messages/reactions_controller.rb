@@ -13,7 +13,7 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
 
   def create
     emoji = reaction_params[:emoji].to_s
-    return render(json: { error: 'Invalid emoji' }, status: :unprocessable_entity) if emoji.bytesize > MAX_EMOJI_BYTES
+    return render(json: { error: 'Invalid emoji' }, status: :unprocessable_entity) unless emoji_payload_valid?(emoji)
 
     result = apply_toggle!(emoji)
 
@@ -96,6 +96,18 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
     message.content.present? && !message.content_attributes['deleted']
   end
 
+  # An emoji payload is either empty (removal) or a single grapheme cluster
+  # containing at least one Unicode emoji codepoint. This blocks plain-text
+  # strings like "ok" or "123" from slipping through and producing a bogus
+  # WhatsApp reaction send.
+  def emoji_payload_valid?(emoji)
+    return true if emoji.empty?
+    return false if emoji.bytesize > MAX_EMOJI_BYTES
+    return false if emoji.each_grapheme_cluster.to_a.length != 1
+
+    emoji.match?(/\p{Emoji}/)
+  end
+
   def ensure_channel_supports_reactions
     channel = @conversation.inbox.channel
     return if channel.respond_to?(:supports_reactions?) && channel.supports_reactions?
@@ -118,9 +130,10 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   # app/javascript/dashboard/components-next/message/Message.vue#canShowReactionToolbar
   # so a crafted POST cannot persist a reaction (and enqueue a provider send)
   # against a target the UI would never let the user pick.
-  def target_unreactable_error # rubocop:disable Metrics/CyclomaticComplexity
+  def target_unreactable_error # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     return 'Cannot react to private messages' if @target_message.private?
     return 'Cannot react to a reaction' if @target_message.reaction?
+    return 'Cannot react to deleted messages' if @target_message.content_attributes['deleted']
     return 'Cannot react to activity messages' if @target_message.activity?
     return 'Cannot react to template messages' if @target_message.template?
     return 'Cannot react to failed messages' if @target_message.failed?
