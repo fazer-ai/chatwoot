@@ -110,17 +110,20 @@ describe Whatsapp::IncomingMessageZapiService do
       end
 
       it 'skips reaction removal for outgoing echoes (fromMe: true) to avoid clobbering the local update' do
+        # Mirror the post-controller state: the reactions controller already
+        # toggled the senderless outgoing row to deleted, so the echoed fromMe
+        # webhook should hit the active-only filter and no-op.
         existing_reaction = create(:message,
                                    conversation: conversation,
-                                   sender: contact,
-                                   message_type: :incoming,
-                                   content: '❤️',
-                                   content_attributes: { is_reaction: true, in_reply_to_external_id: 'target_msg_id' })
+                                   sender: nil,
+                                   message_type: :outgoing,
+                                   content: '',
+                                   content_attributes: { is_reaction: true, in_reply_to_external_id: 'target_msg_id', deleted: true })
         described_class.new(inbox: inbox, params: removal_params.merge(fromMe: true, messageId: 'outgoing_echo_removal')).perform
 
         existing_reaction.reload
-        expect(existing_reaction.content).to eq('❤️')
-        expect(existing_reaction.content_attributes['deleted']).to be_nil
+        expect(existing_reaction.content).to eq('')
+        expect(existing_reaction.content_attributes['deleted']).to be(true)
       end
     end
   end
