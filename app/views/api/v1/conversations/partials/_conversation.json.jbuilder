@@ -28,9 +28,11 @@ end
 
 json.id conversation.display_id
 last_card_message = conversation.messages.where(account_id: conversation.account_id)
+                                .chat
                                 .hide_removed_reactions
                                 .includes([{ attachments: [{ file_attachment: [:blob] }] }])
-                                .last
+                                .reorder(created_at: :desc)
+                                .first
 json.messages last_card_message ? [last_card_message.push_event_data] : []
 
 json.account_id conversation.account_id

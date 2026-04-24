@@ -29,6 +29,12 @@ const isRemovedReaction = msg =>
 // message instead of rendering "<sender> reagiu <>".
 const previewMessage = computed(() => {
   const { lastNonActivityMessage, messages = [] } = props.conversation;
+  // Pre-filter once so both fallbacks share the same removed-reaction guard.
+  const nonRemovedMessages = messages.filter(m => !isRemovedReaction(m));
+  // Mirrors conversationHelper.getLastMessage: when nothing else is available
+  // a non-removed activity row is preferable to a blank "no content" preview.
+  const lastMessageIncludingActivity =
+    nonRemovedMessages[nonRemovedMessages.length - 1] || null;
   // The same row gets mutated in place when a reaction is toggled or echoed
   // from another device, so the snapshot may be stale. Resolve by id against
   // the live messages array first to pick up the freshest copy, then merge the
@@ -45,9 +51,8 @@ const previewMessage = computed(() => {
     return refreshedCandidate;
   }
   return (
-    [...messages]
-      .reverse()
-      .find(m => m?.messageType !== 2 && !isRemovedReaction(m)) || null
+    [...nonRemovedMessages].reverse().find(m => m?.messageType !== 2) ||
+    lastMessageIncludingActivity
   );
 });
 

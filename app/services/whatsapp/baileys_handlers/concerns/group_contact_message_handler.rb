@@ -37,11 +37,14 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
 
     # Reaction removals don't produce a new Message row; handle them before
     # find_or_create_group_conversation so a blank webhook can't create a
-    # stray group thread. Skip when the sender couldn't be resolved so the
-    # lookup never runs with sender: nil and accidentally matches a
-    # senderless outgoing row.
+    # stray group thread. The sender-blank guard only matters for incoming
+    # removals: with `sender: nil` the lookup would accidentally match a
+    # senderless outgoing row. The outgoing (fromMe) branch ignores the
+    # sender argument entirely (it scopes by sender_id IS NULL itself), so
+    # gating multi-device removals on @sender_contact would leave the row
+    # stuck active.
     if reaction_removal?
-      return if @sender_contact.blank?
+      return if incoming? && @sender_contact.blank?
 
       return mark_existing_reaction_as_removed(sender: @sender_contact)
     end
