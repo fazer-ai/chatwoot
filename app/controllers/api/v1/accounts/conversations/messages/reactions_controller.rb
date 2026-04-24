@@ -97,15 +97,20 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   end
 
   # An emoji payload is either empty (removal) or a single grapheme cluster
-  # that renders as an actual pictograph. `\p{Emoji}` alone is too broad — it
-  # matches plain ASCII like `1`, `#`, `*` because those are keycap bases —
-  # so we gate on `\p{Extended_Pictographic}` to require a real emoji rune.
+  # that actually renders as an emoji. `\p{Emoji}` alone is too broad (it
+  # matches keycap bases like `1`, `#`, `*`), while `\p{Extended_Pictographic}`
+  # alone is too narrow — it only hits single codepoints, so flag sequences
+  # (🇧🇷 = 2 regional indicators) and keycaps (1️⃣ = digit + VS16 + U+20E3)
+  # would be rejected. Accept a grapheme cluster that contains at least one
+  # pictographic codepoint, a regional indicator, or the combining keycap.
+  EMOJI_PROPERTY_RE = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u{20E3}]/
+
   def emoji_payload_valid?(emoji)
     return true if emoji.empty?
     return false if emoji.bytesize > MAX_EMOJI_BYTES
     return false if emoji.each_grapheme_cluster.to_a.length != 1
 
-    emoji.match?(/\p{Extended_Pictographic}/)
+    emoji.match?(EMOJI_PROPERTY_RE)
   end
 
   def ensure_channel_supports_reactions

@@ -435,6 +435,10 @@ const canShowReactionToolbar = computed(() => {
   if (props.status === MESSAGE_STATUS.PROGRESS) return false;
   if (props.private) return false;
   if (props.messageType === MESSAGE_TYPES.TEMPLATE) return false;
+  // Mirror ReactionsController#target_unreactable_error: a message without a
+  // provider source_id can't be reacted to on WhatsApp, so the API would 422
+  // if the user clicked. Hide the picker instead of offering a dead action.
+  if (!props.sourceId) return false;
   return true;
 });
 

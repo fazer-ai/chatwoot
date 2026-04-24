@@ -86,10 +86,19 @@ const reactionsByMessageId = computed(() => {
     return senderTypeOf(msg) === 'user' && senderId === props.currentUserId;
   };
 
+  // Build a sourceId → id lookup so reactions that only carry
+  // `inReplyToExternalId` (WhatsApp echo/phone-originated) can still resolve
+  // to a visible target when `inReplyTo` wasn't populated at save time.
+  const messageIdBySourceId = new Map(
+    allMessages.value.filter(m => !!m.sourceId).map(m => [m.sourceId, m.id])
+  );
+
   const latestPerKey = new Map();
   allMessages.value.forEach(msg => {
     if (!msg.contentAttributes?.isReaction) return;
-    const originalId = msg.contentAttributes?.inReplyTo;
+    const originalId =
+      msg.contentAttributes?.inReplyTo ??
+      messageIdBySourceId.get(msg.contentAttributes?.inReplyToExternalId);
     if (!originalId) return;
     const senderId = msg.senderId ?? msg.sender?.id;
     const senderType = senderTypeOf(msg);

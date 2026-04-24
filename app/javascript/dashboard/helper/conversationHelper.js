@@ -72,11 +72,15 @@ export const getLastMessage = m => {
   // ADD_MESSAGE mutates `chat.messages` in place but never touches
   // `last_non_activity_message`, so the API field can hold a stale snapshot of
   // a message that has since been updated (eg. a reaction toggled off). When
-  // the same id is present in the store, prefer that fresher copy.
+  // the same id is present in the store, merge the fresher store fields onto
+  // the API snapshot — replacing would strip jbuilder-only fields like
+  // `in_reply_to_snippet` that aren't present on push_event_data.
   const apiCandidate = m.last_non_activity_message;
   const apiId = apiCandidate?.id;
   const storeVersion = apiId ? m.messages.find(msg => msg.id === apiId) : null;
-  const refreshedApiCandidate = storeVersion || apiCandidate;
+  const refreshedApiCandidate = storeVersion
+    ? { ...apiCandidate, ...storeVersion }
+    : apiCandidate;
   const lastNonActivityMessageFromAPI = isRemovedReaction(refreshedApiCandidate)
     ? null
     : refreshedApiCandidate;
