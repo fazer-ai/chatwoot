@@ -952,9 +952,11 @@ RSpec.describe Message do
     end
 
     it 'hides reactions flagged as deleted' do
+      # Non-blank content here so the assertion can only succeed via the
+      # `deleted: true` branch (blank-content branch is covered separately).
       removed = create(:message,
                        conversation: conversation,
-                       content: '',
+                       content: '👍',
                        content_attributes: { is_reaction: true, deleted: true })
       expect(conversation.messages.hide_removed_reactions).not_to include(removed)
     end
