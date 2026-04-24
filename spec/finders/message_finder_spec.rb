@@ -107,16 +107,21 @@ describe MessageFinder do
       expect(non_reactions.size).to be >= 20
     end
 
-    it 'still includes reactions that fall inside the id window' do
-      msg = create(:message, conversation: fresh_conversation, content: 'Hi')
-      reaction = create(:message,
-                        conversation: fresh_conversation,
-                        content: '🔥',
-                        content_attributes: { is_reaction: true, in_reply_to_external_id: 'ext_1' })
+    it 'includes reactions whose parent message is inside the visible window' do
+      msg = create(:message, conversation: fresh_conversation, content: 'Hi', source_id: 'wamid.parent')
+      attached_reaction = create(:message,
+                                 conversation: fresh_conversation,
+                                 content: '🔥',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.parent' })
+      orphan_reaction = create(:message,
+                               conversation: fresh_conversation,
+                               content: '👍',
+                               content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.older.not.in.window' })
 
       result = message_finder.perform
 
-      expect(result).to include(msg, reaction)
+      expect(result).to include(msg, attached_reaction)
+      expect(result).not_to include(orphan_reaction)
     end
 
     it 'returns an empty scope when no non-reaction messages exist' do

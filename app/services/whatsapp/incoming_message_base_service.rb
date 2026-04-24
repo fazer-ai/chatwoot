@@ -112,24 +112,36 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
   # Cloud delivers a reaction removal as a webhook with empty emoji. Our schema
   # keeps a single Message row per (target, sender) with `deleted` toggled on it,
-  # so we update that row in place. Outbound echoes are skipped because the local
-  # controller already mutated the row when the agent toggled off from Chatwoot.
+  # so we update that row in place.
+  #
+  # Two paths converge here:
+  # - Incoming: contact removed their reaction; mark the contact-owned row.
+  # - Outgoing echo (multi-device, agent un-reacted from the connected phone):
+  #   mark the senderless outgoing row. The Chatwoot-originated removal echo
+  #   also lands here, but the active-only filter drops it (the controller
+  #   already toggled the row to deleted) so it no-ops harmlessly.
   #
   # Lookup is intentionally NOT scoped to `@conversation`: the reaction may live
   # in an older/resolved thread, while `set_conversation` could have just picked
-  # (or created) a different one for this webhook. Find the row via the contact
-  # globally, then operate on its real `existing.conversation`.
-  def mark_existing_reaction_as_removed
-    return if outgoing_echo
+  # (or created) a different one for this webhook. Find the row globally, then
+  # operate on its real `existing.conversation`.
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
     return if @in_reply_to_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
     # Scope by inbox so a colliding WhatsApp id from another inbox can't match
     # here and hand us back the wrong row.
-    matches = Message.where(inbox_id: inbox.id)
-                     .where(sender: @contact)
-                     .where("#{json_path}->>'is_reaction' = 'true'")
-                     .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+    matches = if outgoing_echo
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              else
+                base.where(sender: @contact)
+              end
     # Active-only: when the only matches are already deleted, return nil so
     # the caller no-ops instead of re-deleting and bumping the conversation
     # for an echoed Chatwoot-originated removal.

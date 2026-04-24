@@ -389,6 +389,12 @@ class Message < ApplicationRecord
   end
 
   def human_response?
+    # Reactions are not substantive replies; treating them as one would
+    # clear `waiting_since` / dispatch REPLY_CREATED on every emoji toggle
+    # and skew SLA timers for conversations the agent has not actually
+    # answered yet.
+    return false if reaction?
+
     # if the sender is not a user, it's not a human response
     # if automation rule id is present, it's not a human response
     # if campaign id is present, it's not a human response

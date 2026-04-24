@@ -57,9 +57,9 @@ class MessageFinder
 
   # Reactions don't count toward the page limit — otherwise a heavily-reacted
   # message can flood the latest page and hide regular messages from the UI on
-  # initial load. Pick the most recent non-reactions, then widen the id window
-  # to include any reactions in that range so chips still render alongside
-  # their parents.
+  # initial load. Pick the most recent non-reactions, then add only the
+  # reactions whose target is inside that window so chips render alongside
+  # their parents and orphan reactions on older messages don't bloat the page.
   def page_window(scope)
     # Drop `includes(:sender, ...)` for the id-only probe to avoid Rails trying
     # to eager-load the polymorphic sender association (which would error).
@@ -70,6 +70,14 @@ class MessageFinder
     window_ids = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc').limit(PAGE_LIMIT).pluck(:id)
     return scope.none if window_ids.empty?
 
-    scope.where('id >= ?', window_ids.min).reorder('created_at asc')
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    # `Message#ensure_in_reply_to` always populates content_attributes['in_reply_to']
+    # when either the internal id or external source_id resolves to a parent in the
+    # same conversation, so a single jsonb path scopes reactions to the windowed
+    # parents reliably.
+    reaction_in_window = "((#{json_path}->>'is_reaction') = 'true' AND " \
+                         "(#{json_path}->>'in_reply_to')::bigint IN (:ids))"
+    scope.where("id IN (:ids) OR #{reaction_in_window}", ids: window_ids)
+         .reorder('created_at asc')
   end
 end

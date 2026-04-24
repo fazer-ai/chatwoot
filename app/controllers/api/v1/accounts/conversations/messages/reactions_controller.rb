@@ -12,13 +12,12 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   CONTENT_ATTRIBUTES_JSONB = "(content_attributes#>>'{}')::jsonb".freeze
 
   def create
-    # An omitted `emoji` key silently coerces to ''; without this check a
-    # malformed POST from a client would be interpreted as a remove request
-    # and could wipe out the user's active reaction. An explicit blank string
-    # is still valid (that is the intended remove signal).
-    return render(json: { error: 'emoji is required' }, status: :unprocessable_entity) unless params.key?(:emoji)
+    # An omitted `emoji` key, or an explicit JSON `null`, would otherwise
+    # coerce to '' and silently wipe an active reaction. Require a String
+    # (explicit '' is still the intended remove signal).
+    return render(json: { error: 'emoji is required' }, status: :unprocessable_entity) unless params[:emoji].is_a?(String)
 
-    emoji = reaction_params[:emoji].to_s
+    emoji = reaction_params[:emoji]
     return render(json: { error: 'Invalid emoji' }, status: :unprocessable_entity) unless emoji_payload_valid?(emoji)
 
     result = apply_toggle!(emoji)
