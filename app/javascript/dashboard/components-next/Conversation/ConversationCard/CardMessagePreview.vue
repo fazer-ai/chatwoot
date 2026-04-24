@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import { useMapGetter } from 'dashboard/composables/store';
+import { MESSAGE_TYPE } from 'widget/helpers/constants';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 
@@ -52,7 +53,8 @@ const lastNonActivityMessageContent = computed(() => {
     // Multi-device: agent reacts from the WhatsApp mobile app on the same
     // number as the inbox; the echo is outgoing without an agent. Treat it
     // as "you" so the preview doesn't show a blank reactor name.
-    const isOwnInboxReaction = msg?.messageType === 1 && !senderId;
+    const isOwnInboxReaction =
+      msg?.messageType === MESSAGE_TYPE.OUTGOING && !senderId;
     const senderName =
       senderId === currentUserId.value || isOwnInboxReaction
         ? t('CONVERSATION.REACTIONS.YOU')

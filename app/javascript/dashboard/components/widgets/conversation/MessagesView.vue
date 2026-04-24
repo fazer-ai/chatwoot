@@ -657,7 +657,15 @@ export default {
       const matches = messages.filter(m => {
         if (!m.content_attributes?.is_reaction) return false;
         if (m.content_attributes?.in_reply_to !== messageId) return false;
-        const senderType = (m.sender_type || '').toLowerCase();
+        // REST jbuilder doesn't surface sender_type; only the nested
+        // sender.type. ActionCable push_event_data has the top-level field.
+        // Read both so REST-loaded agent reactions match instead of stacking
+        // a duplicate optimistic row.
+        const senderType = (
+          m.sender_type ||
+          m.sender?.type ||
+          ''
+        ).toLowerCase();
         const senderId = m.sender?.id ?? m.sender_id;
         // Reaction created via Chatwoot UI by the current user
         if (senderType === 'user' && senderId === this.currentUserId) {

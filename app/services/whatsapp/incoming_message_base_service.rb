@@ -120,11 +120,15 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     return if @in_reply_to_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
-    existing = Message.where(sender: @contact)
-                      .where("#{json_path}->>'is_reaction' = 'true'")
-                      .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+    matches = Message.where(sender: @contact)
+                     .where("#{json_path}->>'is_reaction' = 'true'")
+                     .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+    # Prefer the newest active row so a stale deleted echo doesn't get
+    # re-deleted (no-op) while leaving the visible reaction untouched.
+    existing = matches.where.not(content: '')
+                      .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
                       .reorder(created_at: :desc)
-                      .first
+                      .first || matches.reorder(created_at: :desc).first
     return if existing.nil?
 
     new_attrs = existing.content_attributes.merge('deleted' => true)

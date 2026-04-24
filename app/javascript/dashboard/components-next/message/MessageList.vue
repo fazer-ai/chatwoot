@@ -119,6 +119,22 @@ const visibleMessages = computed(() => {
   return allMessages.value.filter(msg => !msg.contentAttributes?.isReaction);
 });
 
+// firstUnreadId can point to a reaction (filtered out of visibleMessages),
+// in which case the unread separator would never render. Anchor it to the
+// first visible message at or after that id so the divider always shows up
+// next to a real bubble.
+const effectiveFirstUnreadId = computed(() => {
+  if (!props.firstUnreadId) return null;
+  const direct = visibleMessages.value.find(
+    msg => msg.id === props.firstUnreadId
+  );
+  if (direct) return direct.id;
+  const fallback = visibleMessages.value.find(
+    msg => msg.id >= props.firstUnreadId
+  );
+  return fallback?.id ?? null;
+});
+
 const currentChat = useMapGetter('getSelectedChat');
 
 const isGroupConversation = computed(
@@ -242,7 +258,7 @@ const getInReplyToMessage = parentMessage => {
     <slot name="beforeAll" />
     <template v-for="(message, index) in visibleMessages" :key="message.id">
       <slot
-        v-if="firstUnreadId && message.id === firstUnreadId"
+        v-if="effectiveFirstUnreadId && message.id === effectiveFirstUnreadId"
         name="unreadBadge"
       />
       <Message
