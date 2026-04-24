@@ -152,9 +152,20 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   #   new Chatwoot-side reaction and the original would never be removed from
   #   WhatsApp.
   def current_user_reaction
+    # Match by both the internal in_reply_to (set by Chatwoot-originated
+    # reactions via MessageBuilder) and the in_reply_to_external_id (set by
+    # WhatsApp incoming/echoed reactions via IncomingMessageBaseService). A
+    # multi-device echo persists with only the external id, so without this OR
+    # the next toggle would miss the echoed row and stack a duplicate self
+    # reaction.
     matches = @conversation.messages
                            .where("#{CONTENT_ATTRIBUTES_JSONB}->>'is_reaction' = 'true'")
-                           .where("(#{CONTENT_ATTRIBUTES_JSONB}->>'in_reply_to')::bigint = ?", @target_message.id)
+                           .where(
+                             "(#{CONTENT_ATTRIBUTES_JSONB}->>'in_reply_to')::bigint = :message_id OR " \
+                             "#{CONTENT_ATTRIBUTES_JSONB}->>'in_reply_to_external_id' = :source_id",
+                             message_id: @target_message.id,
+                             source_id: @target_message.source_id
+                           )
                            .where(
                              '(sender_type = ? AND sender_id = ?) OR ' \
                              '(message_type = ? AND sender_type IS NULL AND sender_id IS NULL)',

@@ -585,14 +585,14 @@ export default {
       const payload = useSnakeCase(message);
       await this.$store.dispatch('sendMessageWithData', payload);
     },
-    async handleToggleReaction({ messageId, emoji }) {
+    async handleToggleReaction({ messageId, targetSourceId, emoji }) {
       // Backend keeps a single Message row per (target, user) and toggles it
       // in-place. The cable echo always carries the original create's echo_id,
       // so creating a fresh optimistic per toggle leaves the new one orphaned
       // in the store (the cable matches the real msg id, never the new echo).
       // Those orphans show up as "reagiu <emoji>" in the chat list preview
       // even after the user toggles off. Update the existing entry instead.
-      const existing = this.findCurrentUserReaction(messageId);
+      const existing = this.findCurrentUserReaction(messageId, targetSourceId);
       if (existing) {
         await this.applyToggleOnExisting(existing, messageId, emoji);
       } else {
@@ -652,11 +652,21 @@ export default {
         useAlert(this.$t('CONVERSATION.REACTIONS.FAILED'));
       }
     },
-    findCurrentUserReaction(messageId) {
+    findCurrentUserReaction(messageId, targetSourceId = null) {
       const messages = this.currentChat?.messages || [];
       const matches = messages.filter(m => {
         if (!m.content_attributes?.is_reaction) return false;
-        if (m.content_attributes?.in_reply_to !== messageId) return false;
+        // Match both in_reply_to (set by Chatwoot-originated reactions) and
+        // in_reply_to_external_id (set by WhatsApp echoes). Without the
+        // external id check, a multi-device reaction sent from the connected
+        // phone would be invisible here, and the next toggle would stack a
+        // duplicate optimistic row instead of mutating the echoed one.
+        const matchesInReplyTo =
+          m.content_attributes?.in_reply_to === messageId;
+        const matchesExternalId =
+          targetSourceId &&
+          m.content_attributes?.in_reply_to_external_id === targetSourceId;
+        if (!matchesInReplyTo && !matchesExternalId) return false;
         // REST jbuilder doesn't surface sender_type; only the nested
         // sender.type. ActionCable push_event_data has the top-level field.
         // Read both so REST-loaded agent reactions match instead of stacking

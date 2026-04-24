@@ -461,7 +461,11 @@ const pendingTimeouts = new Set();
 function handleToggleReaction(emoji) {
   if (pendingEmojis.value.has(emoji)) return;
   pendingEmojis.value = new Set([...pendingEmojis.value, emoji]);
-  emit('toggleReaction', { messageId: props.id, emoji });
+  emit('toggleReaction', {
+    messageId: props.id,
+    targetSourceId: props.sourceId,
+    emoji,
+  });
   const timeoutId = setTimeout(() => {
     pendingTimeouts.delete(timeoutId);
     if (!pendingEmojis.value.has(emoji)) return;
