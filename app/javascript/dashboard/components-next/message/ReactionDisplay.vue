@@ -43,6 +43,7 @@ const groupedReactions = computed(() => {
       (reaction.messageType === 1 && reaction.senderId == null);
     if (isMine) groups[emoji].isMine = true;
     groups[emoji].users.push({
+      id: reaction.id,
       name: reaction.sender?.name || '',
       isMine,
     });
@@ -112,7 +113,7 @@ function handleRowClick(emoji, user) {
       >
         <div
           v-for="(user, userIdx) in group.users"
-          :key="`${group.emoji}-${userIdx}`"
+          :key="`${group.emoji}-${user.id ?? userIdx}`"
           class="flex items-center gap-2 rounded px-1 py-1"
           :class="user.isMine ? 'cursor-pointer hover:bg-n-alpha-2' : ''"
           @click="handleRowClick(group.emoji, user)"

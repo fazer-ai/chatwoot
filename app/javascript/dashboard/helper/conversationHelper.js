@@ -55,13 +55,17 @@ const isRemovedReaction = message =>
   (message?.content_attributes?.deleted || !message?.content);
 
 export const getLastMessage = m => {
-  const lastMessageIncludingActivity = m.messages[m.messages.length - 1];
+  // Drop removed reactions up-front so neither the activity fallback nor the
+  // visible-messages list ever picks a blank "X reagiu " row.
+  const nonRemovedMessages = m.messages.filter(
+    message => !isRemovedReaction(message)
+  );
+  const lastMessageIncludingActivity =
+    nonRemovedMessages[nonRemovedMessages.length - 1];
 
-  const visibleMessages = m.messages.filter(message => {
-    if (message.message_type === 2) return false;
-    if (isRemovedReaction(message)) return false;
-    return true;
-  });
+  const visibleMessages = nonRemovedMessages.filter(
+    message => message.message_type !== 2
+  );
   const lastNonActivityMessageInStore =
     visibleMessages[visibleMessages.length - 1];
 
@@ -80,8 +84,7 @@ export const getLastMessage = m => {
   // If API value and store value for last non activity message
   // is empty, then return the last activity message
   if (!lastNonActivityMessageInStore && !lastNonActivityMessageFromAPI) {
-    if (isRemovedReaction(lastMessageIncludingActivity)) return null;
-    return lastMessageIncludingActivity;
+    return lastMessageIncludingActivity || null;
   }
 
   return getLastNonActivityMessage(

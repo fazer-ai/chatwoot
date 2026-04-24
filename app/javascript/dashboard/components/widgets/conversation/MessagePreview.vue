@@ -43,8 +43,10 @@ export default {
     reactionPreviewText() {
       if (!this.isReactionMessage) return '';
       const senderId = this.message?.sender?.id;
+      const isOwnInboxEcho =
+        this.message?.message_type === MESSAGE_TYPE.OUTGOING && !senderId;
       const senderName =
-        senderId === this.currentUserId
+        senderId === this.currentUserId || isOwnInboxEcho
           ? this.$t('CONVERSATION.REACTIONS.YOU')
           : this.message?.sender?.name || '';
       const emoji = this.message?.content;

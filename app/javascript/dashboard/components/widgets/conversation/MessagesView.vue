@@ -654,23 +654,29 @@ export default {
     },
     findCurrentUserReaction(messageId) {
       const messages = this.currentChat?.messages || [];
-      return messages
-        .filter(m => {
-          if (!m.content_attributes?.is_reaction) return false;
-          if (m.content_attributes?.in_reply_to !== messageId) return false;
-          const senderType = (m.sender_type || '').toLowerCase();
-          const senderId = m.sender?.id ?? m.sender_id;
-          // Reaction created via Chatwoot UI by the current user
-          if (senderType === 'user' && senderId === this.currentUserId) {
-            return true;
-          }
-          // Multi-device echo: agent reacted from the WhatsApp mobile app on
-          // the same number connected to this inbox, so it has no agent in
-          // Chatwoot. Treat it as ours so a click toggles/removes it instead
-          // of stacking a duplicate reaction on top.
-          return m.message_type === 1 && senderId == null;
-        })
-        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+      const matches = messages.filter(m => {
+        if (!m.content_attributes?.is_reaction) return false;
+        if (m.content_attributes?.in_reply_to !== messageId) return false;
+        const senderType = (m.sender_type || '').toLowerCase();
+        const senderId = m.sender?.id ?? m.sender_id;
+        // Reaction created via Chatwoot UI by the current user
+        if (senderType === 'user' && senderId === this.currentUserId) {
+          return true;
+        }
+        // Multi-device echo: agent reacted from the WhatsApp mobile app on
+        // the same number connected to this inbox, so it has no agent in
+        // Chatwoot. Treat it as ours so a click toggles/removes it instead
+        // of stacking a duplicate reaction on top.
+        return m.message_type === 1 && senderId == null;
+      });
+      // Prefer active rows so we never resurrect a stale deleted echo when
+      // there is a fresher live reaction sitting next to it.
+      const byRecency = (a, b) => (b.created_at || 0) - (a.created_at || 0);
+      const isActive = r => !!r.content && !r.content_attributes?.deleted;
+      return (
+        matches.filter(isActive).sort(byRecency)[0] ||
+        matches.sort(byRecency)[0]
+      );
     },
     buildOptimisticReaction(messageId, emoji) {
       // Use the echo_id as the temporary id so findPendingMessageIndex matches

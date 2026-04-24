@@ -182,14 +182,17 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
 
     # Phase 1: scan headers with a single connection to find new emails
     imap = connect_imap(channel, folder)
-    since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
+    begin
+      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
 
-    puts "Searching emails since #{since_date}..."
-    uids = imap.uid_search(['SINCE', since_date])
-    puts "Found #{uids.length} emails in #{folder}."
+      puts "Searching emails since #{since_date}..."
+      uids = imap.uid_search(['SINCE', since_date])
+      puts "Found #{uids.length} emails in #{folder}."
 
-    new_uids, skipped = scan_new_email_uids(imap, channel, uids)
-    imap.logout
+      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
+    ensure
+      imap&.logout
+    end
 
     if new_uids.empty?
       puts 'Nothing new to import.'
@@ -225,7 +228,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
   end
 
   desc 'Dry-run: count how many emails imap:import would import (no changes)'
-  task :scan, %i[inbox_id days folder] => :environment do |_task, args|
+  task :scan, %i[inbox_id days folder] => :environment do |_task, args| # rubocop:disable Metrics/BlockLength
     inbox_id = args[:inbox_id]
     days = (args[:days] || 7).to_i
     folder = args[:folder] || 'INBOX'
@@ -246,14 +249,17 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
     puts '-' * 60
 
     imap = connect_imap(channel, folder)
-    since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
+    begin
+      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
 
-    puts "Searching emails since #{since_date}..."
-    uids = imap.uid_search(['SINCE', since_date])
-    puts "Found #{uids.length} emails in #{folder}."
+      puts "Searching emails since #{since_date}..."
+      uids = imap.uid_search(['SINCE', since_date])
+      puts "Found #{uids.length} emails in #{folder}."
 
-    new_uids, skipped = scan_new_email_uids(imap, channel, uids)
-    imap.logout
+      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
+    ensure
+      imap&.logout
+    end
 
     puts ''
     puts '=' * 60
