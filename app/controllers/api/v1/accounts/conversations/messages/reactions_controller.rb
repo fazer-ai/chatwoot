@@ -123,16 +123,22 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   #   new Chatwoot-side reaction and the original would never be removed from
   #   WhatsApp.
   def current_user_reaction
-    @conversation.messages
-                 .where("#{CONTENT_ATTRIBUTES_JSONB}->>'is_reaction' = 'true'")
-                 .where("(#{CONTENT_ATTRIBUTES_JSONB}->>'in_reply_to')::bigint = ?", @target_message.id)
-                 .where(
-                   '(sender_type = ? AND sender_id = ?) OR ' \
-                   '(message_type = ? AND sender_type IS NULL AND sender_id IS NULL)',
-                   'User', Current.user.id, Message.message_types[:outgoing]
-                 )
-                 .reorder(created_at: :desc)
-                 .first
+    matches = @conversation.messages
+                           .where("#{CONTENT_ATTRIBUTES_JSONB}->>'is_reaction' = 'true'")
+                           .where("(#{CONTENT_ATTRIBUTES_JSONB}->>'in_reply_to')::bigint = ?", @target_message.id)
+                           .where(
+                             '(sender_type = ? AND sender_id = ?) OR ' \
+                             '(message_type = ? AND sender_type IS NULL AND sender_id IS NULL)',
+                             'User', Current.user.id, Message.message_types[:outgoing]
+                           )
+    # Prefer the newest active row so a stale deleted echo can't hijack the
+    # toggle target and either resurrect a removed reaction or leave the
+    # active one untouched (creating a duplicate active state for the user).
+    active = matches.where.not(content: '')
+                    .where("COALESCE(#{CONTENT_ATTRIBUTES_JSONB}->>'deleted', 'false') != 'true'")
+                    .reorder(created_at: :desc)
+                    .first
+    active || matches.reorder(created_at: :desc).first
   end
 
   def build_reaction_message!(emoji)

@@ -23,7 +23,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
   private
 
-  def process_messages
+  def process_messages # rubocop:disable Metrics/CyclomaticComplexity
     @lock_acquired = false
 
     # We don't support ephemeral message now, we need to skip processing the message
@@ -44,10 +44,17 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     with_contact_lock(contact_phone_for_lock) do
       # Re-check after acquiring lock to handle race conditions where an outgoing message
       # was sent from Chatwoot and the webhook arrived before source_id was saved
-      return if find_message_by_source_id(messages_data.first[:id])
+      next if find_message_by_source_id(messages_data.first[:id])
 
       set_contact
-      return unless contact_processable?
+      next unless contact_processable?
+
+      # Process in_reply_to early so mark_existing_reaction_as_removed has
+      # `@in_reply_to_external_id` available. Reaction removals don't create a
+      # new Message row, so handle them outside the transaction to avoid
+      # set_conversation opening/creating a stray thread for a blank webhook.
+      process_in_reply_to(messages_data.first)
+      next mark_existing_reaction_as_removed if reaction_removal?
 
       ActiveRecord::Base.transaction do
         set_conversation
@@ -95,10 +102,6 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   def create_messages
     message = messages_data.first
     log_error(message) && return if error_webhook_event?(message)
-
-    process_in_reply_to(message)
-
-    return mark_existing_reaction_as_removed if reaction_removal?
 
     message_type == 'contacts' ? create_contact_messages(message) : create_regular_message(message)
   end

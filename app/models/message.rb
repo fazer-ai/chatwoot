@@ -245,7 +245,7 @@ class Message < ApplicationRecord
   end
 
   def reaction?
-    content_attributes['is_reaction'].present?
+    ActiveModel::Type::Boolean.new.cast(content_attributes['is_reaction']) == true
   end
 
   def valid_first_reply?

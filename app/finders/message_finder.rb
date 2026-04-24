@@ -63,10 +63,13 @@ class MessageFinder
   def page_window(scope)
     # Drop `includes(:sender, ...)` for the id-only probe to avoid Rails trying
     # to eager-load the polymorphic sender association (which would error).
+    # `minimum(:id)` would silently aggregate over the FULL relation (Rails
+    # drops the limit), pulling in old messages and blowing up the page. Pluck
+    # the limited window first and take the min in Ruby.
     bare = scope.except(:includes)
-    oldest_id = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc').limit(PAGE_LIMIT).minimum(:id)
-    return scope.none if oldest_id.nil?
+    window_ids = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc').limit(PAGE_LIMIT).pluck(:id)
+    return scope.none if window_ids.empty?
 
-    scope.where('id >= ?', oldest_id).reorder('created_at asc')
+    scope.where('id >= ?', window_ids.min).reorder('created_at asc')
   end
 end

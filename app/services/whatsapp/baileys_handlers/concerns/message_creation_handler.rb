@@ -4,8 +4,6 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
   private
 
   def build_and_save_message(conversation:, sender:, attach_media: false)
-    return mark_existing_reaction_as_removed(sender: sender) if reaction_removal?
-
     @message = conversation.messages.build(
       content: message_content,
       account_id: inbox.account_id,

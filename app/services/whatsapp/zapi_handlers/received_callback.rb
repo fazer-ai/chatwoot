@@ -3,7 +3,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback # rubocop:disable Metrics/MethodLength
+  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
@@ -26,6 +26,10 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
         Rails.logger.warn "Contact not found for message: #{raw_message_id}"
         return
       end
+
+      # Reaction removals don't produce a new Message row — handle them before
+      # set_conversation so a blank webhook can't open/create a stray thread.
+      next mark_existing_reaction_as_removed if reaction_removal?
 
       set_conversation
       handle_create_message
@@ -122,8 +126,6 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   end
 
   def handle_create_message
-    return mark_existing_reaction_as_removed if reaction_removal?
-
     if message_type == 'contact'
       create_contact_message
     else

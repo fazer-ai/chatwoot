@@ -5,7 +5,7 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
 
   private
 
-  def handle_individual_contact_message
+  def handle_individual_contact_message # rubocop:disable Metrics/CyclomaticComplexity
     return unless extract_from_jid(type: 'lid')
 
     @lock_acquired = acquire_message_processing_lock
@@ -28,6 +28,10 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
         Rails.logger.warn "Contact not found for message: #{raw_message_id}"
         return
       end
+
+      # Reaction removals don't produce a new Message row; handle them before
+      # set_conversation so a blank webhook can't open/create a stray thread.
+      next mark_existing_reaction_as_removed(sender: @contact) if reaction_removal?
 
       set_conversation
       handle_create_message
