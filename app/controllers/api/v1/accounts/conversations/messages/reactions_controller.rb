@@ -108,10 +108,26 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   end
 
   def ensure_target_is_reactable
-    return render(json: { error: 'Cannot react to private messages' }, status: :unprocessable_entity) if @target_message.private?
-    return unless @target_message.reaction?
+    error = target_unreactable_error
+    return if error.nil?
 
-    render(json: { error: 'Cannot react to a reaction' }, status: :unprocessable_entity)
+    render(json: { error: error }, status: :unprocessable_entity)
+  end
+
+  # Mirrors the client-side guard in
+  # app/javascript/dashboard/components-next/message/Message.vue#canShowReactionToolbar
+  # so a crafted POST cannot persist a reaction (and enqueue a provider send)
+  # against a target the UI would never let the user pick.
+  def target_unreactable_error # rubocop:disable Metrics/CyclomaticComplexity
+    return 'Cannot react to private messages' if @target_message.private?
+    return 'Cannot react to a reaction' if @target_message.reaction?
+    return 'Cannot react to activity messages' if @target_message.activity?
+    return 'Cannot react to template messages' if @target_message.template?
+    return 'Cannot react to failed messages' if @target_message.failed?
+    return 'Cannot react to unsupported messages' if @target_message.content_attributes['is_unsupported']
+    return 'Target message is not deliverable to WhatsApp' if @target_message.source_id.blank?
+
+    nil
   end
 
   # Returns the most recent reaction Message we should mutate for the current

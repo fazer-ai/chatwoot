@@ -39,7 +39,11 @@ class Conversations::EventDataPresenter < SimpleDelegator
   # by the frontend store and `MessagePreview` to derive the latest visible
   # message). Without this, the snapshot taken at fetch time stays stale.
   def push_last_non_activity_message
-    msg = messages.where(account_id: account_id).non_activity_messages.hide_removed_reactions.first
+    msg = messages.where(account_id: account_id)
+                  .non_activity_messages
+                  .hide_removed_reactions
+                  .reorder(created_at: :desc)
+                  .first
     return nil unless msg
 
     data = msg.push_event_data

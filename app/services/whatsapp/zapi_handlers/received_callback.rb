@@ -139,23 +139,32 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   # Z-API delivers a reaction removal as a webhook with empty value. Our schema
   # keeps a single Message row per (target, sender) toggling `deleted` on it,
-  # so we update that row in place. Outbound echoes are skipped because the
-  # local controller already mutated the row when the agent toggled off.
+  # so we update that row in place.
   #
+  # `fromMe` removals can come from two paths and we want both handled:
+  # - Chatwoot-originated echo: the controller already toggled the row to
+  #   deleted, so the active-first lookup finds nothing and this no-ops.
+  # - Multi-device removal (agent un-reacts from the connected phone): the row
+  #   is still active and stored sender-less outgoing, so we mark it deleted.
   # Lookup is intentionally NOT scoped to `@conversation`: the reaction may
   # live in an older/resolved thread, while `set_conversation` could have
-  # picked (or created) a different one for this webhook. Find the row via
-  # the contact globally, then operate on its real `existing.conversation`.
-  def mark_existing_reaction_as_removed
-    return unless incoming_message?
-
+  # picked (or created) a different one for this webhook. Find the row first,
+  # then operate on its real `existing.conversation`.
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
     target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
     return if target_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
-    matches = Message.where(sender: @contact)
-                     .where("#{json_path}->>'is_reaction' = 'true'")
-                     .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+    base = Message.where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+    matches = if incoming_message?
+                base.where(sender: @contact)
+              else
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              end
     # Prefer the newest active row so a stale deleted echo doesn't get
     # re-deleted (no-op) while leaving the visible reaction untouched.
     existing = matches.where.not(content: '')

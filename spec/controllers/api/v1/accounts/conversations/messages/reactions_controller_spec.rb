@@ -7,7 +7,7 @@ RSpec.describe 'Conversation Message Reactions API', type: :request do
   let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
   let(:inbox) { channel.inbox }
   let(:conversation) { create(:conversation, account: account, inbox: inbox) }
-  let!(:target_message) { create(:message, account: account, conversation: conversation, content: 'Hi') }
+  let!(:target_message) { create(:message, account: account, conversation: conversation, content: 'Hi', source_id: 'wamid.target') }
   let(:reactions_url) do
     "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{target_message.id}/reactions"
   end

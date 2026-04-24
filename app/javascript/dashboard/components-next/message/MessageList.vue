@@ -76,6 +76,16 @@ const reactionsByMessageId = computed(() => {
     return msg.messageType === 1 && sid == null;
   };
 
+  // Collapse "agent reacted via Chatwoot" and "agent reacted via the connected
+  // phone" into the same logical actor so the chip never double-counts the
+  // current user. The controller and MessagesView already treat both shapes
+  // as the same toggle target.
+  const isSelfReaction = msg => {
+    if (isOwnInboxReaction(msg)) return true;
+    const senderId = msg.senderId ?? msg.sender?.id;
+    return senderTypeOf(msg) === 'user' && senderId === props.currentUserId;
+  };
+
   const latestPerKey = new Map();
   allMessages.value.forEach(msg => {
     if (!msg.contentAttributes?.isReaction) return;
@@ -83,12 +93,12 @@ const reactionsByMessageId = computed(() => {
     if (!originalId) return;
     const senderId = msg.senderId ?? msg.sender?.id;
     const senderType = senderTypeOf(msg);
-    const ownInbox = isOwnInboxReaction(msg);
-    if (!ownInbox && (senderId == null || !senderType)) return;
+    const selfReaction = isSelfReaction(msg);
+    if (!selfReaction && (senderId == null || !senderType)) return;
     // Each multi-device toggle creates a fresh Message (the backend can't
     // collapse them in place because there is no agent to scope by), so
     // dedupe them under a single key per target message.
-    const key = ownInbox
+    const key = selfReaction
       ? `${originalId}|self|self`
       : `${originalId}|${senderType}|${senderId}`;
     const prev = latestPerKey.get(key);

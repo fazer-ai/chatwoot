@@ -91,10 +91,12 @@ function handleRowClick(user) {
         :key="group.emoji"
         :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
       >
-        <div
+        <component
+          :is="user.isMine ? 'button' : 'div'"
           v-for="user in group.users"
           :key="user.reactionId"
-          class="flex items-center gap-2 rounded px-1 py-1"
+          :type="user.isMine ? 'button' : null"
+          class="flex w-full items-center gap-2 rounded px-1 py-1 text-left"
           :class="user.isMine ? 'cursor-pointer hover:bg-n-alpha-2' : ''"
           @click="handleRowClick(user)"
         >
@@ -107,7 +109,7 @@ function handleRowClick(user) {
               {{ t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE') }}
             </div>
           </div>
-        </div>
+        </component>
       </div>
     </div>
   </div>

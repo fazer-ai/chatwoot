@@ -346,7 +346,9 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
                                      content_attributes: { is_reaction: true,
                                                            in_reply_to_external_id: 'wamid.ORIGINAL_MESSAGE_ID' })
 
-          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          expect do
+            described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          end.not_to(change { whatsapp_channel.inbox.messages.count })
 
           existing_reaction.reload
           expect(existing_reaction.content).to eq('')
