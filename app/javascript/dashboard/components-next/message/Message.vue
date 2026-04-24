@@ -454,17 +454,28 @@ const currentUserReactionEmoji = computed(() => {
   return own?.emoji ?? null;
 });
 
+// Track pending cooldown timers so we can clear them on unmount and avoid
+// touching `pendingEmojis` after the component is gone.
+const pendingTimeouts = new Set();
+
 function handleToggleReaction(emoji) {
   if (pendingEmojis.value.has(emoji)) return;
   pendingEmojis.value = new Set([...pendingEmojis.value, emoji]);
   emit('toggleReaction', { messageId: props.id, emoji });
-  setTimeout(() => {
+  const timeoutId = setTimeout(() => {
+    pendingTimeouts.delete(timeoutId);
     if (!pendingEmojis.value.has(emoji)) return;
     const next = new Set(pendingEmojis.value);
     next.delete(emoji);
     pendingEmojis.value = next;
   }, REACTION_COOLDOWN_MS);
+  pendingTimeouts.add(timeoutId);
 }
+
+onUnmounted(() => {
+  pendingTimeouts.forEach(clearTimeout);
+  pendingTimeouts.clear();
+});
 
 const shouldRenderMessage = computed(() => {
   const hasAttachments = !!(props.attachments && props.attachments.length > 0);

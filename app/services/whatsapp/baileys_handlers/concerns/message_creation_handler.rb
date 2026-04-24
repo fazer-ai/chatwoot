@@ -4,7 +4,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
   private
 
   def build_and_save_message(conversation:, sender:, attach_media: false)
-    return mark_existing_reaction_as_removed(conversation: conversation, sender: sender) if reaction_removal?
+    return mark_existing_reaction_as_removed(sender: sender) if reaction_removal?
 
     @message = conversation.messages.build(
       content: message_content,
@@ -31,34 +31,39 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
   # creating a duplicate empty Message that the chat list would have to filter.
   # Outbound echoes are skipped because the local controller already updated
   # the row when the agent toggled off from the Chatwoot UI.
-  def mark_existing_reaction_as_removed(conversation:, sender:)
+  #
+  # Lookup is intentionally NOT scoped to the inbound conversation: the
+  # original reaction may live in an older/resolved thread, while the inbound
+  # flow could have picked (or created) a different one. Find the row via the
+  # sender globally, then operate on its real `existing.conversation`.
+  def mark_existing_reaction_as_removed(sender:)
     return unless incoming?
 
     target_external_id = unwrap_ephemeral_message(@raw_message[:message]).dig(:reactionMessage, :key, :id)
     return if target_external_id.blank?
 
-    existing = find_existing_reaction(conversation, sender, target_external_id)
+    existing = find_existing_reaction(sender, target_external_id)
     return if existing.nil?
 
     new_attrs = existing.content_attributes.merge('deleted' => true)
     existing.update!(content: '', content_attributes: new_attrs)
+    target_conversation = existing.conversation
     # Refresh the chat list snapshot of `last_non_activity_message`; the cable
     # MESSAGE_UPDATED event only refreshes chat.messages on the client, so
     # without this the preview can stay pointed at the pre-removal reaction.
     # Touch updated_at so the frontend out-of-order guard can drop stale cables.
-    conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-    conversation.dispatch_conversation_updated_event
+    target_conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    target_conversation.dispatch_conversation_updated_event
     existing
   end
 
-  def find_existing_reaction(conversation, sender, target_external_id)
+  def find_existing_reaction(sender, target_external_id)
     json_path = "(content_attributes#>>'{}')::jsonb"
-    conversation.messages
-                .where(sender: sender)
-                .where("#{json_path}->>'is_reaction' = 'true'")
-                .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
-                .reorder(created_at: :desc)
-                .first
+    Message.where(sender: sender)
+           .where("#{json_path}->>'is_reaction' = 'true'")
+           .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+           .reorder(created_at: :desc)
+           .first
   end
 
   def build_message_content_attributes

@@ -139,6 +139,11 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   # keeps a single Message row per (target, sender) toggling `deleted` on it,
   # so we update that row in place. Outbound echoes are skipped because the
   # local controller already mutated the row when the agent toggled off.
+  #
+  # Lookup is intentionally NOT scoped to `@conversation`: the reaction may
+  # live in an older/resolved thread, while `set_conversation` could have
+  # picked (or created) a different one for this webhook. Find the row via
+  # the contact globally, then operate on its real `existing.conversation`.
   def mark_existing_reaction_as_removed
     return unless incoming_message?
 
@@ -146,22 +151,22 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     return if target_external_id.blank?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
-    existing = @conversation.messages
-                            .where(sender: @contact)
-                            .where("#{json_path}->>'is_reaction' = 'true'")
-                            .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
-                            .reorder(created_at: :desc)
-                            .first
+    existing = Message.where(sender: @contact)
+                      .where("#{json_path}->>'is_reaction' = 'true'")
+                      .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+                      .reorder(created_at: :desc)
+                      .first
     return if existing.nil?
 
     new_attrs = existing.content_attributes.merge('deleted' => true)
     existing.update!(content: '', content_attributes: new_attrs)
+    target_conversation = existing.conversation
     # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
     # chat.messages on the client, so the conversation card preview stays stale
     # without an explicit conversation.updated dispatch. Touch updated_at so
     # the frontend out-of-order guard can drop stale cables.
-    @conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-    @conversation.dispatch_conversation_updated_event
+    target_conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    target_conversation.dispatch_conversation_updated_event
   end
 
   def create_contact_message

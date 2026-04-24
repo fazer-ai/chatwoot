@@ -23,14 +23,14 @@ const emit = defineEmits(['select']);
 const { t } = useI18n();
 
 const QUICK_EMOJIS = [
-  { emoji: '👍', label: 'thumbs up' },
-  { emoji: '❤️', label: 'heart' },
-  { emoji: '😂', label: 'joy' },
-  { emoji: '😮', label: 'surprised' },
-  { emoji: '😢', label: 'sad' },
-  { emoji: '🙏', label: 'pray' },
-  { emoji: '🔥', label: 'fire' },
-  { emoji: '🎉', label: 'party' },
+  { emoji: '👍', labelKey: 'CONVERSATION.REACTIONS.QUICK.THUMBS_UP' },
+  { emoji: '❤️', labelKey: 'CONVERSATION.REACTIONS.QUICK.HEART' },
+  { emoji: '😂', labelKey: 'CONVERSATION.REACTIONS.QUICK.JOY' },
+  { emoji: '😮', labelKey: 'CONVERSATION.REACTIONS.QUICK.SURPRISED' },
+  { emoji: '😢', labelKey: 'CONVERSATION.REACTIONS.QUICK.SAD' },
+  { emoji: '🙏', labelKey: 'CONVERSATION.REACTIONS.QUICK.PRAY' },
+  { emoji: '🔥', labelKey: 'CONVERSATION.REACTIONS.QUICK.FIRE' },
+  { emoji: '🎉', labelKey: 'CONVERSATION.REACTIONS.QUICK.PARTY' },
 ];
 
 const isOpen = ref(false);
@@ -81,7 +81,7 @@ useEventListener(window, 'blur', close);
     >
       <button
         v-for="item in QUICK_EMOJIS"
-        :key="item.label"
+        :key="item.labelKey"
         type="button"
         class="flex size-7 items-center justify-center rounded-full text-base hover:bg-n-alpha-2"
         :class="{
@@ -90,7 +90,7 @@ useEventListener(window, 'blur', close);
         :title="
           item.emoji === currentUserEmoji
             ? t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE')
-            : item.label
+            : t(item.labelKey)
         "
         @click="pickEmoji(item.emoji)"
       >
