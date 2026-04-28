@@ -10,6 +10,7 @@
     "SUBMIT": "Atualizar configurações",
     "BACK": "Anterior",
     "DISMISS": "Recusar",
+    "SUPER_ADMIN_ONLY_NOTICE": "Esta mensagem só é visível para administradores do sistema.",
     "UPDATE": {
       "ERROR": "Não foi possível atualizar as configurações, tente novamente!",
       "SUCCESS": "Configurações de conta atualizadas com sucesso"

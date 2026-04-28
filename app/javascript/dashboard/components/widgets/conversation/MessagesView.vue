@@ -703,6 +703,12 @@ export default {
         class="mx-2 mt-2 overflow-hidden rounded-lg"
         :banner-message="$t('CONVERSATION.GROUPS_DISABLED_BANNER_NON_ADMIN')"
       />
+      <p
+        v-if="isGroupsDisabled && isSuperAdmin"
+        class="mx-2 mt-1 text-xs text-center text-n-slate-10"
+      >
+        {{ $t('GENERAL_SETTINGS.SUPER_ADMIN_ONLY_NOTICE') }}
+      </p>
     </div>
     <MessageList
       ref="conversationPanelRef"

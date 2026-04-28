@@ -10,6 +10,7 @@
     "SUBMIT": "Update settings",
     "BACK": "Back",
     "DISMISS": "Dismiss",
+    "SUPER_ADMIN_ONLY_NOTICE": "Only system administrators can see this message.",
     "UPDATE": {
       "ERROR": "Could not update settings, try again!",
       "SUCCESS": "Successfully updated account settings"

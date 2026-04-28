@@ -60,6 +60,9 @@ const upgradeUrl = 'https://fazer.ai/kanban';
           {{ t('KANBAN.PAYWALL.UPGRADE_NOW') }}
         </Button>
       </a>
+      <p v-if="isSuperAdmin" class="mt-3 text-xs text-center text-n-slate-10">
+        {{ t('GENERAL_SETTINGS.SUPER_ADMIN_ONLY_NOTICE') }}
+      </p>
     </div>
   </section>
 </template>
