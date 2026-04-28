@@ -1,6 +1,6 @@
 class LabelPolicy < ApplicationPolicy
   def index?
-    @account_user.administrator? || @account_user.agent?
+    @account_user.administrator? || @account_user.agent? || @account_user.manager?
   end
 
   def update?

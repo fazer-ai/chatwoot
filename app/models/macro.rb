@@ -36,7 +36,7 @@ class Macro < ApplicationRecord
 
   def set_visibility(user, params)
     self.visibility = params[:visibility]
-    self.visibility = :personal if user.agent?
+    self.visibility = :personal if user.agent? || user.manager?
   end
 
   def self.with_visibility(user, _params)
