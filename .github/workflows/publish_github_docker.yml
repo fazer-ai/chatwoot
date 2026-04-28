@@ -124,16 +124,16 @@ jobs:
           GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:${SANITIZED_REF} \
-            -t ghcr.io/${{ github.repository }}:latest \
-            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+            docker buildx imagetools create \
+              -t ghcr.io/tech-auris/chatwoot:${SANITIZED_REF} \
+              -t ghcr.io/tech-auris/chatwoot:latest \
+              $(printf 'ghcr.io/tech-auris/chatwoot@sha256:%s ' *)
 
       - name: Inspect image
         env:
           GIT_REF: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           SANITIZED_REF=$(echo "$GIT_REF" | sed 's/\//-/g')
-          REPO="ghcr.io/${{ github.repository }}"
+          REPO="ghcr.io/tech-auris/chatwoot"
           docker buildx imagetools inspect ${REPO}:${SANITIZED_REF}
           docker buildx imagetools inspect ${REPO}:latest
