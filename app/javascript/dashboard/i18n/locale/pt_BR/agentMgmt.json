@@ -7,6 +7,7 @@
     "LEARN_MORE": "Saiba mais sobre as funções do usuário",
     "AGENT_TYPES": {
       "ADMINISTRATOR": "Administrador",
+      "MANAGER": "Gerente",
       "AGENT": "Agente"
     },
     "COUNT": "{n} agente | {n} agentes",

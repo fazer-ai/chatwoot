@@ -30,7 +30,7 @@ export default {
           component: InboxHome,
           meta: {
             featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-            permissions: ['administrator'],
+            permissions: ['administrator', 'manager'],
           },
         },
       ],
@@ -59,7 +59,7 @@ export default {
               component: ChannelList,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
             },
             {
@@ -68,7 +68,7 @@ export default {
               component: FinishSetup,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
             },
             {
@@ -77,7 +77,7 @@ export default {
               component: ChannelFactory,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
               props: route => {
                 return { channelName: route.params.sub_page };
@@ -88,7 +88,7 @@ export default {
               name: 'settings_inboxes_add_agents',
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
               component: AddAgents,
             },
@@ -100,7 +100,7 @@ export default {
           component: InboxConvert,
           meta: {
             featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-            permissions: ['administrator'],
+            permissions: ['administrator', 'manager'],
           },
         },
         {
@@ -109,7 +109,7 @@ export default {
           component: Settings,
           meta: {
             featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-            permissions: ['administrator'],
+            permissions: ['administrator', 'manager'],
           },
         },
       ],

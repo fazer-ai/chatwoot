@@ -35,47 +35,47 @@ class InboxPolicy < ApplicationPolicy
   end
 
   def campaigns?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def create?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def update?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def destroy?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def set_agent_bot?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def avatar?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def sync_templates?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def health?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def reset_secret?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def disconnect_channel_provider?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def convert_provider?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def on_whatsapp?

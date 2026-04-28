@@ -26,7 +26,7 @@ import SLAReports from './SLAReports.vue';
 
 const meta = {
   featureFlag: FEATURE_FLAGS.REPORTS,
-  permissions: ['administrator', 'report_manage'],
+  permissions: ['administrator', 'manager', 'report_manage'],
 };
 
 const oldReportRoutes = [
@@ -61,7 +61,7 @@ const revisedReportRoutes = [
     path: 'agents_overview',
     name: 'agent_reports_index',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: AgentReportsIndex,
   },
@@ -69,7 +69,7 @@ const revisedReportRoutes = [
     path: 'agents/:id',
     name: 'agent_reports_show',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: AgentReportsShow,
   },
@@ -78,7 +78,7 @@ const revisedReportRoutes = [
     path: 'inboxes_overview',
     name: 'inbox_reports_index',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: InboxReportsIndex,
   },
@@ -86,7 +86,7 @@ const revisedReportRoutes = [
     path: 'inboxes/:id',
     name: 'inbox_reports_show',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: InboxReportsShow,
   },
@@ -94,7 +94,7 @@ const revisedReportRoutes = [
     path: 'teams_overview',
     name: 'team_reports_index',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: TeamReportsIndex,
   },
@@ -102,7 +102,7 @@ const revisedReportRoutes = [
     path: 'teams/:id',
     name: 'team_reports_show',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: TeamReportsShow,
   },
@@ -110,7 +110,7 @@ const revisedReportRoutes = [
     path: 'labels_overview',
     name: 'label_reports_index',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: LabelReportsIndex,
   },
@@ -118,7 +118,7 @@ const revisedReportRoutes = [
     path: 'labels/:id',
     name: 'label_reports_show',
     meta: {
-      permissions: ['administrator', 'report_manage'],
+      permissions: ['administrator', 'manager', 'report_manage'],
     },
     component: LabelReportsShow,
   },

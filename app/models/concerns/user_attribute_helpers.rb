@@ -39,6 +39,10 @@ module UserAttributeHelpers
     current_account_user&.agent?
   end
 
+  def manager?
+    current_account_user&.manager?
+  end
+
   def role
     current_account_user&.role
   end
