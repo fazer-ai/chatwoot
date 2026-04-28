@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  GITHUB_REPO: ghcr.io/${{ github.repository }}
+  GITHUB_REPO: ghcr.io/${{ github.repository_owner_lowercase || 'tech-auris' }}/chatwoot
 
 jobs:
   build:
