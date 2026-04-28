@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import { picoSearch } from '@scmmishra/pico-search';
 import Avatar from 'next/avatar/Avatar.vue';
-import { useAdmin } from 'dashboard/composables/useAdmin';
 import SettingsLayout from '../SettingsLayout.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import {
@@ -19,7 +18,9 @@ import Button from 'dashboard/components-next/button/Button.vue';
 const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
-const { isAdmin } = useAdmin();
+const isAdmin = computed(() =>
+  ['administrator', 'manager'].includes(getters.getCurrentRole.value)
+);
 
 const showDeletePopup = ref(false);
 const selectedInbox = ref({});
