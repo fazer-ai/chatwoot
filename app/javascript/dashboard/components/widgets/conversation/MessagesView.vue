@@ -693,6 +693,7 @@ export default {
         color-scheme="warning"
         class="mx-2 mt-2 overflow-hidden rounded-lg"
         :banner-message="$t('CONVERSATION.GROUPS_DISABLED_BANNER')"
+        :notice-message="$t('GENERAL_SETTINGS.SUPER_ADMIN_ONLY_NOTICE')"
         has-action-button
         :action-button-label="$t('CONVERSATION.GROUPS_DISABLED_CTA')"
         @primary-action="onOpenGroupsEnabledLink"
@@ -703,12 +704,6 @@ export default {
         class="mx-2 mt-2 overflow-hidden rounded-lg"
         :banner-message="$t('CONVERSATION.GROUPS_DISABLED_BANNER_NON_ADMIN')"
       />
-      <p
-        v-if="isGroupsDisabled && isSuperAdmin"
-        class="mx-2 mt-1 text-xs text-center text-n-slate-10"
-      >
-        {{ $t('GENERAL_SETTINGS.SUPER_ADMIN_ONLY_NOTICE') }}
-      </p>
     </div>
     <MessageList
       ref="conversationPanelRef"

@@ -42,6 +42,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    noticeMessage: {
+      type: String,
+      default: '',
+    },
   },
   emits: ['primaryAction', 'close'],
   computed: {
@@ -92,6 +96,9 @@ export default {
       >
         {{ hrefLinkText }}
       </a>
+      <span v-if="noticeMessage" class="banner-notice">
+        {{ noticeMessage }}
+      </span>
     </span>
     <div class="actions">
       <NextButton
@@ -153,6 +160,10 @@ export default {
 
   .banner-message {
     @apply inline;
+  }
+
+  .banner-notice {
+    @apply ml-2 italic opacity-70;
   }
 
   .actions {
