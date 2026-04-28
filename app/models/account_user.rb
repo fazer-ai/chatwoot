@@ -54,7 +54,10 @@ class AccountUser < ApplicationRecord
   end
 
   def permissions
-    [role]
+    return ['administrator'] if administrator?
+    return %w[agent manager] if manager?
+
+    ['agent']
   end
 
   def push_event_data
