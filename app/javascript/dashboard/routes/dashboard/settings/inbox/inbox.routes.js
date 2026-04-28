@@ -59,7 +59,7 @@ export default {
               component: ChannelList,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator', 'manager'],
+                permissions: ['administrator'],
               },
             },
             {
@@ -68,7 +68,7 @@ export default {
               component: FinishSetup,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator', 'manager'],
+                permissions: ['administrator'],
               },
             },
             {
@@ -77,7 +77,7 @@ export default {
               component: ChannelFactory,
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator', 'manager'],
+                permissions: ['administrator'],
               },
               props: route => {
                 return { channelName: route.params.sub_page };
@@ -88,7 +88,7 @@ export default {
               name: 'settings_inboxes_add_agents',
               meta: {
                 featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-                permissions: ['administrator', 'manager'],
+                permissions: ['administrator'],
               },
               component: AddAgents,
             },

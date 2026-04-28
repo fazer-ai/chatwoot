@@ -18,8 +18,10 @@ import Button from 'dashboard/components-next/button/Button.vue';
 const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
-const isAdmin = computed(() =>
-  ['administrator', 'manager'].includes(getters.getCurrentRole.value)
+const currentRole = computed(() => getters.getCurrentRole.value);
+const isAdmin = computed(() => currentRole.value === 'administrator');
+const canConfigureInboxes = computed(() =>
+  ['administrator', 'manager'].includes(currentRole.value)
 );
 
 const showDeletePopup = ref(false);
@@ -159,7 +161,7 @@ const openDelete = inbox => {
               }"
             >
               <Button
-                v-if="isAdmin"
+                v-if="canConfigureInboxes"
                 v-tooltip.top="$t('INBOX_MGMT.SETTINGS')"
                 icon="i-woot-settings"
                 slate
