@@ -344,12 +344,12 @@ export default {
     >
       powered by
       <a
-        href="https://fazer.ai"
+        href="https://auris.ia.br"
         target="_blank"
         rel="noopener noreferrer"
         class="text-n-slate-11 hover:text-n-brand"
       >
-        fazer.ai
+        auris.ia.br
       </a>
     </p>
     <!-- eslint-enable vue/no-bare-strings-in-template @intlify/vue-i18n/no-raw-text -->

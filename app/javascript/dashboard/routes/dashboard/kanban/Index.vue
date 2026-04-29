@@ -14,7 +14,7 @@ const isSuperAdmin = computed(() => {
   return currentUser.value.type === 'SuperAdmin';
 });
 
-const upgradeUrl = 'https://fazer.ai/kanban';
+const upgradeUrl = 'https://auris.ia.br';
 </script>
 
 <template>
