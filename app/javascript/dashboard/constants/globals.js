@@ -44,7 +44,7 @@ export default {
     'https://testimonials.cdn.chatwoot.com/testimonial-content.json',
   WHATSAPP_EMBEDDED_SIGNUP_DOCS_URL:
     'https://developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users#limitations',
-  FAZER_AI_GUIDES_URL: 'https://auris.ia.br',
+  FAZER_AI_GUIDES_URL: 'https://app.auris.ia.br/#/guides',
   SMALL_SCREEN_BREAKPOINT: 768,
   AVAILABILITY_STATUS_KEYS: ['online', 'busy', 'offline'],
   SNOOZE_OPTIONS: {

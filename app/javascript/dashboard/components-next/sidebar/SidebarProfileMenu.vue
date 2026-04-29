@@ -95,7 +95,7 @@ const menuItems = computed(() => {
       showOnCustomBrandedInstance: false,
       label: t('SIDEBAR_ITEMS.CHANGELOG'),
       icon: 'i-lucide-scroll-text',
-      link: 'https://auris.ia.br',
+      link: 'https://auris.ia.br/chatwoot-release-notes',
       nativeLink: true,
       target: '_blank',
     },
