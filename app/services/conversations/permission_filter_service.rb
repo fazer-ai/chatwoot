@@ -8,7 +8,7 @@ class Conversations::PermissionFilterService
   end
 
   def perform
-    return conversations if user_role == 'administrator'
+    return conversations if %w[administrator manager].include?(user_role)
 
     accessible_conversations
   end
