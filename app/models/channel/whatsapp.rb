@@ -78,7 +78,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   def provider_connection_data
     data = { connection: provider_connection['connection'] }
-    if Current.account_user&.administrator?
+    if Current.account_user&.administrator? || Current.account_user&.manager?
       data[:qr_data_url] = provider_connection['qr_data_url']
       data[:error] = provider_connection['error']
     end
