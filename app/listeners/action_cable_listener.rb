@@ -269,7 +269,8 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   def user_tokens(account, agents)
     agent_tokens = agents.pluck(:pubsub_token)
     admin_tokens = account.administrators.pluck(:pubsub_token)
-    (agent_tokens + admin_tokens).uniq
+    manager_tokens = account.managers.pluck(:pubsub_token)
+    (agent_tokens + admin_tokens + manager_tokens).uniq
   end
 
   def contact_tokens(contact_inbox, message)
