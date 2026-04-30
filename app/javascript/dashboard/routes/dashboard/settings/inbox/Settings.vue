@@ -114,6 +114,7 @@ export default {
   computed: {
     ...mapGetters({
       accountId: 'getCurrentAccountId',
+      currentRole: 'getCurrentRole',
       isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
       uiFlags: 'inboxes/getUIFlags',
       portals: 'portals/allPortals',
@@ -148,6 +149,12 @@ export default {
         this.isAWhatsAppBaileysChannel ||
         this.isAWhatsAppZapiChannel ||
         this.is360DialogWhatsAppChannel
+      );
+    },
+    canConvertWhatsAppChannel() {
+      return (
+        this.isConvertibleWhatsAppChannel &&
+        this.currentRole === 'administrator'
       );
     },
     tabs() {
@@ -821,7 +828,7 @@ export default {
                   class="!mb-0 flex-1"
                 />
                 <NextButton
-                  v-if="isConvertibleWhatsAppChannel"
+                  v-if="canConvertWhatsAppChannel"
                   slate
                   sm
                   :label="$t('INBOX_MGMT.CONVERT.BUTTON')"

@@ -100,7 +100,7 @@ export default {
           component: InboxConvert,
           meta: {
             featureFlag: FEATURE_FLAGS.INBOX_MANAGEMENT,
-            permissions: ['administrator', 'manager'],
+            permissions: ['administrator'],
           },
         },
         {
