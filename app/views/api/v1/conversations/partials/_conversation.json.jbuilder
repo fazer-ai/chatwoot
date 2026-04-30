@@ -66,9 +66,12 @@ if last_non_activity
       target_id = last_non_activity.content_attributes['in_reply_to']
       target = target_id.present? ? conversation.messages.find_by(id: target_id) : nil
       # strip_tags so the preview of an HTML/email target doesn't render as
-      # literal "<p>..." markup in the chat list card.
+      # literal "<p>..." markup in the chat list card. Wrap with `String.new`
+      # because `strip_tags` returns `ActiveSupport::SafeBuffer`, which
+      # Sidekiq's strict-args check rejects when this hash flows into a cable
+      # broadcast job (event_data_presenter.rb shares the same pattern).
       if target&.content.present?
-        plain_snippet = ActionController::Base.helpers.strip_tags(target.content)
+        plain_snippet = String.new(ActionController::Base.helpers.strip_tags(target.content))
         json.in_reply_to_snippet plain_snippet.truncate(60)
       end
     end
