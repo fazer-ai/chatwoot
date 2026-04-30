@@ -94,14 +94,14 @@ const pageInfo = computed(() => {
       </span>
       <label
         v-if="showPageSizeSelector"
-        class="flex items-center gap-2 text-body-main text-n-slate-11"
+        class="flex items-center gap-2 text-body-main text-n-slate-11 leading-none"
       >
         <span class="whitespace-nowrap">
           {{ t('PAGINATION_FOOTER.ITEMS_PER_PAGE') }}
         </span>
         <select
           :value="itemsPerPage"
-          class="h-7 rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
+          class="h-6 leading-none text-xs rounded-md border border-n-weak bg-n-input-background px-2 py-0 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
           @change="onChangePageSize"
         >
           <option
