@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_170000) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_29_170000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -725,6 +725,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_170000) do
     t.text "cached_label_list"
     t.bigint "assignee_agent_bot_id"
     t.integer "group_type", default: 0, null: false
+    t.text "summary"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "group_type"], name: "index_conversations_on_account_id_and_group_type"
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"

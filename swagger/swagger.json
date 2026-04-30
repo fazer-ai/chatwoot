@@ -5719,6 +5719,12 @@
                     "type": "number",
                     "description": "The ID of the SLA policy (Available only in Enterprise edition)",
                     "example": 1
+                  },
+                  "summary": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Free-form summary of the conversation. Send null to clear it.",
+                    "example": "Patient greeted and asked about facial evaluation availability."
                   }
                 }
               }
@@ -13156,6 +13162,13 @@
             ],
             "description": "The priority of the conversation"
           },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Free-form summary of the conversation"
+          },
           "waiting_since": {
             "type": [
               "number",
@@ -14010,8 +14023,20 @@
                 "contact_created",
                 "contact_updated",
                 "message_created",
+                "message_incoming",
+                "message_outgoing",
                 "message_updated",
-                "webwidget_triggered"
+                "webwidget_triggered",
+                "inbox_created",
+                "inbox_updated",
+                "conversation_typing_on",
+                "conversation_typing_off",
+                "conversation_recording",
+                "provider_event_received",
+                "internal_chat_message_created",
+                "internal_chat_message_updated",
+                "internal_chat_message_deleted",
+                "internal_chat_channel_updated"
               ]
             },
             "description": "The list of subscribed events"
