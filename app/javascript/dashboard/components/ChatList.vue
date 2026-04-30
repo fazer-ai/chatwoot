@@ -63,6 +63,7 @@ import {
 } from '../store/modules/conversations/helpers/actionHelpers';
 import {
   getUserPermissions,
+  getUserRole,
   filterItemsByPermission,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
@@ -129,6 +130,7 @@ const inboxesList = useMapGetter('inboxes/getInboxes');
 const campaigns = useMapGetter('campaigns/getAllCampaigns');
 const labels = useMapGetter('labels/getLabels');
 const currentAccountId = useMapGetter('getCurrentAccountId');
+const getAccount = useMapGetter('accounts/getAccount');
 // We can't useFunctionGetter here since it needs to be called on setup?
 const getTeamFn = useMapGetter('teams/getTeam');
 const getConversationById = useMapGetter('getConversationById');
@@ -197,9 +199,29 @@ const userPermissions = computed(() => {
   return getUserPermissions(currentUser.value, currentAccountId.value);
 });
 
+const assigneeTabPermissions = computed(() => {
+  if (getUserRole(currentUser.value, currentAccountId.value) !== 'agent') {
+    return ASSIGNEE_TYPE_TAB_PERMISSIONS;
+  }
+
+  const accountSettings =
+    getAccount.value(currentAccountId.value)?.settings || {};
+  const hideUnassigned = Boolean(accountSettings.hide_agent_unassigned_tab);
+  const hideAll = hideUnassigned || Boolean(accountSettings.hide_agent_all_tab);
+
+  if (!hideUnassigned && !hideAll) return ASSIGNEE_TYPE_TAB_PERMISSIONS;
+
+  const { unassigned, all, ...rest } = ASSIGNEE_TYPE_TAB_PERMISSIONS;
+  return {
+    ...rest,
+    ...(hideUnassigned ? {} : { unassigned }),
+    ...(hideAll ? {} : { all }),
+  };
+});
+
 const assigneeTabItems = computed(() => {
   return filterItemsByPermission(
-    ASSIGNEE_TYPE_TAB_PERMISSIONS,
+    assigneeTabPermissions.value,
     userPermissions.value,
     item => item.permissions
   ).map(({ key, count: countKey }) => ({
@@ -855,6 +877,12 @@ onMounted(() => {
 });
 
 watch(conversationList, subscribePresenceForTopChats);
+
+watch(assigneeTabItems, items => {
+  if (!items.some(item => item.key === activeAssigneeTab.value)) {
+    updateAssigneeTab(wootConstants.ASSIGNEE_TYPE.ME);
+  }
+});
 
 onBeforeUnmount(() => {
   if (presenceInterval) clearInterval(presenceInterval);

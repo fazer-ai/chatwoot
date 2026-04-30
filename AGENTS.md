@@ -115,3 +115,18 @@ Practical checklist for any change impacting core logic or public APIs
 ## Branding / White-labeling note
 
 - For user-facing strings that currently contain "Chatwoot" but should adapt to branded/self-hosted installs, prefer applying `replaceInstallationName` from `shared/composables/useBranding` in the UI layer (for example tooltip and suggestion labels) instead of adding hardcoded brand-specific copy.
+
+## Account-level toggles: do NOT extend `config/features.yml`
+
+- `Account#feature_flags` is a `bigint` driven by FlagShihTzu, with each YAML entry mapped to bit position `index` (0-based). Signed bigint can only hold bits 0..63. Adding a 65th entry produces values >= 2^64 that overflow the column on write and silently break high-bit features.
+- `chatwoot-pro-main` already inserts `kanban` and `internal_chat_pro` mid-list, pushing upstream features to bits 60+. After merging into Pro, any new flag added on `main` lands at an even higher bit, accelerating the overflow. The `Featurable.feature_flag_value` helper applies a two's-complement workaround that only fixes manual SQL queries (`feature_flags & ? != 0`); it does NOT fix the FlagShihTzu write path used by the superadmin form.
+- Local DB pitfall: bit positions differ between `main` and `chatwoot-pro-main` because of the kanban/internal_chat_pro insertion. The same bit set on one branch maps to a different feature on the other. Use separate dev DBs per branch or reset `feature_flags` when switching.
+
+For NEW account-level toggles, prefer the `settings` jsonb column instead of `feature_flags`:
+
+1. Declare a `store_accessor :settings, :your_toggle` in `app/models/account.rb` and override the writer to cast (`super(ActiveModel::Type::Boolean.new.cast(value))` for booleans) so JSON schema validation accepts the value.
+2. Add the key to `SETTINGS_PARAMS_SCHEMA` in `app/models/concerns/account_settings_schema.rb`.
+3. Register it as a `Field::Boolean` (or appropriate field) in `app/dashboards/account_dashboard.rb` (`ATTRIBUTE_TYPES`, `FORM_ATTRIBUTES`, `SHOW_PAGE_ATTRIBUTES`).
+4. The frontend reads it from `account.settings.your_toggle` (already serialized via `app/views/api/v1/models/_account.json.jbuilder` as `json.settings resource.settings`).
+
+This keeps toggles keyed by name (immune to bit-position drift between branches) and unbounded by the bigint width.
