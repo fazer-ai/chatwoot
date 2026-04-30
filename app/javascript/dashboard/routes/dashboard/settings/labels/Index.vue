@@ -20,6 +20,24 @@ const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
 
+const PROTECTED_LABEL_TITLES = ['agente-off'];
+const PROTECTED_LABEL_PREFIXES = ['kb-'];
+
+const currentRole = computed(() => getters.getCurrentRole.value);
+
+const isProtectedLabel = label => {
+  const title = label?.title || '';
+  return (
+    PROTECTED_LABEL_TITLES.includes(title) ||
+    PROTECTED_LABEL_PREFIXES.some(prefix => title.startsWith(prefix))
+  );
+};
+
+const canModifyLabel = label => {
+  if (currentRole.value === 'administrator') return true;
+  return !isProtectedLabel(label);
+};
+
 const loading = ref({});
 const showAddPopup = ref(false);
 const showEditPopup = ref(false);
@@ -165,6 +183,7 @@ onBeforeMount(() => {
               <BaseTableCell align="end">
                 <div class="flex gap-3 justify-end flex-shrink-0">
                   <Button
+                    v-if="canModifyLabel(label)"
                     v-tooltip.top="$t('LABEL_MGMT.FORM.EDIT')"
                     icon="i-woot-edit-pen"
                     slate
@@ -173,6 +192,7 @@ onBeforeMount(() => {
                     @click="openEditPopup(label)"
                   />
                   <Button
+                    v-if="canModifyLabel(label)"
                     v-tooltip.top="$t('LABEL_MGMT.FORM.DELETE')"
                     icon="i-woot-bin"
                     slate
