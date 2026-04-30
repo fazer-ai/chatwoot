@@ -91,12 +91,17 @@ const hasMultipleInboxes = computed(
 );
 
 const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
+
+const summary = computed(() => props.chat?.summary?.trim() || '');
 </script>
 
 <template>
   <div
     ref="conversationHeader"
-    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 pt-3 pb-2 h-24 xl:h-12"
+    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 py-4"
+    :class="
+      summary ? 'min-h-[7.5rem] xl:min-h-[6.25rem]' : 'min-h-24 xl:min-h-12'
+    "
   >
     <div
       class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-1"
@@ -115,7 +120,7 @@ const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
         rounded-full
       />
       <div
-        class="flex flex-col items-start min-w-0 ml-2 overflow-hidden rtl:ml-0 rtl:mr-2"
+        class="flex flex-col items-start gap-0.5 min-w-0 ml-2 overflow-hidden rtl:ml-0 rtl:mr-2"
       >
         <div class="flex flex-row items-center max-w-full gap-1 p-0 m-0">
           <span
@@ -139,6 +144,17 @@ const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
           <span v-if="isSnoozed" class="font-medium text-n-amber-10">
             {{ snoozedDisplayText }}
           </span>
+        </div>
+        <div
+          v-if="summary"
+          class="flex items-start max-w-full gap-2 px-2 py-1 mt-1.5 rounded-lg bg-n-slate-3 dark:bg-n-solid-3"
+        >
+          <span
+            class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
+          />
+          <p class="m-0 text-[10px] leading-snug text-n-blue-11">
+            {{ summary }}
+          </p>
         </div>
       </div>
     </div>

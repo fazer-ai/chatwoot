@@ -81,6 +81,11 @@ properties:
       - string
       - 'null'
     description: The priority of the conversation
+  summary:
+    type:
+      - string
+      - 'null'
+    description: Free-form summary of the conversation
   waiting_since:
     type:
       - number

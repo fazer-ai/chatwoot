@@ -22,6 +22,11 @@ requestBody:
             type: number
             description: 'The ID of the SLA policy (Available only in Enterprise edition)'
             example: 1
+          summary:
+            type: string
+            nullable: true
+            description: 'Free-form summary of the conversation. Send null to clear it.'
+            example: 'Patient greeted and asked about facial evaluation availability.'
 responses:
   '200':
     description: Success
