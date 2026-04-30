@@ -1,13 +1,16 @@
 /* global axios */
 import ApiClient from './ApiClient';
 
-export const buildContactParams = (page, sortAttr, label, search) => {
+export const buildContactParams = (page, sortAttr, label, search, perPage) => {
   let params = `include_contact_inboxes=false&page=${page}&sort=${sortAttr}`;
   if (search) {
     params = `${params}&q=${search}`;
   }
   if (label) {
     params = `${params}&labels[]=${label}`;
+  }
+  if (perPage) {
+    params = `${params}&per_page=${perPage}`;
   }
   return params;
 };
@@ -17,12 +20,14 @@ class ContactAPI extends ApiClient {
     super('contacts', { accountScoped: true });
   }
 
-  get(page, sortAttr = 'name', label = '') {
+  // eslint-disable-next-line default-param-last
+  get(page, sortAttr = 'name', label = '', perPage) {
     let requestURL = `${this.url}?${buildContactParams(
       page,
       sortAttr,
       label,
-      ''
+      '',
+      perPage
     )}`;
     return axios.get(requestURL);
   }
@@ -62,19 +67,33 @@ class ContactAPI extends ApiClient {
       page,
       sortAttr,
       label,
-      search
+      search,
+      options.perPage
     )}`;
     return axios.get(requestURL, { signal: options.signal });
   }
 
-  active(page = 1, sortAttr = 'name') {
-    let requestURL = `${this.url}/active?${buildContactParams(page, sortAttr)}`;
+  // eslint-disable-next-line default-param-last
+  active(page = 1, sortAttr = 'name', perPage) {
+    let requestURL = `${this.url}/active?${buildContactParams(
+      page,
+      sortAttr,
+      '',
+      '',
+      perPage
+    )}`;
     return axios.get(requestURL);
   }
 
   // eslint-disable-next-line default-param-last
-  filter(page = 1, sortAttr = 'name', queryPayload) {
-    let requestURL = `${this.url}/filter?${buildContactParams(page, sortAttr)}`;
+  filter(page = 1, sortAttr = 'name', queryPayload, perPage) {
+    let requestURL = `${this.url}/filter?${buildContactParams(
+      page,
+      sortAttr,
+      '',
+      '',
+      perPage
+    )}`;
     return axios.post(requestURL, queryPayload);
   }
 

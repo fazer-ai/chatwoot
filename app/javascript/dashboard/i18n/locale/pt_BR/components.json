@@ -1,7 +1,8 @@
 {
   "PAGINATION_FOOTER": {
     "SHOWING": "Exibindo {startItem} - {endItem} de {totalItems} itens",
-    "CURRENT_PAGE_INFO": "{currentPage} de {totalPages} páginas"
+    "CURRENT_PAGE_INFO": "{currentPage} de {totalPages} páginas",
+    "ITEMS_PER_PAGE": "Itens por página"
   },
   "COMBOBOX": {
     "PLACEHOLDER": "Selecione uma opção...",

@@ -1,4 +1,4 @@
-class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController # rubocop:disable Metrics/ClassLength
   include Sift
   sort_on :email, type: :string
   sort_on :name, internal_name: :order_on_name, type: :scope, scope_params: [:direction]
@@ -9,10 +9,11 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   sort_on :city, internal_name: :order_on_city, type: :scope, scope_params: [:direction]
   sort_on :country, internal_name: :order_on_country_name, type: :scope, scope_params: [:direction]
 
-  RESULTS_PER_PAGE = 15
+  DEFAULT_PER_PAGE = 15
+  ALLOWED_PER_PAGE = [15, 50, 100].freeze
 
   before_action :check_authorization
-  before_action :set_current_page, only: [:index, :active, :search, :filter]
+  before_action :set_pagination_params, only: [:index, :active, :search, :filter]
   before_action :fetch_contact, only: [:show, :update, :destroy, :avatar, :contactable_inboxes, :destroy_custom_attributes, :sync_group]
   before_action :set_include_contact_inboxes, only: [:index, :active, :search, :filter, :show, :update]
 
@@ -135,8 +136,10 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     @resolved_contacts
   end
 
-  def set_current_page
+  def set_pagination_params
     @current_page = params[:page] || 1
+    requested_per_page = params[:per_page].to_i
+    @per_page = ALLOWED_PER_PAGE.include?(requested_per_page) ? requested_per_page : DEFAULT_PER_PAGE
   end
 
   def fetch_contacts(contacts)
@@ -147,7 +150,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     filtrate(contacts)
       .includes(includes_hash)
       .page(@current_page)
-      .per(RESULTS_PER_PAGE)
+      .per(@per_page)
   end
 
   def fetch_contacts_with_has_more(contacts)
@@ -155,15 +158,15 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     includes_hash[:contact_inboxes] = { inbox: :channel } if @include_contact_inboxes
 
     # Calculate offset manually to fetch one extra record for has_more check
-    offset = (@current_page.to_i - 1) * RESULTS_PER_PAGE
+    offset = (@current_page.to_i - 1) * @per_page
     results = filtrate(contacts)
               .includes(includes_hash)
               .offset(offset)
-              .limit(RESULTS_PER_PAGE + 1)
+              .limit(@per_page + 1)
               .to_a
 
-    @has_more = results.size > RESULTS_PER_PAGE
-    results = results.first(RESULTS_PER_PAGE) if @has_more
+    @has_more = results.size > @per_page
+    results = results.first(@per_page) if @has_more
     @contacts_count = results.size
     results
   end

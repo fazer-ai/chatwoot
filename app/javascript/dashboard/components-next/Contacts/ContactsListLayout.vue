@@ -14,6 +14,8 @@ const props = defineProps({
   currentPage: { type: Number, default: 1 },
   totalItems: { type: Number, default: 100 },
   itemsPerPage: { type: Number, default: 15 },
+  showPageSizeSelector: { type: Boolean, default: false },
+  pageSizeOptions: { type: Array, default: () => [15, 50, 100] },
   activeSort: { type: String, default: '' },
   activeOrdering: { type: String, default: '' },
   activeSegment: { type: Object, default: null },
@@ -27,6 +29,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:currentPage',
+  'update:itemsPerPage',
   'update:sort',
   'search',
   'applyFilter',
@@ -61,6 +64,10 @@ const showActiveFiltersPreview = computed(() => {
 
 const updateCurrentPage = page => {
   emit('update:currentPage', page);
+};
+
+const updateItemsPerPage = size => {
+  emit('update:itemsPerPage', size);
 };
 
 const openFilter = () => {
@@ -122,7 +129,10 @@ const showPagination = computed(() => {
           :total-items="totalItems"
           class="max-w-[67rem]"
           :items-per-page="itemsPerPage"
+          :show-page-size-selector="showPageSizeSelector"
+          :page-size-options="pageSizeOptions"
           @update:current-page="updateCurrentPage"
+          @update:items-per-page="updateItemsPerPage"
         />
       </footer>
     </div>

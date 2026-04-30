@@ -22,8 +22,16 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  showPageSizeSelector: {
+    type: Boolean,
+    default: false,
+  },
+  pageSizeOptions: {
+    type: Array,
+    default: () => [15, 50, 100],
+  },
 });
-const emit = defineEmits(['update:currentPage']);
+const emit = defineEmits(['update:currentPage', 'update:itemsPerPage']);
 const { t } = useI18n();
 const { formatCompactNumber, formatFullNumber } = useNumberFormatter();
 
@@ -41,6 +49,13 @@ const isLastPage = computed(() => props.currentPage === totalPages.value);
 const changePage = newPage => {
   if (newPage >= 1 && newPage <= totalPages.value) {
     emit('update:currentPage', newPage);
+  }
+};
+
+const onChangePageSize = event => {
+  const next = Number(event.target.value);
+  if (next && next !== props.itemsPerPage) {
+    emit('update:itemsPerPage', next);
   }
 };
 
@@ -77,6 +92,27 @@ const pageInfo = computed(() => {
       <span class="min-w-0 text-body-main line-clamp-1 text-n-slate-11">
         {{ currentPageInformation }}
       </span>
+      <label
+        v-if="showPageSizeSelector"
+        class="flex items-center gap-2 text-body-main text-n-slate-11"
+      >
+        <span class="whitespace-nowrap">
+          {{ t('PAGINATION_FOOTER.ITEMS_PER_PAGE') }}
+        </span>
+        <select
+          :value="itemsPerPage"
+          class="h-7 rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
+          @change="onChangePageSize"
+        >
+          <option
+            v-for="option in pageSizeOptions"
+            :key="option"
+            :value="option"
+          >
+            {{ option }}
+          </option>
+        </select>
+      </label>
     </div>
     <div class="flex items-center gap-2">
       <Button
