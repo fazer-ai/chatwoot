@@ -23,7 +23,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
   private
 
-  def process_messages # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def process_messages # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/AbcSize,Metrics/MethodLength
     @lock_acquired = false
 
     # We don't support ephemeral message now, we need to skip processing the message
@@ -46,16 +46,22 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
       # was sent from Chatwoot and the webhook arrived before source_id was saved
       next if find_message_by_source_id(messages_data.first[:id])
 
+      # Reaction removals don't persist anything new, so peek for an existing
+      # reaction row before set_contact: a removal webhook for a sender we
+      # never stored has nothing to mark and shouldn't auto-create a contact
+      # just to no-op. The match is sender-agnostic on purpose; the precise
+      # filter happens inside `mark_existing_reaction_as_removed`.
+      process_in_reply_to(messages_data.first)
+      next if reaction_removal? && !existing_reaction_row?
+
       set_contact
       next if @contact.blank?
 
-      # Process in_reply_to early so mark_existing_reaction_as_removed has
-      # `@in_reply_to_external_id` available. Reaction removals don't create a
-      # new Message row, so handle them outside the transaction to avoid
-      # set_conversation opening/creating a stray thread for a blank webhook.
-      # We also intentionally run this BEFORE contact_processable? so blocked
-      # contacts can still reconcile an existing reaction row.
-      process_in_reply_to(messages_data.first)
+      # Reactions don't create a new Message row, so handle them outside the
+      # transaction to avoid set_conversation opening/creating a stray thread
+      # for a blank webhook. We also intentionally run this BEFORE
+      # contact_processable? so blocked contacts can still reconcile an
+      # existing reaction row.
       next mark_existing_reaction_as_removed if reaction_removal?
 
       next unless contact_processable?
@@ -125,6 +131,18 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   # in an older/resolved thread, while `set_conversation` could have just picked
   # (or created) a different one for this webhook. Find the row globally, then
   # operate on its real `existing.conversation`.
+  # Sender-agnostic existence check used to skip set_contact for removal
+  # webhooks that have nothing to act on. Mirrors the inbox/in_reply_to scope
+  # of `mark_existing_reaction_as_removed`.
+  def existing_reaction_row?
+    return false if @in_reply_to_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    Message.where(inbox_id: inbox.id)
+           .where("#{json_path}->>'is_reaction' = 'true'")
+           .exists?(["#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id])
+  end
+
   def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
     return if @in_reply_to_external_id.blank?
 
