@@ -47,18 +47,32 @@ class Whatsapp::OneoffCampaignService
 
   def process_contact(contact)
     Rails.logger.info "Processing contact: #{contact.name} (#{contact.phone_number})"
+    return unless eligible_contact?(contact)
 
-    if contact.phone_number.blank?
-      Rails.logger.info "Skipping contact #{contact.name} - no phone number"
-      return
-    end
+    rendered_body = render_template_body
+    return log_skip(contact, 'template body could not be rendered') if rendered_body.blank?
 
-    if campaign.template_params.blank?
-      Rails.logger.error "Skipping contact #{contact.name} - no template_params found for WhatsApp campaign"
-      return
-    end
+    contact_inbox = ContactInboxBuilder.new(contact: contact, inbox: inbox).perform
+    return log_skip(contact, 'failed to resolve contact inbox') if contact_inbox.blank?
 
-    send_whatsapp_template_message(to: contact.phone_number)
+    conversation = build_campaign_conversation(contact_inbox)
+    build_outgoing_template_message(conversation, rendered_body)
+  rescue StandardError => e
+    Rails.logger.error "Failed to dispatch campaign message to #{contact.name}: #{e.message}"
+    Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
+    nil
+  end
+
+  def eligible_contact?(contact)
+    return log_skip(contact, 'no phone number') && false if contact.phone_number.blank?
+    return log_skip(contact, 'no template_params found for WhatsApp campaign') && false if campaign.template_params.blank?
+
+    true
+  end
+
+  def log_skip(contact, reason)
+    Rails.logger.info "Skipping contact #{contact.name} - #{reason}"
+    nil
   end
 
   def process_audience(audience_labels)
@@ -70,27 +84,34 @@ class Whatsapp::OneoffCampaignService
     Rails.logger.info "Campaign #{campaign.id} processing completed"
   end
 
-  def send_whatsapp_template_message(to:)
-    processor = Whatsapp::TemplateProcessorService.new(
+  def render_template_body
+    Whatsapp::TemplateBodyRenderer.new(
       channel: channel,
       template_params: campaign.template_params
+    ).call
+  end
+
+  def build_campaign_conversation(contact_inbox)
+    Conversation.create!(
+      account_id: campaign.account_id,
+      inbox_id: campaign.inbox_id,
+      contact_id: contact_inbox.contact_id,
+      contact_inbox_id: contact_inbox.id,
+      campaign_id: campaign.id,
+      status: :pending
     )
+  end
 
-    name, namespace, lang_code, processed_parameters = processor.call
-
-    return if name.blank?
-
-    channel.send_template(to, {
-                            name: name,
-                            namespace: namespace,
-                            lang_code: lang_code,
-                            parameters: processed_parameters
-                          }, nil)
-
-  rescue StandardError => e
-    Rails.logger.error "Failed to send WhatsApp template message to #{to}: #{e.message}"
-    Rails.logger.error "Backtrace: #{e.backtrace.first(5).join('\n')}"
-    # continue processing remaining contacts
-    nil
+  def build_outgoing_template_message(conversation, content)
+    Messages::MessageBuilder.new(
+      campaign.sender,
+      conversation,
+      {
+        content: content,
+        message_type: 'outgoing',
+        template_params: campaign.template_params,
+        campaign_id: campaign.id
+      }
+    ).perform
   end
 end
