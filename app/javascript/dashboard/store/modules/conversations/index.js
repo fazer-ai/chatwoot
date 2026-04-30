@@ -234,7 +234,11 @@ export const mutations = {
       chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;
-      if (selectedChatId === conversationId) {
+      // Reactions render as chips on their parent bubble, not as standalone
+      // rows, so jumping the viewport to the bottom on every toggle would
+      // yank the user away from whatever older message they reacted to.
+      const isReaction = message.content_attributes?.is_reaction === true;
+      if (selectedChatId === conversationId && !isReaction) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     }
