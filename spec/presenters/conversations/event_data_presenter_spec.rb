@@ -112,5 +112,22 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(data[:id]).to eq(reaction.id)
       expect(data[:in_reply_to_snippet]).to start_with('Original message body')
     end
+
+    it 'returns in_reply_to_snippet as a plain String, not SafeBuffer (regression)' do
+      # `strip_tags` returns ActiveSupport::SafeBuffer, which Sidekiq's
+      # strict-args check rejects when this hash flows into
+      # ActionCableBroadcastJob.perform_later. The whole reactions controller
+      # request 500s (and the UI shows a misleading toast) if this regresses.
+      target = create(:message, conversation: conversation, account: conversation.account,
+                                message_type: :incoming, content: '<p>HTML <strong>body</strong></p>')
+      create(:message, conversation: conversation, account: conversation.account,
+                       message_type: :incoming, content: '👍',
+                       content_attributes: { is_reaction: true, in_reply_to: target.id })
+
+      snippet = presenter.push_data[:last_non_activity_message][:in_reply_to_snippet]
+
+      expect(snippet.class).to eq(String)
+      expect(snippet).not_to include('<')
+    end
   end
 end

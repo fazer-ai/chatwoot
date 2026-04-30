@@ -172,6 +172,20 @@ describe('#mutations', () => {
       expect(emitter.emit).toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
     });
 
+    it('skips SCROLL_TO_MESSAGE when the new message is a reaction', () => {
+      const state = {
+        allConversations: [{ id: 1, messages: [] }],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        conversation_id: 1,
+        content: '👍',
+        created_at: 1602256198,
+        content_attributes: { is_reaction: true, in_reply_to: 42 },
+      });
+      expect(emitter.emit).not.toHaveBeenCalled();
+    });
+
     it('update message if it exist in the store', () => {
       global.bus = { $emit: vi.fn() };
       const state = {
@@ -206,6 +220,46 @@ describe('#mutations', () => {
           ],
         },
       ]);
+      expect(emitter.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('#UPDATE_CONVERSATION', () => {
+    it('emits SCROLL_TO_MESSAGE when the open conversation gets a regular update', () => {
+      const state = {
+        allConversations: [
+          { id: 1, updated_at: 1, last_non_activity_message: null },
+        ],
+        selectedChatId: 1,
+      };
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        last_non_activity_message: {
+          id: 99,
+          content: 'Hello',
+          content_attributes: {},
+        },
+      });
+      expect(emitter.emit).toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
+    });
+
+    it('skips SCROLL_TO_MESSAGE when the update was triggered by a reaction', () => {
+      const state = {
+        allConversations: [
+          { id: 1, updated_at: 1, last_non_activity_message: null },
+        ],
+        selectedChatId: 1,
+      };
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        last_non_activity_message: {
+          id: 99,
+          content: '👍',
+          content_attributes: { is_reaction: true, in_reply_to: 42 },
+        },
+      });
       expect(emitter.emit).not.toHaveBeenCalled();
     });
   });
