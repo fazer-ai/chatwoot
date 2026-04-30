@@ -75,7 +75,7 @@ class InboxPolicy < ApplicationPolicy
   end
 
   def convert_provider?
-    @account_user.administrator? || @account_user.manager?
+    @account_user.administrator?
   end
 
   def on_whatsapp?
