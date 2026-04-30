@@ -271,7 +271,15 @@ export const mutations = {
 
       const { messages, ...updates } = conversation;
       allConversations[index] = { ...selectedConversation, ...updates };
-      if (_state.selectedChatId === conversation.id) {
+      // The reactions controller bumps `updated_at` and dispatches
+      // CONVERSATION_UPDATED so the chat list preview refreshes; without this
+      // guard every emoji toggle would yank the open conversation back to the
+      // bottom via the SCROLL_TO_MESSAGE listener. When the latest preview row
+      // is a reaction, treat the update as preview-only and skip the scroll.
+      const lastIsReaction =
+        updates.last_non_activity_message?.content_attributes?.is_reaction ===
+        true;
+      if (_state.selectedChatId === conversation.id && !lastIsReaction) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     } else {
