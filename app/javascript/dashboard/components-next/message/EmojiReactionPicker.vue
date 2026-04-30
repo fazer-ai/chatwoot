@@ -78,7 +78,10 @@ useEventListener(window, 'blur', close);
     </button>
     <div
       v-if="isOpen && !showFullPicker"
-      class="absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-1 rounded-full border border-n-slate-6 bg-n-solid-2 p-1 shadow-lg"
+      class="absolute bottom-[calc(100%+0.5rem)] z-50 flex w-max items-center gap-1 rounded-full border border-n-slate-6 bg-n-solid-2 p-1 shadow-lg"
+      :class="
+        alignment === 'right' ? '-right-1 left-auto' : '-left-1 right-auto'
+      "
     >
       <button
         v-for="item in QUICK_EMOJIS"
