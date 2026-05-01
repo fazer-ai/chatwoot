@@ -152,7 +152,9 @@
         "CAMPAIGN_DETAILS": {
           "SENT_FROM": "Enviado de",
           "ON": "ativado"
-        }
+        },
+        "TEMPLATE_LABEL": "Modelo:",
+        "AUDIENCE_LABEL": "Público:"
       },
       "CREATE": {
         "TITLE": "Criar campanha do WhatsApp",
