@@ -28,8 +28,10 @@
     },
     "LABELS": {
       "ASSIGN_LABELS": "Atribuir rótulo",
+      "UNASSIGN_LABELS": "Desatribuir rótulo",
       "NO_LABELS_FOUND": "Nenhuma etiqueta encontrada",
       "ASSIGN_SELECTED_LABELS": "Atribuir etiquetas selecionadas",
+      "UNASSIGN_SELECTED_LABELS": "Desatribuir etiquetas selecionadas",
       "ASSIGN_SUCCESFUL": "Rótulos atribuídos com sucesso.",
       "ASSIGN_FAILED": "Falha ao atribuir etiquetas. Por favor, tente novamente."
     },

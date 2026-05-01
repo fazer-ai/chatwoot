@@ -26,6 +26,7 @@ const props = defineProps({
 const emit = defineEmits([
   'clearSelection',
   'assignLabels',
+  'unassignLabels',
   'toggleAll',
   'deleteSelected',
 ]);
@@ -35,6 +36,7 @@ const { t } = useI18n();
 const selectedCount = computed(() => props.selectedContactIds.length);
 const totalVisibleContacts = computed(() => props.visibleContactIds.length);
 const showLabelSelector = ref(false);
+const showUnassignLabelSelector = ref(false);
 
 const selectAllLabel = computed(() => {
   if (!totalVisibleContacts.value) {
@@ -73,11 +75,13 @@ const selectionModel = computed({
 
 const emitClearSelection = () => {
   showLabelSelector.value = false;
+  showUnassignLabelSelector.value = false;
   emit('clearSelection');
 };
 
 const toggleLabelSelector = () => {
   if (!selectedCount.value || props.isLoading) return;
+  showUnassignLabelSelector.value = false;
   showLabelSelector.value = !showLabelSelector.value;
 };
 
@@ -85,9 +89,24 @@ const closeLabelSelector = () => {
   showLabelSelector.value = false;
 };
 
+const toggleUnassignLabelSelector = () => {
+  if (!selectedCount.value || props.isLoading) return;
+  showLabelSelector.value = false;
+  showUnassignLabelSelector.value = !showUnassignLabelSelector.value;
+};
+
+const closeUnassignLabelSelector = () => {
+  showUnassignLabelSelector.value = false;
+};
+
 const handleAssignLabels = labels => {
   emit('assignLabels', labels);
   closeLabelSelector();
+};
+
+const handleUnassignLabels = labels => {
+  emit('unassignLabels', labels);
+  closeUnassignLabelSelector();
 };
 </script>
 
@@ -141,6 +160,37 @@ const handleAssignLabels = labels => {
                 v-if="showLabelSelector"
                 class="[&>.triangle]:!hidden [&>div>button]:!hidden ltr:!right-0 rtl:!left-0 top-8 mt-0.5"
                 @assign="handleAssignLabels"
+              />
+            </transition>
+          </div>
+          <div
+            v-on-click-outside="closeUnassignLabelSelector"
+            class="relative flex items-center"
+          >
+            <Button
+              sm
+              faded
+              slate
+              icon="i-lucide-tag"
+              :label="t('CONTACTS_BULK_ACTIONS.UNASSIGN_LABELS')"
+              :disabled="!selectedCount || isLoading"
+              :is-loading="isLoading"
+              class="[&>span:nth-child(2)]:hidden sm:[&>span:nth-child(2)]:inline w-fit"
+              @click="toggleUnassignLabelSelector"
+            />
+            <transition
+              enter-active-class="transition ease-out duration-100"
+              enter-from-class="transform opacity-0 scale-95"
+              enter-to-class="transform opacity-100 scale-100"
+              leave-active-class="transition ease-in duration-75"
+              leave-from-class="transform opacity-100 scale-100"
+              leave-to-class="transform opacity-0 scale-95"
+            >
+              <LabelActions
+                v-if="showUnassignLabelSelector"
+                mode="unassign"
+                class="[&>.triangle]:!hidden [&>div>button]:!hidden ltr:!right-0 rtl:!left-0 top-8 mt-0.5"
+                @unassign="handleUnassignLabels"
               />
             </transition>
           </div>
