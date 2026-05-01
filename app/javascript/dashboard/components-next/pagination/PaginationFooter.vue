@@ -103,7 +103,7 @@ const pageInfo = computed(() => {
       <span class="relative inline-flex items-center">
         <select
           :value="itemsPerPage"
-          class="appearance-none h-[1.3125rem] leading-[1.3125rem] text-xs rounded-md border border-n-weak bg-n-input-background pl-2 pr-5 py-0 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
+          class="mt-4 appearance-none h-5 leading-5 text-xs rounded-md border border-n-weak bg-n-input-background pl-1.5 pr-5 py-0 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
           @change="onChangePageSize"
         >
           <option
@@ -114,9 +114,6 @@ const pageInfo = computed(() => {
             {{ option }}
           </option>
         </select>
-        <span
-          class="i-lucide-chevron-down size-3 absolute right-1 top-1/2 -translate-y-1/2 text-n-slate-11 pointer-events-none"
-        />
       </span>
     </label>
     <div class="flex items-center gap-2">
