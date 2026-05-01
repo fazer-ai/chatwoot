@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useMapGetter } from 'dashboard/composables/store';
 
 import CardLayout from 'dashboard/components-next/CardLayout.vue';
 import ContactsForm from 'dashboard/components-next/Contacts/ContactsForm/ContactsForm.vue';
@@ -19,6 +20,7 @@ const props = defineProps({
   phoneNumber: { type: String, default: '' },
   thumbnail: { type: String, default: '' },
   availabilityStatus: { type: String, default: null },
+  labels: { type: Array, default: () => [] },
   isExpanded: { type: Boolean, default: false },
   isUpdating: { type: Boolean, default: false },
   selectable: { type: Boolean, default: false },
@@ -36,6 +38,22 @@ const emit = defineEmits([
 const { t } = useI18n();
 
 const contactsFormRef = ref(null);
+
+const accountLabels = useMapGetter('labels/getLabels');
+
+const resolvedLabels = computed(() => {
+  if (!props.labels?.length) return [];
+  const titleToLabel = new Map(
+    accountLabels.value.map(label => [label.title, label])
+  );
+  return props.labels.map(title => {
+    const match = titleToLabel.get(title);
+    return {
+      title,
+      color: match?.color || '#94a3b8',
+    };
+  });
+});
 
 const getInitialContactData = () => ({
   id: props.id,
@@ -148,6 +166,20 @@ const handleAvatarHover = isHovered => {
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span class="text-base font-medium truncate text-n-slate-12">
               {{ name }}
+            </span>
+            <span
+              v-if="resolvedLabels.length"
+              class="flex flex-wrap items-center gap-1"
+            >
+              <span
+                v-for="label in resolvedLabels"
+                :key="label.title"
+                v-tooltip.top="label.title"
+                class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium text-white truncate max-w-[120px]"
+                :style="{ backgroundColor: label.color }"
+              >
+                {{ label.title }}
+              </span>
             </span>
             <span class="inline-flex items-center gap-1">
               <span
