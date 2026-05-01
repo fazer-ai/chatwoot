@@ -613,6 +613,7 @@ RSpec.describe Conversation do
         },
         id: conversation.display_id,
         messages: [],
+        last_non_activity_message: nil,
         labels: [],
         last_activity_at: conversation.last_activity_at.to_i,
         inbox_id: conversation.inbox_id,

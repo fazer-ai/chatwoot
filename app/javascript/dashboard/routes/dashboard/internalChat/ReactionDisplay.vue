@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { vOnClickOutside } from '@vueuse/components';
-import Icon from 'dashboard/components-next/icon/Icon.vue';
 
 const props = defineProps({
   reactions: {
@@ -32,13 +31,14 @@ const groupedReactions = computed(() => {
         users: [],
       };
     }
+    const isMine = reaction.user_id === props.currentUserId;
     groups[reaction.emoji].count += 1;
     groups[reaction.emoji].users.push({
       name: reaction.user?.name || '',
-      id: reaction.user_id,
       reactionId: reaction.id,
+      isMine,
     });
-    if (reaction.user_id === props.currentUserId) {
+    if (isMine) {
       groups[reaction.emoji].userReactionId = reaction.id;
     }
   });
@@ -53,14 +53,18 @@ function closePopover() {
   showPopover.value = false;
 }
 
-function handleRemove(reactionId) {
-  emit('remove', reactionId);
-  if (props.reactions.length <= 1) {
-    showPopover.value = false;
-  }
+function handleRowClick(user) {
+  if (!user.isMine) return;
+  emit('remove', user.reactionId);
+  // `reactions.length` is still the pre-removal count here. Close when the
+  // post-removal state would leave at most one reaction left: at that point
+  // the popover's list view collapses to a single user and stops being
+  // useful, so dropping it avoids a dangling open panel.
+  if (props.reactions.length - 1 <= 1) closePopover();
 }
 </script>
 
+<!-- eslint-disable-next-line vue/no-root-v-if -->
 <template>
   <div
     v-if="groupedReactions.length"
@@ -81,7 +85,6 @@ function handleRemove(reactionId) {
       <span>{{ group.emoji }}</span>
       <span>{{ group.count }}</span>
     </button>
-
     <div
       v-if="showPopover"
       v-on-click-outside="closePopover"
@@ -92,25 +95,25 @@ function handleRemove(reactionId) {
         :key="group.emoji"
         :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
       >
-        <div
+        <component
+          :is="user.isMine ? 'button' : 'div'"
           v-for="user in group.users"
           :key="user.reactionId"
-          class="flex h-7 items-center gap-2 rounded px-1"
+          :type="user.isMine ? 'button' : null"
+          class="flex w-full items-center gap-2 rounded px-1 py-1 text-left"
+          :class="user.isMine ? 'cursor-pointer hover:bg-n-alpha-2' : ''"
+          @click="handleRowClick(user)"
         >
           <span class="w-5 text-center text-sm">{{ group.emoji }}</span>
-          <span class="flex-1 truncate text-xs text-n-slate-12">
-            {{ user.name }}
-          </span>
-          <button
-            v-if="user.id === currentUserId"
-            type="button"
-            class="flex-shrink-0 rounded p-1 text-n-slate-11 hover:bg-n-ruby-3 hover:text-n-ruby-11"
-            :title="t('INTERNAL_CHAT.MESSAGE.DELETE')"
-            @click.stop="handleRemove(user.reactionId)"
-          >
-            <Icon icon="i-lucide-x" class="size-4" />
-          </button>
-        </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs text-n-slate-12 truncate">
+              {{ user.isMine ? t('CONVERSATION.REACTIONS.YOU') : user.name }}
+            </div>
+            <div v-if="user.isMine" class="text-[10px] text-n-slate-11">
+              {{ t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE') }}
+            </div>
+          </div>
+        </component>
       </div>
     </div>
   </div>

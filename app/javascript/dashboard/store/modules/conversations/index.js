@@ -216,13 +216,29 @@ export const mutations = {
 
     const pendingMessageIndex = findPendingMessageIndex(chat, message);
     if (pendingMessageIndex !== -1) {
+      // MESSAGE_UPDATED cables can arrive out of order when the user toggles a
+      // reaction quickly: each Sidekiq job reads the message at run time, so a
+      // late-arriving cable for an older state would clobber the fresher one.
+      // Drop updates that are older than what we already have.
+      const existing = chat.messages[pendingMessageIndex];
+      const incomingTs = Date.parse(message.updated_at);
+      const existingTs = Date.parse(existing?.updated_at);
+      const hasIncomingTs = Number.isFinite(incomingTs);
+      const hasExistingTs = Number.isFinite(existingTs);
+      // If the incoming timestamp is unparseable, treat it as stale so a
+      // malformed cable can't clobber the local row.
+      if (hasExistingTs && (!hasIncomingTs || incomingTs < existingTs)) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
       chat.messages.push(message);
       chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;
-      if (selectedChatId === conversationId) {
+      // Reactions render as chips on their parent bubble, not as standalone
+      // rows, so jumping the viewport to the bottom on every toggle would
+      // yank the user away from whatever older message they reacted to.
+      const isReaction = message.content_attributes?.is_reaction === true;
+      if (selectedChatId === conversationId && !isReaction) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     }
@@ -255,7 +271,15 @@ export const mutations = {
 
       const { messages, ...updates } = conversation;
       allConversations[index] = { ...selectedConversation, ...updates };
-      if (_state.selectedChatId === conversation.id) {
+      // The reactions controller bumps `updated_at` and dispatches
+      // CONVERSATION_UPDATED so the chat list preview refreshes; without this
+      // guard every emoji toggle would yank the open conversation back to the
+      // bottom via the SCROLL_TO_MESSAGE listener. When the latest preview row
+      // is a reaction, treat the update as preview-only and skip the scroll.
+      const lastIsReaction =
+        updates.last_non_activity_message?.content_attributes?.is_reaction ===
+        true;
+      if (_state.selectedChatId === conversation.id && !lastIsReaction) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     } else {

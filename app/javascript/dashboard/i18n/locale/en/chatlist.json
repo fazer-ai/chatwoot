@@ -139,6 +139,8 @@
     "TYPING": "typing...",
     "RECORDING": "recording...",
     "NO_CONTENT": "No content available",
+    "REACTED": "{sender} reacted {emoji}",
+    "REACTED_TO_SNIPPET": "{sender} reacted {emoji} to \"{snippet}\"",
     "HIDE_QUOTED_TEXT": "Hide Quoted Text",
     "SHOW_QUOTED_TEXT": "Show Quoted Text",
     "MESSAGE_READ": "Read",

@@ -314,6 +314,23 @@
       "CONTACT": "Contact",
       "COPILOT": "Copilot"
     },
+    "REACTIONS": {
+      "ADD_REACTION": "Add reaction",
+      "MORE_EMOJIS": "More emojis",
+      "FAILED": "Couldn't update reaction. Try again.",
+      "YOU": "You",
+      "CLICK_TO_REMOVE": "Click to remove",
+      "QUICK": {
+        "THUMBS_UP": "Thumbs up",
+        "HEART": "Heart",
+        "JOY": "Joy",
+        "SURPRISED": "Surprised",
+        "SAD": "Sad",
+        "PRAY": "Pray",
+        "FIRE": "Fire",
+        "PARTY": "Party"
+      }
+    },
     "VOICE_WIDGET": {
       "INCOMING_CALL": "Incoming call",
       "OUTGOING_CALL": "Outgoing call",

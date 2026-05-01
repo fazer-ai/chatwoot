@@ -588,6 +588,79 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(message.conversation.messages.count).to eq(1)
         end
+
+        it 'marks an existing incoming reaction as removed when webhook arrives with empty text' do
+          existing_reaction = create(:message,
+                                     conversation: message.conversation,
+                                     sender: message.conversation.contact_inbox.contact,
+                                     message_type: :incoming,
+                                     content: '👍',
+                                     content_attributes: { is_reaction: true, in_reply_to_external_id: message.source_id })
+          raw_message[:key][:id] = 'reaction_removal_456'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '12345678@lid', fromMe: true, id: 'msg_123' },
+              text: ''
+            }
+          }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to(change { message.conversation.messages.count })
+
+          existing_reaction.reload
+          expect(existing_reaction.content).to eq('')
+          expect(existing_reaction.content_attributes['deleted']).to be true
+        end
+
+        it 'dispatches conversation.updated after marking a reaction as removed' do
+          create(:message,
+                 conversation: message.conversation,
+                 sender: message.conversation.contact_inbox.contact,
+                 message_type: :incoming,
+                 content: '👍',
+                 content_attributes: { is_reaction: true, in_reply_to_external_id: message.source_id })
+          dispatched = []
+          allow_any_instance_of(Conversation).to receive(:dispatch_conversation_updated_event) do |conv| # rubocop:disable RSpec/AnyInstance
+            dispatched << conv.id
+          end
+          raw_message[:key][:id] = 'reaction_removal_789'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '12345678@lid', fromMe: true, id: 'msg_123' },
+              text: ''
+            }
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(dispatched).to include(message.conversation.id)
+        end
+
+        it 'skips reaction removal for outgoing echoes so the local controller update is not clobbered' do
+          # Mirror the post-controller state: the Chatwoot reactions controller
+          # already toggled the senderless outgoing row to deleted, so the
+          # echoed fromMe webhook should hit the active-only filter and no-op.
+          existing_reaction = create(:message,
+                                     conversation: message.conversation,
+                                     sender: nil,
+                                     message_type: :outgoing,
+                                     content: '',
+                                     content_attributes: { is_reaction: true, in_reply_to_external_id: message.source_id, deleted: true })
+          raw_message[:key][:id] = 'outgoing_echo_removal'
+          raw_message[:key][:fromMe] = true
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '12345678@lid', fromMe: true, id: 'msg_123' },
+              text: ''
+            }
+          }
+          described_class.new(inbox: inbox, params: params).perform
+
+          existing_reaction.reload
+          expect(existing_reaction.content).to eq('')
+          expect(existing_reaction.content_attributes['deleted']).to be(true)
+        end
       end
 
       context 'when message type is image' do

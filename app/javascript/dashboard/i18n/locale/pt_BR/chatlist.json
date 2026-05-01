@@ -139,6 +139,8 @@
     "TYPING": "digitando...",
     "RECORDING": "gravando...",
     "NO_CONTENT": "Nenhum conteúdo disponível",
+    "REACTED": "{sender} reagiu {emoji}",
+    "REACTED_TO_SNIPPET": "{sender} reagiu {emoji} a \"{snippet}\"",
     "HIDE_QUOTED_TEXT": "Ocultar Texto Citado",
     "SHOW_QUOTED_TEXT": "Mostrar Texto Citado",
     "MESSAGE_READ": "Lida",

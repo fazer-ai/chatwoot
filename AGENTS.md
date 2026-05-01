@@ -48,7 +48,7 @@
 - Prefer minimal, readable code over elaborate abstractions; clarity beats cleverness
 - Break down complex tasks into small, testable units
 - Iterate after confirmation
-- Avoid writing specs unless explicitly asked
+- New features must include specs covering the main flows (happy path + critical edge cases). Bugfixes should add a regression spec when the fix is non-trivial. Skip specs only for purely cosmetic changes (CSS tweaks, copy adjustments, log message edits) or when the user explicitly asks to skip.
 - Remove dead/unreachable/unused code
 - Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
 - Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs

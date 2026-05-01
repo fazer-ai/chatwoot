@@ -46,21 +46,49 @@ export const filterDuplicateSourceMessages = (messages = []) => {
  * @param {Object} m - The conversation object containing messages.
  * @returns {Object} The last message of the conversation.
  */
-export const getLastMessage = m => {
-  const lastMessageIncludingActivity = m.messages[m.messages.length - 1];
+// A reaction whose user-facing state is invisible (toggled off / blank).
+// Treated as non-existent for chat list preview purposes — otherwise the
+// preview would render "<sender> reagiu <>" or fall back to "no content"
+// even when there's a real previous message we could show.
+const isRemovedReaction = message =>
+  message?.content_attributes?.is_reaction &&
+  (message?.content_attributes?.deleted || !message?.content);
 
-  const nonActivityMessages = m.messages.filter(
+export const getLastMessage = m => {
+  // Drop removed reactions up-front so neither the activity fallback nor the
+  // visible-messages list ever picks a blank "X reagiu " row.
+  const nonRemovedMessages = m.messages.filter(
+    message => !isRemovedReaction(message)
+  );
+  const lastMessageIncludingActivity =
+    nonRemovedMessages[nonRemovedMessages.length - 1];
+
+  const visibleMessages = nonRemovedMessages.filter(
     message => message.message_type !== 2
   );
   const lastNonActivityMessageInStore =
-    nonActivityMessages[nonActivityMessages.length - 1];
+    visibleMessages[visibleMessages.length - 1];
 
-  const lastNonActivityMessageFromAPI = m.last_non_activity_message;
+  // ADD_MESSAGE mutates `chat.messages` in place but never touches
+  // `last_non_activity_message`, so the API field can hold a stale snapshot of
+  // a message that has since been updated (eg. a reaction toggled off). When
+  // the same id is present in the store, merge the fresher store fields onto
+  // the API snapshot — replacing would strip jbuilder-only fields like
+  // `in_reply_to_snippet` that aren't present on push_event_data.
+  const apiCandidate = m.last_non_activity_message;
+  const apiId = apiCandidate?.id;
+  const storeVersion = apiId ? m.messages.find(msg => msg.id === apiId) : null;
+  const refreshedApiCandidate = storeVersion
+    ? { ...apiCandidate, ...storeVersion }
+    : apiCandidate;
+  const lastNonActivityMessageFromAPI = isRemovedReaction(refreshedApiCandidate)
+    ? null
+    : refreshedApiCandidate;
 
   // If API value and store value for last non activity message
   // is empty, then return the last activity message
   if (!lastNonActivityMessageInStore && !lastNonActivityMessageFromAPI) {
-    return lastMessageIncludingActivity;
+    return lastMessageIncludingActivity || null;
   }
 
   return getLastNonActivityMessage(

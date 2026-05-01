@@ -128,6 +128,20 @@ class Message < ApplicationRecord
   scope :non_activity_messages, -> { where.not(message_type: :activity).reorder('created_at desc') }
   scope :today, -> { where("date_trunc('day', created_at) = ?", Date.current) }
   scope :voice_calls, -> { where(content_type: :voice_call) }
+  # Excludes reactions whose user-facing state is invisible (toggled off or
+  # blank). Used when picking a "last meaningful message" for chat list
+  # previews — a removed reaction shouldn't drive the preview text.
+  # `#>>'{}'` unwraps the legacy double-encoded `content_attributes` (json
+  # column written via `store coder: JSON`) so `->>` can traverse it. The
+  # `IS NOT TRUE` guards keep NULL JSON values from collapsing the row under
+  # SQL three-valued logic.
+  scope :hide_removed_reactions, lambda {
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    where(
+      "((#{json_path})->>'is_reaction' = 'true') IS NOT TRUE " \
+      "OR (((#{json_path})->>'deleted' = 'true') IS NOT TRUE AND content IS NOT NULL AND content <> '')"
+    )
+  }
 
   # TODO: Get rid of default scope
   # https://stackoverflow.com/a/1834250/939299
@@ -230,8 +244,13 @@ class Message < ApplicationRecord
     content_attributes.dig(:email, :auto_reply) == true
   end
 
+  def reaction?
+    ActiveModel::Type::Boolean.new.cast(content_attributes['is_reaction']) == true
+  end
+
   def valid_first_reply?
     return false unless human_response? && !private?
+    return false if reaction?
     return false if conversation.first_reply_created_at.present?
     return false if conversation.messages.outgoing
                                 .where.not(sender_type: ['AgentBot', 'Captain::Assistant'])
@@ -370,6 +389,12 @@ class Message < ApplicationRecord
   end
 
   def human_response?
+    # Reactions are not substantive replies; treating them as one would
+    # clear `waiting_since` / dispatch REPLY_CREATED on every emoji toggle
+    # and skew SLA timers for conversations the agent has not actually
+    # answered yet.
+    return false if reaction?
+
     # if the sender is not a user, it's not a human response
     # if automation rule id is present, it's not a human response
     # if campaign id is present, it's not a human response
@@ -413,6 +438,7 @@ class Message < ApplicationRecord
   def reopen_conversation
     return if conversation.muted?
     return unless incoming?
+    return if reaction?
 
     conversation.open! if conversation.snoozed?
 
@@ -423,6 +449,7 @@ class Message < ApplicationRecord
     return unless captain_pending_conversation?
     return unless human_response?
     return if private?
+    return if reaction?
 
     conversation.open!
   end

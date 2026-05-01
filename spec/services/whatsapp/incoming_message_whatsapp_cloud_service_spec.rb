@@ -332,6 +332,49 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
             described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
           end.not_to(change { whatsapp_channel.inbox.messages.count })
         end
+
+        it 'marks a matching existing reaction as removed in place' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
+          existing_reaction = create(:message,
+                                     conversation: conversation,
+                                     sender: contact,
+                                     message_type: :incoming,
+                                     content: '❤️',
+                                     content_attributes: { is_reaction: true,
+                                                           in_reply_to_external_id: 'wamid.ORIGINAL_MESSAGE_ID' })
+
+          expect do
+            described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          end.not_to(change { whatsapp_channel.inbox.messages.count })
+
+          existing_reaction.reload
+          expect(existing_reaction.content).to eq('')
+          expect(existing_reaction.content_attributes['deleted']).to be true
+        end
+
+        it 'dispatches conversation.updated after marking a reaction as removed' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
+          create(:message,
+                 conversation: conversation,
+                 sender: contact,
+                 message_type: :incoming,
+                 content: '❤️',
+                 content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.ORIGINAL_MESSAGE_ID' })
+          dispatched = []
+          allow_any_instance_of(Conversation).to receive(:dispatch_conversation_updated_event) do |conv| # rubocop:disable RSpec/AnyInstance
+            dispatched << conv.id
+          end
+
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+
+          expect(dispatched).to include(conversation.id)
+        end
       end
     end
   end

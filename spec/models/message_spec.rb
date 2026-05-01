@@ -920,4 +920,87 @@ RSpec.describe Message do
       end
     end
   end
+
+  describe '#reaction?' do
+    let(:conversation) { create(:conversation) }
+
+    it 'returns true when content_attributes carries is_reaction' do
+      message = create(:message, conversation: conversation, content_attributes: { is_reaction: true })
+      expect(message.reaction?).to be true
+    end
+
+    it 'returns false for regular messages' do
+      message = create(:message, conversation: conversation, content_attributes: {})
+      expect(message.reaction?).to be false
+    end
+  end
+
+  describe '.hide_removed_reactions' do
+    let(:conversation) { create(:conversation) }
+
+    it 'keeps regular non-reaction messages' do
+      regular = create(:message, conversation: conversation, content: 'Hello')
+      expect(conversation.messages.hide_removed_reactions).to include(regular)
+    end
+
+    it 'keeps active reactions (content present, not deleted)' do
+      reaction = create(:message,
+                        conversation: conversation,
+                        content: '👍',
+                        content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(conversation.messages.hide_removed_reactions).to include(reaction)
+    end
+
+    it 'hides reactions flagged as deleted' do
+      # Non-blank content here so the assertion can only succeed via the
+      # `deleted: true` branch (blank-content branch is covered separately).
+      removed = create(:message,
+                       conversation: conversation,
+                       content: '👍',
+                       content_attributes: { is_reaction: true, deleted: true })
+      expect(conversation.messages.hide_removed_reactions).not_to include(removed)
+    end
+
+    it 'hides reactions with blank content even when not flagged as deleted' do
+      blank_reaction = create(:message,
+                              conversation: conversation,
+                              content: '',
+                              content_attributes: { is_reaction: true })
+      expect(conversation.messages.hide_removed_reactions).not_to include(blank_reaction)
+    end
+  end
+
+  describe 'reactions do not trigger conversation lifecycle hooks' do
+    let(:conversation) { create(:conversation) }
+
+    it 'does not reopen a resolved conversation' do
+      conversation.resolved!
+      create(:message,
+             conversation: conversation,
+             message_type: :incoming,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(conversation.reload.open?).to be false
+    end
+
+    it 'does not flip a pending conversation to open' do
+      pending_conv = create(:conversation, status: :pending)
+      create(:message,
+             conversation: pending_conv,
+             message_type: :incoming,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(pending_conv.reload.pending?).to be true
+    end
+
+    it 'does not count toward first_reply_created_at' do
+      expect(conversation.first_reply_created_at).to be_nil
+      create(:message,
+             conversation: conversation,
+             message_type: :outgoing,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to: 1 })
+      expect(conversation.reload.first_reply_created_at).to be_nil
+    end
+  end
 end

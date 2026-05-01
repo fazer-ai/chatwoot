@@ -38,19 +38,128 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  inboxSupportsReactions: {
+    type: Boolean,
+    default: false,
+  },
   messages: {
     type: Array,
     default: () => [],
   },
 });
 
-const emit = defineEmits(['retry']);
+const emit = defineEmits(['retry', 'toggleReaction']);
 
 const allMessages = computed(() => {
   return useCamelCase(props.messages, {
     deep: true,
     stopPaths: ['content_attributes.translations'],
   });
+});
+
+const reactionsByMessageId = computed(() => {
+  // Keep only the latest reaction per (originalMessage, sender) and drop
+  // entries flagged as deleted or with empty content.
+  // Normalize sender_type casing: REST jbuilder doesn't expose `sender_type`
+  // (only nested `sender.type` in lowercase), while ActionCable's push_event_data
+  // includes Rails class names ('User', 'Contact'). We unify on lowercase so
+  // dedup keys and "isMine" comparisons stay consistent across both transports.
+  const senderTypeOf = msg =>
+    (msg.senderType ?? msg.sender?.type ?? '').toLowerCase();
+
+  // Multi-device echoes (the agent reacts from the WhatsApp mobile app on the
+  // same number connected to the inbox) arrive as outgoing reactions without an
+  // agent. Treat them as "ours" so they show up in the chip and the preview
+  // instead of falling through as ghosts.
+  const isOwnInboxReaction = msg => {
+    const sid = msg.senderId ?? msg.sender?.id;
+    return msg.messageType === 1 && sid == null;
+  };
+
+  // Collapse "agent reacted via Chatwoot" and "agent reacted via the connected
+  // phone" into the same logical actor so the chip never double-counts the
+  // current user. The controller and MessagesView already treat both shapes
+  // as the same toggle target.
+  const isSelfReaction = msg => {
+    if (isOwnInboxReaction(msg)) return true;
+    const senderId = msg.senderId ?? msg.sender?.id;
+    return senderTypeOf(msg) === 'user' && senderId === props.currentUserId;
+  };
+
+  // Build a sourceId → id lookup so reactions that only carry
+  // `inReplyToExternalId` (WhatsApp echo/phone-originated) can still resolve
+  // to a visible target when `inReplyTo` wasn't populated at save time.
+  const messageIdBySourceId = new Map(
+    allMessages.value.filter(m => !!m.sourceId).map(m => [m.sourceId, m.id])
+  );
+
+  const latestPerKey = new Map();
+  allMessages.value.forEach(msg => {
+    if (!msg.contentAttributes?.isReaction) return;
+    const originalId =
+      msg.contentAttributes?.inReplyTo ??
+      messageIdBySourceId.get(msg.contentAttributes?.inReplyToExternalId);
+    if (!originalId) return;
+    const senderId = msg.senderId ?? msg.sender?.id;
+    const senderType = senderTypeOf(msg);
+    const selfReaction = isSelfReaction(msg);
+    if (!selfReaction && (senderId == null || !senderType)) return;
+    // Each multi-device toggle creates a fresh Message (the backend can't
+    // collapse them in place because there is no agent to scope by), so
+    // dedupe them under a single key per target message.
+    const key = selfReaction
+      ? `${originalId}|self|self`
+      : `${originalId}|${senderType}|${senderId}`;
+    const prev = latestPerKey.get(key);
+    // Use <= so a later iteration wins on timestamp ties. Cable payloads carry
+    // second-resolution createdAt, so two toggles in the same second need a
+    // deterministic later-wins rule to avoid pinning the chip to a stale row.
+    if (!prev || (prev.createdAt ?? 0) <= (msg.createdAt ?? 0)) {
+      latestPerKey.set(key, msg);
+    }
+  });
+
+  const map = new Map();
+  latestPerKey.forEach(reaction => {
+    if (reaction.contentAttributes?.deleted) return;
+    if (!reaction.content) return;
+    // Mirror the first pass: an echoed reaction may carry only
+    // inReplyToExternalId, so resolve via the sourceId lookup before giving up.
+    const originalId =
+      reaction.contentAttributes.inReplyTo ??
+      messageIdBySourceId.get(reaction.contentAttributes?.inReplyToExternalId);
+    if (!originalId) return;
+    if (!map.has(originalId)) map.set(originalId, []);
+    map.get(originalId).push({
+      id: reaction.id,
+      emoji: reaction.content,
+      senderId: reaction.senderId ?? reaction.sender?.id,
+      senderType: senderTypeOf(reaction),
+      sender: reaction.sender,
+      messageType: reaction.messageType,
+    });
+  });
+  return map;
+});
+
+const visibleMessages = computed(() => {
+  return allMessages.value.filter(msg => !msg.contentAttributes?.isReaction);
+});
+
+// firstUnreadId can point to a reaction (filtered out of visibleMessages),
+// in which case the unread separator would never render. Anchor it to the
+// first visible message at or after that id so the divider always shows up
+// next to a real bubble.
+const effectiveFirstUnreadId = computed(() => {
+  if (!props.firstUnreadId) return null;
+  const direct = visibleMessages.value.find(
+    msg => msg.id === props.firstUnreadId
+  );
+  if (direct) return direct.id;
+  const fallback = visibleMessages.value.find(
+    msg => msg.id >= props.firstUnreadId
+  );
+  return fallback?.id ?? null;
 });
 
 const currentChat = useMapGetter('getSelectedChat');
@@ -174,25 +283,28 @@ const getInReplyToMessage = parentMessage => {
 <template>
   <ul class="px-4 bg-n-surface-1">
     <slot name="beforeAll" />
-    <template v-for="(message, index) in allMessages" :key="message.id">
+    <template v-for="(message, index) in visibleMessages" :key="message.id">
       <slot
-        v-if="firstUnreadId && message.id === firstUnreadId"
+        v-if="effectiveFirstUnreadId && message.id === effectiveFirstUnreadId"
         name="unreadBadge"
       />
       <Message
         v-bind="message"
         :is-email-inbox="isAnEmailChannel"
         :in-reply-to="getInReplyToMessage(message)"
-        :group-with-next="shouldGroupWithNext(index, allMessages)"
+        :group-with-next="shouldGroupWithNext(index, visibleMessages)"
         :group-with-previous="
-          index > 0 && shouldGroupWithNext(index - 1, allMessages)
+          index > 0 && shouldGroupWithNext(index - 1, visibleMessages)
         "
         :is-group-conversation="isGroupConversation"
         :inbox-supports-reply-to="inboxSupportsReplyTo"
         :inbox-supports-edit="inboxSupportsEdit"
+        :inbox-supports-reactions="inboxSupportsReactions"
+        :reactions="reactionsByMessageId.get(message.id) || []"
         :current-user-id="currentUserId"
         data-clarity-mask="True"
         @retry="emit('retry', message)"
+        @toggle-reaction="emit('toggleReaction', $event)"
       />
     </template>
     <slot name="after" />

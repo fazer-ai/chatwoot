@@ -274,6 +274,13 @@ export default {
       // Currently only Baileys WhatsApp channel supports message editing
       return this.isAWhatsAppBaileysChannel;
     },
+    inboxSupportsReactions() {
+      return (
+        this.isAWhatsAppCloudChannel ||
+        this.isAWhatsAppBaileysChannel ||
+        this.isAWhatsAppZapiChannel
+      );
+    },
     currentContact() {
       const senderId = this.currentChat?.meta?.sender?.id;
       if (!senderId) return {};
@@ -578,6 +585,150 @@ export default {
       const payload = useSnakeCase(message);
       await this.$store.dispatch('sendMessageWithData', payload);
     },
+    async handleToggleReaction({ messageId, targetSourceId, emoji }) {
+      // Backend keeps a single Message row per (target, user) and toggles it
+      // in-place. The cable echo always carries the original create's echo_id,
+      // so creating a fresh optimistic per toggle leaves the new one orphaned
+      // in the store (the cable matches the real msg id, never the new echo).
+      // Those orphans show up as "reagiu <emoji>" in the chat list preview
+      // even after the user toggles off. Update the existing entry instead.
+      const existing = this.findCurrentUserReaction(messageId, targetSourceId);
+      if (existing) {
+        await this.applyToggleOnExisting(existing, messageId, emoji);
+      } else {
+        await this.applyToggleOnNew(messageId, emoji);
+      }
+    },
+    async applyToggleOnExisting(existing, messageId, emoji) {
+      const isActive =
+        existing.content && !existing.content_attributes?.deleted;
+      const isToggleOff =
+        isActive && (emoji === '' || existing.content === emoji);
+      const newAttrs = { ...(existing.content_attributes || {}) };
+      if (isToggleOff) newAttrs.deleted = true;
+      else delete newAttrs.deleted;
+
+      const previous = {
+        content: existing.content,
+        content_attributes: existing.content_attributes,
+      };
+      this.$store.dispatch('updateMessage', {
+        ...existing,
+        content: isToggleOff ? '' : emoji,
+        content_attributes: newAttrs,
+      });
+
+      try {
+        await this.$store.dispatch('toggleMessageReaction', {
+          conversationId: this.currentChat.id,
+          messageId,
+          emoji,
+          echoId: existing.echo_id,
+        });
+      } catch (error) {
+        this.$store.dispatch('updateMessage', { ...existing, ...previous });
+        useAlert(this.$t('CONVERSATION.REACTIONS.FAILED'));
+      }
+    },
+    async applyToggleOnNew(messageId, emoji) {
+      const optimistic = this.buildOptimisticReaction(messageId, emoji);
+      this.$store.dispatch('addMessage', optimistic);
+
+      try {
+        await this.$store.dispatch('toggleMessageReaction', {
+          conversationId: this.currentChat.id,
+          messageId,
+          emoji,
+          echoId: optimistic.echo_id,
+        });
+      } catch (error) {
+        this.$store.dispatch('updateMessage', {
+          ...optimistic,
+          content_attributes: {
+            ...optimistic.content_attributes,
+            deleted: true,
+          },
+        });
+        useAlert(this.$t('CONVERSATION.REACTIONS.FAILED'));
+      }
+    },
+    findCurrentUserReaction(messageId, targetSourceId = null) {
+      const messages = this.currentChat?.messages || [];
+      const matches = messages.filter(m => {
+        if (!m.content_attributes?.is_reaction) return false;
+        // Match both in_reply_to (set by Chatwoot-originated reactions) and
+        // in_reply_to_external_id (set by WhatsApp echoes). Without the
+        // external id check, a multi-device reaction sent from the connected
+        // phone would be invisible here, and the next toggle would stack a
+        // duplicate optimistic row instead of mutating the echoed one.
+        const matchesInReplyTo =
+          m.content_attributes?.in_reply_to === messageId;
+        const matchesExternalId =
+          targetSourceId &&
+          m.content_attributes?.in_reply_to_external_id === targetSourceId;
+        if (!matchesInReplyTo && !matchesExternalId) return false;
+        // REST jbuilder doesn't surface sender_type; only the nested
+        // sender.type. ActionCable push_event_data has the top-level field.
+        // Read both so REST-loaded agent reactions match instead of stacking
+        // a duplicate optimistic row.
+        const senderType = (
+          m.sender_type ||
+          m.sender?.type ||
+          ''
+        ).toLowerCase();
+        const senderId = m.sender?.id ?? m.sender_id;
+        // Reaction created via Chatwoot UI by the current user
+        if (senderType === 'user' && senderId === this.currentUserId) {
+          return true;
+        }
+        // Multi-device echo: agent reacted from the WhatsApp mobile app on
+        // the same number connected to this inbox, so it has no agent in
+        // Chatwoot. Treat it as ours so a click toggles/removes it instead
+        // of stacking a duplicate reaction on top.
+        return m.message_type === 1 && senderId == null;
+      });
+      // Prefer active rows so we never resurrect a stale deleted echo when
+      // there is a fresher live reaction sitting next to it. created_at is
+      // second-resolution, so a sort can keep the older entry first on ties.
+      // Reduce with >= so that, all else equal, the later iteration wins —
+      // giving a deterministic "newest" pick even for two toggles in the same
+      // second.
+      const pickLatest = list =>
+        list.reduce((latest, candidate) => {
+          if (!latest) return candidate;
+          return (candidate.created_at || 0) >= (latest.created_at || 0)
+            ? candidate
+            : latest;
+        }, null);
+      const isActive = r => !!r.content && !r.content_attributes?.deleted;
+      return pickLatest(matches.filter(isActive)) || pickLatest(matches);
+    },
+    buildOptimisticReaction(messageId, emoji) {
+      // Use the echo_id as the temporary id so findPendingMessageIndex matches
+      // the real Message arriving later via ActionCable (it carries echo_id).
+      const echoId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      return {
+        id: echoId,
+        echo_id: echoId,
+        content: emoji,
+        conversation_id: this.currentChat?.id,
+        message_type: 1,
+        content_type: 'text',
+        content_attributes: {
+          is_reaction: true,
+          in_reply_to: messageId,
+        },
+        additional_attributes: {},
+        attachments: [],
+        sender: this.currentUser,
+        sender_type: 'User',
+        sender_id: this.currentUserId,
+        private: false,
+        status: 'progress',
+        created_at: Math.floor(Date.now() / 1000),
+      };
+    },
     toggleReplyEditorSize() {
       this.resizableEditorWrapperRef?.toggleEditorExpand?.();
     },
@@ -712,8 +863,10 @@ export default {
       :is-an-email-channel="isAnEmailChannel"
       :inbox-supports-reply-to="inboxSupportsReplyTo"
       :inbox-supports-edit="inboxSupportsEdit"
+      :inbox-supports-reactions="inboxSupportsReactions"
       :messages="getMessages"
       @retry="handleMessageRetry"
+      @toggle-reaction="handleToggleReaction"
     >
       <template #beforeAll>
         <transition name="slide-up">

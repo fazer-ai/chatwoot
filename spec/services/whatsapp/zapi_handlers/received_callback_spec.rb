@@ -972,16 +972,26 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         expect(message.content_attributes[:in_reply_to_external_id]).to eq('original_123')
       end
 
-      it 'creates empty reaction message' do
+      it 'no-ops on empty value when there is no existing reaction to remove' do
         params[:reaction][:value] = ''
 
         expect do
           service.perform
-        end.to change(Message, :count).by(1)
+        end.not_to change(Message, :count)
+      end
 
-        message = Message.last
-        expect(message.content).to eq('')
-        expect(message.content_attributes[:is_reaction]).to be(true)
+      it 'marks the existing contact reaction as deleted when value is blank' do
+        existing = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                    content: '👍', content_attributes: {
+                                      is_reaction: true,
+                                      in_reply_to_external_id: 'original_123'
+                                    })
+        params[:reaction][:value] = ''
+
+        expect { service.perform }.not_to change(Message, :count)
+        existing.reload
+        expect(existing.content).to eq('')
+        expect(existing.content_attributes['deleted']).to be(true)
       end
     end
 

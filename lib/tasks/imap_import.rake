@@ -20,6 +20,19 @@ def connect_imap(channel, folder)
   imap
 end
 
+# Logout can raise Net::IMAP::Error when the server has already closed the
+# connection (eg. a transient network blip mid-scan). Mirror the
+# `terminate_imap_connection` pattern used by the IMAP fetch service: log and
+# fall back to a plain disconnect so ensure blocks never fail the whole task.
+def safe_close_imap(imap)
+  return if imap.nil?
+
+  imap.logout
+rescue Net::IMAP::Error => e
+  warn "  [IMAP] logout failed: #{e.message}; disconnecting"
+  imap.disconnect
+end
+
 def format_duration(seconds)
   seconds = seconds.to_i
   if seconds < 60
@@ -131,7 +144,7 @@ def import_worker(channel, folder, uid_batch, progress) # rubocop:disable Metric
         warn "\n  [ERROR] uid #{uid}: #{e.message}"
       end
     ensure
-      imap&.logout
+      safe_close_imap(imap)
     end
   end
 rescue StandardError => e
@@ -182,14 +195,17 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
 
     # Phase 1: scan headers with a single connection to find new emails
     imap = connect_imap(channel, folder)
-    since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
+    begin
+      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
 
-    puts "Searching emails since #{since_date}..."
-    uids = imap.uid_search(['SINCE', since_date])
-    puts "Found #{uids.length} emails in #{folder}."
+      puts "Searching emails since #{since_date}..."
+      uids = imap.uid_search(['SINCE', since_date])
+      puts "Found #{uids.length} emails in #{folder}."
 
-    new_uids, skipped = scan_new_email_uids(imap, channel, uids)
-    imap.logout
+      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
+    ensure
+      safe_close_imap(imap)
+    end
 
     if new_uids.empty?
       puts 'Nothing new to import.'
@@ -221,6 +237,48 @@ namespace :imap do # rubocop:disable Metrics/BlockLength
     puts "  Skipped:  #{progress[:skipped]} (already present)"
     puts "  Errors:   #{progress[:errors]}"
     puts "  Time:     #{format_duration(elapsed)}"
+    puts '=' * 60
+  end
+
+  desc 'Dry-run: count how many emails imap:import would import (no changes)'
+  task :scan, %i[inbox_id days folder] => :environment do |_task, args| # rubocop:disable Metrics/BlockLength
+    inbox_id = args[:inbox_id]
+    days = (args[:days] || 7).to_i
+    folder = args[:folder] || 'INBOX'
+
+    if inbox_id.blank?
+      puts 'Usage: rails imap:scan[<inbox_id>,<days>,<folder>]'
+      puts '  days:   how far back to look (default: 7)'
+      puts '  folder: IMAP folder (default: INBOX)'
+      next
+    end
+
+    inbox, channel = validate_inbox(inbox_id)
+
+    puts "Inbox:    #{inbox.name} (ID: #{inbox.id})"
+    puts "Email:    #{channel.email}"
+    puts "Folder:   #{folder}"
+    puts "Lookback: #{days} days"
+    puts '-' * 60
+
+    imap = connect_imap(channel, folder)
+    begin
+      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
+
+      puts "Searching emails since #{since_date}..."
+      uids = imap.uid_search(['SINCE', since_date])
+      puts "Found #{uids.length} emails in #{folder}."
+
+      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
+    ensure
+      safe_close_imap(imap)
+    end
+
+    puts ''
+    puts '=' * 60
+    puts 'Scan complete (no changes made).'
+    puts "  Would import: #{new_uids.size}"
+    puts "  Would skip:   #{skipped} (already present)"
     puts '=' * 60
   end
 end
