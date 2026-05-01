@@ -92,13 +92,23 @@ class Whatsapp::OneoffCampaignService
   end
 
   def build_campaign_conversation(contact_inbox)
+    existing = inbox.conversations
+                    .where(contact_id: contact_inbox.contact_id)
+                    .order(last_activity_at: :desc)
+                    .first
+
+    if existing
+      existing.update!(status: :open) unless existing.open?
+      return existing
+    end
+
     Conversation.create!(
       account_id: campaign.account_id,
       inbox_id: campaign.inbox_id,
       contact_id: contact_inbox.contact_id,
       contact_inbox_id: contact_inbox.id,
       campaign_id: campaign.id,
-      status: :pending
+      status: :open
     )
   end
 
