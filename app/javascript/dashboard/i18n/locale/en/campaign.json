@@ -152,7 +152,9 @@
         "CAMPAIGN_DETAILS": {
           "SENT_FROM": "Sent from",
           "ON": "on"
-        }
+        },
+        "TEMPLATE_LABEL": "Template:",
+        "AUDIENCE_LABEL": "Audience:"
       },
       "CREATE": {
         "TITLE": "Create WhatsApp campaign",
