@@ -88,32 +88,28 @@ const pageInfo = computed(() => {
   <div
     class="flex justify-between h-[3.375rem] w-full border-t border-n-weak mx-auto bg-n-surface-1 py-3 px-6 items-center before:absolute before:inset-x-0 before:-top-4 before:bg-gradient-to-t before:from-n-surface-1 before:from-0% before:to-transparent before:h-4 before:pointer-events-none"
   >
-    <div class="flex items-center gap-3">
+    <div class="flex items-center">
       <span class="min-w-0 text-body-main line-clamp-1 text-n-slate-11">
         {{ currentPageInformation }}
       </span>
-      <label
-        v-if="showPageSizeSelector"
-        class="flex items-center gap-2 text-body-main text-n-slate-11"
-      >
-        <span class="whitespace-nowrap leading-[1.3125rem]">
-          {{ t('PAGINATION_FOOTER.ITEMS_PER_PAGE') }}
-        </span>
-        <select
-          :value="itemsPerPage"
-          class="h-[1.3125rem] leading-[1.3125rem] text-xs rounded-md border border-n-weak bg-n-input-background pl-2 pr-1 py-0 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
-          @change="onChangePageSize"
-        >
-          <option
-            v-for="option in pageSizeOptions"
-            :key="option"
-            :value="option"
-          >
-            {{ option }}
-          </option>
-        </select>
-      </label>
     </div>
+    <label
+      v-if="showPageSizeSelector"
+      class="flex items-center gap-2 text-body-main text-n-slate-11"
+    >
+      <span class="whitespace-nowrap">
+        {{ t('PAGINATION_FOOTER.ITEMS_PER_PAGE') }}
+      </span>
+      <select
+        :value="itemsPerPage"
+        class="h-[1.3125rem] leading-[1.3125rem] text-xs rounded-md border border-n-weak bg-n-input-background pl-2 pr-1 py-0 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
+        @change="onChangePageSize"
+      >
+        <option v-for="option in pageSizeOptions" :key="option" :value="option">
+          {{ option }}
+        </option>
+      </select>
+    </label>
     <div class="flex items-center gap-2">
       <Button
         icon="i-lucide-chevrons-left"
