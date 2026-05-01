@@ -7,7 +7,15 @@ import { vOnClickOutside } from '@vueuse/components';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 
-const emit = defineEmits(['close', 'assign']);
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'assign',
+    validator: value => ['assign', 'unassign'].includes(value),
+  },
+});
+
+const emit = defineEmits(['close', 'assign', 'unassign']);
 
 const { t } = useI18n();
 
@@ -15,6 +23,18 @@ const labels = useMapGetter('labels/getLabels');
 
 const query = ref('');
 const selectedLabels = ref([]);
+
+const isUnassignMode = computed(() => props.mode === 'unassign');
+const titleKey = computed(() =>
+  isUnassignMode.value
+    ? 'BULK_ACTION.LABELS.UNASSIGN_LABELS'
+    : 'BULK_ACTION.LABELS.ASSIGN_LABELS'
+);
+const submitKey = computed(() =>
+  isUnassignMode.value
+    ? 'BULK_ACTION.LABELS.UNASSIGN_SELECTED_LABELS'
+    : 'BULK_ACTION.LABELS.ASSIGN_SELECTED_LABELS'
+);
 
 const filteredLabels = computed(() => {
   if (!query.value) return labels.value;
@@ -34,8 +54,11 @@ const onClose = () => {
   emit('close');
 };
 
-const handleAssign = () => {
-  if (selectedLabels.value.length > 0) {
+const handleSubmit = () => {
+  if (selectedLabels.value.length === 0) return;
+  if (isUnassignMode.value) {
+    emit('unassign', selectedLabels.value);
+  } else {
     emit('assign', selectedLabels.value);
   }
 };
@@ -54,9 +77,7 @@ const handleAssign = () => {
       </svg>
     </div>
     <div class="flex items-center justify-between p-2.5">
-      <span class="text-sm font-medium">{{
-        t('BULK_ACTION.LABELS.ASSIGN_LABELS')
-      }}</span>
+      <span class="text-sm font-medium">{{ t(titleKey) }}</span>
       <NextButton ghost xs slate icon="i-lucide-x" @click="onClose" />
     </div>
     <div class="flex flex-col max-h-60 min-h-0">
@@ -75,7 +96,7 @@ const handleAssign = () => {
         v-if="hasLabels"
         class="flex-1 overflow-y-auto m-0 list-none"
         role="listbox"
-        :aria-label="t('BULK_ACTION.LABELS.ASSIGN_LABELS')"
+        :aria-label="t(titleKey)"
       >
         <li v-if="!hasFilteredLabels" class="p-2 text-center">
           <span class="text-sm text-n-slate-11">{{
@@ -121,9 +142,9 @@ const handleAssign = () => {
           sm
           type="submit"
           class="w-full"
-          :label="t('BULK_ACTION.LABELS.ASSIGN_SELECTED_LABELS')"
+          :label="t(submitKey)"
           :disabled="!selectedLabels.length"
-          @click="handleAssign"
+          @click="handleSubmit"
         />
       </footer>
     </div>

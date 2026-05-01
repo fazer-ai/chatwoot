@@ -28,8 +28,10 @@
     },
     "LABELS": {
       "ASSIGN_LABELS": "Assign labels",
+      "UNASSIGN_LABELS": "Unassign labels",
       "NO_LABELS_FOUND": "No labels found",
       "ASSIGN_SELECTED_LABELS": "Assign selected labels",
+      "UNASSIGN_SELECTED_LABELS": "Unassign selected labels",
       "ASSIGN_SUCCESFUL": "Labels assigned successfully.",
       "ASSIGN_FAILED": "Failed to assign labels. Please try again."
     },

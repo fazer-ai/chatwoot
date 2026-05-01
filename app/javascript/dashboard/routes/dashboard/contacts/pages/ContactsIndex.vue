@@ -369,6 +369,28 @@ const assignLabels = async labels => {
   }
 };
 
+const unassignLabels = async labels => {
+  if (!labels.length || !selectedContactIds.value.length) {
+    return;
+  }
+
+  isBulkActionLoading.value = true;
+  try {
+    await BulkActionsAPI.create({
+      type: 'Contact',
+      ids: selectedContactIds.value,
+      labels: { remove: labels },
+    });
+    useAlert(t('CONTACTS_BULK_ACTIONS.UNASSIGN_LABELS_SUCCESS'));
+    clearSelection();
+    await fetchContactsBasedOnContext(pageNumber.value);
+  } catch (error) {
+    useAlert(t('CONTACTS_BULK_ACTIONS.UNASSIGN_LABELS_FAILED'));
+  } finally {
+    isBulkActionLoading.value = false;
+  }
+};
+
 const deleteContacts = async () => {
   if (!selectedContactIds.value.length) {
     return;
@@ -536,6 +558,7 @@ onMounted(async () => {
           @toggle-all="toggleSelectAll"
           @clear-selection="clearSelection"
           @assign-labels="assignLabels"
+          @unassign-labels="unassignLabels"
           @delete-selected="openBulkDeleteDialog"
         />
         <ContactEmptyState
