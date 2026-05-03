@@ -43,17 +43,22 @@ const toggle = stageName => {
         >
           <div class="flex items-center gap-2 min-w-0">
             <span
-              class="i-lucide-chevron-down size-4 text-n-slate-11 transition-transform"
+              class="i-lucide-chevron-down size-4 text-n-slate-11 transition-transform flex-shrink-0"
               :class="{ '-rotate-90': collapsed[stage.name] }"
             />
             <span
               class="inline-block size-3 rounded-full flex-shrink-0"
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
-            <span class="text-sm font-medium text-n-slate-12">
-              {{ stage.name }}
+            <span class="text-sm font-medium text-n-slate-12 truncate">
+              {{ stage.description || stage.name }}
             </span>
-            <span class="text-xs text-n-slate-11" :title="stage.description">
+            <span class="text-[11px] text-n-slate-11 truncate">
+              {{ t('FUNNEL.STAGE.LABEL_PREFIX', { name: stage.name }) }}
+            </span>
+            <span
+              class="text-xs text-n-slate-11 ltr:ml-auto rtl:mr-auto flex-shrink-0"
+            >
               {{ stage.count }}
             </span>
           </div>
@@ -99,12 +104,12 @@ const toggle = stageName => {
                   <span
                     :class="
                       conversation.ai_enabled !== false
-                        ? 'bg-n-emerald-3 text-n-emerald-11'
-                        : 'bg-n-slate-3 text-n-slate-11'
+                        ? 'bg-n-emerald-9 text-white'
+                        : 'bg-n-ruby-9 text-white'
                     "
                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
                   >
-                    <span class="size-1.5 rounded-full bg-current" />
+                    <span class="size-1.5 rounded-full bg-white" />
                     {{
                       conversation.ai_enabled !== false
                         ? t('FUNNEL.CARD.AI_ON')

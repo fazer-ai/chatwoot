@@ -45,10 +45,21 @@ const elapsedLabel = computed(() => {
 const goToContact = () => {
   if (!props.conversation.contact?.id) return;
   router.push({
-    name: 'contacts_dashboard',
+    name: 'contacts_edit',
     params: {
       accountId: accountId.value,
       contactId: props.conversation.contact.id,
+    },
+  });
+};
+
+const goToConversation = () => {
+  if (!props.conversation.id) return;
+  router.push({
+    name: 'inbox_conversation',
+    params: {
+      accountId: accountId.value,
+      conversation_id: props.conversation.id,
     },
   });
 };
@@ -69,13 +80,11 @@ const toggleSummary = () => {
       </span>
       <span
         :class="
-          aiEnabled
-            ? 'bg-n-emerald-3 text-n-emerald-11'
-            : 'bg-n-slate-3 text-n-slate-11'
+          aiEnabled ? 'bg-n-emerald-9 text-white' : 'bg-n-ruby-9 text-white'
         "
         class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
       >
-        <span class="size-1.5 rounded-full bg-current" />
+        <span class="size-1.5 rounded-full bg-white" />
         {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
       </span>
     </header>
@@ -107,21 +116,30 @@ const toggleSummary = () => {
         <button
           v-if="hasSummary"
           type="button"
-          class="inline-flex items-center justify-center size-6 rounded text-n-blue-11 hover:bg-n-alpha-2"
+          class="inline-flex items-center justify-center size-7 rounded text-n-blue-11 hover:bg-n-alpha-2"
           :aria-label="t('FUNNEL.CARD.SHOW_SUMMARY')"
           :title="t('FUNNEL.CARD.SHOW_SUMMARY')"
           @click="toggleSummary"
         >
-          <span class="i-lucide-message-square-quote size-3.5" />
+          <span class="i-lucide-message-square-quote size-5" />
         </button>
         <button
           type="button"
-          class="inline-flex items-center justify-center size-6 rounded text-n-slate-11 hover:bg-n-alpha-2"
+          class="inline-flex items-center justify-center size-7 rounded text-n-slate-11 hover:bg-n-alpha-2"
+          :aria-label="t('FUNNEL.CARD.OPEN_CONVERSATION')"
+          :title="t('FUNNEL.CARD.OPEN_CONVERSATION')"
+          @click="goToConversation"
+        >
+          <span class="i-lucide-message-circle size-4" />
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center size-7 rounded text-n-slate-11 hover:bg-n-alpha-2"
           :aria-label="t('FUNNEL.CARD.OPEN_CONTACT')"
           :title="t('FUNNEL.CARD.OPEN_CONTACT')"
           @click="goToContact"
         >
-          <span class="i-lucide-user size-3.5" />
+          <span class="i-lucide-user size-4" />
         </button>
       </div>
     </footer>

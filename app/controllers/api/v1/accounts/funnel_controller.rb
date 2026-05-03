@@ -2,7 +2,7 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
   before_action :authorize_funnel
 
   def show
-    @stages = Current.account.funnel_stages.active.ordered
+    @stages = FunnelStage.active.ordered
     @stages_by_name = @stages.index_by(&:name)
     @labels_by_title = Current.account.labels.where(title: @stages.map(&:name)).index_by(&:title)
     @conversations_by_stage = group_conversations_by_stage(filtered_conversations)
@@ -50,7 +50,7 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
   end
 
   def stage_label_patterns
-    Current.account.funnel_stages.active.pluck(:name).map { |n| "%#{n}%" }
+    FunnelStage.active.pluck(:name).map { |n| "%#{n}%" }
   end
 
   def group_conversations_by_stage(conversations)

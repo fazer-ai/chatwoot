@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_03_100002) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_03_200001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -892,7 +892,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_03_100002) do
   end
 
   create_table "funnel_stages", force: :cascade do |t|
-    t.bigint "account_id", null: false
     t.string "name", null: false
     t.text "description"
     t.integer "position", default: 0, null: false
@@ -900,8 +899,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_03_100002) do
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["account_id", "name"], name: "index_funnel_stages_on_account_id_and_name", unique: true
-    t.index ["account_id", "position"], name: "index_funnel_stages_on_account_id_and_position"
+    t.index ["name"], name: "index_funnel_stages_on_name", unique: true
+    t.index ["position"], name: "index_funnel_stages_on_position"
   end
 
   create_table "group_members", force: :cascade do |t|
@@ -1599,7 +1598,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_03_100002) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "funnel_stage_changes", "accounts", on_delete: :cascade
   add_foreign_key "funnel_stage_changes", "users", on_delete: :nullify
-  add_foreign_key "funnel_stages", "accounts", on_delete: :cascade
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"

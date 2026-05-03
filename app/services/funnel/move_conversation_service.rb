@@ -5,7 +5,7 @@ class Funnel::MoveConversationService
 
   def perform
     raise ActiveRecord::RecordNotFound, 'Conversation not found' unless conversation
-    raise ArgumentError, "Stage '#{target_stage_name}' is not active for this account" unless target_stage
+    raise ArgumentError, "Stage '#{target_stage_name}' is not active" unless target_stage
 
     previous_stage_name = current_stage_label_titles.first
 
@@ -29,11 +29,11 @@ class Funnel::MoveConversationService
   end
 
   def target_stage
-    @target_stage ||= account.funnel_stages.active.find_by(name: target_stage_name)
+    @target_stage ||= FunnelStage.active.find_by(name: target_stage_name)
   end
 
   def stage_label_titles
-    @stage_label_titles ||= account.funnel_stages.active.pluck(:name)
+    @stage_label_titles ||= FunnelStage.active.pluck(:name)
   end
 
   def current_stage_label_titles

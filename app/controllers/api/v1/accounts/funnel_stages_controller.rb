@@ -3,13 +3,13 @@ class Api::V1::Accounts::FunnelStagesController < Api::V1::Accounts::BaseControl
   before_action :check_authorization
 
   def index
-    @funnel_stages = Current.account.funnel_stages.ordered
+    @funnel_stages = FunnelStage.ordered
   end
 
   def show; end
 
   def create
-    @funnel_stage = Current.account.funnel_stages.create!(permitted_params)
+    @funnel_stage = FunnelStage.create!(permitted_params)
   end
 
   def update
@@ -24,7 +24,7 @@ class Api::V1::Accounts::FunnelStagesController < Api::V1::Accounts::BaseControl
   private
 
   def fetch_funnel_stage
-    @funnel_stage = Current.account.funnel_stages.find(params[:id])
+    @funnel_stage = FunnelStage.find(params[:id])
   end
 
   def permitted_params
