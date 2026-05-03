@@ -21,7 +21,7 @@
       "RESET": "Clear filters"
     },
     "STAGE": {
-      "LABEL_PREFIX": "Label {name}"
+      "LABEL_TOOLTIP": "Label {name}"
     },
     "CARD": {
       "AI_ON": "AI on",
@@ -39,6 +39,7 @@
       "PHONE": "Phone",
       "INBOX": "Inbox",
       "AI": "AI",
+      "ACTIONS": "Actions",
       "EMPTY": "No conversations in this stage."
     }
   }

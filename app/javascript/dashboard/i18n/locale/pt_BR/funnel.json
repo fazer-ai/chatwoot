@@ -21,7 +21,7 @@
       "RESET": "Limpar filtros"
     },
     "STAGE": {
-      "LABEL_PREFIX": "Etiqueta {name}"
+      "LABEL_TOOLTIP": "Etiqueta {name}"
     },
     "CARD": {
       "AI_ON": "IA ligada",
@@ -39,6 +39,7 @@
       "PHONE": "Telefone",
       "INBOX": "Caixa de entrada",
       "AI": "IA",
+      "ACTIONS": "Ações",
       "EMPTY": "Nenhuma conversa nesta fase."
     }
   }

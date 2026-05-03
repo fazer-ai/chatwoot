@@ -79,9 +79,7 @@ const toggleSummary = () => {
         #{{ conversation.id }}
       </span>
       <span
-        :class="
-          aiEnabled ? 'bg-n-emerald-9 text-white' : 'bg-n-ruby-9 text-white'
-        "
+        :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
         class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
       >
         <span class="size-1.5 rounded-full bg-white" />
@@ -116,30 +114,30 @@ const toggleSummary = () => {
         <button
           v-if="hasSummary"
           type="button"
-          class="inline-flex items-center justify-center size-7 rounded text-n-blue-11 hover:bg-n-alpha-2"
+          class="inline-flex items-center justify-center size-8 rounded text-n-blue-11 hover:bg-n-alpha-2"
           :aria-label="t('FUNNEL.CARD.SHOW_SUMMARY')"
           :title="t('FUNNEL.CARD.SHOW_SUMMARY')"
           @click="toggleSummary"
         >
-          <span class="i-lucide-message-square-quote size-5" />
+          <span class="i-lucide-message-square-quote size-8" />
         </button>
         <button
           type="button"
-          class="inline-flex items-center justify-center size-7 rounded text-n-slate-11 hover:bg-n-alpha-2"
+          class="inline-flex items-center justify-center size-8 rounded text-n-slate-11 hover:bg-n-alpha-2"
           :aria-label="t('FUNNEL.CARD.OPEN_CONVERSATION')"
           :title="t('FUNNEL.CARD.OPEN_CONVERSATION')"
           @click="goToConversation"
         >
-          <span class="i-lucide-message-circle size-4" />
+          <span class="i-lucide-message-circle size-8" />
         </button>
         <button
           type="button"
-          class="inline-flex items-center justify-center size-7 rounded text-n-slate-11 hover:bg-n-alpha-2"
+          class="inline-flex items-center justify-center size-8 rounded text-n-slate-11 hover:bg-n-alpha-2"
           :aria-label="t('FUNNEL.CARD.OPEN_CONTACT')"
           :title="t('FUNNEL.CARD.OPEN_CONTACT')"
           @click="goToContact"
         >
-          <span class="i-lucide-user size-4" />
+          <span class="i-lucide-user size-8" />
         </button>
       </div>
     </footer>
