@@ -51,8 +51,10 @@ const onDragEnd = (event, targetStage) => {
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
             <span
+              v-tooltip.top="
+                t('FUNNEL.STAGE.LABEL_TOOLTIP', { name: stage.name })
+              "
               class="text-sm font-medium text-n-slate-12 truncate cursor-help"
-              :title="t('FUNNEL.STAGE.LABEL_TOOLTIP', { name: stage.name })"
             >
               {{ stage.description || stage.name }}
             </span>
