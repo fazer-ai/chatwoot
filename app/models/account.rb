@@ -80,6 +80,8 @@ class Account < ApplicationRecord
   has_many :inboxes, dependent: :destroy_async
   has_many :internal_chat_categories, class_name: 'InternalChat::Category', dependent: :destroy_async
   has_many :internal_chat_channels, class_name: 'InternalChat::Channel', dependent: :destroy_async
+  has_many :funnel_stages, dependent: :destroy_async
+  has_many :funnel_stage_changes, dependent: :destroy_async
   has_many :labels, dependent: :destroy_async
   has_many :line_channels, dependent: :destroy_async, class_name: '::Channel::Line'
   has_many :mentions, dependent: :destroy_async
@@ -111,6 +113,7 @@ class Account < ApplicationRecord
   before_validation :validate_limit_keys
   after_create_commit :notify_creation
   after_create_commit :setup_internal_chat
+  after_create_commit :seed_default_funnel_stages
   after_destroy :remove_account_sequences
 
   def agents
@@ -174,6 +177,10 @@ class Account < ApplicationRecord
 
   def setup_internal_chat
     InternalChat::DefaultChannelSetupService.new(account: self).perform
+  end
+
+  def seed_default_funnel_stages
+    Funnel::DefaultStagesSeederService.new(account: self).perform
   end
 
   trigger.after(:insert).for_each(:row) do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_29_170000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_03_100002) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -873,6 +873,37 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_29_170000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "funnel_stage_changes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.integer "inbox_id", null: false
+    t.bigint "contact_id", null: false
+    t.integer "conversation_id", null: false
+    t.string "previous_stage"
+    t.string "new_stage", null: false
+    t.integer "cycle", default: 1, null: false
+    t.text "reason"
+    t.string "source"
+    t.bigint "user_id"
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.index ["account_id", "conversation_id", "created_at"], name: "index_funnel_stage_changes_on_account_conv_created"
+    t.index ["contact_id"], name: "index_funnel_stage_changes_on_contact_id"
+    t.index ["conversation_id"], name: "index_funnel_stage_changes_on_conversation_id"
+    t.index ["user_id"], name: "index_funnel_stage_changes_on_user_id", where: "(user_id IS NOT NULL)"
+  end
+
+  create_table "funnel_stages", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.integer "position", default: 0, null: false
+    t.boolean "closed", default: false, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "name"], name: "index_funnel_stages_on_account_id_and_name", unique: true
+    t.index ["account_id", "position"], name: "index_funnel_stages_on_account_id_and_position"
+  end
+
   create_table "group_members", force: :cascade do |t|
     t.bigint "group_contact_id", null: false
     t.bigint "contact_id", null: false
@@ -1566,6 +1597,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_29_170000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "funnel_stage_changes", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_stage_changes", "users", on_delete: :nullify
+  add_foreign_key "funnel_stages", "accounts", on_delete: :cascade
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"

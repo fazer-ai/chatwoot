@@ -1,0 +1,9 @@
+json.id stage.id
+json.name stage.name
+json.description stage.description
+json.position stage.position
+json.closed stage.closed
+json.active stage.active
+json.color stage.color
+json.created_at stage.created_at
+json.updated_at stage.updated_at

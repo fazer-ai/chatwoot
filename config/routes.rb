@@ -123,6 +123,13 @@ Rails.application.routes.draw do
             end
           end
           resources :campaigns, only: [:index, :create, :show, :update, :destroy]
+          resources :funnel_stages, only: [:index, :show, :create, :update, :destroy]
+          resource :funnel, only: [:show], controller: 'funnel' do
+            collection do
+              post :move
+              get :history
+            end
+          end
           resources :dashboard_apps, only: [:index, :show, :create, :update, :destroy]
           namespace :channels do
             resource :twilio_channel, only: [:create]
