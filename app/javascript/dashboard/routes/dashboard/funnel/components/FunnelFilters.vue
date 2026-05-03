@@ -88,9 +88,8 @@ const onReset = () => emit('reset');
       />
     </label>
 
-    <label class="flex flex-col gap-1">
-      <span class="text-xs invisible select-none">.</span>
-      <span class="inline-flex items-center gap-2 h-10 text-sm text-n-slate-12">
+    <label class="flex flex-col w-48">
+      <span class="inline-flex items-top gap-2 h-11 text-sm text-n-slate-12">
         <input
           type="checkbox"
           :checked="hideClosed"
@@ -101,15 +100,16 @@ const onReset = () => emit('reset');
       </span>
     </label>
 
-    <div v-if="hasActiveFilters" class="flex flex-col gap-1">
-      <span class="text-xs invisible select-none">.</span>
-      <button
-        type="button"
-        class="h-10 px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
-        @click="onReset"
-      >
-        {{ t('FUNNEL.FILTERS.RESET') }}
-      </button>
+    <div v-if="hasActiveFilters" class="flex flex-col w-48">
+      <span class="inline-flex items-top gap-2 h-11 text-sm">
+        <button
+          type="button"
+          class="px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
+          @click="onReset"
+        >
+          {{ t('FUNNEL.FILTERS.RESET') }}
+        </button>
+      </span>
     </div>
   </div>
 </template>
