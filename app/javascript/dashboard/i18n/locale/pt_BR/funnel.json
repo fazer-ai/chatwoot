@@ -1,0 +1,33 @@
+{
+  "FUNNEL": {
+    "TITLE": "Funil",
+    "EMPTY_STATE": "Nenhuma fase configurada para esta conta ainda.",
+    "LOAD_ERROR": "Não foi possível carregar o funil. Tente novamente.",
+    "VIEW_MODE": {
+      "ARIA_LABEL": "Alternar visualização do funil",
+      "BOARD": "Quadro",
+      "LIST": "Lista"
+    },
+    "MOVE": {
+      "SUCCESS": "Conversa movida para {stage}.",
+      "ERROR": "Não foi possível mover a conversa. Tente novamente."
+    },
+    "CARD": {
+      "AI_ON": "IA ligada",
+      "AI_OFF": "IA desligada",
+      "ELAPSED_HOURS": "{hours}h",
+      "ELAPSED_DAYS_HOURS": "{days}d {hours}h",
+      "SHOW_SUMMARY": "Ver resumo da conversa",
+      "OPEN_CONTACT": "Abrir contato"
+    },
+    "LIST": {
+      "ID_HEADER": "#ID",
+      "ID_VALUE": "#{id}",
+      "CONTACT": "Contato",
+      "PHONE": "Telefone",
+      "INBOX": "Caixa de entrada",
+      "AI": "IA",
+      "EMPTY": "Nenhuma conversa nesta fase."
+    }
+  }
+}

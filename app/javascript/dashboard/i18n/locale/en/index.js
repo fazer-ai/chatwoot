@@ -25,6 +25,7 @@ import inbox from './inbox.json';
 import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
+import funnel from './funnel.json';
 import internalChat from './internalChat.json';
 import kanban from './kanban.json';
 import labelsMgmt from './labelsMgmt.json';
@@ -72,6 +73,7 @@ export default {
   ...inboxMgmt,
   ...integrationApps,
   ...integrations,
+  ...funnel,
   ...internalChat,
   ...kanban,
   ...labelsMgmt,
