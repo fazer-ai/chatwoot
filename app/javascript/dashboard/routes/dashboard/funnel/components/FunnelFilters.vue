@@ -52,7 +52,7 @@ const onReset = () => emit('reset');
       </span>
       <select
         :value="inboxId"
-        class="h-8 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
+        class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9"
         @change="onInboxChange"
       >
         <option value="">
@@ -90,7 +90,7 @@ const onReset = () => emit('reset');
 
     <label class="flex flex-col gap-1">
       <span class="text-xs invisible select-none">.</span>
-      <span class="inline-flex items-center gap-2 h-8 text-sm text-n-slate-12">
+      <span class="inline-flex items-center gap-2 h-10 text-sm text-n-slate-12">
         <input
           type="checkbox"
           :checked="hideClosed"
@@ -105,7 +105,7 @@ const onReset = () => emit('reset');
       <span class="text-xs invisible select-none">.</span>
       <button
         type="button"
-        class="h-8 px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
+        class="h-10 px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
         @click="onReset"
       >
         {{ t('FUNNEL.FILTERS.RESET') }}
