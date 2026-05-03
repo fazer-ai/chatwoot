@@ -50,11 +50,11 @@ const toggle = stageName => {
               class="inline-block size-3 rounded-full flex-shrink-0"
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
-            <span class="text-sm font-medium text-n-slate-12 truncate">
+            <span
+              class="text-sm font-medium text-n-slate-12 truncate cursor-help"
+              :title="t('FUNNEL.STAGE.LABEL_TOOLTIP', { name: stage.name })"
+            >
               {{ stage.description || stage.name }}
-            </span>
-            <span class="text-[11px] text-n-slate-11 truncate">
-              {{ t('FUNNEL.STAGE.LABEL_PREFIX', { name: stage.name }) }}
             </span>
             <span
               class="text-xs text-n-slate-11 ltr:ml-auto rtl:mr-auto flex-shrink-0"
