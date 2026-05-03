@@ -12,6 +12,14 @@
       "SUCCESS": "Conversa movida para {stage}.",
       "ERROR": "Não foi possível mover a conversa. Tente novamente."
     },
+    "FILTERS": {
+      "INBOX": "Caixa de entrada",
+      "INBOX_ANY": "Todas",
+      "FROM_DATE": "Lead entrou a partir de",
+      "TO_DATE": "Lead entrou até",
+      "HIDE_CLOSED": "Ocultar finalizadas",
+      "RESET": "Limpar filtros"
+    },
     "CARD": {
       "AI_ON": "IA ligada",
       "AI_OFF": "IA desligada",

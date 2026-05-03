@@ -12,6 +12,14 @@
       "SUCCESS": "Conversation moved to {stage}.",
       "ERROR": "Could not move the conversation. Please try again."
     },
+    "FILTERS": {
+      "INBOX": "Inbox",
+      "INBOX_ANY": "Any inbox",
+      "FROM_DATE": "Lead entered from",
+      "TO_DATE": "Lead entered until",
+      "HIDE_CLOSED": "Hide closed",
+      "RESET": "Clear filters"
+    },
     "CARD": {
       "AI_ON": "AI on",
       "AI_OFF": "AI off",

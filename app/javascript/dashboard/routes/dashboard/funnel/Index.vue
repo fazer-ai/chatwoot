@@ -1,11 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import { debounce } from '@chatwoot/utils';
 import FunnelAPI from 'dashboard/api/funnel';
 
 import FunnelBoard from './components/FunnelBoard.vue';
 import FunnelList from './components/FunnelList.vue';
+import FunnelFilters from './components/FunnelFilters.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const { t } = useI18n();
@@ -17,15 +19,32 @@ const isLoading = ref(false);
 const stages = ref([]);
 const conversationsByStage = ref({});
 
+const filters = ref({
+  inboxId: '',
+  fromDate: '',
+  toDate: '',
+  hideClosed: false,
+});
+
 const setViewMode = mode => {
   if (!VIEW_MODES.includes(mode)) return;
   viewMode.value = mode;
 };
 
+const buildQueryParams = () => {
+  const params = {};
+  if (filters.value.inboxId) params.inbox_id = filters.value.inboxId;
+  if (filters.value.fromDate)
+    params.from = `${filters.value.fromDate}T00:00:00`;
+  if (filters.value.toDate) params.to = `${filters.value.toDate}T23:59:59`;
+  if (filters.value.hideClosed) params.hide_closed = 'true';
+  return params;
+};
+
 const fetchFunnel = async () => {
   isLoading.value = true;
   try {
-    const { data } = await FunnelAPI.get();
+    const { data } = await FunnelAPI.get(buildQueryParams());
     stages.value = data?.payload?.stages || [];
     const grouped = {};
     stages.value.forEach(stage => {
@@ -39,6 +58,8 @@ const fetchFunnel = async () => {
   }
 };
 
+const debouncedFetch = debounce(fetchFunnel, 300);
+
 const moveConversation = async ({ conversationId, stage }) => {
   try {
     await FunnelAPI.move({ conversationId, stage, source: 'web' });
@@ -50,7 +71,18 @@ const moveConversation = async ({ conversationId, stage }) => {
   }
 };
 
+const resetFilters = () => {
+  filters.value = {
+    inboxId: '',
+    fromDate: '',
+    toDate: '',
+    hideClosed: false,
+  };
+};
+
 const isEmpty = computed(() => !isLoading.value && stages.value.length === 0);
+
+watch(filters, debouncedFetch, { deep: true });
 
 onMounted(fetchFunnel);
 </script>
@@ -88,6 +120,14 @@ onMounted(fetchFunnel);
         </button>
       </div>
     </header>
+
+    <FunnelFilters
+      v-model:inbox-id="filters.inboxId"
+      v-model:from-date="filters.fromDate"
+      v-model:to-date="filters.toDate"
+      v-model:hide-closed="filters.hideClosed"
+      @reset="resetFilters"
+    />
 
     <div
       v-if="isLoading"
