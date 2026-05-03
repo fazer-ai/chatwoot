@@ -104,7 +104,7 @@ const toggle = stageName => {
                   <span
                     :class="
                       conversation.ai_enabled !== false
-                        ? 'bg-n-emerald-9 text-white'
+                        ? 'bg-n-teal-9 text-white'
                         : 'bg-n-ruby-9 text-white'
                     "
                     class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"

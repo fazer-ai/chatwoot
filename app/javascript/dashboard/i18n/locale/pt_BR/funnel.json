@@ -21,7 +21,7 @@
       "RESET": "Limpar filtros"
     },
     "STAGE": {
-      "LABEL_PREFIX": "Etiqueta {name}"
+      "LABEL_PREFIX": "Tip {name}"
     },
     "CARD": {
       "AI_ON": "IA ligada",

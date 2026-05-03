@@ -79,9 +79,7 @@ const toggleSummary = () => {
         #{{ conversation.id }}
       </span>
       <span
-        :class="
-          aiEnabled ? 'bg-n-emerald-9 text-white' : 'bg-n-ruby-9 text-white'
-        "
+        :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
         class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
       >
         <span class="size-1.5 rounded-full bg-white" />

@@ -21,7 +21,7 @@
       "RESET": "Clear filters"
     },
     "STAGE": {
-      "LABEL_PREFIX": "Label {name}"
+      "LABEL_PREFIX": "Tip {name}"
     },
     "CARD": {
       "AI_ON": "AI on",
