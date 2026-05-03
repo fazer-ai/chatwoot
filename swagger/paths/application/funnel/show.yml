@@ -1,0 +1,127 @@
+tags:
+  - Funnel
+operationId: show-funnel
+summary: Funnel board state
+description: |
+  Returns the funnel board state for the account: every active stage in display order, the resolved color (taken from the matching account label), and the conversations currently grouped under each stage. A conversation is grouped under a stage when it carries the label whose title equals the stage's name. When multiple stage labels coexist on a conversation, the highest-position stage wins.
+security:
+  - userApiKey: []
+parameters:
+  - name: inbox_id
+    in: query
+    required: false
+    schema:
+      type: integer
+    description: Restrict the result to conversations on a single inbox.
+  - name: from
+    in: query
+    required: false
+    schema:
+      type: string
+      format: date-time
+    description: Lower bound on `conversations.created_at`. Accepts ISO-8601 timestamps; `YYYY-MM-DDT00:00:00` is the typical input from a date picker.
+  - name: to
+    in: query
+    required: false
+    schema:
+      type: string
+      format: date-time
+    description: Upper bound on `conversations.created_at`. Use `YYYY-MM-DDT23:59:59` to include the whole day.
+  - name: hide_closed
+    in: query
+    required: false
+    schema:
+      type: boolean
+    description: When true, conversations whose top stage is marked `closed` are excluded from the response.
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: object
+              properties:
+                stages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      description:
+                        type:
+                          - string
+                          - 'null'
+                      position:
+                        type: integer
+                      closed:
+                        type: boolean
+                      color:
+                        type:
+                          - string
+                          - 'null'
+                      count:
+                        type: integer
+                      conversations:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: Conversation display_id
+                            uuid:
+                              type: string
+                            status:
+                              type: string
+                            summary:
+                              type:
+                                - string
+                                - 'null'
+                            created_at:
+                              type: integer
+                              description: Unix timestamp
+                            last_activity_at:
+                              type: integer
+                            labels:
+                              type: array
+                              items:
+                                type: string
+                            ai_enabled:
+                              type: boolean
+                              description: Derived from the absence of the `agente-off` label.
+                            contact:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                phone_number:
+                                  type:
+                                    - string
+                                    - 'null'
+                                thumbnail:
+                                  type:
+                                    - string
+                                    - 'null'
+                            inbox:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                channel_type:
+                                  type: string
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

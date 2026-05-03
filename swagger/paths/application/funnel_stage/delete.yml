@@ -1,0 +1,30 @@
+tags:
+  - Funnel
+operationId: delete-funnel-stage
+summary: Delete a funnel stage
+description: |
+  Removes a funnel stage from the account. Reserved for administrators and managers. Conversations carrying the matching label keep the label, but stop being grouped under this stage on the board.
+security:
+  - userApiKey: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: integer
+    description: Funnel stage ID
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Not Found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

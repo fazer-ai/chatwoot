@@ -605,6 +605,39 @@
   delete:
     $ref: ./application/custom_filters/delete.yml
 
+# Funnel
+/api/v1/accounts/{account_id}/funnel_stages:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel_stage/index.yml
+  post:
+    $ref: ./application/funnel_stage/create.yml
+/api/v1/accounts/{account_id}/funnel_stages/{id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel_stage/show.yml
+  patch:
+    $ref: ./application/funnel_stage/update.yml
+  delete:
+    $ref: ./application/funnel_stage/delete.yml
+/api/v1/accounts/{account_id}/funnel:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel/show.yml
+/api/v1/accounts/{account_id}/funnel/move:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  post:
+    $ref: ./application/funnel/move.yml
+/api/v1/accounts/{account_id}/funnel/history:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel/history.yml
+
 # webhooks
 /api/v1/accounts/{account_id}/webhooks:
   parameters:

@@ -1,0 +1,33 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: Internal ID of the funnel stage
+  name:
+    type: string
+    description: Stage name. Must match the title of an account label so conversations can be grouped under it.
+  description:
+    type:
+      - string
+      - 'null'
+    description: Free-form description shown as a tooltip on the board column header.
+  position:
+    type: integer
+    description: Left-to-right ordering on the board. Lower numbers appear first.
+  closed:
+    type: boolean
+    description: True for terminal stages (no_show, fechado, perdido). Conversations whose top stage is closed are hidden when the request asks for hide_closed=true.
+  active:
+    type: boolean
+    description: Disabled stages are skipped from the board and from move operations.
+  color:
+    type:
+      - string
+      - 'null'
+    description: Hex color resolved from the account label that shares the stage name. Null when the matching label was deleted.
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

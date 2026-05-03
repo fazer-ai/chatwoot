@@ -1,0 +1,35 @@
+type: object
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Audit row identifier
+  previous_stage:
+    type:
+      - string
+      - 'null'
+    description: Name of the stage the conversation was on before the move. Null on first entry into the funnel.
+  new_stage:
+    type: string
+    description: Name of the stage the conversation moved into.
+  cycle:
+    type: integer
+    description: Number of times this conversation has entered new_stage. Starts at 1, increments on every re-entry.
+  reason:
+    type:
+      - string
+      - 'null'
+    description: Optional human-readable reason for the move.
+  source:
+    type:
+      - string
+      - 'null'
+    description: Where the move originated. Common values, set by the caller, are 'web', 'n8n', 'api'.
+  user_id:
+    type:
+      - integer
+      - 'null'
+    description: ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations).
+  created_at:
+    type: string
+    format: date-time

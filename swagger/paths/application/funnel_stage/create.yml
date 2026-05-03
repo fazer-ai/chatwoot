@@ -1,0 +1,54 @@
+tags:
+  - Funnel
+operationId: create-funnel-stage
+summary: Create a funnel stage
+description: |
+  Creates a new funnel stage. Reserved for administrators and managers. The stage's `name` should match the title of an account label so conversations carrying that label show up under it on the board.
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [funnel_stage]
+        properties:
+          funnel_stage:
+            type: object
+            required: [name, position]
+            properties:
+              name:
+                type: string
+                example: kb-novo
+              description:
+                type: string
+                example: Primeiro contato recebido
+              position:
+                type: integer
+                example: 0
+              closed:
+                type: boolean
+                default: false
+              active:
+                type: boolean
+                default: true
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/funnel_stage'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Validation error
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

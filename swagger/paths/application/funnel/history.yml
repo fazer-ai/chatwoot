@@ -1,0 +1,33 @@
+tags:
+  - Funnel
+operationId: funnel-conversation-history
+summary: Stage change history of a conversation
+description: |
+  Returns the audit trail of stage changes for a single conversation, newest first. Capped at 200 rows.
+security:
+  - userApiKey: []
+parameters:
+  - name: conversation_id
+    in: query
+    required: true
+    schema:
+      type: integer
+    description: Conversation `display_id`
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: array
+              items:
+                $ref: '#/components/schemas/funnel_stage_change'
+  '404':
+    description: Conversation not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

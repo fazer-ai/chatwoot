@@ -1,0 +1,27 @@
+tags:
+  - Funnel
+operationId: get-funnel-stage
+summary: Get a funnel stage
+description: Returns a single funnel stage by ID.
+security:
+  - userApiKey: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: integer
+    description: Funnel stage ID
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/funnel_stage'
+  '404':
+    description: Not Found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
