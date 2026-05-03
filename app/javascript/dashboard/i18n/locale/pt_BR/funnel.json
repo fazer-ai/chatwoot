@@ -20,13 +20,17 @@
       "HIDE_CLOSED": "Ocultar finalizadas",
       "RESET": "Limpar filtros"
     },
+    "STAGE": {
+      "LABEL_PREFIX": "Etiqueta {name}"
+    },
     "CARD": {
       "AI_ON": "IA ligada",
       "AI_OFF": "IA desligada",
       "ELAPSED_HOURS": "{hours}h",
       "ELAPSED_DAYS_HOURS": "{days}d {hours}h",
       "SHOW_SUMMARY": "Ver resumo da conversa",
-      "OPEN_CONTACT": "Abrir contato"
+      "OPEN_CONTACT": "Abrir contato",
+      "OPEN_CONVERSATION": "Abrir conversa"
     },
     "LIST": {
       "ID_HEADER": "#ID",

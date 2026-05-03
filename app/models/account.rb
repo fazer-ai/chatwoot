@@ -80,7 +80,6 @@ class Account < ApplicationRecord
   has_many :inboxes, dependent: :destroy_async
   has_many :internal_chat_categories, class_name: 'InternalChat::Category', dependent: :destroy_async
   has_many :internal_chat_channels, class_name: 'InternalChat::Channel', dependent: :destroy_async
-  has_many :funnel_stages, dependent: :destroy_async
   has_many :funnel_stage_changes, dependent: :destroy_async
   has_many :labels, dependent: :destroy_async
   has_many :line_channels, dependent: :destroy_async, class_name: '::Channel::Line'

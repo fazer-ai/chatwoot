@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import Draggable from 'vuedraggable';
 
 import FunnelCard from './FunnelCard.vue';
@@ -10,6 +11,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['move']);
+
+const { t } = useI18n();
 
 const orderedStages = computed(() =>
   [...props.stages].sort((a, b) => {
@@ -40,22 +43,27 @@ const onDragEnd = (event, targetStage) => {
         class="flex flex-col w-72 flex-shrink-0 bg-n-alpha-2 rounded-lg overflow-hidden"
       >
         <header
-          class="flex items-center justify-between gap-2 px-3 py-2 border-b border-n-weak"
+          class="flex items-start justify-between gap-2 px-3 py-2 border-b border-n-weak"
         >
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-start gap-2 min-w-0 flex-1">
             <span
-              class="inline-block size-3 rounded-full flex-shrink-0"
+              class="inline-block size-3 rounded-full flex-shrink-0 mt-1"
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
-            <span
-              class="text-sm font-medium text-n-slate-12 truncate"
-              :title="stage.description || stage.name"
-            >
-              {{ stage.name }}
-            </span>
+            <div class="flex flex-col min-w-0 flex-1">
+              <span
+                class="text-sm font-medium text-n-slate-12 truncate"
+                :title="stage.description || stage.name"
+              >
+                {{ stage.description || stage.name }}
+              </span>
+              <span class="text-[11px] text-n-slate-11 truncate">
+                {{ t('FUNNEL.STAGE.LABEL_PREFIX', { name: stage.name }) }}
+              </span>
+            </div>
           </div>
           <span
-            class="inline-flex items-center justify-center min-w-6 h-5 px-1.5 text-xs font-medium rounded bg-n-alpha-2 text-n-slate-11"
+            class="inline-flex items-center justify-center min-w-6 h-5 px-1.5 text-xs font-medium rounded bg-n-alpha-2 text-n-slate-11 mt-0.5"
           >
             {{ stage.count }}
           </span>
