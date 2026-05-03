@@ -39,6 +39,7 @@
       "PHONE": "Phone",
       "INBOX": "Inbox",
       "AI": "AI",
+      "ACTIONS": "Actions",
       "EMPTY": "No conversations in this stage."
     }
   }
