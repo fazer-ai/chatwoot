@@ -101,7 +101,7 @@ const onReset = () => emit('reset');
     </label>
 
     <div v-if="hasActiveFilters" class="flex flex-col w-48">
-      <span class="inline-flex items-top gap-2 h-11 text-sm">
+      <span class="inline-flex items-top gap-2 h-16 text-sm">
         <button
           type="button"
           class="px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
