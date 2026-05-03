@@ -46,7 +46,7 @@ const onReset = () => emit('reset');
   <div
     class="flex flex-wrap items-end gap-3 px-6 py-3 border-b border-n-weak bg-n-surface-1"
   >
-    <label class="flex flex-col gap-1 min-w-[12rem]">
+    <label class="flex flex-col gap-1 w-48">
       <span class="text-xs text-n-slate-11">
         {{ t('FUNNEL.FILTERS.INBOX') }}
       </span>
@@ -64,7 +64,7 @@ const onReset = () => emit('reset');
       </select>
     </label>
 
-    <label class="flex flex-col gap-1">
+    <label class="flex flex-col gap-1 w-48">
       <span class="text-xs text-n-slate-11">
         {{ t('FUNNEL.FILTERS.FROM_DATE') }}
       </span>
@@ -76,7 +76,7 @@ const onReset = () => emit('reset');
       />
     </label>
 
-    <label class="flex flex-col gap-1">
+    <label class="flex flex-col gap-1 w-48">
       <span class="text-xs text-n-slate-11">
         {{ t('FUNNEL.FILTERS.TO_DATE') }}
       </span>
@@ -88,23 +88,28 @@ const onReset = () => emit('reset');
       />
     </label>
 
-    <label class="flex items-center gap-2 h-8 mt-5 text-sm text-n-slate-12">
-      <input
-        type="checkbox"
-        :checked="hideClosed"
-        class="size-4 rounded border-n-weak"
-        @change="onHideClosedChange"
-      />
-      {{ t('FUNNEL.FILTERS.HIDE_CLOSED') }}
+    <label class="flex flex-col gap-1">
+      <span class="text-xs invisible select-none">.</span>
+      <span class="inline-flex items-center gap-2 h-8 text-sm text-n-slate-12">
+        <input
+          type="checkbox"
+          :checked="hideClosed"
+          class="size-4 rounded border-n-weak"
+          @change="onHideClosedChange"
+        />
+        {{ t('FUNNEL.FILTERS.HIDE_CLOSED') }}
+      </span>
     </label>
 
-    <button
-      v-if="hasActiveFilters"
-      type="button"
-      class="h-8 mt-5 px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
-      @click="onReset"
-    >
-      {{ t('FUNNEL.FILTERS.RESET') }}
-    </button>
+    <div v-if="hasActiveFilters" class="flex flex-col gap-1">
+      <span class="text-xs invisible select-none">.</span>
+      <button
+        type="button"
+        class="h-8 px-3 text-sm rounded-md text-n-slate-11 hover:bg-n-alpha-2"
+        @click="onReset"
+      >
+        {{ t('FUNNEL.FILTERS.RESET') }}
+      </button>
+    </div>
   </div>
 </template>
