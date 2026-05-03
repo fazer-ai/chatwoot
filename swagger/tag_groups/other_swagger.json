@@ -828,6 +828,103 @@
           }
         }
       },
+      "funnel_stage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Internal ID of the funnel stage"
+          },
+          "name": {
+            "type": "string",
+            "description": "Stage name. Must match the title of an account label so conversations can be grouped under it."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Free-form description shown as a tooltip on the board column header."
+          },
+          "position": {
+            "type": "integer",
+            "description": "Left-to-right ordering on the board. Lower numbers appear first."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "True for terminal stages (no_show, fechado, perdido). Conversations whose top stage is closed are hidden when the request asks for hide_closed=true."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Disabled stages are skipped from the board and from move operations."
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hex color resolved from the account label that shares the stage name. Null when the matching label was deleted."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "funnel_stage_change": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Audit row identifier"
+          },
+          "previous_stage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the stage the conversation was on before the move. Null on first entry into the funnel."
+          },
+          "new_stage": {
+            "type": "string",
+            "description": "Name of the stage the conversation moved into."
+          },
+          "cycle": {
+            "type": "integer",
+            "description": "Number of times this conversation has entered new_stage. Starts at 1, increments on every re-entry."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional human-readable reason for the move."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the move originated. Common values, set by the caller, are 'web', 'n8n', 'api'."
+          },
+          "user_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "message": {
         "type": "object",
         "properties": {
@@ -7807,6 +7904,7 @@
         "Conversations",
         "Custom Attributes",
         "Custom Filters",
+        "Funnel",
         "Inboxes",
         "Integrations",
         "Labels",

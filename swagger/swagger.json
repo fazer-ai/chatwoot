@@ -9046,6 +9046,709 @@
         }
       }
     },
+    "/api/v1/accounts/{account_id}/funnel_stages": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "list-funnel-stages",
+        "summary": "List funnel stages",
+        "description": "Returns every funnel stage configured for the account, including disabled ones, ordered by position.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/funnel_stage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "create-funnel-stage",
+        "summary": "Create a funnel stage",
+        "description": "Creates a new funnel stage. Reserved for administrators and managers. The stage's `name` should match the title of an account label so conversations carrying that label show up under it on the board.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "funnel_stage"
+                ],
+                "properties": {
+                  "funnel_stage": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "position"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "kb-novo"
+                      },
+                      "description": {
+                        "type": "string",
+                        "example": "Primeiro contato recebido"
+                      },
+                      "position": {
+                        "type": "integer",
+                        "example": 0
+                      },
+                      "closed": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "active": {
+                        "type": "boolean",
+                        "default": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/funnel_stage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/funnel_stages/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "get-funnel-stage",
+        "summary": "Get a funnel stage",
+        "description": "Returns a single funnel stage by ID.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Funnel stage ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/funnel_stage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "update-funnel-stage",
+        "summary": "Update a funnel stage",
+        "description": "Updates an existing funnel stage. Reserved for administrators and managers.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Funnel stage ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "funnel_stage": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "position": {
+                        "type": "integer"
+                      },
+                      "closed": {
+                        "type": "boolean"
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/funnel_stage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "delete-funnel-stage",
+        "summary": "Delete a funnel stage",
+        "description": "Removes a funnel stage from the account. Reserved for administrators and managers. Conversations carrying the matching label keep the label, but stop being grouped under this stage on the board.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Funnel stage ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/funnel": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "show-funnel",
+        "summary": "Funnel board state",
+        "description": "Returns the funnel board state for the account: every active stage in display order, the resolved color (taken from the matching account label), and the conversations currently grouped under each stage. A conversation is grouped under a stage when it carries the label whose title equals the stage's name. When multiple stage labels coexist on a conversation, the highest-position stage wins.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inbox_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Restrict the result to conversations on a single inbox."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Lower bound on `conversations.created_at`. Accepts ISO-8601 timestamps; `YYYY-MM-DDT00:00:00` is the typical input from a date picker."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Upper bound on `conversations.created_at`. Use `YYYY-MM-DDT23:59:59` to include the whole day."
+          },
+          {
+            "name": "hide_closed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, conversations whose top stage is marked `closed` are excluded from the response."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "object",
+                      "properties": {
+                        "stages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "position": {
+                                "type": "integer"
+                              },
+                              "closed": {
+                                "type": "boolean"
+                              },
+                              "color": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "conversations": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "description": "Conversation display_id"
+                                    },
+                                    "uuid": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string"
+                                    },
+                                    "summary": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "created_at": {
+                                      "type": "integer",
+                                      "description": "Unix timestamp"
+                                    },
+                                    "last_activity_at": {
+                                      "type": "integer"
+                                    },
+                                    "labels": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "ai_enabled": {
+                                      "type": "boolean",
+                                      "description": "Derived from the absence of the `agente-off` label."
+                                    },
+                                    "contact": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "integer"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "phone_number": {
+                                          "type": [
+                                            "string",
+                                            "null"
+                                          ]
+                                        },
+                                        "thumbnail": {
+                                          "type": [
+                                            "string",
+                                            "null"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "inbox": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "integer"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "channel_type": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/funnel/move": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "move-funnel-conversation",
+        "summary": "Move a conversation to a stage",
+        "description": "Re-tags a conversation so that it lands on the requested stage. The service strips any other active funnel-stage labels off the conversation, attaches the target stage's label, and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before.\n\nAny role can move (administrator, manager, agent). Pass a `source` to identify the integration calling the endpoint (e.g. `n8n`); when authenticated as a session user, the audit row also captures the `user_id`.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "conversation_id",
+                  "stage"
+                ],
+                "properties": {
+                  "conversation_id": {
+                    "type": "integer",
+                    "description": "Conversation `display_id`",
+                    "example": 42
+                  },
+                  "stage": {
+                    "type": "string",
+                    "description": "Target stage `name` (must match an active funnel stage and a label title).",
+                    "example": "kb-confirmado"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Optional human-readable note saved on the audit row.",
+                    "example": "Paciente confirmou pelo WhatsApp."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Identifier of where the move came from. Defaults to 'web' when omitted by the dashboard.",
+                    "example": "n8n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "object",
+                      "properties": {
+                        "conversation_id": {
+                          "type": "integer",
+                          "description": "Conversation `display_id`"
+                        },
+                        "previous_stage": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "new_stage": {
+                          "type": "string"
+                        },
+                        "change": {
+                          "$ref": "#/components/schemas/funnel_stage_change"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Stage is not active or required parameter missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/funnel/history": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "funnel-conversation-history",
+        "summary": "Stage change history of a conversation",
+        "description": "Returns the audit trail of stage changes for a single conversation, newest first. Capped at 200 rows.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Conversation `display_id`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/funnel_stage_change"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounts/{account_id}/webhooks": {
       "parameters": [
         {
@@ -13193,6 +13896,103 @@
               "type": "object",
               "description": "SLA event objects"
             }
+          }
+        }
+      },
+      "funnel_stage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Internal ID of the funnel stage"
+          },
+          "name": {
+            "type": "string",
+            "description": "Stage name. Must match the title of an account label so conversations can be grouped under it."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Free-form description shown as a tooltip on the board column header."
+          },
+          "position": {
+            "type": "integer",
+            "description": "Left-to-right ordering on the board. Lower numbers appear first."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "True for terminal stages (no_show, fechado, perdido). Conversations whose top stage is closed are hidden when the request asks for hide_closed=true."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Disabled stages are skipped from the board and from move operations."
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hex color resolved from the account label that shares the stage name. Null when the matching label was deleted."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "funnel_stage_change": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Audit row identifier"
+          },
+          "previous_stage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the stage the conversation was on before the move. Null on first entry into the funnel."
+          },
+          "new_stage": {
+            "type": "string",
+            "description": "Name of the stage the conversation moved into."
+          },
+          "cycle": {
+            "type": "integer",
+            "description": "Number of times this conversation has entered new_stage. Starts at 1, increments on every re-entry."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional human-readable reason for the move."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the move originated. Common values, set by the caller, are 'web', 'n8n', 'api'."
+          },
+          "user_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -20202,6 +21002,10 @@
       "description": "Saved filters for conversations"
     },
     {
+      "name": "Funnel",
+      "description": "Kanban-style conversation funnel — stages, board view and audit trail"
+    },
+    {
       "name": "Inboxes",
       "description": "Communication channels setup"
     },
@@ -20319,6 +21123,7 @@
         "Conversations",
         "Custom Attributes",
         "Custom Filters",
+        "Funnel",
         "Inboxes",
         "Integrations",
         "Labels",

@@ -1,0 +1,68 @@
+tags:
+  - Funnel
+operationId: move-funnel-conversation
+summary: Move a conversation to a stage
+description: |
+  Re-tags a conversation so that it lands on the requested stage. The service strips any other active funnel-stage labels off the conversation, attaches the target stage's label, and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before.
+
+  Any role can move (administrator, manager, agent). Pass a `source` to identify the integration calling the endpoint (e.g. `n8n`); when authenticated as a session user, the audit row also captures the `user_id`.
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [conversation_id, stage]
+        properties:
+          conversation_id:
+            type: integer
+            description: Conversation `display_id`
+            example: 42
+          stage:
+            type: string
+            description: Target stage `name` (must match an active funnel stage and a label title).
+            example: kb-confirmado
+          reason:
+            type: string
+            description: Optional human-readable note saved on the audit row.
+            example: Paciente confirmou pelo WhatsApp.
+          source:
+            type: string
+            description: Identifier of where the move came from. Defaults to 'web' when omitted by the dashboard.
+            example: n8n
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: object
+              properties:
+                conversation_id:
+                  type: integer
+                  description: Conversation `display_id`
+                previous_stage:
+                  type:
+                    - string
+                    - 'null'
+                new_stage:
+                  type: string
+                change:
+                  $ref: '#/components/schemas/funnel_stage_change'
+  '400':
+    description: Stage is not active or required parameter missing
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Conversation not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

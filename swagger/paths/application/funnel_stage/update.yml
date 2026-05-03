@@ -1,0 +1,53 @@
+tags:
+  - Funnel
+operationId: update-funnel-stage
+summary: Update a funnel stage
+description: Updates an existing funnel stage. Reserved for administrators and managers.
+security:
+  - userApiKey: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: integer
+    description: Funnel stage ID
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          funnel_stage:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              position:
+                type: integer
+              closed:
+                type: boolean
+              active:
+                type: boolean
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/funnel_stage'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Not Found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

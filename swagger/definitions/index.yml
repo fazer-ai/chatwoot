@@ -40,6 +40,10 @@ group_member:
   $ref: ./resource/group_member.yml
 conversation:
   $ref: ./resource/conversation.yml
+funnel_stage:
+  $ref: ./resource/funnel_stage.yml
+funnel_stage_change:
+  $ref: ./resource/funnel_stage_change.yml
 message:
   $ref: ./resource/message.yml
 scheduled_message:

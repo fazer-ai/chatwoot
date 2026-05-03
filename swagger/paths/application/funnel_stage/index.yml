@@ -1,0 +1,25 @@
+tags:
+  - Funnel
+operationId: list-funnel-stages
+summary: List funnel stages
+description: Returns every funnel stage configured for the account, including disabled ones, ordered by position.
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: array
+              items:
+                $ref: '#/components/schemas/funnel_stage'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

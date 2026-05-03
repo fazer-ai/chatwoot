@@ -63,6 +63,8 @@ tags:
     description: Custom fields for contacts and conversations
   - name: Custom Filters
     description: Saved filters for conversations
+  - name: Funnel
+    description: Kanban-style conversation funnel — stages, board view and audit trail
   - name: Inboxes
     description: Communication channels setup
   - name: Integrations
@@ -130,6 +132,7 @@ x-tagGroups:
       - Conversations
       - Custom Attributes
       - Custom Filters
+      - Funnel
       - Inboxes
       - Integrations
       - Labels
