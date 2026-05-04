@@ -32,6 +32,10 @@ requestBody:
             type: string
             description: Identifier of where the move came from. Defaults to 'web' when omitted by the dashboard.
             example: n8n
+          loss_reason_id:
+            type: integer
+            description: 'Required when the target stage has requires_loss_reason set to true (e.g. Perdido). Must reference an active loss_reason.'
+            example: 1
 responses:
   '200':
     description: Success
@@ -62,6 +66,12 @@ responses:
           $ref: '#/components/schemas/bad_request_error'
   '404':
     description: Conversation not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Target stage requires a loss_reason_id, or the supplied loss_reason_id is invalid
     content:
       application/json:
         schema:

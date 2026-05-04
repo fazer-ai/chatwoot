@@ -2,15 +2,16 @@
 #
 # Table name: funnel_stages
 #
-#  id          :bigint           not null, primary key
-#  active      :boolean          default(TRUE), not null
-#  closed      :boolean          default(FALSE), not null
-#  color       :string           not null
-#  description :text
-#  name        :string           not null
-#  position    :integer          default(0), not null
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
+#  id                   :bigint           not null, primary key
+#  active               :boolean          default(TRUE), not null
+#  closed               :boolean          default(FALSE), not null
+#  color                :string           not null
+#  description          :text
+#  name                 :string           not null
+#  position             :integer          default(0), not null
+#  requires_loss_reason :boolean          default(FALSE), not null
+#  created_at           :datetime         not null
+#  updated_at           :datetime         not null
 #
 # Indexes
 #

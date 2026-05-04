@@ -6751,6 +6751,260 @@
         }
       }
     },
+    "/api/v1/accounts/{account_id}/loss_reasons": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "list-loss-reasons",
+        "summary": "List loss reasons",
+        "description": "Returns every loss reason configured in the installation, including inactive ones, ordered by position.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/loss_reason"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "create-loss-reason",
+        "summary": "Create a loss reason",
+        "description": "Creates a new loss reason. Reserved for administrators and managers.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "loss_reason"
+                ],
+                "properties": {
+                  "loss_reason": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "position"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "Achou caro"
+                      },
+                      "position": {
+                        "type": "integer",
+                        "example": 0
+                      },
+                      "active": {
+                        "type": "boolean",
+                        "default": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/loss_reason"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/loss_reasons/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "get-loss-reason",
+        "summary": "Get a loss reason",
+        "description": "Returns a single loss reason by ID.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/loss_reason"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "update-loss-reason",
+        "summary": "Update a loss reason",
+        "description": "Updates an existing loss reason. Reserved for administrators and managers.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "loss_reason": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "position": {
+                        "type": "integer"
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/loss_reason"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounts/{account_id}/funnel_stages": {
       "parameters": [
         {
@@ -6854,6 +7108,11 @@
                         "type": "string",
                         "description": "Hex color used to render the column header on the board.",
                         "example": "#6b7280"
+                      },
+                      "requires_loss_reason": {
+                        "type": "boolean",
+                        "description": "Set to true to force operators to pick a `loss_reason_id` when moving conversations into this stage.",
+                        "default": false
                       }
                     }
                   }
@@ -6999,6 +7258,10 @@
                       "color": {
                         "type": "string",
                         "description": "Hex color used to render the column header on the board."
+                      },
+                      "requires_loss_reason": {
+                        "type": "boolean",
+                        "description": "Set to true to force operators to pick a `loss_reason_id` when moving conversations into this stage."
                       }
                     }
                   }
@@ -7185,6 +7448,9 @@
                               "color": {
                                 "type": "string"
                               },
+                              "requires_loss_reason": {
+                                "type": "boolean"
+                              },
                               "count": {
                                 "type": "integer"
                               },
@@ -7337,6 +7603,11 @@
                     "type": "string",
                     "description": "Identifier of where the move came from. Defaults to 'web' when omitted by the dashboard.",
                     "example": "n8n"
+                  },
+                  "loss_reason_id": {
+                    "type": "integer",
+                    "description": "Required when the target stage has requires_loss_reason set to true (e.g. Perdido). Must reference an active loss_reason.",
+                    "example": 1
                   }
                 }
               }
@@ -7389,6 +7660,16 @@
           },
           "404": {
             "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Target stage requires a loss_reason_id, or the supplied loss_reason_id is invalid",
             "content": {
               "application/json": {
                 "schema": {
@@ -11720,6 +12001,10 @@
             "type": "string",
             "description": "Hex color used to render the column header on the board."
           },
+          "requires_loss_reason": {
+            "type": "boolean",
+            "description": "When true, moving a conversation into this stage requires a `loss_reason_id` on the move call."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -11773,6 +12058,13 @@
               "null"
             ],
             "description": "ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations)."
+          },
+          "loss_reason_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "References `loss_reasons.id` when the new_stage required a reason. Null otherwise."
           },
           "created_at": {
             "type": "string",
