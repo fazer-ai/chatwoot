@@ -21,8 +21,10 @@ properties:
           'contact_created',
           'contact_updated',
           'webwidget_triggered',
+          'funnel_updated',
         ]
     description: The events you want to subscribe to.
     example:
       - conversation_created
       - conversation_status_changed
+      - funnel_updated

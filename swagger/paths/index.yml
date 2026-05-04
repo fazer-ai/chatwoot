@@ -637,6 +637,11 @@
     - $ref: '#/components/parameters/account_id'
   get:
     $ref: ./application/funnel/history.yml
+/api/v1/accounts/{account_id}/funnel/conversation_status:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel/conversation_status.yml
 
 # webhooks
 /api/v1/accounts/{account_id}/webhooks:

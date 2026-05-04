@@ -9101,7 +9101,7 @@
         ],
         "operationId": "create-funnel-stage",
         "summary": "Create a funnel stage",
-        "description": "Creates a new funnel stage. Reserved for administrators and managers. The stage's `name` should match the title of an account label so conversations carrying that label show up under it on the board.\n",
+        "description": "Creates a new funnel stage. Reserved for administrators and managers.\n",
         "security": [
           {
             "userApiKey": []
@@ -9121,12 +9121,13 @@
                     "type": "object",
                     "required": [
                       "name",
-                      "position"
+                      "position",
+                      "color"
                     ],
                     "properties": {
                       "name": {
                         "type": "string",
-                        "example": "kb-novo"
+                        "example": "Novo Contato"
                       },
                       "description": {
                         "type": "string",
@@ -9143,6 +9144,11 @@
                       "active": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "color": {
+                        "type": "string",
+                        "description": "Hex color used to render the column header on the board.",
+                        "example": "#6b7280"
                       }
                     }
                   }
@@ -9284,6 +9290,10 @@
                       },
                       "active": {
                         "type": "boolean"
+                      },
+                      "color": {
+                        "type": "string",
+                        "description": "Hex color used to render the column header on the board."
                       }
                     }
                   }
@@ -9387,7 +9397,7 @@
         ],
         "operationId": "show-funnel",
         "summary": "Funnel board state",
-        "description": "Returns the funnel board state for the account: every active stage in display order, the resolved color (taken from the matching account label), and the conversations currently grouped under each stage. A conversation is grouped under a stage when it carries the label whose title equals the stage's name. When multiple stage labels coexist on a conversation, the highest-position stage wins.\n",
+        "description": "Returns the funnel board state for the account: every active stage in display order, its color, and the conversations currently associated with each stage via `conversations.funnel_stage_id`.\n",
         "security": [
           {
             "userApiKey": []
@@ -9430,7 +9440,7 @@
             "schema": {
               "type": "boolean"
             },
-            "description": "When true, conversations whose top stage is marked `closed` are excluded from the response."
+            "description": "When true, conversations whose stage is marked `closed` are excluded from the response."
           }
         ],
         "responses": {
@@ -9468,10 +9478,7 @@
                                 "type": "boolean"
                               },
                               "color": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
+                                "type": "string"
                               },
                               "count": {
                                 "type": "integer"
@@ -9589,7 +9596,7 @@
         ],
         "operationId": "move-funnel-conversation",
         "summary": "Move a conversation to a stage",
-        "description": "Re-tags a conversation so that it lands on the requested stage. The service strips any other active funnel-stage labels off the conversation, attaches the target stage's label, and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before.\n\nAny role can move (administrator, manager, agent). Pass a `source` to identify the integration calling the endpoint (e.g. `n8n`); when authenticated as a session user, the audit row also captures the `user_id`.\n",
+        "description": "Updates `conversations.funnel_stage_id` to the requested stage and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before. After the move succeeds, a `funnel_updated` webhook event is dispatched to subscribers.\n\nAny role can move (administrator, manager, agent). Pass a `source` to identify the integration calling the endpoint (e.g. `n8n`); when authenticated as a session user, the audit row also captures the `user_id`.\n",
         "security": [
           {
             "userApiKey": []
@@ -9613,8 +9620,8 @@
                   },
                   "stage": {
                     "type": "string",
-                    "description": "Target stage `name` (must match an active funnel stage and a label title).",
-                    "example": "kb-confirmado"
+                    "description": "Target stage `name` (must match an active funnel stage).",
+                    "example": "Confirmado"
                   },
                   "reason": {
                     "type": "string",
@@ -9729,6 +9736,117 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/funnel_stage_change"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/funnel/conversation_status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Funnel"
+        ],
+        "operationId": "funnel-conversation-status",
+        "summary": "Funnel status of a conversation",
+        "description": "Returns the funnel stage currently associated with a conversation in the account. When the conversation has no stage yet, `stage` comes back as `null`.\n",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Conversation `display_id`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payload": {
+                      "type": "object",
+                      "properties": {
+                        "conversation": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "description": "Conversation `display_id`"
+                            },
+                            "uuid": {
+                              "type": "string"
+                            },
+                            "account_id": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "stage": {
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "position": {
+                                  "type": "integer"
+                                },
+                                "closed": {
+                                  "type": "boolean"
+                                },
+                                "active": {
+                                  "type": "boolean"
+                                },
+                                "color": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        }
                       }
                     }
                   }
@@ -13908,7 +14026,7 @@
           },
           "name": {
             "type": "string",
-            "description": "Stage name. Must match the title of an account label so conversations can be grouped under it."
+            "description": "Display name shown on the board column header."
           },
           "description": {
             "type": [
@@ -13923,18 +14041,15 @@
           },
           "closed": {
             "type": "boolean",
-            "description": "True for terminal stages (no_show, fechado, perdido). Conversations whose top stage is closed are hidden when the request asks for hide_closed=true."
+            "description": "True for terminal stages. Conversations whose stage is closed are hidden when the request asks for hide_closed=true."
           },
           "active": {
             "type": "boolean",
             "description": "Disabled stages are skipped from the board and from move operations."
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Hex color resolved from the account label that shares the stage name. Null when the matching label was deleted."
+            "type": "string",
+            "description": "Hex color used to render the column header on the board."
           },
           "created_at": {
             "type": "string",
@@ -18249,13 +18364,15 @@
                 "message_updated",
                 "contact_created",
                 "contact_updated",
-                "webwidget_triggered"
+                "webwidget_triggered",
+                "funnel_updated"
               ]
             },
             "description": "The events you want to subscribe to.",
             "example": [
               "conversation_created",
-              "conversation_status_changed"
+              "conversation_status_changed",
+              "funnel_updated"
             ]
           }
         }

@@ -14,4 +14,8 @@ class FunnelPolicy < ApplicationPolicy
   def history?
     index?
   end
+
+  def conversation_status?
+    index?
+  end
 end

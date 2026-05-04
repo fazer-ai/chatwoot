@@ -837,7 +837,7 @@
           },
           "name": {
             "type": "string",
-            "description": "Stage name. Must match the title of an account label so conversations can be grouped under it."
+            "description": "Display name shown on the board column header."
           },
           "description": {
             "type": [
@@ -852,18 +852,15 @@
           },
           "closed": {
             "type": "boolean",
-            "description": "True for terminal stages (no_show, fechado, perdido). Conversations whose top stage is closed are hidden when the request asks for hide_closed=true."
+            "description": "True for terminal stages. Conversations whose stage is closed are hidden when the request asks for hide_closed=true."
           },
           "active": {
             "type": "boolean",
             "description": "Disabled stages are skipped from the board and from move operations."
           },
           "color": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Hex color resolved from the account label that shares the stage name. Null when the matching label was deleted."
+            "type": "string",
+            "description": "Hex color used to render the column header on the board."
           },
           "created_at": {
             "type": "string",
@@ -5178,13 +5175,15 @@
                 "message_updated",
                 "contact_created",
                 "contact_updated",
-                "webwidget_triggered"
+                "webwidget_triggered",
+                "funnel_updated"
               ]
             },
             "description": "The events you want to subscribe to.",
             "example": [
               "conversation_created",
-              "conversation_status_changed"
+              "conversation_status_changed",
+              "funnel_updated"
             ]
           }
         }

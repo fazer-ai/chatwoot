@@ -36,6 +36,9 @@ module Events::Types
   CONVERSATION_MENTIONED = 'conversation.mentioned'
   CONVERSATION_UNREAD = 'conversation.unread'
 
+  # funnel events
+  FUNNEL_UPDATED = 'funnel.updated'
+
   # message events
   MESSAGE_CREATED = 'message.created'
   FIRST_REPLY_CREATED = 'first.reply.created'
