@@ -32,6 +32,9 @@ requestBody:
                 type: boolean
               active:
                 type: boolean
+              color:
+                type: string
+                description: Hex color used to render the column header on the board.
 responses:
   '200':
     description: Success

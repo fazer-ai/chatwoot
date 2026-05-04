@@ -128,6 +128,7 @@ Rails.application.routes.draw do
             collection do
               post :move
               get :history
+              get :conversation_status
             end
           end
           resources :dashboard_apps, only: [:index, :show, :create, :update, :destroy]

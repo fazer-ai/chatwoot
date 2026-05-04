@@ -3,9 +3,7 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
 
   def show
     @stages = FunnelStage.active.ordered
-    @stages_by_name = @stages.index_by(&:name)
-    @labels_by_title = Current.account.labels.where(title: @stages.map(&:name)).index_by(&:title)
-    @conversations_by_stage = group_conversations_by_stage(filtered_conversations)
+    @conversations_by_stage = group_conversations(filtered_conversations)
   end
 
   def move
@@ -29,6 +27,12 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
                       .limit(200)
   end
 
+  def conversation_status
+    conversation = Current.account.conversations.find_by!(display_id: params.require(:conversation_id))
+    @conversation = conversation
+    @stage = conversation.funnel_stage
+  end
+
   private
 
   def authorize_funnel
@@ -40,41 +44,28 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
     relation = relation.where('conversations.created_at >= ?', from_date) if from_date.present?
     relation = relation.where('conversations.created_at <= ?', to_date) if to_date.present?
     relation = relation.where(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+    relation = relation.where.not(funnel_stage_id: closed_stage_ids) if hide_closed?
     relation
   end
 
   def scoped_conversations
     Current.account.conversations
            .includes(:contact, :inbox)
-           .where('cached_label_list ILIKE ANY (ARRAY[?])', stage_label_patterns)
+           .where(funnel_stage_id: active_stage_ids)
   end
 
-  def stage_label_patterns
-    FunnelStage.active.pluck(:name).map { |n| "%#{n}%" }
+  def active_stage_ids
+    @active_stage_ids ||= FunnelStage.active.pluck(:id)
   end
 
-  def group_conversations_by_stage(conversations)
-    closed_stage_names = @stages.select(&:closed).map(&:name)
+  def closed_stage_ids
+    @closed_stage_ids ||= FunnelStage.active.closed_stages.pluck(:id)
+  end
+
+  def group_conversations(conversations)
     grouped = Hash.new { |h, k| h[k] = [] }
-
-    conversations.find_each do |conversation|
-      stage = pick_stage_for_conversation(conversation, closed_stage_names)
-      next unless stage
-
-      grouped[stage.name] << conversation
-    end
-
+    conversations.find_each { |c| grouped[c.funnel_stage_id] << c }
     grouped
-  end
-
-  def pick_stage_for_conversation(conversation, closed_stage_names)
-    label_titles = Array(conversation.label_list)
-    matching_stages = label_titles.filter_map { |title| @stages_by_name[title] }
-    return nil if matching_stages.empty?
-
-    return nil if hide_closed? && matching_stages.map(&:name).intersect?(closed_stage_names)
-
-    matching_stages.max_by(&:position)
   end
 
   def from_date

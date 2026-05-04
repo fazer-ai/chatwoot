@@ -3,7 +3,7 @@ tags:
 operationId: create-funnel-stage
 summary: Create a funnel stage
 description: |
-  Creates a new funnel stage. Reserved for administrators and managers. The stage's `name` should match the title of an account label so conversations carrying that label show up under it on the board.
+  Creates a new funnel stage. Reserved for administrators and managers.
 security:
   - userApiKey: []
 requestBody:
@@ -16,11 +16,11 @@ requestBody:
         properties:
           funnel_stage:
             type: object
-            required: [name, position]
+            required: [name, position, color]
             properties:
               name:
                 type: string
-                example: kb-novo
+                example: Novo Contato
               description:
                 type: string
                 example: Primeiro contato recebido
@@ -33,6 +33,10 @@ requestBody:
               active:
                 type: boolean
                 default: true
+              color:
+                type: string
+                description: Hex color used to render the column header on the board.
+                example: '#6b7280'
 responses:
   '200':
     description: Success

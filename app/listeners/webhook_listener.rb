@@ -1,4 +1,4 @@
-class WebhookListener < BaseListener
+class WebhookListener < BaseListener # rubocop:disable Metrics/ClassLength
   def conversation_status_changed(event)
     conversation = extract_conversation_and_account(event)[0]
     changed_attributes = extract_changed_attributes(event)
@@ -116,6 +116,35 @@ class WebhookListener < BaseListener
 
   def conversation_recording(event)
     handle_typing_status(__method__.to_s, event)
+  end
+
+  def funnel_updated(event)
+    conversation = event.data[:conversation]
+    inbox = conversation.inbox
+    payload = conversation.webhook_data.merge(
+      event: __method__.to_s,
+      funnel: {
+        previous_stage: funnel_stage_payload(event.data[:previous_stage]),
+        new_stage: funnel_stage_payload(event.data[:new_stage]),
+        reason: event.data[:reason],
+        source: event.data[:source],
+        user_id: event.data[:user]&.id
+      }
+    )
+    deliver_webhook_payloads(payload, inbox)
+  end
+
+  def funnel_stage_payload(stage)
+    return nil if stage.blank?
+
+    {
+      id: stage.id,
+      name: stage.name,
+      description: stage.description,
+      position: stage.position,
+      closed: stage.closed,
+      color: stage.color
+    }
   end
 
   %i[internal_chat_message_created internal_chat_message_updated internal_chat_message_deleted].each do |event_name|
