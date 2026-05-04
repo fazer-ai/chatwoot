@@ -53,6 +53,7 @@ export default {
       allowedDomains: '',
       isUpdatingAllowedDomains: false,
       isSettingDefaults: false,
+      isTogglingReconnection: false,
       baileysProviderUrl: '',
       showLinkDeviceModal: false,
       markAsRead: true,
@@ -81,6 +82,23 @@ export default {
   computed: {
     isEmbeddedSignupWhatsApp() {
       return this.inbox.provider_config?.source === 'embedded_signup';
+    },
+    reconnectionEnabled() {
+      // Backend returns true when nil (treats absence as enabled). Defensive default for older payloads.
+      return this.inbox.reconnection_enabled !== false;
+    },
+    canToggleReconnection() {
+      return Object.prototype.hasOwnProperty.call(
+        this.inbox,
+        'reconnection_enabled'
+      );
+    },
+    showReconnectionButton() {
+      if (!this.canToggleReconnection) return false;
+      const connection = this.inbox.provider_connection?.connection;
+      // Already connected and not paused → no need to expose the button.
+      if (this.reconnectionEnabled && connection === 'open') return false;
+      return true;
     },
     whatsappAppId() {
       return window.chatwootConfig?.whatsappAppId;
@@ -280,6 +298,17 @@ export default {
     },
     onCloseLinkDeviceModal() {
       this.showLinkDeviceModal = false;
+    },
+    async toggleReconnection() {
+      this.isTogglingReconnection = true;
+      try {
+        await this.$store.dispatch('inboxes/toggleReconnection', this.inbox.id);
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+      } catch (error) {
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+      } finally {
+        this.isTogglingReconnection = false;
+      }
     },
     async updateZapiInstanceId() {
       try {
@@ -638,13 +667,31 @@ export default {
             with-phone-number
             with-provider-connection-status
           />
-          <NextButton class="w-fit" @click="onOpenLinkDeviceModal">
-            {{
-              $t(
-                'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON'
-              )
-            }}
-          </NextButton>
+          <div class="flex flex-wrap gap-2 w-fit">
+            <NextButton @click="onOpenLinkDeviceModal">
+              {{
+                $t(
+                  'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON'
+                )
+              }}
+            </NextButton>
+            <NextButton
+              v-if="showReconnectionButton"
+              :color="reconnectionEnabled ? 'ruby' : 'blue'"
+              :is-loading="isTogglingReconnection"
+              @click="toggleReconnection"
+            >
+              {{
+                reconnectionEnabled
+                  ? $t(
+                      'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_BAILEYS_PAUSE_RECONNECTION'
+                    )
+                  : $t(
+                      'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_BAILEYS_RESUME_RECONNECTION'
+                    )
+              }}
+            </NextButton>
+          </div>
         </div>
       </SettingsSection>
       <SettingsSection

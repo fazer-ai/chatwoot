@@ -79,6 +79,10 @@ class Inboxes extends CacheEnabledApiClient {
       provider_config: providerConfig,
     });
   }
+
+  toggleReconnection(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/toggle_reconnection`);
+  }
 }
 
 export default new Inboxes();

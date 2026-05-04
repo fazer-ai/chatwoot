@@ -416,6 +416,19 @@ export const actions = {
       throwErrorMessage(error);
     }
   },
+  toggleReconnection: async ({ commit }, inboxId) => {
+    try {
+      const response = await InboxesAPI.toggleReconnection(inboxId);
+      commit(types.default.EDIT_INBOXES, {
+        id: inboxId,
+        reconnection_enabled: response.data?.reconnection_enabled,
+      });
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return undefined;
+    }
+  },
 };
 
 export const mutations = {
