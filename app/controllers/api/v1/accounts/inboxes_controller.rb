@@ -98,6 +98,27 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     channel.update_provider_connection!(connection: 'close') if channel.respond_to?(:update_provider_connection!)
   end
 
+  def toggle_reconnection
+    channel = @inbox.channel
+
+    unless channel.is_a?(Channel::Whatsapp) && channel.provider == 'baileys'
+      render json: { error: 'Channel does not support reconnection toggle' }, status: :unprocessable_entity and return
+    end
+
+    next_value = !channel.reconnection_enabled?
+    channel.update!(reconnection_enabled: next_value)
+
+    if next_value && channel.provider_connection['connection'] != 'open'
+      begin
+        channel.setup_channel_provider
+      rescue StandardError => e
+        Rails.logger.error "toggle_reconnection: setup_channel_provider failed for inbox #{@inbox.id}: #{e.message}"
+      end
+    end
+
+    render json: { reconnection_enabled: next_value }
+  end
+
   def convert_provider
     channel = @inbox.channel
 

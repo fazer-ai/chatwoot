@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_04_300000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_04_400000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -620,6 +620,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_04_300000) do
     t.jsonb "message_templates", default: {}
     t.datetime "message_templates_last_updated", precision: nil
     t.jsonb "provider_connection", default: {}
+    t.boolean "reconnection_enabled"
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
     t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text]))", using: :gin
   end

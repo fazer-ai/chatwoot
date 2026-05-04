@@ -847,6 +847,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     whatsapp_channel.update_provider_connection!(connection: 'close')
 
     return if @handling_error
+    return unless whatsapp_channel.reconnection_enabled?
 
     @handling_error = true
     begin
