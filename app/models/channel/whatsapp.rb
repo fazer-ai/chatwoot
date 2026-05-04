@@ -10,6 +10,7 @@
 #  provider                       :string           default("default")
 #  provider_config                :jsonb
 #  provider_connection            :jsonb
+#  reconnection_enabled           :boolean
 #  created_at                     :datetime         not null
 #  updated_at                     :datetime         not null
 #  account_id                     :integer          not null
@@ -35,6 +36,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
   validate :validate_provider_config
+
+  scope :with_reconnection_enabled, -> { where(reconnection_enabled: [nil, true]) }
 
   has_one :inbox, as: :channel, dependent: :destroy
 
@@ -62,6 +65,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   def use_internal_host?
     provider == 'baileys' && ENV.fetch('BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL', false)
+  end
+
+  def reconnection_enabled?
+    reconnection_enabled != false
   end
 
   def mark_message_templates_updated

@@ -78,6 +78,10 @@ class InboxPolicy < ApplicationPolicy
     @account_user.administrator?
   end
 
+  def toggle_reconnection?
+    @account_user.administrator?
+  end
+
   def on_whatsapp?
     true
   end
