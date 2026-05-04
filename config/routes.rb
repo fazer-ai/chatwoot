@@ -124,6 +124,7 @@ Rails.application.routes.draw do
           end
           resources :campaigns, only: [:index, :create, :show, :update, :destroy]
           resources :funnel_stages, only: [:index, :show, :create, :update, :destroy]
+          resources :loss_reasons, only: [:index, :show, :create, :update]
           resource :funnel, only: [:show], controller: 'funnel' do
             collection do
               post :move

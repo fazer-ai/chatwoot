@@ -1453,6 +1453,10 @@
             "type": "string",
             "description": "Hex color used to render the column header on the board."
           },
+          "requires_loss_reason": {
+            "type": "boolean",
+            "description": "When true, moving a conversation into this stage requires a `loss_reason_id` on the move call."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -1506,6 +1510,13 @@
               "null"
             ],
             "description": "ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations)."
+          },
+          "loss_reason_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "References `loss_reasons.id` when the new_stage required a reason. Null otherwise."
           },
           "created_at": {
             "type": "string",

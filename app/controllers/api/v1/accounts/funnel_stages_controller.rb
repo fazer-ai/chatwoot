@@ -28,6 +28,6 @@ class Api::V1::Accounts::FunnelStagesController < Api::V1::Accounts::BaseControl
   end
 
   def permitted_params
-    params.require(:funnel_stage).permit(:name, :description, :position, :closed, :active)
+    params.require(:funnel_stage).permit(:name, :description, :position, :closed, :active, :color, :requires_loss_reason)
   end
 end
