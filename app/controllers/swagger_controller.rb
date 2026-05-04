@@ -1,13 +1,15 @@
 class SwaggerController < ApplicationController
   def respond
-    if Rails.env.development? || Rails.env.test?
-      render inline: Rails.root.join('swagger', derived_path).read
-    else
-      head :not_found
-    end
+    return head :not_found unless docs_enabled?
+
+    render inline: Rails.root.join('swagger', derived_path).read
   end
 
   private
+
+  def docs_enabled?
+    Rails.env.development? || Rails.env.test? || ActiveModel::Type::Boolean.new.cast(ENV.fetch('ENABLE_SWAGGER_DOCS', false))
+  end
 
   def derived_path
     params[:path] ||= 'index.html'
