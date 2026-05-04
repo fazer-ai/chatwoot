@@ -13,10 +13,13 @@ class Api::V1::Accounts::FunnelController < Api::V1::Accounts::BaseController
       target_stage_name: params.require(:stage),
       user: Current.user,
       reason: params[:reason],
-      source: params[:source] || 'web'
+      source: params[:source] || 'web',
+      loss_reason_id: params[:loss_reason_id]
     )
     @result = service.perform
     render :show_move
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def history

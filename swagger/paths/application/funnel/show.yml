@@ -63,6 +63,8 @@ responses:
                         type: boolean
                       color:
                         type: string
+                      requires_loss_reason:
+                        type: boolean
                       count:
                         type: integer
                       conversations:

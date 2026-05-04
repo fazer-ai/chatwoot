@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_04_200000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_04_300000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -888,9 +888,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_04_200000) do
     t.string "source"
     t.bigint "user_id"
     t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.bigint "loss_reason_id"
     t.index ["account_id", "conversation_id", "created_at"], name: "index_funnel_stage_changes_on_account_conv_created"
     t.index ["contact_id"], name: "index_funnel_stage_changes_on_contact_id"
     t.index ["conversation_id"], name: "index_funnel_stage_changes_on_conversation_id"
+    t.index ["loss_reason_id"], name: "index_funnel_stage_changes_on_loss_reason_id"
     t.index ["user_id"], name: "index_funnel_stage_changes_on_user_id", where: "(user_id IS NOT NULL)"
   end
 
@@ -903,6 +905,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_04_200000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "color", null: false
+    t.boolean "requires_loss_reason", default: false, null: false
     t.index ["name"], name: "index_funnel_stages_on_name", unique: true
     t.index ["position"], name: "index_funnel_stages_on_position"
   end
@@ -1192,6 +1195,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_04_200000) do
     t.index ["account_id"], name: "index_leaves_on_account_id"
     t.index ["approved_by_id"], name: "index_leaves_on_approved_by_id"
     t.index ["user_id"], name: "index_leaves_on_user_id"
+  end
+
+  create_table "loss_reasons", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_loss_reasons_on_name", unique: true
+    t.index ["position"], name: "index_loss_reasons_on_position"
   end
 
   create_table "macros", force: :cascade do |t|
@@ -1602,6 +1615,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_04_200000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "conversations", "funnel_stages", on_delete: :nullify
   add_foreign_key "funnel_stage_changes", "accounts", on_delete: :cascade
+  add_foreign_key "funnel_stage_changes", "loss_reasons", on_delete: :nullify
   add_foreign_key "funnel_stage_changes", "users", on_delete: :nullify
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"

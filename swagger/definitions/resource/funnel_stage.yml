@@ -23,6 +23,9 @@ properties:
   color:
     type: string
     description: Hex color used to render the column header on the board.
+  requires_loss_reason:
+    type: boolean
+    description: When true, moving a conversation into this stage requires a `loss_reason_id` on the move call.
   created_at:
     type: string
     format: date-time

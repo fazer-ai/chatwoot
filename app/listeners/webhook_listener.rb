@@ -126,6 +126,7 @@ class WebhookListener < BaseListener # rubocop:disable Metrics/ClassLength
       funnel: {
         previous_stage: funnel_stage_payload(event.data[:previous_stage]),
         new_stage: funnel_stage_payload(event.data[:new_stage]),
+        loss_reason: loss_reason_payload(event.data[:loss_reason]),
         reason: event.data[:reason],
         source: event.data[:source],
         user_id: event.data[:user]&.id
@@ -143,8 +144,15 @@ class WebhookListener < BaseListener # rubocop:disable Metrics/ClassLength
       description: stage.description,
       position: stage.position,
       closed: stage.closed,
-      color: stage.color
+      color: stage.color,
+      requires_loss_reason: stage.requires_loss_reason
     }
+  end
+
+  def loss_reason_payload(loss_reason)
+    return nil if loss_reason.blank?
+
+    { id: loss_reason.id, name: loss_reason.name }
   end
 
   %i[internal_chat_message_created internal_chat_message_updated internal_chat_message_deleted].each do |event_name|
