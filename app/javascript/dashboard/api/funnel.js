@@ -18,12 +18,13 @@ class FunnelAPI extends ApiClient {
     return axios.get(url);
   }
 
-  move({ conversationId, stage, reason, source = 'web' }) {
+  move({ conversationId, stage, reason, source = 'web', lossReasonId }) {
     return axios.post(`${this.url}/move`, {
       conversation_id: conversationId,
       stage,
       reason,
       source,
+      loss_reason_id: lossReasonId,
     });
   }
 

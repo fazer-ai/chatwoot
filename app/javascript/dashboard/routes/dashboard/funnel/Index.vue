@@ -5,10 +5,12 @@ import { useAlert } from 'dashboard/composables';
 import { useStoreGetters } from 'dashboard/composables/store';
 import { debounce } from '@chatwoot/utils';
 import FunnelAPI from 'dashboard/api/funnel';
+import LossReasonAPI from 'dashboard/api/lossReason';
 
 import FunnelBoard from './components/FunnelBoard.vue';
 import FunnelList from './components/FunnelList.vue';
 import FunnelFilters from './components/FunnelFilters.vue';
+import LossReasonDialog from './components/LossReasonDialog.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const { t } = useI18n();
@@ -71,41 +73,118 @@ const fetchFunnel = async () => {
 
 const debouncedFetch = debounce(fetchFunnel, 300);
 
-const moveConversation = async ({ conversationId, stage }) => {
-  let sourceStageName = null;
-  let movedConversation = null;
+const lossReasonDialogRef = ref(null);
+const lossReasons = ref([]);
+const isLoadingLossReasons = ref(false);
+const isSubmittingLossReason = ref(false);
+const pendingMove = ref(null);
 
-  Object.entries(conversationsByStage.value).some(([stageName, list]) => {
-    const idx = list.findIndex(c => c.id === conversationId);
-    if (idx === -1) return false;
-    sourceStageName = stageName;
-    movedConversation = list[idx];
-    return true;
-  });
+const fetchLossReasons = async () => {
+  if (lossReasons.value.length) return;
+  isLoadingLossReasons.value = true;
+  try {
+    const { data } = await LossReasonAPI.get();
+    lossReasons.value = (data?.payload || []).filter(r => r.active);
+  } finally {
+    isLoadingLossReasons.value = false;
+  }
+};
 
-  if (!movedConversation || sourceStageName === stage) return;
+const optimisticMove = ({ conversationId, fromStageName, toStageName }) => {
+  const movedConversation = (
+    conversationsByStage.value[fromStageName] || []
+  ).find(c => c.id === conversationId);
+  if (!movedConversation) return null;
 
   conversationsByStage.value = {
     ...conversationsByStage.value,
-    [sourceStageName]: conversationsByStage.value[sourceStageName].filter(
+    [fromStageName]: conversationsByStage.value[fromStageName].filter(
       c => c.id !== conversationId
     ),
-    [stage]: [...(conversationsByStage.value[stage] || []), movedConversation],
+    [toStageName]: [
+      ...(conversationsByStage.value[toStageName] || []),
+      movedConversation,
+    ],
   };
 
   stages.value = stages.value.map(s => {
-    if (s.name === sourceStageName)
+    if (s.name === fromStageName)
       return { ...s, count: Math.max(0, (s.count || 0) - 1) };
-    if (s.name === stage) return { ...s, count: (s.count || 0) + 1 };
+    if (s.name === toStageName) return { ...s, count: (s.count || 0) + 1 };
     return s;
   });
 
+  return movedConversation;
+};
+
+const callMove = async ({ conversationId, toStageName, lossReasonId }) => {
   try {
-    await FunnelAPI.move({ conversationId, stage, source: 'web' });
+    await FunnelAPI.move({
+      conversationId,
+      stage: toStageName,
+      source: 'web',
+      lossReasonId,
+    });
   } catch (error) {
     useAlert(t('FUNNEL.MOVE.ERROR'));
     await fetchFunnel();
   }
+};
+
+const moveConversation = async ({ conversationId, stage }) => {
+  let sourceStageName = null;
+  Object.entries(conversationsByStage.value).some(([stageName, list]) => {
+    const idx = list.findIndex(c => c.id === conversationId);
+    if (idx === -1) return false;
+    sourceStageName = stageName;
+    return true;
+  });
+
+  if (!sourceStageName || sourceStageName === stage) return;
+
+  const targetStage = stages.value.find(s => s.name === stage);
+  if (!targetStage) return;
+
+  if (targetStage.requires_loss_reason) {
+    pendingMove.value = {
+      conversationId,
+      fromStageName: sourceStageName,
+      toStageName: stage,
+    };
+    fetchLossReasons();
+    lossReasonDialogRef.value?.open();
+    return;
+  }
+
+  optimisticMove({
+    conversationId,
+    fromStageName: sourceStageName,
+    toStageName: stage,
+  });
+  await callMove({ conversationId, toStageName: stage });
+};
+
+const onLossReasonConfirm = async lossReasonId => {
+  if (!pendingMove.value) return;
+  isSubmittingLossReason.value = true;
+  try {
+    optimisticMove(pendingMove.value);
+    await callMove({
+      conversationId: pendingMove.value.conversationId,
+      toStageName: pendingMove.value.toStageName,
+      lossReasonId,
+    });
+    lossReasonDialogRef.value?.close();
+    pendingMove.value = null;
+  } finally {
+    isSubmittingLossReason.value = false;
+  }
+};
+
+const onLossReasonClose = () => {
+  if (!pendingMove.value) return;
+  pendingMove.value = null;
+  fetchFunnel();
 };
 
 const resetFilters = () => {
@@ -195,6 +274,15 @@ onMounted(fetchFunnel);
       :conversations-by-stage="conversationsByStage"
       :average-ticket="accountAverageTicket"
       :locale="accountLocale"
+    />
+
+    <LossReasonDialog
+      ref="lossReasonDialogRef"
+      :reasons="lossReasons"
+      :is-loading="isLoadingLossReasons"
+      :is-submitting="isSubmittingLossReason"
+      @confirm="onLossReasonConfirm"
+      @close="onLossReasonClose"
     />
   </section>
 </template>

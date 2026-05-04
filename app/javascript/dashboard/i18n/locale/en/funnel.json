@@ -14,6 +14,14 @@
     "STAGE": {
       "COUNT_LABEL": "{count} conversation | {count} conversations"
     },
+    "LOSS_REASON_DIALOG": {
+      "TITLE": "Why was this lost?",
+      "DESCRIPTION": "Pick one of the reasons below to move the conversation to Perdido.",
+      "CONFIRM": "Move to Perdido",
+      "CANCEL": "Cancel",
+      "LOADING": "Loading reasons…",
+      "EMPTY": "No active loss reasons configured."
+    },
     "FILTERS": {
       "INBOX": "Inbox",
       "INBOX_ANY": "Any inbox",
