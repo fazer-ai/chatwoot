@@ -38,6 +38,24 @@ const stageSummary = stage => {
   return `${sum} · ${countLabel}`;
 };
 
+const ticketLabel = computed(() =>
+  props.averageTicket ? formatCurrency(props.averageTicket, props.locale) : ''
+);
+
+const elapsedLabelFor = conversation => {
+  const createdAtSec = Number(conversation.created_at) || 0;
+  if (!createdAtSec) return '';
+  const nowSec = Math.floor(Date.now() / 1000);
+  const diff = Math.max(0, nowSec - createdAtSec);
+  const hours = Math.floor(diff / 3600);
+  if (hours < 24) return t('FUNNEL.CARD.ELAPSED_HOURS', { hours });
+  const days = Math.floor(hours / 24);
+  return t('FUNNEL.CARD.ELAPSED_DAYS_HOURS', {
+    days,
+    hours: hours - days * 24,
+  });
+};
+
 const toggle = stageName => {
   collapsed.value = {
     ...collapsed.value,
@@ -123,9 +141,6 @@ const goToContact = conversation => {
             <thead class="bg-n-alpha-1">
               <tr class="text-left text-xs text-n-slate-11">
                 <th class="px-4 py-2 font-medium">
-                  {{ t('FUNNEL.LIST.ID_HEADER') }}
-                </th>
-                <th class="px-4 py-2 font-medium">
                   {{ t('FUNNEL.LIST.CONTACT') }}
                 </th>
                 <th class="px-4 py-2 font-medium">
@@ -135,6 +150,12 @@ const goToContact = conversation => {
                   {{ t('FUNNEL.LIST.INBOX') }}
                 </th>
                 <th class="px-4 py-2 font-medium">{{ t('FUNNEL.LIST.AI') }}</th>
+                <th class="px-4 py-2 font-medium">
+                  {{ t('FUNNEL.LIST.VALUE') }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ t('FUNNEL.LIST.ELAPSED') }}
+                </th>
                 <th class="px-4 py-2 font-medium text-right">
                   {{ t('FUNNEL.LIST.ACTIONS') }}
                 </th>
@@ -146,9 +167,6 @@ const goToContact = conversation => {
                 :key="conversation.id"
               >
                 <tr class="border-t border-n-weak hover:bg-n-alpha-1">
-                  <td class="px-4 py-2 text-n-slate-11">
-                    {{ t('FUNNEL.LIST.ID_VALUE', { id: conversation.id }) }}
-                  </td>
                   <td class="px-4 py-2 font-medium text-n-slate-12">
                     {{ conversation.contact?.name }}
                   </td>
@@ -174,6 +192,12 @@ const goToContact = conversation => {
                           : t('FUNNEL.CARD.AI_OFF')
                       }}
                     </span>
+                  </td>
+                  <td class="px-4 py-2 text-n-slate-12">
+                    {{ ticketLabel }}
+                  </td>
+                  <td class="px-4 py-2 text-n-slate-11">
+                    {{ elapsedLabelFor(conversation) }}
                   </td>
                   <td class="px-4 py-2">
                     <div class="flex items-center justify-end gap-1">
@@ -212,7 +236,7 @@ const goToContact = conversation => {
                   v-if="isSummaryOpen(conversation) && hasSummary(conversation)"
                   class="border-t border-n-weak bg-n-slate-2 dark:bg-n-solid-2"
                 >
-                  <td colspan="6" class="px-4 py-3">
+                  <td colspan="7" class="px-4 py-3">
                     <div
                       class="flex items-start gap-2 px-3 py-2 rounded-md bg-n-slate-3 dark:bg-n-solid-3"
                     >
@@ -228,7 +252,7 @@ const goToContact = conversation => {
               </template>
               <tr v-if="cardsFor(stage).length === 0">
                 <td
-                  colspan="6"
+                  colspan="7"
                   class="px-4 py-6 text-center text-xs text-n-slate-11"
                 >
                   {{ t('FUNNEL.LIST.EMPTY') }}

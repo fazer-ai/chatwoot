@@ -32,12 +32,12 @@
       "OPEN_CONVERSATION": "Open conversation"
     },
     "LIST": {
-      "ID_HEADER": "#ID",
-      "ID_VALUE": "#{id}",
       "CONTACT": "Contact",
       "PHONE": "Phone",
       "INBOX": "Inbox",
       "AI": "AI",
+      "VALUE": "Value",
+      "ELAPSED": "Time open",
       "ACTIONS": "Actions",
       "EMPTY": "No conversations in this stage."
     }

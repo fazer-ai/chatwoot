@@ -90,23 +90,7 @@ const toggleSummary = () => {
   <article
     class="flex flex-col gap-2 px-3 py-2.5 bg-n-surface-1 border border-n-weak rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-n-slate-6"
   >
-    <header class="flex items-center justify-between gap-2">
-      <span class="text-xs font-medium text-n-slate-11">
-        #{{ conversation.id }}
-      </span>
-      <span
-        :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
-        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-      >
-        <span class="size-1.5 rounded-full bg-white" />
-        {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
-      </span>
-    </header>
-
     <div class="flex flex-col gap-0.5">
-      <span class="text-xs text-n-slate-11 truncate" :title="inboxName">
-        {{ inboxName }}
-      </span>
       <div class="flex items-center gap-2 min-w-0">
         <Avatar
           :src="contactThumbnail"
@@ -115,18 +99,35 @@ const toggleSummary = () => {
           rounded-full
         />
         <span
-          class="text-sm font-medium text-n-slate-12 truncate"
+          class="text-sm font-medium text-n-slate-12 truncate min-w-0 flex-1"
           :title="contactName"
         >
           {{ contactName }}
+        </span>
+        <span
+          :class="
+            aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'
+          "
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
+        >
+          <span class="size-1.5 rounded-full bg-white" />
+          {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
         </span>
       </div>
       <span v-if="phoneNumber" class="text-xs text-n-slate-11">
         {{ phoneNumber }}
       </span>
-      <span v-if="ticketLabel" class="text-xs font-medium text-n-slate-12">
-        {{ ticketLabel }}
-      </span>
+      <div class="flex items-center justify-between gap-2 min-w-0">
+        <span class="text-xs font-medium text-n-slate-12">
+          {{ ticketLabel }}
+        </span>
+        <span
+          class="text-xs text-n-slate-11 truncate min-w-0"
+          :title="inboxName"
+        >
+          {{ inboxName }}
+        </span>
+      </div>
     </div>
 
     <footer class="flex items-center justify-between gap-2 mt-auto">
