@@ -18,6 +18,10 @@
 #available at https://guides.rubyonrails.org/i18n.html.
 pt_BR:
   hello: 'Olá, mundo'
+  activerecord:
+    attributes:
+      account:
+        average_ticket: 'Ticket médio'
   internal_chat:
     default_category_name: 'Canais'
     default_channel_name: 'Geral'
