@@ -9,8 +9,10 @@
       "LIST": "Lista"
     },
     "MOVE": {
-      "SUCCESS": "Conversa movida para {stage}.",
       "ERROR": "Não foi possível mover a conversa. Tente novamente."
+    },
+    "STAGE": {
+      "COUNT_LABEL": "{count} conversa | {count} conversas"
     },
     "FILTERS": {
       "INBOX": "Caixa de entrada",
@@ -19,9 +21,6 @@
       "TO_DATE": "Lead entrou até",
       "HIDE_CLOSED": "Ocultar finalizadas",
       "RESET": "Limpar filtros"
-    },
-    "STAGE": {
-      "LABEL_TOOLTIP": "Etiqueta {name}"
     },
     "CARD": {
       "AI_ON": "IA ligada",

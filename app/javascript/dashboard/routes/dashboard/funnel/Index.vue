@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import { useStoreGetters } from 'dashboard/composables/store';
 import { debounce } from '@chatwoot/utils';
 import FunnelAPI from 'dashboard/api/funnel';
 
@@ -11,6 +12,7 @@ import FunnelFilters from './components/FunnelFilters.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const { t } = useI18n();
+const getters = useStoreGetters();
 
 const VIEW_MODES = ['board', 'list'];
 const viewMode = ref('board');
@@ -18,6 +20,15 @@ const viewMode = ref('board');
 const isLoading = ref(false);
 const stages = ref([]);
 const conversationsByStage = ref({});
+
+const accountId = computed(() => getters.getCurrentAccountId.value);
+const account = computed(() =>
+  getters['accounts/getAccount'].value(accountId.value)
+);
+const accountLocale = computed(() => account.value?.locale || 'en');
+const accountAverageTicket = computed(
+  () => Number(account.value?.average_ticket) || 0
+);
 
 const filters = ref({
   inboxId: '',
@@ -61,10 +72,36 @@ const fetchFunnel = async () => {
 const debouncedFetch = debounce(fetchFunnel, 300);
 
 const moveConversation = async ({ conversationId, stage }) => {
+  let sourceStageName = null;
+  let movedConversation = null;
+
+  Object.entries(conversationsByStage.value).some(([stageName, list]) => {
+    const idx = list.findIndex(c => c.id === conversationId);
+    if (idx === -1) return false;
+    sourceStageName = stageName;
+    movedConversation = list[idx];
+    return true;
+  });
+
+  if (!movedConversation || sourceStageName === stage) return;
+
+  conversationsByStage.value = {
+    ...conversationsByStage.value,
+    [sourceStageName]: conversationsByStage.value[sourceStageName].filter(
+      c => c.id !== conversationId
+    ),
+    [stage]: [...(conversationsByStage.value[stage] || []), movedConversation],
+  };
+
+  stages.value = stages.value.map(s => {
+    if (s.name === sourceStageName)
+      return { ...s, count: Math.max(0, (s.count || 0) - 1) };
+    if (s.name === stage) return { ...s, count: (s.count || 0) + 1 };
+    return s;
+  });
+
   try {
     await FunnelAPI.move({ conversationId, stage, source: 'web' });
-    useAlert(t('FUNNEL.MOVE.SUCCESS', { stage }));
-    await fetchFunnel();
   } catch (error) {
     useAlert(t('FUNNEL.MOVE.ERROR'));
     await fetchFunnel();
@@ -147,6 +184,8 @@ onMounted(fetchFunnel);
       v-else-if="viewMode === 'board'"
       :stages="stages"
       :conversations-by-stage="conversationsByStage"
+      :average-ticket="accountAverageTicket"
+      :locale="accountLocale"
       @move="moveConversation"
     />
 
@@ -154,6 +193,8 @@ onMounted(fetchFunnel);
       v-else
       :stages="stages"
       :conversations-by-stage="conversationsByStage"
+      :average-ticket="accountAverageTicket"
+      :locale="accountLocale"
     />
   </section>
 </template>

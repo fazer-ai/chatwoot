@@ -3,10 +3,13 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
+import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
   stages: { type: Array, required: true },
   conversationsByStage: { type: Object, required: true },
+  averageTicket: { type: Number, default: 0 },
+  locale: { type: String, default: 'en' },
 });
 
 const { t } = useI18n();
@@ -26,6 +29,14 @@ const orderedStages = computed(() =>
 );
 
 const cardsFor = stage => props.conversationsByStage[stage.name] || [];
+
+const stageSummary = stage => {
+  const count = stage.count || 0;
+  const countLabel = t('FUNNEL.STAGE.COUNT_LABEL', count, { count });
+  if (!props.averageTicket) return countLabel;
+  const sum = formatCurrency(count * props.averageTicket, props.locale);
+  return `${sum} · ${countLabel}`;
+};
 
 const toggle = stageName => {
   collapsed.value = {
@@ -84,7 +95,7 @@ const goToContact = conversation => {
           class="flex items-center justify-between gap-3 w-full px-4 py-2.5 text-left hover:bg-n-alpha-2"
           @click="toggle(stage.name)"
         >
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
             <span
               class="i-lucide-chevron-down size-4 text-n-slate-11 transition-transform flex-shrink-0"
               :class="{ '-rotate-90': collapsed[stage.name] }"
@@ -93,19 +104,18 @@ const goToContact = conversation => {
               class="inline-block size-3 rounded-full flex-shrink-0"
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
-            <span
-              v-tooltip.top="
-                t('FUNNEL.STAGE.LABEL_TOOLTIP', { name: stage.name })
-              "
-              class="text-sm font-medium text-n-slate-12 truncate cursor-help"
-            >
-              {{ stage.description || stage.name }}
-            </span>
-            <span
-              class="text-xs text-n-slate-11 ltr:ml-auto rtl:mr-auto flex-shrink-0"
-            >
-              {{ stage.count }}
-            </span>
+            <div class="flex flex-col min-w-0">
+              <span
+                v-tooltip.top="stage.description"
+                class="text-sm font-medium text-n-slate-12 truncate"
+                :class="{ 'cursor-help': stage.description }"
+              >
+                {{ stage.name }}
+              </span>
+              <span class="text-xs text-n-slate-11 truncate">
+                {{ stageSummary(stage) }}
+              </span>
+            </div>
           </div>
         </button>
         <div v-if="!collapsed[stage.name]" class="border-t border-n-weak">

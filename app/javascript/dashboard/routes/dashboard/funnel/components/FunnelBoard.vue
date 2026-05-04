@@ -4,10 +4,13 @@ import { useI18n } from 'vue-i18n';
 import Draggable from 'vuedraggable';
 
 import FunnelCard from './FunnelCard.vue';
+import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
   stages: { type: Array, required: true },
   conversationsByStage: { type: Object, required: true },
+  averageTicket: { type: Number, default: 0 },
+  locale: { type: String, default: 'en' },
 });
 
 const emit = defineEmits(['move']);
@@ -22,6 +25,14 @@ const orderedStages = computed(() =>
 );
 
 const cardsFor = stage => props.conversationsByStage[stage.name] || [];
+
+const stageSummary = stage => {
+  const count = stage.count || 0;
+  const countLabel = t('FUNNEL.STAGE.COUNT_LABEL', count, { count });
+  if (!props.averageTicket) return countLabel;
+  const sum = formatCurrency(count * props.averageTicket, props.locale);
+  return `${sum} · ${countLabel}`;
+};
 
 const onDragEnd = (event, targetStage) => {
   if (!event?.added) return;
@@ -42,27 +53,22 @@ const onDragEnd = (event, targetStage) => {
         :key="stage.id"
         class="flex flex-col w-72 flex-shrink-0 bg-n-alpha-2 rounded-lg overflow-hidden"
       >
-        <header
-          class="flex items-center justify-between gap-2 px-3 py-2 border-b border-n-weak"
-        >
+        <header class="flex flex-col gap-0.5 px-3 py-2 border-b border-n-weak">
           <div class="flex items-center gap-2 min-w-0">
             <span
               class="inline-block size-3 rounded-full flex-shrink-0"
               :style="{ backgroundColor: stage.color || '#94a3b8' }"
             />
             <span
-              v-tooltip.top="
-                t('FUNNEL.STAGE.LABEL_TOOLTIP', { name: stage.name })
-              "
-              class="text-sm font-medium text-n-slate-12 truncate cursor-help"
+              v-tooltip.top="stage.description"
+              class="text-sm font-medium text-n-slate-12 truncate"
+              :class="{ 'cursor-help': stage.description }"
             >
-              {{ stage.description || stage.name }}
+              {{ stage.name }}
             </span>
           </div>
-          <span
-            class="inline-flex items-center justify-center min-w-6 h-5 px-1.5 text-xs font-medium rounded bg-n-alpha-2 text-n-slate-11"
-          >
-            {{ stage.count }}
+          <span class="text-xs text-n-slate-11">
+            {{ stageSummary(stage) }}
           </span>
         </header>
 

@@ -3,6 +3,8 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
   conversation: { type: Object, required: true },
@@ -13,11 +15,25 @@ const router = useRouter();
 const getters = useStoreGetters();
 
 const accountId = computed(() => getters.getCurrentAccountId.value);
+const account = computed(() =>
+  getters['accounts/getAccount'].value(accountId.value)
+);
+const accountLocale = computed(() => account.value?.locale || 'en');
+const accountAverageTicket = computed(
+  () => Number(account.value?.average_ticket) || 0
+);
+const ticketLabel = computed(() => {
+  if (!accountAverageTicket.value) return '';
+  return formatCurrency(accountAverageTicket.value, accountLocale.value);
+});
 
 const showSummary = ref(false);
 
 const inboxName = computed(() => props.conversation.inbox?.name || '');
 const contactName = computed(() => props.conversation.contact?.name || '');
+const contactThumbnail = computed(
+  () => props.conversation.contact?.thumbnail || ''
+);
 const phoneNumber = computed(
   () => props.conversation.contact?.phone_number || ''
 );
@@ -91,14 +107,25 @@ const toggleSummary = () => {
       <span class="text-xs text-n-slate-11 truncate" :title="inboxName">
         {{ inboxName }}
       </span>
-      <span
-        class="text-sm font-medium text-n-slate-12 truncate"
-        :title="contactName"
-      >
-        {{ contactName }}
-      </span>
+      <div class="flex items-center gap-2 min-w-0">
+        <Avatar
+          :src="contactThumbnail"
+          :name="contactName"
+          :size="24"
+          rounded-full
+        />
+        <span
+          class="text-sm font-medium text-n-slate-12 truncate"
+          :title="contactName"
+        >
+          {{ contactName }}
+        </span>
+      </div>
       <span v-if="phoneNumber" class="text-xs text-n-slate-11">
         {{ phoneNumber }}
+      </span>
+      <span v-if="ticketLabel" class="text-xs font-medium text-n-slate-12">
+        {{ ticketLabel }}
       </span>
     </div>
 

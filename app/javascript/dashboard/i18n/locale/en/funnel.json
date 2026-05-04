@@ -9,8 +9,10 @@
       "LIST": "List"
     },
     "MOVE": {
-      "SUCCESS": "Conversation moved to {stage}.",
       "ERROR": "Could not move the conversation. Please try again."
+    },
+    "STAGE": {
+      "COUNT_LABEL": "{count} conversation | {count} conversations"
     },
     "FILTERS": {
       "INBOX": "Inbox",
@@ -19,9 +21,6 @@
       "TO_DATE": "Lead entered until",
       "HIDE_CLOSED": "Hide closed",
       "RESET": "Clear filters"
-    },
-    "STAGE": {
-      "LABEL_TOOLTIP": "Label {name}"
     },
     "CARD": {
       "AI_ON": "AI on",
