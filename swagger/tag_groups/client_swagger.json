@@ -1524,6 +1524,35 @@
           }
         }
       },
+      "loss_reason": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Internal ID of the loss reason"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name shown to operators when they move a conversation to a stage that requires a reason."
+          },
+          "position": {
+            "type": "integer",
+            "description": "Ordering inside the dropdown when picking a reason."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Inactive reasons are hidden from the picker but kept for historical audit rows."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "message": {
         "type": "object",
         "properties": {

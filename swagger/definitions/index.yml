@@ -44,6 +44,8 @@ funnel_stage:
   $ref: ./resource/funnel_stage.yml
 funnel_stage_change:
   $ref: ./resource/funnel_stage_change.yml
+loss_reason:
+  $ref: ./resource/loss_reason.yml
 message:
   $ref: ./resource/message.yml
 scheduled_message:
