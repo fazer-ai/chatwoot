@@ -28,6 +28,7 @@
 #  contact_id             :bigint           not null
 #  contact_inbox_id       :bigint
 #  display_id             :integer          not null
+#  funnel_stage_id        :bigint
 #  inbox_id               :integer          not null
 #  sla_policy_id          :bigint
 #  team_id                :bigint
@@ -43,6 +44,7 @@
 #  index_conversations_on_contact_id                  (contact_id)
 #  index_conversations_on_contact_inbox_id            (contact_inbox_id)
 #  index_conversations_on_first_reply_created_at      (first_reply_created_at)
+#  index_conversations_on_funnel_stage_id             (funnel_stage_id)
 #  index_conversations_on_id_and_account_id           (account_id,id)
 #  index_conversations_on_identifier_and_account_id   (identifier,account_id)
 #  index_conversations_on_inbox_id                    (inbox_id)
@@ -53,6 +55,10 @@
 #  index_conversations_on_team_id                     (team_id)
 #  index_conversations_on_uuid                        (uuid) UNIQUE
 #  index_conversations_on_waiting_since               (waiting_since)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (funnel_stage_id => funnel_stages.id) ON DELETE => nullify
 #
 
 class Conversation < ApplicationRecord
@@ -110,6 +116,7 @@ class Conversation < ApplicationRecord
   belongs_to :contact_inbox
   belongs_to :team, optional: true
   belongs_to :campaign, optional: true
+  belongs_to :funnel_stage, optional: true
 
   has_many :mentions, dependent: :destroy_async
   has_many :messages, dependent: :destroy_async, autosave: true

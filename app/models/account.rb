@@ -4,6 +4,7 @@
 #
 #  id                    :integer          not null, primary key
 #  auto_resolve_duration :integer
+#  average_ticket        :decimal(12, 2)
 #  custom_attributes     :jsonb
 #  domain                :string(100)
 #  feature_flags         :bigint           default(0), not null
@@ -112,7 +113,6 @@ class Account < ApplicationRecord
   before_validation :validate_limit_keys
   after_create_commit :notify_creation
   after_create_commit :setup_internal_chat
-  after_create_commit :seed_default_funnel_stages
   after_destroy :remove_account_sequences
 
   def agents
@@ -176,10 +176,6 @@ class Account < ApplicationRecord
 
   def setup_internal_chat
     InternalChat::DefaultChannelSetupService.new(account: self).perform
-  end
-
-  def seed_default_funnel_stages
-    Funnel::DefaultStagesSeederService.new(account: self).perform
   end
 
   trigger.after(:insert).for_each(:row) do

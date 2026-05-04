@@ -1,0 +1,42 @@
+tags:
+  - Funnel
+operationId: update-loss-reason
+summary: Update a loss reason
+description: Updates an existing loss reason. Reserved for administrators and managers.
+security:
+  - userApiKey: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: integer
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          loss_reason:
+            type: object
+            properties:
+              name:
+                type: string
+              position:
+                type: integer
+              active:
+                type: boolean
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/loss_reason'
+  '404':
+    description: Not Found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

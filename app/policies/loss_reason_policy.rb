@@ -1,4 +1,4 @@
-class FunnelPolicy < ApplicationPolicy
+class LossReasonPolicy < ApplicationPolicy
   def index?
     @account_user.administrator? || @account_user.manager? || @account_user.agent?
   end
@@ -7,15 +7,11 @@ class FunnelPolicy < ApplicationPolicy
     index?
   end
 
-  def move?
-    index?
+  def create?
+    @account_user.administrator? || @account_user.manager?
   end
 
-  def history?
-    index?
-  end
-
-  def conversation_status?
-    index?
+  def update?
+    create?
   end
 end

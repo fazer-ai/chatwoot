@@ -1,0 +1,47 @@
+tags:
+  - Funnel
+operationId: create-loss-reason
+summary: Create a loss reason
+description: Creates a new loss reason. Reserved for administrators and managers.
+security:
+  - userApiKey: []
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required: [loss_reason]
+        properties:
+          loss_reason:
+            type: object
+            required: [name, position]
+            properties:
+              name:
+                type: string
+                example: Achou caro
+              position:
+                type: integer
+                example: 0
+              active:
+                type: boolean
+                default: true
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/loss_reason'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Validation error
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

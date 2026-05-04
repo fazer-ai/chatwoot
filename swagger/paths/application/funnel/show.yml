@@ -3,7 +3,7 @@ tags:
 operationId: show-funnel
 summary: Funnel board state
 description: |
-  Returns the funnel board state for the account: every active stage in display order, the resolved color (taken from the matching account label), and the conversations currently grouped under each stage. A conversation is grouped under a stage when it carries the label whose title equals the stage's name. When multiple stage labels coexist on a conversation, the highest-position stage wins.
+  Returns the funnel board state for the account: every active stage in display order, its color, and the conversations currently associated with each stage via `conversations.funnel_stage_id`.
 security:
   - userApiKey: []
 parameters:
@@ -32,7 +32,7 @@ parameters:
     required: false
     schema:
       type: boolean
-    description: When true, conversations whose top stage is marked `closed` are excluded from the response.
+    description: When true, conversations whose stage is marked `closed` are excluded from the response.
 responses:
   '200':
     description: Success
@@ -62,9 +62,9 @@ responses:
                       closed:
                         type: boolean
                       color:
-                        type:
-                          - string
-                          - 'null'
+                        type: string
+                      requires_loss_reason:
+                        type: boolean
                       count:
                         type: integer
                       conversations:

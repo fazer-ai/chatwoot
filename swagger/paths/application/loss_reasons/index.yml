@@ -1,0 +1,25 @@
+tags:
+  - Funnel
+operationId: list-loss-reasons
+summary: List loss reasons
+description: Returns every loss reason configured in the installation, including inactive ones, ordered by position.
+security:
+  - userApiKey: []
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: array
+              items:
+                $ref: '#/components/schemas/loss_reason'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

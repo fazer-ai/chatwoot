@@ -1,0 +1,63 @@
+tags:
+  - Funnel
+operationId: funnel-conversation-status
+summary: Funnel status of a conversation
+description: |
+  Returns the funnel stage currently associated with a conversation in the account. When the conversation has no stage yet, `stage` comes back as `null`.
+security:
+  - userApiKey: []
+parameters:
+  - name: conversation_id
+    in: query
+    required: true
+    schema:
+      type: integer
+    description: Conversation `display_id`
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            payload:
+              type: object
+              properties:
+                conversation:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: Conversation `display_id`
+                    uuid:
+                      type: string
+                    account_id:
+                      type: integer
+                stage:
+                  oneOf:
+                    - type: 'null'
+                    - type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        description:
+                          type:
+                            - string
+                            - 'null'
+                        position:
+                          type: integer
+                        closed:
+                          type: boolean
+                        active:
+                          type: boolean
+                        color:
+                          type: string
+  '404':
+    description: Conversation not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

@@ -32,6 +32,12 @@ requestBody:
                 type: boolean
               active:
                 type: boolean
+              color:
+                type: string
+                description: Hex color used to render the column header on the board.
+              requires_loss_reason:
+                type: boolean
+                description: Set to true to force operators to pick a `loss_reason_id` when moving conversations into this stage.
 responses:
   '200':
     description: Success

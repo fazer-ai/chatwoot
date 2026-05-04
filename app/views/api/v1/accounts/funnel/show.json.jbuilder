@@ -1,18 +1,20 @@
 json.payload do
   json.stages do
     json.array! @stages do |stage|
+      conversations = @conversations_by_stage[stage.id] || []
       json.id stage.id
       json.name stage.name
       json.description stage.description
       json.position stage.position
       json.closed stage.closed
-      json.color @labels_by_title[stage.name]&.color
+      json.color stage.color
+      json.requires_loss_reason stage.requires_loss_reason
       json.conversations do
-        json.array!(@conversations_by_stage[stage.name] || []) do |conversation|
+        json.array!(conversations) do |conversation|
           json.partial! 'api/v1/accounts/funnel/conversation', formats: [:json], conversation: conversation
         end
       end
-      json.count (@conversations_by_stage[stage.name] || []).size
+      json.count conversations.size
     end
   end
 end

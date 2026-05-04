@@ -30,6 +30,11 @@ properties:
       - integer
       - 'null'
     description: ID of the user that performed the move when the request was authenticated as a session user. Null when the call came from a non-user API key (n8n, integrations).
+  loss_reason_id:
+    type:
+      - integer
+      - 'null'
+    description: References `loss_reasons.id` when the new_stage required a reason. Null otherwise.
   created_at:
     type: string
     format: date-time

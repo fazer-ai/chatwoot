@@ -4,6 +4,7 @@ json.description stage.description
 json.position stage.position
 json.closed stage.closed
 json.active stage.active
-json.color stage.color_for(Current.account)
+json.color stage.color
+json.requires_loss_reason stage.requires_loss_reason
 json.created_at stage.created_at
 json.updated_at stage.updated_at

@@ -1,41 +1,25 @@
 class Funnel::DefaultStagesSeederService
   DEFAULT_STAGES = [
-    { name: 'kb-novo',           description: 'Primeiro contato recebido',         position: 0, closed: false, color: '#6b7280' },
-    { name: 'kb-triagem',        description: 'Em qualificação / triagem',         position: 1, closed: false, color: '#38bdf8' },
-    { name: 'kb-em_agendamento', description: 'Entrando no fluxo de agendamento',  position: 2, closed: false, color: '#3b82f6' },
-    { name: 'kb-agendado',       description: 'Consulta agendada com sucesso',     position: 3, closed: false, color: '#8b5cf6' },
-    { name: 'kb-reagendado',     description: 'Consulta reagendada',               position: 3, closed: false, color: '#f59e0b' },
-    { name: 'kb-confirmado',     description: 'Paciente confirmou presença',       position: 4, closed: false, color: '#10b981' },
-    { name: 'kb-no_show',        description: 'Não compareceu',                    position: 5, closed: true,  color: '#f97316' },
-    { name: 'kb-fechado',        description: 'Atendimento encerrado',             position: 5, closed: true,  color: '#1e293b' },
-    { name: 'kb-perdido',        description: 'Paciente perdido / desistiu',       position: 5, closed: true,  color: '#dc2626' }
+    { name: 'Novo Contato',    description: 'Primeiro contato recebido',         position: 0, closed: false, color: '#6b7280' },
+    { name: 'Em Qualificação', description: 'Em qualificação / triagem',         position: 1, closed: false, color: '#38bdf8' },
+    { name: 'Em Agendamento',  description: 'Entrando no fluxo de agendamento',  position: 2, closed: false, color: '#3b82f6' },
+    { name: 'Agendado',        description: 'Consulta agendada com sucesso',     position: 3, closed: false, color: '#10b981' },
+    { name: 'Reagendado',      description: 'Consulta reagendada',               position: 3, closed: false, color: '#f59e0b' },
+    { name: 'Confirmado',      description: 'Paciente confirmou presença',       position: 4, closed: false, color: '#8DA43F' },
+    { name: 'No-Show',         description: 'Não compareceu',                    position: 5, closed: true,  color: '#f97316' },
+    { name: 'Ganho',           description: 'Atendimento encerrado',             position: 5, closed: true,  color: '#086944' },
+    { name: 'Perdido',         description: 'Paciente perdido / desistiu',       position: 5, closed: true,  color: '#dc2626' }
   ].freeze
 
   def self.seed_global_stages!
     DEFAULT_STAGES.each do |attrs|
       stage = FunnelStage.find_or_initialize_by(name: attrs[:name])
       stage.description ||= attrs[:description]
+      stage.color ||= attrs[:color]
       stage.position = attrs[:position] if stage.new_record?
       stage.closed = attrs[:closed] if stage.new_record?
       stage.active = true if stage.new_record?
       stage.save!
     end
-  end
-
-  pattr_initialize [:account!]
-
-  def perform
-    self.class.seed_global_stages!
-    DEFAULT_STAGES.each { |attrs| ensure_label(attrs) }
-  end
-
-  private
-
-  def ensure_label(attrs)
-    label = account.labels.find_or_initialize_by(title: attrs[:name])
-    label.color = attrs[:color] if label.new_record?
-    label.description = attrs[:description] if label.description.blank?
-    label.show_on_sidebar = true if label.new_record?
-    label.save!
   end
 end

@@ -31,6 +31,10 @@
 
 en:
   hello: 'Hello world'
+  activerecord:
+    attributes:
+      account:
+        average_ticket: 'Average ticket'
   internal_chat:
     default_category_name: 'Channels'
     default_channel_name: 'General'

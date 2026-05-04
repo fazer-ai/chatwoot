@@ -606,6 +606,20 @@
     $ref: ./application/custom_filters/delete.yml
 
 # Funnel
+/api/v1/accounts/{account_id}/loss_reasons:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/loss_reasons/index.yml
+  post:
+    $ref: ./application/loss_reasons/create.yml
+/api/v1/accounts/{account_id}/loss_reasons/{id}:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/loss_reasons/show.yml
+  patch:
+    $ref: ./application/loss_reasons/update.yml
 /api/v1/accounts/{account_id}/funnel_stages:
   parameters:
     - $ref: '#/components/parameters/account_id'
@@ -637,6 +651,11 @@
     - $ref: '#/components/parameters/account_id'
   get:
     $ref: ./application/funnel/history.yml
+/api/v1/accounts/{account_id}/funnel/conversation_status:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/funnel/conversation_status.yml
 
 # webhooks
 /api/v1/accounts/{account_id}/webhooks:

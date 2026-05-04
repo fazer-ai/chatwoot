@@ -3,7 +3,7 @@ tags:
 operationId: move-funnel-conversation
 summary: Move a conversation to a stage
 description: |
-  Re-tags a conversation so that it lands on the requested stage. The service strips any other active funnel-stage labels off the conversation, attaches the target stage's label, and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before.
+  Updates `conversations.funnel_stage_id` to the requested stage and writes a row to the audit table inside a single transaction. Cycle is incremented automatically when the conversation re-enters a stage it has visited before. After the move succeeds, a `funnel_updated` webhook event is dispatched to subscribers.
 
   Any role can move (administrator, manager, agent). Pass a `source` to identify the integration calling the endpoint (e.g. `n8n`); when authenticated as a session user, the audit row also captures the `user_id`.
 security:
@@ -22,8 +22,8 @@ requestBody:
             example: 42
           stage:
             type: string
-            description: Target stage `name` (must match an active funnel stage and a label title).
-            example: kb-confirmado
+            description: Target stage `name` (must match an active funnel stage).
+            example: Confirmado
           reason:
             type: string
             description: Optional human-readable note saved on the audit row.
@@ -32,6 +32,10 @@ requestBody:
             type: string
             description: Identifier of where the move came from. Defaults to 'web' when omitted by the dashboard.
             example: n8n
+          loss_reason_id:
+            type: integer
+            description: 'Required when the target stage has requires_loss_reason set to true (e.g. Perdido). Must reference an active loss_reason.'
+            example: 1
 responses:
   '200':
     description: Success
@@ -62,6 +66,12 @@ responses:
           $ref: '#/components/schemas/bad_request_error'
   '404':
     description: Conversation not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Target stage requires a loss_reason_id, or the supplied loss_reason_id is invalid
     content:
       application/json:
         schema:

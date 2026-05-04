@@ -1,0 +1,26 @@
+tags:
+  - Funnel
+operationId: get-loss-reason
+summary: Get a loss reason
+description: Returns a single loss reason by ID.
+security:
+  - userApiKey: []
+parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: integer
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/loss_reason'
+  '404':
+    description: Not Found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
