@@ -28,6 +28,7 @@ const ticketLabel = computed(() => {
 });
 
 const showSummary = ref(false);
+const showLossReason = ref(false);
 
 const inboxName = computed(() => props.conversation.inbox?.name || '');
 const contactName = computed(() => props.conversation.contact?.name || '');
@@ -42,6 +43,11 @@ const summary = computed(() =>
   (props.conversation.summary || '').toString().trim()
 );
 const hasSummary = computed(() => summary.value.length > 0);
+
+const lossReasonName = computed(
+  () => props.conversation.loss_reason?.name || ''
+);
+const hasLossReason = computed(() => lossReasonName.value.length > 0);
 
 const elapsedLabel = computed(() => {
   const createdAtSec = Number(props.conversation.created_at) || 0;
@@ -83,6 +89,11 @@ const goToConversation = () => {
 const toggleSummary = () => {
   if (!hasSummary.value) return;
   showSummary.value = !showSummary.value;
+};
+
+const toggleLossReason = () => {
+  if (!hasLossReason.value) return;
+  showLossReason.value = !showLossReason.value;
 };
 </script>
 
@@ -140,6 +151,16 @@ const toggleSummary = () => {
       </span>
       <div class="flex items-center gap-1">
         <button
+          v-if="hasLossReason"
+          type="button"
+          class="inline-flex items-center justify-center size-8 rounded text-n-ruby-11 hover:bg-n-alpha-2"
+          :aria-label="t('FUNNEL.CARD.SHOW_LOSS_REASON')"
+          :title="t('FUNNEL.CARD.SHOW_LOSS_REASON')"
+          @click="toggleLossReason"
+        >
+          <span class="i-lucide-circle-x size-8" />
+        </button>
+        <button
           v-if="hasSummary"
           type="button"
           class="inline-flex items-center justify-center size-8 rounded text-n-blue-11 hover:bg-n-alpha-2"
@@ -169,6 +190,18 @@ const toggleSummary = () => {
         </button>
       </div>
     </footer>
+
+    <div
+      v-if="showLossReason && hasLossReason"
+      class="flex items-start gap-2 px-2.5 py-2 mt-1 rounded-md bg-n-slate-3 dark:bg-n-solid-3"
+    >
+      <span
+        class="i-lucide-circle-x size-3 mt-0.5 flex-shrink-0 text-n-ruby-11"
+      />
+      <p class="m-0 text-[11px] leading-snug text-n-ruby-11">
+        {{ lossReasonName }}
+      </p>
+    </div>
 
     <div
       v-if="showSummary && hasSummary"

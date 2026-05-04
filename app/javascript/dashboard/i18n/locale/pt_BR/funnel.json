@@ -36,6 +36,7 @@
       "ELAPSED_HOURS": "{hours}h",
       "ELAPSED_DAYS_HOURS": "{days}d {hours}h",
       "SHOW_SUMMARY": "Ver resumo da conversa",
+      "SHOW_LOSS_REASON": "Ver motivo da perda",
       "OPEN_CONTACT": "Abrir contato",
       "OPEN_CONVERSATION": "Abrir conversa"
     },
