@@ -873,6 +873,8 @@
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Gerenciar Conexão do Provedor",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Conecte o seu dispositivo e gerencie a conexão do provedor.",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Gerenciar conexão",
+      "WHATSAPP_BAILEYS_PAUSE_RECONNECTION": "Cancelar Reconexão",
+      "WHATSAPP_BAILEYS_RESUME_RECONNECTION": "Ativar Reconexão",
       "WHATSAPP_PROVIDER_URL_TITLE": "URL do provedor",
       "WHATSAPP_PROVIDER_URL_SUBHEADER": "Se o provedor não estiver rodando localmente, por favor, forneça a URL.",
       "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Digite a URL do provedor",

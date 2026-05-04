@@ -872,6 +872,8 @@
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Manage Provider Connection",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Link your device and manage the provider connection.",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Manage connection",
+      "WHATSAPP_BAILEYS_PAUSE_RECONNECTION": "Pause auto-reconnect",
+      "WHATSAPP_BAILEYS_RESUME_RECONNECTION": "Resume auto-reconnect",
       "WHATSAPP_PROVIDER_URL_TITLE": "Provider URL",
       "WHATSAPP_PROVIDER_URL_SUBHEADER": "If the provider is not running locally, please provide the URL.",
       "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Enter the provider URL",
