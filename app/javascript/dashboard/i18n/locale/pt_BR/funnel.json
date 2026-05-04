@@ -9,8 +9,18 @@
       "LIST": "Lista"
     },
     "MOVE": {
-      "SUCCESS": "Conversa movida para {stage}.",
       "ERROR": "Não foi possível mover a conversa. Tente novamente."
+    },
+    "STAGE": {
+      "COUNT_LABEL": "{count} conversa | {count} conversas"
+    },
+    "LOSS_REASON_DIALOG": {
+      "TITLE": "Por que foi perdido?",
+      "DESCRIPTION": "Selecione um dos motivos abaixo para mover a conversa para Perdido.",
+      "CONFIRM": "Mover para Perdido",
+      "CANCEL": "Cancelar",
+      "LOADING": "Carregando motivos…",
+      "EMPTY": "Nenhum motivo de perda ativo cadastrado."
     },
     "FILTERS": {
       "INBOX": "Caixa de entrada",
@@ -20,25 +30,23 @@
       "HIDE_CLOSED": "Ocultar finalizadas",
       "RESET": "Limpar filtros"
     },
-    "STAGE": {
-      "LABEL_TOOLTIP": "Etiqueta {name}"
-    },
     "CARD": {
       "AI_ON": "IA ligada",
       "AI_OFF": "IA desligada",
       "ELAPSED_HOURS": "{hours}h",
       "ELAPSED_DAYS_HOURS": "{days}d {hours}h",
       "SHOW_SUMMARY": "Ver resumo da conversa",
+      "SHOW_LOSS_REASON": "Ver motivo da perda",
       "OPEN_CONTACT": "Abrir contato",
       "OPEN_CONVERSATION": "Abrir conversa"
     },
     "LIST": {
-      "ID_HEADER": "#ID",
-      "ID_VALUE": "#{id}",
       "CONTACT": "Contato",
       "PHONE": "Telefone",
       "INBOX": "Caixa de entrada",
       "AI": "IA",
+      "VALUE": "Valor",
+      "ELAPSED": "Tempo desde abertura",
       "ACTIONS": "Ações",
       "EMPTY": "Nenhuma conversa nesta fase."
     }

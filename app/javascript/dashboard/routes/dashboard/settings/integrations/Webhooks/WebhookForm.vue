@@ -30,6 +30,7 @@ const SUPPORTED_WEBHOOK_EVENTS = [
   'internal_chat_message_updated',
   'internal_chat_message_deleted',
   'internal_chat_channel_updated',
+  'funnel_updated',
 ];
 
 const localhostUrl = value => {

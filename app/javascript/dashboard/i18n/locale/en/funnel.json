@@ -9,8 +9,18 @@
       "LIST": "List"
     },
     "MOVE": {
-      "SUCCESS": "Conversation moved to {stage}.",
       "ERROR": "Could not move the conversation. Please try again."
+    },
+    "STAGE": {
+      "COUNT_LABEL": "{count} conversation | {count} conversations"
+    },
+    "LOSS_REASON_DIALOG": {
+      "TITLE": "Why was this lost?",
+      "DESCRIPTION": "Pick one of the reasons below to move the conversation to Perdido.",
+      "CONFIRM": "Move to Perdido",
+      "CANCEL": "Cancel",
+      "LOADING": "Loading reasons…",
+      "EMPTY": "No active loss reasons configured."
     },
     "FILTERS": {
       "INBOX": "Inbox",
@@ -20,25 +30,23 @@
       "HIDE_CLOSED": "Hide closed",
       "RESET": "Clear filters"
     },
-    "STAGE": {
-      "LABEL_TOOLTIP": "Label {name}"
-    },
     "CARD": {
       "AI_ON": "AI on",
       "AI_OFF": "AI off",
       "ELAPSED_HOURS": "{hours}h",
       "ELAPSED_DAYS_HOURS": "{days}d {hours}h",
       "SHOW_SUMMARY": "Show conversation summary",
+      "SHOW_LOSS_REASON": "Show loss reason",
       "OPEN_CONTACT": "Open contact",
       "OPEN_CONVERSATION": "Open conversation"
     },
     "LIST": {
-      "ID_HEADER": "#ID",
-      "ID_VALUE": "#{id}",
       "CONTACT": "Contact",
       "PHONE": "Phone",
       "INBOX": "Inbox",
       "AI": "AI",
+      "VALUE": "Value",
+      "ELAPSED": "Time open",
       "ACTIONS": "Actions",
       "EMPTY": "No conversations in this stage."
     }

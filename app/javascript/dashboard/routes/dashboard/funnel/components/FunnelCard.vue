@@ -3,6 +3,8 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
+import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
   conversation: { type: Object, required: true },
@@ -13,11 +15,26 @@ const router = useRouter();
 const getters = useStoreGetters();
 
 const accountId = computed(() => getters.getCurrentAccountId.value);
+const account = computed(() =>
+  getters['accounts/getAccount'].value(accountId.value)
+);
+const accountLocale = computed(() => account.value?.locale || 'en');
+const accountAverageTicket = computed(
+  () => Number(account.value?.average_ticket) || 0
+);
+const ticketLabel = computed(() => {
+  if (!accountAverageTicket.value) return '';
+  return formatCurrency(accountAverageTicket.value, accountLocale.value);
+});
 
 const showSummary = ref(false);
+const showLossReason = ref(false);
 
 const inboxName = computed(() => props.conversation.inbox?.name || '');
 const contactName = computed(() => props.conversation.contact?.name || '');
+const contactThumbnail = computed(
+  () => props.conversation.contact?.thumbnail || ''
+);
 const phoneNumber = computed(
   () => props.conversation.contact?.phone_number || ''
 );
@@ -26,6 +43,11 @@ const summary = computed(() =>
   (props.conversation.summary || '').toString().trim()
 );
 const hasSummary = computed(() => summary.value.length > 0);
+
+const lossReasonName = computed(
+  () => props.conversation.loss_reason?.name || ''
+);
+const hasLossReason = computed(() => lossReasonName.value.length > 0);
 
 const elapsedLabel = computed(() => {
   const createdAtSec = Number(props.conversation.created_at) || 0;
@@ -68,38 +90,55 @@ const toggleSummary = () => {
   if (!hasSummary.value) return;
   showSummary.value = !showSummary.value;
 };
+
+const toggleLossReason = () => {
+  if (!hasLossReason.value) return;
+  showLossReason.value = !showLossReason.value;
+};
 </script>
 
 <template>
   <article
     class="flex flex-col gap-2 px-3 py-2.5 bg-n-surface-1 border border-n-weak rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-n-slate-6"
   >
-    <header class="flex items-center justify-between gap-2">
-      <span class="text-xs font-medium text-n-slate-11">
-        #{{ conversation.id }}
-      </span>
-      <span
-        :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
-        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-      >
-        <span class="size-1.5 rounded-full bg-white" />
-        {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
-      </span>
-    </header>
-
     <div class="flex flex-col gap-0.5">
-      <span class="text-xs text-n-slate-11 truncate" :title="inboxName">
-        {{ inboxName }}
-      </span>
-      <span
-        class="text-sm font-medium text-n-slate-12 truncate"
-        :title="contactName"
-      >
-        {{ contactName }}
-      </span>
+      <div class="flex items-center gap-2 min-w-0">
+        <Avatar
+          :src="contactThumbnail"
+          :name="contactName"
+          :size="24"
+          rounded-full
+        />
+        <span
+          class="text-sm font-medium text-n-slate-12 truncate min-w-0 flex-1"
+          :title="contactName"
+        >
+          {{ contactName }}
+        </span>
+        <span
+          :class="
+            aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'
+          "
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
+        >
+          <span class="size-1.5 rounded-full bg-white" />
+          {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
+        </span>
+      </div>
       <span v-if="phoneNumber" class="text-xs text-n-slate-11">
         {{ phoneNumber }}
       </span>
+      <div class="flex items-center justify-between gap-2 min-w-0">
+        <span class="text-xs font-medium text-n-slate-12">
+          {{ ticketLabel }}
+        </span>
+        <span
+          class="text-xs text-n-slate-11 truncate min-w-0"
+          :title="inboxName"
+        >
+          {{ inboxName }}
+        </span>
+      </div>
     </div>
 
     <footer class="flex items-center justify-between gap-2 mt-auto">
@@ -111,6 +150,16 @@ const toggleSummary = () => {
         {{ elapsedLabel }}
       </span>
       <div class="flex items-center gap-1">
+        <button
+          v-if="hasLossReason"
+          type="button"
+          class="inline-flex items-center justify-center size-8 rounded text-n-ruby-11 hover:bg-n-alpha-2"
+          :aria-label="t('FUNNEL.CARD.SHOW_LOSS_REASON')"
+          :title="t('FUNNEL.CARD.SHOW_LOSS_REASON')"
+          @click="toggleLossReason"
+        >
+          <span class="i-lucide-circle-x size-8" />
+        </button>
         <button
           v-if="hasSummary"
           type="button"
@@ -141,6 +190,18 @@ const toggleSummary = () => {
         </button>
       </div>
     </footer>
+
+    <div
+      v-if="showLossReason && hasLossReason"
+      class="flex items-start gap-2 px-2.5 py-2 mt-1 rounded-md bg-n-slate-3 dark:bg-n-solid-3"
+    >
+      <span
+        class="i-lucide-circle-x size-3 mt-0.5 flex-shrink-0 text-n-ruby-11"
+      />
+      <p class="m-0 text-[11px] leading-snug text-n-ruby-11">
+        {{ lossReasonName }}
+      </p>
+    </div>
 
     <div
       v-if="showSummary && hasSummary"
