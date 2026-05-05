@@ -329,13 +329,6 @@ const menuItems = computed(() => {
       ],
     },
     {
-      name: 'Funnel',
-      label: t('SIDEBAR.FUNNEL'),
-      icon: 'i-lucide-list-tree',
-      to: accountScopedRoute('funnel_index'),
-      activeOn: ['funnel_index'],
-    },
-    {
       name: 'InternalChat',
       label: t('SIDEBAR.INTERNAL_CHAT'),
       icon: 'i-lucide-messages-square',
@@ -351,6 +344,13 @@ const menuItems = computed(() => {
       getterKeys: {
         count: 'internalChat/getUnreadCount',
       },
+    },
+    {
+      name: 'Funnel',
+      label: t('SIDEBAR.FUNNEL'),
+      icon: 'i-lucide-columns-3',
+      to: accountScopedRoute('funnel_index'),
+      activeOn: ['funnel_index'],
     },
     {
       name: 'Contacts',

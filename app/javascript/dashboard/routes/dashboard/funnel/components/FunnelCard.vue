@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
@@ -22,10 +23,9 @@ const accountLocale = computed(() => account.value?.locale || 'en');
 const accountAverageTicket = computed(
   () => Number(account.value?.average_ticket) || 0
 );
-const ticketLabel = computed(() => {
-  if (!accountAverageTicket.value) return '';
-  return formatCurrency(accountAverageTicket.value, accountLocale.value);
-});
+const ticketLabel = computed(() =>
+  formatCurrency(accountAverageTicket.value, accountLocale.value)
+);
 
 const showSummary = ref(false);
 const showLossReason = ref(false);
@@ -110,7 +110,7 @@ const toggleLossReason = () => {
           rounded-full
         />
         <span
-          class="text-sm font-medium text-n-slate-12 truncate min-w-0 flex-1"
+          class="text-[13px] font-medium text-n-slate-12 truncate min-w-0 flex-1"
           :title="contactName"
         >
           {{ contactName }}
@@ -132,12 +132,17 @@ const toggleLossReason = () => {
         <span class="text-xs font-medium text-n-slate-12">
           {{ ticketLabel }}
         </span>
-        <span
-          class="text-xs text-n-slate-11 truncate min-w-0"
+        <div
+          v-if="conversation.inbox"
           :title="inboxName"
+          class="flex items-center gap-1 min-w-0 text-n-slate-11"
         >
-          {{ inboxName }}
-        </span>
+          <ChannelIcon
+            :inbox="conversation.inbox"
+            class="size-3.5 flex-shrink-0"
+          />
+          <span class="text-xs truncate">{{ inboxName }}</span>
+        </div>
       </div>
     </div>
 

@@ -29,7 +29,6 @@ const cardsFor = stage => props.conversationsByStage[stage.name] || [];
 const stageSummary = stage => {
   const count = stage.count || 0;
   const countLabel = t('FUNNEL.STAGE.COUNT_LABEL', count, { count });
-  if (!props.averageTicket) return countLabel;
   const sum = formatCurrency(count * props.averageTicket, props.locale);
   return `${sum} · ${countLabel}`;
 };
@@ -51,7 +50,7 @@ const onDragEnd = (event, targetStage) => {
       <section
         v-for="stage in orderedStages"
         :key="stage.id"
-        class="flex flex-col w-72 flex-shrink-0 bg-n-alpha-2 rounded-lg overflow-hidden"
+        class="flex flex-col w-[17rem] flex-shrink-0 bg-n-alpha-2 rounded-lg overflow-hidden"
       >
         <header class="flex flex-col gap-0.5 px-3 py-2 border-b border-n-weak">
           <div class="flex items-center gap-2 min-w-0">
