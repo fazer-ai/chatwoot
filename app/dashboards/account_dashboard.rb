@@ -34,6 +34,7 @@ class AccountDashboard < Administrate::BaseDashboard
     locale: Field::Select.with_options(collection: LANGUAGES_CONFIG.map { |_x, y| y[:iso_639_1_code] }),
     status: Field::Select.with_options(collection: [%w[Active active], %w[Suspended suspended]]),
     average_ticket: Field::Number.with_options(decimals: 2, step: 0.01),
+    funnel_enabled: Field::Boolean,
     account_users: Field::HasMany,
     custom_attributes: Field::String
   }.merge(enterprise_attribute_types).freeze
@@ -70,6 +71,7 @@ class AccountDashboard < Administrate::BaseDashboard
     locale
     status
     average_ticket
+    funnel_enabled
     conversations
     account_users
   ] + enterprise_show_page_attributes).freeze
@@ -90,6 +92,7 @@ class AccountDashboard < Administrate::BaseDashboard
     locale
     status
     average_ticket
+    funnel_enabled
   ] + enterprise_form_attributes).freeze
 
   # COLLECTION_FILTERS

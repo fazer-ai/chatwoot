@@ -35,6 +35,7 @@ en:
     attributes:
       account:
         average_ticket: 'Average ticket'
+        funnel_enabled: 'Funnel menu enabled'
   internal_chat:
     default_category_name: 'Channels'
     default_channel_name: 'General'
