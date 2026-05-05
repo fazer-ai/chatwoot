@@ -383,7 +383,7 @@ useKeyboardEvents(keyboardEvents);
       <div
         v-if="!isGroupMode"
         :class="[{ 'mt-2': !viewInModal }, composePopoverClass]"
-        class="w-[42rem] flex flex-col"
+        class="w-[42rem] flex flex-col min-w-0"
       >
         <div
           v-if="hasGroupInboxes"
@@ -442,7 +442,7 @@ useKeyboardEvents(keyboardEvents);
       <div
         v-else
         :class="[{ 'mt-2': !viewInModal }, composePopoverClass]"
-        class="w-[42rem] flex flex-col"
+        class="w-[42rem] flex flex-col min-w-0"
       >
         <div
           class="flex gap-1 px-4 pt-3 pb-0 bg-n-alpha-3 border border-b-0 border-n-strong backdrop-blur-[100px] rounded-t-xl"
