@@ -765,6 +765,16 @@ const menuItems = computed(() => {
         class="flex gap-2"
         :class="isEffectivelyCollapsed ? 'flex-col items-center' : 'px-2'"
       >
+        <button
+          v-if="isEffectivelyCollapsed"
+          type="button"
+          class="flex items-center justify-center size-9 rounded-lg outline outline-1 outline-n-weak bg-n-button-color text-n-slate-11 hover:bg-n-alpha-2 dark:hover:bg-n-slate-9/30"
+          :title="t('SIDEBAR.EXPAND')"
+          :aria-label="t('SIDEBAR.EXPAND')"
+          @click="toggleSidebar"
+        >
+          <span class="i-lucide-panel-left-open size-4" />
+        </button>
         <RouterLink
           v-if="!isEffectivelyCollapsed"
           :to="{ name: 'search' }"
@@ -805,16 +815,6 @@ const menuItems = computed(() => {
             />
           </template>
         </ComposeConversation>
-        <button
-          v-if="isEffectivelyCollapsed"
-          type="button"
-          class="flex items-center justify-center size-8 rounded-lg outline outline-1 outline-n-weak bg-n-button-color text-n-slate-11 hover:bg-n-alpha-2 dark:hover:bg-n-slate-9/30"
-          :title="t('SIDEBAR.EXPAND')"
-          :aria-label="t('SIDEBAR.EXPAND')"
-          @click="toggleSidebar"
-        >
-          <span class="i-lucide-panel-left-open size-4" />
-        </button>
       </div>
     </section>
     <nav
