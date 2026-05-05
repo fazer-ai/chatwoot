@@ -326,6 +326,8 @@
     "NO_ITEMS": "No items",
     "CURRENTLY_VIEWING_ACCOUNT": "Currently viewing:",
     "SWITCH": "Switch",
+    "COLLAPSE": "Collapse sidebar",
+    "EXPAND": "Expand sidebar",
     "INBOX_VIEW": "Inbox View",
     "CONVERSATIONS": "Conversations",
     "INBOX": "My Inbox",

@@ -71,8 +71,6 @@ const toggleShortcutModalFn = show => {
   }
 };
 
-useSidebarKeyboardShortcuts(toggleShortcutModalFn);
-
 const expandedItem = ref(null);
 
 const setExpandedItem = name => {
@@ -93,6 +91,13 @@ const {
 const isEffectivelyCollapsed = computed(
   () => !isMobile.value && isCollapsed.value
 );
+
+const toggleSidebar = () => {
+  if (isCollapsed.value) snapToExpanded();
+  else snapToCollapsed();
+};
+
+useSidebarKeyboardShortcuts(toggleShortcutModalFn, toggleSidebar);
 
 // Resize handle logic
 const isResizing = ref(false);
@@ -745,6 +750,15 @@ const menuItems = computed(() => {
             class="flex-grow -mx-1 min-w-0"
             @show-create-account-modal="emit('showCreateAccountModal')"
           />
+          <button
+            type="button"
+            class="grid flex-shrink-0 place-content-center size-6 rounded-md text-n-slate-11 hover:bg-n-alpha-1 hover:text-n-slate-12"
+            :title="t('SIDEBAR.COLLAPSE')"
+            :aria-label="t('SIDEBAR.COLLAPSE')"
+            @click="toggleSidebar"
+          >
+            <span class="i-lucide-panel-left-close size-4" />
+          </button>
         </template>
       </div>
       <div
@@ -791,6 +805,16 @@ const menuItems = computed(() => {
             />
           </template>
         </ComposeConversation>
+        <button
+          v-if="isEffectivelyCollapsed"
+          type="button"
+          class="flex items-center justify-center size-8 rounded-lg outline outline-1 outline-n-weak bg-n-button-color text-n-slate-11 hover:bg-n-alpha-2 dark:hover:bg-n-slate-9/30"
+          :title="t('SIDEBAR.EXPAND')"
+          :aria-label="t('SIDEBAR.EXPAND')"
+          @click="toggleSidebar"
+        >
+          <span class="i-lucide-panel-left-open size-4" />
+        </button>
       </div>
     </section>
     <nav
