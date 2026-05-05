@@ -326,6 +326,8 @@
     "NO_ITEMS": "Nenhum item",
     "CURRENTLY_VIEWING_ACCOUNT": "Visualização atual:",
     "SWITCH": "Trocar",
+    "COLLAPSE": "Recolher barra lateral",
+    "EXPAND": "Expandir barra lateral",
     "INBOX_VIEW": "Caixa de entrada",
     "CONVERSATIONS": "Conversas",
     "INBOX": "Caixa de Entrada",
