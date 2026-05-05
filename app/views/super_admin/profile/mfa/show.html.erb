@@ -1,0 +1,137 @@
+<% content_for(:title) do %>
+  Two-factor authentication
+<% end %>
+
+<header class="flex px-8 py-4 items-center border-b border-n-weak" role="banner">
+  <div class="border border-n-weak mr-4 p-2 rounded-full">
+    <svg width="24" height="24"><use xlink:href="#icon-settings-2-line" /></svg>
+  </div>
+  <div class="flex flex-col h-14 justify-center">
+    <h1 class="text-base font-medium leading-6 text-n-slate-12" id="page-title">
+      <%= content_for(:title) %>
+    </h1>
+    <p class="text-sm font-normal leading-5 text-slate-500 m-0">
+      Protect your super admin account with an authenticator app.
+    </p>
+  </div>
+</header>
+
+<section class="main-content__body px-8 py-6">
+  <% if flash[:alert].present? %>
+    <div class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+      <%= flash[:alert] %>
+    </div>
+  <% end %>
+  <% if flash[:notice].present? %>
+    <div class="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded mb-4 text-sm">
+      <%= flash[:notice] %>
+    </div>
+  <% end %>
+
+  <% if @backup_codes.present? %>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <h3 class="text-sm font-medium text-amber-900 mb-1">Save your backup codes</h3>
+      <p class="text-xs text-amber-800 mb-3">
+        Each code works exactly once. Store them somewhere safe — they're your only way back in if you lose access to the authenticator app.
+      </p>
+      <div class="grid grid-cols-2 gap-2 font-mono text-sm">
+        <% @backup_codes.each do |code| %>
+          <code class="bg-white border border-amber-200 rounded px-2 py-1 text-amber-900 select-all">
+            <%= code %>
+          </code>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @mfa_service.mfa_enabled? %>
+    <div class="bg-white border border-n-weak rounded-lg p-6 max-w-2xl">
+      <div class="flex items-start gap-4 mb-6">
+        <span class="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">Enabled</span>
+        <div>
+          <h2 class="text-base font-medium text-n-slate-12 mb-1">Two-factor authentication is on.</h2>
+          <p class="text-sm text-slate-500 m-0">You'll be asked for a 6-digit code from your authenticator app every time you sign in.</p>
+        </div>
+      </div>
+
+      <div class="grid gap-6">
+        <div class="border-t border-n-weak pt-4">
+          <h3 class="text-sm font-medium text-n-slate-12 mb-2">Regenerate backup codes</h3>
+          <p class="text-xs text-slate-500 mb-3">
+            Already-used codes will be invalidated. Enter a 6-digit code to confirm it's really you.
+          </p>
+          <%= form_with url: backup_codes_super_admin_profile_mfa_path, method: :post, local: true, class: 'flex flex-col gap-2 max-w-sm' do %>
+            <input type="text" name="otp_code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required minlength="6" maxlength="6" pattern="\d{6}" class="block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-woot-500 sm:text-sm outline-none">
+            <button type="submit" class="self-start rounded-md bg-slate-900 text-white text-sm px-3 py-2 hover:bg-slate-700">Generate new codes</button>
+          <% end %>
+        </div>
+
+        <div class="border-t border-n-weak pt-4">
+          <h3 class="text-sm font-medium text-red-700 mb-2">Disable two-factor authentication</h3>
+          <p class="text-xs text-slate-500 mb-3">
+            We'll wipe your secret and backup codes. Confirm with your password and a 6-digit code.
+          </p>
+          <%= form_with url: super_admin_profile_mfa_path, method: :delete, local: true, class: 'flex flex-col gap-2 max-w-sm' do %>
+            <input type="password" name="password" autocomplete="current-password" placeholder="Current password" required class="block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-woot-500 sm:text-sm outline-none">
+            <input type="text" name="otp_code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required minlength="6" maxlength="6" pattern="\d{6}" class="block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-woot-500 sm:text-sm outline-none">
+            <button type="submit" class="self-start rounded-md bg-red-600 text-white text-sm px-3 py-2 hover:bg-red-700">Disable 2FA</button>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% elsif @mfa_service.two_factor_setup_pending? %>
+    <div class="bg-white border border-n-weak rounded-lg p-6 max-w-2xl">
+      <div class="flex items-start gap-4 mb-6">
+        <span class="inline-flex items-center px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">Setup pending</span>
+        <div>
+          <h2 class="text-base font-medium text-n-slate-12 mb-1">Setup Authenticator app</h2>
+          <p class="text-sm text-slate-500 m-0">Scan the QR code, or paste the secret manually, then enter the 6-digit code from the app.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        <div>
+          <h3 class="text-sm font-medium text-n-slate-12 mb-2">1. Scan the QR code</h3>
+          <div class="inline-block bg-white p-3 border border-n-weak rounded-lg w-[220px]">
+            <%= @qr_svg %>
+          </div>
+          <% if @secret %>
+            <p class="text-xs text-slate-500 mt-3 mb-1">Or enter this code manually:</p>
+            <code class="block w-full break-all bg-slate-100 rounded px-2 py-2 text-xs select-all"><%= @secret %></code>
+          <% end %>
+        </div>
+        <div>
+          <h3 class="text-sm font-medium text-n-slate-12 mb-2">2. Enter the 6-digit code</h3>
+          <%= form_with url: verify_super_admin_profile_mfa_path, method: :post, local: true, class: 'flex flex-col gap-2' do %>
+            <input type="text" name="otp_code" inputmode="numeric" autocomplete="one-time-code" placeholder="e.g. 123456" required minlength="6" maxlength="6" pattern="\d{6}" autofocus class="block w-full rounded-md border-0 px-3 py-3 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-woot-500 sm:text-sm outline-none">
+            <button type="submit" class="rounded-md bg-woot-500 text-white text-sm px-3 py-3 hover:bg-woot-600">Continue</button>
+          <% end %>
+          <%= form_with url: super_admin_profile_mfa_path, method: :post, local: true, class: 'mt-3' do %>
+            <button type="submit" class="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer">Generate a new code</button>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% else %>
+    <div class="bg-white border border-n-weak rounded-lg p-6 max-w-2xl">
+      <div class="flex items-start gap-4 mb-4">
+        <span class="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">Disabled</span>
+        <div>
+          <h2 class="text-base font-medium text-n-slate-12 mb-1">Two-factor authentication is currently disabled.</h2>
+          <p class="text-sm text-slate-500 m-0">
+            Add a second factor on top of your password using an authenticator app like 1Password, Authy or Google Authenticator.
+          </p>
+        </div>
+      </div>
+      <%= form_with url: super_admin_profile_mfa_path, method: :post, local: true do %>
+        <button type="submit" class="rounded-md bg-woot-500 text-white text-sm px-3 py-2 hover:bg-woot-600">
+          Enable 2FA
+        </button>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+
+<style>
+  .mfa-qr { width: 100%; height: auto; display: block; }
+</style>

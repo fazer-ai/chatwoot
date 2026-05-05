@@ -8,6 +8,11 @@ class SuperAdmin::Devise::SessionsController < Devise::SessionsController
   def create
     redirect_to(super_admin_session_path, flash: { error: @error_message }) && return unless valid_credentials?
 
+    if Chatwoot.mfa_enabled? && @super_admin.mfa_enabled?
+      session[:super_admin_pending_mfa_id] = @super_admin.id
+      redirect_to super_admin_sessions_mfa_challenge_path and return
+    end
+
     sign_in(:super_admin, @super_admin)
     flash.discard
     redirect_to super_admin_users_path

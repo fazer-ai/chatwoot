@@ -721,6 +721,19 @@ Rails.application.routes.draw do
 
       # resources that doesn't appear in primary navigation in super admin
       resources :account_users, only: [:new, :create, :show, :destroy]
+
+      namespace :profile do
+        resource :mfa, only: [:show, :create, :destroy], controller: 'mfa' do
+          collection do
+            post :verify
+            post :backup_codes
+          end
+        end
+      end
+
+      namespace :sessions do
+        resource :mfa_challenge, only: [:show, :create], controller: 'mfa_challenge'
+      end
     end
     authenticated :super_admin do
       mount Sidekiq::Web => '/monitoring/sidekiq'
