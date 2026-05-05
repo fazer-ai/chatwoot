@@ -33,13 +33,12 @@ const cardsFor = stage => props.conversationsByStage[stage.name] || [];
 const stageSummary = stage => {
   const count = stage.count || 0;
   const countLabel = t('FUNNEL.STAGE.COUNT_LABEL', count, { count });
-  if (!props.averageTicket) return countLabel;
   const sum = formatCurrency(count * props.averageTicket, props.locale);
   return `${sum} · ${countLabel}`;
 };
 
 const ticketLabel = computed(() =>
-  props.averageTicket ? formatCurrency(props.averageTicket, props.locale) : ''
+  formatCurrency(props.averageTicket, props.locale)
 );
 
 const elapsedLabelFor = conversation => {
