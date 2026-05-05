@@ -51,6 +51,8 @@ class AccountDashboard < Administrate::BaseDashboard
     users
     conversations
     status
+    average_ticket
+    funnel_enabled
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
