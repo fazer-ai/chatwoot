@@ -23,6 +23,7 @@ json.id @account.id
 json.locale @account.locale
 json.name @account.name
 json.average_ticket @account.average_ticket
+json.funnel_enabled @account.funnel_enabled
 json.support_email @account.support_email
 json.status @account.status
 json.cache_keys @account.cache_keys

@@ -22,6 +22,7 @@ pt_BR:
     attributes:
       account:
         average_ticket: 'Ticket médio'
+        funnel_enabled: 'Menu Funil ativo'
   internal_chat:
     default_category_name: 'Canais'
     default_channel_name: 'Geral'

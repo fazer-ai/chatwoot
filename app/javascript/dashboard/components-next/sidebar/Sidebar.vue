@@ -55,6 +55,7 @@ const accountId = useMapGetter('getCurrentAccountId');
 const isFeatureEnabledonAccount = useMapGetter(
   'accounts/isFeatureEnabledonAccount'
 );
+const accountGetter = useMapGetter('accounts/getAccount');
 
 const hasAdvancedAssignment = computed(() => {
   return isFeatureEnabledonAccount.value(
@@ -62,6 +63,10 @@ const hasAdvancedAssignment = computed(() => {
     FEATURE_FLAGS.ADVANCED_ASSIGNMENT
   );
 });
+
+const isFunnelEnabled = computed(
+  () => accountGetter.value(accountId.value)?.funnel_enabled !== false
+);
 
 const toggleShortcutModalFn = show => {
   if (show) {
@@ -345,13 +350,17 @@ const menuItems = computed(() => {
         count: 'internalChat/getUnreadCount',
       },
     },
-    {
-      name: 'Funnel',
-      label: t('SIDEBAR.FUNNEL'),
-      icon: 'i-lucide-columns-3',
-      to: accountScopedRoute('funnel_index'),
-      activeOn: ['funnel_index'],
-    },
+    ...(isFunnelEnabled.value
+      ? [
+          {
+            name: 'Funnel',
+            label: t('SIDEBAR.FUNNEL'),
+            icon: 'i-lucide-columns-3',
+            to: accountScopedRoute('funnel_index'),
+            activeOn: ['funnel_index'],
+          },
+        ]
+      : []),
     {
       name: 'Contacts',
       label: t('SIDEBAR.CONTACTS'),
