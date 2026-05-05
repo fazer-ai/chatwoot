@@ -8,7 +8,7 @@
 #  custom_attributes     :jsonb
 #  domain                :string(100)
 #  feature_flags         :bigint           default(0), not null
-#  funnel_enabled        :boolean          default(TRUE), not null
+#  funnel_enabled        :boolean          default(FALSE), not null
 #  internal_attributes   :jsonb            not null
 #  limits                :jsonb
 #  locale                :integer          default("en")
