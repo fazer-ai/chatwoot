@@ -16,6 +16,8 @@ import { requiredIf } from '@vuelidate/validators';
 import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
+import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { mapGetters } from 'vuex';
 
 export default {
   components: {
@@ -54,6 +56,7 @@ export default {
       isUpdatingAllowedDomains: false,
       isSettingDefaults: false,
       isTogglingReconnection: false,
+      isEnablingWhatsappCampaignFeature: false,
       baileysProviderUrl: '',
       showLinkDeviceModal: false,
       markAsRead: true,
@@ -80,6 +83,30 @@ export default {
     };
   },
   computed: {
+    ...mapGetters({
+      currentAccountId: 'getCurrentAccountId',
+      currentUser: 'getCurrentUser',
+      isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
+    }),
+    whatsappCampaignFeatureEnabled() {
+      return this.isFeatureEnabledonAccount(
+        this.currentAccountId,
+        FEATURE_FLAGS.WHATSAPP_CAMPAIGNS
+      );
+    },
+    isCurrentUserAdministrator() {
+      const accountId = Number(this.currentAccountId);
+      const accountUser = (this.currentUser?.accounts || []).find(
+        a => a.id === accountId
+      );
+      return accountUser?.role === 'administrator';
+    },
+    showEnableWhatsappCampaignCard() {
+      // Only meaningful for the WhatsApp Cloud branch — Baileys/Twilio don't drive this menu.
+      if (!this.isAWhatsAppCloudChannel) return false;
+      if (this.whatsappCampaignFeatureEnabled) return false;
+      return this.isCurrentUserAdministrator;
+    },
     isEmbeddedSignupWhatsApp() {
       return this.inbox.provider_config?.source === 'embedded_signup';
     },
@@ -308,6 +335,23 @@ export default {
         useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
       } finally {
         this.isTogglingReconnection = false;
+      }
+    },
+    async enableWhatsappCampaignFeature() {
+      this.isEnablingWhatsappCampaignFeature = true;
+      try {
+        await this.$store.dispatch('accounts/enableFeature', {
+          feature: 'whatsapp_campaign',
+        });
+        useAlert(
+          this.$t(
+            'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_CAMPAIGN_FEATURE.ENABLED_SUCCESS'
+          )
+        );
+      } catch (error) {
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+      } finally {
+        this.isEnablingWhatsappCampaignFeature = false;
       }
     },
     async updateZapiInstanceId() {
@@ -630,6 +674,28 @@ export default {
       >
         <NextButton :disabled="isSyncingTemplates" @click="syncTemplates">
           {{ $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_TEMPLATES_SYNC_BUTTON') }}
+        </NextButton>
+      </SettingsFieldSection>
+      <SettingsFieldSection
+        v-if="showEnableWhatsappCampaignCard"
+        :label="$t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_CAMPAIGN_FEATURE.TITLE')"
+        :help-text="
+          $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_CAMPAIGN_FEATURE.SUBHEADER')
+        "
+      >
+        <div
+          class="rounded-md bg-n-amber-3 outline outline-1 outline-n-amber-4 text-n-amber-11 px-3 py-2.5 mb-2 text-sm"
+        >
+          {{
+            $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_CAMPAIGN_FEATURE.WARNING')
+          }}
+        </div>
+        <NextButton
+          :is-loading="isEnablingWhatsappCampaignFeature"
+          :disabled="isEnablingWhatsappCampaignFeature"
+          @click="enableWhatsappCampaignFeature"
+        >
+          {{ $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_CAMPAIGN_FEATURE.BUTTON') }}
         </NextButton>
       </SettingsFieldSection>
     </div>

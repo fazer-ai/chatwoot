@@ -68,6 +68,25 @@ class Api::V1::AccountsController < Api::BaseController
     head :ok
   end
 
+  # Self-service toggle so account admins can flip on the few features that
+  # ship disabled-by-default for legacy accounts but are required to expose
+  # functionality the customer is already paying for (e.g. WhatsApp campaigns
+  # depend on the `whatsapp_campaign` flag). The allowlist is intentionally
+  # tiny — anything else is super_admin territory.
+  ADMIN_TOGGLABLE_FEATURES = %w[whatsapp_campaign].freeze
+
+  def enable_feature
+    feature = params.require(:feature)
+    unless ADMIN_TOGGLABLE_FEATURES.include?(feature)
+      render json: { error: 'Feature is not toggleable from this endpoint' }, status: :unprocessable_entity and return
+    end
+
+    @account.enable_features!(feature)
+    @account.update_cache_key('account')
+
+    render json: { feature: feature, enabled: @account.feature_enabled?(feature) }
+  end
+
   private
 
   def enqueue_branding_enrichment

@@ -16,6 +16,13 @@ class AccountAPI extends ApiClient {
     );
     return response.data.cache_keys;
   }
+
+  enableFeature(feature) {
+    return axios.post(
+      `/api/v1/accounts/${this.accountIdFromRoute}/enable_feature`,
+      { feature }
+    );
+  }
 }
 
 export default new AccountAPI();

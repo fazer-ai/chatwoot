@@ -869,6 +869,13 @@
       "WHATSAPP_TEMPLATES_SYNC_SUBHEADER": "Manually sync message templates from WhatsApp to update your available templates.",
       "WHATSAPP_TEMPLATES_SYNC_BUTTON": "Sync Templates",
       "WHATSAPP_TEMPLATES_SYNC_SUCCESS": "Templates sync initiated successfully. It may take a couple of minutes to update.",
+      "WHATSAPP_CAMPAIGN_FEATURE": {
+        "TITLE": "WhatsApp campaign menu",
+        "SUBHEADER": "Required to use this inbox in WhatsApp campaigns. The flag is off by default for accounts created before this feature shipped — enabling it once is enough.",
+        "WARNING": "Campaigns → WhatsApp is hidden for this account. Enable the feature below so administrators can create and dispatch campaigns from this inbox.",
+        "BUTTON": "Enable WhatsApp campaigns",
+        "ENABLED_SUCCESS": "WhatsApp campaigns enabled. Reload the page or hard refresh the dashboard to see the menu."
+      },
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Manage Provider Connection",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Link your device and manage the provider connection.",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Manage connection",

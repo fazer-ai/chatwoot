@@ -92,6 +92,11 @@ export const actions = {
       throw new Error(error);
     }
   },
+  enableFeature: async ({ dispatch }, { feature }) => {
+    await AccountAPI.enableFeature(feature);
+    // refresh the account so feature_flags / enabled features are up-to-date
+    await dispatch('get');
+  },
   toggleDeletion: async (
     { commit },
     { action_type } = { action_type: 'delete' }

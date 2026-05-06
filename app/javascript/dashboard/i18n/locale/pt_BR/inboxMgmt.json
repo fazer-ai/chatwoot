@@ -869,6 +869,13 @@
       "WHATSAPP_TEMPLATES_SYNC_SUBHEADER": "Sincronize manualmente os modelos de mensagens do WhatsApp para atualizar seus modelos disponíveis.",
       "WHATSAPP_TEMPLATES_SYNC_BUTTON": "Sincronizar Modelos",
       "WHATSAPP_TEMPLATES_SYNC_SUCCESS": "Sincronização de modelos iniciada com sucesso. Pode demorar alguns minutos para atualizar.",
+      "WHATSAPP_CAMPAIGN_FEATURE": {
+        "TITLE": "Menu de Campanhas no WhatsApp",
+        "SUBHEADER": "Necessário para usar essa caixa em campanhas WhatsApp. A flag vem desativada por padrão em contas criadas antes do ship do recurso — habilitar uma vez é suficiente.",
+        "WARNING": "Campanhas → WhatsApp está escondido para esta conta. Habilite o recurso abaixo para que administradores possam criar e disparar campanhas a partir desta caixa.",
+        "BUTTON": "Habilitar Campanhas WhatsApp",
+        "ENABLED_SUCCESS": "Campanhas WhatsApp habilitadas. Recarregue a página ou faça um hard refresh do dashboard para ver o menu."
+      },
       "UPDATE_PRE_CHAT_FORM_SETTINGS": "Atualizar configurações do Formulário Pre Chat",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Gerenciar Conexão do Provedor",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Conecte o seu dispositivo e gerencie a conexão do provedor.",
