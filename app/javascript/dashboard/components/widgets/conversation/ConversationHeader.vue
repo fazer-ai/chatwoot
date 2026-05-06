@@ -5,6 +5,7 @@ import { useStore } from 'vuex';
 import { useElementSize } from '@vueuse/core';
 import BackButton from '../BackButton.vue';
 import InboxName from '../InboxName.vue';
+import AiStatusBadge from 'dashboard/components-next/Conversation/AiStatusBadge.vue';
 import MoreActions from './MoreActions.vue';
 import Avatar from 'next/avatar/Avatar.vue';
 import SLACardLabel from './components/SLACardLabel.vue';
@@ -141,6 +142,12 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
           class="flex items-center gap-2 overflow-hidden text-xs conversation--header--actions text-ellipsis whitespace-nowrap"
         >
           <InboxName v-if="hasMultipleInboxes" :inbox="inbox" class="!mx-0" />
+          <AiStatusBadge
+            v-if="chat?.id"
+            :conversation-id="chat.id"
+            :ai-enabled="chat.ai_enabled !== false"
+            size="xs"
+          />
           <span v-if="isSnoozed" class="font-medium text-n-amber-10">
             {{ snoozedDisplayText }}
           </span>
