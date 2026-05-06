@@ -345,16 +345,11 @@ const deleteConversation = () => {
       >
         <InboxName v-if="showInboxName" :inbox="inbox" class="flex-1 min-w-0" />
         <div
-          class="flex items-center gap-2 flex-shrink-0"
+          class="flex items-baseline gap-2 flex-shrink-0"
           :class="{
             'flex-1 justify-between': !showInboxName,
           }"
         >
-          <AiStatusBadge
-            :conversation-id="chat.id"
-            :ai-enabled="chat.ai_enabled !== false"
-            size="xs"
-          />
           <span
             v-if="showAssignee && assignee.name"
             class="text-n-slate-11 text-xs font-medium leading-3 py-0.5 px-0 inline-flex items-center truncate"
@@ -368,12 +363,19 @@ const deleteConversation = () => {
           />
         </div>
       </div>
-      <h4
-        class="conversation--user text-sm my-0 mx-2 capitalize pt-0.5 text-ellipsis overflow-hidden whitespace-nowrap flex-1 min-w-0 ltr:pr-16 rtl:pl-16 text-n-slate-12"
-        :class="hasUnread ? 'font-semibold' : 'font-medium'"
-      >
-        {{ currentContact.name }}
-      </h4>
+      <div class="flex items-center gap-2 mx-2 pt-0.5 ltr:pr-16 rtl:pl-16">
+        <h4
+          class="conversation--user text-sm m-0 capitalize text-ellipsis overflow-hidden whitespace-nowrap min-w-0 text-n-slate-12"
+          :class="hasUnread ? 'font-semibold' : 'font-medium'"
+        >
+          {{ currentContact.name }}
+        </h4>
+        <AiStatusBadge
+          :conversation-id="chat.id"
+          :ai-enabled="chat.ai_enabled !== false"
+          size="xs"
+        />
+      </div>
       <VoiceCallStatus
         v-if="voiceCallData.status"
         key="voice-status-row"
