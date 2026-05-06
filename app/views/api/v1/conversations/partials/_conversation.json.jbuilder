@@ -27,13 +27,19 @@ json.meta do
 end
 
 json.id conversation.display_id
-last_card_message = conversation.messages.where(account_id: conversation.account_id)
-                                .chat
-                                .hide_removed_reactions
-                                .includes([{ attachments: [{ file_attachment: [:blob] }] }])
-                                .reorder(created_at: :desc)
-                                .first
-json.messages last_card_message ? [last_card_message.push_event_data] : []
+# Seeds `currentChat.messages` and is also the source for the `before` cursor
+# in setActiveChat → fetchPreviousMessages. Must include private notes: the
+# `chat` scope filters them out, so a trailing private note would never enter
+# the store on cold open and the bubble wouldn't render until a non-private
+# message arrived after it.
+last_message = conversation.messages
+                           .where(account_id: conversation.account_id)
+                           .non_activity_messages
+                           .hide_removed_reactions
+                           .includes([{ attachments: [{ file_attachment: [:blob] }] }])
+                           .reorder(created_at: :desc)
+                           .first
+json.messages last_message ? [last_message.push_event_data] : []
 
 json.account_id conversation.account_id
 json.uuid conversation.uuid
@@ -53,17 +59,11 @@ json.updated_at conversation.updated_at.to_f
 json.timestamp conversation.last_activity_at.to_i
 json.first_reply_created_at conversation.first_reply_created_at.to_i
 json.unread_count conversation.unread_incoming_messages.count
-last_non_activity = conversation.messages
-                                .where(account_id: conversation.account_id)
-                                .non_activity_messages
-                                .hide_removed_reactions
-                                .reorder(created_at: :desc)
-                                .first
-if last_non_activity
+if last_message
   json.last_non_activity_message do
-    json.merge! last_non_activity.push_event_data
-    if last_non_activity.reaction?
-      target_id = last_non_activity.content_attributes['in_reply_to']
+    json.merge! last_message.push_event_data
+    if last_message.reaction?
+      target_id = last_message.content_attributes['in_reply_to']
       target = target_id.present? ? conversation.messages.find_by(id: target_id) : nil
       # strip_tags so the preview of an HTML/email target doesn't render as
       # literal "<p>..." markup in the chat list card. Wrap with `String.new`
