@@ -35,6 +35,23 @@ RSpec.describe 'Conversations API', type: :request do
         expect(body[:data][:payload].first[:messages].first[:id]).to eq(message.id)
       end
 
+      # Regression: when the latest message is a private note, the seed is the
+      # cursor for setActiveChat → fetchPreviousMessages(before: id). Filtering
+      # private notes here would leave the trailing note out of the store on
+      # cold open, so the bubble wouldn't render until a non-private message
+      # arrived after it.
+      it 'seeds the latest message even when it is a private note' do
+        create(:message, conversation: conversation, account: account)
+        private_note = create(:message, conversation: conversation, account: account, private: true)
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        body = JSON.parse(response.body, symbolize_names: true)
+        expect(body[:data][:payload].first[:messages].first[:id]).to eq(private_note.id)
+      end
+
       it 'returns conversations with empty messages array for conversations with out messages' do
         get "/api/v1/accounts/#{account.id}/conversations",
             headers: agent.create_new_auth_token,

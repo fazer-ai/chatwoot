@@ -350,6 +350,18 @@ const actions = {
     }
   },
 
+  toggleMessageReaction: function toggleMessageReaction(
+    _context,
+    { conversationId, messageId, emoji, echoId }
+  ) {
+    // The optimistic Message is dispatched to the store by the caller.
+    // Backend echoes back the same echo_id via ActionCable MESSAGE_CREATED, and
+    // findPendingMessageIndex in the ADD_MESSAGE mutation swaps the fake for
+    // the real one. Returning the promise lets callers reconcile if the cable
+    // echo is delayed/missing.
+    return MessageApi.toggleReaction(conversationId, messageId, emoji, echoId);
+  },
+
   editMessage: async function editMessage(
     { commit },
     { conversationId, messageId, content }

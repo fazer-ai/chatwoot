@@ -172,8 +172,11 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   end
 
   def ignore_message?
-    message_type.in?(%w[protocol context edited]) ||
-      (message_type == 'reaction' && message_content.blank?)
+    message_type.in?(%w[protocol context edited])
+  end
+
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
   end
 
   def fetch_profile_picture_url(phone_number)

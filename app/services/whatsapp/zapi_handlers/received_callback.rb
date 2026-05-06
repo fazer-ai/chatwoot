@@ -3,7 +3,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback # rubocop:disable Metrics/MethodLength
+  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
@@ -26,6 +26,10 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
         Rails.logger.warn "Contact not found for message: #{raw_message_id}"
         return
       end
+
+      # Reaction removals don't produce a new Message row — handle them before
+      # set_conversation so a blank webhook can't open/create a stray thread.
+      next mark_existing_reaction_as_removed if reaction_removal?
 
       set_conversation
       handle_create_message
@@ -127,6 +131,62 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     else
       create_message(attach_media: %w[image sticker file video audio].include?(message_type))
     end
+  end
+
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
+  end
+
+  # Z-API delivers a reaction removal as a webhook with empty value. Our schema
+  # keeps a single Message row per (target, sender) toggling `deleted` on it,
+  # so we update that row in place.
+  #
+  # `fromMe` removals can come from two paths and we want both handled:
+  # - Chatwoot-originated echo: the controller already toggled the row to
+  #   deleted, so the active-first lookup finds nothing and this no-ops.
+  # - Multi-device removal (agent un-reacts from the connected phone): the row
+  #   is still active and stored sender-less outgoing, so we mark it deleted.
+  # Lookup is intentionally NOT scoped to `@conversation`: the reaction may
+  # live in an older/resolved thread, while `set_conversation` could have
+  # picked (or created) a different one for this webhook. Find the row first,
+  # then operate on its real `existing.conversation`.
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+    target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
+    return if target_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    # Scope by inbox: the senderless outgoing branch would otherwise match any
+    # reaction with the same provider message id, and two inboxes that ever
+    # receive colliding WhatsApp ids would step on each other's rows.
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+    matches = if incoming_message?
+                base.where(sender: @contact)
+              else
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              end
+    # Active-only: when the only matches are already deleted, return nil so
+    # the caller no-ops instead of re-deleting and bumping the conversation
+    # for an echoed Chatwoot-originated removal.
+    existing = matches.where.not(content: '')
+                      .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
+                      .reorder(created_at: :desc)
+                      .first
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    target_conversation = existing.conversation
+    # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
+    # chat.messages on the client, so the conversation card preview stays stale
+    # without an explicit conversation.updated dispatch. Touch updated_at so
+    # the frontend out-of-order guard can drop stale cables.
+    target_conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    target_conversation.dispatch_conversation_updated_event
   end
 
   def create_contact_message

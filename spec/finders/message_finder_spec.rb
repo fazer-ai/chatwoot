@@ -74,4 +74,63 @@ describe MessageFinder do
       end
     end
   end
+
+  describe 'page_window with reactions' do
+    # Isolated setup: skip the shared `before` block's fixtures so count assertions stay stable.
+    subject(:message_finder) { described_class.new(fresh_conversation, {}) }
+
+    let!(:fresh_conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+
+    it 'does not let reactions consume the 20-item page limit' do
+      # 22 non-reaction messages plus a handful of reactions interleaved.
+      # Without the non-reaction-based pick, the trailing reactions could push
+      # real messages off the page.
+      regular_messages = []
+      22.times do |i|
+        regular_messages << create(:message, conversation: fresh_conversation, content: "msg #{i}")
+      end
+      5.times do |i|
+        create(:message,
+               conversation: fresh_conversation,
+               content: '👍',
+               content_attributes: { is_reaction: true, in_reply_to_external_id: "ext_#{i}" })
+      end
+
+      result = message_finder.perform
+      non_reactions = result.reject { |m| m.content_attributes['is_reaction'] }
+
+      # The latest non-reactions must be present even though 5 reactions came
+      # after them — the page is anchored on non-reactions, not raw position.
+      expect(non_reactions).to include(regular_messages.last)
+      # And the page yields at least 20 non-reactions (anchor is the 20th
+      # newest non-reaction, plus any newer ones). No early truncation.
+      expect(non_reactions.size).to be >= 20
+    end
+
+    it 'includes reactions whose parent message is inside the visible window' do
+      msg = create(:message, conversation: fresh_conversation, content: 'Hi', source_id: 'wamid.parent')
+      attached_reaction = create(:message,
+                                 conversation: fresh_conversation,
+                                 content: '🔥',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.parent' })
+      orphan_reaction = create(:message,
+                               conversation: fresh_conversation,
+                               content: '👍',
+                               content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.older.not.in.window' })
+
+      result = message_finder.perform
+
+      expect(result).to include(msg, attached_reaction)
+      expect(result).not_to include(orphan_reaction)
+    end
+
+    it 'returns an empty scope when no non-reaction messages exist' do
+      create(:message,
+             conversation: fresh_conversation,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'ext_orphan' })
+
+      expect(message_finder.perform).to be_empty
+    end
+  end
 end

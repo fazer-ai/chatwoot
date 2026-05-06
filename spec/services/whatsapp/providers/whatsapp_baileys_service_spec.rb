@@ -1825,6 +1825,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   def send_message_body(hash, msg = message)
-    hash.merge(chatwootMessageId: msg.id).to_json
+    hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}").to_json
   end
 end

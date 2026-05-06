@@ -813,4 +813,26 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.sync_group(conversation)).to be_nil
     end
   end
+
+  describe '#supports_reactions?' do
+    it 'returns true for whatsapp_cloud provider' do
+      channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
+      expect(channel.supports_reactions?).to be(true)
+    end
+
+    it 'returns true for baileys provider' do
+      channel = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
+      expect(channel.supports_reactions?).to be(true)
+    end
+
+    it 'returns true for zapi provider' do
+      channel = create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false)
+      expect(channel.supports_reactions?).to be(true)
+    end
+
+    it 'returns false for default (360dialog) provider' do
+      channel = create(:channel_whatsapp, provider: 'default', validate_provider_config: false, sync_templates: false)
+      expect(channel.supports_reactions?).to be(false)
+    end
+  end
 end
