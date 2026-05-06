@@ -91,6 +91,12 @@ class Whatsapp::OneoffCampaignService
     ).call
   end
 
+  # Status policy when the contact already has a conversation in this inbox:
+  #   open      -> reuse, stays open (message joins the live thread)
+  #   pending   -> reuse, stays pending (campaign is colder traffic, no agent change)
+  #   snoozed   -> reuse, stays snoozed (agent snoozed on purpose; respect it)
+  #   resolved  -> reuse, reopen as pending (back on the radar, doesn't pollute open)
+  #   none      -> create a new conversation as pending
   def build_campaign_conversation(contact_inbox)
     existing = inbox.conversations
                     .where(contact_id: contact_inbox.contact_id)
@@ -98,7 +104,7 @@ class Whatsapp::OneoffCampaignService
                     .first
 
     if existing
-      existing.update!(status: :open) unless existing.open?
+      existing.update!(status: :pending) if existing.resolved?
       return existing
     end
 
@@ -108,7 +114,7 @@ class Whatsapp::OneoffCampaignService
       contact_id: contact_inbox.contact_id,
       contact_inbox_id: contact_inbox.id,
       campaign_id: campaign.id,
-      status: :open
+      status: :pending
     )
   end
 
