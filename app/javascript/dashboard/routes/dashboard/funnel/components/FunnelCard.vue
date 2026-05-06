@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
+import AiStatusBadge from 'dashboard/components-next/Conversation/AiStatusBadge.vue';
 import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
@@ -115,15 +116,11 @@ const toggleLossReason = () => {
         >
           {{ contactName }}
         </span>
-        <span
-          :class="
-            aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'
-          "
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
-        >
-          <span class="size-1.5 rounded-full bg-white" />
-          {{ aiEnabled ? t('FUNNEL.CARD.AI_ON') : t('FUNNEL.CARD.AI_OFF') }}
-        </span>
+        <AiStatusBadge
+          :conversation-id="conversation.id"
+          :ai-enabled="aiEnabled"
+          size="xs"
+        />
       </div>
       <span v-if="phoneNumber" class="text-xs text-n-slate-11">
         {{ phoneNumber }}

@@ -135,6 +135,14 @@ export const mutations = {
     chat.priority = priority;
   },
 
+  [types.UPDATE_CONVERSATION_AI_ENABLED](
+    _state,
+    { conversationId, aiEnabled }
+  ) {
+    const chat = _state.allConversations.find(c => c.id === conversationId);
+    if (chat) chat.ai_enabled = aiEnabled;
+  },
+
   [types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES](
     _state,
     { conversationId, customAttributes }

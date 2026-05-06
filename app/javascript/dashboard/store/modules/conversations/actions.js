@@ -594,6 +594,15 @@ const actions = {
     commit(types.ASSIGN_PRIORITY, { priority, conversationId });
   },
 
+  toggleAiStatus: async ({ commit }, { conversationId }) => {
+    const { data } = await ConversationApi.toggleAiStatus({ conversationId });
+    commit(types.UPDATE_CONVERSATION_AI_ENABLED, {
+      conversationId,
+      aiEnabled: data.ai_enabled,
+    });
+    return data.ai_enabled;
+  },
+
   setContextMenuChatId({ commit }, chatId) {
     commit(types.SET_CONTEXT_MENU_CHAT_ID, chatId);
   },

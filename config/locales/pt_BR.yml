@@ -23,6 +23,7 @@ pt_BR:
       account:
         average_ticket: 'Ticket médio'
         funnel_enabled: 'Menu Funil ativo'
+        ai_status_uses_attribute: 'Status da IA por atributo (desligado = etiqueta agente-off legada)'
   internal_chat:
     default_category_name: 'Canais'
     default_channel_name: 'Geral'

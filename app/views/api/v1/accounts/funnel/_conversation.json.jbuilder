@@ -18,7 +18,7 @@ json.summary conversation.summary
 json.created_at conversation.created_at.to_i
 json.last_activity_at conversation.last_activity_at.to_i
 json.labels labels
-json.ai_enabled !labels.include?('agente-off')
+json.ai_enabled conversation.ai_status_enabled?
 json.loss_reason loss_reason ? { id: loss_reason.id, name: loss_reason.name } : nil
 json.contact do
   json.id contact.id

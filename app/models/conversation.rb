@@ -5,6 +5,7 @@
 #  id                     :integer          not null, primary key
 #  additional_attributes  :jsonb
 #  agent_last_seen_at     :datetime
+#  ai_enabled             :boolean          default(TRUE), not null
 #  assignee_last_seen_at  :datetime
 #  cached_label_list      :text
 #  contact_last_seen_at   :datetime
@@ -165,6 +166,34 @@ class Conversation < ApplicationRecord
     self.status = open? ? :resolved : :open
     self.status = :open if pending? || snoozed?
     save # rubocop:disable Rails/SaveBang
+  end
+
+  # AI status the dashboard should display. The account-level flag picks the
+  # source so existing automations (n8n watching the `agente-off` label) keep
+  # working until each account is migrated to the persisted attribute.
+  def ai_status_enabled?
+    return ai_enabled if account.ai_status_uses_attribute?
+
+    label_list.exclude?('agente-off')
+  end
+
+  # Flips the AI status using whichever source the account is configured for.
+  # In legacy mode this toggles the `agente-off` label; in attribute mode it
+  # flips the column. Returns the new state.
+  def toggle_ai_status!
+    if account.ai_status_uses_attribute?
+      update!(ai_enabled: !ai_enabled)
+      ai_enabled
+    else
+      labels = Array(label_list)
+      if labels.include?('agente-off')
+        update!(label_list: labels - ['agente-off'])
+        true
+      else
+        update!(label_list: labels + ['agente-off'])
+        false
+      end
+    end
   end
 
   def toggle_priority(priority = nil)

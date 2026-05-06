@@ -111,6 +111,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
+  def toggle_ai_status
+    new_state = @conversation.toggle_ai_status!
+    render json: { ai_enabled: new_state }
+  end
+
   def toggle_typing_status
     typing_status_manager = ::Conversations::TypingStatusManager.new(@conversation, Current.user, params)
     typing_status_manager.toggle_typing_status
