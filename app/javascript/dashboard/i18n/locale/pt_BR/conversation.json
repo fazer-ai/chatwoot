@@ -1,5 +1,12 @@
 {
   "CONVERSATION": {
+    "AI_STATUS": {
+      "AI_ON": "IA ligada",
+      "AI_OFF": "IA desligada",
+      "TOGGLE_ON_TOOLTIP": "Clique para ativar a IA nesta conversa",
+      "TOGGLE_OFF_TOOLTIP": "Clique para desativar a IA nesta conversa",
+      "TOGGLE_ERROR": "Não foi possível alternar a IA nesta conversa. Tente novamente."
+    },
     "SELECT_A_CONVERSATION": "Por favor, selecione uma conversa no painel da esquerda",
     "CSAT_REPLY_MESSAGE": "Por favor, classifique a conversa",
     "404": "Desculpe, não conseguimos encontrar a conversa. Por favor, tente novamente",

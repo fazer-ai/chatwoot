@@ -167,6 +167,7 @@ Rails.application.routes.draw do
               post :transcript
               post :toggle_status
               post :toggle_priority
+              post :toggle_ai_status
               post :toggle_typing_status
               post :presence_subscribe
               post :update_last_seen

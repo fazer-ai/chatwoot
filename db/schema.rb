@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_05_110000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_06_130000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -83,6 +83,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_05_110000) do
     t.jsonb "settings", default: {}
     t.decimal "average_ticket", precision: 12, scale: 2
     t.boolean "funnel_enabled", default: false, null: false
+    t.boolean "ai_status_uses_attribute", default: false, null: false
     t.index ["status"], name: "index_accounts_on_status"
   end
 
@@ -730,6 +731,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_05_110000) do
     t.integer "group_type", default: 0, null: false
     t.text "summary"
     t.bigint "funnel_stage_id"
+    t.boolean "ai_enabled", default: true, null: false
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "group_type"], name: "index_conversations_on_account_id_and_group_type"
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"
