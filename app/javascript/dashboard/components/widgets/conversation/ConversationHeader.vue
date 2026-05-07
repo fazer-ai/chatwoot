@@ -147,7 +147,12 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
     <div class="flex justify-start xl:flex-1 xl:justify-center xl:px-3 min-w-0">
       <div
         v-if="summary"
-        v-tooltip.bottom="summary"
+        v-tooltip="{
+          content: summary,
+          placement: 'bottom',
+          popperClass:
+            '[&_.v-popper__inner]:max-w-xs [&_.v-popper__inner]:whitespace-normal',
+        }"
         class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-2xl cursor-help"
       >
         <span
