@@ -31,7 +31,7 @@ const toggle = async () => {
 <template>
   <button
     type="button"
-    class="inline-flex items-center gap-1 h-5 px-1.5 py-0.5 rounded-[4px] text-xs font-medium leading-tight flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
+    class="inline-flex items-center gap-1 h-4 px-1.5 py-0.5 rounded-[4px] text-xs font-medium leading-tight flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
     :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
     :disabled="isToggling"
     :title="

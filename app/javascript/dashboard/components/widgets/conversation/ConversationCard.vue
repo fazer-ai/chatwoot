@@ -148,14 +148,6 @@ const showInboxName = computed(() => {
   );
 });
 
-const showMetaSection = computed(() => {
-  return (
-    showInboxName.value ||
-    (props.showAssignee && assignee.value.name) ||
-    props.chat.priority
-  );
-});
-
 const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
 
 const showLabelsSection = computed(() => {
@@ -336,7 +328,6 @@ const deleteConversation = () => {
       class="px-0 py-3 border-b group-hover:border-transparent flex-1 border-n-slate-3 min-w-0"
     >
       <div
-        v-if="showMetaSection"
         class="flex items-center min-w-0 gap-1"
         :class="{
           'ltr:ml-2 rtl:mr-2': !compact,
@@ -345,10 +336,8 @@ const deleteConversation = () => {
       >
         <InboxName v-if="showInboxName" :inbox="inbox" class="flex-1 min-w-0" />
         <div
-          class="flex items-baseline gap-2 flex-shrink-0"
-          :class="{
-            'flex-1 justify-between': !showInboxName,
-          }"
+          class="flex items-center gap-2 flex-shrink-0"
+          :class="{ 'flex-1 justify-end': !showInboxName }"
         >
           <span
             v-if="showAssignee && assignee.name"
@@ -361,20 +350,18 @@ const deleteConversation = () => {
             :priority="chat.priority"
             class="flex-shrink-0 !size-3.5"
           />
+          <AiStatusBadge
+            :conversation-id="chat.id"
+            :ai-enabled="chat.ai_enabled !== false"
+          />
         </div>
       </div>
-      <div class="flex items-center gap-2 mx-2 pt-0.5 ltr:pr-16 rtl:pl-16">
-        <h4
-          class="conversation--user text-sm m-0 capitalize text-ellipsis overflow-hidden whitespace-nowrap min-w-0 text-n-slate-12"
-          :class="hasUnread ? 'font-semibold' : 'font-medium'"
-        >
-          {{ currentContact.name }}
-        </h4>
-        <AiStatusBadge
-          :conversation-id="chat.id"
-          :ai-enabled="chat.ai_enabled !== false"
-        />
-      </div>
+      <h4
+        class="conversation--user text-sm my-0 mx-2 capitalize pt-0.5 text-ellipsis overflow-hidden whitespace-nowrap flex-1 min-w-0 ltr:pr-16 rtl:pl-16 text-n-slate-12"
+        :class="hasUnread ? 'font-semibold' : 'font-medium'"
+      >
+        {{ currentContact.name }}
+      </h4>
       <VoiceCallStatus
         v-if="voiceCallData.status"
         key="voice-status-row"
@@ -412,10 +399,7 @@ const deleteConversation = () => {
           {{ $t(`CHAT_LIST.NO_MESSAGES`) }}
         </span>
       </p>
-      <div
-        class="absolute flex flex-col ltr:right-3 rtl:left-3"
-        :class="showMetaSection ? 'top-8' : 'top-4'"
-      >
+      <div class="absolute flex flex-col ltr:right-3 rtl:left-3 top-8">
         <span class="ml-auto font-normal leading-4 text-xxs">
           <TimeAgo
             :last-activity-timestamp="chat.timestamp"
