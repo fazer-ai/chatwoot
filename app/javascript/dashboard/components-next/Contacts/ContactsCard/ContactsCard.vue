@@ -171,15 +171,15 @@ const handleAvatarHover = isHovered => {
               v-if="resolvedLabels.length"
               class="flex flex-wrap items-center gap-1"
             >
-              <span
+              <woot-label
                 v-for="label in resolvedLabels"
                 :key="label.title"
-                v-tooltip.top="label.title"
-                class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium text-white truncate max-w-[120px]"
-                :style="{ backgroundColor: label.color }"
-              >
-                {{ label.title }}
-              </span>
+                :title="label.title"
+                :color="label.color"
+                variant="smooth"
+                small
+                class="!mb-0 max-w-[calc(100%-0.5rem)]"
+              />
             </span>
             <span class="inline-flex items-center gap-1">
               <span
