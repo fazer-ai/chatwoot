@@ -256,12 +256,7 @@
         },
         "SELECT_PROVIDER": {
           "TITLE": "Selecione seu provedor de API",
-          "DESCRIPTION": "Escolha seu provedor do WhatsApp. Você pode se conectar diretamente através de metade, que não requer nenhuma configuração ou se conectar pelo Twilio usando as credenciais da sua conta.",
-          "ZAPI_PROMO": {
-            "TITLE": "Procurando uma solução WhatsApp confiável?",
-            "DESCRIPTION": "Z-API oferece estabilidade superior comparado ao Baileys e é muito mais simples de configurar que Cloud ou Twilio - sem necessidade de configuração complexa. Perfeito para empresas que querem começar rapidamente.",
-            "CTA": "Usar Z-API"
-          }
+          "DESCRIPTION": "Escolha seu provedor do WhatsApp. Você pode se conectar diretamente através de metade, que não requer nenhuma configuração ou se conectar pelo Twilio usando as credenciais da sua conta."
         },
         "INBOX_NAME": {
           "LABEL": "Nome da Caixa de Entrada",
@@ -368,13 +363,6 @@
           "SUCCESS_FALLBACK": "A conta do WhatsApp Business foi configurada com sucesso",
           "MANUAL_FALLBACK": "Se o seu número já estiver conectado à Plataforma WhatsApp Business (API) ou se você for um provedor de tecnologia integrando o seu próprio número, use o fluxo de {link}",
           "MANUAL_LINK_TEXT": "fluxo de configuração manual"
-        },
-        "ZAPI_PROMO": {
-          "SETUP_BANNER": {
-            "TITLE": "Ganhe 10% de desconto na sua assinatura Z-API",
-            "DESCRIPTION": "Crie sua conta Z-API usando nosso link de afiliado e receba 10% de desconto. Configuração simples, conexões confiáveis e ótimo suporte.",
-            "CTA": "Criar Conta Z-API"
-          }
         },
         "API": {
           "ERROR_MESSAGE": "Não foi possível salvar o canal do WhatsApp"
