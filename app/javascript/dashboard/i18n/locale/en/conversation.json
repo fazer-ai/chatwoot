@@ -1,7 +1,7 @@
 {
   "CONVERSATION": {
     "AI_STATUS": {
-      "LABEL": "AI",
+      "LABEL": "ai",
       "TOGGLE_ON_TOOLTIP": "Click to enable AI on this conversation",
       "TOGGLE_OFF_TOOLTIP": "Click to disable AI on this conversation",
       "TOGGLE_ERROR": "Could not toggle AI on this conversation. Please try again."

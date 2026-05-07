@@ -1,7 +1,7 @@
 {
   "CONVERSATION": {
     "AI_STATUS": {
-      "LABEL": "IA",
+      "LABEL": "ia",
       "TOGGLE_ON_TOOLTIP": "Clique para ativar a IA nesta conversa",
       "TOGGLE_OFF_TOOLTIP": "Clique para desativar a IA nesta conversa",
       "TOGGLE_ERROR": "Não foi possível alternar a IA nesta conversa. Tente novamente."
