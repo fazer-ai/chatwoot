@@ -23,9 +23,7 @@ import GreetingsEditor from 'shared/components/GreetingsEditor.vue';
 import ConfigurationPage from './settingsPage/ConfigurationPage.vue';
 import CustomerSatisfactionPage from './settingsPage/CustomerSatisfactionPage.vue';
 import CollaboratorsPage from './settingsPage/CollaboratorsPage.vue';
-import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
-import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -44,7 +42,6 @@ import { copyTextToClipboard } from 'shared/helpers/clipboard';
 
 export default {
   components: {
-    BotConfiguration,
     CollaboratorsPage,
     ConfigurationPage,
     CustomerSatisfactionPage,
@@ -113,9 +110,7 @@ export default {
   },
   computed: {
     ...mapGetters({
-      accountId: 'getCurrentAccountId',
       currentRole: 'getCurrentRole',
-      isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
       uiFlags: 'inboxes/getUIFlags',
       portals: 'portals/allPortals',
     }),
@@ -213,17 +208,6 @@ export default {
         ];
       }
 
-      if (
-        this.isFeatureEnabledonAccount(this.accountId, FEATURE_FLAGS.AGENT_BOTS)
-      ) {
-        visibleToAllChannelTabs = [
-          ...visibleToAllChannelTabs,
-          {
-            key: 'bot-configuration',
-            name: this.$t('INBOX_MGMT.TABS.BOT_CONFIGURATION'),
-          },
-        ];
-      }
       if (this.shouldShowWhatsAppConfiguration) {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
@@ -247,7 +231,7 @@ export default {
       return getInboxIconByType(type, medium, 'line');
     },
     bannerMaxWidth() {
-      const narrowTabs = ['collaborators', 'bot-configuration'];
+      const narrowTabs = ['collaborators'];
       const wideIfWebWidget = ['configuration', 'inbox-settings'];
       if (narrowTabs.includes(this.selectedTabKey)) return 'max-w-4xl';
       if (wideIfWebWidget.includes(this.selectedTabKey)) {
@@ -1274,9 +1258,6 @@ export default {
         </div>
         <div v-if="selectedTabKey === 'business-hours'">
           <WeeklyAvailability :inbox="inbox" />
-        </div>
-        <div v-if="selectedTabKey === 'bot-configuration'">
-          <BotConfiguration :inbox="inbox" />
         </div>
         <div v-if="selectedTabKey === 'whatsapp-health'">
           <AccountHealth
