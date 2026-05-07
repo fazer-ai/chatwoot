@@ -1,8 +1,6 @@
 require 'rails_helper'
 
 RSpec.describe ActionCableBroadcastJob do
-  subject(:job) { described_class.perform_later(members, event_name, data) }
-
   let(:account) { create(:account) }
   let(:conversation) { create(:conversation, account: account) }
   let(:members) { ['agent-token'] }
