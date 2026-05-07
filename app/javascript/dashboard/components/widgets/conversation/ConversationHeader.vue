@@ -99,10 +99,7 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
 <template>
   <div
     ref="conversationHeader"
-    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 py-4"
-    :class="
-      summary ? 'min-h-[7.5rem] xl:min-h-[6.25rem]' : 'min-h-24 xl:min-h-12'
-    "
+    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 py-4 min-h-24 xl:min-h-12"
   >
     <div
       class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-1"
@@ -154,19 +151,24 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
       </div>
     </div>
     <div
-      class="flex flex-row items-start justify-start xl:justify-end flex-shrink-0 gap-2 w-full xl:w-auto header-actions-wrap"
+      class="flex flex-col items-stretch xl:items-end gap-2 flex-shrink-0 w-full xl:w-auto header-actions-wrap"
     >
-      <SLACardLabel
-        v-if="hasSlaPolicyId"
-        :chat="chat"
-        show-extended-info
-        :parent-width="width"
-        class="hidden md:flex"
-      />
+      <div
+        class="flex flex-row items-start justify-start xl:justify-end gap-2 w-full xl:w-auto"
+      >
+        <SLACardLabel
+          v-if="hasSlaPolicyId"
+          :chat="chat"
+          show-extended-info
+          :parent-width="width"
+          class="hidden md:flex"
+        />
+        <MoreActions :conversation-id="currentChat.id" />
+      </div>
       <div
         v-if="summary"
         v-tooltip.bottom="summary"
-        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help"
+        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help self-start xl:self-end"
       >
         <span
           class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
@@ -175,7 +177,6 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
           {{ summary }}
         </p>
       </div>
-      <MoreActions :conversation-id="currentChat.id" />
     </div>
   </div>
 </template>
