@@ -119,7 +119,6 @@ const toggleLossReason = () => {
         <AiStatusBadge
           :conversation-id="conversation.id"
           :ai-enabled="aiEnabled"
-          size="xs"
         />
       </div>
       <span v-if="phoneNumber" class="text-xs text-n-slate-11">

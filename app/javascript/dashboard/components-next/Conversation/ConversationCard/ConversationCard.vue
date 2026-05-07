@@ -107,7 +107,6 @@ const onCardClick = e => {
           <AiStatusBadge
             :conversation-id="conversation.id"
             :ai-enabled="conversation.ai_enabled !== false"
-            size="xs"
           />
           <CardPriorityIcon :priority="conversation.priority || null" />
           <div
