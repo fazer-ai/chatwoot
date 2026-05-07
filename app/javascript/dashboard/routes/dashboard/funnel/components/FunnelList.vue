@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useStoreGetters } from 'dashboard/composables/store';
+import AiStatusBadge from 'dashboard/components-next/Conversation/AiStatusBadge.vue';
 import { formatCurrency } from '../funnelFormatters';
 
 const props = defineProps({
@@ -176,21 +177,10 @@ const goToContact = conversation => {
                     {{ conversation.inbox?.name }}
                   </td>
                   <td class="px-4 py-2">
-                    <span
-                      :class="
-                        conversation.ai_enabled !== false
-                          ? 'bg-n-teal-9 text-white'
-                          : 'bg-n-ruby-9 text-white'
-                      "
-                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-                    >
-                      <span class="size-1.5 rounded-full bg-white" />
-                      {{
-                        conversation.ai_enabled !== false
-                          ? t('FUNNEL.CARD.AI_ON')
-                          : t('FUNNEL.CARD.AI_OFF')
-                      }}
-                    </span>
+                    <AiStatusBadge
+                      :conversation-id="conversation.id"
+                      :ai-enabled="conversation.ai_enabled !== false"
+                    />
                   </td>
                   <td class="px-4 py-2 text-n-slate-12">
                     {{ ticketLabel }}
