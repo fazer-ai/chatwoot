@@ -304,6 +304,12 @@ RSpec.describe Message do
       expect(message.conversation.open?).to be true
     end
 
+    it 'reopens pending conversation when the message is from a contact' do
+      conversation.pending!
+      message.save!
+      expect(message.conversation.open?).to be true
+    end
+
     it 'will not reopen if the conversation is muted' do
       conversation.resolved!
       conversation.mute!
