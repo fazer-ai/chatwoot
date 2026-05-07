@@ -26,6 +26,24 @@ RSpec.describe ActionCableBroadcastJob do
       end
     end
 
+    context 'when the event is a conversation update without event_metadata' do
+      let(:event_name) { 'conversation.updated' }
+      let(:data) { base_data }
+
+      # Regression guard: a missing `event_metadata` must NOT be assigned as `nil`
+      # on the refreshed payload. The frontend uses optional chaining today, but
+      # locking the absence here protects against a future loosening of the
+      # `present?` check on the job side.
+      it 'does not inject a nil event_metadata key' do
+        expect(ActionCable.server).to receive(:broadcast) do |_member, payload|
+          expect(payload[:event]).to eq('conversation.updated')
+          expect(payload[:data]).not_to have_key(:event_metadata)
+          expect(payload[:data][:id]).to eq(conversation.display_id)
+        end
+        described_class.new.perform(members, event_name, data)
+      end
+    end
+
     context 'when the event is not in the refresh list' do
       let(:event_name) { 'message.created' }
       let(:data) { base_data.merge(event_metadata: { source: 'reaction_toggle' }) }
