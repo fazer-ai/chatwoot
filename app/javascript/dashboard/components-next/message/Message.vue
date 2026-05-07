@@ -375,6 +375,8 @@ const componentToRender = computed(() => {
   return TextBubble;
 });
 
+const isAudioBubble = computed(() => componentToRender.value === AudioBubble);
+
 const shouldShowContextMenu = computed(() => {
   return !props.contentAttributes?.isUnsupported;
 });
@@ -782,6 +784,7 @@ provideMessageContext({
             :pending-emojis="pendingEmojis"
             :alignment="orientation === ORIENTATION.RIGHT ? 'right' : 'left'"
             :read-only="!inboxSupportsReactions"
+            :overlap="!isAudioBubble"
             @toggle="handleToggleReaction"
           />
         </div>

@@ -27,6 +27,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  overlap: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(['toggle']);
@@ -100,7 +104,8 @@ onBeforeUnmount(() =>
     theme="naked-popover"
     :placement="alignment === 'right' ? 'top-end' : 'top-start'"
     :distance="4"
-    class="-mt-1 flex flex-wrap items-center gap-1"
+    class="relative flex flex-wrap items-center gap-1"
+    :class="overlap ? '-mt-1' : ''"
     popper-class="[&_.v-popper\_\_arrow-container]:hidden"
     @apply-hide="closePopover"
   >
