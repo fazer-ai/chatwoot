@@ -49,4 +49,23 @@ describe('useAdmin', () => {
     const { isAdmin } = useAdmin();
     expect(isAdmin.value).toBe(false);
   });
+
+  it('returns isManager true only when the current user is a manager', () => {
+    useStoreGetters.mockReturnValue({
+      getCurrentRole: ref('manager'),
+    });
+
+    const { isAdmin, isManager } = useAdmin();
+    expect(isManager.value).toBe(true);
+    expect(isAdmin.value).toBe(false);
+  });
+
+  it('returns isManager false for non-manager roles', () => {
+    useStoreGetters.mockReturnValue({
+      getCurrentRole: ref('agent'),
+    });
+
+    const { isManager } = useAdmin();
+    expect(isManager.value).toBe(false);
+  });
 });

@@ -1,5 +1,5 @@
 <script>
-import { ref, provide, useTemplateRef } from 'vue';
+import { computed, ref, provide, useTemplateRef } from 'vue';
 import { useElementSize } from '@vueuse/core';
 // composable
 import { useLabelSuggestions } from 'dashboard/composables/useLabelSuggestions';
@@ -54,7 +54,10 @@ export default {
   },
   mixins: [inboxMixin],
   setup() {
-    const { isAdmin } = useAdmin();
+    const { isAdmin, isManager } = useAdmin();
+    const canManageInboxConnection = computed(
+      () => isAdmin.value || isManager.value
+    );
     const isPopOutReplyBox = ref(false);
     const conversationPanelRef = ref(null);
     const resizableEditorWrapperRef = ref(null);
@@ -92,6 +95,7 @@ export default {
       containerHeight,
       topBannerHeight,
       isAdmin,
+      canManageInboxConnection,
       isPopOutReplyBox,
     };
   },
@@ -791,7 +795,7 @@ export default {
           color-scheme="alert"
           class="mt-2 mx-2 rounded-lg overflow-hidden"
           :banner-message="
-            isAdmin
+            canManageInboxConnection
               ? $t(
                   'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED'
                 )
@@ -801,15 +805,19 @@ export default {
           "
           has-action-button
           :action-button-label="
-            isAdmin
+            canManageInboxConnection
               ? $t(
                   'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.LINK_DEVICE'
                 )
               : ''
           "
-          :action-button-icon="isAdmin ? '' : 'i-lucide-refresh-cw'"
+          :action-button-icon="
+            canManageInboxConnection ? '' : 'i-lucide-refresh-cw'
+          "
           @primary-action="
-            isAdmin ? onOpenLinkDeviceModal() : onSetupProviderConnection()
+            canManageInboxConnection
+              ? onOpenLinkDeviceModal()
+              : onSetupProviderConnection()
           "
         />
       </template>
