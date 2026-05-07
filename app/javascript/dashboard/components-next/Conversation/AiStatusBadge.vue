@@ -7,11 +7,6 @@ import { useAlert } from 'dashboard/composables';
 const props = defineProps({
   conversationId: { type: Number, required: true },
   aiEnabled: { type: Boolean, default: true },
-  size: {
-    type: String,
-    default: 'sm',
-    validator: value => ['xs', 'sm'].includes(value),
-  },
 });
 
 const { t } = useI18n();
@@ -36,11 +31,8 @@ const toggle = async () => {
 <template>
   <button
     type="button"
-    class="inline-flex items-center gap-1 rounded font-medium flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
-    :class="[
-      aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white',
-      size === 'xs' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5',
-    ]"
+    class="inline-flex items-center gap-1 h-5 px-1.5 py-0.5 rounded-[4px] text-xs font-medium leading-tight flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
+    :class="aiEnabled ? 'bg-n-teal-9 text-white' : 'bg-n-ruby-9 text-white'"
     :disabled="isToggling"
     :title="
       aiEnabled
@@ -49,11 +41,7 @@ const toggle = async () => {
     "
     @click.stop.prevent="toggle"
   >
-    <span class="size-1.5 rounded-full bg-white" />
-    {{
-      aiEnabled
-        ? t('CONVERSATION.AI_STATUS.AI_ON')
-        : t('CONVERSATION.AI_STATUS.AI_OFF')
-    }}
+    <span class="inline-block w-2 h-2 rounded-sm bg-white" />
+    {{ t('CONVERSATION.AI_STATUS.LABEL') }}
   </button>
 </template>

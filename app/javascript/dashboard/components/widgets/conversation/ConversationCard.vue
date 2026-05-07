@@ -373,7 +373,6 @@ const deleteConversation = () => {
         <AiStatusBadge
           :conversation-id="chat.id"
           :ai-enabled="chat.ai_enabled !== false"
-          size="xs"
         />
       </div>
       <VoiceCallStatus

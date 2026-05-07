@@ -146,7 +146,6 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
             v-if="chat?.id"
             :conversation-id="chat.id"
             :ai-enabled="chat.ai_enabled !== false"
-            size="xs"
           />
           <span v-if="isSnoozed" class="font-medium text-n-amber-10">
             {{ snoozedDisplayText }}
