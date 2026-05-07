@@ -256,12 +256,7 @@
         },
         "SELECT_PROVIDER": {
           "TITLE": "Select your API provider",
-          "DESCRIPTION": "Choose your WhatsApp provider. You can connect directly through Meta which requires no setup, or connect through Twilio using your account credentials.",
-          "ZAPI_PROMO": {
-            "TITLE": "Looking for a reliable WhatsApp solution?",
-            "DESCRIPTION": "Z-API offers superior stability compared to Baileys and is much simpler to set up than Cloud or Twilio - no complex configuration required. Perfect for businesses that want to get started quickly.",
-            "CTA": "Use Z-API"
-          }
+          "DESCRIPTION": "Choose your WhatsApp provider. You can connect directly through Meta which requires no setup, or connect through Twilio using your account credentials."
         },
         "INBOX_NAME": {
           "LABEL": "Inbox Name",
@@ -368,13 +363,6 @@
           "SUCCESS_FALLBACK": "WhatsApp Business Account has been successfully configured",
           "MANUAL_FALLBACK": "If your number is already connected to the WhatsApp Business Platform (API), or if you’re a tech provider onboarding your own number, please use the {link} flow",
           "MANUAL_LINK_TEXT": "manual setup flow"
-        },
-        "ZAPI_PROMO": {
-          "SETUP_BANNER": {
-            "TITLE": "Get 10% off your Z-API subscription",
-            "DESCRIPTION": "Create your Z-API account using our affiliate link and receive 10% off. Simple setup, reliable connections, and great support.",
-            "CTA": "Create Z-API Account"
-          }
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to save the WhatsApp channel"
