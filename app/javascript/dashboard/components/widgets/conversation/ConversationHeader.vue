@@ -151,21 +151,10 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
             icon="warning"
           />
         </div>
-        <div
-          v-if="summary"
-          class="flex items-start max-w-full gap-2 px-2 py-1 mt-1.5 rounded-lg bg-n-slate-3 dark:bg-n-solid-3"
-        >
-          <span
-            class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
-          />
-          <p class="m-0 text-[10px] leading-snug text-n-blue-11">
-            {{ summary }}
-          </p>
-        </div>
       </div>
     </div>
     <div
-      class="flex flex-row items-center justify-start xl:justify-end flex-shrink-0 gap-2 w-full xl:w-auto header-actions-wrap"
+      class="flex flex-row items-start justify-start xl:justify-end flex-shrink-0 gap-2 w-full xl:w-auto header-actions-wrap"
     >
       <SLACardLabel
         v-if="hasSlaPolicyId"
@@ -174,6 +163,18 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
         :parent-width="width"
         class="hidden md:flex"
       />
+      <div
+        v-if="summary"
+        v-tooltip.bottom="summary"
+        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help"
+      >
+        <span
+          class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
+        />
+        <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
+          {{ summary }}
+        </p>
+      </div>
       <MoreActions :conversation-id="currentChat.id" />
     </div>
   </div>
