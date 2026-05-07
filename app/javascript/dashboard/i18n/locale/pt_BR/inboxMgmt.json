@@ -256,7 +256,7 @@
         },
         "SELECT_PROVIDER": {
           "TITLE": "Selecione seu provedor de API",
-          "DESCRIPTION": "Escolha seu provedor do WhatsApp. Você pode se conectar diretamente através de metade, que não requer nenhuma configuração ou se conectar pelo Twilio usando as credenciais da sua conta."
+          "DESCRIPTION": "Escolha seu provedor do WhatsApp. Você pode se conectar diretamente através da Meta, que não requer nenhuma configuração, ou se conectar pelo Twilio usando as credenciais da sua conta."
         },
         "INBOX_NAME": {
           "LABEL": "Nome da Caixa de Entrada",
