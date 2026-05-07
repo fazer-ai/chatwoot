@@ -121,8 +121,22 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
         rounded-full
       />
       <div
-        class="flex flex-col items-start gap-0.5 min-w-0 ml-2 overflow-hidden rtl:ml-0 rtl:mr-2"
+        class="flex flex-col items-start gap-0.5 min-w-0 ml-2 overflow-hidden rtl:ml-0 rtl:mr-2 flex-1"
       >
+        <div
+          class="flex items-center gap-2 overflow-hidden text-xs conversation--header--actions text-ellipsis whitespace-nowrap w-full"
+        >
+          <InboxName v-if="hasMultipleInboxes" :inbox="inbox" class="!mx-0" />
+          <span v-if="isSnoozed" class="font-medium text-n-amber-10">
+            {{ snoozedDisplayText }}
+          </span>
+          <AiStatusBadge
+            v-if="chat?.id"
+            :conversation-id="chat.id"
+            :ai-enabled="chat.ai_enabled !== false"
+            class="ltr:ml-auto rtl:mr-auto"
+          />
+        </div>
         <div class="flex flex-row items-center max-w-full gap-1 p-0 m-0">
           <span
             class="text-sm font-medium truncate leading-tight text-n-slate-12"
@@ -136,20 +150,6 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
             class="text-n-amber-10 my-0 mx-0 min-w-[14px] flex-shrink-0"
             icon="warning"
           />
-        </div>
-
-        <div
-          class="flex items-center gap-2 overflow-hidden text-xs conversation--header--actions text-ellipsis whitespace-nowrap"
-        >
-          <InboxName v-if="hasMultipleInboxes" :inbox="inbox" class="!mx-0" />
-          <AiStatusBadge
-            v-if="chat?.id"
-            :conversation-id="chat.id"
-            :ai-enabled="chat.ai_enabled !== false"
-          />
-          <span v-if="isSnoozed" class="font-medium text-n-amber-10">
-            {{ snoozedDisplayText }}
-          </span>
         </div>
         <div
           v-if="summary"
