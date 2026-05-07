@@ -127,12 +127,6 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
           <span v-if="isSnoozed" class="font-medium text-n-amber-10">
             {{ snoozedDisplayText }}
           </span>
-          <AiStatusBadge
-            v-if="chat?.id"
-            :conversation-id="chat.id"
-            :ai-enabled="chat.ai_enabled !== false"
-            class="ltr:ml-auto rtl:mr-auto"
-          />
         </div>
         <div class="flex flex-row items-center max-w-full gap-1 p-0 m-0">
           <span
@@ -151,11 +145,28 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
       </div>
     </div>
     <div
-      class="flex flex-col items-stretch xl:items-end gap-2 flex-shrink-0 w-full xl:w-auto header-actions-wrap"
+      class="flex flex-row items-center justify-start xl:justify-end gap-3 flex-shrink-0 w-full xl:w-auto header-actions-wrap"
     >
-      <div
-        class="flex flex-row items-start justify-start xl:justify-end gap-2 w-full xl:w-auto"
-      >
+      <div class="flex flex-col items-start gap-1 min-w-0">
+        <AiStatusBadge
+          v-if="chat?.id"
+          :conversation-id="chat.id"
+          :ai-enabled="chat.ai_enabled !== false"
+        />
+        <div
+          v-if="summary"
+          v-tooltip.bottom="summary"
+          class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help"
+        >
+          <span
+            class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
+          />
+          <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
+            {{ summary }}
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-row items-center gap-2 flex-shrink-0">
         <SLACardLabel
           v-if="hasSlaPolicyId"
           :chat="chat"
@@ -164,18 +175,6 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
           class="hidden md:flex"
         />
         <MoreActions :conversation-id="currentChat.id" />
-      </div>
-      <div
-        v-if="summary"
-        v-tooltip.bottom="summary"
-        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help self-start xl:self-end"
-      >
-        <span
-          class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
-        />
-        <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
-          {{ summary }}
-        </p>
       </div>
     </div>
   </div>
