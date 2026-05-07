@@ -103,7 +103,7 @@ onBeforeUnmount(() =>
       theme="naked-popover"
       :placement="alignment === 'right' ? 'top-end' : 'top-start'"
       :distance="4"
-      popper-class="naked-popover-popper"
+      popper-class="[&_.v-popper\_\_arrow-container]:hidden"
       @apply-hide="closePopover"
     >
       <button

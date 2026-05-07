@@ -82,7 +82,7 @@ onBeforeUnmount(() => emitter.off(BUS_EVENTS.ON_MESSAGE_LIST_SCROLL, close));
     theme="naked-popover"
     :placement="props.alignment === 'right' ? 'top-end' : 'top-start'"
     :distance="8"
-    popper-class="naked-popover-popper"
+    popper-class="[&_.v-popper\_\_arrow-container]:hidden"
     @apply-hide="close"
   >
     <button
@@ -142,9 +142,3 @@ onBeforeUnmount(() => emitter.off(BUS_EVENTS.ON_MESSAGE_LIST_SCROLL, close));
     </template>
   </Dropdown>
 </template>
-
-<style>
-.naked-popover-popper .v-popper__arrow-container {
-  display: none;
-}
-</style>
