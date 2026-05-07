@@ -148,12 +148,12 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
       <div
         v-if="summary"
         v-tooltip.bottom="summary"
-        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-md cursor-help"
+        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-2xl cursor-help"
       >
         <span
           class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
         />
-        <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-3">
+        <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
           {{ summary }}
         </p>
       </div>
