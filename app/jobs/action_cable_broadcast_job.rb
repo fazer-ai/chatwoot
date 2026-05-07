@@ -27,7 +27,13 @@ class ActionCableBroadcastJob < ApplicationJob
 
     account = Account.find(data[:account_id])
     conversation = account.conversations.find_by!(display_id: data[:id])
-    conversation.push_event_data.merge(account_id: data[:account_id])
+    fresh_data = conversation.push_event_data.merge(account_id: data[:account_id])
+    # The refreshed payload comes from the conversation row; transient per-event
+    # metadata set by the listener (eg. `source: 'reaction_toggle'` so the
+    # frontend skips SCROLL_TO_MESSAGE) lives only on the original `data` hash,
+    # so carry it forward explicitly.
+    fresh_data[:event_metadata] = data[:event_metadata] if data[:event_metadata].present?
+    fresh_data
   end
 
   def broadcast_to_members(members, event_name, broadcast_data)

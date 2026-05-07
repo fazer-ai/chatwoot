@@ -230,6 +230,18 @@ describe ActionCableListener do
       )
       listener.conversation_updated(event)
     end
+
+    it 'merges broadcast_metadata into the payload as event_metadata' do
+      metadata = { source: 'reaction_toggle' }
+      tagged_event = Events::Base.new(event_name, Time.zone.now, conversation: conversation, broadcast_metadata: metadata)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token, admin.pubsub_token, conversation.contact_inbox.pubsub_token],
+        'conversation.updated',
+        conversation.push_event_data.merge(account_id: account.id, event_metadata: metadata)
+      )
+      listener.conversation_updated(tagged_event)
+    end
   end
 
   shared_examples 'scheduled message event broadcast' do |method_name, event_name|
