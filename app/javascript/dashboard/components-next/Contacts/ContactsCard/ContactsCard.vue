@@ -178,7 +178,7 @@ const handleAvatarHover = isHovered => {
                 :color="label.color"
                 variant="smooth"
                 small
-                class="!mb-0 max-w-[calc(100%-0.5rem)]"
+                class="!mb-0"
               />
             </span>
             <span class="inline-flex items-center gap-1">
