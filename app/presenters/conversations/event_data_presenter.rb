@@ -19,6 +19,7 @@ class Conversations::EventDataPresenter < SimpleDelegator
       first_reply_created_at: first_reply_created_at,
       priority: priority,
       summary: summary,
+      ai_enabled: ai_status_enabled?,
       waiting_since: waiting_since.to_i,
       **push_timestamps
     }
