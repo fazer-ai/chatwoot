@@ -15,6 +15,13 @@ json.pubsub_token resource.pubsub_token
 json.custom_attributes resource.custom_attributes if resource.custom_attributes.present?
 json.role resource.active_account_user&.role
 json.ui_settings resource.ui_settings
+json.last_seen_release_tag resource.last_seen_release_tag
+json.unseen_release_tag(
+  begin
+    latest_tag = ::Release::CatalogService.latest&.dig('tag')
+    latest_tag if latest_tag.present? && latest_tag != resource.last_seen_release_tag
+  end
+)
 json.uid resource.uid
 json.type resource.type
 json.accounts do

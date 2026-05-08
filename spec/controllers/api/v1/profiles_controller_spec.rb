@@ -400,4 +400,27 @@ RSpec.describe 'Profile API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/profile/dismiss_release' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    it 'records the tag as the last seen release' do
+      post '/api/v1/profile/dismiss_release',
+           headers: agent.create_new_auth_token,
+           params: { tag: 'v9.9.9-test' },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(agent.reload.last_seen_release_tag).to eq('v9.9.9-test')
+    end
+
+    it 'rejects an empty tag' do
+      post '/api/v1/profile/dismiss_release',
+           headers: agent.create_new_auth_token,
+           params: { tag: '' },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
 end

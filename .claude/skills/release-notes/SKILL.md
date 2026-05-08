@@ -168,3 +168,20 @@ When invoked for a release (new or backfill):
      RELEASE_ID=$(gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.id')
      gh api -X PATCH "repos/<owner>/<repo>/releases/$RELEASE_ID" -F body=@<file>
      ```
+10. **Update the in-app catalog**: after the GitHub release is published (or its body edited), prepend the same content to `config/release_notes.yml` so the in-app **Release notes** page and "what's new" modal pick it up. The product reads only this file at runtime — it never calls GitHub. Format:
+    ```yaml
+    ---
+    - tag: v4.13.0-auris.1.12
+      published_at: '2026-05-08T20:00:00Z'
+      url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.12
+      notes:
+        en: |-
+          ### ⚡ Improvements
+
+          - **...** ...
+        pt_BR: |-
+          ### ⚡ Melhorias
+
+          - **...** ...
+    ```
+    The `en` and `pt_BR` values must contain only the markdown that was inside the `<!-- user-notes:xx:start -->` markers in the release body — strip the markers themselves. Commit `config/release_notes.yml` to `develop` **before** cutting the release tag, so the tagged commit ships with the new entry. Cap the file at the most recent ~20 releases (drop the oldest entry when adding a new one) to keep the menu usable.

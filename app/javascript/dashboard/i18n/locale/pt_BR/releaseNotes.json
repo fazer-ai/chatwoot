@@ -1,0 +1,11 @@
+{
+  "RELEASE_NOTES": {
+    "PAGE_TITLE": "Notas de versão",
+    "PAGE_DESCRIPTION": "O que mudou nas últimas versões.",
+    "EMPTY_STATE": "Nenhuma nota de versão ainda.",
+    "MODAL_TITLE": "O que há de novo",
+    "MODAL_SUBTITLE": "Novidades da versão {tag}",
+    "DISMISS": "Entendi",
+    "SEE_ALL": "Ver versões anteriores"
+  }
+}

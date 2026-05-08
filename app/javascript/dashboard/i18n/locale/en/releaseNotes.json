@@ -1,0 +1,11 @@
+{
+  "RELEASE_NOTES": {
+    "PAGE_TITLE": "Release notes",
+    "PAGE_DESCRIPTION": "What's new across the latest releases.",
+    "EMPTY_STATE": "No release notes yet.",
+    "MODAL_TITLE": "What's new",
+    "MODAL_SUBTITLE": "Highlights from {tag}",
+    "DISMISS": "Got it",
+    "SEE_ALL": "See previous releases"
+  }
+}
