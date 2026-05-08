@@ -99,10 +99,10 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
 <template>
   <div
     ref="conversationHeader"
-    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 py-4 min-h-24 xl:min-h-12"
+    class="flex flex-col gap-3 items-stretch flex-1 w-full min-w-0 xl:flex-row xl:items-center px-3 py-4 min-h-24 xl:min-h-12"
   >
     <div
-      class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-1"
+      class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-shrink-0"
     >
       <BackButton
         v-if="showBackButton"
@@ -144,38 +144,40 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
         </div>
       </div>
     </div>
+    <div class="flex justify-start xl:flex-1 xl:justify-center xl:px-3 min-w-0">
+      <div
+        v-if="summary"
+        v-tooltip="{
+          content: summary,
+          placement: 'bottom',
+          popperClass: 'tooltip-balloon',
+        }"
+        class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-2xl cursor-help"
+      >
+        <span
+          class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
+        />
+        <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
+          {{ summary }}
+        </p>
+      </div>
+    </div>
     <div
-      class="flex flex-row items-center justify-start xl:justify-end gap-3 flex-shrink-0 w-full xl:w-auto header-actions-wrap"
+      class="flex flex-row items-center justify-start xl:justify-end gap-2 flex-shrink-0 w-full xl:w-auto header-actions-wrap"
     >
-      <div class="flex flex-col items-start gap-1 min-w-0">
-        <AiStatusBadge
-          v-if="chat?.id"
-          :conversation-id="chat.id"
-          :ai-enabled="chat.ai_enabled !== false"
-        />
-        <div
-          v-if="summary"
-          v-tooltip.bottom="summary"
-          class="flex items-start gap-2 px-2 py-1 rounded-lg bg-n-slate-3 dark:bg-n-solid-3 max-w-xs cursor-help"
-        >
-          <span
-            class="i-lucide-message-square-quote size-3 mt-0.5 flex-shrink-0 text-n-blue-11"
-          />
-          <p class="m-0 text-[10px] leading-snug text-n-blue-11 line-clamp-2">
-            {{ summary }}
-          </p>
-        </div>
-      </div>
-      <div class="flex flex-row items-center gap-2 flex-shrink-0">
-        <SLACardLabel
-          v-if="hasSlaPolicyId"
-          :chat="chat"
-          show-extended-info
-          :parent-width="width"
-          class="hidden md:flex"
-        />
-        <MoreActions :conversation-id="currentChat.id" />
-      </div>
+      <AiStatusBadge
+        v-if="chat?.id"
+        :conversation-id="chat.id"
+        :ai-enabled="chat.ai_enabled !== false"
+      />
+      <SLACardLabel
+        v-if="hasSlaPolicyId"
+        :chat="chat"
+        show-extended-info
+        :parent-width="width"
+        class="hidden md:flex"
+      />
+      <MoreActions :conversation-id="currentChat.id" />
     </div>
   </div>
 </template>

@@ -36,5 +36,13 @@ echo "Running db:chatwoot_prepare..."
 bundle exec rake db:chatwoot_prepare
 echo "Database preparation complete."
 
+# Sync branding-related InstallationConfig rows from environment variables
+# (INSTALLATION_NAME, LOGO, BRAND_NAME, etc.). The default ConfigLoader only
+# fills in missing rows, so without this step changes to those env vars never
+# reach the database after the first boot.
+echo "Running branding:update..."
+bundle exec rake branding:update
+echo "Branding configuration synced."
+
 # Execute the main process of the container
 exec "$@"

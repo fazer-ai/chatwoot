@@ -7,8 +7,8 @@ class Funnel::DefaultStagesSeederService
     { name: 'Reagendado',      description: 'Consulta reagendada',               position: 3, closed: false, color: '#f59e0b' },
     { name: 'Confirmado',      description: 'Paciente confirmou presença',       position: 4, closed: false, color: '#8DA43F' },
     { name: 'No-Show',         description: 'Não compareceu',                    position: 5, closed: true,  color: '#f97316' },
-    { name: 'Ganho',           description: 'Atendimento encerrado',             position: 5, closed: true,  color: '#086944' },
-    { name: 'Perdido',         description: 'Paciente perdido / desistiu',       position: 5, closed: true,  color: '#dc2626' }
+    { name: 'Perdido',         description: 'Paciente perdido / desistiu',       position: 6, closed: true,  color: '#dc2626' },
+    { name: 'Ganho',           description: 'Atendimento encerrado',             position: 7, closed: true,  color: '#086944' }
   ].freeze
 
   def self.seed_global_stages!

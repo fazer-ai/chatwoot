@@ -9,7 +9,6 @@ import { required } from '@vuelidate/validators';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
-import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
 
 const props = defineProps({
   mode: {
@@ -38,10 +37,6 @@ const token = ref('');
 const clientToken = ref('');
 
 const uiFlags = computed(() => store.getters['inboxes/getUIFlags']);
-
-// NOTE: Affiliate link is left intentionally hardcoded.
-const zapiAffiliateUrl =
-  'https://app.z-api.io/app/auth/new-account?afilliate=3E0B31343E6CB0297B567AC1D8277FBB';
 
 const rules = computed(() => ({
   inboxName: { required },
@@ -122,21 +117,6 @@ const createChannel = async () => {
 
 <template>
   <form class="flex flex-wrap mx-0" @submit.prevent="createChannel()">
-    <div v-if="!isConvertMode" class="w-full mb-6">
-      <PromoBanner
-        :title="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.TITLE')"
-        :description="
-          $t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.DESCRIPTION')
-        "
-        variant="success"
-        logo-src="/assets/images/dashboard/channels/z-api/z-api-dark-green.png"
-        logo-alt="Z-API"
-        :cta-text="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.CTA')"
-        cta-external
-        :cta-link="zapiAffiliateUrl"
-      />
-    </div>
-
     <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
       <label :class="{ error: v$.inboxName.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.LABEL') }}
