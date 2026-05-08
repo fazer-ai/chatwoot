@@ -268,6 +268,7 @@
     "SUPER_ADMIN_CONSOLE": "Console de Super Admin",
     "DOCS": "Ler documentação",
     "CHANGELOG": "Notas de versão",
+    "RELEASE_NOTES": "Notas de versão",
     "LOGOUT": "Encerrar sessão"
   },
   "APP_GLOBAL": {

@@ -1,0 +1,340 @@
+---
+- tag: v4.13.0-auris.1.11
+  published_at: '2026-05-07T18:21:20Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.11
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Consistent AI badge across the product.** The list view in the **Funnel** menu now shows the same compact **ai** badge used in the conversation list, conversation header and funnel cards — green when AI is on, red when off, and clickable to toggle.
+      - **Consistent label style on the Contacts list.** Contact labels now match the smooth small style used on conversation cards, instead of the older solid pill.
+      - **Cleaner navigation menus.** Removed the **Reports → Bots** and **Settings → Bots** sidebar entries, plus the **Bot Configuration** tab inside an inbox's settings, since we don't use the legacy bot system. Other menus and tabs are unchanged.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Badge da IA consistente em todo o produto.** A visualização de lista do menu **Funil** agora mostra o mesmo badge compacto **ia** usado na lista de conversas, no cabeçalho da conversa e nos cartões do funil — verde quando ligada, vermelho quando desligada, clicável pra alternar.
+      - **Etiquetas dos contatos com o mesmo estilo das conversas.** As etiquetas em **Contatos** passaram para o mesmo estilo suave e pequeno usado nos cartões de conversa, em vez da pílula sólida antiga.
+      - **Menus de navegação mais limpos.** Removidos os itens **Relatórios → Robôs** e **Configurações → Robôs** do sidebar, junto com a aba **Configuração do Bot** dentro das configurações de uma caixa de entrada — não usamos o sistema legado de bots. Os demais menus e abas continuam iguais.
+- tag: v4.13.0-auris.1.10
+  published_at: '2026-05-07T02:50:23Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.10
+  notes:
+    en: "### ✨ What's new\n\n- **AI on/off per conversation.** A new **ai** badge
+      shows up on every conversation card, on the conversation header and on the funnel
+      card. Click it to turn AI on or off for that specific conversation — green means
+      on, red means off. Useful when you want to take a single conversation off the
+      AI flow without disabling it for the whole account.\n- **WhatsApp emoji reactions.**
+      React to messages with emojis right from the agent panel, and see reactions
+      sent by contacts on their messages.\n- **Enable WhatsApp Campaigns yourself.**
+      Administrators can now turn the **Campaigns → WhatsApp** menu on directly from
+      the WhatsApp Cloud inbox settings, without asking support to flip a flag.\n\n###
+      ⚡ Improvements\n\n- **Pending conversations come back to the queue when the
+      customer replies.** When a conversation was set to *Pending* and the customer
+      sent a new message, the conversation used to stay invisible in pending — operators
+      missed leads and SLAs slipped. Now any incoming reply automatically reopens
+      the conversation to *Open* and notifies the assigned agent.\n- **Cleaner conversation
+      header.** The summary chip now sits right below the **ai** badge in the action
+      area, no longer squeezed between buttons. The header keeps the same height with
+      or without a summary, the contact name and inbox name are on their own rows,
+      and contact labels in the **Contacts** list now match the smooth small style
+      used in conversations.\n- **New-conversation modal works on narrow screens.**
+      The \"New conversation\" modal no longer overflows on small viewports.\n- **Internal
+      notes show up in the conversation preview.** When the most recent activity in
+      a conversation is a private note, the preview line in the conversation list
+      now reflects that note.\n\n### \U0001F41B Fixes\n\n- **Managers can now reconnect
+      WhatsApp.** When a WhatsApp inbox dropped, the *Connect device* button on the
+      disconnection banner only showed for administrators — managers saw the warning
+      with no way to act on it. The button is now available to managers as well, with
+      the same flow as administrators.\n- **No more \"undefined\" as email subject.**
+      New email/WhatsApp conversations without a subject no longer write the literal
+      text \"undefined\" as the subject. Existing conversations carrying that bad
+      value are cleaned up automatically."
+    pt_BR: "### ✨ Novidades\n\n- **IA ligada/desligada por conversa.** Um novo badge
+      **ia** aparece em todo cartão de conversa, no cabeçalho da conversa e no cartão
+      do funil. Clica para ligar ou desligar a IA naquela conversa específica — verde
+      é ligada, vermelho é desligada. Útil quando você quer tirar uma conversa do
+      fluxo de IA sem desligar a IA da conta inteira.\n- **Reações com emoji no WhatsApp.**
+      Reagir a mensagens com emojis direto do painel do agente, e ver as reações que
+      o contato envia nas mensagens dele.\n- **Habilitar Campanhas de WhatsApp sem
+      precisar de suporte.** Administrador agora liga o menu **Campanhas → WhatsApp**
+      direto na configuração da caixa do WhatsApp Cloud, sem precisar pedir pra suporte
+      ativar a flag.\n\n### ⚡ Melhorias\n\n- **Conversas pendentes voltam pra fila
+      quando o cliente responde.** Quando uma conversa estava em *Pendente* e o cliente
+      mandava uma nova mensagem, ela ficava parada lá — leads sumiam e SLA queimava
+      sem ninguém ver. Agora qualquer resposta do cliente reabre a conversa automaticamente
+      para *Aberta* e notifica o agente atribuído.\n- **Cabeçalho da conversa mais
+      limpo.** O resumo aparece logo abaixo do badge **ia** na área de ações, em vez
+      de ficar espremido entre os botões. O cabeçalho fica do mesmo tamanho com ou
+      sem resumo, o nome do contato e o nome da caixa ficam em linhas próprias, e
+      as etiquetas em **Contatos** agora seguem o mesmo estilo suave e pequeno usado
+      nas conversas.\n- **Modal de nova conversa funciona em telas estreitas.** O
+      modal \"Nova conversa\" não estoura mais em viewports pequenas.\n- **Notas internas
+      aparecem no preview da conversa.** Quando a última atividade da conversa é uma
+      nota privada, a prévia na lista de conversas passa a refletir essa nota.\n\n###
+      \U0001F41B Correções\n\n- **Manager consegue reconectar o WhatsApp.** Quando
+      uma caixa do WhatsApp caía, o botão *Conectar dispositivo* no aviso de desconexão
+      só aparecia para administradores — o manager via o aviso sem poder fazer nada.
+      Agora o botão também aparece para o manager, com o mesmo fluxo do administrador.\n-
+      **Sem mais \"undefined\" no assunto.** Conversas novas de e-mail/WhatsApp sem
+      assunto não escrevem mais a string literal \"undefined\" como assunto. Conversas
+      antigas com esse valor foram limpas automaticamente."
+- tag: v4.13.0-auris.1.9
+  published_at: '2026-05-06T11:20:52Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.9
+  notes:
+    en: "### \U0001F41B Fixes\n\n- **Campaign dispatch no longer hijacks the agent
+      queue.** WhatsApp campaign messages were forcing every conversation to **Open**
+      on dispatch — campaign traffic was mixing with live conversations the agent
+      was already handling. The status of existing conversations is now preserved
+      (open stays open, pending stays pending, snoozed stays snoozed). Resolved conversations
+      come back as **Pending** instead of jumping to Open, and brand-new conversations
+      are also created as **Pending**."
+    pt_BR: "### \U0001F41B Correções\n\n- **Disparo de campanha não atropela mais
+      a fila do agente.** Mensagens de campanha no WhatsApp estavam forçando toda
+      conversa para **Aberta** no disparo — o tráfego de campanha se misturava com
+      as conversas vivas que o agente já estava atendendo. Agora o status existente
+      é preservado (aberta continua aberta, pendente continua pendente, adiada continua
+      adiada). Conversas resolvidas voltam como **Pendente** em vez de pular pra Aberta,
+      e conversas novas também entram como **Pendente**."
+- tag: v4.13.0-auris.1.8
+  published_at: '2026-05-05T22:22:55Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.8
+  notes:
+    en: "### ⚡ Improvements\n\n- **Super admin accounts grid.** The accounts list
+      on `/super_admin/accounts` now shows **Average ticket** and **Funnel menu enabled**
+      directly as columns, no need to open each account.\n\n### \U0001F41B Fixes\n\n-
+      **Baileys WhatsApp pairing.** The **Conectar dispositivo** modal no longer gets
+      stuck on **Conectando...** and stops flickering between the QR code and the
+      spinner on customers in reconnect loops. The QR stays visible until the connection
+      actually leaves the connecting state."
+    pt_BR: "### ⚡ Melhorias\n\n- **Grid de contas no super admin.** A lista de contas
+      em `/super_admin/accounts` agora mostra **Ticket médio** e **Menu Funil ativo**
+      direto nas colunas, sem precisar abrir cada conta.\n\n### \U0001F41B Correções\n\n-
+      **Pareamento WhatsApp Baileys.** O modal **Conectar dispositivo** parou de travar
+      em **Conectando...** e parou de piscar entre o QR code e o spinner em clientes
+      em loop de reconexão. O QR fica visível até a conexão realmente sair do estado
+      de connecting."
+- tag: v4.13.0-auris.1.7
+  published_at: '2026-05-05T19:54:07Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.7
+  notes:
+    en: "### ✨ What's new\n\n- **Two-factor authentication for super admins.** Super
+      admins can now turn on TOTP 2FA from `/super_admin/profile/mfa`. Once enabled,
+      the super admin sign-in flow asks for a 6-digit code (or a backup code) before
+      granting access. Backup codes can be regenerated and 2FA can be disabled at
+      any time.\n- **Sidebar collapse toggle.** A new icon next to the account name
+      collapses the sidebar with one click; the same icon expands it back when collapsed.
+      Also bound to the macOS-style **⌘\\\\** shortcut.\n- **Per-account Funnel toggle.**
+      From `/super_admin/accounts/:id/edit`, super admins can enable or disable the
+      **Funil** menu per customer. The flag is **off by default**; flip it on for
+      the customers that should see the funnel.\n\n### ⚡ Improvements\n\n- **Funnel
+      polish.** Slightly smaller contact name on cards, channel icon next to the inbox
+      name, tighter column width, and the ticket value falls back to `R$ 0,00` instead
+      of disappearing when no average ticket is set on the account. The list view
+      replaces the `#ID` column with **Valor** (ticket value) and **Tempo desde abertura**
+      (time open).\n\n### \U0001F41B Fixes\n\n- **Swagger UI on hosted environments.**
+      `/swagger` returned 404 outside development; now it renders whenever `ENABLE_SWAGGER_DOCS=true`
+      is set in the environment. ReDoc no longer breaks with `Invalid reference token:
+      loss_reason`.\n- **Super admin home page.** Loading `/super_admin` returned
+      a 500 right after the 2FA work shipped because the new MFA controllers were
+      being auto-detected as sidebar entries. Skipped from the auto-generated nav."
+    pt_BR: "### ✨ Novidades\n\n- **Autenticação em dois fatores para super admins.**
+      Super admins agora ativam o 2FA via TOTP em `/super_admin/profile/mfa`. Com
+      o 2FA ligado, o login do super admin pede um código de 6 dígitos (ou um backup
+      code) antes de liberar o acesso. Os backup codes podem ser regerados a qualquer
+      momento e o 2FA pode ser desativado.\n- **Botão de recolher a barra lateral.**
+      Um ícone novo ao lado do nome da conta recolhe a sidebar com um clique; o mesmo
+      ícone expande ela de volta quando recolhida. Também atalhado em **⌘\\\\** no
+      macOS.\n- **Funil habilitável por conta.** Em `/super_admin/accounts/:id/edit`,
+      super admins agora ligam ou desligam o menu **Funil** por cliente. A flag vem
+      **desligada por padrão**; super admin liga só para os clientes que vão usar
+      o funil.\n\n### ⚡ Melhorias\n\n- **Polimento do funil.** Fonte do nome do contato
+      um pouco menor no card, ícone do canal ao lado do nome da caixa de entrada,
+      raia da coluna mais estreita, e o valor do ticket cai para `R$ 0,00` quando
+      a conta não tem ticket médio configurado, em vez de sumir. A visão Lista trocou
+      a coluna `#ID` por **Valor** (ticket) e **Tempo desde abertura**.\n\n### \U0001F41B
+      Correções\n\n- **Swagger UI em ambientes hospedados.** O `/swagger` retornava
+      404 fora de desenvolvimento; agora abre sempre que `ENABLE_SWAGGER_DOCS=true`
+      está setado no ambiente. O ReDoc também parou de quebrar com `Invalid reference
+      token: loss_reason`.\n- **Página inicial do super admin.** Carregar `/super_admin`
+      quebrava com erro 500 logo após o ship do 2FA porque os controllers novos de
+      MFA estavam sendo auto-detectados na navegação lateral. Removidos da nav auto-gerada."
+- tag: v4.13.0-auris.1.6
+  published_at: '2026-05-04T22:43:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.6
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Friendlier funnel stages.** Stages now have human-friendly names (Novo Contato, Em Qualificação, Em Agendamento, Agendado, Reagendado, Confirmado, No-Show, Ganho, Perdido), each with its own color, replacing the old technical labels.
+      - **Per-account average ticket.** Set an average ticket value in super admin; every funnel card displays the value and each column shows the stage total, all formatted using the account's region.
+      - **Drag without reload.** Moving a conversation between stages updates instantly — no full refresh and no success toast.
+      - **Required loss reason.** Moving a conversation to **Perdido** prompts you to pick a loss reason (Achou caro, Busca convênio, Parou de responder, ...). Reasons stay in the audit history and can be managed through the API.
+      - **Contact avatar on cards.** Each card shows the contact picture next to the name with the AI badge on the same line, making the card more compact.
+      - **Loss reason inline on the card.** Cards in **Perdido** have a red button that reveals the loss reason recorded on the latest move, mirroring the summary toggle.
+      - **New funnel_updated webhook event.** Subscribe to it on the webhook form to plug funnel moves into external systems.
+      - **Pause Baileys WhatsApp auto-reconnection.** Administrators can now cancel and resume auto-reconnection for each Baileys WhatsApp inbox directly on the inbox configuration page, avoiding storms of reconnection attempts when many numbers are disconnected.
+
+      ### ⚡ Improvements
+
+      - **More useful funnel list view.** The #ID column is gone; **Valor** (ticket value) and **Tempo desde abertura** (time open) are in.
+      - **Stage description tooltip.** The column description now appears as a tooltip over the stage name instead of taking a permanent line on the header.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Funil mais claro.** As fases agora têm nomes amigáveis (Novo Contato, Em Qualificação, Em Agendamento, Agendado, Reagendado, Confirmado, No-Show, Ganho, Perdido), cada uma com sua cor, no lugar dos antigos rótulos técnicos.
+      - **Ticket médio por conta.** Defina o valor médio de ticket no super admin; cada card do funil exibe o valor e cada coluna mostra o total da fase, tudo formatado pela região da conta.
+      - **Arraste sem recarregar.** Mover uma conversa entre fases atualiza na hora — sem reload e sem mensagem de confirmação.
+      - **Motivo da perda obrigatório.** Ao mover uma conversa para **Perdido**, o sistema pede um motivo (Achou caro, Busca convênio, Parou de responder, ...). Os motivos ficam no histórico e podem ser gerenciados pela API.
+      - **Avatar do contato no card.** Cada card mostra a foto do contato ao lado do nome, com o badge da IA na mesma linha — card mais compacto.
+      - **Motivo da perda direto no card.** Cards na fase **Perdido** têm um botão vermelho que revela inline o motivo registrado na última movimentação, no mesmo padrão do resumo da conversa.
+      - **Novo evento de webhook funnel_updated.** Marque a opção no formulário de webhooks para integrar as movimentações do funil com sistemas externos.
+      - **Pausar reconexão do WhatsApp Baileys.** Administradores agora podem cancelar e reativar a reconexão automática de cada caixa WhatsApp Baileys direto na tela de configuração da inbox, evitando picos de tentativas quando muitos números estão desconectados.
+
+      ### ⚡ Melhorias
+
+      - **Visualização em Lista do funil mais útil.** A coluna #ID saiu; entraram **Valor** (ticket) e **Tempo desde abertura**.
+      - **Tooltip da descrição.** A descrição da fase aparece em tooltip sobre o nome da coluna em vez de ocupar uma linha fixa no cabeçalho.
+- tag: v4.13.0-auris.1.5
+  published_at: '2026-05-03T22:38:51Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.5
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **New Funil menu.** A kanban-style view of conversations grouped by funnel stage, mapped to the existing labels (`kb-novo`, `kb-triagem`, `kb-em_agendamento`, …). Available to administrators, managers and agents.
+      - **Two views per page.** Switch between **Quadro** (kanban board) and **Lista** (collapsible grouped table) at the top of the page. The board comes with drag-and-drop between columns; each move re-tags the conversation with the matching label and records the change for audit.
+      - **Quick actions on every card and row.** Open the conversation summary, jump straight to the conversation, or open the contact — same three shortcuts on Quadro cards and Lista rows.
+      - **Filters.** Narrow the funnel by inbox, lead-entry date range, or hide closed stages with a single checkbox.
+      - **Hover the column title.** A small tip shows which label backs the stage (e.g. "Etiqueta kb-confirmado") so it's clear which tag will be applied when a conversation lands there.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Novo menu Funil.** Visão estilo kanban das conversas agrupadas por fase do funil, atreladas às etiquetas existentes (`kb-novo`, `kb-triagem`, `kb-em_agendamento`, …). Disponível para administradores, gerentes e agentes.
+      - **Duas visualizações na mesma tela.** Alterne entre **Quadro** (board kanban) e **Lista** (tabela agrupada e colapsável) no topo da página. O quadro tem arrastar-e-soltar entre as colunas; cada movimentação re-atribui a etiqueta correspondente e registra a mudança no histórico.
+      - **Ações rápidas em cada card e linha.** Abrir o resumo da conversa, ir direto pra conversa, ou abrir o contato — os mesmos três atalhos no card do Quadro e na linha da Lista.
+      - **Filtros.** Filtre o funil por caixa de entrada, intervalo de entrada do lead, ou oculte fases finalizadas com um clique.
+      - **Hover no título da coluna.** Um tooltip mostra qual etiqueta sustenta a fase (ex.: "Etiqueta kb-confirmado") — fica claro qual marcação será aplicada quando uma conversa entrar lá.
+- tag: v4.13.0-auris.1.4
+  published_at: '2026-05-01T23:37:55Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.4
+  notes:
+    en: "### ✨ What's new\n\n- **Contact labels show up directly on the contacts list.**
+      Each contact now shows their assigned labels as colored pills next to the name,
+      so triaging by tag doesn't require expanding every row.\n- **Unassign labels
+      in bulk.** A new \"Desatribuir rótulo\" button on the contacts list lets you
+      remove labels from many contacts at once, mirroring the existing \"Atribuir
+      rótulo\" action.\n- **Campaign cards show the template and audience.** WhatsApp
+      campaign cards now display the chosen template name and the audience labels
+      as colored pills, making it easier to scan campaigns at a glance.\n\n### ⚡ Improvements\n\n-
+      **Managers can now run campaigns.** Users with the manager role have access
+      to the Campaigns menu (Live Chat, SMS, WhatsApp) and the full campaign lifecycle
+      — create, edit, follow status, delete.\n\n### \U0001F41B Fixes\n\n- **Campaigns
+      no longer create duplicate conversations.** When a contact already has an active
+      conversation in the inbox, the campaign message lands in that thread instead
+      of opening a new pending conversation alongside. Resolved conversations are
+      reopened (as pending). Snoozed and pending threads stay untouched."
+    pt_BR: "### ✨ Novidades\n\n- **Etiquetas dos contatos aparecem direto na lista.**
+      Cada contato agora exibe as etiquetas atribuídas como pills coloridas ao lado
+      do nome, então pra triar por etiqueta você não precisa expandir cada linha.\n-
+      **Desatribuir rótulos em massa.** Novo botão \"Desatribuir rótulo\" na lista
+      de contatos permite remover etiquetas de vários contatos de uma vez, espelhando
+      o \"Atribuir rótulo\" que já existia.\n- **Cards de campanha mostram o template
+      e o público.** Cada cartão de campanha do WhatsApp passa a exibir o nome do
+      template escolhido e as etiquetas do público como pills coloridas, facilitando
+      olhar a lista em um relance.\n\n### ⚡ Melhorias\n\n- **Gerentes podem operar
+      campanhas.** Usuários com perfil de gerente passam a acessar o menu Campanhas
+      (Chat ao vivo, SMS, WhatsApp) e o ciclo completo da campanha — criar, editar,
+      acompanhar status e excluir.\n\n### \U0001F41B Correções\n\n- **Campanhas deixam
+      de criar conversas duplicadas.** Quando o contato já tem uma conversa ativa
+      na caixa, a mensagem da campanha entra nessa thread em vez de abrir uma nova
+      conversa pendente em paralelo. Conversas resolvidas são reabertas (como pendentes).
+      Já as adiadas e as pendentes são preservadas."
+- tag: v4.13.0-auris.1.3
+  published_at: '2026-05-01T03:02:06Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.3
+  notes:
+    en: "### ✨ What's new\n\n- **WhatsApp campaign messages now show up in the conversations
+      view.** Templates sent through the WhatsApp campaigns menu create a conversation
+      and a message in the dashboard, so agents can see exactly what was sent — instead
+      of finding out only when the contact replies.\n- **Pick how many contacts to
+      show per page.** The contacts list now lets you choose 15, 50, or 100 contacts
+      per page. Your choice is remembered between sessions.\n\n### ⚡ Improvements\n\n-
+      **Switching an inbox's WhatsApp provider is administrator-only.** This operation
+      drops session state and can break message delivery for the entire inbox, so
+      it's restricted to administrators. The \"Converter\" button on the inbox settings
+      page is now hidden for managers.\n\n### \U0001F41B Fixes\n\n- **Managers can
+      reply on any conversation again.** Managers could not send messages on conversations
+      in inboxes they were not a member of — the bubble turned red and the message
+      never reached the contact. Fixed."
+    pt_BR: "### ✨ Novidades\n\n- **Mensagens de campanha do WhatsApp aparecem na tela
+      de conversas.** Templates enviados pelo menu de campanhas do WhatsApp agora
+      criam uma conversa e uma mensagem no dashboard, então o agente vê exatamente
+      o que foi enviado — sem precisar esperar o contato responder pra ver o histórico.\n-
+      **Escolha quantos contatos exibir por página.** A lista de contatos passa a
+      permitir 15, 50 ou 100 itens por página. A escolha fica memorizada entre sessões.\n\n###
+      ⚡ Melhorias\n\n- **Trocar provedor de WhatsApp da caixa de entrada agora é exclusivo
+      do administrador.** A operação derruba a sessão e pode quebrar o envio de mensagens
+      da caixa toda, então fica restrita ao perfil de administrador. O botão \"Converter\"
+      na tela de configurações da caixa fica oculto pro perfil de gerente.\n\n###
+      \U0001F41B Correções\n\n- **Gerentes voltam a conseguir responder em qualquer
+      conversa.** Usuários com perfil de gerente não conseguiam enviar mensagens em
+      conversas de caixas das quais não eram membros — a bolha ficava vermelha e a
+      mensagem não chegava ao contato. Corrigido."
+- tag: v4.13.0-auris.1.2
+  published_at: '2026-04-30T17:11:53Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.2
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Managers can now manage labels.** Users with the manager role can open the Labels screen and create, edit, and delete labels on their own. Labels named `agente-off` and any label starting with `kb-` stay protected — only administrators can change or remove those.
+      - **Conversation summary at the top of the chat.** Every conversation can show a short summary in the header, helping agents grasp the context at a glance. The text is populated via API, so AI assistants and automations can keep it up to date.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Gerentes agora gerenciam etiquetas.** Usuários com o perfil de gerente acessam a tela de Etiquetas e criam, editam e excluem livremente, sem depender do administrador. Etiquetas chamadas `agente-off` e qualquer etiqueta com prefixo `kb-` continuam protegidas — só o administrador consegue alterá-las ou removê-las.
+      - **Resumo da conversa no topo do chat.** Cada conversa pode exibir um resumo curto no cabeçalho, ajudando o agente a captar o contexto rapidamente. O texto é preenchido via API, permitindo que assistentes de IA e automações mantenham o resumo atualizado.
+- tag: v4.13.0-auris.1.1
+  published_at: '2026-04-29T20:20:55Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.1
+  notes:
+    en: "> Includes changes from Chatwoot fazer.ai v4.13.0-fazer-ai.61.\n\n### ⚡ Improvements\n\n-
+      **Cleaner login screen.** The login title no longer mentions \"Chatwoot\", keeping
+      the screen neutral on white-labeled installs.\n\n### \U0001F41B Fixes\n\n- **Manager
+      role now works across conversations and WhatsApp.** Managers can see every conversation
+      in the \"All\" tab, receive the QR code to reconnect Baileys channels, and the
+      \"Disconnect\" button works correctly."
+    pt_BR: "> Inclui mudanças do Chatwoot fazer.ai v4.13.0-fazer-ai.61.\n\n### ⚡ Melhorias\n\n-
+      **Tela de login mais limpa.** O título da página de login não menciona mais
+      o nome \"Chatwoot\", deixando a tela neutra em instalações personalizadas.\n\n###
+      \U0001F41B Correções\n\n- **Perfil \"Gerente\" agora funciona em conversas e
+      WhatsApp.** Gerentes voltam a ver todas as conversas na aba \"Todos\", recebem
+      o QR code para reconectar canais Baileys, e o botão \"Desconectar\" funciona
+      corretamente."
+- tag: v4.13.0-auris.1
+  published_at: '2026-04-29T02:35:31Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1
+  notes:
+    en: |-
+      > Includes changes from Chatwoot fazer.ai v4.13.0-fazer-ai.61.
+
+      ### ✨ What's new
+
+      - **New "Manager" role.** A new role between agent and administrator: managers see all reports and can configure existing inboxes (including reconnecting WhatsApp Baileys via QR code), on top of everything an agent does. They cannot create or delete inboxes — those actions remain restricted to administrators.
+
+      ### ⚡ Improvements
+
+      - **auris.ia.br branding.** New logos and the auris.ia.br brand replace the previous fazer.ai branding across the product (login footer, build info, help links, in-app references).
+      - **Kanban and Captain menus hidden.** These items were removed from the sidebar.
+    pt_BR: |-
+      > Inclui mudanças do Chatwoot fazer.ai v4.13.0-fazer-ai.61.
+
+      ### ✨ Novidades
+
+      - **Novo perfil "Gerente".** Um perfil intermediário entre agente e administrador: gerentes têm acesso a todos os relatórios e podem configurar caixas de entrada existentes (incluindo reconectar canais WhatsApp Baileys via QR code), além de tudo que um agente faz. Não conseguem criar nem excluir caixas — essas ações continuam restritas a administradores.
+
+      ### ⚡ Melhorias
+
+      - **Identidade visual auris.ia.br.** Novos logos e a marca auris.ia.br substituem a marca fazer.ai em todo o produto (rodapé do login, informações de build, links de ajuda, referências internas).
+      - **Menus Kanban e Captain ocultados.** Esses itens foram removidos do menu lateral.

@@ -43,6 +43,7 @@ import notifications from './modules/notifications';
 import portals from './modules/helpCenterPortals';
 import reports from './modules/reports';
 import recurringScheduledMessages from './modules/recurringScheduledMessages';
+import releases from './modules/releases';
 import scheduledMessages from './modules/scheduledMessages';
 import sla from './modules/sla';
 import slaReports from './modules/SLAReports';
@@ -111,6 +112,7 @@ export default createStore({
     portals,
     reports,
     recurringScheduledMessages,
+    releases,
     scheduledMessages,
     sla,
     slaReports,

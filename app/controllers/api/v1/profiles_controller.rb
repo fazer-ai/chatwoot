@@ -47,6 +47,14 @@ class Api::V1::ProfilesController < Api::BaseController
     @user.reload
   end
 
+  def dismiss_release
+    tag = params[:tag].to_s
+    return render_could_not_create_error('Missing release tag') if tag.blank?
+
+    @user.update!(last_seen_release_tag: tag)
+    head :ok
+  end
+
   private
 
   def set_user

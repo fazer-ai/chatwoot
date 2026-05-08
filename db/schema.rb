@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_06_130000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_08_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1577,6 +1577,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_06_130000) do
     t.integer "consumed_timestep"
     t.boolean "otp_required_for_login", default: false, null: false
     t.text "otp_backup_codes"
+    t.string "last_seen_release_tag"
     t.index "f_unaccent((name)::text) gin_trgm_ops", name: "idx_users_name_unaccent_trgm", using: :gin
     t.index ["email"], name: "index_users_on_email"
     t.index ["otp_required_for_login"], name: "index_users_on_otp_required_for_login"

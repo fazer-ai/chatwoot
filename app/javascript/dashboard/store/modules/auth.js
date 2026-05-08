@@ -78,6 +78,9 @@ export const getters = {
   getCurrentUser($state) {
     return $state.currentUser;
   },
+  getUnseenReleaseTag($state) {
+    return $state.currentUser?.unseen_release_tag || null;
+  },
 
   getMessageSignature($state) {
     const { message_signature: messageSignature } = $state.currentUser;
@@ -287,6 +290,14 @@ export const mutations = {
 
   [types.SET_CURRENT_USER_UI_FLAGS](_state, { isFetching }) {
     _state.uiFlags = { isFetching };
+  },
+
+  [types.SET_CURRENT_USER_LAST_SEEN_RELEASE](_state, tag) {
+    _state.currentUser = {
+      ..._state.currentUser,
+      last_seen_release_tag: tag,
+      unseen_release_tag: null,
+    };
   },
 };
 

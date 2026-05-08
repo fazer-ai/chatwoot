@@ -92,12 +92,10 @@ const menuItems = computed(() => {
     },
     {
       show: true,
-      showOnCustomBrandedInstance: false,
-      label: t('SIDEBAR_ITEMS.CHANGELOG'),
+      showOnCustomBrandedInstance: true,
+      label: t('SIDEBAR_ITEMS.RELEASE_NOTES'),
       icon: 'i-lucide-scroll-text',
-      link: 'https://auris.ia.br/chatwoot-release-notes',
-      nativeLink: true,
-      target: '_blank',
+      link: { name: 'release_notes_index' },
     },
     {
       show: currentUser.value.type === 'SuperAdmin',

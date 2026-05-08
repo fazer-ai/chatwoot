@@ -31,6 +31,7 @@ import kanban from './kanban.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
+import releaseNotes from './releaseNotes.json';
 import report from './report.json';
 import resetPassword from './resetPassword.json';
 import search from './search.json';
@@ -79,6 +80,7 @@ export default {
   ...labelsMgmt,
   ...login,
   ...macros,
+  ...releaseNotes,
   ...report,
   ...resetPassword,
   ...search,
