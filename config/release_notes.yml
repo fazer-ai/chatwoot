@@ -1,4 +1,30 @@
 ---
+- tag: v4.13.0-auris.1.12
+  published_at: '2026-05-08T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.12
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **In-app release notes.** A new "What's new" modal pops up the first time you open the dashboard after a release lands, with the changes shown in your interface language. The full history is available under your profile menu → Release notes.
+
+      ### ⚡ Improvements
+
+      - **Funnel stages now end with Perdido → Ganho.** Reordered the closing lanes so a lost lead sits before a won one — matching the standard CRM convention where a loss can still come back as a win later.
+      - **Cleaner conversation header.** Contact and inbox name stay on the left, the summary chip is centered in the middle, and the AI badge plus the Resolver/Adiar/Pendente combo are aligned to the right. The summary tooltip on hover is now a compact balloon instead of stretching across the screen.
+      - **Contact labels show their full text.** Long labels on the Contacts list are no longer truncated with "...".
+      - **Cleaner WhatsApp inbox creation.** Removed the two green Z-API promotional banners from the WhatsApp inbox setup flow.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Notas de versão dentro do sistema.** Um modal "O que há de novo" aparece na primeira vez que você abre o painel após uma nova versão, no idioma da interface. O histórico completo fica disponível no menu do seu perfil → Notas de versão.
+
+      ### ⚡ Melhorias
+
+      - **Funil agora termina em Perdido → Ganho.** As raias finais foram reordenadas — um lead perdido vem antes do ganho, seguindo o padrão de CRM onde uma perda ainda pode virar ganho depois.
+      - **Cabeçalho da conversa mais limpo.** Nome do contato e da caixa à esquerda, resumo da conversa centralizado no meio, e badge da IA junto com Resolver/Adiar/Pendente alinhados à direita. Ao passar o mouse no resumo, agora aparece um balão compacto em vez de uma faixa que pegava a tela inteira.
+      - **Etiquetas dos contatos aparecem por inteiro.** Etiquetas longas em Contatos não são mais cortadas com "...".
+      - **Criação de inbox WhatsApp mais limpa.** Removidos os dois banners verdes promocionais do Z-API na tela de configuração da caixa do WhatsApp.
 - tag: v4.13.0-auris.1.11
   published_at: '2026-05-07T18:21:20Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.11
