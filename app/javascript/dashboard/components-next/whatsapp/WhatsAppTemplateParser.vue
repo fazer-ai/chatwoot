@@ -14,6 +14,7 @@ import { requiredIf } from '@vuelidate/validators';
 import { useI18n } from 'vue-i18n';
 
 import Input from 'dashboard/components-next/input/Input.vue';
+import LiquidVariableInput from 'dashboard/components-next/whatsapp/LiquidVariableInput.vue';
 import {
   buildTemplateParameters,
   allKeysRequired,
@@ -269,10 +270,9 @@ defineExpose({
           :key="`body-${key}`"
           class="flex items-center mb-2.5"
         >
-          <Input
+          <LiquidVariableInput
             v-model="processedParams.body[key]"
             type="text"
-            class="flex-1"
             :placeholder="
               t('WHATSAPP_TEMPLATES.PARSER.VARIABLE_PLACEHOLDER', {
                 variable: key,

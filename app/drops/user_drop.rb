@@ -7,6 +7,10 @@ class UserDrop < BaseDrop
     @obj.try(:available_name)
   end
 
+  def email
+    @obj.try(:email)
+  end
+
   def first_name
     @obj.try(:name).try(:split).try(:first).try(:capitalize) if @obj.try(:name).try(:split).try(:size) > 1
   end

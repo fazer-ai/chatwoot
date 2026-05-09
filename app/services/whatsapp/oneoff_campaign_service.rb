@@ -49,14 +49,15 @@ class Whatsapp::OneoffCampaignService
     Rails.logger.info "Processing contact: #{contact.name} (#{contact.phone_number})"
     return unless eligible_contact?(contact)
 
-    rendered_body = render_template_body
+    rendered_template_params = render_template_params_for(contact)
+    rendered_body = render_template_body(rendered_template_params)
     return log_skip(contact, 'template body could not be rendered') if rendered_body.blank?
 
     contact_inbox = ContactInboxBuilder.new(contact: contact, inbox: inbox).perform
     return log_skip(contact, 'failed to resolve contact inbox') if contact_inbox.blank?
 
     conversation = build_campaign_conversation(contact_inbox)
-    build_outgoing_template_message(conversation, rendered_body)
+    build_outgoing_template_message(conversation, rendered_body, rendered_template_params)
   rescue StandardError => e
     Rails.logger.error "Failed to dispatch campaign message to #{contact.name}: #{e.message}"
     Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
@@ -84,10 +85,18 @@ class Whatsapp::OneoffCampaignService
     Rails.logger.info "Campaign #{campaign.id} processing completed"
   end
 
-  def render_template_body
+  def render_template_params_for(contact)
+    Whatsapp::CampaignTemplateLiquidRenderer.new(
+      campaign: campaign,
+      contact: contact,
+      template_params: campaign.template_params
+    ).call
+  end
+
+  def render_template_body(template_params)
     Whatsapp::TemplateBodyRenderer.new(
       channel: channel,
-      template_params: campaign.template_params
+      template_params: template_params
     ).call
   end
 
@@ -118,14 +127,14 @@ class Whatsapp::OneoffCampaignService
     )
   end
 
-  def build_outgoing_template_message(conversation, content)
+  def build_outgoing_template_message(conversation, content, template_params)
     Messages::MessageBuilder.new(
       campaign.sender,
       conversation,
       {
         content: content,
         message_type: 'outgoing',
-        template_params: campaign.template_params,
+        template_params: template_params,
         campaign_id: campaign.id
       }
     ).perform
