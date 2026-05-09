@@ -173,15 +173,15 @@ const hasCampaignDetails = computed(
           <span class="text-sm text-n-slate-11 whitespace-nowrap">
             {{ t('CAMPAIGN.WHATSAPP.CARD.AUDIENCE_LABEL') }}
           </span>
-          <span
+          <woot-label
             v-for="label in audienceLabels"
             :key="label.id"
-            v-tooltip.top="label.title"
-            class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium text-white truncate max-w-[140px]"
-            :style="{ backgroundColor: label.color }"
-          >
-            {{ label.title }}
-          </span>
+            :title="label.title"
+            :color="label.color"
+            variant="smooth"
+            small
+            class="!mb-0"
+          />
         </div>
       </div>
     </div>
