@@ -181,20 +181,36 @@ class Conversation < ApplicationRecord
   # In legacy mode this toggles the `agente-off` label; in attribute mode it
   # flips the column. Returns the new state.
   def toggle_ai_status!
+    set_ai_status!(!ai_status_enabled?)
+  end
+
+  # Sets the AI status to an explicit boolean. Idempotent: a second call with
+  # the same value is a noop. Respects the account's mode (legacy label vs
+  # attribute column) so external integrations don't have to know which is in
+  # use. Returns the new state.
+  def set_ai_status!(enabled)
+    desired = ActiveModel::Type::Boolean.new.cast(enabled)
     if account.ai_status_uses_attribute?
-      update!(ai_enabled: !ai_enabled)
+      update!(ai_enabled: desired) unless ai_enabled == desired
       ai_enabled
     else
-      labels = Array(label_list)
-      if labels.include?('agente-off')
-        update!(label_list: labels - ['agente-off'])
-        true
-      else
-        update!(label_list: labels + ['agente-off'])
-        false
-      end
+      sync_legacy_ai_label(desired)
+      desired
     end
   end
+
+  private
+
+  def sync_legacy_ai_label(desired)
+    labels = Array(label_list)
+    has_off_label = labels.include?('agente-off')
+    return if desired == !has_off_label
+
+    new_labels = desired ? labels - ['agente-off'] : labels + ['agente-off']
+    update!(label_list: new_labels)
+  end
+
+  public
 
   def toggle_priority(priority = nil)
     self.priority = priority.presence

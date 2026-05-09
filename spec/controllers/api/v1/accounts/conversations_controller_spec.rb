@@ -1174,4 +1174,63 @@ RSpec.describe 'Conversations API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/toggle_ai_status' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:conversation) { create(:conversation, account: account) }
+
+    before do
+      create(:inbox_member, user: agent, inbox: conversation.inbox)
+      account.update!(ai_status_uses_attribute: true)
+    end
+
+    it 'toggles the AI status when no body is provided' do
+      expect(conversation.ai_enabled).to be true
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_ai_status",
+           headers: agent.create_new_auth_token,
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['ai_enabled']).to be false
+      expect(conversation.reload.ai_enabled).to be false
+    end
+
+    it 'sets the AI status to the explicit value when ai_enabled is in the body' do
+      expect(conversation.ai_enabled).to be true
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_ai_status",
+           headers: agent.create_new_auth_token,
+           params: { ai_enabled: false },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['ai_enabled']).to be false
+      expect(conversation.reload.ai_enabled).to be false
+    end
+
+    it 'is idempotent when called twice with the same explicit value' do
+      conversation.update!(ai_enabled: false)
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_ai_status",
+           headers: agent.create_new_auth_token,
+           params: { ai_enabled: false },
+           as: :json
+
+      expect(response.parsed_body['ai_enabled']).to be false
+      expect(conversation.reload.ai_enabled).to be false
+    end
+
+    it 'accepts string truthy values from form-encoded calls' do
+      conversation.update!(ai_enabled: false)
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_ai_status",
+           headers: agent.create_new_auth_token,
+           params: { ai_enabled: 'true' },
+           as: :json
+
+      expect(response.parsed_body['ai_enabled']).to be true
+      expect(conversation.reload.ai_enabled).to be true
+    end
+  end
 end

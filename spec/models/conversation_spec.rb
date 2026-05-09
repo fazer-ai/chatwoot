@@ -1137,4 +1137,60 @@ RSpec.describe Conversation do
       expect(group_conversation).to be_group_type_group
     end
   end
+
+  describe '#set_ai_status!' do
+    let(:set_ai_account) { create(:account) }
+    let(:set_ai_conversation) { create(:conversation, account: set_ai_account) }
+
+    context 'when the account uses the ai_enabled attribute' do
+      before { set_ai_account.update!(ai_status_uses_attribute: true) }
+
+      it 'sets the column to the explicit value' do
+        set_ai_conversation.update!(ai_enabled: true)
+
+        expect(set_ai_conversation.set_ai_status!(false)).to be false
+        expect(set_ai_conversation.reload.ai_enabled).to be false
+      end
+
+      it 'is a noop when the value already matches' do
+        set_ai_conversation.update!(ai_enabled: false)
+        baseline = set_ai_conversation.reload.updated_at
+
+        set_ai_conversation.set_ai_status!(false)
+        expect(set_ai_conversation.reload.updated_at).to eq(baseline)
+      end
+
+      it 'casts string truthy values' do
+        set_ai_conversation.update!(ai_enabled: false)
+
+        expect(set_ai_conversation.set_ai_status!('true')).to be true
+        expect(set_ai_conversation.reload.ai_enabled).to be true
+      end
+    end
+
+    context 'when the account uses the legacy agente-off label' do
+      before { set_ai_account.update!(ai_status_uses_attribute: false) }
+
+      it 'removes the agente-off label when set to true' do
+        set_ai_conversation.update!(label_list: %w[other agente-off])
+
+        expect(set_ai_conversation.set_ai_status!(true)).to be true
+        expect(set_ai_conversation.reload.label_list).not_to include('agente-off')
+      end
+
+      it 'adds the agente-off label when set to false' do
+        set_ai_conversation.update!(label_list: ['other'])
+
+        expect(set_ai_conversation.set_ai_status!(false)).to be false
+        expect(set_ai_conversation.reload.label_list).to include('agente-off')
+      end
+
+      it 'does not duplicate the label when already off' do
+        set_ai_conversation.update!(label_list: %w[other agente-off])
+
+        set_ai_conversation.set_ai_status!(false)
+        expect(set_ai_conversation.reload.label_list.count('agente-off')).to eq(1)
+      end
+    end
+  end
 end
