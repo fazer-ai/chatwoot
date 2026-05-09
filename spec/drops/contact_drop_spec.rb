@@ -20,6 +20,11 @@ describe ContactDrop do
       contact.update!(name: 'john doe')
       expect(subject.last_name).to eq 'Doe'
     end
+
+    it 'returns the single-word name as the first name (no fallback to nil)' do
+      contact.update!(name: 'maria')
+      expect(subject.first_name).to eq 'Maria'
+    end
   end
 
   context 'when last name' do
@@ -28,9 +33,9 @@ describe ContactDrop do
       expect(subject.last_name).to eq 'Doe'
     end
 
-    it 'returns empty when last name not present' do
+    it 'falls back to the single-word name so liquid tokens never render empty' do
       contact.update!(name: 'John')
-      expect(subject.last_name).to be_nil
+      expect(subject.last_name).to eq 'John'
     end
 
     it('return the capitalized last name') do

@@ -12,11 +12,21 @@ class ContactDrop < BaseDrop
   end
 
   def first_name
-    @obj.try(:name).try(:split).try(:first).try(:capitalize) if @obj.try(:name).try(:split).try(:size) > 1
+    parts = @obj.try(:name).to_s.split
+    return nil if parts.empty?
+
+    parts.first.capitalize
   end
 
+  # Falls back to the contact's full name when the name has a single word, so
+  # `Olá {{contact.last_name}}` for a contact saved as "Maria" renders "Olá
+  # Maria" instead of an empty string. Same idea behind first_name above.
   def last_name
-    @obj.try(:name).try(:split).try(:last).try(:capitalize) if @obj.try(:name).try(:split).try(:size) > 1
+    parts = @obj.try(:name).to_s.split
+    return nil if parts.empty?
+    return parts.first.capitalize if parts.size == 1
+
+    parts.last.capitalize
   end
 
   def custom_attribute

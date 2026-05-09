@@ -331,6 +331,12 @@ export default {
             :disabled="loginApi.showLoading"
             :is-loading="loginApi.showLoading"
           />
+          <p
+            v-if="globalConfig.releaseVersion"
+            class="mt-3 text-center text-xs text-n-slate-10"
+          >
+            {{ globalConfig.releaseVersion }}
+          </p>
         </form>
       </div>
       <div v-else class="flex items-center justify-center">

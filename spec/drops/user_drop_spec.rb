@@ -15,6 +15,11 @@ describe UserDrop do
       user.update!(name: 'john doe')
       expect(subject.first_name).to eq 'John'
     end
+
+    it 'returns the single-word name (no fallback to nil)' do
+      user.update!(name: 'maria')
+      expect(subject.first_name).to eq 'Maria'
+    end
   end
 
   it('return the capitalized name') do
@@ -28,9 +33,9 @@ describe UserDrop do
       expect(subject.last_name).to eq 'Doe'
     end
 
-    it 'returns empty when last name not present' do
+    it 'falls back to the single-word name so tokens never render empty' do
       user.update!(name: 'John')
-      expect(subject.last_name).to be_nil
+      expect(subject.last_name).to eq 'John'
     end
 
     it('return the capitalized last name') do
