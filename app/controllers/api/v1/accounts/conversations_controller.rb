@@ -112,7 +112,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def toggle_ai_status
-    new_state = @conversation.toggle_ai_status!
+    new_state = if params.key?(:ai_enabled)
+                  @conversation.set_ai_status!(params[:ai_enabled])
+                else
+                  @conversation.toggle_ai_status!
+                end
     render json: { ai_enabled: new_state }
   end
 

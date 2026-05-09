@@ -6037,6 +6037,88 @@
         }
       }
     },
+    "/api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_ai_status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/conversation_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "toggle-ai-status-of-a-conversation",
+        "summary": "Toggle or set AI status",
+        "description": "Sets or toggles the AI status of a conversation. When the request body includes `ai_enabled`, the conversation is set to that exact value (idempotent — calling twice with the same value keeps it as is). When the body is empty, the AI status is flipped. The endpoint respects the account's configured mode: it updates the `ai_enabled` column on accounts that opted into the attribute mode, or toggles the legacy `agente-off` label on accounts still using it.",
+        "security": [
+          {
+            "userApiKey": []
+          },
+          {
+            "agentBotApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ai_enabled": {
+                    "type": "boolean",
+                    "description": "When provided, sets the AI status to this value explicitly. Omit the body to toggle the current value instead.",
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ai_enabled": {
+                      "type": "boolean",
+                      "description": "The new AI status of the conversation after the call.",
+                      "example": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounts/{account_id}/conversations/{conversation_id}/custom_attributes": {
       "parameters": [
         {
