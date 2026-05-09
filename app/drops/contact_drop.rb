@@ -11,6 +11,12 @@ class ContactDrop < BaseDrop
     @obj.try(:phone_number)
   end
 
+  # Alias so that {{contact.phone}} (the token surfaced by the message-editor
+  # variable picker) resolves to the same value as {{contact.phone_number}}.
+  def phone
+    @obj.try(:phone_number)
+  end
+
   def first_name
     @obj.try(:name).try(:split).try(:first).try(:capitalize) if @obj.try(:name).try(:split).try(:size) > 1
   end
