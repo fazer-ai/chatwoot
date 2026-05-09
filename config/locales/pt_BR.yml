@@ -282,6 +282,11 @@ pt_BR:
       labels:
         added: '%{user_name} adicionou %{labels}'
         removed: '%{user_name} removeu %{labels}'
+      ai_status:
+        enabled: '%{user_name} acionou a IA'
+        disabled: '%{user_name} desligou a IA'
+        enabled_system: 'IA acionada'
+        disabled_system: 'IA desligada'
       sla:
         added: '%{user_name} adicionou política de SLA %{sla_name}'
         removed: '%{user_name} removeu a política de SLA %{sla_name}'
