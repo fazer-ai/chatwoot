@@ -136,14 +136,25 @@ defineExpose({
         <div
           v-for="tag in selectedTags"
           :key="tag.value"
-          class="flex items-center justify-center max-w-full gap-1 px-2 py-0.5 rounded-lg bg-n-alpha-black1"
+          class="flex items-center max-w-full"
           @click.stop
         >
-          <span class="flex-grow min-w-0 text-sm truncate text-n-slate-12">
+          <woot-label
+            v-if="tag.color"
+            :title="tag.label"
+            :color="tag.color"
+            variant="smooth"
+            small
+            class="!mb-0"
+          />
+          <span
+            v-else
+            class="flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg bg-n-alpha-black1 text-sm text-n-slate-12"
+          >
             {{ tag.label }}
           </span>
           <span
-            class="flex-shrink-0 cursor-pointer i-lucide-x size-3 text-n-slate-11"
+            class="flex-shrink-0 cursor-pointer i-lucide-x size-3 text-n-slate-11 ml-1"
             @click="removeTag(tag.value)"
           />
         </div>

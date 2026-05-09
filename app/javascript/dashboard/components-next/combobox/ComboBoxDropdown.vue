@@ -89,7 +89,16 @@ defineExpose({
         :aria-selected="isSelected(option)"
         @click="emit('select', option)"
       >
+        <woot-label
+          v-if="option.color"
+          :title="option.label"
+          :color="option.color"
+          variant="smooth"
+          small
+          class="!mb-0"
+        />
         <span
+          v-else
           :class="{
             'font-medium': isSelected(option),
           }"
