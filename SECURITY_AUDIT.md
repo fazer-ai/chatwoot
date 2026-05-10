@@ -8,16 +8,16 @@ Escopo principal: arquivos Auris-específicos divergindo do upstream `chatwoot/c
 | Severidade | Quantidade |
 |---|---|
 | CRÍTICO | 1 |
-| ALTO | 5 |
+| ALTO | 4 |
 | MÉDIO | 4 |
 | BAIXO | 2 |
 | INFO | 4 |
 
 **Top 3 riscos:**
 
-1. **Recursos globais sem `account_id`** (`FunnelStage`, `LossReason`) — qualquer admin ou manager de qualquer conta pode renomear, reordenar ou apagar essas tabelas, atingindo todas as contas da instalação ao mesmo tempo (ALTO, finding #1).
-2. **Path traversal no `SwaggerController`** quando `ENABLE_SWAGGER_DOCS=true` em produção: `Rails.root.join('swagger', user_path)` aceita `params[:path]` absoluto, escapando do diretório (ALTO, finding #2). Em dev/test sempre habilitado.
-3. **`JWT.decode ... false`** em `OauthCallbackController#users_data` — descodifica o id_token sem verificar assinatura. Mitigado pela origem server-to-server da requisição, mas qualquer regressão que repassasse um id_token vindo de input do usuário viraria takeover (CRÍTICO, finding #3 — upstream, mas presente no fork).
+1. **`JWT.decode ... false`** em `OauthCallbackController#users_data` — descodifica o id_token sem verificar assinatura. Mitigado pela origem server-to-server da requisição, mas qualquer regressão que repassasse um id_token vindo de input do usuário viraria takeover (CRÍTICO).
+2. **Path traversal no `SwaggerController`** quando `ENABLE_SWAGGER_DOCS=true` em produção: `Rails.root.join('swagger', user_path)` aceita `params[:path]` absoluto, escapando do diretório (ALTO). Em dev/test sempre habilitado.
+3. **CSP totalmente desabilitada** — qualquer XSS refletido ou armazenado pode rodar inline scripts e exfiltrar `localStorage`/cookies. Defesa em profundidade importante dado o volume de conteúdo de usuário renderizado (mensagens, custom_attributes, release notes via `v-html`) (ALTO).
 
 ---
 
@@ -57,39 +57,6 @@ def users_data
 end
 ```
 - **Referências**: CWE-345 (Insufficient Verification of Data Authenticity), OWASP Top 10 A07.
-
----
-
-**[ALTO] FunnelStage e LossReason são globais e mutáveis por qualquer admin/manager**
-
-- **Categoria**: IDOR cross-tenant / Autorização
-- **Arquivos**:
-  - [`app/policies/funnel_stage_policy.rb:11`](app/policies/funnel_stage_policy.rb#L11)
-  - [`app/policies/loss_reason_policy.rb:11`](app/policies/loss_reason_policy.rb#L11)
-  - [`app/controllers/api/v1/accounts/funnel_stages_controller.rb`](app/controllers/api/v1/accounts/funnel_stages_controller.rb)
-  - [`app/controllers/api/v1/accounts/loss_reasons_controller.rb`](app/controllers/api/v1/accounts/loss_reasons_controller.rb)
-  - [`db/schema.rb`](db/schema.rb) — tabelas `funnel_stages` e `loss_reasons` sem coluna `account_id`
-- **Trecho vulnerável**:
-```ruby
-# funnel_stage_policy.rb
-def update?
-  @account_user.administrator? || @account_user.manager?
-end
-
-# funnel_stages_controller.rb
-def update
-  @funnel_stage.update!(permitted_params)  # FunnelStage é global, sem account_id
-end
-```
-- **Descrição**: As migrations `20260503200000_make_funnel_stages_global.rb` e `20260504300000_create_loss_reasons_and_link_funnel_stage_changes.rb` removeram/nunca colocaram `account_id` nessas tabelas — funcionam como configuração de instalação. As policies só checam papel (`administrator? || manager?`), e os controllers carregam o registro por id sem filtrar por conta. Resultado: um manager de uma conta qualquer da instalação consegue, via API:
-  - `PUT /api/v1/accounts/<qualquer>/funnel_stages/1` renomeando "Novo Contato" pra outra coisa em **todas as contas**.
-  - `DELETE /api/v1/accounts/<qualquer>/funnel_stages/<id>` deletando uma raia que outra conta usa.
-  - `POST /api/v1/accounts/<qualquer>/loss_reasons` poluindo o catálogo global.
-- **Impacto**: Disrupção transversal entre contas — uma equipe pode quebrar o funil das outras. Em SaaS multi-tenant é uma quebra de isolamento. Em deploy single-tenant (uma conta por imagem) o impacto é só a conta dela mesma — então **dependa de como vocês operam**. Se for single-tenant Auris, é INFO; se algum dia houver mais de uma conta na mesma imagem, é ALTO/CRÍTICO.
-- **Sugestão de correção**:
-  - **Opção A (multi-tenant)**: adicionar `account_id` nas duas tabelas, escopar todos os queries (`current_account.funnel_stages`, `current_account.loss_reasons`), atualizar a policy pra verificar `record.account_id == @account_user.account_id`. Migration backfill copiando os atuais para cada conta.
-  - **Opção B (decisão de design — global por instalação)**: mover esses recursos pro Super Admin (apenas super-admin lê e escreve), expor index pra admin/manager mas remover `create/update/destroy` do escopo da conta.
-- **Referências**: CWE-639 (Authorization Bypass Through User-Controlled Key), OWASP A01 Broken Access Control.
 
 ---
 
@@ -340,10 +307,9 @@ Rails.application.config.action_cable.allowed_request_origins = [
 
 ## 4. Próximos passos recomendados
 
-1. Decidir se `FunnelStage`/`LossReason` são globais por design (Super Admin) ou por conta. Implementar a opção escolhida.
-2. Sanear `SwaggerController` (path traversal) e garantir que `ENABLE_SWAGGER_DOCS` está `false` em produção.
-3. Trocar comparações de webhook pra `secure_compare`.
-4. Habilitar CSP em modo report-only por algumas semanas, depois bloquear.
-5. Setar `FORCE_SSL=true` em todas as imagens de produção e validar HSTS.
-6. Limitar tamanho de `last_seen_release_tag` no `dismiss_release`.
-7. Rodar `bundle audit` no CI.
+1. Sanear `SwaggerController` (path traversal) e garantir que `ENABLE_SWAGGER_DOCS` está `false` em produção.
+2. Trocar comparações de webhook pra `secure_compare`.
+3. Habilitar CSP em modo report-only por algumas semanas, depois bloquear.
+4. Setar `FORCE_SSL=true` em todas as imagens de produção e validar HSTS.
+5. Limitar tamanho de `last_seen_release_tag` no `dismiss_release`.
+6. Rodar `bundle audit` no CI.
