@@ -12,11 +12,15 @@ class CustomFilterPolicy < ApplicationPolicy
   end
 
   def update?
-    author? || (@account_user.administrator? && @record.global?)
+    return @account_user.administrator? if @record.global?
+
+    author?
   end
 
   def destroy?
-    author? || (@account_user.administrator? && @record.global?)
+    return @account_user.administrator? if @record.global?
+
+    author?
   end
 
   private

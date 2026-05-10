@@ -45,6 +45,12 @@ RSpec.describe CustomFilterPolicy, type: :policy do
         expect(custom_filter_policy.new(agent_context, global_filter).update?).to be false
         expect(custom_filter_policy.new(agent_context, global_filter).destroy?).to be false
       end
+
+      it 'denies destructive actions to a non-admin author of a global filter' do
+        agent_authored = create(:custom_filter, account: account, user: agent, visibility: :global)
+        expect(custom_filter_policy.new(agent_context, agent_authored).update?).to be false
+        expect(custom_filter_policy.new(agent_context, agent_authored).destroy?).to be false
+      end
     end
 
     context 'when record is personal' do
