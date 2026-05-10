@@ -219,8 +219,15 @@ const onUpdateSegment = async (payload, segmentName, segmentVisibility) => {
       segmentVisibility ?? props.activeSegment?.visibility ?? 'personal',
     query: filterQueryGenerator(payload),
   };
-  await store.dispatch('customViews/update', payloadData);
-  closeAdvanceFiltersModal();
+  try {
+    await store.dispatch('customViews/update', payloadData);
+    closeAdvanceFiltersModal();
+  } catch (error) {
+    useAlert(
+      error?.message ??
+        t('CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.ERROR_MESSAGE')
+    );
+  }
 };
 
 const setParamsForEditSegmentModal = () => {

@@ -474,7 +474,7 @@ function closeAdvanceFiltersModal() {
   appliedFilter.value = [];
 }
 
-function onUpdateSavedFilter(payload, folderName, folderVisibility) {
+async function onUpdateSavedFilter(payload, folderName, folderVisibility) {
   const transformedPayload = useSnakeCase(payload);
   const payloadData = {
     ...unref(activeFolder),
@@ -483,8 +483,14 @@ function onUpdateSavedFilter(payload, folderName, folderVisibility) {
       folderVisibility ?? unref(activeFolder)?.visibility ?? 'personal',
     query: filterQueryGenerator(transformedPayload),
   };
-  store.dispatch('customViews/update', payloadData);
-  closeAdvanceFiltersModal();
+  try {
+    await store.dispatch('customViews/update', payloadData);
+    closeAdvanceFiltersModal();
+  } catch (error) {
+    useAlert(
+      error?.message ?? t('FILTER.CUSTOM_VIEWS.ADD.API_FOLDERS.ERROR_MESSAGE')
+    );
+  }
 }
 
 function onClickOpenAddFoldersModal() {
