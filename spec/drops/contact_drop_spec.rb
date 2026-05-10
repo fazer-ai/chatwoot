@@ -57,5 +57,38 @@ describe ContactDrop do
       contact.update!(custom_attributes: nil)
       expect(contact_drop.custom_attribute).to eq({})
     end
+
+    it 'strips html tags out of string custom attribute values' do
+      contact.update!(custom_attributes: { remark: '<script>alert(1)</script>important' })
+      expect(contact_drop.custom_attribute['remark']).to eq 'important'
+    end
+  end
+
+  context 'with html-bearing names (defense in depth)' do
+    it 'strips script tags from name before rendering' do
+      contact.update!(name: 'Maria <script>alert(1)</script>')
+      expect(contact_drop.name).to eq 'Maria'
+    end
+
+    it 'strips inline event handlers in image tags' do
+      contact.update!(name: '<img src=x onerror=alert(1)> Joao')
+      expect(contact_drop.name).to eq 'Joao'
+    end
+
+    it 'preserves legitimate ampersands and unicode in names' do
+      contact.update!(name: 'Mary & John 💚')
+      expect(contact_drop.name).to eq 'Mary & John 💚'
+    end
+
+    it 'strips tags from email-shaped strings too' do
+      contact.update!(email: '<b>bold</b>user@example.com')
+      expect(contact_drop.email).to eq 'bolduser@example.com'
+    end
+
+    it 'derives first_name and last_name from the sanitized name' do
+      contact.update!(name: '<script>x</script>Maria Silva')
+      expect(contact_drop.first_name).to eq 'Maria'
+      expect(contact_drop.last_name).to eq 'Silva'
+    end
   end
 end

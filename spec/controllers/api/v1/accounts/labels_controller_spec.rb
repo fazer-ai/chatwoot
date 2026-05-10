@@ -101,4 +101,51 @@ RSpec.describe 'Label API', type: :request do
       end
     end
   end
+
+  describe 'protected label modifications' do
+    let(:admin) { create(:user, account: account, role: :administrator) }
+    let(:agente_off_label) { create(:label, account: account, title: 'agente-off') }
+    let(:kb_label) { create(:label, account: account, title: 'kb-suporte') }
+
+    it 'blocks administrators from updating the agente-off label' do
+      patch "/api/v1/accounts/#{account.id}/labels/#{agente_off_label.id}",
+            headers: admin.create_new_auth_token,
+            params: { title: 'something-else' },
+            as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(agente_off_label.reload.title).to eq('agente-off')
+    end
+
+    it 'blocks administrators from deleting the agente-off label' do
+      delete "/api/v1/accounts/#{account.id}/labels/#{agente_off_label.id}",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(Label.find_by(id: agente_off_label.id)).to be_present
+    end
+
+    it 'blocks administrators from updating any kb-* label' do
+      patch "/api/v1/accounts/#{account.id}/labels/#{kb_label.id}",
+            headers: admin.create_new_auth_token,
+            params: { title: 'something-else' },
+            as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(kb_label.reload.title).to eq('kb-suporte')
+    end
+
+    it 'allows administrators to modify regular labels' do
+      regular = create(:label, account: account, title: 'cliente')
+
+      patch "/api/v1/accounts/#{account.id}/labels/#{regular.id}",
+            headers: admin.create_new_auth_token,
+            params: { title: 'cliente-vip' },
+            as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(regular.reload.title).to eq('cliente-vip')
+    end
+  end
 end

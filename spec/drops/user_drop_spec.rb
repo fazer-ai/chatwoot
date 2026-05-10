@@ -43,4 +43,24 @@ describe UserDrop do
       expect(subject.last_name).to eq 'Doe'
     end
   end
+
+  context 'with html-bearing names (defense in depth)' do
+    it 'strips script tags from name before rendering' do
+      user.update!(name: 'Maria <script>alert(1)</script>')
+      expect(subject.name).to eq 'Maria'
+    end
+
+    it 'preserves legitimate ampersands' do
+      user.update!(name: 'Mary & John')
+      expect(subject.name).to eq 'Mary & John'
+    end
+
+    it 'strips html from email when somehow stored that way' do
+      # Devise's email validator wouldn't allow the bad value through normal save.
+      # update_columns bypasses validations to simulate corrupted data — defense
+      # in depth: even if a row somehow has tags, the drop renders clean text.
+      user.update_columns(email: '<b>bold</b>agent@example.com') # rubocop:disable Rails/SkipsModelValidations
+      expect(described_class.new(user.reload).email).to eq 'boldagent@example.com'
+    end
+  end
 end

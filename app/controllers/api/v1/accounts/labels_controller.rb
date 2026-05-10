@@ -36,8 +36,15 @@ class Api::V1::Accounts::LabelsController < Api::V1::Accounts::BaseController
     params.require(:label).permit(:title, :description, :color, :show_on_sidebar)
   end
 
+  # Protected labels (`agente-off`, `kb-*`) are operational invariants of the
+  # AurisChat install — `agente-off` drives the legacy AI on/off contract and
+  # the `kb-` prefix is reserved for knowledge-base sync. They must not be
+  # renamed, recolored or deleted from any role, including administrator,
+  # because that would silently break those contracts and the bots that read
+  # the labels via webhooks. Allow only creation through `Funnel::DefaultStagesSeederService`-style
+  # internal seeders (which call into the model directly, not through this
+  # controller).
   def prevent_protected_label_modification
-    return unless Current.account_user&.manager?
     return unless protected_label?(@label)
 
     raise Pundit::NotAuthorizedError
