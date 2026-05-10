@@ -143,6 +143,7 @@ const toggleConversationLayout = () => {
         <NextButton
           v-else
           v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.READ_ONLY_TOOLTIP')"
+          :aria-label="$t('FILTER.CUSTOM_VIEWS.READ_ONLY_TOOLTIP')"
           icon="i-lucide-info"
           slate
           xs

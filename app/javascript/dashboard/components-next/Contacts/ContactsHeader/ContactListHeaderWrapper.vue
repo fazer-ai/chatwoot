@@ -224,8 +224,7 @@ const onUpdateSegment = async (payload, segmentName, segmentVisibility) => {
     closeAdvanceFiltersModal();
   } catch (error) {
     useAlert(
-      error?.message ??
-        t('CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.ERROR_MESSAGE')
+      error?.message ?? t('FILTER.CUSTOM_VIEWS.EDIT.API_SEGMENTS.ERROR_MESSAGE')
     );
   }
 };

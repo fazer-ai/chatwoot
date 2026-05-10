@@ -488,7 +488,7 @@ async function onUpdateSavedFilter(payload, folderName, folderVisibility) {
     closeAdvanceFiltersModal();
   } catch (error) {
     useAlert(
-      error?.message ?? t('FILTER.CUSTOM_VIEWS.ADD.API_FOLDERS.ERROR_MESSAGE')
+      error?.message ?? t('FILTER.CUSTOM_VIEWS.EDIT.API_FOLDERS.ERROR_MESSAGE')
     );
   }
 }

@@ -94,7 +94,13 @@
         }
       },
       "EDIT": {
-        "EDIT_BUTTON": "Edit folder"
+        "EDIT_BUTTON": "Edit folder",
+        "API_FOLDERS": {
+          "ERROR_MESSAGE": "Error while updating folder."
+        },
+        "API_SEGMENTS": {
+          "ERROR_MESSAGE": "Error while updating segment."
+        }
       },
       "DELETE": {
         "DELETE_BUTTON": "Delete filter",

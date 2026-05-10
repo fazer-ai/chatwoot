@@ -94,7 +94,13 @@
         }
       },
       "EDIT": {
-        "EDIT_BUTTON": "Alterar Pasta"
+        "EDIT_BUTTON": "Alterar Pasta",
+        "API_FOLDERS": {
+          "ERROR_MESSAGE": "Erro ao atualizar a pasta."
+        },
+        "API_SEGMENTS": {
+          "ERROR_MESSAGE": "Erro ao atualizar o segmento."
+        }
       },
       "DELETE": {
         "DELETE_BUTTON": "Excluir filtro",

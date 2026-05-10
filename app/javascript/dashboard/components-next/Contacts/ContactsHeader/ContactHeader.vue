@@ -126,6 +126,11 @@ const emit = defineEmits([
                   'CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.READ_ONLY_TOOLTIP'
                 )
               "
+              :aria-label="
+                $t(
+                  'CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.READ_ONLY_TOOLTIP'
+                )
+              "
               icon="i-lucide-info"
               color="slate"
               size="sm"
