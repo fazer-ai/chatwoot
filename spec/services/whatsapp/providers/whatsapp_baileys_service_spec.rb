@@ -3,9 +3,16 @@ require 'rails_helper'
 describe Whatsapp::Providers::WhatsappBaileysService do
   subject(:service) { described_class.new(whatsapp_channel: whatsapp_channel) }
 
+  # `cache_classes = false` in the test env lets Zeitwerk reload constants
+  # between specs (controller specs commonly trigger this). After a reload,
+  # the `described_class` captured when this file was loaded points at a
+  # stale copy whose `::ProviderUnavailableError` constant no longer matches
+  # the one raised by the real (currently-loaded) class, breaking
+  # `raise_error(ProviderUnavailableError, ...)` matchers. Re-resolving the
+  # constant on every example keeps the reference fresh.
+  let(:described_class) { Whatsapp::Providers::WhatsappBaileysService } # rubocop:disable RSpec/DescribedClass
   let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false) }
   let(:message) { create(:message, inbox: whatsapp_channel.inbox, source_id: 'msg_123', content_attributes: { external_created_at: 123 }) }
-
   let(:test_send_phone_number) { '551187654321' }
   let(:test_send_jid) { '551187654321@s.whatsapp.net' }
 
