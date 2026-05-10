@@ -44,6 +44,7 @@ const emit = defineEmits([
   'search',
   'applyFilter',
   'clearFilters',
+  'contactCreated',
 ]);
 
 const { t } = useI18n();
@@ -98,6 +99,7 @@ const onCreate = async contact => {
     useAlert(
       t('CONTACTS_LAYOUT.HEADER.ACTIONS.CONTACT_CREATION.SUCCESS_MESSAGE')
     );
+    emit('contactCreated');
   } catch (error) {
     const i18nPrefix = 'CONTACTS_LAYOUT.HEADER.ACTIONS.CONTACT_CREATION';
     if (error instanceof DuplicateContactException) {

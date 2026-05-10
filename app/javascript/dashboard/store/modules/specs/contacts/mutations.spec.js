@@ -27,7 +27,7 @@ describe('#mutations', () => {
   });
 
   describe('#SET_CONTACT_ITEM', () => {
-    it('push contact data to the store', () => {
+    it('upserts contact data into records without touching sortOrder', () => {
       const state = {
         records: {
           1: { id: 1, name: 'contact1', email: 'contact1@chatwoot.com' },
@@ -43,7 +43,27 @@ describe('#mutations', () => {
         1: { id: 1, name: 'contact1', email: 'contact1@chatwoot.com' },
         2: { id: 2, name: 'contact2', email: 'contact2@chatwoot.com' },
       });
-      expect(state.sortOrder).toEqual([1, 2]);
+      expect(state.sortOrder).toEqual([1]);
+    });
+
+    it('merges into an existing record without changing sortOrder position', () => {
+      const state = {
+        records: {
+          1: { id: 1, name: 'contact1', email: 'contact1@chatwoot.com' },
+          2: { id: 2, name: 'contact2', email: 'contact2@chatwoot.com' },
+        },
+        sortOrder: [2, 1],
+      };
+      mutations[types.SET_CONTACT_ITEM](state, {
+        id: 1,
+        name: 'contact1-updated',
+      });
+      expect(state.records[1]).toEqual({
+        id: 1,
+        name: 'contact1-updated',
+        email: 'contact1@chatwoot.com',
+      });
+      expect(state.sortOrder).toEqual([2, 1]);
     });
   });
 
