@@ -124,8 +124,8 @@ Rails.application.routes.draw do
             end
           end
           resources :campaigns, only: [:index, :create, :show, :update, :destroy]
-          resources :funnel_stages, only: [:index, :show, :create, :update, :destroy]
-          resources :loss_reasons, only: [:index, :show, :create, :update]
+          resources :funnel_stages, only: [:index, :show]
+          resources :loss_reasons, only: [:index, :show]
           resource :funnel, only: [:show], controller: 'funnel' do
             collection do
               post :move
@@ -721,6 +721,8 @@ Rails.application.routes.draw do
         delete :avatar, on: :member, action: :destroy_avatar
       end
       resources :platform_apps, only: [:index, :new, :create, :show, :edit, :update, :destroy]
+      resources :funnel_stages, only: [:index, :new, :create, :show, :edit, :update, :destroy]
+      resources :loss_reasons, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resource :instance_status, only: [:show]
 
       resource :settings, only: [:show] do
