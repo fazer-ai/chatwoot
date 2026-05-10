@@ -46,6 +46,7 @@ const select = value => emit('update:modelValue', value);
         type="button"
         class="p-2 relative rounded-md border border-solid justify-between items-start gap-2 flex flex-col text-start cursor-pointer"
         :class="isActive('global')"
+        :aria-pressed="modelValue === 'global'"
         @click.prevent="select('global')"
       >
         <div class="flex items-center gap-2 min-w-0 justify-between w-full">
@@ -66,6 +67,7 @@ const select = value => emit('update:modelValue', value);
         type="button"
         class="p-2 relative rounded-md border border-solid justify-between items-start gap-2 flex flex-col text-start cursor-pointer"
         :class="isActive('personal')"
+        :aria-pressed="modelValue === 'personal'"
         @click.prevent="select('personal')"
       >
         <div class="flex items-center gap-2 min-w-0 justify-between w-full">

@@ -32,7 +32,8 @@ class CustomFilter < ApplicationRecord
   end
 
   def self.with_visibility(user, params)
-    filter_type = params[:filter_type] || 'conversation'
+    filter_type = params[:filter_type].to_s
+    filter_type = 'conversation' unless filter_types.key?(filter_type)
     scope = Current.account.custom_filters.where(filter_type: filter_type)
     scope.global.or(scope.personal.where(user_id: user.id)).order(:id)
   end

@@ -86,11 +86,11 @@ export default {
           type: this.filterType === 0 ? 'folder' : 'segment',
         });
       } catch (error) {
-        const errorMessage = error?.message;
-        this.alertMessage =
-          errorMessage || this.filterType === 0
-            ? errorMessage
+        const fallbackMessage =
+          this.filterType === 0
+            ? this.$t('FILTER.CUSTOM_VIEWS.ADD.API_FOLDERS.ERROR_MESSAGE')
             : this.$t('FILTER.CUSTOM_VIEWS.ADD.API_SEGMENTS.ERROR_MESSAGE');
+        this.alertMessage = error?.message || fallbackMessage;
       } finally {
         useAlert(this.alertMessage);
       }

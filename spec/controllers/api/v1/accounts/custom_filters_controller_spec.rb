@@ -253,7 +253,7 @@ RSpec.describe 'Custom Filters API', type: :request do
       end
     end
 
-    context 'when it is an authenticated admin user' do
+    context 'when it is an authenticated user' do
       it 'deletes custom filter if it is attached to the current user and account' do
         delete "/api/v1/accounts/#{account.id}/custom_filters/#{custom_filter.id}",
                headers: user.create_new_auth_token,
