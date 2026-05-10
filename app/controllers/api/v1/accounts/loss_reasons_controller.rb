@@ -1,5 +1,9 @@
+# Loss reasons live alongside funnel stages and are managed exclusively from
+# the Super Admin dashboard. Account-scoped endpoints stay read-only so the
+# Funnel UI can list them and `Funnel::MoveConversationService` can resolve a
+# reason by id when an agent moves a conversation into a "lost" stage.
 class Api::V1::Accounts::LossReasonsController < Api::V1::Accounts::BaseController
-  before_action :fetch_loss_reason, except: [:index, :create]
+  before_action :fetch_loss_reason, only: [:show]
   before_action :check_authorization
 
   def index
@@ -8,21 +12,9 @@ class Api::V1::Accounts::LossReasonsController < Api::V1::Accounts::BaseControll
 
   def show; end
 
-  def create
-    @loss_reason = LossReason.create!(permitted_params)
-  end
-
-  def update
-    @loss_reason.update!(permitted_params)
-  end
-
   private
 
   def fetch_loss_reason
     @loss_reason = LossReason.find(params[:id])
-  end
-
-  def permitted_params
-    params.require(:loss_reason).permit(:name, :position, :active)
   end
 end

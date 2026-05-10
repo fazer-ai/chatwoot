@@ -7,15 +7,19 @@ class FunnelStagePolicy < ApplicationPolicy
     index?
   end
 
+  # FunnelStage is a global resource managed only from the Super Admin
+  # dashboard. Account-scoped users (admin, manager, agent) can read but
+  # never write — preventing one account from mutating a record that other
+  # accounts depend on.
   def create?
-    @account_user.administrator? || @account_user.manager?
+    false
   end
 
   def update?
-    create?
+    false
   end
 
   def destroy?
-    create?
+    false
   end
 end

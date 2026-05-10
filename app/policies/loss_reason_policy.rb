@@ -7,11 +7,14 @@ class LossReasonPolicy < ApplicationPolicy
     index?
   end
 
+  # LossReason is a global resource managed only from the Super Admin
+  # dashboard. Account-scoped users can read but not write — preventing a
+  # single tenant from mutating a record that the rest of the install relies on.
   def create?
-    @account_user.administrator? || @account_user.manager?
+    false
   end
 
   def update?
-    create?
+    false
   end
 end
