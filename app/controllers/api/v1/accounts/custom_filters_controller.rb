@@ -1,6 +1,6 @@
 class Api::V1::Accounts::CustomFiltersController < Api::V1::Accounts::BaseController
   before_action :fetch_custom_filter, only: [:show, :update, :destroy]
-  before_action :check_authorization, only: [:show, :update, :destroy]
+  before_action :check_authorization
   before_action :fetch_custom_filters, only: [:index]
 
   def index; end
@@ -35,7 +35,7 @@ class Api::V1::Accounts::CustomFiltersController < Api::V1::Accounts::BaseContro
   end
 
   def check_authorization
-    authorize(@custom_filter)
+    authorize(@custom_filter || CustomFilter)
   end
 
   def permitted_payload

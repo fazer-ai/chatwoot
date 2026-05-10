@@ -73,6 +73,12 @@ RSpec.describe CustomFilter do
       expect(filters.pluck(:filter_type).uniq).to eq(['conversation'])
     end
 
+    it 'defaults to conversation when filter_type is invalid' do
+      filters = described_class.with_visibility(admin, { filter_type: 'bogus' })
+
+      expect(filters.pluck(:filter_type).uniq).to eq(['conversation'])
+    end
+
     it 'isolates by filter_type for contacts' do
       filters = described_class.with_visibility(agent, { filter_type: 'contact' })
 

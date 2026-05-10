@@ -230,6 +230,18 @@ RSpec.describe 'Custom Filters API', type: :request do
         expect(admin_filter.reload.visibility).to eq('global')
       end
 
+      it 'keeps agent-owned filters personal when agent sends visibility=global on update' do
+        agent_filter = create(:custom_filter, user: user, account: account, visibility: :personal)
+
+        patch "/api/v1/accounts/#{account.id}/custom_filters/#{agent_filter.id}",
+              headers: user.create_new_auth_token,
+              params: { custom_filter: { visibility: 'global' } },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(agent_filter.reload.visibility).to eq('personal')
+      end
+
       it 'allows administrators to edit a global filter authored by another admin' do
         other_admin = create(:user, account: account, role: :administrator)
         global_filter = create(:custom_filter, user: other_admin, account: account, visibility: :global)
