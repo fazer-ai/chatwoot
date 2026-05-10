@@ -85,6 +85,7 @@ export default {
         useTrack(CONTACTS_EVENTS.SAVE_FILTER, {
           type: this.filterType === 0 ? 'folder' : 'segment',
         });
+        this.openLastSavedItem();
       } catch (error) {
         const fallbackMessage =
           this.filterType === 0
@@ -94,7 +95,6 @@ export default {
       } finally {
         useAlert(this.alertMessage);
       }
-      this.openLastSavedItem();
     },
   },
 };
