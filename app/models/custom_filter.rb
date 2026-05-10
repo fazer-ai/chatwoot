@@ -22,7 +22,7 @@ class CustomFilter < ApplicationRecord
   belongs_to :account
 
   enum filter_type: { conversation: 0, contact: 1, report: 2 }
-  enum visibility: { personal: 0, global: 1 }
+  enum :visibility, { personal: 0, global: 1 }, validate: true
 
   validate :validate_number_of_filters
 

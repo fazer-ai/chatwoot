@@ -71,13 +71,14 @@ export default {
         const filterType = this.activeCustomViews;
         await this.$store.dispatch('customViews/delete', { id, filterType });
         this.closeDeletePopup();
+        this.openLastItemAfterDelete();
         useAlert(
           this.activeFilterType === 0
             ? this.$t('FILTER.CUSTOM_VIEWS.DELETE.API_FOLDERS.SUCCESS_MESSAGE')
             : this.$t('FILTER.CUSTOM_VIEWS.DELETE.API_SEGMENTS.SUCCESS_MESSAGE')
         );
         useTrack(CONTACTS_EVENTS.DELETE_FILTER, {
-          type: this.filterType === 0 ? 'folder' : 'segment',
+          type: this.activeFilterType === 0 ? 'folder' : 'segment',
         });
       } catch (error) {
         const fallbackMessage =
@@ -86,7 +87,6 @@ export default {
             : this.$t('FILTER.CUSTOM_VIEWS.DELETE.API_SEGMENTS.ERROR_MESSAGE');
         useAlert(error?.response?.data?.error || fallbackMessage);
       }
-      this.openLastItemAfterDelete();
     },
     closeDeletePopup() {
       this.$emit('close');

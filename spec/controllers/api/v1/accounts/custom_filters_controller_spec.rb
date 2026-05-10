@@ -86,6 +86,14 @@ RSpec.describe 'Custom Filters API', type: :request do
 
         expect(response).to have_http_status(:unauthorized)
       end
+
+      it 'forbids administrators from fetching a personal filter owned by another user' do
+        get "/api/v1/accounts/#{account.id}/custom_filters/#{custom_filter.id}",
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
   end
 

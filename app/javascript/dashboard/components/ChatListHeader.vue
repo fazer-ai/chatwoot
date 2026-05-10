@@ -116,7 +116,7 @@ const toggleConversationLayout = () => {
         <template v-if="canManageActiveFolder">
           <div class="relative">
             <NextButton
-              id="toggleConversationFilterButton"
+              id="editConversationFilterButton"
               v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.EDIT.EDIT_BUTTON')"
               icon="i-lucide-pen-line"
               slate
@@ -131,7 +131,7 @@ const toggleConversationLayout = () => {
             />
           </div>
           <NextButton
-            id="toggleConversationFilterButton"
+            id="deleteConversationFilterButton"
             v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.DELETE.DELETE_BUTTON')"
             icon="i-lucide-trash-2"
             ruby
