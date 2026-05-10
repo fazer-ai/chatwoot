@@ -370,7 +370,19 @@
             "PLACEHOLDER": "Enter the name of the filter",
             "ERROR": "Enter a valid name",
             "SUCCESS_MESSAGE": "Filter saved successfully",
-            "ERROR_MESSAGE": "Unable to save filter. Please try again later."
+            "ERROR_MESSAGE": "Unable to save filter. Please try again later.",
+            "VISIBILITY": {
+              "LABEL": "Visibility",
+              "GLOBAL": {
+                "LABEL": "Public",
+                "DESCRIPTION": "Available to all agents in this account."
+              },
+              "PERSONAL": {
+                "LABEL": "Private",
+                "DESCRIPTION": "Only you will be able to see and manage this segment."
+              }
+            },
+            "READ_ONLY_TOOLTIP": "Public segment. Ask an administrator to edit or delete it."
           },
           "DELETE_SEGMENT": {
             "TITLE": "Confirm Deletion",

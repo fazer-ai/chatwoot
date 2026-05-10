@@ -11,10 +11,13 @@ import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import Button from 'next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import ConditionRow from './ConditionRow.vue';
+import VisibilitySelector from './VisibilitySelector.vue';
+import { useMapGetter } from 'dashboard/composables/store';
 
 const props = defineProps({
   isSegmentView: { type: Boolean, default: false },
   segmentName: { type: String, default: '' },
+  segmentVisibility: { type: String, default: 'personal' },
 });
 
 const emit = defineEmits([
@@ -30,6 +33,9 @@ const filters = defineModel({
   default: [],
 });
 const segmentNameLocal = ref(props.segmentName);
+const segmentVisibilityLocal = ref(props.segmentVisibility);
+const currentRole = useMapGetter('getCurrentRole');
+const isAdmin = computed(() => currentRole.value === 'administrator');
 
 const DEFAULT_FILTER = {
   attributeKey: 'name',
@@ -67,7 +73,12 @@ const isConditionsValid = () => {
 
 const updateSavedSegment = () => {
   if (isConditionsValid()) {
-    emit('updateSegment', filters.value, segmentNameLocal.value);
+    emit(
+      'updateSegment',
+      filters.value,
+      segmentNameLocal.value,
+      segmentVisibilityLocal.value
+    );
   }
 };
 
@@ -110,11 +121,16 @@ const outsideClickHandler = [
       {{ filterModalHeaderTitle }}
     </h3>
     <div v-if="props.isSegmentView">
-      <div class="pb-6 border-b border-n-weak">
+      <div class="pb-6 border-b border-n-weak grid gap-4">
         <Input
           v-model="segmentNameLocal"
           :label="$t('CONTACTS_LAYOUT.FILTER.SEGMENT.LABEL')"
           :placeholder="t('CONTACTS_LAYOUT.FILTER.SEGMENT.INPUT_PLACEHOLDER')"
+        />
+        <VisibilitySelector
+          v-if="isAdmin"
+          v-model="segmentVisibilityLocal"
+          i18n-prefix="CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.VISIBILITY"
         />
       </div>
     </div>

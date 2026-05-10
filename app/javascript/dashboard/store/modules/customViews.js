@@ -98,8 +98,6 @@ export const actions = {
     try {
       await CustomViewsAPI.deleteCustomViews(id, filterType);
       commit(types.DELETE_CUSTOM_VIEW, { data: id, filterType });
-    } catch (error) {
-      throw new Error(error);
     } finally {
       commit(types.SET_CUSTOM_VIEW_UI_FLAG, { isDeleting: false });
     }

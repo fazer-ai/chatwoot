@@ -182,6 +182,19 @@ const activeFolderName = computed(() => {
   return activeFolder.value?.name;
 });
 
+const activeFolderVisibility = computed(() => {
+  return activeFolder.value?.visibility ?? 'personal';
+});
+
+const currentRole = useMapGetter('getCurrentRole');
+const canManageActiveFolder = computed(() => {
+  if (!activeFolder.value) return true;
+  if (activeFolder.value.visibility === 'global') {
+    return currentRole.value === 'administrator';
+  }
+  return true;
+});
+
 const hasActiveFolders = computed(() => {
   return Boolean(activeFolder.value && props.foldersId !== 0);
 });
@@ -461,11 +474,13 @@ function closeAdvanceFiltersModal() {
   appliedFilter.value = [];
 }
 
-function onUpdateSavedFilter(payload, folderName) {
+function onUpdateSavedFilter(payload, folderName, folderVisibility) {
   const transformedPayload = useSnakeCase(payload);
   const payloadData = {
     ...unref(activeFolder),
     name: unref(folderName),
+    visibility:
+      folderVisibility ?? unref(activeFolder)?.visibility ?? 'personal',
     query: filterQueryGenerator(transformedPayload),
   };
   store.dispatch('customViews/update', payloadData);
@@ -968,6 +983,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :page-title="pageTitle"
       :has-applied-filters="hasAppliedFilters"
       :has-active-folders="hasActiveFolders"
+      :can-manage-active-folder="canManageActiveFolder"
       :active-status="activeStatus"
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"
@@ -1085,6 +1101,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       <ConversationFilter
         v-model="appliedFilter"
         :folder-name="activeFolderName"
+        :folder-visibility="activeFolderVisibility"
         :is-folder-view="hasActiveFolders"
         @apply-filter="onApplyFilter"
         @update-folder="onUpdateSavedFilter"

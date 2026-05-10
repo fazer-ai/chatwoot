@@ -369,7 +369,19 @@
             "PLACEHOLDER": "Informe o nome para esse filtro",
             "ERROR": "Informe um nome válido",
             "SUCCESS_MESSAGE": "Filtro salvo com sucesso",
-            "ERROR_MESSAGE": "Não foi possível salvar o filtro. Por favor, tente mais tarde."
+            "ERROR_MESSAGE": "Não foi possível salvar o filtro. Por favor, tente mais tarde.",
+            "VISIBILITY": {
+              "LABEL": "Visibilidade",
+              "GLOBAL": {
+                "LABEL": "Pública",
+                "DESCRIPTION": "Disponível para todos os agentes desta conta."
+              },
+              "PERSONAL": {
+                "LABEL": "Privada",
+                "DESCRIPTION": "Apenas você poderá ver e gerenciar este segmento."
+              }
+            },
+            "READ_ONLY_TOOLTIP": "Segmento público. Peça a um administrador para editar ou excluir."
           },
           "DELETE_SEGMENT": {
             "TITLE": "Confirmar exclusão",

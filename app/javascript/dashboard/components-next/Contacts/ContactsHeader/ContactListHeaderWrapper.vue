@@ -67,6 +67,17 @@ const hasActiveSegments = computed(
   () => props.activeSegment && props.segmentsId !== 0
 );
 const activeSegmentName = computed(() => props.activeSegment?.name);
+const activeSegmentVisibility = computed(
+  () => props.activeSegment?.visibility ?? 'personal'
+);
+const currentRole = useMapGetter('getCurrentRole');
+const canManageActiveSegment = computed(() => {
+  if (!props.activeSegment) return true;
+  if (props.activeSegment.visibility === 'global') {
+    return currentRole.value === 'administrator';
+  }
+  return true;
+});
 
 const openCreateNewContactDialog = () => {
   createNewContactDialogRef.value?.dialogRef.open();
@@ -199,11 +210,13 @@ const onApplyFilter = async payload => {
   showFiltersModal.value = false;
 };
 
-const onUpdateSegment = async (payload, segmentName) => {
+const onUpdateSegment = async (payload, segmentName, segmentVisibility) => {
   payload = useSnakeCase(payload);
   const payloadData = {
     ...props.activeSegment,
     name: segmentName,
+    visibility:
+      segmentVisibility ?? props.activeSegment?.visibility ?? 'personal',
     query: filterQueryGenerator(payload),
   };
   await store.dispatch('customViews/update', payloadData);
@@ -281,6 +294,7 @@ defineExpose({
     :is-label-view="isLabelView"
     :is-active-view="isActiveView"
     :has-active-filters="hasAppliedFilters"
+    :can-manage-active-segment="canManageActiveSegment"
     :button-label="t('CONTACTS_LAYOUT.HEADER.MESSAGE_BUTTON')"
     @search="emit('search', $event)"
     @update:sort="emit('update:sort', $event)"
@@ -299,6 +313,7 @@ defineExpose({
           v-if="showFiltersModal"
           v-model="appliedFilter"
           :segment-name="activeSegmentName"
+          :segment-visibility="activeSegmentVisibility"
           :is-segment-view="hasActiveSegments"
           @apply-filter="onApplyFilter"
           @update-segment="onUpdateSegment"
