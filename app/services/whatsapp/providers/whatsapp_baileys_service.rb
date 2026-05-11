@@ -47,8 +47,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?,
-        autoPresenceSubscribe: whatsapp_channel.provider_config['presence_subscribe'] || false
+        groupsEnabled: self.class.groups_enabled?
       }.compact.to_json
     )
 
