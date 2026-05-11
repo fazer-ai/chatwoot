@@ -59,13 +59,13 @@ const insertVariable = variable => {
 </script>
 
 <template>
-  <div ref="wrapperRef" class="relative">
+  <div ref="wrapperRef" class="relative w-full">
     <Input
       ref="inputRef"
       :model-value="modelValue"
       :type="type"
       :placeholder="placeholder"
-      class="flex-1"
+      class="w-full"
       @update:model-value="onUpdate"
       @focus="showSuggestions = false"
     />
