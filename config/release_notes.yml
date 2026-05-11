@@ -4,10 +4,6 @@
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.14
   notes:
     en: |-
-      ### ✨ What's new
-
-      - **(Super Admin) Baileys inbox status report.** A new report under Super Admin → Reports lists every WhatsApp Baileys inbox across all accounts of the installation, with connected vs. disconnected totals, a pie chart, and a one-click *Connect device* QR flow per row. No more logging into each tenant to check or reconnect a number.
-
       ### ⚡ Improvements
 
       - **Audience labels on the WhatsApp campaign list now appear with their colors.** Same smooth chip style already used on the campaign form and on the contacts and conversations lists.
@@ -17,10 +13,6 @@
 
       - **Protected labels stay protected for everyone.** Internal labels like `agente-off` and `kb-*` can no longer be renamed or deleted from the labels settings screen — not even by an account administrator. The AI on/off contract is preserved.
     pt_BR: |-
-      ### ✨ Novidades
-
-      - **(Super Admin) Relatório de status Baileys por inbox.** Um novo relatório em Super Admin → Relatórios mostra todas as inboxes WhatsApp Baileys de todas as contas da instalação, com totais conectado/desconectado, gráfico e botão *Conectar dispositivo* (QR) em cada linha. Operação não precisa mais entrar em cada conta pra reconectar um número.
-
       ### ⚡ Melhorias
 
       - **Etiquetas do público na lista de campanhas WhatsApp aparecem com cor.** Mesmo estilo suave colorido já presente no formulário de campanha e nas listas de contatos e conversas.
