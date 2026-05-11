@@ -724,6 +724,14 @@ Rails.application.routes.draw do
       resources :funnel_stages, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resources :loss_reasons, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resource :instance_status, only: [:show]
+      namespace :reports do
+        resource :baileys_inbox_status, only: [:show], controller: :baileys_inbox_status do
+          get :data, on: :member
+        end
+      end
+      resources :inboxes, only: [], module: :inboxes do
+        resource :baileys_connection, only: [:show, :create, :destroy]
+      end
 
       resource :settings, only: [:show] do
         get :refresh, on: :collection

@@ -9,7 +9,7 @@ class SuperAdmin::ApplicationController < Administrate::ApplicationController
   include ActionView::Context
   include SuperAdmin::NavigationHelper
 
-  helper_method :render_vue_component, :settings_open?, :settings_pages
+  helper_method :render_vue_component, :settings_open?, :settings_pages, :reports_open?, :reports_pages
   # authenticiation done via devise : SuperAdmin Model
   before_action :authenticate_super_admin!
 

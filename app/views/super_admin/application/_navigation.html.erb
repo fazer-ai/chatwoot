@@ -33,7 +33,7 @@ as defined by the routes in the `admin/` namespace
     <ul class="my-4">
       <%= render partial: "nav_item", locals: { icon: 'icon-grid-line', url: super_admin_root_url, label: 'Dashboard' } %>
       <% Administrate::Namespace.new(namespace).resources.each do |resource| %>
-        <% next if ["account_users", "access_tokens", "installation_configs", "dashboard", "devise/sessions", "app_configs", "instance_statuses", "settings", "profile/mfa", "sessions/mfa_challenge"].include?  resource.resource %>
+        <% next if ["account_users", "access_tokens", "installation_configs", "dashboard", "devise/sessions", "app_configs", "instance_statuses", "settings", "profile/mfa", "sessions/mfa_challenge", "reports/baileys_inbox_status", "inboxes/baileys_connections"].include?  resource.resource %>
         <%= render partial: "nav_item", locals: {
             icon: sidebar_icons[resource.resource.to_sym],
             url: resource_index_route(resource),
@@ -42,13 +42,13 @@ as defined by the routes in the `admin/` namespace
         %>
 
       <% end %>
+      <%= render 'reports_menu', open: reports_open? %>
       <%= render 'settings_menu', open: settings_open? %>
     </ul>
   </div>
   <div>
     <ul class="my-4">
       <%= render partial: "nav_item", locals: { icon: 'icon-mist-fill', url: sidekiq_web_url, label: 'Sidekiq Dashboard' } %>
-      <%= render partial: "nav_item", locals: { icon: 'icon-health-book-line', url: super_admin_instance_status_url, label: 'Instance Health' } %>
       <%= render partial: "nav_item", locals: { icon: 'icon-dashboard-line', url: '/', label: 'Agent Dashboard' } %>
       <% if Chatwoot.mfa_enabled? %>
         <%= render partial: "nav_item", locals: { icon: 'icon-lock-line', url: super_admin_profile_mfa_url, label: 'Two-factor auth' } %>
