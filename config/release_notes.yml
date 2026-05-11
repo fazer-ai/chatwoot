@@ -1,4 +1,34 @@
 ---
+- tag: v4.13.0-auris.1.14
+  published_at: '2026-05-11T00:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.14
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **(Super Admin) Baileys inbox status report.** A new report under Super Admin → Reports lists every WhatsApp Baileys inbox across all accounts of the installation, with connected vs. disconnected totals, a pie chart, and a one-click *Connect device* QR flow per row. No more logging into each tenant to check or reconnect a number.
+
+      ### ⚡ Improvements
+
+      - **Audience labels on the WhatsApp campaign list now appear with their colors.** Same smooth chip style already used on the campaign form and on the contacts and conversations lists.
+      - **Funnel stages and loss reasons are now standard across the installation.** They moved out of each account's settings and into Super Admin, so every team sees the same Auris funnel pipeline.
+
+      ### 🐛 Fixes
+
+      - **Protected labels stay protected for everyone.** Internal labels like `agente-off` and `kb-*` can no longer be renamed or deleted from the labels settings screen — not even by an account administrator. The AI on/off contract is preserved.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **(Super Admin) Relatório de status Baileys por inbox.** Um novo relatório em Super Admin → Relatórios mostra todas as inboxes WhatsApp Baileys de todas as contas da instalação, com totais conectado/desconectado, gráfico e botão *Conectar dispositivo* (QR) em cada linha. Operação não precisa mais entrar em cada conta pra reconectar um número.
+
+      ### ⚡ Melhorias
+
+      - **Etiquetas do público na lista de campanhas WhatsApp aparecem com cor.** Mesmo estilo suave colorido já presente no formulário de campanha e nas listas de contatos e conversas.
+      - **Raias do funil e motivos de perda agora são padrão da instalação.** Saíram das configurações de cada conta e foram para o Super Admin, garantindo que todos os clientes Auris usem o mesmo pipeline do funil.
+
+      ### 🐛 Correções
+
+      - **Etiquetas protegidas continuam protegidas pra todo mundo.** Etiquetas internas como `agente-off` e `kb-*` não podem mais ser renomeadas ou excluídas pela tela de Configurações → Etiquetas — nem por administradores. Isso preserva a regra de ligar/desligar a IA.
 - tag: v4.13.0-auris.1.13
   published_at: '2026-05-09T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.13
