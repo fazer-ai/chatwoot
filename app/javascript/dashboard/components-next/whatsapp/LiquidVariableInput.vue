@@ -11,11 +11,12 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 
-// Surface only the tokens that make sense outside an ongoing conversation.
-// In a campaign there is no `conversation.id` yet (the conversation is built
-// per recipient by the dispatcher) and there's no editing agent reading
-// `agent.email`, so we filter those out to avoid suggesting tokens that
-// would render empty.
+// Surface only the tokens that make sense in a WhatsApp campaign template.
+// Campaigns are dispatched by the Chatwoot bot, not by an interacting agent,
+// so `{{agent.*}}` would resolve to the campaign creator — confusing and
+// rarely what the operator filling in the template wants. We also hide
+// `conversation.id` because the conversation is created per recipient by
+// the dispatcher and doesn't exist yet at template-fill time.
 const ALLOWED_KEYS = new Set([
   'contact.id',
   'contact.name',
@@ -23,10 +24,6 @@ const ALLOWED_KEYS = new Set([
   'contact.last_name',
   'contact.email',
   'contact.phone',
-  'agent.name',
-  'agent.first_name',
-  'agent.last_name',
-  'agent.email',
   'inbox.name',
 ]);
 
