@@ -1,0 +1,7 @@
+<% content_for(:title) do %>
+  Inbox status Baileys
+<% end %>
+
+<%= render_vue_component('BaileysInboxStatusIndex', {
+  data_url: data_super_admin_reports_baileys_inbox_status_url(format: :json)
+}) %>

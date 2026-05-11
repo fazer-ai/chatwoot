@@ -28,6 +28,13 @@ module.exports = {
         'no-console': 'off',
       },
     },
+    {
+      // Super-admin pages are internal tooling — no i18n expected.
+      files: ['app/javascript/superadmin_pages/**/*.vue'],
+      rules: {
+        'vue/no-bare-strings-in-template': 'off',
+      },
+    },
   ],
   plugins: ['html', 'prettier'],
   parserOptions: {
