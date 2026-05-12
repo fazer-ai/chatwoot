@@ -38,7 +38,12 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
     # `updated_at` first so the frontend's out-of-order guard in
     # UPDATE_CONVERSATION can drop stale cables when the user toggles fast.
     @conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-    @conversation.dispatch_conversation_updated_event
+    # Tag the broadcast so the frontend's UPDATE_CONVERSATION mutation can skip
+    # the SCROLL_TO_MESSAGE side-effect: when a reaction is toggled and there
+    # are newer non-reaction messages in the conversation, `last_non_activity_message`
+    # remains a regular message, so the heuristics on `is_reaction` / id-revert
+    # alone can't tell this dispatch apart from a fresh outgoing/incoming.
+    @conversation.dispatch_conversation_updated_event(broadcast_metadata: { source: 'reaction_toggle' })
 
     head :ok
   end

@@ -47,8 +47,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?,
-        autoPresenceSubscribe: whatsapp_channel.provider_config['presence_subscribe'] || false
+        groupsEnabled: self.class.groups_enabled?
       }.compact.to_json
     )
 
@@ -264,7 +263,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     persist_group_settings(group_contact, metadata)
     persist_invite_code(group_contact) unless soft
     persist_pending_join_requests(group_contact, inbox) unless soft
-    try_update_group_avatar(group_contact) unless soft
+    Channels::Whatsapp::BaileysUpdateGroupAvatarJob.perform_later(group_contact) unless soft
 
     participant_contacts = build_participant_contacts(metadata[:participants], inbox, skip_avatars: soft)
     sync_group_members(group_contact, participant_contacts)
@@ -405,7 +404,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/profile-picture-url",
       headers: api_headers,
       query: { jid: jid },
-      format: :json
+      format: :json,
+      timeout: 10
     )
 
     return nil unless process_response(response)

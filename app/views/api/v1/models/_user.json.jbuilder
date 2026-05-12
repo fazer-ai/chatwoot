@@ -18,7 +18,7 @@ json.ui_settings resource.ui_settings
 json.last_seen_release_tag resource.last_seen_release_tag
 json.unseen_release_tag(
   begin
-    latest_tag = ::Release::CatalogService.latest&.dig('tag')
+    latest_tag = Release::CatalogService.latest&.dig('tag')
     latest_tag if latest_tag.present? && latest_tag != resource.last_seen_release_tag
   end
 )

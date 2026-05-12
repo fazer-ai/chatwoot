@@ -135,7 +135,10 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     conversation, account = extract_conversation_and_account(event)
     tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
 
-    broadcast(account, tokens, CONVERSATION_UPDATED, conversation.push_event_data)
+    payload = conversation.push_event_data
+    metadata = event.data[:broadcast_metadata]
+    payload = payload.merge(event_metadata: metadata) if metadata.present?
+    broadcast(account, tokens, CONVERSATION_UPDATED, payload)
   end
 
   def conversation_typing_on(event)

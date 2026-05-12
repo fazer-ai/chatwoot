@@ -12,6 +12,7 @@ const props = defineProps({
   pageTitle: { type: String, required: true },
   hasAppliedFilters: { type: Boolean, required: true },
   hasActiveFolders: { type: Boolean, required: true },
+  canManageActiveFolder: { type: Boolean, default: true },
   activeStatus: { type: String, required: true },
   isOnExpandedLayout: { type: Boolean, required: true },
   conversationStats: { type: Object, required: true },
@@ -112,30 +113,41 @@ const toggleConversationLayout = () => {
         />
       </template>
       <template v-if="hasActiveFolders">
-        <div class="relative">
+        <template v-if="canManageActiveFolder">
+          <div class="relative">
+            <NextButton
+              id="editConversationFilterButton"
+              v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.EDIT.EDIT_BUTTON')"
+              icon="i-lucide-pen-line"
+              slate
+              xs
+              faded
+              @click="emit('filtersModal')"
+            />
+            <div
+              id="conversationFilterTeleportTarget"
+              class="absolute z-50 mt-2"
+              :class="{ 'ltr:right-0 rtl:left-0': isOnExpandedLayout }"
+            />
+          </div>
           <NextButton
-            id="toggleConversationFilterButton"
-            v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.EDIT.EDIT_BUTTON')"
-            icon="i-lucide-pen-line"
-            slate
+            id="deleteConversationFilterButton"
+            v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.DELETE.DELETE_BUTTON')"
+            icon="i-lucide-trash-2"
+            ruby
             xs
             faded
-            @click="emit('filtersModal')"
+            @click="emit('deleteFolders')"
           />
-          <div
-            id="conversationFilterTeleportTarget"
-            class="absolute z-50 mt-2"
-            :class="{ 'ltr:right-0 rtl:left-0': isOnExpandedLayout }"
-          />
-        </div>
+        </template>
         <NextButton
-          id="toggleConversationFilterButton"
-          v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.DELETE.DELETE_BUTTON')"
-          icon="i-lucide-trash-2"
-          ruby
+          v-else
+          v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.READ_ONLY_TOOLTIP')"
+          :aria-label="$t('FILTER.CUSTOM_VIEWS.READ_ONLY_TOOLTIP')"
+          icon="i-lucide-info"
+          slate
           xs
           faded
-          @click="emit('deleteFolders')"
         />
       </template>
       <div v-else class="relative">

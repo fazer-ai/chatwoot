@@ -444,7 +444,13 @@ const handleSort = async ({ sort, order }) => {
 
 const createContact = async contact => {
   await store.dispatch('contacts/create', contact);
+  await fetchContactsBasedOnContext(pageNumber.value, {
+    clearSelection: false,
+  });
 };
+
+const onContactCreated = () =>
+  fetchContactsBasedOnContext(pageNumber.value, { clearSelection: false });
 
 watch(hasSelection, value => {
   if (!value) {
@@ -541,6 +547,7 @@ onMounted(async () => {
       @apply-filter="fetchSavedOrAppliedFilteredContact"
       @clear-filters="fetchContacts"
       @load-more="loadMoreSearchResults"
+      @contact-created="onContactCreated"
     >
       <div
         v-if="isFetchingList && !(isSearchView && hasContacts)"

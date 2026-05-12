@@ -44,6 +44,7 @@ const emit = defineEmits([
   'search',
   'applyFilter',
   'clearFilters',
+  'contactCreated',
 ]);
 
 const { t } = useI18n();
@@ -67,6 +68,17 @@ const hasActiveSegments = computed(
   () => props.activeSegment && props.segmentsId !== 0
 );
 const activeSegmentName = computed(() => props.activeSegment?.name);
+const activeSegmentVisibility = computed(
+  () => props.activeSegment?.visibility ?? 'personal'
+);
+const currentRole = useMapGetter('getCurrentRole');
+const canManageActiveSegment = computed(() => {
+  if (!props.activeSegment) return true;
+  if (props.activeSegment.visibility === 'global') {
+    return currentRole.value === 'administrator';
+  }
+  return true;
+});
 
 const openCreateNewContactDialog = () => {
   createNewContactDialogRef.value?.dialogRef.open();
@@ -87,6 +99,7 @@ const onCreate = async contact => {
     useAlert(
       t('CONTACTS_LAYOUT.HEADER.ACTIONS.CONTACT_CREATION.SUCCESS_MESSAGE')
     );
+    emit('contactCreated');
   } catch (error) {
     const i18nPrefix = 'CONTACTS_LAYOUT.HEADER.ACTIONS.CONTACT_CREATION';
     if (error instanceof DuplicateContactException) {
@@ -199,15 +212,23 @@ const onApplyFilter = async payload => {
   showFiltersModal.value = false;
 };
 
-const onUpdateSegment = async (payload, segmentName) => {
+const onUpdateSegment = async (payload, segmentName, segmentVisibility) => {
   payload = useSnakeCase(payload);
   const payloadData = {
     ...props.activeSegment,
     name: segmentName,
+    visibility:
+      segmentVisibility ?? props.activeSegment?.visibility ?? 'personal',
     query: filterQueryGenerator(payload),
   };
-  await store.dispatch('customViews/update', payloadData);
-  closeAdvanceFiltersModal();
+  try {
+    await store.dispatch('customViews/update', payloadData);
+    closeAdvanceFiltersModal();
+  } catch (error) {
+    useAlert(
+      error?.message ?? t('FILTER.CUSTOM_VIEWS.EDIT.API_SEGMENTS.ERROR_MESSAGE')
+    );
+  }
 };
 
 const setParamsForEditSegmentModal = () => {
@@ -281,6 +302,7 @@ defineExpose({
     :is-label-view="isLabelView"
     :is-active-view="isActiveView"
     :has-active-filters="hasAppliedFilters"
+    :can-manage-active-segment="canManageActiveSegment"
     :button-label="t('CONTACTS_LAYOUT.HEADER.MESSAGE_BUTTON')"
     @search="emit('search', $event)"
     @update:sort="emit('update:sort', $event)"
@@ -299,6 +321,7 @@ defineExpose({
           v-if="showFiltersModal"
           v-model="appliedFilter"
           :segment-name="activeSegmentName"
+          :segment-visibility="activeSegmentVisibility"
           :is-segment-view="hasActiveSegments"
           @apply-filter="onApplyFilter"
           @update-segment="onUpdateSegment"

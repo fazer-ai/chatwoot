@@ -179,23 +179,15 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     message_type == 'reaction' && message_content.blank?
   end
 
-  def fetch_profile_picture_url(phone_number)
-    jid = "#{phone_number}@s.whatsapp.net"
-    response = inbox.channel.provider_service.get_profile_pic(jid)
-    response&.dig('data', 'profilePictureUrl')
-  rescue StandardError => e
-    Rails.logger.error "Failed to fetch profile picture for #{phone_number}: #{e.message}"
-    nil
-  end
-
   def try_update_contact_avatar(contact = nil)
     # TODO: Current logic will never update the contact avatar if their profile picture changes on WhatsApp.
     target_contact = contact || @contact
     return if target_contact.avatar.attached?
 
     phone = contact ? target_contact.phone_number&.delete('+') : extract_from_jid(type: 'pn')
-    profile_pic_url = fetch_profile_picture_url(phone) if phone
-    ::Avatar::AvatarFromUrlJob.perform_later(target_contact, profile_pic_url) if profile_pic_url
+    return if phone.blank?
+
+    Channels::Whatsapp::BaileysUpdateContactAvatarJob.perform_later(target_contact, inbox, phone)
   end
 
   def message_under_process?

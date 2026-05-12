@@ -3,6 +3,7 @@ require 'rails_helper'
 RSpec.describe 'Custom Filters API', type: :request do
   let(:account) { create(:account) }
   let(:user) { create(:user, account: account, role: :agent) }
+  let(:admin) { create(:user, account: account, role: :administrator) }
   let!(:custom_filter) { create(:custom_filter, user: user, account: account) }
 
   before do
@@ -41,6 +42,19 @@ RSpec.describe 'Custom Filters API', type: :request do
         expect(response_body.first['name']).to eq(custom_filter.name)
         expect(response_body.first['query']).to eq(custom_filter.query)
       end
+
+      it 'includes global filters created by other users in the same account' do
+        global_filter = create(:custom_filter, user: admin, account: account, visibility: :global, name: 'shared folder')
+        create(:custom_filter, user: admin, account: account, visibility: :personal, name: 'private to admin')
+
+        get "/api/v1/accounts/#{account.id}/custom_filters",
+            headers: user.create_new_auth_token,
+            as: :json
+
+        names = response.parsed_body.pluck('name')
+        expect(names).to include(custom_filter.name, global_filter.name)
+        expect(names).not_to include('private to admin')
+      end
     end
   end
 
@@ -61,6 +75,24 @@ RSpec.describe 'Custom Filters API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(response.body).to include(custom_filter.name)
+      end
+
+      it 'forbids fetching a personal filter owned by another user' do
+        other_filter = create(:custom_filter, user: admin, account: account, visibility: :personal)
+
+        get "/api/v1/accounts/#{account.id}/custom_filters/#{other_filter.id}",
+            headers: user.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'forbids administrators from fetching a personal filter owned by another user' do
+        get "/api/v1/accounts/#{account.id}/custom_filters/#{custom_filter.id}",
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
       end
     end
   end
@@ -91,6 +123,23 @@ RSpec.describe 'Custom Filters API', type: :request do
         expect(response).to have_http_status(:success)
         json_response = response.parsed_body
         expect(json_response['name']).to eq 'vip-customers'
+        expect(json_response['visibility']).to eq 'personal'
+      end
+
+      it 'forces agent-created filters to personal even when visibility=global is sent' do
+        post "/api/v1/accounts/#{account.id}/custom_filters", headers: user.create_new_auth_token,
+                                                              params: { custom_filter: payload[:custom_filter].merge(visibility: 'global') }
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['visibility']).to eq 'personal'
+      end
+
+      it 'allows administrators to create global filters' do
+        post "/api/v1/accounts/#{account.id}/custom_filters", headers: admin.create_new_auth_token,
+                                                              params: { custom_filter: payload[:custom_filter].merge(visibility: 'global') }
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['visibility']).to eq 'global'
       end
 
       it 'gives the error for 1001st record' do
@@ -157,6 +206,54 @@ RSpec.describe 'Custom Filters API', type: :request do
 
         expect(response).to have_http_status(:not_found)
       end
+
+      it 'forbids agents from updating a global filter authored by an admin' do
+        global_filter = create(:custom_filter, user: admin, account: account, visibility: :global)
+
+        patch "/api/v1/accounts/#{account.id}/custom_filters/#{global_filter.id}",
+              headers: user.create_new_auth_token,
+              params: payload,
+              as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'allows administrators to flip a personal filter to global' do
+        admin_filter = create(:custom_filter, user: admin, account: account, visibility: :personal)
+
+        patch "/api/v1/accounts/#{account.id}/custom_filters/#{admin_filter.id}",
+              headers: admin.create_new_auth_token,
+              params: { custom_filter: { visibility: 'global' } },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(admin_filter.reload.visibility).to eq('global')
+      end
+
+      it 'keeps agent-owned filters personal when agent sends visibility=global on update' do
+        agent_filter = create(:custom_filter, user: user, account: account, visibility: :personal)
+
+        patch "/api/v1/accounts/#{account.id}/custom_filters/#{agent_filter.id}",
+              headers: user.create_new_auth_token,
+              params: { custom_filter: { visibility: 'global' } },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(agent_filter.reload.visibility).to eq('personal')
+      end
+
+      it 'allows administrators to edit a global filter authored by another admin' do
+        other_admin = create(:user, account: account, role: :administrator)
+        global_filter = create(:custom_filter, user: other_admin, account: account, visibility: :global)
+
+        patch "/api/v1/accounts/#{account.id}/custom_filters/#{global_filter.id}",
+              headers: admin.create_new_auth_token,
+              params: { custom_filter: { name: 'renamed by other admin' } },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(global_filter.reload.name).to eq('renamed by other admin')
+      end
     end
   end
 
@@ -168,13 +265,35 @@ RSpec.describe 'Custom Filters API', type: :request do
       end
     end
 
-    context 'when it is an authenticated admin user' do
+    context 'when it is an authenticated user' do
       it 'deletes custom filter if it is attached to the current user and account' do
         delete "/api/v1/accounts/#{account.id}/custom_filters/#{custom_filter.id}",
                headers: user.create_new_auth_token,
                as: :json
         expect(response).to have_http_status(:no_content)
         expect(user.custom_filters.count).to be 0
+      end
+
+      it 'forbids an agent from deleting a global filter owned by an admin' do
+        global_filter = create(:custom_filter, user: admin, account: account, visibility: :global)
+
+        delete "/api/v1/accounts/#{account.id}/custom_filters/#{global_filter.id}",
+               headers: user.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(CustomFilter.exists?(global_filter.id)).to be true
+      end
+
+      it 'allows admin to delete a global filter authored by another admin' do
+        other_admin = create(:user, account: account, role: :administrator)
+        global_filter = create(:custom_filter, user: other_admin, account: account, visibility: :global)
+
+        delete "/api/v1/accounts/#{account.id}/custom_filters/#{global_filter.id}",
+               headers: admin.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:no_content)
       end
     end
   end
