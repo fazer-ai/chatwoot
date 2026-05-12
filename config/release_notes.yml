@@ -1,4 +1,40 @@
 ---
+- tag: v4.13.0-auris.1.15
+  published_at: '2026-05-12T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.15
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Personal or global visibility for custom filters.** Every contact or conversation filter can now be marked Personal (only you see it) or Global (visible to everyone on the team).
+      - **Patient language on contacts.** You can set each contact's language (Portuguese, English, Spanish, or French) right on the contact card.
+
+      ### ⚡ Improvements
+
+      - **Cleaner variables picker on WhatsApp campaigns.** The `{{agent.*}}` tokens no longer appear when filling campaign variables — campaigns are sent by the bot, so those tokens never resolved meaningfully there and just cluttered the list.
+      - **New inboxes default to "Reopen the same conversation".** Matches the Auris standard for WhatsApp/SMS-style channels. You can switch it off per inbox in the inbox settings if you prefer the old behavior.
+      - **Faster WhatsApp processing under instability.** Contact profile pictures and group avatars now load in the background, keeping message processing snappy when WhatsApp itself is flaky.
+
+      ### 🐛 Fixes
+
+      - **Contact filters respect contacts created in real time.** A brand-new contact (or one arriving through a message) now correctly appears in or disappears from your list according to the filters you have applied.
+      - **Small Portuguese translation fixes** across the WhatsApp setup flow.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Visibilidade pessoal ou global em filtros personalizados.** Cada filtro de contatos ou de conversas agora pode ser marcado como *Pessoal* (só você vê) ou *Global* (visível para toda a equipe).
+      - **Idioma do paciente no contato.** Você pode definir o idioma de cada contato (Português, Inglês, Espanhol ou Francês) diretamente no card do contato.
+
+      ### ⚡ Melhorias
+
+      - **Picker de variáveis em campanhas WhatsApp mais limpo.** Os tokens `{{agent.*}}` não aparecem mais ao montar variáveis de campanha — campanhas são disparadas pelo robô, então esses tokens nunca faziam sentido ali e só poluíam a lista.
+      - **Caixas de entrada novas começam com "Reabrir a mesma conversa" ativado.** Padrão Auris para canais de WhatsApp/SMS. Você pode desativar individualmente nas configurações de cada caixa, se preferir o comportamento antigo.
+      - **WhatsApp mais rápido em momentos de instabilidade.** Fotos de perfil de contatos e avatares de grupos agora carregam em segundo plano, evitando travamentos no processamento de mensagens durante oscilações da própria WhatsApp.
+
+      ### 🐛 Correções
+
+      - **Filtros de contato respeitam contatos criados em tempo real.** Um contato novo (ou recebido por mensagem) agora aparece ou some da lista corretamente conforme os filtros aplicados.
+      - **Pequenas correções de tradução em português** no fluxo de configuração do WhatsApp.
 - tag: v4.13.0-auris.1.14
   published_at: '2026-05-11T00:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.14
