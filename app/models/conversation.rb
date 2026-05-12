@@ -271,8 +271,8 @@ class Conversation < ApplicationRecord
     "#{ENV.fetch('FRONTEND_URL', nil)}/survey/responses/#{uuid}"
   end
 
-  def dispatch_conversation_updated_event(previous_changes = nil)
-    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes)
+  def dispatch_conversation_updated_event(previous_changes = nil, broadcast_metadata: nil)
+    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes, broadcast_metadata: broadcast_metadata)
   end
 
   private
@@ -368,10 +368,11 @@ class Conversation < ApplicationRecord
     end
   end
 
-  def dispatcher_dispatch(event_name, changed_attributes = nil)
-    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
-                                                                       changed_attributes: changed_attributes,
-                                                                       performed_by: Current.executed_by)
+  def dispatcher_dispatch(event_name, changed_attributes = nil, broadcast_metadata: nil)
+    payload = { conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
+                changed_attributes: changed_attributes, performed_by: Current.executed_by }
+    payload[:broadcast_metadata] = broadcast_metadata unless broadcast_metadata.nil?
+    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, **payload)
   end
 
   def conversation_status_changed_to_open?

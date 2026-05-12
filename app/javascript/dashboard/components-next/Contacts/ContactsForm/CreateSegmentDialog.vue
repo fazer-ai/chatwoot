@@ -1,26 +1,33 @@
 <script setup>
 import { ref, reactive, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'vuex';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useVuelidate } from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
 
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
+import VisibilitySelector from 'dashboard/components-next/filter/VisibilitySelector.vue';
 
 const emit = defineEmits(['create']);
 
 const FILTER_TYPE_CONTACT = 1;
 
 const { t } = useI18n();
+const store = useStore();
 
 const uiFlags = useMapGetter('customViews/getUIFlags');
 const isCreating = computed(() => uiFlags.value.isCreating);
+const isAdmin = computed(
+  () => store.getters.getCurrentRole === 'administrator'
+);
 
 const dialogRef = ref(null);
 
 const state = reactive({
   name: '',
+  visibility: 'personal',
 });
 
 const validationRules = {
@@ -35,8 +42,10 @@ const handleDialogConfirm = async () => {
   emit('create', {
     name: state.name,
     filter_type: FILTER_TYPE_CONTACT,
+    visibility: state.visibility,
   });
   state.name = '';
+  state.visibility = 'personal';
   v$.value.$reset();
 };
 
@@ -66,6 +75,12 @@ defineExpose({ dialogRef });
           : ''
       "
       :message-type="v$.name.$error ? 'error' : 'info'"
+    />
+    <VisibilitySelector
+      v-if="isAdmin"
+      v-model="state.visibility"
+      class="mt-4"
+      i18n-prefix="CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.VISIBILITY"
     />
   </Dialog>
 </template>

@@ -244,7 +244,30 @@ describe('#mutations', () => {
       expect(emitter.emit).toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
     });
 
-    it('skips SCROLL_TO_MESSAGE when the update was triggered by a reaction', () => {
+    it('skips SCROLL_TO_MESSAGE when the broadcast is tagged as a reaction toggle', () => {
+      const state = {
+        allConversations: [
+          { id: 1, updated_at: 1, last_non_activity_message: null },
+        ],
+        selectedChatId: 1,
+      };
+      // Newer non-reaction messages exist after the reacted target, so
+      // `last_non_activity_message` is a regular message — the explicit
+      // metadata is what tells us this update is preview-only.
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        last_non_activity_message: {
+          id: 256,
+          content: 'Hello',
+          content_attributes: {},
+        },
+        event_metadata: { source: 'reaction_toggle' },
+      });
+      expect(emitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('does not persist the event_metadata field onto the cached conversation', () => {
       const state = {
         allConversations: [
           { id: 1, updated_at: 1, last_non_activity_message: null },
@@ -254,13 +277,10 @@ describe('#mutations', () => {
       mutations[types.UPDATE_CONVERSATION](state, {
         id: 1,
         updated_at: 2,
-        last_non_activity_message: {
-          id: 99,
-          content: '👍',
-          content_attributes: { is_reaction: true, in_reply_to: 42 },
-        },
+        last_non_activity_message: null,
+        event_metadata: { source: 'reaction_toggle' },
       });
-      expect(emitter.emit).not.toHaveBeenCalled();
+      expect(state.allConversations[0]).not.toHaveProperty('event_metadata');
     });
   });
 

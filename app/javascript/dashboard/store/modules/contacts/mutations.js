@@ -51,10 +51,6 @@ export const mutations = {
       ...($state.records[data.id] || {}),
       ...data,
     };
-
-    if (!$state.sortOrder.includes(data.id)) {
-      $state.sortOrder.push(data.id);
-    }
   },
 
   [types.EDIT_CONTACT]: ($state, data) => {

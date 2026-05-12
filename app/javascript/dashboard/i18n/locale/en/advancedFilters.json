@@ -94,7 +94,13 @@
         }
       },
       "EDIT": {
-        "EDIT_BUTTON": "Edit folder"
+        "EDIT_BUTTON": "Edit folder",
+        "API_FOLDERS": {
+          "ERROR_MESSAGE": "Error while updating folder."
+        },
+        "API_SEGMENTS": {
+          "ERROR_MESSAGE": "Error while updating segment."
+        }
       },
       "DELETE": {
         "DELETE_BUTTON": "Delete filter",
@@ -114,7 +120,19 @@
           "SUCCESS_MESSAGE": "Segment deleted successfully.",
           "ERROR_MESSAGE": "Error while deleting segment."
         }
-      }
+      },
+      "VISIBILITY": {
+        "LABEL": "Visibility",
+        "GLOBAL": {
+          "LABEL": "Public",
+          "DESCRIPTION": "Available to all agents in this account."
+        },
+        "PERSONAL": {
+          "LABEL": "Private",
+          "DESCRIPTION": "Only you will be able to see and manage this filter."
+        }
+      },
+      "READ_ONLY_TOOLTIP": "Public folder. Ask an administrator to edit or delete it."
     }
   }
 }

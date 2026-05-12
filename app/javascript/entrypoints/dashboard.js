@@ -88,6 +88,12 @@ app.use(FloatingVue, {
   instantMove: true,
   arrowOverflow: false,
   disposeTimeout: 5000000,
+  themes: {
+    'naked-popover': {
+      $extend: 'dropdown',
+      $resetCss: true,
+    },
+  },
 });
 app.use(hljsVuePlugin);
 

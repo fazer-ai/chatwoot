@@ -89,12 +89,7 @@ module Whatsapp::BaileysHandlers::Concerns::GroupStubMessageHandler # rubocop:di
   end
 
   def update_group_avatar(group_contact)
-    provider = group_contact.group_channel&.provider_service
-    return if provider.blank?
-
-    provider.try_update_group_avatar(group_contact, force: true)
-  rescue StandardError => e
-    Rails.logger.error "[GROUP_ICON] Failed to update avatar for #{group_contact.identifier}: #{e.message}"
+    Channels::Whatsapp::BaileysUpdateGroupAvatarJob.perform_later(group_contact, force: true)
   end
 
   def parse_membership_request_action(stub_params)

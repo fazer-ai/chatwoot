@@ -5,7 +5,7 @@ describe Whatsapp::BaileysHandlers::PresenceUpdate do
   let!(:whatsapp_channel) do
     create(:channel_whatsapp,
            provider: 'baileys',
-           provider_config: { webhook_verify_token: webhook_verify_token },
+           provider_config: { webhook_verify_token: webhook_verify_token, presence_subscribe: true },
            validate_provider_config: false,
            received_messages: false)
   end
@@ -133,6 +133,36 @@ describe Whatsapp::BaileysHandlers::PresenceUpdate do
       expect(Rails.configuration.dispatcher).not_to receive(:dispatch).with('conversation.typing_on', any_args)
 
       perform(group_data)
+    end
+
+    context 'when presence_subscribe is disabled on the channel' do
+      before do
+        whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge('presence_subscribe' => false))
+      end
+
+      it 'does not dispatch typing events' do
+        jid = "#{lid}@lid"
+
+        expect(Rails.configuration.dispatcher).to receive(:dispatch).with('provider.event_received', any_args)
+        expect(Rails.configuration.dispatcher).not_to receive(:dispatch).with('conversation.typing_on', any_args)
+
+        perform(presence_data_for(jid, 'composing'))
+      end
+    end
+
+    context 'when presence_subscribe key is missing on the channel' do
+      before do
+        whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.except('presence_subscribe'))
+      end
+
+      it 'does not dispatch typing events' do
+        jid = "#{lid}@lid"
+
+        expect(Rails.configuration.dispatcher).to receive(:dispatch).with('provider.event_received', any_args)
+        expect(Rails.configuration.dispatcher).not_to receive(:dispatch).with('conversation.typing_on', any_args)
+
+        perform(presence_data_for(jid, 'composing'))
+      end
     end
   end
 end

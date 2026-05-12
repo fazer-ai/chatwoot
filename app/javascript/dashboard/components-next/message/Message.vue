@@ -150,6 +150,7 @@ const emit = defineEmits(['retry', 'toggleReaction']);
 const contextMenuPosition = ref({});
 const showBackgroundHighlight = ref(false);
 const showContextMenu = ref(false);
+const reactionPickerOpen = ref(false);
 const { t } = useI18n();
 const route = useRoute();
 const inboxGetter = useMapGetter('inboxes/getInbox');
@@ -373,6 +374,8 @@ const componentToRender = computed(() => {
 
   return TextBubble;
 });
+
+const isAudioBubble = computed(() => componentToRender.value === AudioBubble);
 
 const shouldShowContextMenu = computed(() => {
   return !props.contentAttributes?.isUnsupported;
@@ -746,12 +749,15 @@ provideMessageContext({
             <Component :is="componentToRender" />
             <div
               v-if="canShowReactionToolbar"
-              class="absolute top-1/2 -translate-y-1/2 z-10 flex items-center gap-0.5 rounded-full border border-n-slate-6 bg-n-solid-2 shadow-sm p-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity [@media(hover:none)]:opacity-100"
-              :class="
+              class="absolute top-1/2 -translate-y-1/2 z-10 flex items-center gap-0.5 rounded-full border border-n-slate-6 bg-n-solid-2 shadow-sm p-0.5 transition-opacity [@media(hover:none)]:opacity-100"
+              :class="[
+                reactionPickerOpen
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
                 orientation === ORIENTATION.RIGHT
                   ? 'ltr:right-full ltr:mr-2 rtl:left-full rtl:ml-2'
-                  : 'ltr:left-full ltr:ml-2 rtl:right-full rtl:mr-2'
-              "
+                  : 'ltr:left-full ltr:ml-2 rtl:right-full rtl:mr-2',
+              ]"
             >
               <EmojiReactionPicker
                 :alignment="
@@ -759,6 +765,7 @@ provideMessageContext({
                 "
                 :current-user-emoji="currentUserReactionEmoji"
                 @select="handleToggleReaction"
+                @update:open="value => (reactionPickerOpen = value)"
               />
             </div>
           </div>
@@ -777,6 +784,7 @@ provideMessageContext({
             :pending-emojis="pendingEmojis"
             :alignment="orientation === ORIENTATION.RIGHT ? 'right' : 'left'"
             :read-only="!inboxSupportsReactions"
+            :overlap="!isAudioBubble"
             @toggle="handleToggleReaction"
           />
         </div>

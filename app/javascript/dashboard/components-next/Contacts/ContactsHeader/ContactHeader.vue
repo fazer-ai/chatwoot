@@ -17,6 +17,7 @@ defineProps({
   hasActiveFilters: { type: Boolean, default: false },
   isLabelView: { type: Boolean, default: false },
   isActiveView: { type: Boolean, default: false },
+  canManageActiveSegment: { type: Boolean, default: true },
 });
 
 const emit = defineEmits([
@@ -61,7 +62,14 @@ const emit = defineEmits([
         </div>
         <div class="flex items-center flex-shrink-0 gap-4">
           <div class="flex items-center gap-2">
-            <div v-if="!isLabelView && !isActiveView" class="relative">
+            <div
+              v-if="
+                !isLabelView &&
+                !isActiveView &&
+                (!isSegmentsView || canManageActiveSegment)
+              "
+              class="relative"
+            >
               <Button
                 id="toggleContactsFilterButton"
                 :icon="
@@ -94,12 +102,39 @@ const emit = defineEmits([
               @click="emit('createSegment')"
             />
             <Button
-              v-if="isSegmentsView && !isLabelView && !isActiveView"
+              v-if="
+                isSegmentsView &&
+                !isLabelView &&
+                !isActiveView &&
+                canManageActiveSegment
+              "
               icon="i-lucide-trash"
               color="slate"
               size="sm"
               variant="ghost"
               @click="emit('deleteSegment')"
+            />
+            <Button
+              v-if="
+                isSegmentsView &&
+                !isLabelView &&
+                !isActiveView &&
+                !canManageActiveSegment
+              "
+              v-tooltip.bottom-end="
+                $t(
+                  'CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.READ_ONLY_TOOLTIP'
+                )
+              "
+              :aria-label="
+                $t(
+                  'CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.READ_ONLY_TOOLTIP'
+                )
+              "
+              icon="i-lucide-info"
+              color="slate"
+              size="sm"
+              variant="ghost"
             />
             <ContactSortMenu
               :active-sort="activeSort"

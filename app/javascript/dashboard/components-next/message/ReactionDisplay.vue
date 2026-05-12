@@ -1,7 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { vOnClickOutside } from '@vueuse/components';
+import { Dropdown } from 'floating-vue';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const props = defineProps({
   reactions: {
@@ -24,6 +26,10 @@ const props = defineProps({
   readOnly: {
     type: Boolean,
     default: false,
+  },
+  overlap: {
+    type: Boolean,
+    default: true,
   },
 });
 
@@ -81,13 +87,27 @@ function handleRowClick(emoji, user) {
   emit('toggle', emoji);
   closePopover();
 }
+
+onMounted(() => emitter.on(BUS_EVENTS.ON_MESSAGE_LIST_SCROLL, closePopover));
+onBeforeUnmount(() =>
+  emitter.off(BUS_EVENTS.ON_MESSAGE_LIST_SCROLL, closePopover)
+);
 </script>
 
 <!-- eslint-disable-next-line vue/no-root-v-if -->
 <template>
-  <div
+  <Dropdown
     v-if="groupedReactions.length"
-    class="relative -mt-1 flex flex-wrap items-center gap-1"
+    :shown="showPopover"
+    :triggers="[]"
+    auto-hide
+    theme="naked-popover"
+    :placement="alignment === 'right' ? 'top-end' : 'top-start'"
+    :distance="4"
+    class="relative flex flex-wrap items-center gap-1"
+    :class="overlap ? '-mt-1' : ''"
+    popper-class="[&_.v-popper\_\_arrow-container]:hidden"
+    @apply-hide="closePopover"
   >
     <button
       type="button"
@@ -98,6 +118,8 @@ function handleRowClick(emoji, user) {
           : 'border-n-slate-6 bg-n-alpha-1 text-n-slate-12 hover:bg-n-alpha-2'
       "
       :disabled="isAnyPending"
+      :aria-expanded="showPopover"
+      aria-haspopup="dialog"
       @click="togglePopover"
     >
       <span class="inline-flex items-center gap-0.5">
@@ -105,42 +127,43 @@ function handleRowClick(emoji, user) {
       </span>
       <span>{{ totalCount }}</span>
     </button>
-    <div
-      v-if="showPopover"
-      v-on-click-outside="closePopover"
-      class="absolute bottom-full z-50 mb-1 min-w-48 rounded-lg border border-n-slate-6 bg-n-solid-2 p-2 shadow-lg"
-      :class="alignment === 'right' ? 'right-0' : 'left-0'"
-    >
+    <template #popper>
       <div
-        v-for="(group, groupIdx) in groupedReactions"
-        :key="group.emoji"
-        :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
+        class="min-w-48 rounded-lg border border-n-slate-6 bg-n-solid-2 p-2 shadow-lg"
       >
-        <component
-          :is="user.isMine && !readOnly ? 'button' : 'div'"
-          v-for="(user, userIdx) in group.users"
-          :key="`${group.emoji}-${user.id ?? userIdx}`"
-          :type="user.isMine && !readOnly ? 'button' : null"
-          class="flex w-full items-center gap-2 rounded px-1 py-1 text-left"
-          :class="
-            user.isMine && !readOnly ? 'cursor-pointer hover:bg-n-alpha-2' : ''
-          "
-          @click="handleRowClick(group.emoji, user)"
+        <div
+          v-for="(group, groupIdx) in groupedReactions"
+          :key="group.emoji"
+          :class="{ 'mt-2 border-t border-n-slate-5 pt-2': groupIdx > 0 }"
         >
-          <span class="w-5 text-center text-sm">{{ group.emoji }}</span>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs text-n-slate-12 truncate">
-              {{ user.isMine ? t('CONVERSATION.REACTIONS.YOU') : user.name }}
+          <component
+            :is="user.isMine && !readOnly ? 'button' : 'div'"
+            v-for="(user, userIdx) in group.users"
+            :key="`${group.emoji}-${user.id ?? userIdx}`"
+            :type="user.isMine && !readOnly ? 'button' : null"
+            class="flex w-full items-center gap-2 rounded px-1 py-1 text-left"
+            :class="
+              user.isMine && !readOnly
+                ? 'cursor-pointer hover:bg-n-alpha-2'
+                : ''
+            "
+            @click="handleRowClick(group.emoji, user)"
+          >
+            <span class="w-5 text-center text-sm">{{ group.emoji }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs text-n-slate-12 truncate">
+                {{ user.isMine ? t('CONVERSATION.REACTIONS.YOU') : user.name }}
+              </div>
+              <div
+                v-if="user.isMine && !readOnly"
+                class="text-[10px] text-n-slate-11"
+              >
+                {{ t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE') }}
+              </div>
             </div>
-            <div
-              v-if="user.isMine && !readOnly"
-              class="text-[10px] text-n-slate-11"
-            >
-              {{ t('CONVERSATION.REACTIONS.CLICK_TO_REMOVE') }}
-            </div>
-          </div>
-        </component>
+          </component>
+        </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </Dropdown>
 </template>

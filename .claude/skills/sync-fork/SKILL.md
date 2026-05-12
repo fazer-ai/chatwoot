@@ -1,24 +1,47 @@
 ---
-name: merge-upstream
-description: Use this skill when pulling chatwoot upstream (chatwoot/chatwoot) into the fazer-ai fork, resolving merge conflicts, and validating the result. Covers direction choice, per-file decision framework (KC/AI/CO/delete), recurring patterns (SaveBang, signature architecture, schema.rb regen, WhatsApp service, installation_config), validation flow, and pre-commit/CI pitfalls specific to this repo. Trigger when the user asks to merge develop/main from chatwoot upstream, resolve merge conflicts on a merge branch, or bump the fork to a new chatwoot version.
+name: sync-fork
+description: Use this skill when syncing one of our forks with its upstream — either pulling chatwoot/chatwoot into fazer-ai/chatwoot, OR pulling fazer-ai/chatwoot `main` into fazer-ai/chatwoot-pro (`chatwoot-pro-main`). Covers per-file decision framework (KC/AI/CO/delete), recurring patterns (SaveBang, signature architecture, schema.rb regen, WhatsApp service, installation_config, Pro-only overrides), validation flow, and pre-commit/CI pitfalls specific to this repo. Trigger when the user asks to merge develop/main from chatwoot upstream, resolve merge conflicts on a merge branch, bump the fork to a new chatwoot version, or merge CE `main` into `chatwoot-pro-main`. **Never assume the sync direction — always confirm with the user which side is upstream and which is the receiving fork before doing anything.**
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 
-# Merge upstream (chatwoot → fazer-ai fork)
+# Sync fork — (chatwoot → fazer-ai CE) and (fazer-ai CE → fazer-ai Pro)
 
-The fazer-ai fork diverges from chatwoot upstream on real features (Baileys, Zapi, per-inbox signatures, scheduled messages, group conversations, internal chat). Every few releases we pull upstream in to stay current. This skill captures the recurring patterns and footguns so the next merge doesn't rediscover them from scratch.
+> **Direction is never implicit.** Before reading any further, confirm with the user which sync flow this is: `chatwoot/chatwoot → fazer-ai/chatwoot` (CE merge) or `fazer-ai/chatwoot → fazer-ai/chatwoot-pro` (Pro merge). Both flows share most patterns but diverge on branch names, push targets, and which side is HEAD. Picking the wrong flow silently inverts the KC/AI decisions in every recurring pattern below — do not infer from context, ask.
 
-## Direction of merge
+The fazer-ai CE fork diverges from chatwoot upstream on real features (Baileys, Zapi, per-inbox signatures, scheduled messages, group conversations, internal chat). fazer-ai Pro further extends CE with Pro-only features (kanban, integrity reporting, protected subscription keys, configurable super-admin paywall URL, etc.). Every few releases we pull each level of upstream in to stay current. This skill captures the recurring patterns and footguns for **both** sync flows so the next merge doesn't rediscover them from scratch.
 
-Prefer **branch from our fork's `main`, merge `upstream/develop` into it**, not the other way around.
+## Two merge flows this skill covers
 
+### A) chatwoot/chatwoot → fazer-ai/chatwoot (CE merge)
+
+Branch from our fork's `main`, merge `upstream/develop` (or a release tag like `chatwoot/develop`) into it via a `chore/merge-upstream-X.Y.Z` branch and PR.
+
+- HEAD = fork (`main`), MERGE_HEAD = upstream.
 - Same number of conflicts either way — git is symmetric.
 - What differs: the `--first-parent` chain. Merging upstream into a fork-based branch keeps our main's first-parent history "our work", with upstream as a side merge. Easier to answer "what's ours" later with `git log --first-parent`.
 - If the current in-progress merge already went the other direction, finish it as-is. Standardize on next merge.
 
+### B) fazer-ai/chatwoot → fazer-ai/chatwoot-pro (Pro merge)
+
+Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+
+- HEAD = Pro (`chatwoot-pro-main`), MERGE_HEAD = CE (`main`).
+- Pro is a strict superset of CE: every conflict is either "CE changed something we overrode" (usually KC/CO to preserve Pro behavior) or "CE added new code next to our additions" (usually CO).
+- Recurring patterns below tagged **[Pro]** list files that conflict on almost every CE→Pro merge.
+
+## How to use this skill (checklist)
+
+When triggered on a merge, don't just read the file and wing it — walk the full flow:
+
+1. Run the **Pre-flight** block.
+2. For every conflicted file: apply the **Per-file decision framework**, cross-referencing the **Recurring patterns** subsection for that file when one exists.
+3. Resolve and `git add` each file. Keep a running list of the KC/AI/CO/DEL decision per file (useful for the commit message and PR body).
+4. Run the **Validation flow** end-to-end (it is mandatory, not optional). Do not commit if any step fails.
+5. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+
 ## Pre-flight
 
-After `git merge upstream/develop` (or whatever ref), before touching anything:
+After `git merge upstream/develop` (CE) or `git merge main` (Pro), before touching anything:
 
 ```bash
 # list conflicted files
@@ -29,6 +52,10 @@ cat .git/MERGE_HEAD
 head -5 .git/MERGE_MSG
 git log --oneline HEAD -3
 git log --oneline MERGE_HEAD -3
+
+# for Pro merges, confirm the branch and remote before doing anything destructive
+git branch --show-current   # should be chatwoot-pro-main
+git remote -v               # should show `chatwoot-pro` remote pointing at fazer-ai/chatwoot-pro
 ```
 
 Terminology used in this skill:
@@ -118,14 +145,34 @@ Always conflicts because both sides have different migration versions. Resolutio
 
 Upstream migrated `.annotaterb.yml` + `lib/tasks/annotate_rb.rake` and deleted the old custom `lib/tasks/auto_annotate_models.rake`. Our fork did a similar migration earlier with different config style.
 
-- `.annotaterb.yml`: **KC** (upstream's format is more complete, symbol-key style).
+- `.annotaterb.yml`: **KC** for CE merge (upstream's format is more complete, symbol-key style).
 - `lib/tasks/auto_annotate_models.rake`: **DEL** (`git rm`). Replacement is `lib/tasks/annotate_rb.rake` from upstream.
+
+For **CE→Pro merges**, `.annotaterb.yml` is **CO**: adopt CE's newer format but keep the Pro-only `fazer_ai/app/models` entry in `model_dir`. Pro scans fazer-ai-specific models living under `fazer_ai/app/models`; dropping that path silently stops annotation for those models.
+
+### Pro-only UI overrides
+
+Pro deliberately patched a few CE components to widen access or make URLs configurable. On every CE→Pro merge CE's changes near these points re-conflict:
+
+- **`app/javascript/dashboard/routes/dashboard/settings/components/BasePaywallModal.vue`** — Pro removed CE's `!isOnChatwootCloud` guard (so super admins see the CTA on cloud too) and added a `superAdminUrl` prop with a default so Pro instances can point to their own admin panel. → **KC**: keep Pro's `v-else-if="isSuperAdmin"` + `:href="superAdminUrl"`.
+
+### Pro automation composables
+
+Pro extended the automation composables to feed conditions/actions state into dropdown builders (used by kanban and other Pro-only conditions). When CE upstream touches the same functions, the signatures diverge.
+
+- **`app/javascript/dashboard/composables/useAutomationValues.js`** — Pro signature is `getActionDropdownValues(type, conditions = [], actions = [])`. CE sometimes changes the signature (4.13.0 added `last_responding_agent` injection in the body). → **CO**: keep Pro's signature, layer CE's body changes in. If CE introduced a local variable like `agentsList`, let the returned `agents:` key read from it — pass Pro's `conditions` and `actions` through unchanged.
+
+- **`app/javascript/dashboard/composables/useEditableAutomation.js`** — Pro recomputes `getConditionDropdownValues(condition.attribute_key, automation.conditions)` inside the filter (conditions affect dropdown content). CE reuses the pre-computed `dropdownValues` without conditions. → **KC**: keep Pro's recompute-with-conditions pattern; dropping it silently breaks kanban-related automation dropdowns.
 
 ### InstallationConfig serialize
 
 Upstream simplified to `serialize :serialized_value, coder: YAML, type: ActiveSupport::HashWithIndifferentAccess, default: {}.with_indifferent_access`. Our fork had a custom `SerializedValueCoder` handling both YAML strings and native jsonb hashes.
 
 Test before choosing: create a legacy `InstallationConfig` where `serialized_value` is a YAML string inside the jsonb column, then confirm upstream's simpler version can still load it. If it works (it did in 4.13.0 merge with all 3 legacy formats: tagged YAML, symbol-key YAML, native hash), go **KC**. Otherwise keep the custom coder.
+
+Pro adds `PROTECTED_SUBSCRIPTION_KEYS` constant + `protected_subscription_key_check` validator on top of CE's version. On a CE→Pro merge the serialize block and the PROTECTED_SUBSCRIPTION_KEYS block may conflict as one hunk.
+
+- **[Pro] CE→Pro merge:** **CO** — accept CE's simplified serialize (already validated against legacy data in 4.13.0), keep Pro's `PROTECTED_SUBSCRIPTION_KEYS`, `protected_subscription_key_check` validate, and related tests. Verify with `bundle exec rspec spec/models/installation_config_spec.rb` — both the `describe 'new record defaults'` (CE) and `describe 'protected fazer.ai config keys'` (Pro) blocks must stay.
 
 ### i18n files
 
@@ -139,33 +186,50 @@ Controllers (`inboxes_controller`, `conversations_controller`), policies, routes
 
 ## Validation flow
 
+**This flow is mandatory — do not commit the merge without running it.** Reading the skill is not enough; past merges have reached commit/push with silently broken state (class autoload issues, missing f_unaccent function, stray tables in schema.rb, rubocop offenses in upstream-only files) because validation steps were skipped.
+
 After staging all resolved files and before commit:
 
 ```bash
-# parse sanity
+# 1. parse sanity (catches stray conflict markers / bad YAML / bad Ruby)
 ruby -c app/models/installation_config.rb
 ruby -c db/schema.rb
+grep -l '<<<<<<<\|=======\|>>>>>>>' $(git diff --name-only --cached) || echo "no leftover markers"
 
-# rails boots
+# 2. rails boots (catches broken autoload, bad requires, missing constants)
 bundle exec rails runner 'puts "ok"'
 
-# migrations all apply
+# 3. migrations all apply (catches missing f_unaccent, bad schema.rb, stray tables)
 bundle exec rails db:migrate
 
-# specs for each changed area at minimum
+# 4. specs for each changed area at minimum (scale up for CE merges, keep targeted for Pro merges)
 bundle exec rspec spec/models spec/policies
-bundle exec rspec spec/services/whatsapp
+bundle exec rspec spec/services/whatsapp  # only when WA service touched
 bundle exec rspec spec/controllers/api/v1/accounts/inboxes_controller_spec.rb \
                   spec/controllers/api/v1/accounts/conversations_controller_spec.rb \
                   spec/controllers/api/v1/accounts/conversations/messages_controller_spec.rb
 
-# targeted specs we touched
-bundle exec rspec spec/services/action_service_spec.rb \
-                  spec/services/automation_rules/action_service_spec.rb
+# 5. targeted specs for files we actually resolved (always run)
+bundle exec rspec spec/models/installation_config_spec.rb  # both CE and Pro describe blocks must pass
+# Pro-only specs live under fazer_ai/spec/, NOT spec/lib/fazer_ai/ — rspec silently returns 0 examples on the wrong path
+bundle exec rspec fazer_ai/spec/lib/fazer_ai/integrity_report_spec.rb fazer_ai/spec/lib/fazer_ai_hub_spec.rb  # run when Pro-specific Ruby touched
 
-# smoke: load real installation configs / other records touched by the merge
-bundle exec rails runner 'InstallationConfig.find_each { |c| c.value }'
+# 6. rubocop project-wide (Husky only lints staged diff; upstream files with offenses slip past)
+bundle exec rubocop --parallel
+
+# 7. smoke: exercise serialize/legacy-data paths and anything else the merge touched
+bundle exec rails runner 'InstallationConfig.find_each { |c| c.value }; puts "legacy configs load ok"'
+
+# 8. targeted JS specs for changed composables / Vue components
+# `pnpm test` wraps vitest with `--no-cache` which OOMs the runner on WSL. Use vitest directly
+# with a bigger Node heap when testing composables / big dashboards:
+NODE_OPTIONS="--max-old-space-size=4096" npx vitest run \
+  app/javascript/dashboard/composables/spec/useEditableAutomation.spec.js \
+  app/javascript/dashboard/composables/spec/useAutomation.spec.js \
+  --no-coverage --reporter=verbose
 ```
+
+Keep the output around until after push — if CI fails, being able to compare local vs CI run saves a round trip.
 
 ## Pre-commit pitfalls
 

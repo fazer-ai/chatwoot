@@ -1,21 +1,31 @@
 class CustomFilterPolicy < ApplicationPolicy
+  def index?
+    @account_user.administrator? || @account_user.agent? || @account_user.manager?
+  end
+
   def create?
     @account_user.administrator? || @account_user.agent? || @account_user.manager?
   end
 
   def show?
-    @account_user.administrator? || @account_user.agent? || @account_user.manager?
-  end
-
-  def index?
-    @account_user.administrator? || @account_user.agent? || @account_user.manager?
+    @record.global? || author?
   end
 
   def update?
-    @account_user.administrator? || @account_user.agent? || @account_user.manager?
+    return @account_user.administrator? || @account_user.manager? if @record.global?
+
+    author?
   end
 
   def destroy?
-    @account_user.administrator? || @account_user.agent? || @account_user.manager?
+    return @account_user.administrator? || @account_user.manager? if @record.global?
+
+    author?
+  end
+
+  private
+
+  def author?
+    @record.user == @account_user.user
   end
 end
