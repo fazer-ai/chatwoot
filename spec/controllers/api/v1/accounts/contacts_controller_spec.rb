@@ -643,6 +643,35 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response).to have_http_status(:not_found)
       end
 
+      it 'updates the contact language and exposes the language code in the response' do
+        language = create(:language, code: 'pt-br', name: 'Português', position: 1)
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
+              headers: admin.create_new_auth_token,
+              params: { language_id: language.id },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(contact.reload.language_id).to eq(language.id)
+        expect(response.parsed_body['payload']).to include(
+          'language_id' => language.id,
+          'language_code' => 'pt-br'
+        )
+      end
+
+      it 'clears the contact language when language_id is nil' do
+        language = create(:language, code: 'pt-br', name: 'Português', position: 1)
+        contact.update!(language_id: language.id)
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
+              headers: admin.create_new_auth_token,
+              params: { language_id: nil },
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(contact.reload.language_id).to be_nil
+      end
+
       it 'prevents updating with an existing email' do
         other_contact = create(:contact, account: account, email: 'test1@example.com')
 

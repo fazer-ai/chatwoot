@@ -206,4 +206,23 @@ RSpec.describe Contact do
       expect(group_contact).to be_group_type_group
     end
   end
+
+  describe '#webhook_data' do
+    let(:contact) { create(:contact) }
+
+    it 'returns nil language_id/language_code when no language is set' do
+      payload = contact.webhook_data
+      expect(payload[:language_id]).to be_nil
+      expect(payload[:language_code]).to be_nil
+    end
+
+    it 'exposes the assigned language id and code' do
+      language = create(:language, code: 'pt-br', name: 'Português', position: 1)
+      contact.update!(language: language)
+
+      payload = contact.webhook_data
+      expect(payload[:language_id]).to eq(language.id)
+      expect(payload[:language_code]).to eq('pt-br')
+    end
+  end
 end

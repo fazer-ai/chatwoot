@@ -1,10 +1,11 @@
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { required, email } from '@vuelidate/validators';
 import { useVuelidate } from '@vuelidate/core';
 import { splitName } from '@chatwoot/utils';
 import countries from 'shared/constants/countries.js';
+import languagesAPI from 'dashboard/api/languages';
 import Input from 'dashboard/components-next/input/Input.vue';
 import ComboBox from 'dashboard/components-next/combobox/ComboBox.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -36,6 +37,7 @@ const FORM_CONFIG = {
   PHONE_NUMBER: { field: 'phoneNumber' },
   CITY: { field: 'additionalAttributes.city' },
   COUNTRY: { field: 'additionalAttributes.countryCode' },
+  LANGUAGE: { field: 'languageId' },
   BIO: { field: 'additionalAttributes.description' },
   COMPANY_NAME: { field: 'additionalAttributes.companyName' },
 };
@@ -57,6 +59,7 @@ const defaultState = {
   firstName: '',
   lastName: '',
   phoneNumber: '',
+  languageId: null,
   additionalAttributes: {
     description: '',
     companyName: '',
@@ -96,6 +99,7 @@ const prepareStateBasedOnProps = () => {
     name = '',
     email: emailAddress,
     phoneNumber,
+    language_id: languageId = null,
     additionalAttributes = {},
   } = props.contactData || {};
   const { firstName, lastName } = splitName(name || '');
@@ -119,6 +123,7 @@ const prepareStateBasedOnProps = () => {
     lastName,
     email: emailAddress,
     phoneNumber,
+    languageId,
     additionalAttributes: {
       description,
       companyName,
@@ -136,6 +141,27 @@ const prepareStateBasedOnProps = () => {
 const countryOptions = computed(() =>
   countries.map(({ name, id }) => ({ label: name, value: id }))
 );
+
+const languages = ref([]);
+const languageOptions = computed(() =>
+  languages.value.map(({ id, name }) => ({ label: name, value: id }))
+);
+
+onMounted(async () => {
+  try {
+    const { data } = await languagesAPI.get();
+    languages.value = data?.data || [];
+  } catch (error) {
+    // Surface fetch failures via console; the dropdown just renders empty.
+    // eslint-disable-next-line no-console
+    console.error('Failed to load languages catalog', error);
+  }
+});
+
+const handleLanguageSelection = value => {
+  state.languageId = value || null;
+  emit('update', state);
+};
 
 const editDetailsForm = computed(() =>
   Object.keys(FORM_CONFIG).map(key => ({
@@ -266,6 +292,19 @@ defineExpose({
               '[&>div>button]:!bg-n-alpha-black2': isDetailsView,
             }"
             @update:model-value="handleCountrySelection"
+          />
+          <ComboBox
+            v-else-if="item.key === 'LANGUAGE'"
+            v-model="state.languageId"
+            :options="languageOptions"
+            :placeholder="item.placeholder"
+            class="[&>div>button]:h-8"
+            :class="{
+              '[&>div>button]:bg-n-alpha-black2 [&>div>button:not(.focused)]:!outline-transparent':
+                !isDetailsView,
+              '[&>div>button]:!bg-n-alpha-black2': isDetailsView,
+            }"
+            @update:model-value="handleLanguageSelection"
           />
           <PhoneNumberInput
             v-else-if="item.key === 'PHONE_NUMBER'"
