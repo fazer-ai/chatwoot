@@ -13,6 +13,7 @@
 #  internal_attributes      :jsonb            not null
 #  limits                   :jsonb
 #  locale                   :integer          default("en")
+#  multi_language_ai        :boolean          default(FALSE), not null
 #  name                     :string           not null
 #  settings                 :jsonb
 #  status                   :integer          default("active")
@@ -143,6 +144,19 @@ class Account < ApplicationRecord
     {
       id: id,
       name: name
+    }
+  end
+
+  # Virtual reader consumed by the Super Admin `auris_settings` Administrate
+  # field. Administrate instantiates each form field with
+  # `resource.send(attribute_name)`, so this needs to respond. The three keys
+  # are the toggles rendered in the "Auris settings" grid; persistence goes
+  # through `SuperAdmin::AccountsController#merge_auris_settings` on submit.
+  def auris_settings
+    {
+      funnel_enabled: funnel_enabled,
+      ai_status_uses_attribute: ai_status_uses_attribute,
+      multi_language_ai: multi_language_ai
     }
   end
 
