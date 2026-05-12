@@ -41,6 +41,14 @@ RSpec.describe Inbox do
     it_behaves_like 'avatarable'
   end
 
+  describe 'defaults' do
+    # Auris flavor: new inboxes default to reopening the same conversation
+    # instead of spawning a fresh one per inbound message.
+    it 'lock_to_single_conversation defaults to true' do
+      expect(described_class.new.lock_to_single_conversation).to be(true)
+    end
+  end
+
   describe '#add_members' do
     let(:inbox) { FactoryBot.create(:inbox) }
 
