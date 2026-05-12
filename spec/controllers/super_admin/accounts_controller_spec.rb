@@ -55,6 +55,57 @@ RSpec.describe 'Super Admin accounts API', type: :request do
     end
   end
 
+  describe 'PUT /super_admin/accounts/{account_id} (Auris settings section)' do
+    let(:params) do
+      {
+        account: { name: account.name },
+        auris_settings: {
+          funnel_enabled: '1',
+          ai_status_uses_attribute: '1',
+          multi_language_ai: '1'
+        }
+      }
+    end
+
+    before { sign_in(super_admin, scope: :super_admin) }
+
+    it 'persists Funnel and AI status toggles to their dedicated columns' do
+      account.update!(funnel_enabled: false, ai_status_uses_attribute: false)
+
+      put "/super_admin/accounts/#{account.id}", params: params
+
+      expect(response).to have_http_status(:redirect)
+      account.reload
+      expect(account.funnel_enabled).to be(true)
+      expect(account.ai_status_uses_attribute).to be(true)
+    end
+
+    it 'flips the multi_language_ai column' do
+      expect(account.multi_language_ai).to be(false)
+
+      put "/super_admin/accounts/#{account.id}", params: params
+
+      expect(response).to have_http_status(:redirect)
+      expect(account.reload.multi_language_ai).to be(true)
+    end
+
+    it 'turns settings back off when the checkboxes are submitted unchecked' do
+      account.update!(funnel_enabled: true, ai_status_uses_attribute: true, multi_language_ai: true)
+
+      put "/super_admin/accounts/#{account.id}",
+          params: params.merge(auris_settings: {
+                                 funnel_enabled: '0',
+                                 ai_status_uses_attribute: '0',
+                                 multi_language_ai: '0'
+                               })
+
+      account.reload
+      expect(account.funnel_enabled).to be(false)
+      expect(account.ai_status_uses_attribute).to be(false)
+      expect(account.multi_language_ai).to be(false)
+    end
+  end
+
   describe 'DELETE /super_admin/accounts/{account_id}' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do

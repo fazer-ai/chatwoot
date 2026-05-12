@@ -13,6 +13,7 @@
 #  internal_attributes      :jsonb            not null
 #  limits                   :jsonb
 #  locale                   :integer          default("en")
+#  multi_language_ai        :boolean          default(FALSE), not null
 #  name                     :string           not null
 #  settings                 :jsonb
 #  status                   :integer          default("active")

@@ -37,6 +37,7 @@ class SuperAdmin::AccountsController < SuperAdmin::ApplicationController
     permitted_params = super
     permitted_params[:limits] = permitted_params[:limits].to_h.compact
     permitted_params[:selected_feature_flags] = params[:enabled_features].keys.map(&:to_sym) if params[:enabled_features].present?
+    merge_auris_settings(permitted_params)
     permitted_params
   end
 
@@ -64,6 +65,20 @@ class SuperAdmin::AccountsController < SuperAdmin::ApplicationController
     # rubocop:disable Rails/I18nLocaleTexts
     redirect_back(fallback_location: [namespace, requested_resource], notice: 'Account deletion is in progress.')
     # rubocop:enable Rails/I18nLocaleTexts
+  end
+
+  private
+
+  # Maps the "Auris settings" grid checkboxes (rendered by
+  # AurisAccountSettingsField) onto the three boolean columns on the
+  # `accounts` table that back them.
+  def merge_auris_settings(permitted_params)
+    return if params[:auris_settings].blank?
+
+    auris = params.require(:auris_settings).permit(:funnel_enabled, :ai_status_uses_attribute, :multi_language_ai)
+    permitted_params[:funnel_enabled] = auris[:funnel_enabled] == '1'
+    permitted_params[:ai_status_uses_attribute] = auris[:ai_status_uses_attribute] == '1'
+    permitted_params[:multi_language_ai] = auris[:multi_language_ai] == '1'
   end
 end
 
