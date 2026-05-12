@@ -441,6 +441,9 @@
           "COUNTRY": {
             "PLACEHOLDER": "Selecione o país"
           },
+          "LANGUAGE": {
+            "PLACEHOLDER": "Selecione o idioma"
+          },
           "BIO": {
             "PLACEHOLDER": "Digite uma biografia"
           },

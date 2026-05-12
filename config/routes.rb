@@ -476,6 +476,8 @@ Rails.application.routes.draw do
 
       resources :releases, only: [:index]
 
+      resources :languages, only: [:index]
+
       namespace :widget do
         resource :direct_uploads, only: [:create]
         resource :config, only: [:create]
