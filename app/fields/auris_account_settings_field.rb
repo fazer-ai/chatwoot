@@ -16,7 +16,7 @@ class AurisAccountSettingsField < Administrate::Field::Base
         label: 'Funnel',
         checked: resource.funnel_enabled },
       { key: :ai_status_uses_attribute,
-        label: 'AI status from attribute (off = legacy agente-off label)',
+        label: 'AI status from attribute',
         checked: resource.ai_status_uses_attribute },
       { key: :multi_language_ai,
         label: 'Multi-language AI',
