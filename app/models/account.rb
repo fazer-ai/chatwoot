@@ -147,6 +147,19 @@ class Account < ApplicationRecord
     }
   end
 
+  # Virtual reader consumed by the Super Admin `auris_settings` Administrate
+  # field. Administrate instantiates each form field with
+  # `resource.send(attribute_name)`, so this needs to respond. The three keys
+  # are the toggles rendered in the "Auris settings" grid; persistence goes
+  # through `SuperAdmin::AccountsController#merge_auris_settings` on submit.
+  def auris_settings
+    {
+      funnel_enabled: funnel_enabled,
+      ai_status_uses_attribute: ai_status_uses_attribute,
+      multi_language_ai: multi_language_ai
+    }
+  end
+
   def inbound_email_domain
     domain.presence || GlobalConfig.get('MAILER_INBOUND_EMAIL_DOMAIN')['MAILER_INBOUND_EMAIL_DOMAIN'] || ENV.fetch('MAILER_INBOUND_EMAIL_DOMAIN',
                                                                                                                    false)
