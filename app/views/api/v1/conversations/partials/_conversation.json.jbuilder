@@ -28,13 +28,13 @@ end
 
 json.id conversation.display_id
 # Seeds `currentChat.messages` and is also the source for the `before` cursor
-# in setActiveChat → fetchPreviousMessages. Must include private notes: the
-# `chat` scope filters them out, so a trailing private note would never enter
-# the store on cold open and the bubble wouldn't render until a non-private
-# message arrived after it.
+# in setActiveChat → fetchPreviousMessages. Must include private notes AND
+# activity messages: filtering either out leaves a trailing bubble (private
+# note, status change, assignment, etc.) outside both the seed and the
+# `before` cursor window, so it never renders again after re-entering the
+# conversation until a newer non-filtered message arrives after it.
 last_message = conversation.messages
                            .where(account_id: conversation.account_id)
-                           .non_activity_messages
                            .hide_removed_reactions
                            .includes([{ attachments: [{ file_attachment: [:blob] }] }])
                            .reorder(created_at: :desc)
