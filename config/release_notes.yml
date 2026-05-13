@@ -1,4 +1,26 @@
 ---
+- tag: v4.13.0-auris.1.16
+  published_at: '2026-05-13T21:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.16
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Refreshed Baileys status report.** The Super Admin Baileys inbox status page now follows the same layout and palette as the dashboard reports, with Total / Connected / Disconnected cards at the top, redesigned filters, and a polished table.
+      - **Sturdier custom attribute editing.** While editing a custom attribute value, you can now click-and-drag to select text without the editor closing, and the content auto-saves when you click outside.
+
+      ### 🐛 Fixes
+
+      - **Conversation activity messages stay visible.** Bubbles like "Conversation resolved", "Reopened", agent assignment, priority change, and AI toggle now persist in the chat after you leave the conversation and come back — previously the state itself was kept but the activity bubble disappeared.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Relatório de status Baileys repaginado.** A página de status dos canais Baileys no Super Admin agora segue o mesmo visual dos relatórios do dashboard, com cards de Total / Conectado / Desconectado no topo, filtros redesenhados e tabela na paleta padrão.
+      - **Edição de atributos personalizados mais robusta.** Ao editar o valor de um atributo personalizado, agora você pode selecionar texto com clique-e-arrasta sem o editor fechar, e o conteúdo é salvo automaticamente ao clicar fora.
+
+      ### 🐛 Correções
+
+      - **Atividades da conversa permanecem visíveis.** Balões como "Conversa marcada como resolvida", "Reaberta", atribuição de agente, troca de prioridade e troca da IA voltam a permanecer no chat depois que você sai da conversa e volta — antes, o status persistia mas o balão da atividade sumia.
 - tag: v4.13.0-auris.1.15
   published_at: '2026-05-12T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.15
