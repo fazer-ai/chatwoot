@@ -284,7 +284,7 @@ const resetFilters = () => {
 
       <!-- Inbox table — same look as /reports/overview Agent Table -->
       <div
-        class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow overflow-hidden"
+        class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5 mb-6"
       >
         <table class="w-full text-sm">
           <thead class="bg-n-slate-1 text-n-slate-12">
