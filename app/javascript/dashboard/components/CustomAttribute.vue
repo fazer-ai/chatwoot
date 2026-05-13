@@ -1,6 +1,7 @@
 <script>
 import { format, parseISO } from 'date-fns';
 import { required, url } from '@vuelidate/validators';
+import { vOnClickOutside } from '@vueuse/components';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import HelperTextPopup from 'dashboard/components/ui/HelperTextPopup.vue';
@@ -18,6 +19,9 @@ export default {
     MultiselectDropdown,
     HelperTextPopup,
     NextButton,
+  },
+  directives: {
+    onClickOutside: vOnClickOutside,
   },
   props: {
     label: { type: String, required: true },
@@ -42,6 +46,7 @@ export default {
     return {
       isEditing: false,
       editedValue: null,
+      initialEditValue: null,
     };
   },
   computed: {
@@ -160,11 +165,16 @@ export default {
       }
     },
     onClickAway() {
-      this.v$.$reset();
-      this.isEditing = false;
+      if (this.editedValue === this.initialEditValue) {
+        this.v$.$reset();
+        this.isEditing = false;
+        return;
+      }
+      this.onUpdate();
     },
     onEdit() {
       this.isEditing = true;
+      this.initialEditValue = this.editedValue;
       this.$nextTick(() => {
         this.focusInput();
       });
@@ -238,7 +248,7 @@ export default {
       </h4>
     </div>
     <div v-if="notAttributeTypeCheckboxAndList">
-      <div v-if="isEditing" v-on-clickaway="onClickAway">
+      <div v-if="isEditing" v-on-click-outside="onClickAway">
         <div class="flex items-center w-full mb-2">
           <input
             ref="inputfield"
