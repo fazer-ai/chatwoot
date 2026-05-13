@@ -335,6 +335,118 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
           expect(contact.name).to eq('123456789@lid')
         end
       end
+
+      # Regression: outbound webhooks from Z-API carry the WhatsApp profile name
+      # of the instance owner (the agent) in `senderName`. Using it here stamps
+      # the agent's name onto a freshly-created customer contact, which then
+      # appears in every conversation card and on the contact panel.
+      context 'when outbound webhook has senderName and chatName' do
+        let(:params) do
+          params_with_lid.merge(
+            fromMe: true,
+            senderName: 'Danielle | Especialista Auris',
+            chatName: 'Customer From Chat'
+          )
+        end
+
+        before { create(:account_user, account: inbox.account) }
+
+        it 'ignores senderName and uses chatName instead' do
+          service.perform
+
+          expect(Contact.last.name).to eq('Customer From Chat')
+        end
+      end
+
+      context 'when outbound webhook has senderName but chatName is blank' do
+        let(:params) do
+          params_with_lid.merge(
+            fromMe: true,
+            senderName: 'Danielle | Especialista Auris',
+            chatName: nil
+          )
+        end
+
+        before { create(:account_user, account: inbox.account) }
+
+        it 'falls back to the phone identifier, never the agent name' do
+          service.perform
+
+          expect(Contact.last.name).to eq('123456789@lid')
+        end
+      end
+    end
+
+    # Regression: pre-fix outbound webhooks created contacts with the agent's
+    # WhatsApp profile name. When the customer eventually replies we should
+    # overwrite that placeholder with their real WhatsApp profile name, even
+    # though the saved name no longer matches the phone fallback.
+    context 'when the customer replies for the first time on a pre-fix contact' do
+      let!(:existing_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'Danielle | Especialista Auris')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '123456789@lid',
+          chatLid: '123456789@lid',
+          senderName: 'Real Customer'
+        )
+      end
+
+      before do
+        create(:contact_inbox,
+               inbox: inbox,
+               contact: existing_contact,
+               source_id: '123456789')
+      end
+
+      it 'overwrites a stale outbound-stamped name with the incoming senderName' do
+        service.perform
+
+        expect(existing_contact.reload.name).to eq('Real Customer')
+      end
+    end
+
+    context 'when a subsequent incoming arrives for a contact with prior incoming history' do
+      let!(:existing_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'Hand-edited Name')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '123456789@lid',
+          chatLid: '123456789@lid',
+          senderName: 'Real Customer'
+        )
+      end
+
+      before do
+        create(:contact_inbox,
+               inbox: inbox,
+               contact: existing_contact,
+               source_id: '123456789')
+        conversation = create(:conversation, contact: existing_contact, inbox: inbox, account: inbox.account)
+        create(:message,
+               account: inbox.account,
+               inbox: inbox,
+               conversation: conversation,
+               sender: existing_contact,
+               message_type: :incoming,
+               content: 'previous reply')
+      end
+
+      it 'does not overwrite the existing name' do
+        service.perform
+
+        expect(existing_contact.reload.name).to eq('Hand-edited Name')
+      end
     end
 
     context 'when contact exists by phone but new LID provided' do
