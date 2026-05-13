@@ -132,25 +132,25 @@ watch(
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
     @click.self="close"
   >
     <div
-      class="bg-white rounded-lg shadow-xl w-[400px] max-w-[90vw] p-6 flex flex-col gap-4"
+      class="bg-n-background rounded-xl shadow-xl outline outline-1 outline-n-container w-[400px] max-w-[90vw] p-6 flex flex-col gap-4"
     >
-      <div class="flex items-start justify-between">
+      <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-slate-800">
+          <h2 class="text-lg font-medium text-n-slate-12">
             Conectar dispositivo
           </h2>
-          <p class="text-sm text-slate-500 mt-1">
+          <p class="text-sm text-n-slate-11 mt-1">
             {{ inbox.account_name }} · {{ inbox.inbox_name }}
           </p>
-          <p class="text-sm text-slate-500">{{ inbox.phone_number }}</p>
+          <p class="text-sm text-n-slate-11">{{ inbox.phone_number }}</p>
         </div>
         <button
           type="button"
-          class="text-slate-400 hover:text-slate-600 text-xl leading-none"
+          class="text-n-slate-10 hover:text-n-slate-12 text-xl leading-none"
           @click="close"
         >
           ×
@@ -158,23 +158,24 @@ watch(
       </div>
 
       <div
-        class="bg-slate-50 rounded px-3 py-2 text-xs uppercase font-medium text-slate-600"
+        class="bg-n-alpha-2 rounded-lg px-3 py-2 text-xs uppercase font-medium text-n-slate-11"
       >
         Status: {{ showLabel }}
       </div>
 
-      <div v-if="state.error" class="text-red-500 text-sm">
+      <div
+        v-if="state.error"
+        class="px-3 py-2 rounded-lg bg-n-ruby-3 text-n-ruby-12 text-sm"
+      >
         {{ state.error }}
       </div>
 
       <div class="flex flex-col items-center justify-center min-h-[280px]">
         <template v-if="state.connection === 'open'">
-          <p class="text-emerald-600 font-medium mb-3">
-            Dispositivo conectado.
-          </p>
+          <p class="text-n-teal-12 font-medium mb-3">Dispositivo conectado.</p>
           <button
             type="button"
-            class="px-4 py-2 rounded bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+            class="px-4 py-2 rounded-lg bg-n-ruby-3 text-n-ruby-12 text-sm font-medium hover:bg-n-ruby-4 disabled:opacity-50"
             :disabled="loading"
             @click="disconnect"
           >
@@ -188,31 +189,31 @@ watch(
           <img
             :src="state.qr_data_url"
             alt="QR Code"
-            class="w-[276px] h-[276px]"
+            class="w-[276px] h-[276px] rounded-lg"
           />
-          <p class="text-xs text-slate-500 mt-3">
+          <p class="text-xs text-n-slate-11 mt-3">
             Escaneie o QR no WhatsApp do dispositivo.
           </p>
         </template>
 
         <template v-else-if="state.connection === 'connecting'">
           <div
-            class="w-8 h-8 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin"
+            class="w-8 h-8 rounded-full border-2 border-n-weak border-t-n-slate-11 animate-spin"
           />
-          <p class="text-sm text-slate-500 mt-3">Gerando QR Code…</p>
+          <p class="text-sm text-n-slate-11 mt-3">Gerando QR Code…</p>
         </template>
 
         <template v-else-if="state.connection === 'reconnecting'">
           <div
-            class="w-8 h-8 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin"
+            class="w-8 h-8 rounded-full border-2 border-n-weak border-t-n-slate-11 animate-spin"
           />
-          <p class="text-sm text-slate-500 mt-3">Reconectando…</p>
+          <p class="text-sm text-n-slate-11 mt-3">Reconectando…</p>
         </template>
 
         <template v-else>
           <button
             type="button"
-            class="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+            class="px-4 py-2 rounded-lg bg-n-brand text-white text-sm font-medium hover:bg-n-brand/90 disabled:opacity-50"
             :disabled="loading"
             @click="setup"
           >

@@ -151,216 +151,233 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="w-full h-full">
-    <header class="main-content__header" role="banner">
-      <h1 id="page-title" class="main-content__page-title">
-        Inbox status Baileys
-      </h1>
-    </header>
-
-    <section class="main-content__body">
-      <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div class="text-sm text-slate-500">
-          Última atualização:
-          <span class="font-medium text-slate-700">{{ lastFetchedLabel }}</span>
+  <div class="overflow-auto bg-n-background w-full px-6">
+    <div class="max-w-7xl mx-auto pb-12">
+      <header class="flex flex-col gap-1 pt-6 pb-5">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 class="text-heading-1 text-n-slate-12">Inbox status Baileys</h1>
+            <p class="text-sm text-n-slate-11 mt-1">
+              Última atualização: {{ lastFetchedLabel }}
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium text-n-slate-12 bg-n-alpha-2 hover:bg-n-alpha-3 disabled:opacity-50"
+              :disabled="loading"
+              @click="resetFilters"
+            >
+              Limpar filtros
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-n-brand hover:bg-n-brand/90 disabled:opacity-50"
+              :disabled="loading"
+              @click="fetchData"
+            >
+              {{ loading ? 'Atualizando…' : 'Atualizar' }}
+            </button>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-sm text-slate-700 disabled:opacity-50"
-            :disabled="loading"
-            @click="resetFilters"
-          >
-            Limpar filtros
-          </button>
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded bg-blue-500 hover:bg-blue-600 text-sm text-white disabled:opacity-50"
-            :disabled="loading"
-            @click="fetchData"
-          >
-            {{ loading ? 'Atualizando…' : 'Atualizar' }}
-          </button>
-        </div>
-      </div>
+      </header>
 
-      <div v-if="error" class="text-sm text-red-600 mb-4">
+      <div
+        v-if="error"
+        class="px-4 py-3 mb-4 rounded-lg bg-n-ruby-3 text-n-ruby-12 text-sm"
+      >
         Falha ao carregar dados: {{ error }}
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div>
-          <div class="bg-white border border-slate-200 rounded p-4 mb-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <label class="flex flex-col text-xs text-slate-600">
-                Status
-                <select
-                  v-model="filters.status"
-                  class="mt-1 border border-slate-300 rounded px-2 py-1 text-sm"
-                >
-                  <option value="all">Todos</option>
-                  <option value="connected">Conectado</option>
-                  <option value="disconnected">Desconectado</option>
-                </select>
-              </label>
-              <label class="flex flex-col text-xs text-slate-600">
-                Telefone
-                <input
-                  v-model="filters.phone"
-                  type="text"
-                  class="mt-1 border border-slate-300 rounded px-2 py-1 text-sm"
-                  placeholder="Ex: 5585…"
-                />
-              </label>
-              <label class="flex flex-col text-xs text-slate-600">
-                Account ID
-                <input
-                  v-model="filters.account_id"
-                  type="text"
-                  class="mt-1 border border-slate-300 rounded px-2 py-1 text-sm"
-                  placeholder="Ex: 42"
-                />
-              </label>
-              <label class="flex flex-col text-xs text-slate-600">
-                Account
-                <input
-                  v-model="filters.account_name"
-                  list="superadmin-account-name-options"
-                  type="text"
-                  class="mt-1 border border-slate-300 rounded px-2 py-1 text-sm"
-                  placeholder="Nome da account"
-                />
-                <datalist id="superadmin-account-name-options">
-                  <option
-                    v-for="opt in accountNameOptions"
-                    :key="opt"
-                    :value="opt"
-                  />
-                </datalist>
-              </label>
-              <label class="flex flex-col text-xs text-slate-600">
-                Inbox
-                <input
-                  v-model="filters.inbox_name"
-                  list="superadmin-inbox-name-options"
-                  type="text"
-                  class="mt-1 border border-slate-300 rounded px-2 py-1 text-sm"
-                  placeholder="Nome da caixa"
-                />
-                <datalist id="superadmin-inbox-name-options">
-                  <option
-                    v-for="opt in inboxNameOptions"
-                    :key="opt"
-                    :value="opt"
-                  />
-                </datalist>
-              </label>
-            </div>
-          </div>
-
-          <div class="bg-white border border-slate-200 rounded overflow-hidden">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
-                <tr>
-                  <th class="text-left px-3 py-2">Account</th>
-                  <th class="text-left px-3 py-2">Account ID</th>
-                  <th class="text-left px-3 py-2">Inbox</th>
-                  <th class="text-left px-3 py-2">Telefone</th>
-                  <th class="text-left px-3 py-2">Status</th>
-                  <th class="text-right px-3 py-2">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in filteredInboxes"
-                  :key="row.inbox_id"
-                  class="border-t border-slate-100"
-                >
-                  <td class="px-3 py-2">{{ row.account_name }}</td>
-                  <td class="px-3 py-2 text-slate-500">{{ row.account_id }}</td>
-                  <td class="px-3 py-2">{{ row.inbox_name }}</td>
-                  <td class="px-3 py-2 font-mono text-xs">
-                    {{ row.phone_number }}
-                  </td>
-                  <td class="px-3 py-2">
-                    <span
-                      v-if="row.connected"
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-50 text-emerald-700"
-                    >
-                      <span class="w-2 h-2 rounded-full bg-emerald-500" />
-                      Conectado
-                    </span>
-                    <span
-                      v-else
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-700"
-                    >
-                      <span class="w-2 h-2 rounded-full bg-red-500" />
-                      {{ row.connection || 'Desconectado' }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    <button
-                      v-if="!row.connected"
-                      type="button"
-                      class="px-2 py-1 rounded bg-blue-500 text-white text-xs hover:bg-blue-600"
-                      @click="openConnectModal(row)"
-                    >
-                      Conectar dispositivo
-                    </button>
-                    <button
-                      v-else
-                      type="button"
-                      class="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs hover:bg-slate-200"
-                      @click="openConnectModal(row)"
-                    >
-                      Detalhes
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="!filteredInboxes.length">
-                  <td colspan="6" class="px-3 py-6 text-center text-slate-400">
-                    Nenhuma inbox Baileys encontrada com os filtros atuais.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      <!-- KPI cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div
+          class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5"
+        >
+          <div class="text-sm text-n-slate-11">Total</div>
+          <div class="text-3xl font-medium text-n-slate-12 mt-2">
+            {{ filteredTotal }}
           </div>
         </div>
-
-        <aside class="bg-white border border-slate-200 rounded p-4">
-          <h2 class="text-sm font-semibold text-slate-700 mb-3">
-            Resumo (filtrado)
-          </h2>
-          <div class="flex flex-col gap-2 text-sm mb-4">
-            <div class="flex justify-between">
-              <span class="text-slate-600">Conectado</span>
-              <span class="font-medium text-emerald-600">
-                {{ filteredCounts.connected }} ({{
-                  pct(filteredCounts.connected)
-                }})
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-600">Desconectado</span>
-              <span class="font-medium text-red-600">
-                {{ filteredCounts.disconnected }} ({{
-                  pct(filteredCounts.disconnected)
-                }})
-              </span>
-            </div>
-            <div
-              class="flex justify-between border-t border-slate-100 pt-2 mt-1"
-            >
-              <span class="text-slate-600">Total</span>
-              <span class="font-medium">{{ filteredTotal }}</span>
-            </div>
+        <div
+          class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5"
+        >
+          <div class="text-sm text-n-slate-11">Conectado</div>
+          <div class="flex items-baseline gap-2 mt-2">
+            <span class="text-3xl font-medium text-n-teal-11">
+              {{ filteredCounts.connected }}
+            </span>
+            <span class="text-sm text-n-slate-11">
+              {{ pct(filteredCounts.connected) }}
+            </span>
           </div>
-          <div class="h-[260px]">
+        </div>
+        <div
+          class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5"
+        >
+          <div class="text-sm text-n-slate-11">Desconectado</div>
+          <div class="flex items-baseline gap-2 mt-2">
+            <span class="text-3xl font-medium text-n-ruby-11">
+              {{ filteredCounts.disconnected }}
+            </span>
+            <span class="text-sm text-n-slate-11">
+              {{ pct(filteredCounts.disconnected) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div
+        class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5 mb-6"
+      >
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Status
+            <select
+              v-model="filters.status"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+            >
+              <option value="all">Todos</option>
+              <option value="connected">Conectado</option>
+              <option value="disconnected">Desconectado</option>
+            </select>
+          </label>
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Telefone
+            <input
+              v-model="filters.phone"
+              type="text"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+              placeholder="Ex: 5585…"
+            />
+          </label>
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Account ID
+            <input
+              v-model="filters.account_id"
+              type="text"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+              placeholder="Ex: 42"
+            />
+          </label>
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Account
+            <input
+              v-model="filters.account_name"
+              list="superadmin-account-name-options"
+              type="text"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+              placeholder="Nome da account"
+            />
+            <datalist id="superadmin-account-name-options">
+              <option
+                v-for="opt in accountNameOptions"
+                :key="opt"
+                :value="opt"
+              />
+            </datalist>
+          </label>
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Inbox
+            <input
+              v-model="filters.inbox_name"
+              list="superadmin-inbox-name-options"
+              type="text"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+              placeholder="Nome da caixa"
+            />
+            <datalist id="superadmin-inbox-name-options">
+              <option v-for="opt in inboxNameOptions" :key="opt" :value="opt" />
+            </datalist>
+          </label>
+        </div>
+      </div>
+
+      <!-- Table + Chart 2-col -->
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        <div
+          class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow overflow-hidden"
+        >
+          <table class="w-full text-sm">
+            <thead class="bg-n-slate-3 text-n-slate-11 text-xs uppercase">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium">Account</th>
+                <th class="text-left px-4 py-3 font-medium">Account ID</th>
+                <th class="text-left px-4 py-3 font-medium">Inbox</th>
+                <th class="text-left px-4 py-3 font-medium">Telefone</th>
+                <th class="text-left px-4 py-3 font-medium">Status</th>
+                <th class="text-right px-4 py-3 font-medium">Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in filteredInboxes"
+                :key="row.inbox_id"
+                class="border-t border-n-weak text-n-slate-12 hover:bg-n-alpha-1"
+              >
+                <td class="px-4 py-3">{{ row.account_name }}</td>
+                <td class="px-4 py-3 text-n-slate-11">{{ row.account_id }}</td>
+                <td class="px-4 py-3">{{ row.inbox_name }}</td>
+                <td class="px-4 py-3 font-mono text-xs">
+                  {{ row.phone_number }}
+                </td>
+                <td class="px-4 py-3">
+                  <span
+                    v-if="row.connected"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-n-teal-3 text-n-teal-12"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-n-teal-10" />
+                    Conectado
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-n-ruby-3 text-n-ruby-12"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-n-ruby-10" />
+                    {{ row.connection || 'Desconectado' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <button
+                    v-if="!row.connected"
+                    type="button"
+                    class="px-2.5 py-1 rounded-lg bg-n-brand text-white text-xs font-medium hover:bg-n-brand/90"
+                    @click="openConnectModal(row)"
+                  >
+                    Conectar dispositivo
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="px-2.5 py-1 rounded-lg bg-n-alpha-2 text-n-slate-12 text-xs font-medium hover:bg-n-alpha-3"
+                    @click="openConnectModal(row)"
+                  >
+                    Detalhes
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!filteredInboxes.length">
+                <td colspan="6" class="px-4 py-8 text-center text-n-slate-11">
+                  Nenhuma inbox Baileys encontrada com os filtros atuais.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <aside
+          class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5"
+        >
+          <h2 class="text-sm font-medium text-n-slate-12 mb-4">
+            Conectado vs. desconectado
+          </h2>
+          <div class="h-72">
             <PieChart :collection="chartCollection" />
           </div>
         </aside>
       </div>
-    </section>
+    </div>
 
     <BaileysConnectionModal
       v-if="selectedInbox"
