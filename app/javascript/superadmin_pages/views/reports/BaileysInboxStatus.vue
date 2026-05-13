@@ -282,38 +282,41 @@ const resetFilters = () => {
         </div>
       </div>
 
-      <!-- Inbox table -->
+      <!-- Inbox table — same look as /reports/overview Agent Table -->
       <div
         class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow overflow-hidden"
       >
         <table class="w-full text-sm">
-          <thead class="bg-n-slate-3 text-n-slate-11 text-xs">
+          <thead class="bg-n-slate-1 text-n-slate-12">
             <tr>
-              <th class="text-left !pl-8 pr-6 py-3 font-medium">Account</th>
-              <th class="text-left px-6 py-3 font-medium">Account ID</th>
-              <th class="text-left px-6 py-3 font-medium">Inbox</th>
-              <th class="text-left px-6 py-3 font-medium">Telefone</th>
-              <th class="text-left px-6 py-3 font-medium">Status</th>
+              <th class="text-left !pl-6 pr-5 py-3 font-medium text-sm">
+                Account
+              </th>
+              <th class="text-left px-5 py-3 font-medium text-sm">Inbox</th>
+              <th class="text-left px-5 py-3 font-medium text-sm">Telefone</th>
+              <th class="text-left px-5 py-3 font-medium text-sm">Status</th>
               <th
-                class="text-left pl-6 !pr-8 py-3 font-medium w-px whitespace-nowrap"
+                class="text-left pl-5 !pr-6 py-3 font-medium text-sm w-px whitespace-nowrap"
               >
                 Ação
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-n-slate-2">
             <tr
               v-for="row in filteredInboxes"
               :key="row.inbox_id"
-              class="border-t border-n-weak text-n-slate-12 hover:bg-n-alpha-1"
+              class="text-n-slate-12 hover:bg-n-alpha-1"
             >
-              <td class="!pl-8 pr-6 py-3">{{ row.account_name }}</td>
-              <td class="px-6 py-3 text-n-slate-11">{{ row.account_id }}</td>
-              <td class="px-6 py-3">{{ row.inbox_name }}</td>
-              <td class="px-6 py-3 font-mono text-xs">
+              <td class="!pl-6 pr-5 py-4">
+                <span class="text-n-slate-11">({{ row.account_id }})</span>
+                {{ row.account_name }}
+              </td>
+              <td class="px-5 py-4">{{ row.inbox_name }}</td>
+              <td class="px-5 py-4 font-mono text-xs">
                 {{ row.phone_number }}
               </td>
-              <td class="px-6 py-3">
+              <td class="px-5 py-4">
                 <span
                   v-if="row.connected"
                   class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-n-teal-3 text-n-teal-12"
@@ -329,7 +332,7 @@ const resetFilters = () => {
                   {{ row.connection || 'Desconectado' }}
                 </span>
               </td>
-              <td class="pl-6 !pr-8 py-3 w-px whitespace-nowrap">
+              <td class="pl-5 !pr-6 py-4 w-px whitespace-nowrap">
                 <button
                   v-if="!row.connected"
                   type="button"
@@ -349,7 +352,7 @@ const resetFilters = () => {
               </td>
             </tr>
             <tr v-if="!filteredInboxes.length">
-              <td colspan="6" class="px-8 py-8 text-center text-n-slate-11">
+              <td colspan="5" class="!px-6 py-8 text-center text-n-slate-11">
                 Nenhuma inbox Baileys encontrada com os filtros atuais.
               </td>
             </tr>
