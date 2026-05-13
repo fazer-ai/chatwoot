@@ -52,6 +52,22 @@ RSpec.describe 'Conversations API', type: :request do
         expect(body[:data][:payload].first[:messages].first[:id]).to eq(private_note.id)
       end
 
+      # Regression: same logic applies to activity messages (status change,
+      # assignment, etc.). Filtering them from the seed would leave a trailing
+      # activity bubble outside the `before` cursor window, so it would
+      # disappear when the conversation is re-entered after navigating away.
+      it 'seeds the latest message even when it is an activity message' do
+        create(:message, conversation: conversation, account: account)
+        activity = create(:message, conversation: conversation, account: account, message_type: :activity, content: 'Conversation resolved')
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        body = JSON.parse(response.body, symbolize_names: true)
+        expect(body[:data][:payload].first[:messages].first[:id]).to eq(activity.id)
+      end
+
       it 'returns conversations with empty messages array for conversations with out messages' do
         get "/api/v1/accounts/#{account.id}/conversations",
             headers: agent.create_new_auth_token,
