@@ -4,6 +4,7 @@ import { parseISO } from 'date-fns';
 import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
+import { vOnClickOutside } from '@vueuse/components';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
@@ -24,6 +25,7 @@ const { t } = useI18n();
 
 const isEditingValue = ref(false);
 const editedValue = ref(props.attribute.value || '');
+const initialEditValue = ref('');
 
 const rules = {
   editedValue: {
@@ -63,6 +65,9 @@ const toggleEditValue = value => {
     v$.value.$reset();
     editedValue.value = new Date().toISOString();
   }
+  if (isEditingValue.value) {
+    initialEditValue.value = editedValue.value;
+  }
 };
 
 const handleInputUpdate = async () => {
@@ -71,6 +76,14 @@ const handleInputUpdate = async () => {
 
   emit('update', parseISO(editedValue.value));
   isEditingValue.value = false;
+};
+
+const handleClickOutside = () => {
+  if (editedValue.value === initialEditValue.value) {
+    isEditingValue.value = false;
+    return;
+  }
+  handleInputUpdate();
 };
 </script>
 
@@ -119,7 +132,7 @@ const handleInputUpdate = async () => {
 
     <div
       v-if="isEditingValue"
-      v-on-clickaway="() => toggleEditValue(false)"
+      v-on-click-outside="handleClickOutside"
       class="flex items-center w-full"
     >
       <Input
