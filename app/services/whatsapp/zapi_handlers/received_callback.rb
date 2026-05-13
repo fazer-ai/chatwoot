@@ -76,8 +76,16 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     end
   end
 
+  # On outbound webhooks (`fromMe: true`), `senderName` is the WhatsApp profile
+  # name of the *instance owner* (the agent), not the recipient. Skip it so we
+  # don't stamp the agent's name onto a freshly-created contact when the first
+  # touch is an outbound message dispatched via Z-API (e.g. n8n flows). The
+  # phone fallback keeps the contact identifiable until the customer responds
+  # and `update_contact_name_if_needed` can fill in their real WhatsApp name.
   def contact_name
-    @raw_message[:senderName] || @raw_message[:chatName] || @raw_message[:phone]
+    return @raw_message[:chatName].presence || @raw_message[:phone] if @raw_message[:fromMe]
+
+    @raw_message[:senderName].presence || @raw_message[:chatName].presence || @raw_message[:phone]
   end
 
   def set_contact # rubocop:disable Metrics/MethodLength
@@ -106,9 +114,26 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    @contact.update!(name: push_name) if @contact.name == @raw_message[:phone]
+    update_contact_name_if_needed(push_name)
     update_contact_phone_number
     try_update_contact_avatar
+  end
+
+  # Two paths trigger a name update:
+  # 1. The existing name is still the phone-number placeholder (fresh contact
+  #    or one previously created by an outbound webhook after the contact_name
+  #    fix landed).
+  # 2. This is the customer's first incoming message in this inbox. Pre-fix
+  #    outbound webhooks stamped the agent's WhatsApp profile name onto the
+  #    contact; on the customer's first reply we now have their real
+  #    `senderName` and the contact has no prior incoming history to honor,
+  #    so overwrite the placeholder/agent-name with the WhatsApp profile name.
+  def update_contact_name_if_needed(push_name)
+    return @contact.update!(name: push_name) if @contact.name == @raw_message[:phone]
+    return unless incoming_message? && @raw_message[:senderName].present?
+    return if @contact.messages.exists?(inbox_id: inbox.id, message_type: :incoming)
+
+    @contact.update!(name: @raw_message[:senderName])
   end
 
   def update_contact_phone_number
