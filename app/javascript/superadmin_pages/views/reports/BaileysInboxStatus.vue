@@ -289,13 +289,13 @@ const resetFilters = () => {
         <table class="w-full text-sm">
           <thead class="bg-n-slate-3 text-n-slate-11 text-xs">
             <tr>
-              <th class="text-left pl-8 pr-6 py-3 font-medium">Account</th>
+              <th class="text-left !pl-8 pr-6 py-3 font-medium">Account</th>
               <th class="text-left px-6 py-3 font-medium">Account ID</th>
               <th class="text-left px-6 py-3 font-medium">Inbox</th>
               <th class="text-left px-6 py-3 font-medium">Telefone</th>
               <th class="text-left px-6 py-3 font-medium">Status</th>
               <th
-                class="text-left pl-6 pr-8 py-3 font-medium w-px whitespace-nowrap"
+                class="text-left pl-6 !pr-8 py-3 font-medium w-px whitespace-nowrap"
               >
                 Ação
               </th>
@@ -307,7 +307,7 @@ const resetFilters = () => {
               :key="row.inbox_id"
               class="border-t border-n-weak text-n-slate-12 hover:bg-n-alpha-1"
             >
-              <td class="pl-8 pr-6 py-3">{{ row.account_name }}</td>
+              <td class="!pl-8 pr-6 py-3">{{ row.account_name }}</td>
               <td class="px-6 py-3 text-n-slate-11">{{ row.account_id }}</td>
               <td class="px-6 py-3">{{ row.inbox_name }}</td>
               <td class="px-6 py-3 font-mono text-xs">
@@ -329,7 +329,7 @@ const resetFilters = () => {
                   {{ row.connection || 'Desconectado' }}
                 </span>
               </td>
-              <td class="pl-6 pr-8 py-3 w-px whitespace-nowrap">
+              <td class="pl-6 !pr-8 py-3 w-px whitespace-nowrap">
                 <button
                   v-if="!row.connected"
                   type="button"
