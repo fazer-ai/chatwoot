@@ -289,14 +289,15 @@ const resetFilters = () => {
         <table class="w-full text-sm">
           <thead class="bg-n-slate-1 text-n-slate-12">
             <tr>
-              <th class="text-left !pl-6 pr-5 py-3 font-medium text-sm">
-                Account
+              <th class="text-left px-5 py-3 font-medium text-sm">Account</th>
+              <th class="text-left px-5 py-3 font-medium text-sm">
+                Account ID
               </th>
               <th class="text-left px-5 py-3 font-medium text-sm">Inbox</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Telefone</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Status</th>
               <th
-                class="text-left pl-5 !pr-6 py-3 font-medium text-sm w-px whitespace-nowrap"
+                class="text-left px-5 py-3 font-medium text-sm w-px whitespace-nowrap"
               >
                 Ação
               </th>
@@ -308,10 +309,8 @@ const resetFilters = () => {
               :key="row.inbox_id"
               class="text-n-slate-12 hover:bg-n-alpha-1"
             >
-              <td class="!pl-6 pr-5 py-4">
-                <span class="text-n-slate-11">({{ row.account_id }})</span>
-                {{ row.account_name }}
-              </td>
+              <td class="px-5 py-4">{{ row.account_name }}</td>
+              <td class="px-5 py-4 text-n-slate-11">{{ row.account_id }}</td>
               <td class="px-5 py-4">{{ row.inbox_name }}</td>
               <td class="px-5 py-4 font-mono text-xs">
                 {{ row.phone_number }}
@@ -332,7 +331,7 @@ const resetFilters = () => {
                   {{ row.connection || 'Desconectado' }}
                 </span>
               </td>
-              <td class="pl-5 !pr-6 py-4 w-px whitespace-nowrap">
+              <td class="px-5 py-4 w-px whitespace-nowrap">
                 <button
                   v-if="!row.connected"
                   type="button"
@@ -352,7 +351,7 @@ const resetFilters = () => {
               </td>
             </tr>
             <tr v-if="!filteredInboxes.length">
-              <td colspan="5" class="!px-6 py-8 text-center text-n-slate-11">
+              <td colspan="6" class="px-5 py-8 text-center text-n-slate-11">
                 Nenhuma inbox Baileys encontrada com os filtros atuais.
               </td>
             </tr>
