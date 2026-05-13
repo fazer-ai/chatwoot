@@ -12,6 +12,7 @@
       ### 🐛 Fixes
 
       - **Conversation activity messages stay visible.** Bubbles like "Conversation resolved", "Reopened", agent assignment, priority change, and AI toggle now persist in the chat after you leave the conversation and come back — previously the state itself was kept but the activity bubble disappeared.
+      - **Z-API contacts no longer get stamped with the agent's name.** When the first message in a chat is sent from outside Chatwoot (e.g. n8n flows hitting Z-API directly), the new contact is now identified by phone instead of being named after the WhatsApp instance owner. As soon as the customer replies for the first time, their real WhatsApp profile name is filled in automatically — fixing both new and previously-polluted contacts.
     pt_BR: |-
       ### ⚡ Melhorias
 
@@ -21,6 +22,7 @@
       ### 🐛 Correções
 
       - **Atividades da conversa permanecem visíveis.** Balões como "Conversa marcada como resolvida", "Reaberta", atribuição de agente, troca de prioridade e troca da IA voltam a permanecer no chat depois que você sai da conversa e volta — antes, o status persistia mas o balão da atividade sumia.
+      - **Contatos Z-API não recebem mais o nome do agente.** Quando a primeira mensagem é disparada de fora do Chatwoot (ex.: fluxos no n8n chamando a Z-API direto), o novo contato passa a ser identificado pelo telefone em vez de herdar o nome do dono da instância WhatsApp. Assim que o paciente responder pela primeira vez, o nome real do WhatsApp dele é preenchido automaticamente — corrigindo tanto contatos novos quanto contatos já contaminados.
 - tag: v4.13.0-auris.1.15
   published_at: '2026-05-12T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.15
