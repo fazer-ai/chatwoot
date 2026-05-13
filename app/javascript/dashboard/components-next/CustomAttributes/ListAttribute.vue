@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToggle } from '@vueuse/core';
+import { vOnClickOutside } from '@vueuse/components';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
@@ -48,7 +49,7 @@ const handleAttributeAction = async action => {
     }"
   >
     <div
-      v-on-clickaway="() => toggleAttributeListDropdown(false)"
+      v-on-click-outside="() => toggleAttributeListDropdown(false)"
       class="relative flex items-center"
     >
       <span
