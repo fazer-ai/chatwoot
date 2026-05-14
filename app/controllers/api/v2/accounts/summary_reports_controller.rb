@@ -1,6 +1,6 @@
 class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseController
   before_action :check_authorization
-  before_action :prepare_builder_params, only: [:agent, :team, :inbox, :label, :channel]
+  before_action :prepare_builder_params, only: [:agent, :team, :inbox, :label, :channel, :funnel]
 
   def agent
     render_report_with(V2::Reports::AgentSummaryBuilder)
@@ -22,6 +22,10 @@ class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseContr
     return render_could_not_create_error(I18n.t('errors.reports.date_range_too_long')) if date_range_too_long?
 
     render_report_with(V2::Reports::ChannelSummaryBuilder)
+  end
+
+  def funnel
+    render_report_with(V2::Reports::FunnelSummaryBuilder)
   end
 
   private

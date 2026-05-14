@@ -22,6 +22,11 @@ const typeMap = {
     apiMethod: 'getLabelReports',
     mutationKey: 'setLabelSummaryReport',
   },
+  funnel: {
+    flagKey: 'isFetchingFunnelSummaryReports',
+    apiMethod: 'getFunnelReports',
+    mutationKey: 'setFunnelSummaryReport',
+  },
 };
 
 async function fetchSummaryReports(type, params, { commit }) {
@@ -46,11 +51,13 @@ export const initialState = {
   agentSummaryReports: [],
   teamSummaryReports: [],
   labelSummaryReports: [],
+  funnelSummaryReports: [],
   uiFlags: {
     isFetchingInboxSummaryReports: false,
     isFetchingAgentSummaryReports: false,
     isFetchingTeamSummaryReports: false,
     isFetchingLabelSummaryReports: false,
+    isFetchingFunnelSummaryReports: false,
   },
 };
 
@@ -66,6 +73,9 @@ export const getters = {
   },
   getLabelSummaryReports(state) {
     return state.labelSummaryReports;
+  },
+  getFunnelSummaryReports(state) {
+    return state.funnelSummaryReports;
   },
   getUIFlags(state) {
     return state.uiFlags;
@@ -88,6 +98,10 @@ export const actions = {
   fetchLabelSummaryReports({ commit }, params) {
     return fetchSummaryReports('label', params, { commit });
   },
+
+  fetchFunnelSummaryReports({ commit }, params) {
+    return fetchSummaryReports('funnel', params, { commit });
+  },
 };
 
 export const mutations = {
@@ -102,6 +116,9 @@ export const mutations = {
   },
   setLabelSummaryReport(state, data) {
     state.labelSummaryReports = data;
+  },
+  setFunnelSummaryReport(state, data) {
+    state.funnelSummaryReports = data;
   },
   setUIFlags(state, uiFlag) {
     state.uiFlags = { ...state.uiFlags, ...uiFlag };

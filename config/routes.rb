@@ -522,6 +522,7 @@ Rails.application.routes.draw do
               get :inbox
               get :label
               get :channel
+              get :funnel
             end
           end
           resources :reports, only: [:index] do
