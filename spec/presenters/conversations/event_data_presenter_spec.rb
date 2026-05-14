@@ -72,6 +72,20 @@ RSpec.describe Conversations::EventDataPresenter do
     it 'returns empty messages when conversation has no chat messages' do
       expect(presenter.webhook_data[:messages]).to eq([])
     end
+
+    # Regression: automation webhooks and bare conversation_* events ride this
+    # presenter and previously shipped without any account context, so n8n
+    # flows couldn't branch on the per-account Auris feature flags.
+    it 'embeds the account context including Auris settings' do
+      conversation.account.update!(funnel_enabled: true, ai_status_uses_attribute: false, multi_language_ai: true)
+
+      expect(presenter.webhook_data[:account]).to eq(conversation.account.webhook_data)
+      expect(presenter.webhook_data.dig(:account, :settings)).to eq(
+        funnel_enabled: true,
+        ai_status_uses_attribute: false,
+        multi_language_ai: true
+      )
+    end
   end
 
   describe '#push_data last_non_activity_message' do
