@@ -83,13 +83,13 @@ const columns = computed(() => [
     width: 260,
     cell: renderStageName,
   }),
-  columnHelper.accessor('inStageCount', {
-    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.IN_STAGE')),
+  columnHelper.accessor('enteredCount', {
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.ENTERED')),
     width: 200,
     cell: defaultRender,
   }),
-  columnHelper.accessor('enteredCount', {
-    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.ENTERED')),
+  columnHelper.accessor('inStageCount', {
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.IN_STAGE')),
     width: 200,
     cell: defaultRender,
   }),
