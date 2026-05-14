@@ -157,7 +157,7 @@
     "SCROLL_TO_BOTTOM": "Scroll to bottom",
     "NEW_MESSAGES": "New messages",
     "LOADING_MESSAGES": "Loading messages...",
-    "MENTION_BADGE": "@",
+    "MENTION_BADGE": "{'@'}",
     "EMPTY_STATE": {
       "TITLE": "Welcome to Internal Chat",
       "SUBTITLE": "Pick a channel or conversation from the sidebar to get started."
