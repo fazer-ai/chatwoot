@@ -155,13 +155,14 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
         </text>
       </g>
 
-      <!-- Vertical separators between stages -->
+      <!-- Vertical separators between stages — confined to the funnel area
+           so they never run through the label text above. -->
       <g>
         <line
           v-for="(pt, idx) in stagePoints"
           :key="`sep-${idx}`"
           :x1="pt.x"
-          y1="10"
+          :y1="FUNNEL_TOP"
           :x2="pt.x"
           :y2="VIEWBOX_HEIGHT - 10"
           stroke="#e5e7eb"
