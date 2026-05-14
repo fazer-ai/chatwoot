@@ -9,6 +9,7 @@ import InboxReportsIndex from './InboxReportsIndex.vue';
 import TeamReportsIndex from './TeamReportsIndex.vue';
 import LabelReportsIndex from './LabelReportsIndex.vue';
 import FunnelReportsIndex from './FunnelReportsIndex.vue';
+import FunnelConversionReportsIndex from './FunnelConversionReportsIndex.vue';
 
 import AgentReportsShow from './AgentReportsShow.vue';
 import InboxReportsShow from './InboxReportsShow.vue';
@@ -174,6 +175,12 @@ export default {
           name: 'funnel_reports_index',
           meta,
           component: FunnelReportsIndex,
+        },
+        {
+          path: 'funnel_conversion',
+          name: 'funnel_conversion_reports_index',
+          meta,
+          component: FunnelConversionReportsIndex,
         },
       ],
     },

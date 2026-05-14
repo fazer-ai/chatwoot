@@ -658,5 +658,21 @@
       "WON": "Won",
       "LOST": "Lost"
     }
+  },
+  "FUNNEL_CONVERSION_REPORTS": {
+    "HEADER": "Funnel Conversion",
+    "DESCRIPTION": "Visualize how many distinct conversations passed through each funnel stage in the period and the conversion rate between consecutive stages — the classic sales-funnel chart.",
+    "EMPTY_STATE": "No funnel activity in the selected period.",
+    "CONVERSION_LABEL": "Conversion",
+    "CONVERSION_VALUE": "Conversion: {rate}",
+    "DROP_OFF_LABEL": "{count} dropped off",
+    "WIN_RATE_DETAIL": "{won} / {total}",
+    "EXCEEDS_TOOLTIP": "More conversations entered this stage than the previous one — some arrived without passing through the prior stage.",
+    "SEPARATOR": "·",
+    "KPIS": {
+      "TOP_COUNT": "Top of funnel",
+      "COMPLETED": "Completed",
+      "WIN_RATE": "Win rate"
+    }
   }
 }

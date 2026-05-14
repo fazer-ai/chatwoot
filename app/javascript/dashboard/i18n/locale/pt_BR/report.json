@@ -658,5 +658,21 @@
       "WON": "Ganhas",
       "LOST": "Perdidas"
     }
+  },
+  "FUNNEL_CONVERSION_REPORTS": {
+    "HEADER": "Funil de Conversão",
+    "DESCRIPTION": "Visualize quantas conversas distintas passaram por cada fase do funil no período e a taxa de conversão entre fases consecutivas — o gráfico clássico de funil de vendas.",
+    "EMPTY_STATE": "Nenhuma atividade no funil no período selecionado.",
+    "CONVERSION_LABEL": "Conversão",
+    "CONVERSION_VALUE": "Conversão: {rate}",
+    "DROP_OFF_LABEL": "{count} não avançou",
+    "WIN_RATE_DETAIL": "{won} / {total}",
+    "EXCEEDS_TOOLTIP": "Mais conversas entraram nesta fase do que na anterior — algumas chegaram sem passar pela fase anterior.",
+    "SEPARATOR": "·",
+    "KPIS": {
+      "TOP_COUNT": "Topo do funil",
+      "COMPLETED": "Concluídas",
+      "WIN_RATE": "Taxa de ganho"
+    }
   }
 }

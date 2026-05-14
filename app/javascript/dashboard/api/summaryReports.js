@@ -54,6 +54,15 @@ class SummaryReportsAPI extends ApiClient {
       },
     });
   }
+
+  getFunnelConversionReports({ since, until } = {}) {
+    return axios.get(`${this.url}/funnel_conversion`, {
+      params: {
+        since,
+        until,
+      },
+    });
+  }
 }
 
 export default new SummaryReportsAPI();

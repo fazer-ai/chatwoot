@@ -394,6 +394,7 @@
     "REPORTS_INBOX": "Inbox",
     "REPORTS_TEAM": "Team",
     "REPORTS_FUNNEL": "Funnel",
+    "REPORTS_FUNNEL_CONVERSION": "Funnel Conversion",
     "AGENT_ASSIGNMENT": "Agent Assignment",
     "SET_AVAILABILITY_TITLE": "Set yourself as",
     "SET_YOUR_AVAILABILITY": "Set your availability",

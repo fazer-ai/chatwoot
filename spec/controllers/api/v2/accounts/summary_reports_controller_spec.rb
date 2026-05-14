@@ -278,4 +278,53 @@ RSpec.describe 'Summary Reports API', type: :request do
       end
     end
   end
+
+  describe 'GET /api/v2/accounts/:account_id/summary_reports/funnel_conversion' do
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel_conversion"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:params) do
+        { since: start_of_today.to_s, until: end_of_today.to_s }
+      end
+
+      it 'returns unauthorized for agents' do
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel_conversion",
+            params: params,
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'calls V2::Reports::FunnelConversionBuilder when admin and renders the funnel + KPIs' do
+        builder = instance_double(V2::Reports::FunnelConversionBuilder)
+        allow(V2::Reports::FunnelConversionBuilder).to receive(:new).and_return(builder)
+        allow(builder).to receive(:build).and_return(
+          stages: [{ id: 1, name: 'Lead', count: 10, conversion_rate: 50.0, drop_off_count: 5 }],
+          kpis: { top_count: 10, completed_count: 4, won_count: 3, win_rate: 75.0 }
+        )
+
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel_conversion",
+            params: params,
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(V2::Reports::FunnelConversionBuilder).to have_received(:new).with(
+          account: account,
+          params: hash_including(since: start_of_today.to_s, until: end_of_today.to_s)
+        )
+        expect(builder).to have_received(:build)
+
+        json_response = response.parsed_body
+        expect(json_response['stages'].first['name']).to eq('Lead')
+        expect(json_response['kpis']['win_rate']).to eq(75.0)
+      end
+    end
+  end
 end

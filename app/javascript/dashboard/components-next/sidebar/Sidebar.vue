@@ -472,6 +472,11 @@ const menuItems = computed(() => {
           label: t('SIDEBAR.REPORTS_FUNNEL'),
           to: accountScopedRoute('funnel_reports_index'),
         },
+        {
+          name: 'Reports Funnel Conversion',
+          label: t('SIDEBAR.REPORTS_FUNNEL_CONVERSION'),
+          to: accountScopedRoute('funnel_conversion_reports_index'),
+        },
       ],
     },
     {
