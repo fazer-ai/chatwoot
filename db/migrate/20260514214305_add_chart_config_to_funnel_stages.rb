@@ -21,6 +21,7 @@ class AddChartConfigToFunnelStages < ActiveRecord::Migration[7.1]
     add_column :funnel_stages, :chart_display_name, :string
 
     execute("UPDATE funnel_stages SET chart_display_name = 'Total de leads' WHERE name = 'Novo Contato'")
+    execute("UPDATE funnel_stages SET chart_display_name = 'Vendas realizadas' WHERE name = 'Ganho'")
     execute(<<~SQL.squish)
       UPDATE funnel_stages
          SET chart_group = 'Agendamento'
