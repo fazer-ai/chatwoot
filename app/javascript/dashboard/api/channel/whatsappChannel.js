@@ -10,14 +10,7 @@ class WhatsappChannel extends ApiClient {
     return axios.post(`${this.baseUrl()}/whatsapp/authorization`, params);
   }
 
-  reauthorizeWhatsApp({ inboxId, ...params }) {
-    return axios.post(`${this.baseUrl()}/whatsapp/authorization`, {
-      ...params,
-      inbox_id: inboxId,
-    });
-  }
-
-  convertViaEmbeddedSignup({ inboxId, ...params }) {
+  postEmbeddedSignupAuthorization({ inboxId, ...params }) {
     return axios.post(`${this.baseUrl()}/whatsapp/authorization`, {
       ...params,
       inbox_id: inboxId,

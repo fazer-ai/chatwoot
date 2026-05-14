@@ -279,7 +279,8 @@ export const actions = {
   convertWhatsAppEmbeddedSignup: async ({ commit, dispatch }, params) => {
     commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: true });
     try {
-      const response = await WhatsappChannel.convertViaEmbeddedSignup(params);
+      const response =
+        await WhatsappChannel.postEmbeddedSignupAuthorization(params);
       await dispatch('get');
       commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
       return response.data;
