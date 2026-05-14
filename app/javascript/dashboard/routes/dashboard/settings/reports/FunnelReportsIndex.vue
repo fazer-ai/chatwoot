@@ -46,16 +46,29 @@ const renderCount = value =>
 const renderTime = value => (value ? formatTime(value) : '--');
 
 const columnHelper = createColumnHelper();
+// Headers and the stage-name cell render as a span with `whitespace-nowrap` so
+// labels like "Atualmente na fase" and "Tempo médio na fase" — plus longer
+// custom stage names — stay on one line instead of wrapping into the column
+// underneath. tanstack-vue-table's column `width` is a hint, not a hard cap;
+// nowrap lets the actual cell drive the final width.
+const nowrapHeader = label => () =>
+  h('span', { class: 'whitespace-nowrap' }, label);
+
 const defaultRender = cellProps =>
   h(
     'span',
-    { class: cellProps.getValue() ? '' : 'text-n-slate-12' },
+    {
+      class: [
+        'whitespace-nowrap',
+        cellProps.getValue() ? '' : 'text-n-slate-12',
+      ],
+    },
     cellProps.getValue()
   );
 
 const renderStageName = cellProps => {
   const row = cellProps.row.original;
-  return h('div', { class: 'flex items-center gap-2' }, [
+  return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
     h('span', {
       class: 'w-2.5 h-2.5 rounded-full flex-shrink-0',
       style: { backgroundColor: row.color || '#94a3b8' },
@@ -66,32 +79,32 @@ const renderStageName = cellProps => {
 
 const columns = computed(() => [
   columnHelper.accessor('name', {
-    header: t('FUNNEL_REPORTS.COLUMNS.STAGE'),
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.STAGE')),
     width: 260,
     cell: renderStageName,
   }),
   columnHelper.accessor('inStageCount', {
-    header: t('FUNNEL_REPORTS.COLUMNS.IN_STAGE'),
-    width: 160,
-    cell: defaultRender,
-  }),
-  columnHelper.accessor('enteredCount', {
-    header: t('FUNNEL_REPORTS.COLUMNS.ENTERED'),
-    width: 180,
-    cell: defaultRender,
-  }),
-  columnHelper.accessor('avgTimeInStage', {
-    header: t('FUNNEL_REPORTS.COLUMNS.AVG_TIME'),
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.IN_STAGE')),
     width: 200,
     cell: defaultRender,
   }),
+  columnHelper.accessor('enteredCount', {
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.ENTERED')),
+    width: 200,
+    cell: defaultRender,
+  }),
+  columnHelper.accessor('avgTimeInStage', {
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.AVG_TIME')),
+    width: 220,
+    cell: defaultRender,
+  }),
   columnHelper.accessor('wonCount', {
-    header: t('FUNNEL_REPORTS.COLUMNS.WON'),
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.WON')),
     width: 140,
     cell: defaultRender,
   }),
   columnHelper.accessor('lostCount', {
-    header: t('FUNNEL_REPORTS.COLUMNS.LOST'),
+    header: nowrapHeader(t('FUNNEL_REPORTS.COLUMNS.LOST')),
     width: 140,
     cell: defaultRender,
   }),
