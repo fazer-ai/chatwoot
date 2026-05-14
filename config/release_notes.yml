@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.18
+  published_at: '2026-05-14T02:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.18
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Webhook improvements.** More event types now carry account context alongside their payload, including events fired by automation rules and bare conversation updates.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Melhorias nos webhooks.** Mais tipos de evento passam a carregar o contexto da conta junto com o payload, incluindo os disparados por regras de automação e atualizações de conversa.
 - tag: v4.13.0-auris.1.17
   published_at: '2026-05-14T00:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.17
