@@ -37,11 +37,11 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
     }, status: :unprocessable_entity
   end
 
+  # Accept any WhatsApp inbox here so the embedded signup flow can drive both
+  # reauth/upgrade of an existing whatsapp_cloud inbox AND provider conversion
+  # from a non-cloud WhatsApp inbox (baileys, zapi, 360dialog) to cloud.
   def can_upgrade_to_embedded_signup?
-    channel = @inbox.channel
-    return false unless channel.provider == 'whatsapp_cloud'
-
-    true
+    @inbox.channel.is_a?(Channel::Whatsapp)
   end
 
   def render_success_response(inbox)

@@ -151,14 +151,74 @@ describe Whatsapp::EmbeddedSignupService do
       end
     end
 
+    context 'with provider conversion flow' do
+      let(:baileys_channel) do
+        create(:channel_whatsapp, account: account, provider: 'baileys', phone_number: '+1234567890',
+                                  validate_provider_config: false, sync_templates: false)
+      end
+      let(:baileys_inbox) { baileys_channel.inbox }
+      let(:service_with_inbox) do
+        described_class.new(account: account, params: params, inbox_id: baileys_inbox.id)
+      end
+
+      before do
+        # The service does `@account.inboxes.find(id).channel`; force the chain
+        # to return the same Ruby instances the test sets expectations on so
+        # the message expectations actually match.
+        inbox_relation = instance_double(ActiveRecord::Relation)
+        allow(account).to receive(:inboxes).and_return(inbox_relation)
+        allow(inbox_relation).to receive(:find).with(baileys_inbox.id).and_return(baileys_inbox)
+        allow(baileys_inbox).to receive(:channel).and_return(baileys_channel)
+
+        allow(baileys_channel).to receive(:convert_provider!).and_return(baileys_channel)
+        allow(baileys_channel).to receive(:setup_webhooks)
+      end
+
+      it 'routes to convert_provider! with embedded signup credentials' do
+        expect(baileys_channel).to receive(:convert_provider!).with(
+          new_provider: 'whatsapp_cloud',
+          new_provider_config: {
+            'api_key' => access_token,
+            'phone_number_id' => params[:phone_number_id],
+            'business_account_id' => params[:business_id],
+            'source' => 'embedded_signup'
+          }
+        ).and_return(baileys_channel)
+
+        expect(baileys_channel).to receive(:setup_webhooks)
+
+        result = service_with_inbox.perform
+        expect(result).to eq(baileys_channel)
+      end
+
+      it 'skips ReauthorizationService when current provider is not whatsapp_cloud' do
+        expect(Whatsapp::ReauthorizationService).not_to receive(:new)
+        service_with_inbox.perform
+      end
+
+      it 'does not run channel health check on conversion' do
+        expect(Whatsapp::HealthService).not_to receive(:new)
+        service_with_inbox.perform
+      end
+    end
+
     context 'with reauthorization flow' do
       let(:inbox_id) { 123 }
+      let(:cloud_inbox) { instance_double(Inbox) }
+      let(:cloud_channel) { instance_double(Channel::Whatsapp, provider: 'whatsapp_cloud') }
       let(:reauth_service) { instance_double(Whatsapp::ReauthorizationService) }
       let(:service_with_inbox) do
         described_class.new(account: account, params: params, inbox_id: inbox_id)
       end
 
       before do
+        # The service looks up the channel before routing; stub the lookup chain
+        # so it returns a whatsapp_cloud channel and routes to ReauthorizationService.
+        inbox_relation = instance_double(ActiveRecord::Relation)
+        allow(account).to receive(:inboxes).and_return(inbox_relation)
+        allow(inbox_relation).to receive(:find).with(inbox_id).and_return(cloud_inbox)
+        allow(cloud_inbox).to receive(:channel).and_return(cloud_channel)
+
         allow(Whatsapp::ReauthorizationService).to receive(:new).with(
           account: account,
           inbox_id: inbox_id,
@@ -189,12 +249,16 @@ describe Whatsapp::EmbeddedSignupService do
       context 'with real channel requiring reauthorization' do
         let(:inbox) { create(:inbox, account: account) }
         let(:whatsapp_channel) do
-          create(:channel_whatsapp, account: account, phone_number: '+1234567890',
+          create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', phone_number: '+1234567890',
                                     validate_provider_config: false, sync_templates: false)
         end
         let(:service_with_real_inbox) { described_class.new(account: account, params: params, inbox_id: inbox.id) }
 
         before do
+          # Reset the outer context's account.inboxes stub so the real lookup runs
+          # against the persisted inbox created here.
+          allow(account).to receive(:inboxes).and_call_original
+
           inbox.update!(channel: whatsapp_channel)
           whatsapp_channel.prompt_reauthorization!
 

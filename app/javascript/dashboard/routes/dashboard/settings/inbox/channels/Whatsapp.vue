@@ -153,8 +153,7 @@ const selectProvider = providerValue => {
 const shouldShowCloudWhatsapp = provider => {
   return (
     provider === PROVIDER_TYPES.WHATSAPP_MANUAL ||
-    (provider === PROVIDER_TYPES.WHATSAPP &&
-      (!hasWhatsappAppId.value || isConvertMode.value))
+    (provider === PROVIDER_TYPES.WHATSAPP && !hasWhatsappAppId.value)
   );
 };
 
@@ -203,12 +202,10 @@ const handleManualLinkClick = () => {
         <!-- Show embedded signup if app ID is configured -->
         <div
           v-if="
-            !isConvertMode &&
-            hasWhatsappAppId &&
-            selectedProvider === PROVIDER_TYPES.WHATSAPP
+            hasWhatsappAppId && selectedProvider === PROVIDER_TYPES.WHATSAPP
           "
         >
-          <WhatsappEmbeddedSignup />
+          <WhatsappEmbeddedSignup :mode="mode" :inbox="inbox" />
 
           <!-- Manual setup fallback option -->
           <div class="pt-6 mt-6 border-t border-n-weak">
