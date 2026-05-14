@@ -143,7 +143,8 @@ class Account < ApplicationRecord
   def webhook_data
     {
       id: id,
-      name: name
+      name: name,
+      settings: auris_settings
     }
   end
 

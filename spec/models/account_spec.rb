@@ -349,4 +349,25 @@ RSpec.describe Account do
       end
     end
   end
+
+  describe '#webhook_data' do
+    let(:account) do
+      create(:account,
+             funnel_enabled: true,
+             ai_status_uses_attribute: true,
+             multi_language_ai: false)
+    end
+
+    it 'includes the Auris settings block so n8n consumers can read feature flags' do
+      expect(account.webhook_data).to eq(
+        id: account.id,
+        name: account.name,
+        settings: {
+          funnel_enabled: true,
+          ai_status_uses_attribute: true,
+          multi_language_ai: false
+        }
+      )
+    end
+  end
 end
