@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.17
+  published_at: '2026-05-14T00:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.17
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Webhook improvements.** Webhook payloads now carry extra account context alongside each event, making external integrations (n8n, Zapier, etc.) easier to wire up.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Melhorias nos webhooks.** Os webhooks agora carregam mais informações de contexto da conta junto com cada evento, facilitando integrações externas (n8n, Zapier, etc.).
 - tag: v4.13.0-auris.1.16
   published_at: '2026-05-13T21:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.16
