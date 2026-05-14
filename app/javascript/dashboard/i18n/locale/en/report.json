@@ -662,6 +662,7 @@
   "FUNNEL_CONVERSION_REPORTS": {
     "HEADER": "Funnel Conversion",
     "DESCRIPTION": "Visualize how many distinct conversations passed through each funnel stage in the period and the conversion rate between consecutive stages — the classic sales-funnel chart.",
+    "CHART_ARIA_LABEL": "Funnel conversion chart",
     "EMPTY_STATE": "No funnel activity in the selected period.",
     "CONVERSION_LABEL": "Conversion",
     "CONVERSION_VALUE": "Conversion: {rate}",

@@ -9,6 +9,8 @@ import LossReasonAPI from 'dashboard/api/lossReason';
 
 import FunnelBoard from './components/FunnelBoard.vue';
 import FunnelList from './components/FunnelList.vue';
+import FunnelOverview from './components/FunnelOverview.vue';
+import FunnelConversion from './components/FunnelConversion.vue';
 import FunnelFilters from './components/FunnelFilters.vue';
 import LossReasonDialog from './components/LossReasonDialog.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
@@ -16,7 +18,17 @@ import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 const { t } = useI18n();
 const getters = useStoreGetters();
 
-const VIEW_MODES = ['board', 'list'];
+// 'board' and 'list' share the FunnelFilters / fetchFunnel pipeline below
+// (real-time stage layout with conversations grouped by stage). 'overview'
+// and 'conversion' are report-style views that bring their own date filter
+// and Vuex-backed fetch, so they sit outside that pipeline.
+const VIEW_MODES = ['board', 'list', 'overview', 'conversion'];
+const VIEW_ICONS = {
+  board: 'i-lucide-columns-3',
+  list: 'i-lucide-list',
+  overview: 'i-lucide-table',
+  conversion: 'i-lucide-trending-down',
+};
 const viewMode = ref('board');
 
 const isLoading = ref(false);
@@ -228,53 +240,57 @@ onMounted(fetchFunnel);
           "
           @click="setViewMode(mode)"
         >
-          <span
-            :class="mode === 'board' ? 'i-lucide-columns-3' : 'i-lucide-list'"
-            class="size-4"
-          />
+          <span :class="VIEW_ICONS[mode]" class="size-4" />
           {{ t(`FUNNEL.VIEW_MODE.${mode.toUpperCase()}`) }}
         </button>
       </div>
     </header>
 
-    <FunnelFilters
-      v-model:inbox-id="filters.inboxId"
-      v-model:from-date="filters.fromDate"
-      v-model:to-date="filters.toDate"
-      v-model:hide-closed="filters.hideClosed"
-      @reset="resetFilters"
-    />
+    <!-- Report-style views (overview / conversion) -->
+    <FunnelOverview v-if="viewMode === 'overview'" />
+    <FunnelConversion v-else-if="viewMode === 'conversion'" />
 
-    <div
-      v-if="isLoading"
-      class="flex items-center justify-center flex-1 text-n-slate-11"
-    >
-      <Spinner />
-    </div>
+    <!-- Stage-layout views (board / list) share the funnel fetch pipeline -->
+    <template v-else>
+      <FunnelFilters
+        v-model:inbox-id="filters.inboxId"
+        v-model:from-date="filters.fromDate"
+        v-model:to-date="filters.toDate"
+        v-model:hide-closed="filters.hideClosed"
+        @reset="resetFilters"
+      />
 
-    <div
-      v-else-if="isEmpty"
-      class="flex items-center justify-center flex-1 text-n-slate-11 px-6 text-center"
-    >
-      {{ t('FUNNEL.EMPTY_STATE') }}
-    </div>
+      <div
+        v-if="isLoading"
+        class="flex items-center justify-center flex-1 text-n-slate-11"
+      >
+        <Spinner />
+      </div>
 
-    <FunnelBoard
-      v-else-if="viewMode === 'board'"
-      :stages="stages"
-      :conversations-by-stage="conversationsByStage"
-      :average-ticket="accountAverageTicket"
-      :locale="accountLocale"
-      @move="moveConversation"
-    />
+      <div
+        v-else-if="isEmpty"
+        class="flex items-center justify-center flex-1 text-n-slate-11 px-6 text-center"
+      >
+        {{ t('FUNNEL.EMPTY_STATE') }}
+      </div>
 
-    <FunnelList
-      v-else
-      :stages="stages"
-      :conversations-by-stage="conversationsByStage"
-      :average-ticket="accountAverageTicket"
-      :locale="accountLocale"
-    />
+      <FunnelBoard
+        v-else-if="viewMode === 'board'"
+        :stages="stages"
+        :conversations-by-stage="conversationsByStage"
+        :average-ticket="accountAverageTicket"
+        :locale="accountLocale"
+        @move="moveConversation"
+      />
+
+      <FunnelList
+        v-else
+        :stages="stages"
+        :conversations-by-stage="conversationsByStage"
+        :average-ticket="accountAverageTicket"
+        :locale="accountLocale"
+      />
+    </template>
 
     <LossReasonDialog
       ref="lossReasonDialogRef"

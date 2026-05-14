@@ -662,6 +662,7 @@
   "FUNNEL_CONVERSION_REPORTS": {
     "HEADER": "Funil de Conversão",
     "DESCRIPTION": "Visualize quantas conversas distintas passaram por cada fase do funil no período e a taxa de conversão entre fases consecutivas — o gráfico clássico de funil de vendas.",
+    "CHART_ARIA_LABEL": "Gráfico do funil de conversão",
     "EMPTY_STATE": "Nenhuma atividade no funil no período selecionado.",
     "CONVERSION_LABEL": "Conversão",
     "CONVERSION_VALUE": "Conversão: {rate}",

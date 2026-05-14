@@ -8,9 +8,6 @@ import AgentReportsIndex from './AgentReportsIndex.vue';
 import InboxReportsIndex from './InboxReportsIndex.vue';
 import TeamReportsIndex from './TeamReportsIndex.vue';
 import LabelReportsIndex from './LabelReportsIndex.vue';
-import FunnelReportsIndex from './FunnelReportsIndex.vue';
-import FunnelConversionReportsIndex from './FunnelConversionReportsIndex.vue';
-
 import AgentReportsShow from './AgentReportsShow.vue';
 import InboxReportsShow from './InboxReportsShow.vue';
 import TeamReportsShow from './TeamReportsShow.vue';
@@ -169,18 +166,6 @@ export default {
           name: 'bot_reports',
           meta,
           component: BotReports,
-        },
-        {
-          path: 'funnel_overview',
-          name: 'funnel_reports_index',
-          meta,
-          component: FunnelReportsIndex,
-        },
-        {
-          path: 'funnel_conversion',
-          name: 'funnel_conversion_reports_index',
-          meta,
-          component: FunnelConversionReportsIndex,
         },
       ],
     },
