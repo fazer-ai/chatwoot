@@ -133,7 +133,7 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
           :x="label.x"
           :y="32"
           :text-anchor="label.anchor"
-          class="fill-n-slate-11 text-lg"
+          class="fill-n-slate-11 text-sm"
         >
           {{ label.name }}
         </text>
@@ -141,7 +141,7 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
           :x="label.x"
           :y="72"
           :text-anchor="label.anchor"
-          class="fill-n-slate-12 text-4xl font-semibold"
+          class="fill-n-slate-12 text-2xl font-semibold"
         >
           {{ formatCount(label.count) }}
         </text>
@@ -149,7 +149,7 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
           :x="label.x"
           :y="100"
           :text-anchor="label.anchor"
-          class="fill-n-slate-11 text-lg"
+          class="fill-n-slate-11 text-sm"
         >
           {{ formatPct(label.pct) }}
         </text>

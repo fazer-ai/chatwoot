@@ -144,6 +144,17 @@ const table = useVueTable({
 
 <template>
   <div class="flex flex-col flex-1 gap-3 px-6 py-5 overflow-auto">
+    <section class="flex flex-col gap-2 pb-2">
+      <span class="text-heading-1 text-n-slate-12">
+        {{ $t('FUNNEL_REPORTS.HEADER') }}
+      </span>
+      <p
+        class="text-n-slate-11 mb-0 line-clamp-5 sm:line-clamp-none text-body-main"
+      >
+        {{ $t('FUNNEL_REPORTS.DESCRIPTION') }}
+      </p>
+    </section>
+
     <div
       class="flex flex-col justify-between gap-3 md:flex-row"
       :class="{ 'pointer-events-none opacity-50': isLoading }"
