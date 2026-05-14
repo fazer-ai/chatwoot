@@ -4,6 +4,9 @@
 #
 #  id                   :bigint           not null, primary key
 #  active               :boolean          default(TRUE), not null
+#  chart_display_name   :string
+#  chart_group          :string
+#  chart_visible        :boolean          default(TRUE), not null
 #  closed               :boolean          default(FALSE), not null
 #  color                :string           not null
 #  description          :text

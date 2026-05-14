@@ -9,35 +9,106 @@ class V2::Reports::FunnelConversionBuilder
   end
 
   def build
-    stages = FunnelStage.active.ordered.to_a
-    return { stages: [], kpis: empty_kpis } if stages.empty?
+    all_stages = FunnelStage.active.ordered.to_a
+    return { stages: [], kpis: empty_kpis } if all_stages.empty?
 
-    counts = fetch_distinct_counts(stages.map(&:name))
-    stage_rows = build_stage_rows(stages, counts)
+    # KPIs always look at the FULL set of active stages — visibility/merge
+    # rules are presentation-only and shouldn't change "completed" or "won"
+    # arithmetic. The chart, on the other hand, walks the display groups.
+    display_groups = build_display_groups(all_stages)
+    group_counts = fetch_group_counts(display_groups)
+    stage_rows = build_stage_rows(display_groups, group_counts)
 
-    { stages: stage_rows, kpis: build_kpis(stages, counts) }
+    { stages: stage_rows, kpis: build_kpis(all_stages) }
   end
 
   private
 
-  # Distinct conversation ids that entered each stage within the period.
-  # Reentries by the same conversation (cycle > 1) count once per stage —
-  # the funnel chart answers "how many conversations passed through", not
-  # "how many entries happened".
-  def fetch_distinct_counts(stage_names)
-    scope = account.funnel_stage_changes.where(new_stage: stage_names)
-    scope = scope.where(created_at: range) if range.present?
-    scope.distinct.group(:new_stage).count(:conversation_id)
+  # A "display group" is what shows up as one column in the chart. Either:
+  #   - one stage with chart_visible=true and no chart_group (group of size 1)
+  #   - several stages sharing the same chart_group (collapsed into one)
+  # Hidden stages (chart_visible=false) never enter a group.
+  def build_display_groups(stages)
+    grouped, singles = partition_by_chart_group(stages.select(&:chart_visible))
+    groups = singles.map { |stage| single_stage_group(stage) }
+    grouped.each do |group_name, members|
+      groups << merged_group(group_name, members)
+    end
+    groups.sort_by { |g| g[:position] }
   end
 
-  def build_stage_rows(stages, counts)
-    rows = stages.map { |stage| stage_row(stage, counts[stage.name] || 0) }
+  def partition_by_chart_group(stages)
+    grouped = {}
+    singles = []
+    stages.each do |stage|
+      if stage.chart_group.present?
+        grouped[stage.chart_group] ||= []
+        grouped[stage.chart_group] << stage
+      else
+        singles << stage
+      end
+    end
+    [grouped, singles]
+  end
 
-    # Conversion / drop-off look at the next stage in the displayed order.
-    # The denominator is THIS stage's count: when the next stage has more
-    # conversations than this one (entered from outside), conversion legitimately
-    # crosses 100% — flag that case so the UI can render an explanatory tooltip
-    # instead of silently capping the number.
+  def single_stage_group(stage)
+    {
+      key: stage.name,
+      display_name: stage.chart_display_name.presence || stage.name,
+      color: stage.color,
+      position: stage.position,
+      closed: stage.closed,
+      stage_names: [stage.name],
+      stage_id: stage.id
+    }
+  end
+
+  # When stages collapse, the group name becomes the visible label, the first
+  # member's color seeds the bar, position uses the earliest member so the
+  # group lands where its first underlying stage would have. `closed` flips
+  # true only if ALL members are closed — a mixed group is treated as open.
+  def merged_group(group_name, members)
+    {
+      key: group_name,
+      display_name: group_name,
+      color: members.first.color,
+      position: members.map(&:position).min,
+      closed: members.all?(&:closed),
+      stage_names: members.map(&:name),
+      stage_id: nil
+    }
+  end
+
+  # Counts the distinct conversation ids that entered ANY member stage of each
+  # group within the period. A conversation that traversed multiple members
+  # (e.g. Em Agendamento → Agendado) counts once for the merged group.
+  # One DB roundtrip + Ruby-side bucketing; the dataset is small in practice.
+  def fetch_group_counts(groups)
+    return {} if groups.empty?
+
+    rows = fetch_stage_change_rows(groups)
+    groups.each_with_object({}) do |group, acc|
+      acc[group[:key]] = distinct_conv_count_for(group, rows)
+    end
+  end
+
+  def fetch_stage_change_rows(groups)
+    all_names = groups.flat_map { |g| g[:stage_names] }.uniq
+    scope = account.funnel_stage_changes.where(new_stage: all_names)
+    scope = scope.where(created_at: range) if range.present?
+    scope.distinct.pluck(:new_stage, :conversation_id)
+  end
+
+  def distinct_conv_count_for(group, rows)
+    member_set = group[:stage_names].to_set
+    rows.each_with_object(Set.new) do |(new_stage, conv_id), set|
+      set << conv_id if member_set.include?(new_stage)
+    end.size
+  end
+
+  def build_stage_rows(groups, counts)
+    rows = groups.map { |group| stage_row(group, counts[group[:key]] || 0) }
+
     rows.each_with_index do |row, idx|
       next_row = rows[idx + 1]
       next if next_row.nil?
@@ -52,13 +123,13 @@ class V2::Reports::FunnelConversionBuilder
     rows
   end
 
-  def stage_row(stage, count)
+  def stage_row(group, count)
     {
-      id: stage.id,
-      name: stage.name,
-      color: stage.color,
-      position: stage.position,
-      closed: stage.closed,
+      id: group[:stage_id],
+      name: group[:display_name],
+      color: group[:color],
+      position: group[:position],
+      closed: group[:closed],
       count: count,
       next_stage_id: nil,
       next_stage_name: nil,
@@ -83,24 +154,27 @@ class V2::Reports::FunnelConversionBuilder
     [from_count - to_count, 0].max
   end
 
-  def build_kpis(stages, counts)
-    closed_names = stages.select(&:closed).map(&:name)
+  # KPIs use every active stage (visible or not) so hidden closed stages like
+  # No-Show / Perdido still count toward "completed".
+  def build_kpis(all_stages)
+    closed_names = all_stages.select(&:closed).map(&:name)
     completed = distinct_count_for(closed_names)
     won = distinct_count_for_won(closed_names)
+    top_count = first_open_stage_count(all_stages)
 
     {
-      top_count: top_open_stage_count(stages, counts),
+      top_count: top_count,
       completed_count: completed,
       won_count: won,
       win_rate: completed.zero? ? nil : ((won.to_f / completed) * 100).round(2)
     }
   end
 
-  def top_open_stage_count(stages, counts)
-    first_open = stages.reject(&:closed).first
+  def first_open_stage_count(all_stages)
+    first_open = all_stages.reject(&:closed).first
     return 0 if first_open.nil?
 
-    counts[first_open.name] || 0
+    distinct_count_for([first_open.name])
   end
 
   def distinct_count_for(stage_names)
@@ -111,9 +185,6 @@ class V2::Reports::FunnelConversionBuilder
     scope.distinct.count(:conversation_id)
   end
 
-  # "Won" mirrors the FunnelSummaryBuilder convention: an entry into a closed
-  # stage with no loss_reason. Lost = closed + loss_reason set. No-show is
-  # whichever convention the operator chose when registering the transition.
   def distinct_count_for_won(stage_names)
     return 0 if stage_names.empty?
 

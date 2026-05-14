@@ -125,5 +125,72 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(lead_row[:drop_off_count]).to eq(0) # clamped — net influx isn't loss
       end
     end
+
+    context 'with chart_display_name set on a stage' do
+      before do
+        stages[:lead].update!(chart_display_name: 'Total de leads')
+        conv = conversation_with_id
+        stage_change(conv_id: conv.id, new_stage: stages[:lead].name)
+      end
+
+      it 'renders the display name instead of the canonical stage name' do
+        result = builder.build
+        expect(result[:stages].map { |row| row[:name] }).to include('Total de leads')
+        expect(result[:stages].map { |row| row[:name] }).not_to include(stages[:lead].name)
+      end
+    end
+
+    context 'with chart_visible: false on a stage' do
+      before do
+        stages[:lost].update!(chart_visible: false)
+        # A loss-flagged transition still counts toward KPIs even though
+        # the lost stage is hidden from the chart.
+        loss = create(:loss_reason, name: "reason_#{SecureRandom.hex(4)}")
+        conv = conversation_with_id
+        stage_change(conv_id: conv.id, new_stage: stages[:lost].name, loss_reason: loss)
+      end
+
+      it 'omits the hidden stage from chart rows' do
+        result = builder.build
+        expect(result[:stages].map { |row| row[:name] }).not_to include(stages[:lost].name)
+      end
+
+      it 'still counts the hidden closed stage toward KPIs' do
+        kpis = builder.build[:kpis]
+        expect(kpis[:completed_count]).to eq(1)
+      end
+    end
+
+    context 'with chart_group merging multiple stages' do
+      let(:agendamento_a) do
+        create(:funnel_stage, name: "agendamento_a_#{SecureRandom.hex(4)}", position: 5, chart_group: 'Agendamento')
+      end
+      let(:agendamento_b) do
+        create(:funnel_stage, name: "agendamento_b_#{SecureRandom.hex(4)}", position: 6, chart_group: 'Agendamento')
+      end
+
+      before do
+        agendamento_a
+        agendamento_b
+
+        # conv_a entered only the first member.
+        conv_a = conversation_with_id
+        stage_change(conv_id: conv_a.id, new_stage: agendamento_a.name)
+
+        # conv_b traversed both — must count once in the merged group.
+        conv_b = conversation_with_id
+        stage_change(conv_id: conv_b.id, new_stage: agendamento_a.name)
+        stage_change(conv_id: conv_b.id, previous_stage: agendamento_a.name, new_stage: agendamento_b.name)
+      end
+
+      it 'collapses members into a single row keyed by the chart_group' do
+        report = builder.build
+        merged = report[:stages].find { |row| row[:name] == 'Agendamento' }
+
+        expect(merged).not_to be_nil
+        expect(merged[:count]).to eq(2)
+        expect(report[:stages].map { |row| row[:name] }).not_to include(agendamento_a.name, agendamento_b.name)
+      end
+    end
   end
 end
