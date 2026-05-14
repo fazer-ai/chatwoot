@@ -25,9 +25,15 @@ class Conversations::EventDataPresenter < SimpleDelegator
     }
   end
 
-  # Like #push_data but with message text normalized for external integrations (webhooks).
+  # Like #push_data but with message text normalized for external integrations
+  # (webhooks). Also embeds `account` so consumers like automation webhooks
+  # (`automation_event.*`) and bare `conversation_*` events ride with the same
+  # account context (id, name, Auris settings) already shipped on
+  # `message_created` payloads. `push_data` deliberately stays leaner — the
+  # frontend cable subscribers don't need account info on every conversation
+  # broadcast.
   def webhook_data
-    push_data.merge(messages: webhook_push_messages)
+    push_data.merge(messages: webhook_push_messages, account: account.webhook_data)
   end
 
   private
