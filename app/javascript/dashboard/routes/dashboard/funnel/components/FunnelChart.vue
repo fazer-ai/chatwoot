@@ -122,8 +122,8 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
     >
       <defs>
         <linearGradient id="funnelGradient" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" :stop-color="FILL_COLOR" stop-opacity="0.55" />
-          <stop offset="100%" :stop-color="FILL_COLOR" stop-opacity="0.95" />
+          <stop offset="0%" :stop-color="FILL_COLOR" stop-opacity="0.45" />
+          <stop offset="100%" :stop-color="FILL_COLOR" stop-opacity="1.0" />
         </linearGradient>
       </defs>
 
