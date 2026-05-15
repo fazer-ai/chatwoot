@@ -65,7 +65,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def disconnect_channel_provider
     HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
-      headers: api_headers
+      headers: api_headers,
+      timeout: 10
     )
     true
   rescue StandardError => e
