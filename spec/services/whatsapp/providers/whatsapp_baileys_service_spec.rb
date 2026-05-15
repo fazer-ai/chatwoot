@@ -168,12 +168,15 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     # succeed.
     context 'when the Baileys API responds with an error status' do
       [404, 500].each do |status|
-        it "returns true and does not raise for HTTP #{status}" do
+        it "returns true, logs a warning, and does not raise for HTTP #{status}" do
           stub_request(:delete, disconnect_url)
             .with(headers: stub_headers(whatsapp_channel))
             .to_return(status: status, body: 'baileys error')
 
+          allow(Rails.logger).to receive(:warn)
+
           expect(service.disconnect_channel_provider).to be(true)
+          expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=#{status}/)
         end
       end
     end

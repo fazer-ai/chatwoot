@@ -63,11 +63,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # calling this is to avoid leaving a dangling session, not to gate the
   # caller's flow on that cleanup succeeding.
   def disconnect_channel_provider
-    HTTParty.delete(
+    response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       timeout: 10
     )
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}") unless response.success?
     true
   rescue StandardError => e
     Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
