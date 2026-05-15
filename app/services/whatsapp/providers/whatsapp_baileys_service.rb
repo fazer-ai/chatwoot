@@ -56,14 +56,20 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
+  # Best-effort disconnect: we tell the Baileys API to drop the session and
+  # move on regardless of the response. A stale or already-cleared session
+  # (404), a Baileys API hiccup (5xx), or even a network error should not
+  # block a provider conversion or channel teardown — the only point of
+  # calling this is to avoid leaving a dangling session, not to gate the
+  # caller's flow on that cleanup succeeding.
   def disconnect_channel_provider
-    response = HTTParty.delete(
+    HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers
     )
-
-    raise ProviderUnavailableError unless process_response(response)
-
+    true
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
     true
   end
 
@@ -864,7 +870,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   with_error_handling :setup_channel_provider,
-                      :disconnect_channel_provider,
                       :send_message,
                       :toggle_typing_status,
                       :presence_subscribe,
