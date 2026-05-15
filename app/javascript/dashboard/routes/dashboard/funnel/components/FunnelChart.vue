@@ -127,13 +127,16 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
         </linearGradient>
       </defs>
 
-      <!-- Labels above each stage: name, count, pct -->
+      <!-- Labels above each stage: name, count, pct. Sized larger after the
+           chart moved into a 2/3 col-span container — the same viewBox renders
+           narrower on screen now, so SVG text needs more font-size weight to
+           stay legible at typical dashboard widths. -->
       <g v-for="label in labelsForStages" :key="label.key">
         <text
           :x="label.x"
           :y="32"
           :text-anchor="label.anchor"
-          class="fill-n-slate-11 text-xs"
+          class="fill-n-slate-11 text-lg"
         >
           {{ label.name }}
         </text>
@@ -141,7 +144,7 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
           :x="label.x"
           :y="72"
           :text-anchor="label.anchor"
-          class="fill-n-slate-12 text-xl font-semibold"
+          class="fill-n-slate-12 text-3xl font-semibold"
         >
           {{ formatCount(label.count) }}
         </text>
@@ -149,7 +152,7 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
           :x="label.x"
           :y="100"
           :text-anchor="label.anchor"
-          class="fill-n-slate-11 text-xs"
+          class="fill-n-slate-11 text-lg"
         >
           {{ formatPct(label.pct) }}
         </text>
