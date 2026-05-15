@@ -917,6 +917,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_14_225413) do
     t.datetime "updated_at", null: false
     t.string "color", null: false
     t.boolean "requires_loss_reason", default: false, null: false
+    t.boolean "chart_visible", default: true, null: false
+    t.string "chart_group"
+    t.string "chart_display_name"
     t.index ["name"], name: "index_funnel_stages_on_name", unique: true
     t.index ["position"], name: "index_funnel_stages_on_position"
   end
@@ -993,7 +996,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_14_225413) do
     t.boolean "csat_survey_enabled", default: false
     t.boolean "allow_messages_after_resolved", default: true
     t.jsonb "auto_assignment_config", default: {}
-    t.boolean "lock_to_single_conversation", default: false, null: false
+    t.boolean "lock_to_single_conversation", default: true, null: false
     t.bigint "portal_id"
     t.integer "sender_name_type", default: 0, null: false
     t.string "business_name"

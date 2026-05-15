@@ -6,7 +6,9 @@
     "VIEW_MODE": {
       "ARIA_LABEL": "Alternar visualização do funil",
       "BOARD": "Quadro",
-      "LIST": "Lista"
+      "LIST": "Lista",
+      "OVERVIEW": "Visão geral",
+      "CONVERSION": "Conversão"
     },
     "MOVE": {
       "ERROR": "Não foi possível mover a conversa. Tente novamente."

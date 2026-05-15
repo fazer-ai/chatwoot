@@ -1,7 +1,6 @@
 <script setup>
 import { computed, h, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
 import { formatTime } from '@chatwoot/utils';
 import subDays from 'date-fns/subDays';
 
@@ -19,21 +18,13 @@ import { getUnixStartOfDay, getUnixEndOfDay } from 'helpers/DateHelper';
 import Table from 'dashboard/components/table/Table.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
-import ReportHeader from './components/ReportHeader.vue';
-import {
-  generateReportURLParams,
-  parseReportURLParams,
-} from './helpers/reportFilterHelper';
-
 const store = useStore();
 const { t } = useI18n();
-const route = useRoute();
-const router = useRouter();
 
 const customDateRange = ref([subDays(new Date(), 6), new Date()]);
 const selectedDateRange = ref(DATE_RANGE_TYPES.LAST_7_DAYS);
-const from = ref(0);
-const to = ref(0);
+const from = ref(getUnixStartOfDay(customDateRange.value[0]));
+const to = ref(getUnixEndOfDay(customDateRange.value[1]));
 
 const uiFlags = useMapGetter('summaryReports/getUIFlags');
 const reportMetrics = useMapGetter('summaryReports/getFunnelSummaryReports');
@@ -46,11 +37,6 @@ const renderCount = value =>
 const renderTime = value => (value ? formatTime(value) : '--');
 
 const columnHelper = createColumnHelper();
-// Headers and the stage-name cell render as a span with `whitespace-nowrap` so
-// labels like "Atualmente na fase" and "Tempo médio na fase" — plus longer
-// custom stage names — stay on one line instead of wrapping into the column
-// underneath. tanstack-vue-table's column `width` is a hint, not a hard cap;
-// nowrap lets the actual cell drive the final width.
 const nowrapHeader = label => () =>
   h('span', { class: 'whitespace-nowrap' }, label);
 
@@ -119,8 +105,6 @@ const tableData = computed(() =>
     inStageCount: renderCount(row.inStageCount),
     enteredCount: renderCount(row.enteredCount),
     avgTimeInStage: renderTime(row.avgTimeInStage),
-    // Closed stages don't have downstream exits to "won/lost" — render as --
-    // instead of a misleading zero so the table stays honest.
     wonCount: row.closed ? '--' : renderCount(row.wonCount),
     lostCount: row.closed ? '--' : renderCount(row.lostCount),
   }))
@@ -135,42 +119,16 @@ const fetchReports = async () => {
   }
 };
 
-const updateURLParams = () => {
-  const params = generateReportURLParams({
-    from: from.value,
-    to: to.value,
-    range: selectedDateRange.value,
-  });
-  router.replace({ query: { ...params } });
-};
-
 const onDateRangeChange = value => {
   const [startDate, endDate, rangeType] = value;
   customDateRange.value = [startDate, endDate];
   selectedDateRange.value = rangeType || DATE_RANGE_TYPES.CUSTOM_RANGE;
   from.value = getUnixStartOfDay(startDate);
   to.value = getUnixEndOfDay(endDate);
-  updateURLParams();
   fetchReports();
 };
 
-const initializeFromURL = () => {
-  const urlParams = parseReportURLParams(route.query);
-  if (urlParams.range) selectedDateRange.value = urlParams.range;
-  if (urlParams.from && urlParams.to) {
-    customDateRange.value = [
-      new Date(urlParams.from * 1000),
-      new Date(urlParams.to * 1000),
-    ];
-  }
-  from.value = getUnixStartOfDay(customDateRange.value[0]);
-  to.value = getUnixEndOfDay(customDateRange.value[1]);
-};
-
-onMounted(() => {
-  initializeFromURL();
-  fetchReports();
-});
+onMounted(fetchReports);
 
 const table = useVueTable({
   get data() {
@@ -185,42 +143,50 @@ const table = useVueTable({
 </script>
 
 <template>
-  <ReportHeader
-    :header-title="$t('FUNNEL_REPORTS.HEADER')"
-    :header-description="$t('FUNNEL_REPORTS.DESCRIPTION')"
-  />
-
-  <div
-    class="flex flex-col justify-between gap-3 md:flex-row"
-    :class="{ 'pointer-events-none opacity-50': isLoading }"
-  >
-    <div class="flex flex-col flex-wrap items-start gap-2 md:flex-row">
-      <WootDatePicker
-        v-model:date-range="customDateRange"
-        v-model:range-type="selectedDateRange"
-        @date-range-changed="onDateRangeChange"
-      />
-    </div>
-  </div>
-
-  <div
-    class="relative flex-1 overflow-auto px-2 py-2 mt-5 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
-  >
-    <Table :table="table" />
-    <Transition
-      enter-active-class="transition-opacity duration-300 ease-out"
-      leave-active-class="transition-opacity duration-200 ease-in"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="isLoading"
-        class="absolute inset-0 flex justify-center pt-[12.5rem] bg-n-solid-1/70 rounded-xl pointer-events-none"
+  <div class="flex flex-col flex-1 gap-3 px-6 py-5 overflow-auto">
+    <section class="flex flex-col gap-2 pb-2">
+      <span class="text-heading-1 text-n-slate-12">
+        {{ $t('FUNNEL_REPORTS.HEADER') }}
+      </span>
+      <p
+        class="text-n-slate-11 mb-0 line-clamp-5 sm:line-clamp-none text-body-main"
       >
-        <Spinner :size="32" class="text-n-brand" />
+        {{ $t('FUNNEL_REPORTS.DESCRIPTION') }}
+      </p>
+    </section>
+
+    <div
+      class="flex flex-col justify-between gap-3 md:flex-row"
+      :class="{ 'pointer-events-none opacity-50': isLoading }"
+    >
+      <div class="flex flex-col flex-wrap items-start gap-2 md:flex-row">
+        <WootDatePicker
+          v-model:date-range="customDateRange"
+          v-model:range-type="selectedDateRange"
+          @date-range-changed="onDateRangeChange"
+        />
       </div>
-    </Transition>
+    </div>
+
+    <div
+      class="relative flex-1 overflow-auto px-2 py-2 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+    >
+      <Table :table="table" />
+      <Transition
+        enter-active-class="transition-opacity duration-300 ease-out"
+        leave-active-class="transition-opacity duration-200 ease-in"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="isLoading"
+          class="absolute inset-0 flex justify-center pt-[12.5rem] bg-n-solid-1/70 rounded-xl pointer-events-none"
+        >
+          <Spinner :size="32" class="text-n-brand" />
+        </div>
+      </Transition>
+    </div>
   </div>
 </template>

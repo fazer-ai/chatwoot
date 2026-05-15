@@ -6,7 +6,9 @@
     "VIEW_MODE": {
       "ARIA_LABEL": "Switch funnel view",
       "BOARD": "Board",
-      "LIST": "List"
+      "LIST": "List",
+      "OVERVIEW": "Overview",
+      "CONVERSION": "Conversion"
     },
     "MOVE": {
       "ERROR": "Could not move the conversation. Please try again."

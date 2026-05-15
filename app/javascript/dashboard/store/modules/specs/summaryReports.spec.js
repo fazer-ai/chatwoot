@@ -28,12 +28,14 @@ describe('Summary Reports Store', () => {
         teamSummaryReports: [],
         labelSummaryReports: [],
         funnelSummaryReports: [],
+        funnelConversionReport: { stages: [], kpis: {} },
         uiFlags: {
           isFetchingInboxSummaryReports: false,
           isFetchingAgentSummaryReports: false,
           isFetchingTeamSummaryReports: false,
           isFetchingLabelSummaryReports: false,
           isFetchingFunnelSummaryReports: false,
+          isFetchingFunnelConversionReports: false,
         },
       });
     });

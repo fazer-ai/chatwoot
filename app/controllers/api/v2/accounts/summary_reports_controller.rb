@@ -1,6 +1,6 @@
 class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseController
   before_action :check_authorization
-  before_action :prepare_builder_params, only: [:agent, :team, :inbox, :label, :channel, :funnel]
+  before_action :prepare_builder_params, only: [:agent, :team, :inbox, :label, :channel, :funnel, :funnel_conversion]
 
   def agent
     render_report_with(V2::Reports::AgentSummaryBuilder)
@@ -26,6 +26,10 @@ class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseContr
 
   def funnel
     render_report_with(V2::Reports::FunnelSummaryBuilder)
+  end
+
+  def funnel_conversion
+    render_report_with(V2::Reports::FunnelConversionBuilder)
   end
 
   private
