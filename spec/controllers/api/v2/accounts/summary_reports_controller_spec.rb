@@ -307,7 +307,10 @@ RSpec.describe 'Summary Reports API', type: :request do
         allow(V2::Reports::FunnelConversionBuilder).to receive(:new).and_return(builder)
         allow(builder).to receive(:build).and_return(
           stages: [{ id: 1, name: 'Lead', count: 10, conversion_rate: 50.0, drop_off_count: 5 }],
-          kpis: { top_count: 10, completed_count: 4, won_count: 3, win_rate: 75.0 }
+          kpis: { total_leads: 10,
+                  scheduling_count: 6, scheduling_rate: 60.0,
+                  attendance_count: 4, attendance_rate: 40.0,
+                  no_show_count: 1, no_show_rate: 10.0 }
         )
 
         get "/api/v2/accounts/#{account.id}/summary_reports/funnel_conversion",
@@ -323,7 +326,7 @@ RSpec.describe 'Summary Reports API', type: :request do
 
         json_response = response.parsed_body
         expect(json_response['stages'].first['name']).to eq('Lead')
-        expect(json_response['kpis']['win_rate']).to eq(75.0)
+        expect(json_response['kpis']['attendance_rate']).to eq(40.0)
       end
     end
   end

@@ -667,13 +667,12 @@
     "CONVERSION_LABEL": "Conversion",
     "CONVERSION_VALUE": "Conversion: {rate}",
     "DROP_OFF_LABEL": "{count} dropped off",
-    "WIN_RATE_DETAIL": "{won} / {total}",
     "EXCEEDS_TOOLTIP": "More conversations entered this stage than the previous one — some arrived without passing through the prior stage.",
     "SEPARATOR": "·",
     "KPIS": {
-      "TOP_COUNT": "Top of funnel",
-      "COMPLETED": "Completed",
-      "WIN_RATE": "Win rate"
+      "SCHEDULING_RATE": "Scheduling rate",
+      "ATTENDANCE_RATE": "Attendance rate (wins)",
+      "NO_SHOW_RATE": "No-show rate"
     }
   }
 }

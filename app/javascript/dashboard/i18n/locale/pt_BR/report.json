@@ -667,13 +667,12 @@
     "CONVERSION_LABEL": "Conversão",
     "CONVERSION_VALUE": "Conversão: {rate}",
     "DROP_OFF_LABEL": "{count} não avançou",
-    "WIN_RATE_DETAIL": "{won} / {total}",
     "EXCEEDS_TOOLTIP": "Mais conversas entraram nesta fase do que na anterior — algumas chegaram sem passar pela fase anterior.",
     "SEPARATOR": "·",
     "KPIS": {
-      "TOP_COUNT": "Topo do funil",
-      "COMPLETED": "Concluídas",
-      "WIN_RATE": "Taxa de ganho"
+      "SCHEDULING_RATE": "Taxa de agendamento",
+      "ATTENDANCE_RATE": "Taxa de comparecimento ( ganho )",
+      "NO_SHOW_RATE": "Taxa de no-show"
     }
   }
 }
