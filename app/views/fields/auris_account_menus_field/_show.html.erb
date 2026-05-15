@@ -1,0 +1,12 @@
+<div class="w-full">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <% field.options.each do |opt| %>
+      <div class="flex items-center justify-between p-3 bg-white rounded-md outline outline-n-container outline-1 shadow-sm">
+        <span class="text-sm text-n-slate-12"><%= opt[:label] %></span>
+        <span class="<%= opt[:checked] ? 'bg-green-400 text-white' : 'bg-slate-50 text-slate-800' %> rounded-full p-1 inline-flex right-4 top-5">
+          <svg width="12" height="12"><use xlink:href="#icon-tick-line" /></svg>
+        </span>
+      </div>
+    <% end %>
+  </div>
+</div>
