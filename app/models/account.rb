@@ -163,6 +163,17 @@ class Account < ApplicationRecord
     }
   end
 
+  # Sibling reader for the "Auris menus" Administrate field. Kept separate
+  # from `auris_settings` on purpose: these flags are navigation/access
+  # controls and intentionally don't ride along on webhook payloads
+  # (which only forward `auris_settings`).
+  def auris_menus
+    {
+      inbox_view_menu_enabled: inbox_view_menu_enabled,
+      help_center_menu_enabled: help_center_menu_enabled
+    }
+  end
+
   def inbound_email_domain
     domain.presence || GlobalConfig.get('MAILER_INBOUND_EMAIL_DOMAIN')['MAILER_INBOUND_EMAIL_DOMAIN'] || ENV.fetch('MAILER_INBOUND_EMAIL_DOMAIN',
                                                                                                                    false)
