@@ -1,3 +1,7 @@
+# rubocop:disable Metrics/ClassLength — three orthogonal concerns (display
+# groups, KPI math, loss-reason aggregation) live here on purpose; extracting
+# either would mean threading account/params/range plumbing across builders
+# for a marginal LOC reduction.
 class V2::Reports::FunnelConversionBuilder
   include DateRangeHelper
 
@@ -19,7 +23,7 @@ class V2::Reports::FunnelConversionBuilder
 
   def build
     all_stages = FunnelStage.active.ordered.to_a
-    return { stages: [], kpis: empty_kpis } if all_stages.empty?
+    return { stages: [], kpis: empty_kpis, loss_reasons: [] } if all_stages.empty?
 
     # KPIs always look at the FULL set of active stages — visibility/merge
     # rules are presentation-only and shouldn't change "completed" or "won"
@@ -28,7 +32,11 @@ class V2::Reports::FunnelConversionBuilder
     group_counts = fetch_group_counts(display_groups)
     stage_rows = build_stage_rows(display_groups, group_counts)
 
-    { stages: stage_rows, kpis: build_kpis(all_stages) }
+    {
+      stages: stage_rows,
+      kpis: build_kpis(all_stages),
+      loss_reasons: build_loss_reasons_breakdown
+    }
   end
 
   private
@@ -208,6 +216,37 @@ class V2::Reports::FunnelConversionBuilder
     scope.distinct.count(:conversation_id)
   end
 
+  # Distinct conversations per loss reason in the period, sorted descending.
+  # A conversation that got lost with the same reason twice still counts once
+  # (mirrors how the funnel counts distinct convs per stage). Reasons with
+  # zero entries in the period are omitted — the donut shouldn't render
+  # empty slices.
+  def build_loss_reasons_breakdown
+    counts = fetch_loss_reason_counts
+    return [] if counts.empty?
+
+    total = counts.values.sum
+    counts.map { |(id, name), count| loss_reason_row(id, name, count, total) }
+          .sort_by { |row| -row[:count] }
+  end
+
+  def fetch_loss_reason_counts
+    scope = account.funnel_stage_changes.where.not(loss_reason_id: nil)
+    scope = scope.where(created_at: range) if range.present?
+    scope.joins(:loss_reason).distinct
+         .group('loss_reasons.id', 'loss_reasons.name')
+         .count(:conversation_id)
+  end
+
+  def loss_reason_row(id, name, count, total)
+    {
+      id: id,
+      name: name,
+      count: count,
+      percentage: total.zero? ? 0 : ((count.to_f / total) * 100).round(2)
+    }
+  end
+
   def empty_kpis
     {
       total_leads: 0,
@@ -217,3 +256,4 @@ class V2::Reports::FunnelConversionBuilder
     }
   end
 end
+# rubocop:enable Metrics/ClassLength

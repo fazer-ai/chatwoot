@@ -673,6 +673,15 @@
       "SCHEDULING_RATE": "Taxa de agendamento",
       "ATTENDANCE_RATE": "Taxa de comparecimento ( ganho )",
       "NO_SHOW_RATE": "Taxa de no-show"
+    },
+    "LOSS_REASONS": {
+      "HEADER": "Motivos de perda",
+      "CENTER_LABEL": "Total",
+      "EMPTY_STATE": "Nenhuma perda registrada no período.",
+      "CHART_ARIA_LABEL": "Distribuição de motivos de perda",
+      "COLUMN_NAME": "Motivo",
+      "COLUMN_COUNT": "Valor",
+      "COLUMN_PERCENT": "%"
     }
   }
 }

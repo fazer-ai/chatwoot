@@ -673,6 +673,15 @@
       "SCHEDULING_RATE": "Scheduling rate",
       "ATTENDANCE_RATE": "Attendance rate (wins)",
       "NO_SHOW_RATE": "No-show rate"
+    },
+    "LOSS_REASONS": {
+      "HEADER": "Loss reasons",
+      "CENTER_LABEL": "Total",
+      "EMPTY_STATE": "No losses recorded in the selected period.",
+      "CHART_ARIA_LABEL": "Loss reasons distribution",
+      "COLUMN_NAME": "Reason",
+      "COLUMN_COUNT": "Count",
+      "COLUMN_PERCENT": "%"
     }
   }
 }

@@ -12,6 +12,7 @@ import { getUnixStartOfDay, getUnixEndOfDay } from 'helpers/DateHelper';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 import FunnelChart from './FunnelChart.vue';
+import LossReasonsDonut from './LossReasonsDonut.vue';
 
 const store = useStore();
 const { t } = useI18n();
@@ -29,6 +30,7 @@ const isLoading = computed(
 
 const stages = computed(() => report.value?.stages || []);
 const kpis = computed(() => report.value?.kpis || {});
+const lossReasons = computed(() => report.value?.lossReasons || []);
 
 const formatRate = value => {
   if (value === null || value === undefined) return '--';
@@ -116,18 +118,37 @@ onMounted(fetchReports);
       </div>
     </div>
 
-    <!-- Funnel chart card -->
-    <div
-      class="relative px-6 py-5 mt-2 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
-    >
+    <!-- Funnel + loss-reasons row. Funnel needs more horizontal width to be
+         readable across many stages, so it takes 2/3 on md+ while the donut
+         breakdown sits on the remaining third. Stacks vertically below md. -->
+    <div class="relative mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
       <div
-        v-if="!isLoading && stages.length === 0"
-        class="py-10 text-center text-n-slate-11"
+        class="md:col-span-2 px-6 py-5 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
       >
-        {{ $t('FUNNEL_CONVERSION_REPORTS.EMPTY_STATE') }}
+        <div
+          v-if="!isLoading && stages.length === 0"
+          class="py-10 text-center text-n-slate-11"
+        >
+          {{ $t('FUNNEL_CONVERSION_REPORTS.EMPTY_STATE') }}
+        </div>
+
+        <FunnelChart v-else :stages="stages" />
       </div>
 
-      <FunnelChart v-else :stages="stages" />
+      <div
+        class="md:col-span-1 px-6 py-5 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+      >
+        <div class="text-sm font-medium text-n-slate-12 mb-4">
+          {{ $t('FUNNEL_CONVERSION_REPORTS.LOSS_REASONS.HEADER') }}
+        </div>
+        <div
+          v-if="!isLoading && lossReasons.length === 0"
+          class="py-10 text-center text-n-slate-11 text-sm"
+        >
+          {{ $t('FUNNEL_CONVERSION_REPORTS.LOSS_REASONS.EMPTY_STATE') }}
+        </div>
+        <LossReasonsDonut v-else :reasons="lossReasons" />
+      </div>
 
       <Transition
         enter-active-class="transition-opacity duration-300 ease-out"

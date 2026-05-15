@@ -35,7 +35,7 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
     context 'when there are no active stages' do
       before { FunnelStage.update_all(active: false) } # rubocop:disable Rails/SkipsModelValidations
 
-      it 'returns empty stages and zeroed KPIs' do
+      it 'returns empty stages, zeroed KPIs, and empty loss_reasons' do
         result = described_class.new(account: create(:account), params: params).build
         expect(result[:stages]).to eq([])
         expect(result[:kpis]).to eq(
@@ -44,6 +44,7 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
           attendance_count: 0, attendance_rate: nil,
           no_show_count: 0, no_show_rate: nil
         )
+        expect(result[:loss_reasons]).to eq([])
       end
     end
 
@@ -213,6 +214,40 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(merged).not_to be_nil
         expect(merged[:count]).to eq(2)
         expect(report[:stages].map { |row| row[:name] }).not_to include(agendamento_a.name, agendamento_b.name)
+      end
+    end
+
+    context 'with loss_reasons attached to transitions' do
+      let(:reason_price) { create(:loss_reason, name: "price_#{SecureRandom.hex(4)}") }
+      let(:reason_no_response) { create(:loss_reason, name: "no_response_#{SecureRandom.hex(4)}") }
+
+      before do
+        # 2 distinct convs lost to "price" (one re-entered with the same reason
+        # — should NOT double-count) and 1 lost to "no response".
+        conv_a = conversation_with_id
+        stage_change(conv_id: conv_a.id, new_stage: stages[:lost].name, loss_reason: reason_price)
+        stage_change(conv_id: conv_a.id, new_stage: stages[:lost].name, loss_reason: reason_price, created_at: 12.hours.ago)
+        conv_b = conversation_with_id
+        stage_change(conv_id: conv_b.id, new_stage: stages[:lost].name, loss_reason: reason_price)
+        conv_c = conversation_with_id
+        stage_change(conv_id: conv_c.id, new_stage: stages[:lost].name, loss_reason: reason_no_response)
+      end
+
+      it 'aggregates distinct conversations per loss reason sorted desc' do
+        rows = builder.build[:loss_reasons]
+
+        expect(rows.length).to eq(2)
+        expect(rows.first[:name]).to eq(reason_price.name)
+        expect(rows.first[:count]).to eq(2)
+        expect(rows.first[:percentage]).to be_within(0.01).of(66.67)
+        expect(rows.last[:name]).to eq(reason_no_response.name)
+        expect(rows.last[:count]).to eq(1)
+        expect(rows.last[:percentage]).to be_within(0.01).of(33.33)
+      end
+
+      it 'omits loss reasons with no entries in the period' do
+        unused = create(:loss_reason, name: "unused_#{SecureRandom.hex(4)}")
+        expect(builder.build[:loss_reasons].map { |r| r[:name] }).not_to include(unused.name)
       end
     end
   end
