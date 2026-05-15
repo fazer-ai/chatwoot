@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.19.1
+  published_at: '2026-05-15T02:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.19.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Account pages in Super Admin load again.** The Super Admin → Accounts edit and show pages were broken since v1.19 (when the *Auris menus* section was added). Fixed.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Páginas de Conta no Super Admin voltam a abrir.** A edição e visualização de contas em Super Admin → Accounts estavam quebradas desde a v1.19 (quando a seção *Auris menus* foi adicionada). Corrigido.
 - tag: v4.13.0-auris.1.19
   published_at: '2026-05-15T01:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.19
