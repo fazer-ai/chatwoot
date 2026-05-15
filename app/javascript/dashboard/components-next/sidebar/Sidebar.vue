@@ -68,6 +68,16 @@ const isFunnelEnabled = computed(
   () => accountGetter.value(accountId.value)?.funnel_enabled !== false
 );
 
+// Both menu flags default to false at the database level. Treat any
+// non-true value as "hidden" so a missing key in the cached account payload
+// behaves the same way an explicit `false` would.
+const isInboxMenuEnabled = computed(
+  () => accountGetter.value(accountId.value)?.inbox_view_menu_enabled === true
+);
+const isHelpCenterMenuEnabled = computed(
+  () => accountGetter.value(accountId.value)?.help_center_menu_enabled === true
+);
+
 const toggleShortcutModalFn = show => {
   if (show) {
     emit('openKeyShortcutModal');
@@ -235,16 +245,20 @@ const reportRoutes = computed(() => newReportRoutes());
 
 const menuItems = computed(() => {
   const items = [
-    {
-      name: 'Inbox',
-      label: t('SIDEBAR.INBOX'),
-      icon: 'i-lucide-inbox',
-      to: accountScopedRoute('inbox_view'),
-      activeOn: ['inbox_view', 'inbox_view_conversation'],
-      getterKeys: {
-        count: 'notifications/getUnreadCount',
-      },
-    },
+    ...(isInboxMenuEnabled.value
+      ? [
+          {
+            name: 'Inbox',
+            label: t('SIDEBAR.INBOX'),
+            icon: 'i-lucide-inbox',
+            to: accountScopedRoute('inbox_view'),
+            activeOn: ['inbox_view', 'inbox_view_conversation'],
+            getterKeys: {
+              count: 'notifications/getUnreadCount',
+            },
+          },
+        ]
+      : []),
     {
       name: 'Conversation',
       label: t('SIDEBAR.CONVERSATIONS'),
@@ -491,53 +505,57 @@ const menuItems = computed(() => {
         },
       ],
     },
-    {
-      name: 'Portals',
-      label: t('SIDEBAR.HELP_CENTER.TITLE'),
-      icon: 'i-lucide-library-big',
-      children: [
-        {
-          name: 'Articles',
-          label: t('SIDEBAR.HELP_CENTER.ARTICLES'),
-          activeOn: [
-            'portals_articles_index',
-            'portals_articles_new',
-            'portals_articles_edit',
-          ],
-          to: accountScopedRoute('portals_index', {
-            navigationPath: 'portals_articles_index',
-          }),
-        },
-        {
-          name: 'Categories',
-          label: t('SIDEBAR.HELP_CENTER.CATEGORIES'),
-          activeOn: [
-            'portals_categories_index',
-            'portals_categories_articles_index',
-            'portals_categories_articles_edit',
-          ],
-          to: accountScopedRoute('portals_index', {
-            navigationPath: 'portals_categories_index',
-          }),
-        },
-        {
-          name: 'Locales',
-          label: t('SIDEBAR.HELP_CENTER.LOCALES'),
-          activeOn: ['portals_locales_index'],
-          to: accountScopedRoute('portals_index', {
-            navigationPath: 'portals_locales_index',
-          }),
-        },
-        {
-          name: 'Settings',
-          label: t('SIDEBAR.HELP_CENTER.SETTINGS'),
-          activeOn: ['portals_settings_index'],
-          to: accountScopedRoute('portals_index', {
-            navigationPath: 'portals_settings_index',
-          }),
-        },
-      ],
-    },
+    ...(isHelpCenterMenuEnabled.value
+      ? [
+          {
+            name: 'Portals',
+            label: t('SIDEBAR.HELP_CENTER.TITLE'),
+            icon: 'i-lucide-library-big',
+            children: [
+              {
+                name: 'Articles',
+                label: t('SIDEBAR.HELP_CENTER.ARTICLES'),
+                activeOn: [
+                  'portals_articles_index',
+                  'portals_articles_new',
+                  'portals_articles_edit',
+                ],
+                to: accountScopedRoute('portals_index', {
+                  navigationPath: 'portals_articles_index',
+                }),
+              },
+              {
+                name: 'Categories',
+                label: t('SIDEBAR.HELP_CENTER.CATEGORIES'),
+                activeOn: [
+                  'portals_categories_index',
+                  'portals_categories_articles_index',
+                  'portals_categories_articles_edit',
+                ],
+                to: accountScopedRoute('portals_index', {
+                  navigationPath: 'portals_categories_index',
+                }),
+              },
+              {
+                name: 'Locales',
+                label: t('SIDEBAR.HELP_CENTER.LOCALES'),
+                activeOn: ['portals_locales_index'],
+                to: accountScopedRoute('portals_index', {
+                  navigationPath: 'portals_locales_index',
+                }),
+              },
+              {
+                name: 'Settings',
+                label: t('SIDEBAR.HELP_CENTER.SETTINGS'),
+                activeOn: ['portals_settings_index'],
+                to: accountScopedRoute('portals_index', {
+                  navigationPath: 'portals_settings_index',
+                }),
+              },
+            ],
+          },
+        ]
+      : []),
     {
       name: 'Settings',
       label: t('SIDEBAR.SETTINGS'),
