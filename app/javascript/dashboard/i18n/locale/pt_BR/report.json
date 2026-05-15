@@ -671,6 +671,7 @@
     "SEPARATOR": "·",
     "KPIS": {
       "SCHEDULING_RATE": "Taxa de agendamento",
+      "CONFIRMATION_RATE": "Taxa de confirmação",
       "ATTENDANCE_RATE": "Taxa de comparecimento ( ganho )",
       "NO_SHOW_RATE": "Taxa de no-show"
     },

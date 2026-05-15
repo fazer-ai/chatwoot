@@ -84,30 +84,45 @@ onMounted(fetchReports);
       </div>
     </div>
 
-    <!-- KPI strip -->
-    <div class="grid grid-cols-1 gap-3 mt-2 sm:grid-cols-3">
-      <div
-        class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
-      >
-        <div class="text-sm text-n-slate-11 whitespace-nowrap">
-          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.SCHEDULING_RATE') }}
+    <!-- KPI strip mirrors the chart row below: the three funnel-flow rates
+         (scheduling / confirmation / attendance) sit over the funnel chart
+         column (col-span-2 with a nested 3-col grid), while the no-show rate
+         sits over the loss-reasons donut column. Layout stacks below md. -->
+    <div class="grid grid-cols-1 gap-3 mt-2 md:grid-cols-3">
+      <div class="md:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div
+          class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+        >
+          <div class="text-sm text-n-slate-11 whitespace-nowrap">
+            {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.SCHEDULING_RATE') }}
+          </div>
+          <div class="mt-2 text-3xl font-semibold text-n-slate-12">
+            {{ formatRate(kpis.schedulingRate) }}
+          </div>
         </div>
-        <div class="mt-2 text-3xl font-semibold text-n-slate-12">
-          {{ formatRate(kpis.schedulingRate) }}
+        <div
+          class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+        >
+          <div class="text-sm text-n-slate-11 whitespace-nowrap">
+            {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.CONFIRMATION_RATE') }}
+          </div>
+          <div class="mt-2 text-3xl font-semibold text-n-slate-12">
+            {{ formatRate(kpis.confirmationRate) }}
+          </div>
+        </div>
+        <div
+          class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+        >
+          <div class="text-sm text-n-slate-11 whitespace-nowrap">
+            {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.ATTENDANCE_RATE') }}
+          </div>
+          <div class="mt-2 text-3xl font-semibold text-n-slate-12">
+            {{ formatRate(kpis.attendanceRate) }}
+          </div>
         </div>
       </div>
       <div
-        class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
-      >
-        <div class="text-sm text-n-slate-11 whitespace-nowrap">
-          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.ATTENDANCE_RATE') }}
-        </div>
-        <div class="mt-2 text-3xl font-semibold text-n-slate-12">
-          {{ formatRate(kpis.attendanceRate) }}
-        </div>
-      </div>
-      <div
-        class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
+        class="md:col-span-1 px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
       >
         <div class="text-sm text-n-slate-11 whitespace-nowrap">
           {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.NO_SHOW_RATE') }}

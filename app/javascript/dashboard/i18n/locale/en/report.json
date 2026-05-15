@@ -671,6 +671,7 @@
     "SEPARATOR": "·",
     "KPIS": {
       "SCHEDULING_RATE": "Scheduling rate",
+      "CONFIRMATION_RATE": "Confirmation rate",
       "ATTENDANCE_RATE": "Attendance rate (wins)",
       "NO_SHOW_RATE": "No-show rate"
     },

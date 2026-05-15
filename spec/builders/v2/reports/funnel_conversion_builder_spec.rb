@@ -41,6 +41,7 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(result[:kpis]).to eq(
           total_leads: 0,
           scheduling_count: 0, scheduling_rate: nil,
+          confirmation_count: 0, confirmation_rate: nil,
           attendance_count: 0, attendance_rate: nil,
           no_show_count: 0, no_show_rate: nil
         )
@@ -101,9 +102,13 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(lead_row[:drop_off_count]).to eq(1)
       end
 
-      it 'reports KPIs: total_leads + scheduling/attendance/no_show rates' do
+      # rubocop:disable RSpec/MultipleExpectations
+      it 'reports KPIs: total_leads + scheduling/confirmation/attendance/no_show rates' do
         # Point the KPI canon at the spec's random-named test stages so we can
         # exercise the math without relying on the seeder's canonical names.
+        # confirmation has no matching stage in this setup — it should land
+        # as zero count / nil rate so the data shape stays defined.
+        stub_const('V2::Reports::FunnelConversionBuilder::CONFIRMATION_STAGE_NAME', '__no_matching_stage__')
         stub_const('V2::Reports::FunnelConversionBuilder::ATTENDANCE_STAGE_NAME', stages[:won].name)
         stub_const('V2::Reports::FunnelConversionBuilder::NO_SHOW_STAGE_NAME', stages[:lost].name)
         stages[:qualified].update!(
@@ -113,16 +118,20 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         kpis = builder.build[:kpis]
         # 3 entered lead (the first open stage = total_leads denominator).
         # 2 entered qualified → scheduling = 2 → 66.67%.
+        # 0 entered confirmation (no matching stage) → 0 / 0%.
         # 1 entered won → attendance = 1 → 33.33%.
         # 1 entered lost (stubbed as no-show) → no_show = 1 → 33.33%.
         expect(kpis[:total_leads]).to eq(3)
         expect(kpis[:scheduling_count]).to eq(2)
         expect(kpis[:scheduling_rate]).to be_within(0.01).of(66.67)
+        expect(kpis[:confirmation_count]).to eq(0)
+        expect(kpis[:confirmation_rate]).to eq(0.0)
         expect(kpis[:attendance_count]).to eq(1)
         expect(kpis[:attendance_rate]).to be_within(0.01).of(33.33)
         expect(kpis[:no_show_count]).to eq(1)
         expect(kpis[:no_show_rate]).to be_within(0.01).of(33.33)
       end
+      # rubocop:enable RSpec/MultipleExpectations
     end
 
     context 'when the next stage has more conversations than the current (entries from outside)' do

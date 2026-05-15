@@ -11,6 +11,7 @@ class V2::Reports::FunnelConversionBuilder
   # canon (set/maintained by the chart-rules data migration); changing them
   # on FunnelStage means updating these constants in lockstep.
   SCHEDULING_CHART_GROUP = 'Agendamento'.freeze
+  CONFIRMATION_STAGE_NAME = 'Confirmado'.freeze
   ATTENDANCE_STAGE_NAME = 'Comparecimento ( ganho )'.freeze
   NO_SHOW_STAGE_NAME = 'No-Show'.freeze
 
@@ -171,12 +172,13 @@ class V2::Reports::FunnelConversionBuilder
     [from_count - to_count, 0].max
   end
 
-  # Three sales-funnel rates, all anchored on the same denominator (total
+  # Four sales-funnel rates, all anchored on the same denominator (total
   # leads entering the funnel in the period). Hidden stages still count —
   # `chart_visible` only controls the chart bars, not the KPI math.
   def build_kpis(all_stages)
     total_leads = first_open_stage_count(all_stages)
     scheduling_count = distinct_count_for(scheduling_member_names(all_stages))
+    confirmation_count = distinct_count_for([CONFIRMATION_STAGE_NAME])
     attendance_count = distinct_count_for([ATTENDANCE_STAGE_NAME])
     no_show_count = distinct_count_for([NO_SHOW_STAGE_NAME])
 
@@ -184,6 +186,8 @@ class V2::Reports::FunnelConversionBuilder
       total_leads: total_leads,
       scheduling_count: scheduling_count,
       scheduling_rate: rate(scheduling_count, total_leads),
+      confirmation_count: confirmation_count,
+      confirmation_rate: rate(confirmation_count, total_leads),
       attendance_count: attendance_count,
       attendance_rate: rate(attendance_count, total_leads),
       no_show_count: no_show_count,
@@ -251,6 +255,7 @@ class V2::Reports::FunnelConversionBuilder
     {
       total_leads: 0,
       scheduling_count: 0, scheduling_rate: nil,
+      confirmation_count: 0, confirmation_rate: nil,
       attendance_count: 0, attendance_rate: nil,
       no_show_count: 0, no_show_rate: nil
     }

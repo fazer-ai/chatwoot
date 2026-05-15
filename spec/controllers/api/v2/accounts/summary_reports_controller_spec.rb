@@ -309,6 +309,7 @@ RSpec.describe 'Summary Reports API', type: :request do
           stages: [{ id: 1, name: 'Lead', count: 10, conversion_rate: 50.0, drop_off_count: 5 }],
           kpis: { total_leads: 10,
                   scheduling_count: 6, scheduling_rate: 60.0,
+                  confirmation_count: 5, confirmation_rate: 50.0,
                   attendance_count: 4, attendance_rate: 40.0,
                   no_show_count: 1, no_show_rate: 10.0 }
         )
