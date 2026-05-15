@@ -1,4 +1,26 @@
 ---
+- tag: v4.13.0-auris.1.19
+  published_at: '2026-05-15T01:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.19
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Two new funnel views inside the Funnel menu.** Alongside *Board* and *List*, you now have **Overview** (per-stage table with entries in the period, average time in stage, won and lost counts) and **Conversion** (a horizontal sales-funnel chart showing how leads narrow down through the stages).
+      - **Per-account sidebar menu controls in Super Admin.** From the new *Auris menus* section under Super Admin → Accounts, you can now toggle the **Inbox** and **Help Center** sidebar menus on or off independently for each account.
+
+      ### ⚡ Improvements
+
+      - **Cleaner sales-funnel display.** The Conversion chart groups the scheduling stages into a single bar, hides closed-without-sale outcomes from the chart (they still count toward the closed-deal KPIs), and uses display names aligned with how a sales team actually talks about leads.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Dois novos modos dentro do menu Funil.** Ao lado de *Quadro* e *Lista*, agora você tem também **Visão geral** (tabela com entradas no período, tempo médio em cada fase, ganhas e perdidas) e **Conversão** (gráfico horizontal de funil de vendas mostrando como os leads avançam até a conclusão).
+      - **Controle de menus por conta no Super Admin.** Na nova seção *Auris menus* em Super Admin → Accounts, você consegue ativar ou desativar os menus **Caixa de Entrada** e **Central de Ajuda** independentemente por conta.
+
+      ### ⚡ Melhorias
+
+      - **Visual do funil de conversão alinhado com vendas.** O gráfico de Conversão agrupa as etapas de agendamento numa fase só ("Agendamento"), esconde os estados terminais sem venda (continuam contando nas métricas de fechamento) e usa nomes alinhados com a forma como o time comercial fala — "Total de leads" no topo, "Vendas realizadas" no fechamento.
 - tag: v4.13.0-auris.1.18
   published_at: '2026-05-14T02:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.18
