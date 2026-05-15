@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { defineComponent, h, nextTick, reactive } from 'vue';
 import { mount } from '@vue/test-utils';
 import Whatsapp from '../Whatsapp.vue';
@@ -8,6 +8,7 @@ import Whatsapp from '../Whatsapp.vue';
 let mockRoute;
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
+let originalChatwootConfig;
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual('vue-router');
@@ -91,6 +92,7 @@ const setRouteProvider = value => {
 
 describe('Whatsapp.vue (convert mode)', () => {
   beforeEach(() => {
+    originalChatwootConfig = window.chatwootConfig;
     mockPush.mockReset();
     mockReplace.mockReset();
     mockRoute = reactive({
@@ -98,6 +100,10 @@ describe('Whatsapp.vue (convert mode)', () => {
       params: { inboxId: 30 },
       query: {},
     });
+  });
+
+  afterEach(() => {
+    window.chatwootConfig = originalChatwootConfig;
   });
 
   it('shows the provider picker when no provider is selected in the query', () => {
