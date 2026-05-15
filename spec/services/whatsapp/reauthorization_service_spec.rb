@@ -68,7 +68,10 @@ describe Whatsapp::ReauthorizationService do
     it 'raises when the phone number does not match' do
       mismatched_phone_info = phone_info.merge(phone_number: '+0987654321')
       expect { service.perform(access_token, mismatched_phone_info) }
-        .to raise_error(StandardError, /Phone number mismatch/)
+        .to raise_error do |error|
+          expect(error.class.name).to eq('StandardError')
+          expect(error.message).to match(/Phone number mismatch/)
+        end
     end
   end
 end
