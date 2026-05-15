@@ -224,4 +224,58 @@ RSpec.describe 'Summary Reports API', type: :request do
       end
     end
   end
+
+  describe 'GET /api/v2/accounts/:account_id/summary_reports/funnel' do
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:params) do
+        {
+          since: start_of_today.to_s,
+          until: end_of_today.to_s
+        }
+      end
+
+      it 'returns unauthorized for agents' do
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel",
+            params: params,
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'calls V2::Reports::FunnelSummaryBuilder with the right params if the user is an admin' do
+        funnel_summary_builder = instance_double(V2::Reports::FunnelSummaryBuilder)
+        allow(V2::Reports::FunnelSummaryBuilder).to receive(:new).and_return(funnel_summary_builder)
+        allow(funnel_summary_builder).to receive(:build).and_return([
+                                                                      { id: 1, name: 'Lead', in_stage_count: 3,
+                                                                        entered_count: 5, avg_time_in_stage: 3600.0,
+                                                                        won_count: 1, lost_count: 0 }
+                                                                    ])
+
+        get "/api/v2/accounts/#{account.id}/summary_reports/funnel",
+            params: params,
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(V2::Reports::FunnelSummaryBuilder).to have_received(:new).with(
+          account: account,
+          params: hash_including(since: start_of_today.to_s, until: end_of_today.to_s)
+        )
+        expect(funnel_summary_builder).to have_received(:build)
+
+        expect(response).to have_http_status(:success)
+        json_response = response.parsed_body
+        expect(json_response.first['name']).to eq('Lead')
+        expect(json_response.first['entered_count']).to eq(5)
+      end
+    end
+  end
 end

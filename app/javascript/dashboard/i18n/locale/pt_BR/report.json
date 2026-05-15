@@ -646,5 +646,17 @@
     "AVG_REPLY_TIME": "Tempo Médio de Espera do Cliente",
     "RESOLUTION_COUNT": "Contagem de Resolução",
     "CONVERSATIONS": "Nº de Conversas"
+  },
+  "FUNNEL_REPORTS": {
+    "HEADER": "Visão Geral do Funil",
+    "DESCRIPTION": "Acompanhe como as conversas avançam por cada fase do funil com métricas-chave: contagem atual na fase, entradas no período, tempo médio na fase e saídas ganhas ou perdidas.",
+    "COLUMNS": {
+      "STAGE": "Fase",
+      "IN_STAGE": "Atualmente na fase",
+      "ENTERED": "Entraram (período)",
+      "AVG_TIME": "Tempo médio na fase",
+      "WON": "Ganhas",
+      "LOST": "Perdidas"
+    }
   }
 }

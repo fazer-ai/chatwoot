@@ -646,5 +646,17 @@
     "AVG_REPLY_TIME": "Avg. Customer Waiting Time",
     "RESOLUTION_COUNT": "Resolution Count",
     "CONVERSATIONS": "No. of conversations"
+  },
+  "FUNNEL_REPORTS": {
+    "HEADER": "Funnel Overview",
+    "DESCRIPTION": "Track how conversations move through each funnel stage with key metrics: current snapshot, entries in the period, average time spent, and wins or losses leaving the stage.",
+    "COLUMNS": {
+      "STAGE": "Stage",
+      "IN_STAGE": "Currently in stage",
+      "ENTERED": "Entered (period)",
+      "AVG_TIME": "Avg. time in stage",
+      "WON": "Won",
+      "LOST": "Lost"
+    }
   }
 }
