@@ -180,7 +180,7 @@ describe Whatsapp::EmbeddedSignupService do
           new_provider_config: {
             'api_key' => access_token,
             'phone_number_id' => params[:phone_number_id],
-            'business_account_id' => params[:business_id],
+            'business_account_id' => params[:waba_id],
             'source' => 'embedded_signup'
           }
         ).and_return(baileys_channel)
@@ -189,6 +189,19 @@ describe Whatsapp::EmbeddedSignupService do
 
         result = service_with_inbox.perform
         expect(result).to eq(baileys_channel)
+      end
+
+      it 'stores the waba_id (not the meta business_id) in business_account_id' do
+        captured_config = nil
+        allow(baileys_channel).to receive(:convert_provider!) do |args|
+          captured_config = args[:new_provider_config]
+          baileys_channel
+        end
+
+        service_with_inbox.perform
+
+        expect(captured_config['business_account_id']).to eq(params[:waba_id])
+        expect(captured_config['business_account_id']).not_to eq(params[:business_id])
       end
 
       it 'skips ReauthorizationService when current provider is not whatsapp_cloud' do
@@ -223,7 +236,7 @@ describe Whatsapp::EmbeddedSignupService do
           account: account,
           inbox_id: inbox_id,
           phone_number_id: params[:phone_number_id],
-          business_id: params[:business_id]
+          waba_id: params[:waba_id]
         ).and_return(reauth_service)
         allow(reauth_service).to receive(:perform).with(access_token, phone_info).and_return(channel)
 
@@ -281,7 +294,7 @@ describe Whatsapp::EmbeddedSignupService do
             account: account,
             inbox_id: inbox.id,
             phone_number_id: params[:phone_number_id],
-            business_id: params[:business_id]
+            waba_id: params[:waba_id]
           ).and_return(reauth_service)
 
           allow(reauth_service).to receive(:perform) do
