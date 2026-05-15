@@ -38,6 +38,7 @@ class SuperAdmin::AccountsController < SuperAdmin::ApplicationController
     permitted_params[:limits] = permitted_params[:limits].to_h.compact
     permitted_params[:selected_feature_flags] = params[:enabled_features].keys.map(&:to_sym) if params[:enabled_features].present?
     merge_auris_settings(permitted_params)
+    merge_auris_menus(permitted_params)
     permitted_params
   end
 
@@ -79,6 +80,18 @@ class SuperAdmin::AccountsController < SuperAdmin::ApplicationController
     permitted_params[:funnel_enabled] = auris[:funnel_enabled] == '1'
     permitted_params[:ai_status_uses_attribute] = auris[:ai_status_uses_attribute] == '1'
     permitted_params[:multi_language_ai] = auris[:multi_language_ai] == '1'
+  end
+
+  # Maps the "Auris menus" grid checkboxes (rendered by AurisAccountMenusField)
+  # onto the two sidebar-visibility columns. Kept separate from the settings
+  # writer so menu access stays an isolated concern: it doesn't ride along on
+  # webhooks and a future Super Admin reshuffle can move it independently.
+  def merge_auris_menus(permitted_params)
+    return if params[:auris_menus].blank?
+
+    menus = params.require(:auris_menus).permit(:inbox_view_menu_enabled, :help_center_menu_enabled)
+    permitted_params[:inbox_view_menu_enabled] = menus[:inbox_view_menu_enabled] == '1'
+    permitted_params[:help_center_menu_enabled] = menus[:help_center_menu_enabled] == '1'
   end
 end
 

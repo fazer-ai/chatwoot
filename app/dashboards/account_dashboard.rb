@@ -35,8 +35,11 @@ class AccountDashboard < Administrate::BaseDashboard
     status: Field::Select.with_options(collection: [%w[Active active], %w[Suspended suspended]]),
     average_ticket: Field::Number.with_options(decimals: 2, step: 0.01),
     auris_settings: AurisAccountSettingsField,
+    auris_menus: AurisAccountMenusField,
     funnel_enabled: Field::Boolean,
     ai_status_uses_attribute: Field::Boolean,
+    inbox_view_menu_enabled: Field::Boolean,
+    help_center_menu_enabled: Field::Boolean,
     account_users: Field::HasMany,
     custom_attributes: Field::String
   }.merge(enterprise_attribute_types).freeze
@@ -77,6 +80,7 @@ class AccountDashboard < Administrate::BaseDashboard
     status
     average_ticket
     auris_settings
+    auris_menus
     conversations
     account_users
   ] + enterprise_show_page_attributes).freeze
@@ -98,6 +102,7 @@ class AccountDashboard < Administrate::BaseDashboard
     status
     average_ticket
     auris_settings
+    auris_menus
   ] + enterprise_form_attributes).freeze
 
   # COLLECTION_FILTERS
