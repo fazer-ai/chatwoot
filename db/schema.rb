@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_12_020000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_14_225413) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -85,6 +85,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_12_020000) do
     t.boolean "funnel_enabled", default: false, null: false
     t.boolean "ai_status_uses_attribute", default: false, null: false
     t.boolean "multi_language_ai", default: false, null: false
+    t.boolean "inbox_view_menu_enabled", default: false, null: false
+    t.boolean "help_center_menu_enabled", default: false, null: false
     t.index ["status"], name: "index_accounts_on_status"
   end
 

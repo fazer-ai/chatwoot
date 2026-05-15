@@ -1,0 +1,13 @@
+<div class="field-unit__label">
+  <%= f.label :auris_menus, "Auris menus" %>
+</div>
+<div class="field-unit__field feature-container">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <% field.options.each do |opt| %>
+      <div class="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm outline outline-1 outline-n-container">
+        <span class="text-sm text-slate-700"><%= opt[:label] %></span>
+        <span><%= check_box "auris_menus", opt[:key], { checked: opt[:checked], class: "h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-600" }, "1", "0" %></span>
+      </div>
+    <% end %>
+  </div>
+</div>
