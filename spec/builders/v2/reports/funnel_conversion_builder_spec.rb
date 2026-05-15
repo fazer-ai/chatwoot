@@ -38,7 +38,12 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
       it 'returns empty stages and zeroed KPIs' do
         result = described_class.new(account: create(:account), params: params).build
         expect(result[:stages]).to eq([])
-        expect(result[:kpis]).to eq(top_count: 0, completed_count: 0, won_count: 0, win_rate: nil)
+        expect(result[:kpis]).to eq(
+          total_leads: 0,
+          scheduling_count: 0, scheduling_rate: nil,
+          attendance_count: 0, attendance_rate: nil,
+          no_show_count: 0, no_show_rate: nil
+        )
       end
     end
 
@@ -95,12 +100,27 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(lead_row[:drop_off_count]).to eq(1)
       end
 
-      it 'reports KPIs: top, completed (won + lost), won, win_rate' do
+      it 'reports KPIs: total_leads + scheduling/attendance/no_show rates' do
+        # Point the KPI canon at the spec's random-named test stages so we can
+        # exercise the math without relying on the seeder's canonical names.
+        stub_const('V2::Reports::FunnelConversionBuilder::ATTENDANCE_STAGE_NAME', stages[:won].name)
+        stub_const('V2::Reports::FunnelConversionBuilder::NO_SHOW_STAGE_NAME', stages[:lost].name)
+        stages[:qualified].update!(
+          chart_group: V2::Reports::FunnelConversionBuilder::SCHEDULING_CHART_GROUP
+        )
+
         kpis = builder.build[:kpis]
-        expect(kpis[:top_count]).to eq(3)
-        expect(kpis[:completed_count]).to eq(2)
-        expect(kpis[:won_count]).to eq(1)
-        expect(kpis[:win_rate]).to eq(50.0)
+        # 3 entered lead (the first open stage = total_leads denominator).
+        # 2 entered qualified → scheduling = 2 → 66.67%.
+        # 1 entered won → attendance = 1 → 33.33%.
+        # 1 entered lost (stubbed as no-show) → no_show = 1 → 33.33%.
+        expect(kpis[:total_leads]).to eq(3)
+        expect(kpis[:scheduling_count]).to eq(2)
+        expect(kpis[:scheduling_rate]).to be_within(0.01).of(66.67)
+        expect(kpis[:attendance_count]).to eq(1)
+        expect(kpis[:attendance_rate]).to be_within(0.01).of(33.33)
+        expect(kpis[:no_show_count]).to eq(1)
+        expect(kpis[:no_show_rate]).to be_within(0.01).of(33.33)
       end
     end
 
@@ -156,8 +176,11 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
       end
 
       it 'still counts the hidden closed stage toward KPIs' do
-        kpis = builder.build[:kpis]
-        expect(kpis[:completed_count]).to eq(1)
+        # The hidden lost stage stands in for No-Show in the canonical
+        # mapping; chart_visible=false hides it from the chart but the KPI
+        # math should still see the entry.
+        stub_const('V2::Reports::FunnelConversionBuilder::NO_SHOW_STAGE_NAME', stages[:lost].name)
+        expect(builder.build[:kpis][:no_show_count]).to eq(1)
       end
     end
 

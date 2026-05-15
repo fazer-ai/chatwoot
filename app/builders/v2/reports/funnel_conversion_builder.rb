@@ -1,6 +1,15 @@
 class V2::Reports::FunnelConversionBuilder
   include DateRangeHelper
 
+  # KPI denominators are all "total de leads" — distinct conversations that
+  # entered the first open funnel stage in the period. The other three KPIs
+  # are read off specific stage identities below. Names are Auris funnel
+  # canon (set/maintained by the chart-rules data migration); changing them
+  # on FunnelStage means updating these constants in lockstep.
+  SCHEDULING_CHART_GROUP = 'Agendamento'.freeze
+  ATTENDANCE_STAGE_NAME = 'Comparecimento ( ganho )'.freeze
+  NO_SHOW_STAGE_NAME = 'No-Show'.freeze
+
   attr_reader :account, :params
 
   def initialize(account:, params:)
@@ -154,20 +163,34 @@ class V2::Reports::FunnelConversionBuilder
     [from_count - to_count, 0].max
   end
 
-  # KPIs use every active stage (visible or not) so hidden closed stages like
-  # No-Show / Perdido still count toward "completed".
+  # Three sales-funnel rates, all anchored on the same denominator (total
+  # leads entering the funnel in the period). Hidden stages still count —
+  # `chart_visible` only controls the chart bars, not the KPI math.
   def build_kpis(all_stages)
-    closed_names = all_stages.select(&:closed).map(&:name)
-    completed = distinct_count_for(closed_names)
-    won = distinct_count_for_won(closed_names)
-    top_count = first_open_stage_count(all_stages)
+    total_leads = first_open_stage_count(all_stages)
+    scheduling_count = distinct_count_for(scheduling_member_names(all_stages))
+    attendance_count = distinct_count_for([ATTENDANCE_STAGE_NAME])
+    no_show_count = distinct_count_for([NO_SHOW_STAGE_NAME])
 
     {
-      top_count: top_count,
-      completed_count: completed,
-      won_count: won,
-      win_rate: completed.zero? ? nil : ((won.to_f / completed) * 100).round(2)
+      total_leads: total_leads,
+      scheduling_count: scheduling_count,
+      scheduling_rate: rate(scheduling_count, total_leads),
+      attendance_count: attendance_count,
+      attendance_rate: rate(attendance_count, total_leads),
+      no_show_count: no_show_count,
+      no_show_rate: rate(no_show_count, total_leads)
     }
+  end
+
+  def scheduling_member_names(all_stages)
+    all_stages.select { |stage| stage.chart_group == SCHEDULING_CHART_GROUP }.map(&:name)
+  end
+
+  def rate(count, total)
+    return nil if total.zero?
+
+    ((count.to_f / total) * 100).round(2)
   end
 
   def first_open_stage_count(all_stages)
@@ -185,15 +208,12 @@ class V2::Reports::FunnelConversionBuilder
     scope.distinct.count(:conversation_id)
   end
 
-  def distinct_count_for_won(stage_names)
-    return 0 if stage_names.empty?
-
-    scope = account.funnel_stage_changes.where(new_stage: stage_names, loss_reason_id: nil)
-    scope = scope.where(created_at: range) if range.present?
-    scope.distinct.count(:conversation_id)
-  end
-
   def empty_kpis
-    { top_count: 0, completed_count: 0, won_count: 0, win_rate: nil }
+    {
+      total_leads: 0,
+      scheduling_count: 0, scheduling_rate: nil,
+      attendance_count: 0, attendance_rate: nil,
+      no_show_count: 0, no_show_rate: nil
+    }
   end
 end

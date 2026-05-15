@@ -30,11 +30,6 @@ const isLoading = computed(
 const stages = computed(() => report.value?.stages || []);
 const kpis = computed(() => report.value?.kpis || {});
 
-const formatCount = value => {
-  if (value === null || value === undefined) return '--';
-  return Number(value).toLocaleString();
-};
-
 const formatRate = value => {
   if (value === null || value === undefined) return '--';
   return `${Number(value).toFixed(1)}%`;
@@ -93,38 +88,30 @@ onMounted(fetchReports);
         class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
       >
         <div class="text-sm text-n-slate-11 whitespace-nowrap">
-          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.TOP_COUNT') }}
+          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.SCHEDULING_RATE') }}
         </div>
         <div class="mt-2 text-3xl font-semibold text-n-slate-12">
-          {{ formatCount(kpis.topCount) }}
+          {{ formatRate(kpis.schedulingRate) }}
         </div>
       </div>
       <div
         class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
       >
         <div class="text-sm text-n-slate-11 whitespace-nowrap">
-          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.COMPLETED') }}
+          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.ATTENDANCE_RATE') }}
         </div>
         <div class="mt-2 text-3xl font-semibold text-n-slate-12">
-          {{ formatCount(kpis.completedCount) }}
+          {{ formatRate(kpis.attendanceRate) }}
         </div>
       </div>
       <div
         class="px-5 py-4 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
       >
         <div class="text-sm text-n-slate-11 whitespace-nowrap">
-          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.WIN_RATE') }}
+          {{ $t('FUNNEL_CONVERSION_REPORTS.KPIS.NO_SHOW_RATE') }}
         </div>
         <div class="mt-2 text-3xl font-semibold text-n-slate-12">
-          {{ formatRate(kpis.winRate) }}
-        </div>
-        <div class="text-xs text-n-slate-11 mt-1 whitespace-nowrap">
-          {{
-            $t('FUNNEL_CONVERSION_REPORTS.WIN_RATE_DETAIL', {
-              won: formatCount(kpis.wonCount),
-              total: formatCount(kpis.completedCount),
-            })
-          }}
+          {{ formatRate(kpis.noShowRate) }}
         </div>
       </div>
     </div>
