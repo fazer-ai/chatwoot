@@ -186,9 +186,7 @@ const table = useVueTable({
       class="flex flex-col justify-between gap-3 md:flex-row"
       :class="{ 'pointer-events-none opacity-50': isLoading }"
     >
-      <div
-        class="flex flex-col flex-wrap items-start gap-2 md:flex-row md:items-center"
-      >
+      <div class="flex flex-col flex-wrap items-start gap-2 md:flex-row">
         <WootDatePicker
           v-model:date-range="customDateRange"
           v-model:range-type="selectedDateRange"
