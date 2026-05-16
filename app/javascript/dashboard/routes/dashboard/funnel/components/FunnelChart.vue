@@ -171,6 +171,28 @@ const hoverZones = computed(() => {
 });
 
 const hoveredIdx = ref(null);
+const tooltipScreenPos = ref({ x: 0, y: 0 });
+
+// The tooltip is teleported to <body> with `position: fixed` so it can
+// escape any `overflow: hidden / auto` container in the chart's ancestry
+// (the reports view scrolls, which would otherwise clip a tooltip that
+// extends past the leftmost stage). Coordinates are read off the SVG's
+// actual screen rect on each mouseenter — they don't track on scroll, but
+// the mouseleave/enter cycle re-captures them as needed.
+const onStageHover = (idx, event) => {
+  hoveredIdx.value = idx;
+  const svgEl = event.currentTarget.ownerSVGElement;
+  if (!svgEl) return;
+
+  const svgRect = svgEl.getBoundingClientRect();
+  const stagePoint = stagePoints.value[idx];
+  if (!stagePoint) return;
+
+  tooltipScreenPos.value = {
+    x: svgRect.left + (stagePoint.x / VIEWBOX_WIDTH) * svgRect.width,
+    y: svgRect.top + (FUNNEL_TOP / VIEWBOX_HEIGHT) * svgRect.height,
+  };
+};
 
 const hoveredTooltip = computed(() => {
   if (hoveredIdx.value === null) return null;
@@ -185,17 +207,12 @@ const hoveredTooltip = computed(() => {
   // add up to 100%.
   const aiPct = total === 0 ? 0 : (ai / total) * 100;
   const manualPct = total === 0 ? 0 : (manual / total) * 100;
-  // X positioning: percentage of the viewBox so it works regardless of the
-  // SVG's rendered width. Tooltip sits over the funnel area, just above the
-  // stage's split line.
-  const x = stagePoints.value[hoveredIdx.value].x;
   return {
     name: stage.name,
     aiCount: ai,
     manualCount: manual,
     aiPct,
     manualPct,
-    leftPct: (x / VIEWBOX_WIDTH) * 100,
   };
 });
 </script>
@@ -282,54 +299,59 @@ const hoveredTooltip = computed(() => {
           :width="zone.width"
           :height="VIEWBOX_HEIGHT - FUNNEL_TOP + 10"
           fill="transparent"
-          @mouseenter="hoveredIdx = idx"
+          @mouseenter="onStageHover(idx, $event)"
           @mouseleave="hoveredIdx = null"
         />
       </g>
     </svg>
 
-    <!-- Floating tooltip with the per-stage AI/manual split. Positioned in
-         percentages of the wrapper width so it tracks the stage regardless
-         of the SVG's actual rendered width. -->
-    <div
-      v-if="hoveredTooltip"
-      class="absolute pointer-events-none z-[60] top-[22%] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
-      :style="{ left: `${hoveredTooltip.leftPct}%` }"
-    >
-      <div class="font-medium text-n-slate-12 mb-1">
-        {{ hoveredTooltip.name }}
+    <!-- Floating tooltip with the per-stage AI/manual split. Teleported to
+         body + `position: fixed` so the leftmost stage's tooltip isn't
+         clipped by the report view's `overflow-auto` scroll container. -->
+    <Teleport to="body">
+      <div
+        v-if="hoveredTooltip"
+        class="fixed pointer-events-none z-[60] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
+        :style="{
+          left: `${tooltipScreenPos.x}px`,
+          top: `${tooltipScreenPos.y}px`,
+        }"
+      >
+        <div class="font-medium text-n-slate-12 mb-1">
+          {{ hoveredTooltip.name }}
+        </div>
+        <div class="flex items-center gap-1.5 text-n-slate-12">
+          <span
+            class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+            :style="{ backgroundColor: AI_COLOR }"
+          />
+          <span>
+            {{
+              $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
+                label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.AI'),
+                pct: formatPct(hoveredTooltip.aiPct),
+                count: formatCount(hoveredTooltip.aiCount),
+              })
+            }}
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 text-n-slate-12 mt-0.5">
+          <span
+            class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+            :style="{ backgroundColor: MANUAL_COLOR }"
+          />
+          <span>
+            {{
+              $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
+                label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.MANUAL'),
+                pct: formatPct(hoveredTooltip.manualPct),
+                count: formatCount(hoveredTooltip.manualCount),
+              })
+            }}
+          </span>
+        </div>
       </div>
-      <div class="flex items-center gap-1.5 text-n-slate-12">
-        <span
-          class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-          :style="{ backgroundColor: AI_COLOR }"
-        />
-        <span>
-          {{
-            $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
-              label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.AI'),
-              pct: formatPct(hoveredTooltip.aiPct),
-              count: formatCount(hoveredTooltip.aiCount),
-            })
-          }}
-        </span>
-      </div>
-      <div class="flex items-center gap-1.5 text-n-slate-12 mt-0.5">
-        <span
-          class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-          :style="{ backgroundColor: MANUAL_COLOR }"
-        />
-        <span>
-          {{
-            $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
-              label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.MANUAL'),
-              pct: formatPct(hoveredTooltip.manualPct),
-              count: formatCount(hoveredTooltip.manualCount),
-            })
-          }}
-        </span>
-      </div>
-    </div>
+    </Teleport>
 
     <!-- Legend mapping color → semantic. Compact so it fits next to the
          loss-reasons donut on md+. -->
