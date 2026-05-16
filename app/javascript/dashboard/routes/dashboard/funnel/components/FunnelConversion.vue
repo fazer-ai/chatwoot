@@ -103,45 +103,49 @@ onMounted(fetchReports);
       :class="{ 'pointer-events-none opacity-50': isLoading }"
     >
       <div
-        class="flex flex-col flex-wrap items-start gap-2 md:flex-row md:items-end"
+        class="flex flex-col flex-wrap items-start gap-2 md:flex-row md:items-center"
       >
         <WootDatePicker
           v-model:date-range="customDateRange"
           v-model:range-type="selectedDateRange"
           @date-range-changed="onDateRangeChange"
         />
-        <select
-          :value="inboxId"
-          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand w-32"
-          @change="onInboxChange"
-        >
-          <option value="">
-            {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.INBOX_ANY') }}
-          </option>
-          <option
-            v-for="inbox in inboxOptions"
-            :key="inbox.id"
-            :value="inbox.id"
+        <div class="relative flex-shrink-0">
+          <select
+            :value="inboxId"
+            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-32"
+            @change="onInboxChange"
           >
-            {{ inbox.name }}
-          </option>
-        </select>
-        <select
-          :value="labelName"
-          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand w-32"
-          @change="onLabelChange"
-        >
-          <option value="">
-            {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.LABEL_ANY') }}
-          </option>
-          <option
-            v-for="label in labelOptions"
-            :key="label.id"
-            :value="label.title"
+            <option value="">
+              {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.INBOX_ANY') }}
+            </option>
+            <option
+              v-for="inbox in inboxOptions"
+              :key="inbox.id"
+              :value="inbox.id"
+            >
+              {{ inbox.name }}
+            </option>
+          </select>
+        </div>
+        <div class="relative flex-shrink-0">
+          <select
+            :value="labelName"
+            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-32"
+            @change="onLabelChange"
           >
-            {{ label.title }}
-          </option>
-        </select>
+            <option value="">
+              {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.LABEL_ANY') }}
+            </option>
+            <option
+              v-for="label in labelOptions"
+              :key="label.id"
+              :value="label.title"
+            >
+              {{ label.title }}
+            </option>
+          </select>
+        </div>
       </div>
     </div>
 
