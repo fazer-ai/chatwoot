@@ -112,7 +112,7 @@ onMounted(fetchReports);
         />
         <select
           :value="inboxId"
-          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand min-w-[10rem]"
+          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand w-32"
           @change="onInboxChange"
         >
           <option value="">
@@ -128,7 +128,7 @@ onMounted(fetchReports);
         </select>
         <select
           :value="labelName"
-          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand min-w-[10rem]"
+          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand w-32"
           @change="onLabelChange"
         >
           <option value="">
