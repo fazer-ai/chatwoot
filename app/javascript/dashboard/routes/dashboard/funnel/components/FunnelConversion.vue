@@ -21,9 +21,13 @@ const customDateRange = ref([subDays(new Date(), 6), new Date()]);
 const selectedDateRange = ref(DATE_RANGE_TYPES.LAST_7_DAYS);
 const from = ref(getUnixStartOfDay(customDateRange.value[0]));
 const to = ref(getUnixEndOfDay(customDateRange.value[1]));
+const inboxId = ref('');
+const labelName = ref('');
 
 const uiFlags = useMapGetter('summaryReports/getUIFlags');
 const report = useMapGetter('summaryReports/getFunnelConversionReport');
+const inboxes = useMapGetter('inboxes/getInboxes');
+const labels = useMapGetter('labels/getLabels');
 const isLoading = computed(
   () => uiFlags.value.isFetchingFunnelConversionReports ?? false
 );
@@ -32,13 +36,26 @@ const stages = computed(() => report.value?.stages || []);
 const kpis = computed(() => report.value?.kpis || {});
 const lossReasons = computed(() => report.value?.lossReasons || []);
 
+const inboxOptions = computed(() =>
+  [...inboxes.value].sort((a, b) => a.name.localeCompare(b.name))
+);
+
+const labelOptions = computed(() =>
+  [...labels.value].sort((a, b) => a.title.localeCompare(b.title))
+);
+
 const formatRate = value => {
   if (value === null || value === undefined) return '--';
   return `${Number(value).toFixed(1)}%`;
 };
 
 const fetchReports = async () => {
-  const params = { since: from.value, until: to.value };
+  const params = {
+    since: from.value,
+    until: to.value,
+    inboxId: inboxId.value || undefined,
+    label: labelName.value || undefined,
+  };
   try {
     await store.dispatch('summaryReports/fetchFunnelConversionReports', params);
   } catch {
@@ -52,6 +69,16 @@ const onDateRangeChange = value => {
   selectedDateRange.value = rangeType || DATE_RANGE_TYPES.CUSTOM_RANGE;
   from.value = getUnixStartOfDay(startDate);
   to.value = getUnixEndOfDay(endDate);
+  fetchReports();
+};
+
+const onInboxChange = event => {
+  inboxId.value = event.target.value;
+  fetchReports();
+};
+
+const onLabelChange = event => {
+  labelName.value = event.target.value;
   fetchReports();
 };
 
@@ -75,12 +102,46 @@ onMounted(fetchReports);
       class="flex flex-col justify-between gap-3 md:flex-row"
       :class="{ 'pointer-events-none opacity-50': isLoading }"
     >
-      <div class="flex flex-col flex-wrap items-start gap-2 md:flex-row">
+      <div
+        class="flex flex-col flex-wrap items-start gap-2 md:flex-row md:items-end"
+      >
         <WootDatePicker
           v-model:date-range="customDateRange"
           v-model:range-type="selectedDateRange"
           @date-range-changed="onDateRangeChange"
         />
+        <select
+          :value="inboxId"
+          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand min-w-[10rem]"
+          @change="onInboxChange"
+        >
+          <option value="">
+            {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.INBOX_ANY') }}
+          </option>
+          <option
+            v-for="inbox in inboxOptions"
+            :key="inbox.id"
+            :value="inbox.id"
+          >
+            {{ inbox.name }}
+          </option>
+        </select>
+        <select
+          :value="labelName"
+          class="h-10 text-sm rounded-md border border-n-weak bg-n-alpha-black2 px-3 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand min-w-[10rem]"
+          @change="onLabelChange"
+        >
+          <option value="">
+            {{ $t('FUNNEL_CONVERSION_REPORTS.FILTERS.LABEL_ANY') }}
+          </option>
+          <option
+            v-for="label in labelOptions"
+            :key="label.id"
+            :value="label.title"
+          >
+            {{ label.title }}
+          </option>
+        </select>
       </div>
     </div>
 

@@ -112,9 +112,20 @@ class V2::Reports::FunnelConversionBuilder
 
   def fetch_stage_change_rows(groups)
     all_names = groups.flat_map { |g| g[:stage_names] }.uniq
-    scope = account.funnel_stage_changes.where(new_stage: all_names)
+    scope = funnel_stage_changes_scope.where(new_stage: all_names)
     scope = scope.where(created_at: range) if range.present?
     scope.distinct.pluck(:new_stage, :conversation_id)
+  end
+
+  # Single point that applies the optional inbox / label filters used by both
+  # `Visão geral` and `Conversão`. Returns an ActiveRecord scope so callers
+  # can chain `.where(...)` / `.group(...)` like they did before. Filters
+  # default to OFF when the param is blank.
+  def funnel_stage_changes_scope
+    scope = account.funnel_stage_changes
+    scope = scope.where(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+    scope = scope.where(conversation_id: account.conversations.tagged_with(params[:label], on: :labels).select(:id)) if params[:label].present?
+    scope
   end
 
   def distinct_conv_count_for(group, rows)
@@ -215,7 +226,7 @@ class V2::Reports::FunnelConversionBuilder
   def distinct_count_for(stage_names)
     return 0 if stage_names.empty?
 
-    scope = account.funnel_stage_changes.where(new_stage: stage_names)
+    scope = funnel_stage_changes_scope.where(new_stage: stage_names)
     scope = scope.where(created_at: range) if range.present?
     scope.distinct.count(:conversation_id)
   end
@@ -235,7 +246,7 @@ class V2::Reports::FunnelConversionBuilder
   end
 
   def fetch_loss_reason_counts
-    scope = account.funnel_stage_changes.where.not(loss_reason_id: nil)
+    scope = funnel_stage_changes_scope.where.not(loss_reason_id: nil)
     scope = scope.where(created_at: range) if range.present?
     scope.joins(:loss_reason).distinct
          .group('loss_reasons.id', 'loss_reasons.name')

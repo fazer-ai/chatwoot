@@ -657,6 +657,10 @@
       "AVG_TIME": "Avg. time in stage",
       "WON": "Won",
       "LOST": "Lost"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "All inboxes",
+      "LABEL_ANY": "All labels"
     }
   },
   "FUNNEL_CONVERSION_REPORTS": {
@@ -683,6 +687,10 @@
       "COLUMN_NAME": "Reason",
       "COLUMN_COUNT": "Count",
       "COLUMN_PERCENT": "%"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "All inboxes",
+      "LABEL_ANY": "All labels"
     }
   }
 }

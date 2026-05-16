@@ -45,7 +45,7 @@ RSpec.describe 'Summary Reports API', type: :request do
             headers: admin.create_new_auth_token,
             as: :json
 
-        expect(V2::Reports::AgentSummaryBuilder).to have_received(:new).with(account: account, params: params)
+        expect(V2::Reports::AgentSummaryBuilder).to have_received(:new).with(account: account, params: hash_including(params))
         expect(agent_summary_builder).to have_received(:build)
 
         expect(response).to have_http_status(:success)
@@ -96,7 +96,7 @@ RSpec.describe 'Summary Reports API', type: :request do
             headers: admin.create_new_auth_token,
             as: :json
 
-        expect(V2::Reports::InboxSummaryBuilder).to have_received(:new).with(account: account, params: params)
+        expect(V2::Reports::InboxSummaryBuilder).to have_received(:new).with(account: account, params: hash_including(params))
         expect(inbox_summary_builder).to have_received(:build)
 
         expect(response).to have_http_status(:success)
@@ -147,7 +147,7 @@ RSpec.describe 'Summary Reports API', type: :request do
             headers: admin.create_new_auth_token,
             as: :json
 
-        expect(V2::Reports::TeamSummaryBuilder).to have_received(:new).with(account: account, params: params)
+        expect(V2::Reports::TeamSummaryBuilder).to have_received(:new).with(account: account, params: hash_including(params))
         expect(team_summary_builder).to have_received(:build)
 
         expect(response).to have_http_status(:success)

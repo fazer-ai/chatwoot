@@ -259,5 +259,57 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
         expect(builder.build[:loss_reasons].map { |r| r[:name] }).not_to include(unused.name)
       end
     end
+
+    context 'with inbox_id filter' do
+      let(:other_inbox) { create(:inbox, account: account) }
+
+      before do
+        # Two convs in `inbox`, one in `other_inbox`. Only the matching scope
+        # should show up in the counts.
+        conv_a = conversation_with_id
+        stage_change(conv_id: conv_a.id, new_stage: stages[:lead].name)
+        conv_b = conversation_with_id
+        stage_change(conv_id: conv_b.id, new_stage: stages[:lead].name)
+
+        other_conv = create(:conversation, account: account, inbox: other_inbox, contact: contact)
+        create(:funnel_stage_change,
+               account: account, conversation_id: other_conv.id,
+               contact: contact, inbox: other_inbox,
+               previous_stage: nil, new_stage: stages[:lead].name)
+      end
+
+      it 'only counts changes from the chosen inbox' do
+        filtered = described_class.new(
+          account: account,
+          params: params.merge(inbox_id: inbox.id)
+        ).build
+
+        lead_row = filtered[:stages].find { |row| row[:name] == stages[:lead].name }
+        expect(lead_row[:count]).to eq(2)
+      end
+    end
+
+    context 'with label filter' do
+      let(:matching_label) { 'reativar-fup' }
+
+      before do
+        labeled_conv = conversation_with_id
+        labeled_conv.update_labels(matching_label)
+        stage_change(conv_id: labeled_conv.id, new_stage: stages[:lead].name)
+
+        bare_conv = conversation_with_id
+        stage_change(conv_id: bare_conv.id, new_stage: stages[:lead].name)
+      end
+
+      it 'only counts changes from conversations carrying the label' do
+        filtered = described_class.new(
+          account: account,
+          params: params.merge(label: matching_label)
+        ).build
+
+        lead_row = filtered[:stages].find { |row| row[:name] == stages[:lead].name }
+        expect(lead_row[:count]).to eq(1)
+      end
+    end
   end
 end

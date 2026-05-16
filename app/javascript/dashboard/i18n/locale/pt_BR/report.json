@@ -657,6 +657,10 @@
       "AVG_TIME": "Tempo médio na fase",
       "WON": "Ganhas",
       "LOST": "Perdidas"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "Todas as caixas",
+      "LABEL_ANY": "Todas as etiquetas"
     }
   },
   "FUNNEL_CONVERSION_REPORTS": {
@@ -683,6 +687,10 @@
       "COLUMN_NAME": "Motivo",
       "COLUMN_COUNT": "Valor",
       "COLUMN_PERCENT": "%"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "Todas as caixas",
+      "LABEL_ANY": "Todas as etiquetas"
     }
   }
 }
