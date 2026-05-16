@@ -113,7 +113,7 @@ onMounted(fetchReports);
         <div class="relative flex-shrink-0">
           <select
             :value="inboxId"
-            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-32"
+            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-[10.5rem]"
             @change="onInboxChange"
           >
             <option value="">
@@ -131,7 +131,7 @@ onMounted(fetchReports);
         <div class="relative flex-shrink-0">
           <select
             :value="labelName"
-            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-32"
+            class="h-10 text-sm rounded-md border border-n-weak bg-n-input-background px-2 text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-blue-9 w-[10.5rem]"
             @change="onLabelChange"
           >
             <option value="">
