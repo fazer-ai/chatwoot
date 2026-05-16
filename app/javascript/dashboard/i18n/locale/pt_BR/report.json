@@ -695,6 +695,7 @@
     "LEGEND": {
       "AI": "Atendido pela IA",
       "MANUAL": "Atendido manualmente"
-    }
+    },
+    "TOOLTIP_STAT": "{label}: {pct} ({count})"
   }
 }

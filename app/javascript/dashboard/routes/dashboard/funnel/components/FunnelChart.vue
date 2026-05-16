@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   stages: {
@@ -149,10 +149,59 @@ const labelsForStages = computed(() => {
 
 const formatCount = value => Number(value || 0).toLocaleString();
 const formatPct = value => `${Number(value).toFixed(1)}%`;
+
+// Hover hit zones: one invisible rect per stage, spanning the half-distance
+// to its left and right neighbors so a mouse anywhere over the stage's
+// vertical column triggers its tooltip. Edge stages anchor to the viewBox
+// boundary on their outer side.
+const hoverZones = computed(() => {
+  const pts = stagePoints.value;
+  if (pts.length === 0) return [];
+
+  return pts.map((pt, i) => {
+    const leftBound = i === 0 ? 0 : (pts[i - 1].x + pt.x) / 2;
+    const rightBound =
+      i === pts.length - 1 ? VIEWBOX_WIDTH : (pt.x + pts[i + 1].x) / 2;
+    return {
+      x: leftBound,
+      width: rightBound - leftBound,
+      stage: pt.stage,
+    };
+  });
+});
+
+const hoveredIdx = ref(null);
+
+const hoveredTooltip = computed(() => {
+  if (hoveredIdx.value === null) return null;
+  const stage = props.stages[hoveredIdx.value];
+  if (!stage) return null;
+
+  const total = stage.count || 0;
+  const ai = stage.countAi || 0;
+  const manual = stage.countManual || 0;
+  // Per-stage share — the split is meaningful relative to the stage's own
+  // total (not relative to total leads), so each stage's two slices always
+  // add up to 100%.
+  const aiPct = total === 0 ? 0 : (ai / total) * 100;
+  const manualPct = total === 0 ? 0 : (manual / total) * 100;
+  // X positioning: percentage of the viewBox so it works regardless of the
+  // SVG's rendered width. Tooltip sits over the funnel area, just above the
+  // stage's split line.
+  const x = stagePoints.value[hoveredIdx.value].x;
+  return {
+    name: stage.name,
+    aiCount: ai,
+    manualCount: manual,
+    aiPct,
+    manualPct,
+    leftPct: (x / VIEWBOX_WIDTH) * 100,
+  };
+});
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full relative">
     <svg
       class="w-full h-auto"
       :viewBox="`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`"
@@ -220,7 +269,67 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
            naturally overlays the split boundary without antialiasing seams. -->
       <path :d="manualPath" fill="url(#funnelGradientManual)" />
       <path :d="aiPath" fill="url(#funnelGradientAi)" />
+
+      <!-- Invisible hit areas per stage — driven by `hoverZones`. Sitting
+           on top of the funnel paths so hover targets the entire column,
+           not just the colored band. -->
+      <g>
+        <rect
+          v-for="(zone, idx) in hoverZones"
+          :key="`hit-${idx}`"
+          :x="zone.x"
+          :y="FUNNEL_TOP - 10"
+          :width="zone.width"
+          :height="VIEWBOX_HEIGHT - FUNNEL_TOP + 10"
+          fill="transparent"
+          @mouseenter="hoveredIdx = idx"
+          @mouseleave="hoveredIdx = null"
+        />
+      </g>
     </svg>
+
+    <!-- Floating tooltip with the per-stage AI/manual split. Positioned in
+         percentages of the wrapper width so it tracks the stage regardless
+         of the SVG's actual rendered width. -->
+    <div
+      v-if="hoveredTooltip"
+      class="absolute pointer-events-none z-10 top-[22%] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
+      :style="{ left: `${hoveredTooltip.leftPct}%` }"
+    >
+      <div class="font-medium text-n-slate-12 mb-1">
+        {{ hoveredTooltip.name }}
+      </div>
+      <div class="flex items-center gap-1.5 text-n-slate-12">
+        <span
+          class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+          :style="{ backgroundColor: AI_COLOR }"
+        />
+        <span>
+          {{
+            $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
+              label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.AI'),
+              pct: formatPct(hoveredTooltip.aiPct),
+              count: formatCount(hoveredTooltip.aiCount),
+            })
+          }}
+        </span>
+      </div>
+      <div class="flex items-center gap-1.5 text-n-slate-12 mt-0.5">
+        <span
+          class="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+          :style="{ backgroundColor: MANUAL_COLOR }"
+        />
+        <span>
+          {{
+            $t('FUNNEL_CONVERSION_REPORTS.TOOLTIP_STAT', {
+              label: $t('FUNNEL_CONVERSION_REPORTS.LEGEND.MANUAL'),
+              pct: formatPct(hoveredTooltip.manualPct),
+              count: formatCount(hoveredTooltip.manualCount),
+            })
+          }}
+        </span>
+      </div>
+    </div>
 
     <!-- Legend mapping color → semantic. Compact so it fits next to the
          loss-reasons donut on md+. -->
