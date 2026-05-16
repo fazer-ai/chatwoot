@@ -190,7 +190,10 @@ const onStageHover = (idx, event) => {
 
   tooltipScreenPos.value = {
     x: svgRect.left + (stagePoint.x / VIEWBOX_WIDTH) * svgRect.width,
-    y: svgRect.top + (FUNNEL_TOP / VIEWBOX_HEIGHT) * svgRect.height,
+    // Anchor at the funnel's vertical midpoint so the tooltip lands over the
+    // chart's middle band, not over the stage labels (name / count / pct)
+    // that sit at the top of the SVG.
+    y: svgRect.top + (MIDPOINT / VIEWBOX_HEIGHT) * svgRect.height,
   };
 };
 
@@ -311,7 +314,7 @@ const hoveredTooltip = computed(() => {
     <Teleport to="body">
       <div
         v-if="hoveredTooltip"
-        class="fixed pointer-events-none z-[60] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
+        class="fixed pointer-events-none z-[60] -translate-x-1/2 -translate-y-1/2 px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
         :style="{
           left: `${tooltipScreenPos.x}px`,
           top: `${tooltipScreenPos.y}px`,
