@@ -289,6 +289,30 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
       end
     end
 
+    context 'with AI / manual split per stage' do
+      before do
+        ai_conv = conversation_with_id
+        ai_conv.update!(ai_enabled: true)
+        stage_change(conv_id: ai_conv.id, new_stage: stages[:lead].name)
+
+        manual_conv = conversation_with_id
+        manual_conv.update!(ai_enabled: false)
+        stage_change(conv_id: manual_conv.id, new_stage: stages[:lead].name)
+
+        another_manual = conversation_with_id
+        another_manual.update!(ai_enabled: false)
+        stage_change(conv_id: another_manual.id, new_stage: stages[:lead].name)
+      end
+
+      it 'returns count_ai and count_manual alongside the total per stage' do
+        lead_row = builder.build[:stages].find { |row| row[:name] == stages[:lead].name }
+
+        expect(lead_row[:count]).to eq(3)
+        expect(lead_row[:count_ai]).to eq(1)
+        expect(lead_row[:count_manual]).to eq(2)
+      end
+    end
+
     context 'with label filter' do
       let(:matching_label) { 'reativar-fup' }
 

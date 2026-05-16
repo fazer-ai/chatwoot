@@ -691,6 +691,10 @@
     "FILTERS": {
       "INBOX_ANY": "All inboxes",
       "LABEL_ANY": "All labels"
+    },
+    "LEGEND": {
+      "AI": "Handled by AI",
+      "MANUAL": "Handled manually"
     }
   }
 }

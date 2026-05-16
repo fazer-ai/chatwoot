@@ -18,67 +18,107 @@ const FUNNEL_TOP = LABEL_BAND;
 const FUNNEL_HEIGHT = VIEWBOX_HEIGHT - FUNNEL_TOP - 40;
 const MIDPOINT = FUNNEL_TOP + FUNNEL_HEIGHT / 2;
 
-// Max count anchors the funnel height at 100%. Using the largest stage (vs.
-// always the first) keeps the chart honest when a downstream stage received
-// more entries than the top — the bar reaches full height where the data
-// actually peaks, so nothing visually exceeds the canvas.
+// Two colors split each stage's count by the conversation's current
+// `ai_enabled` flag: a lime gradient for AI-handled, blue for manual.
+// The reference design Auris asked us to match uses lime as the dominant
+// "system" tone, blue as the highlight "human-touch" band underneath.
+const AI_COLOR = '#84cc16'; // tailwind lime-500
+const MANUAL_COLOR = '#3b82f6'; // tailwind blue-500
+
+// Max stage TOTAL anchors the funnel height — the AI/manual split sits
+// inside that total. Using the largest stage (vs. always the first) keeps
+// the chart honest when a downstream stage received more entries than the
+// top: the bar reaches full height where the data actually peaks.
 const maxCount = computed(() => {
   const counts = props.stages.map(s => s.count || 0);
   return Math.max(1, ...counts);
 });
-
-const FILL_COLOR = '#3b82f6'; // tailwind blue-500 — neutral funnel fill
 
 const stagePoints = computed(() => {
   const n = props.stages.length;
   if (n === 0) return [];
 
   return props.stages.map((stage, i) => {
-    const count = stage.count || 0;
-    const ratio = count / maxCount.value;
-    const halfHeight = (ratio * FUNNEL_HEIGHT) / 2;
+    const total = stage.count || 0;
+    const ai = stage.countAi || 0;
+    const totalRatio = total / maxCount.value;
+    const halfHeight = (totalRatio * FUNNEL_HEIGHT) / 2;
+    // AI sits on top of the band, manual underneath — `splitY` separates them.
+    // Sliding it from `topY` to `botY` by the AI proportion of the total.
+    const aiProportion = total === 0 ? 0 : ai / total;
+    const topY = MIDPOINT - halfHeight;
+    const botY = MIDPOINT + halfHeight;
+    const splitY = topY + aiProportion * (botY - topY);
     // Spread stages evenly. With a single stage, center it.
     const x = n === 1 ? VIEWBOX_WIDTH / 2 : (i / (n - 1)) * VIEWBOX_WIDTH;
     return {
       x,
-      topY: MIDPOINT - halfHeight,
-      botY: MIDPOINT + halfHeight,
-      count,
+      topY,
+      splitY,
+      botY,
+      count: total,
       stage,
     };
   });
 });
 
-// Cubic Bezier between consecutive stage points. Control points sit at the
-// midpoint X to give the curve gentle S-shapes instead of straight slopes —
-// matches the reference look without a chart dependency.
-const funnelPath = computed(() => {
-  const pts = stagePoints.value;
+// Cubic Bezier between consecutive Y values across all stage X positions.
+// Used for each of the three horizontal edges of the stacked funnel (top,
+// AI/manual split, bottom). Control points sit at the midpoint X to give the
+// curve gentle S-shapes instead of straight slopes.
+const smoothCurve = (pts, yKey) => {
   if (pts.length === 0) return '';
 
-  let d = `M ${pts[0].x.toFixed(2)} ${pts[0].topY.toFixed(2)}`;
-
-  // Top edge left-to-right.
+  let d = `M ${pts[0].x.toFixed(2)} ${pts[0][yKey].toFixed(2)}`;
   for (let i = 1; i < pts.length; i += 1) {
     const prev = pts[i - 1];
     const curr = pts[i];
     const midX = (prev.x + curr.x) / 2;
-    d += ` C ${midX.toFixed(2)} ${prev.topY.toFixed(2)}, ${midX.toFixed(2)} ${curr.topY.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.topY.toFixed(2)}`;
+    d += ` C ${midX.toFixed(2)} ${prev[yKey].toFixed(2)}, ${midX.toFixed(2)} ${curr[yKey].toFixed(2)}, ${curr.x.toFixed(2)} ${curr[yKey].toFixed(2)}`;
   }
+  return d;
+};
 
-  // Close down on the right edge.
-  d += ` L ${pts[pts.length - 1].x.toFixed(2)} ${pts[pts.length - 1].botY.toFixed(2)}`;
-
-  // Bottom edge right-to-left, mirroring the top.
+// Reverse cubic Bezier (right-to-left), used to close a polygon by walking
+// back along the lower edge after drawing the upper edge left-to-right.
+const reverseCurve = (pts, yKey) => {
+  let d = '';
   for (let i = pts.length - 2; i >= 0; i -= 1) {
     const next = pts[i + 1];
     const curr = pts[i];
     const midX = (next.x + curr.x) / 2;
-    d += ` C ${midX.toFixed(2)} ${next.botY.toFixed(2)}, ${midX.toFixed(2)} ${curr.botY.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.botY.toFixed(2)}`;
+    d += ` C ${midX.toFixed(2)} ${next[yKey].toFixed(2)}, ${midX.toFixed(2)} ${curr[yKey].toFixed(2)}, ${curr.x.toFixed(2)} ${curr[yKey].toFixed(2)}`;
   }
-
-  d += ' Z';
   return d;
+};
+
+// AI region: top edge + split edge (walked back). Manual region: split edge
+// + bottom edge (walked back). Each ends with a line to the right edge so
+// the polygon closes cleanly.
+const aiPath = computed(() => {
+  const pts = stagePoints.value;
+  if (pts.length === 0) return '';
+
+  const last = pts[pts.length - 1];
+  return [
+    smoothCurve(pts, 'topY'),
+    `L ${last.x.toFixed(2)} ${last.splitY.toFixed(2)}`,
+    reverseCurve(pts, 'splitY'),
+    'Z',
+  ].join(' ');
+});
+
+const manualPath = computed(() => {
+  const pts = stagePoints.value;
+  if (pts.length === 0) return '';
+
+  const last = pts[pts.length - 1];
+  return [
+    smoothCurve(pts, 'splitY'),
+    `L ${last.x.toFixed(2)} ${last.botY.toFixed(2)}`,
+    reverseCurve(pts, 'botY'),
+    'Z',
+  ].join(' ');
 });
 
 const labelsForStages = computed(() => {
@@ -121,16 +161,17 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
       :aria-label="$t('FUNNEL_CONVERSION_REPORTS.CHART_ARIA_LABEL')"
     >
       <defs>
-        <linearGradient id="funnelGradient" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" :stop-color="FILL_COLOR" stop-opacity="0.45" />
-          <stop offset="100%" :stop-color="FILL_COLOR" stop-opacity="1.0" />
+        <linearGradient id="funnelGradientAi" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" :stop-color="AI_COLOR" stop-opacity="0.45" />
+          <stop offset="100%" :stop-color="AI_COLOR" stop-opacity="1.0" />
+        </linearGradient>
+        <linearGradient id="funnelGradientManual" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" :stop-color="MANUAL_COLOR" stop-opacity="0.55" />
+          <stop offset="100%" :stop-color="MANUAL_COLOR" stop-opacity="1.0" />
         </linearGradient>
       </defs>
 
-      <!-- Labels above each stage: name, count, pct. Sized larger after the
-           chart moved into a 2/3 col-span container — the same viewBox renders
-           narrower on screen now, so SVG text needs more font-size weight to
-           stay legible at typical dashboard widths. -->
+      <!-- Labels above each stage: name, total count, pct. -->
       <g v-for="label in labelsForStages" :key="label.key">
         <text
           :x="label.x"
@@ -174,8 +215,32 @@ const formatPct = value => `${Number(value).toFixed(1)}%`;
         />
       </g>
 
-      <!-- Funnel area path -->
-      <path :d="funnelPath" fill="url(#funnelGradient)" />
+      <!-- Funnel area paths. AI sits on top (lime), manual is the band
+           underneath (blue). Drawing manual first so AI's bottom edge
+           naturally overlays the split boundary without antialiasing seams. -->
+      <path :d="manualPath" fill="url(#funnelGradientManual)" />
+      <path :d="aiPath" fill="url(#funnelGradientAi)" />
     </svg>
+
+    <!-- Legend mapping color → semantic. Compact so it fits next to the
+         loss-reasons donut on md+. -->
+    <div
+      class="flex items-center justify-center gap-4 mt-2 text-xs text-n-slate-11"
+    >
+      <div class="flex items-center gap-1.5">
+        <span
+          class="w-3 h-3 rounded-sm flex-shrink-0"
+          :style="{ backgroundColor: AI_COLOR }"
+        />
+        <span>{{ $t('FUNNEL_CONVERSION_REPORTS.LEGEND.AI') }}</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span
+          class="w-3 h-3 rounded-sm flex-shrink-0"
+          :style="{ backgroundColor: MANUAL_COLOR }"
+        />
+        <span>{{ $t('FUNNEL_CONVERSION_REPORTS.LEGEND.MANUAL') }}</span>
+      </div>
+    </div>
   </div>
 </template>

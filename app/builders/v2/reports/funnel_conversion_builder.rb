@@ -98,15 +98,16 @@ class V2::Reports::FunnelConversionBuilder
   end
 
   # Counts the distinct conversation ids that entered ANY member stage of each
-  # group within the period. A conversation that traversed multiple members
-  # (e.g. Em Agendamento → Agendado) counts once for the merged group.
+  # group within the period, split by the conversation's CURRENT `ai_enabled`
+  # state. Returns `{ count, count_ai, count_manual }` per group. Reentries by
+  # the same conversation still count once (matches the rest of the funnel).
   # One DB roundtrip + Ruby-side bucketing; the dataset is small in practice.
   def fetch_group_counts(groups)
     return {} if groups.empty?
 
     rows = fetch_stage_change_rows(groups)
     groups.each_with_object({}) do |group, acc|
-      acc[group[:key]] = distinct_conv_count_for(group, rows)
+      acc[group[:key]] = split_counts_for(group, rows)
     end
   end
 
@@ -114,7 +115,9 @@ class V2::Reports::FunnelConversionBuilder
     all_names = groups.flat_map { |g| g[:stage_names] }.uniq
     scope = funnel_stage_changes_scope.where(new_stage: all_names)
     scope = scope.where(created_at: range) if range.present?
-    scope.distinct.pluck(:new_stage, :conversation_id)
+    scope.joins('INNER JOIN conversations ON conversations.id = funnel_stage_changes.conversation_id')
+         .distinct
+         .pluck(:new_stage, :conversation_id, Arel.sql('conversations.ai_enabled'))
   end
 
   # Single point that applies the optional inbox / label filters used by both
@@ -128,15 +131,24 @@ class V2::Reports::FunnelConversionBuilder
     scope
   end
 
-  def distinct_conv_count_for(group, rows)
+  # The two buckets are disjoint by construction (a conversation has a single
+  # `ai_enabled` value), so the total is just `ai + manual` — no second
+  # de-dup pass needed.
+  def split_counts_for(group, rows)
     member_set = group[:stage_names].to_set
-    rows.each_with_object(Set.new) do |(new_stage, conv_id), set|
-      set << conv_id if member_set.include?(new_stage)
-    end.size
+    ai_ids = Set.new
+    manual_ids = Set.new
+    rows.each do |new_stage, conv_id, ai_enabled|
+      next unless member_set.include?(new_stage)
+
+      (ai_enabled ? ai_ids : manual_ids) << conv_id
+    end
+    { count: ai_ids.size + manual_ids.size, count_ai: ai_ids.size, count_manual: manual_ids.size }
   end
 
   def build_stage_rows(groups, counts)
-    rows = groups.map { |group| stage_row(group, counts[group[:key]] || 0) }
+    empty_counts = { count: 0, count_ai: 0, count_manual: 0 }
+    rows = groups.map { |group| stage_row(group, counts[group[:key]] || empty_counts) }
 
     rows.each_with_index do |row, idx|
       next_row = rows[idx + 1]
@@ -152,14 +164,16 @@ class V2::Reports::FunnelConversionBuilder
     rows
   end
 
-  def stage_row(group, count)
+  def stage_row(group, counts)
     {
       id: group[:stage_id],
       name: group[:display_name],
       color: group[:color],
       position: group[:position],
       closed: group[:closed],
-      count: count,
+      count: counts[:count],
+      count_ai: counts[:count_ai],
+      count_manual: counts[:count_manual],
       next_stage_id: nil,
       next_stage_name: nil,
       conversion_rate: nil,
