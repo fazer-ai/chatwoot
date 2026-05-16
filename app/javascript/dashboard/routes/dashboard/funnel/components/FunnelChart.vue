@@ -293,7 +293,7 @@ const hoveredTooltip = computed(() => {
          of the SVG's actual rendered width. -->
     <div
       v-if="hoveredTooltip"
-      class="absolute pointer-events-none z-10 top-[22%] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
+      class="absolute pointer-events-none z-[60] top-[22%] -translate-x-1/2 -translate-y-full px-3 py-2 rounded-md shadow-md bg-n-solid-1 outline outline-1 outline-n-container text-xs whitespace-nowrap"
       :style="{ left: `${hoveredTooltip.leftPct}%` }"
     >
       <div class="font-medium text-n-slate-12 mb-1">
