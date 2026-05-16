@@ -25,18 +25,36 @@ class V2::Reports::FunnelSummaryBuilder
 
   private
 
-  # Snapshot. Always NOW — date filter only narrows entry/exit/time-in-stage metrics.
+  # Snapshot. Always NOW — date filter only narrows entry/exit/time-in-stage
+  # metrics. Inbox / label filters DO apply to the snapshot (the operator
+  # is scoping the whole report, not just the period-based numbers).
   def fetch_in_stage_counts(stages)
-    account.conversations
-           .where(funnel_stage_id: stages.map(&:id))
-           .group(:funnel_stage_id)
-           .count
+    filtered_conversations_scope
+      .where(funnel_stage_id: stages.map(&:id))
+      .group(:funnel_stage_id)
+      .count
   end
 
   def fetch_entered_counts(stage_names)
-    scope = account.funnel_stage_changes.where(new_stage: stage_names)
+    scope = funnel_stage_changes_scope.where(new_stage: stage_names)
     scope = scope.where(created_at: range) if range.present?
     scope.group(:new_stage).count
+  end
+
+  # Single point that applies the optional inbox / label filters. Returns
+  # ActiveRecord scopes so callers can chain freely.
+  def funnel_stage_changes_scope
+    scope = account.funnel_stage_changes
+    scope = scope.where(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+    scope = scope.where(conversation_id: account.conversations.tagged_with(params[:label], on: :labels).select(:id)) if params[:label].present?
+    scope
+  end
+
+  def filtered_conversations_scope
+    scope = account.conversations
+    scope = scope.where(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+    scope = scope.tagged_with(params[:label], on: :labels) if params[:label].present?
+    scope
   end
 
   # For each entry into a stage, the time spent equals
@@ -48,6 +66,10 @@ class V2::Reports::FunnelSummaryBuilder
   # The period filter is applied to the ENTRY's created_at, not to the next
   # change. That matches the user-facing question "for entries that happened
   # in this period, how long did people stay?".
+  #
+  # `:inbox_id` and `:conv_ids` are pre-resolved by the caller — they're nil
+  # when the filter is off, which collapses the guard into a tautology so the
+  # WHERE clause stays generic and indexable.
   AVG_TIME_SQL = <<~SQL.squish.freeze
     WITH ordered AS (
       SELECT
@@ -59,6 +81,8 @@ class V2::Reports::FunnelSummaryBuilder
         ) AS next_change_at
       FROM funnel_stage_changes
       WHERE account_id = :account_id
+        AND (CAST(:inbox_id AS bigint) IS NULL OR inbox_id = :inbox_id)
+        AND (:has_label_filter = FALSE OR conversation_id IN (:conv_ids))
     )
     SELECT
       new_stage,
@@ -73,21 +97,37 @@ class V2::Reports::FunnelSummaryBuilder
   def fetch_avg_times_in_stage(stage_names)
     return {} if stage_names.empty? || range_endpoints.nil?
 
+    label_conv_ids = filtered_conversation_ids_for_label
     sanitized = ActiveRecord::Base.sanitize_sql_array(
-      [AVG_TIME_SQL, { account_id: account.id, stage_names: stage_names,
-                       since: range_endpoints.first, until_exclusive: range_endpoints.last }]
+      [AVG_TIME_SQL,
+       { account_id: account.id, stage_names: stage_names,
+         since: range_endpoints.first, until_exclusive: range_endpoints.last,
+         inbox_id: params[:inbox_id].presence,
+         has_label_filter: params[:label].present?,
+         # `IN (:conv_ids)` errors on an empty array — fall back to a single
+         # sentinel id that won't match so the guard above stays simple.
+         conv_ids: label_conv_ids.empty? ? [-1] : label_conv_ids }]
     )
     ActiveRecord::Base.connection.select_all(sanitized).each_with_object({}) do |row, acc|
       acc[row['new_stage']] = row['avg_seconds'].to_f
     end
   end
 
+  # Materialized array of conversation_ids matching the label filter, used to
+  # inject into the raw-SQL CTE above. Empty when no label is selected — the
+  # SQL guard short-circuits in that case, so the array isn't consulted.
+  def filtered_conversation_ids_for_label
+    return [] if params[:label].blank?
+
+    account.conversations.tagged_with(params[:label], on: :labels).pluck(:id)
+  end
+
   def fetch_exit_counts(stage_names)
     closed_names = FunnelStage.active.closed_stages.pluck(:name)
     return {} if closed_names.empty?
 
-    base = account.funnel_stage_changes
-                  .where(previous_stage: stage_names, new_stage: closed_names)
+    base = funnel_stage_changes_scope
+           .where(previous_stage: stage_names, new_stage: closed_names)
     base = base.where(created_at: range) if range.present?
 
     won = base.where(loss_reason_id: nil).group(:previous_stage).count

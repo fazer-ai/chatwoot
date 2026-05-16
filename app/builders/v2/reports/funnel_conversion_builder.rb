@@ -1,3 +1,7 @@
+# rubocop:disable Metrics/ClassLength — three orthogonal concerns (display
+# groups, KPI math, loss-reason aggregation) live here on purpose; extracting
+# either would mean threading account/params/range plumbing across builders
+# for a marginal LOC reduction.
 class V2::Reports::FunnelConversionBuilder
   include DateRangeHelper
 
@@ -7,6 +11,7 @@ class V2::Reports::FunnelConversionBuilder
   # canon (set/maintained by the chart-rules data migration); changing them
   # on FunnelStage means updating these constants in lockstep.
   SCHEDULING_CHART_GROUP = 'Agendamento'.freeze
+  CONFIRMATION_STAGE_NAME = 'Confirmado'.freeze
   ATTENDANCE_STAGE_NAME = 'Comparecimento ( ganho )'.freeze
   NO_SHOW_STAGE_NAME = 'No-Show'.freeze
 
@@ -19,7 +24,7 @@ class V2::Reports::FunnelConversionBuilder
 
   def build
     all_stages = FunnelStage.active.ordered.to_a
-    return { stages: [], kpis: empty_kpis } if all_stages.empty?
+    return { stages: [], kpis: empty_kpis, loss_reasons: [] } if all_stages.empty?
 
     # KPIs always look at the FULL set of active stages — visibility/merge
     # rules are presentation-only and shouldn't change "completed" or "won"
@@ -28,7 +33,11 @@ class V2::Reports::FunnelConversionBuilder
     group_counts = fetch_group_counts(display_groups)
     stage_rows = build_stage_rows(display_groups, group_counts)
 
-    { stages: stage_rows, kpis: build_kpis(all_stages) }
+    {
+      stages: stage_rows,
+      kpis: build_kpis(all_stages),
+      loss_reasons: build_loss_reasons_breakdown
+    }
   end
 
   private
@@ -89,34 +98,57 @@ class V2::Reports::FunnelConversionBuilder
   end
 
   # Counts the distinct conversation ids that entered ANY member stage of each
-  # group within the period. A conversation that traversed multiple members
-  # (e.g. Em Agendamento → Agendado) counts once for the merged group.
+  # group within the period, split by the conversation's CURRENT `ai_enabled`
+  # state. Returns `{ count, count_ai, count_manual }` per group. Reentries by
+  # the same conversation still count once (matches the rest of the funnel).
   # One DB roundtrip + Ruby-side bucketing; the dataset is small in practice.
   def fetch_group_counts(groups)
     return {} if groups.empty?
 
     rows = fetch_stage_change_rows(groups)
     groups.each_with_object({}) do |group, acc|
-      acc[group[:key]] = distinct_conv_count_for(group, rows)
+      acc[group[:key]] = split_counts_for(group, rows)
     end
   end
 
   def fetch_stage_change_rows(groups)
     all_names = groups.flat_map { |g| g[:stage_names] }.uniq
-    scope = account.funnel_stage_changes.where(new_stage: all_names)
+    scope = funnel_stage_changes_scope.where(new_stage: all_names)
     scope = scope.where(created_at: range) if range.present?
-    scope.distinct.pluck(:new_stage, :conversation_id)
+    scope.joins('INNER JOIN conversations ON conversations.id = funnel_stage_changes.conversation_id')
+         .distinct
+         .pluck(:new_stage, :conversation_id, Arel.sql('conversations.ai_enabled'))
   end
 
-  def distinct_conv_count_for(group, rows)
+  # Single point that applies the optional inbox / label filters used by both
+  # `Visão geral` and `Conversão`. Returns an ActiveRecord scope so callers
+  # can chain `.where(...)` / `.group(...)` like they did before. Filters
+  # default to OFF when the param is blank.
+  def funnel_stage_changes_scope
+    scope = account.funnel_stage_changes
+    scope = scope.where(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+    scope = scope.where(conversation_id: account.conversations.tagged_with(params[:label], on: :labels).select(:id)) if params[:label].present?
+    scope
+  end
+
+  # The two buckets are disjoint by construction (a conversation has a single
+  # `ai_enabled` value), so the total is just `ai + manual` — no second
+  # de-dup pass needed.
+  def split_counts_for(group, rows)
     member_set = group[:stage_names].to_set
-    rows.each_with_object(Set.new) do |(new_stage, conv_id), set|
-      set << conv_id if member_set.include?(new_stage)
-    end.size
+    ai_ids = Set.new
+    manual_ids = Set.new
+    rows.each do |new_stage, conv_id, ai_enabled|
+      next unless member_set.include?(new_stage)
+
+      (ai_enabled ? ai_ids : manual_ids) << conv_id
+    end
+    { count: ai_ids.size + manual_ids.size, count_ai: ai_ids.size, count_manual: manual_ids.size }
   end
 
   def build_stage_rows(groups, counts)
-    rows = groups.map { |group| stage_row(group, counts[group[:key]] || 0) }
+    empty_counts = { count: 0, count_ai: 0, count_manual: 0 }
+    rows = groups.map { |group| stage_row(group, counts[group[:key]] || empty_counts) }
 
     rows.each_with_index do |row, idx|
       next_row = rows[idx + 1]
@@ -132,14 +164,16 @@ class V2::Reports::FunnelConversionBuilder
     rows
   end
 
-  def stage_row(group, count)
+  def stage_row(group, counts)
     {
       id: group[:stage_id],
       name: group[:display_name],
       color: group[:color],
       position: group[:position],
       closed: group[:closed],
-      count: count,
+      count: counts[:count],
+      count_ai: counts[:count_ai],
+      count_manual: counts[:count_manual],
       next_stage_id: nil,
       next_stage_name: nil,
       conversion_rate: nil,
@@ -163,12 +197,13 @@ class V2::Reports::FunnelConversionBuilder
     [from_count - to_count, 0].max
   end
 
-  # Three sales-funnel rates, all anchored on the same denominator (total
+  # Four sales-funnel rates, all anchored on the same denominator (total
   # leads entering the funnel in the period). Hidden stages still count —
   # `chart_visible` only controls the chart bars, not the KPI math.
   def build_kpis(all_stages)
     total_leads = first_open_stage_count(all_stages)
     scheduling_count = distinct_count_for(scheduling_member_names(all_stages))
+    confirmation_count = distinct_count_for([CONFIRMATION_STAGE_NAME])
     attendance_count = distinct_count_for([ATTENDANCE_STAGE_NAME])
     no_show_count = distinct_count_for([NO_SHOW_STAGE_NAME])
 
@@ -176,6 +211,8 @@ class V2::Reports::FunnelConversionBuilder
       total_leads: total_leads,
       scheduling_count: scheduling_count,
       scheduling_rate: rate(scheduling_count, total_leads),
+      confirmation_count: confirmation_count,
+      confirmation_rate: rate(confirmation_count, total_leads),
       attendance_count: attendance_count,
       attendance_rate: rate(attendance_count, total_leads),
       no_show_count: no_show_count,
@@ -203,17 +240,50 @@ class V2::Reports::FunnelConversionBuilder
   def distinct_count_for(stage_names)
     return 0 if stage_names.empty?
 
-    scope = account.funnel_stage_changes.where(new_stage: stage_names)
+    scope = funnel_stage_changes_scope.where(new_stage: stage_names)
     scope = scope.where(created_at: range) if range.present?
     scope.distinct.count(:conversation_id)
+  end
+
+  # Distinct conversations per loss reason in the period, sorted descending.
+  # A conversation that got lost with the same reason twice still counts once
+  # (mirrors how the funnel counts distinct convs per stage). Reasons with
+  # zero entries in the period are omitted — the donut shouldn't render
+  # empty slices.
+  def build_loss_reasons_breakdown
+    counts = fetch_loss_reason_counts
+    return [] if counts.empty?
+
+    total = counts.values.sum
+    counts.map { |(id, name), count| loss_reason_row(id, name, count, total) }
+          .sort_by { |row| -row[:count] }
+  end
+
+  def fetch_loss_reason_counts
+    scope = funnel_stage_changes_scope.where.not(loss_reason_id: nil)
+    scope = scope.where(created_at: range) if range.present?
+    scope.joins(:loss_reason).distinct
+         .group('loss_reasons.id', 'loss_reasons.name')
+         .count(:conversation_id)
+  end
+
+  def loss_reason_row(id, name, count, total)
+    {
+      id: id,
+      name: name,
+      count: count,
+      percentage: total.zero? ? 0 : ((count.to_f / total) * 100).round(2)
+    }
   end
 
   def empty_kpis
     {
       total_leads: 0,
       scheduling_count: 0, scheduling_rate: nil,
+      confirmation_count: 0, confirmation_rate: nil,
       attendance_count: 0, attendance_rate: nil,
       no_show_count: 0, no_show_rate: nil
     }
   end
 end
+# rubocop:enable Metrics/ClassLength

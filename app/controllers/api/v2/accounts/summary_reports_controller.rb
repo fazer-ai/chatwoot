@@ -42,7 +42,10 @@ class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseContr
     @builder_params = {
       since: permitted_params[:since],
       until: permitted_params[:until],
-      business_hours: ActiveModel::Type::Boolean.new.cast(permitted_params[:business_hours])
+      business_hours: ActiveModel::Type::Boolean.new.cast(permitted_params[:business_hours]),
+      # Funnel reports honor these two; other builders quietly ignore them.
+      inbox_id: permitted_params[:inbox_id],
+      label: permitted_params[:label]
     }
   end
 
@@ -52,7 +55,7 @@ class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseContr
   end
 
   def permitted_params
-    params.permit(:since, :until, :business_hours)
+    params.permit(:since, :until, :business_hours, :inbox_id, :label)
   end
 
   def date_range_too_long?

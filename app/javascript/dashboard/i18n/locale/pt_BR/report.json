@@ -657,6 +657,10 @@
       "AVG_TIME": "Tempo médio na fase",
       "WON": "Ganhas",
       "LOST": "Perdidas"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "Todas as caixas",
+      "LABEL_ANY": "Todas as etiquetas"
     }
   },
   "FUNNEL_CONVERSION_REPORTS": {
@@ -671,8 +675,27 @@
     "SEPARATOR": "·",
     "KPIS": {
       "SCHEDULING_RATE": "Taxa de agendamento",
+      "CONFIRMATION_RATE": "Taxa de confirmação",
       "ATTENDANCE_RATE": "Taxa de comparecimento ( ganho )",
       "NO_SHOW_RATE": "Taxa de no-show"
-    }
+    },
+    "LOSS_REASONS": {
+      "HEADER": "Motivos de perda",
+      "CENTER_LABEL": "Total",
+      "EMPTY_STATE": "Nenhuma perda registrada no período.",
+      "CHART_ARIA_LABEL": "Distribuição de motivos de perda",
+      "COLUMN_NAME": "Motivo",
+      "COLUMN_COUNT": "Valor",
+      "COLUMN_PERCENT": "%"
+    },
+    "FILTERS": {
+      "INBOX_ANY": "Todas as caixas",
+      "LABEL_ANY": "Todas as etiquetas"
+    },
+    "LEGEND": {
+      "AI": "Atendido pela IA",
+      "MANUAL": "Atendido manualmente"
+    },
+    "TOOLTIP_STAT": "{label}: {pct} ({count})"
   }
 }

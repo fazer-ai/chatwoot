@@ -59,7 +59,7 @@ const openDatePicker = () => {
 <template>
   <div class="inline-flex items-center gap-1">
     <button
-      class="inline-flex relative items-center rounded-lg gap-2 py-1.5 px-3 h-8 bg-n-alpha-2 hover:bg-n-alpha-1 active:bg-n-alpha-1 flex-shrink-0"
+      class="inline-flex relative items-center rounded-lg gap-2 py-1.5 px-3 h-10 border border-n-weak bg-n-alpha-2 hover:bg-n-alpha-1 active:bg-n-alpha-1 flex-shrink-0"
       @click="openDatePicker"
     >
       <Icon
