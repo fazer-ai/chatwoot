@@ -876,6 +876,15 @@
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Gerenciar conexão",
       "WHATSAPP_BAILEYS_PAUSE_RECONNECTION": "Cancelar Reconexão",
       "WHATSAPP_BAILEYS_RESUME_RECONNECTION": "Ativar Reconexão",
+      "BAILEYS_HISTORY_IMPORT": {
+        "TITLE": "Importação de histórico",
+        "STATUS_IN_PROGRESS": "Importando",
+        "STATUS_COMPLETED": "Concluída",
+        "BATCHES": "{processed} de {total} lotes",
+        "MESSAGES": "{count} mensagens importadas",
+        "STARTED_AT": "Início: {time}",
+        "FINISHED_AT": "Conclusão: {time}"
+      },
       "WHATSAPP_PROVIDER_URL_TITLE": "URL do provedor",
       "WHATSAPP_PROVIDER_URL_SUBHEADER": "Se o provedor não estiver rodando localmente, por favor, forneça a URL.",
       "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Digite a URL do provedor",

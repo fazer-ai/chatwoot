@@ -875,6 +875,15 @@
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Manage connection",
       "WHATSAPP_BAILEYS_PAUSE_RECONNECTION": "Pause auto-reconnect",
       "WHATSAPP_BAILEYS_RESUME_RECONNECTION": "Resume auto-reconnect",
+      "BAILEYS_HISTORY_IMPORT": {
+        "TITLE": "History import",
+        "STATUS_IN_PROGRESS": "Importing",
+        "STATUS_COMPLETED": "Completed",
+        "BATCHES": "{processed} of {total} batches",
+        "MESSAGES": "{count} messages imported",
+        "STARTED_AT": "Started: {time}",
+        "FINISHED_AT": "Finished: {time}"
+      },
       "WHATSAPP_PROVIDER_URL_TITLE": "Provider URL",
       "WHATSAPP_PROVIDER_URL_SUBHEADER": "If the provider is not running locally, please provide the URL.",
       "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Enter the provider URL",
