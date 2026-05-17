@@ -108,4 +108,28 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
       expect(whatsapp_channel.reload.history_import_state).to be_nil
     end
   end
+
+  context 'when a connection.update event arrives mid-import' do
+    # Regression: `update_provider_connection!` replaces the JSONB, so the
+    # connection_update handler used to wipe `history_import` every time the
+    # node service emitted a state change. The card kept appearing then
+    # vanishing in dev because Baileys re-emits connection_update events
+    # for typing/QR rotation/reconnect.
+    it 'preserves the history_import snapshot across connection state changes' do
+      described_class.new(inbox: inbox, params: base_params).perform
+      expect(whatsapp_channel.reload.history_import_state).to be_present
+
+      connection_params = {
+        webhookVerifyToken: webhook_verify_token,
+        event: 'connection.update',
+        data: { connection: 'open' }
+      }
+      described_class.new(inbox: inbox, params: connection_params).perform
+
+      state = whatsapp_channel.reload.history_import_state
+      expect(state).to be_present
+      expect(state['status']).to eq('completed')
+      expect(state['messages_imported']).to eq(1)
+    end
+  end
 end
