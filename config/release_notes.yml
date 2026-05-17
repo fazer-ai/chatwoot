@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.21
+  published_at: '2026-05-17T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21
+  notes:
+    en: |-
+      Internal improvements to the unofficial WhatsApp connection (Baileys).
+    pt_BR: |-
+      Melhorias internas na conexão WhatsApp não oficial (Baileys).
 - tag: v4.13.0-auris.1.20
   published_at: '2026-05-16T18:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.20
@@ -509,60 +517,3 @@
       conversa.** Usuários com perfil de gerente não conseguiam enviar mensagens em
       conversas de caixas das quais não eram membros — a bolha ficava vermelha e a
       mensagem não chegava ao contato. Corrigido."
-- tag: v4.13.0-auris.1.2
-  published_at: '2026-04-30T17:11:53Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.2
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Managers can now manage labels.** Users with the manager role can open the Labels screen and create, edit, and delete labels on their own. Labels named `agente-off` and any label starting with `kb-` stay protected — only administrators can change or remove those.
-      - **Conversation summary at the top of the chat.** Every conversation can show a short summary in the header, helping agents grasp the context at a glance. The text is populated via API, so AI assistants and automations can keep it up to date.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Gerentes agora gerenciam etiquetas.** Usuários com o perfil de gerente acessam a tela de Etiquetas e criam, editam e excluem livremente, sem depender do administrador. Etiquetas chamadas `agente-off` e qualquer etiqueta com prefixo `kb-` continuam protegidas — só o administrador consegue alterá-las ou removê-las.
-      - **Resumo da conversa no topo do chat.** Cada conversa pode exibir um resumo curto no cabeçalho, ajudando o agente a captar o contexto rapidamente. O texto é preenchido via API, permitindo que assistentes de IA e automações mantenham o resumo atualizado.
-- tag: v4.13.0-auris.1.1
-  published_at: '2026-04-29T20:20:55Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.1
-  notes:
-    en: "> Includes changes from Chatwoot fazer.ai v4.13.0-fazer-ai.61.\n\n### ⚡ Improvements\n\n-
-      **Cleaner login screen.** The login title no longer mentions \"Chatwoot\", keeping
-      the screen neutral on white-labeled installs.\n\n### \U0001F41B Fixes\n\n- **Manager
-      role now works across conversations and WhatsApp.** Managers can see every conversation
-      in the \"All\" tab, receive the QR code to reconnect Baileys channels, and the
-      \"Disconnect\" button works correctly."
-    pt_BR: "> Inclui mudanças do Chatwoot fazer.ai v4.13.0-fazer-ai.61.\n\n### ⚡ Melhorias\n\n-
-      **Tela de login mais limpa.** O título da página de login não menciona mais
-      o nome \"Chatwoot\", deixando a tela neutra em instalações personalizadas.\n\n###
-      \U0001F41B Correções\n\n- **Perfil \"Gerente\" agora funciona em conversas e
-      WhatsApp.** Gerentes voltam a ver todas as conversas na aba \"Todos\", recebem
-      o QR code para reconectar canais Baileys, e o botão \"Desconectar\" funciona
-      corretamente."
-- tag: v4.13.0-auris.1
-  published_at: '2026-04-29T02:35:31Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1
-  notes:
-    en: |-
-      > Includes changes from Chatwoot fazer.ai v4.13.0-fazer-ai.61.
-
-      ### ✨ What's new
-
-      - **New "Manager" role.** A new role between agent and administrator: managers see all reports and can configure existing inboxes (including reconnecting WhatsApp Baileys via QR code), on top of everything an agent does. They cannot create or delete inboxes — those actions remain restricted to administrators.
-
-      ### ⚡ Improvements
-
-      - **auris.ia.br branding.** New logos and the auris.ia.br brand replace the previous fazer.ai branding across the product (login footer, build info, help links, in-app references).
-      - **Kanban and Captain menus hidden.** These items were removed from the sidebar.
-    pt_BR: |-
-      > Inclui mudanças do Chatwoot fazer.ai v4.13.0-fazer-ai.61.
-
-      ### ✨ Novidades
-
-      - **Novo perfil "Gerente".** Um perfil intermediário entre agente e administrador: gerentes têm acesso a todos os relatórios e podem configurar caixas de entrada existentes (incluindo reconectar canais WhatsApp Baileys via QR code), além de tudo que um agente faz. Não conseguem criar nem excluir caixas — essas ações continuam restritas a administradores.
-
-      ### ⚡ Melhorias
-
-      - **Identidade visual auris.ia.br.** Novos logos e a marca auris.ia.br substituem a marca fazer.ai em todo o produto (rodapé do login, informações de build, links de ajuda, referências internas).
-      - **Menus Kanban e Captain ocultados.** Esses itens foram removidos do menu lateral.
