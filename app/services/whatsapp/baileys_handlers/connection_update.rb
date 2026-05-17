@@ -14,11 +14,19 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
 
     next_connection = data[:connection] || current['connection']
 
-    inbox.channel.update_provider_connection!({
+    payload = {
       connection: next_connection,
       qr_data_url: resolve_qr_data_url(data, current, next_connection),
       error: translate_baileys_error(data[:error])
-    }.compact)
+    }.compact
+    # `history_import` lives alongside `connection` in the same JSONB. Since
+    # `update_provider_connection!` REPLACES the column (not merge), we have
+    # to carry the snapshot forward or the history-import card disappears
+    # the next time Baileys re-emits a connection_update event (typing, QR
+    # rotation, reconnect).
+    payload[:history_import] = current['history_import'] if current['history_import'].present?
+
+    inbox.channel.update_provider_connection!(payload)
 
     Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
