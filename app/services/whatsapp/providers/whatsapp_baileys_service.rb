@@ -47,7 +47,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        # Baileys node uses this to filter `messaging-history.set` events
+        # before relaying them as a sequence of `importMode: true` webhooks.
+        # 0 / nil disables the import; compact drops the key in that case.
+        historyImportDays: (whatsapp_channel.history_import_days if whatsapp_channel.history_import_days.positive?)
       }.compact.to_json
     )
 

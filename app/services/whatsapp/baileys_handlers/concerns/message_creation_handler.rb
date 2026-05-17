@@ -14,13 +14,36 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
       content_attributes: build_message_content_attributes
     )
 
-    attach_media_to_message if attach_media
+    # History import: never auto-download media for backfilled messages
+    # (would flood the disk and Baileys can rehydrate them lazily) and never
+    # send read receipts back to the contact for messages they sent days ago.
+    attach_media_to_message if attach_media && !Current.history_import
 
     @message.save!
 
-    inbox.channel.received_messages([@message], conversation) if incoming?
+    finalize_after_save(conversation)
 
     @message
+  end
+
+  def finalize_after_save(conversation)
+    if Current.history_import
+      mark_history_import_conversation_resolved(conversation)
+    elsif incoming?
+      inbox.channel.received_messages([@message], conversation)
+    end
+  end
+
+  # Backfilled conversations open as `resolved` so historical chats don't
+  # flood the active inbox view with assignments and unread counters. Only
+  # the first message in a fresh conversation triggers this; subsequent
+  # messages keep whatever status the conversation already has.
+  def mark_history_import_conversation_resolved(conversation)
+    return unless conversation.previously_new_record? && conversation.open?
+
+    # rubocop:disable Rails/SkipsModelValidations
+    conversation.update_columns(status: Conversation.statuses[:resolved], updated_at: Time.current)
+    # rubocop:enable Rails/SkipsModelValidations
   end
 
   # WhatsApp delivers a reaction removal as a fresh message with empty text.

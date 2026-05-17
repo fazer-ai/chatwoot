@@ -93,8 +93,33 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     if Current.account_user&.administrator? || Current.account_user&.manager?
       data[:qr_data_url] = provider_connection['qr_data_url']
       data[:error] = provider_connection['error']
+      data[:history_import] = history_import_state if history_import_state.present?
     end
     data
+  end
+
+  # Number of days of WhatsApp history to import after the next QR pairing.
+  # Lives in `provider_config` so it rides existing permits and serializers.
+  # 0 (default) disables the import.
+  def history_import_days
+    provider_config['history_import_days'].to_i
+  end
+
+  def history_import_enabled?
+    provider == 'baileys' && history_import_days.positive?
+  end
+
+  def history_import_state
+    provider_connection['history_import']
+  end
+
+  # Merge-update for the import progress snapshot. Uses
+  # `update_provider_connection!` so we keep the validate-skipping behavior
+  # other Baileys callers rely on (provider_config may not currently validate).
+  def update_history_import_state!(attrs)
+    current_state = provider_connection.deep_dup
+    current_state['history_import'] = (current_state['history_import'] || {}).merge(attrs.stringify_keys)
+    update_provider_connection!(current_state)
   end
 
   def toggle_typing_status(typing_status, conversation:)

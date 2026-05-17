@@ -1,0 +1,111 @@
+require 'rails_helper'
+
+# Covers the `importMode: true` backfill path: live-only side effects are
+# suppressed, conversations open as resolved, no read receipts go back to the
+# device, and the channel's provider_connection['history_import'] snapshot
+# tracks per-batch progress.
+describe Whatsapp::IncomingMessageBaileysService, type: :service do
+  let(:webhook_verify_token) { 'valid_token' }
+  let!(:whatsapp_channel) do
+    create(:channel_whatsapp,
+           provider: 'baileys',
+           provider_config: { webhook_verify_token: webhook_verify_token, history_import_days: 7 },
+           validate_provider_config: false,
+           received_messages: false)
+  end
+  let(:inbox) { whatsapp_channel.inbox }
+  let(:timestamp) { Time.current.to_i }
+  let(:raw_message) do
+    {
+      key: { id: 'history_msg_1', remoteJid: '5511999999999@s.whatsapp.net', fromMe: false },
+      pushName: 'Old Contact',
+      messageTimestamp: timestamp - (3 * 86_400),
+      message: { conversation: 'Hi from last week' }
+    }
+  end
+  let(:base_params) do
+    {
+      webhookVerifyToken: webhook_verify_token,
+      event: 'messages.upsert',
+      importMode: true,
+      importBatch: { index: 0, total: 1, phase: 'history' },
+      data: { type: 'notify', messages: [raw_message] }
+    }
+  end
+
+  before do
+    stub_request(:get, /profile-picture-url/)
+      .to_return(status: 200, body: { data: { profilePictureUrl: nil } }.to_json)
+    Current.reset
+  end
+
+  after { Current.reset }
+
+  it 'creates the conversation as resolved' do
+    described_class.new(inbox: inbox, params: base_params).perform
+
+    conversation = inbox.conversations.last
+    expect(conversation).to be_present
+    expect(conversation.status).to eq('resolved')
+  end
+
+  it 'does not dispatch MESSAGE_CREATED or PROVIDER_EVENT_RECEIVED' do
+    allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+    described_class.new(inbox: inbox, params: base_params).perform
+
+    expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
+      .with(Events::Types::PROVIDER_EVENT_RECEIVED, anything, anything)
+    expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
+      .with(Events::Types::MESSAGE_CREATED, anything, anything)
+  end
+
+  it 'does not send read receipts back to the device' do
+    allow(whatsapp_channel).to receive(:received_messages)
+    allow(inbox).to receive(:channel).and_return(whatsapp_channel)
+
+    described_class.new(inbox: inbox, params: base_params).perform
+
+    expect(whatsapp_channel).not_to have_received(:received_messages)
+  end
+
+  it 'updates the channel history_import snapshot per batch' do
+    described_class.new(inbox: inbox, params: base_params).perform
+
+    state = whatsapp_channel.reload.history_import_state
+    expect(state['status']).to eq('completed')
+    expect(state['processed_batches']).to eq(1)
+    expect(state['total_batches']).to eq(1)
+    expect(state['messages_imported']).to eq(1)
+    expect(state['started_at']).to be_present
+    expect(state['finished_at']).to be_present
+  end
+
+  it 'keeps status in_progress on non-final batches' do
+    intermediate_params = base_params.merge(importBatch: { index: 0, total: 3, phase: 'history' })
+
+    described_class.new(inbox: inbox, params: intermediate_params).perform
+
+    state = whatsapp_channel.reload.history_import_state
+    expect(state['status']).to eq('in_progress')
+    expect(state['processed_batches']).to eq(1)
+    expect(state['total_batches']).to eq(3)
+    expect(state['finished_at']).to be_nil
+  end
+
+  it 'resets Current.history_import after perform so subsequent live events behave normally' do
+    described_class.new(inbox: inbox, params: base_params).perform
+
+    expect(Current.history_import).to be_nil
+  end
+
+  context 'without importMode' do
+    it 'does not touch the history_import snapshot' do
+      live_params = base_params.except(:importMode, :importBatch)
+
+      described_class.new(inbox: inbox, params: live_params).perform
+
+      expect(whatsapp_channel.reload.history_import_state).to be_nil
+    end
+  end
+end

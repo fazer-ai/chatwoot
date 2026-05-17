@@ -835,4 +835,46 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.supports_reactions?).to be(false)
     end
   end
+
+  describe 'history import helpers' do
+    let(:channel) do
+      create(:channel_whatsapp,
+             provider: 'baileys',
+             provider_config: { history_import_days: 30 },
+             validate_provider_config: false,
+             sync_templates: false)
+    end
+
+    it 'reads history_import_days from provider_config' do
+      expect(channel.history_import_days).to eq(30)
+    end
+
+    it 'returns 0 when the key is absent' do
+      channel.update!(provider_config: channel.provider_config.except('history_import_days'))
+      expect(channel.history_import_days).to eq(0)
+    end
+
+    it 'considers import enabled only for baileys with positive days' do
+      expect(channel.history_import_enabled?).to be(true)
+
+      channel.update!(provider_config: channel.provider_config.merge('history_import_days' => 0))
+      expect(channel.history_import_enabled?).to be(false)
+
+      cloud = create(:channel_whatsapp, provider: 'whatsapp_cloud',
+                                        provider_config: { history_import_days: 30 },
+                                        validate_provider_config: false, sync_templates: false)
+      expect(cloud.history_import_enabled?).to be(false)
+    end
+
+    it 'merges updates into provider_connection.history_import' do
+      channel.update_history_import_state!(status: 'in_progress', processed_batches: 1)
+      channel.update_history_import_state!(processed_batches: 2, messages_imported: 50)
+
+      expect(channel.reload.history_import_state).to include(
+        'status' => 'in_progress',
+        'processed_batches' => 2,
+        'messages_imported' => 50
+      )
+    end
+  end
 end

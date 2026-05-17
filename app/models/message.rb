@@ -351,6 +351,13 @@ class Message < ApplicationRecord
   end
 
   def execute_after_create_commit_callbacks
+    # WhatsApp Baileys history backfill ingests messages that are days/weeks
+    # old. None of these side effects are correct for old messages: reopening
+    # would override the resolved-on-create status; dispatching MESSAGE_CREATED
+    # would fan out to notifications, automation rules and outbound webhooks;
+    # update_contact_activity would bounce last_activity_at to today.
+    return if Current.history_import
+
     # rails issue with order of active record callbacks being executed https://github.com/rails/rails/issues/20911
     reopen_conversation
     mark_pending_conversation_as_open_for_human_response
