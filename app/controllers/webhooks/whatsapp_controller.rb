@@ -17,7 +17,13 @@ class Webhooks::WhatsappController < ActionController::API
     perform_sync if params[:awaitResponse].present?
     return if performed?
 
-    Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
+    if params[:importMode]
+      # Baileys history-sync backfill: divert to the dedicated low-priority
+      # queue so live messages on `:low` always win the worker slot.
+      Webhooks::WhatsappEventsJob.set(queue: :whatsapp_history).perform_later(params.to_unsafe_hash)
+    else
+      Webhooks::WhatsappEventsJob.perform_later(params.to_unsafe_hash)
+    end
     head :ok
   end
 

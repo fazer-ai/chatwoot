@@ -306,6 +306,12 @@
         "PRESENCE_SUBSCRIBE": {
           "LABEL": "Mostrar indicadores de digitação do contato"
         },
+        "HISTORY_IMPORT": {
+          "LABEL": "Importar histórico no primeiro pareamento",
+          "OPTION_DISABLED": "Não importar",
+          "OPTION_DAYS": "Últimos {days} dias",
+          "HINT": "Conversas importadas entram como resolvidas. Automações, notificações e webhooks de saída não disparam para mensagens antigas. Mídias não são baixadas automaticamente. Limitado ao que o WhatsApp libera ao dispositivo."
+        },
         "INSTANCE_ID": {
           "LABEL": "ID da instância",
           "PLACEHOLDER": "Por favor, insira o ID da sua instância",

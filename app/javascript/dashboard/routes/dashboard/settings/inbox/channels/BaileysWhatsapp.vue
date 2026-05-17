@@ -39,6 +39,11 @@ const providerUrl = ref('');
 const showAdvancedOptions = ref(false);
 const markAsRead = ref(true);
 const presenceSubscribe = ref(false);
+// History import (days). 0 disables. The Baileys Node service applies this
+// filter to `messaging-history.set` events after pairing and pushes the
+// filtered messages back as `importMode: true` webhooks.
+const historyImportDays = ref(0);
+const historyImportOptions = [0, 7, 30, 90];
 
 const uiFlags = computed(() => store.getters['inboxes/getUIFlags']);
 
@@ -63,6 +68,7 @@ const buildProviderConfig = () => {
   const providerConfig = {
     mark_as_read: markAsRead.value,
     presence_subscribe: presenceSubscribe.value,
+    history_import_days: Number(historyImportDays.value) || 0,
   };
 
   if (apiKey.value || providerUrl.value) {
@@ -227,6 +233,33 @@ const setShowAdvancedOptions = () => {
             </span>
             <Switch id="presenceSubscribe" v-model="presenceSubscribe" />
           </div>
+        </label>
+      </div>
+
+      <div
+        v-if="!isConvertMode"
+        class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]"
+      >
+        <label>
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.HISTORY_IMPORT.LABEL') }}
+          <select v-model="historyImportDays" class="text-sm">
+            <option
+              v-for="option in historyImportOptions"
+              :key="option"
+              :value="option"
+            >
+              {{
+                option === 0
+                  ? $t('INBOX_MGMT.ADD.WHATSAPP.HISTORY_IMPORT.OPTION_DISABLED')
+                  : $t('INBOX_MGMT.ADD.WHATSAPP.HISTORY_IMPORT.OPTION_DAYS', {
+                      days: option,
+                    })
+              }}
+            </option>
+          </select>
+          <span class="text-xs text-n-slate-11">
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP.HISTORY_IMPORT.HINT') }}
+          </span>
         </label>
       </div>
     </template>

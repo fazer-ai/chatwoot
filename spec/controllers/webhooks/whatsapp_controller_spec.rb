@@ -63,6 +63,22 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
     end
 
+    context 'when importMode is true (Baileys history backfill)' do
+      it 'routes the job to the dedicated whatsapp_history queue' do
+        # ActiveJob's `set(queue: ...)` returns a ConfiguredJob proxy; we stub
+        # at that layer to assert the queue swap without booting Sidekiq.
+        configured = instance_double(ActiveJob::ConfiguredJob, perform_later: true)
+        allow(Webhooks::WhatsappEventsJob).to receive(:set).with(queue: :whatsapp_history).and_return(configured)
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
+        post '/webhooks/whatsapp/123221321', params: { content: 'hello', importMode: true }
+
+        expect(Webhooks::WhatsappEventsJob).to have_received(:set).with(queue: :whatsapp_history)
+        expect(configured).to have_received(:perform_later)
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+      end
+    end
+
     context 'when awaitResponse param is present' do
       it 'calls the whatsapp events job synchronously' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)

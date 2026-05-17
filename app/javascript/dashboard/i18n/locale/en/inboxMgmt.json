@@ -306,6 +306,12 @@
         "PRESENCE_SUBSCRIBE": {
           "LABEL": "Show contact typing indicators"
         },
+        "HISTORY_IMPORT": {
+          "LABEL": "Import history on first pairing",
+          "OPTION_DISABLED": "Don't import",
+          "OPTION_DAYS": "Last {days} days",
+          "HINT": "Imported conversations open as resolved. Automations, notifications and outbound webhooks won't fire for backfilled messages. Media is not downloaded automatically. Limited by what WhatsApp releases to the device."
+        },
         "INSTANCE_ID": {
           "LABEL": "Instance ID",
           "PLACEHOLDER": "Please enter your instance ID",
