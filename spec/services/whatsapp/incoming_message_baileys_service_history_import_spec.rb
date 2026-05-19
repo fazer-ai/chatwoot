@@ -73,24 +73,33 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
     described_class.new(inbox: inbox, params: base_params).perform
 
     state = whatsapp_channel.reload.history_import_state
-    expect(state['status']).to eq('completed')
-    expect(state['processed_batches']).to eq(1)
-    expect(state['total_batches']).to eq(1)
-    expect(state['messages_imported']).to eq(1)
-    expect(state['started_at']).to be_present
-    expect(state['finished_at']).to be_present
-  end
-
-  it 'keeps status in_progress on non-final batches' do
-    intermediate_params = base_params.merge(importBatch: { index: 0, total: 3, phase: 'history' })
-
-    described_class.new(inbox: inbox, params: intermediate_params).perform
-
-    state = whatsapp_channel.reload.history_import_state
+    # Status stays `in_progress` until the watchdog flips it — Baileys can
+    # keep firing `messaging-history.set` after the supposed "last" batch.
     expect(state['status']).to eq('in_progress')
     expect(state['processed_batches']).to eq(1)
-    expect(state['total_batches']).to eq(3)
+    expect(state['messages_imported']).to eq(1)
+    expect(state['started_at']).to be_present
+    expect(state['last_batch_at']).to be_present
     expect(state['finished_at']).to be_nil
+  end
+
+  it 'accumulates messages_imported across multiple history events' do
+    described_class.new(inbox: inbox, params: base_params).perform
+    described_class.new(inbox: inbox, params: base_params.merge(
+      data: { type: 'notify', messages: [raw_message.merge(key: { id: 'history_msg_2', remoteJid: raw_message[:key][:remoteJid], fromMe: false })] }
+    )).perform
+
+    state = whatsapp_channel.reload.history_import_state
+    expect(state['processed_batches']).to eq(2)
+    expect(state['messages_imported']).to eq(2)
+    expect(state['status']).to eq('in_progress')
+  end
+
+  it 'schedules a watchdog job to finalize the import after the idle window' do
+    expect do
+      described_class.new(inbox: inbox, params: base_params).perform
+    end.to have_enqueued_job(Channels::Whatsapp::BaileysHistoryImportFinalizeJob)
+      .with(whatsapp_channel.id)
   end
 
   it 'resets Current.history_import after perform so subsequent live events behave normally' do
@@ -106,6 +115,33 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
       described_class.new(inbox: inbox, params: live_params).perform
 
       expect(whatsapp_channel.reload.history_import_state).to be_nil
+    end
+  end
+
+  context 'when the history payload has only a @lid remoteJid (no phone fallback)' do
+    # Regression: `messaging-history.set` events frequently arrive with
+    # `remoteJid: "<lid>@lid"` and neither `addressingMode` nor
+    # `remoteJidAlt`. The previous extract_from_jid blindly returned the lid
+    # part for `type: 'pn'`, so contacts got created with the LID stored as
+    # a fake phone number (e.g. "+258982249787509").
+    let(:lid_only_message) do
+      {
+        key: { id: 'lid_only_1', remoteJid: '258982249787509@lid', fromMe: false },
+        messageTimestamp: timestamp - (2 * 86_400),
+        message: { conversation: 'Olá do histórico' }
+      }
+    end
+    let(:lid_only_params) do
+      base_params.merge(data: { type: 'notify', messages: [lid_only_message] })
+    end
+
+    it 'does not store the LID as a phone number on the new contact' do
+      described_class.new(inbox: inbox, params: lid_only_params).perform
+
+      contact = inbox.contacts.last
+      expect(contact).to be_present
+      expect(contact.identifier).to eq('258982249787509@lid')
+      expect(contact.phone_number).to be_blank
     end
   end
 
@@ -128,7 +164,7 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
 
       state = whatsapp_channel.reload.history_import_state
       expect(state).to be_present
-      expect(state['status']).to eq('completed')
+      expect(state['status']).to eq('in_progress')
       expect(state['messages_imported']).to eq(1)
     end
   end

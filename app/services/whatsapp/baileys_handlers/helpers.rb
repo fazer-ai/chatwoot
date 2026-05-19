@@ -148,6 +148,18 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     jid = @raw_message[:key][reference_field]
     return unless jid
 
+    # `addressingMode` lets Baileys steer pn↔lid lookups when it's present, but
+    # `messaging-history.set` events (the backfill path) often arrive without
+    # it. Falling back to `remoteJid` is fine in most cases, but we must NOT
+    # return a `@lid` body when the caller asked for a phone number — that
+    # would land the LID in `contact.phone_number` (e.g. "+258982249787509"
+    # for what is actually a routing id). The reverse direction (returning
+    # a phone body as a `lid` source_id) is also imperfect but predates this
+    # guard and existing flows rely on it as a stable identifier, so we
+    # leave it alone.
+    server = jid.split('@').last
+    return if type == 'pn' && server == 'lid'
+
     # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
     # https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc.6/src/WABinary/jid-utils.ts#L52
     jid.split('@').first.split(':').first.split('_').first

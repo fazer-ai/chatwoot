@@ -879,10 +879,10 @@
         "TITLE": "History import",
         "STATUS_IN_PROGRESS": "Importing",
         "STATUS_COMPLETED": "Completed",
-        "BATCHES": "{processed} of {total} batches",
         "MESSAGES": "{count} messages imported",
-        "STARTED_AT": "Started: {time}",
-        "FINISHED_AT": "Finished: {time}"
+        "FINISHED_AT": "Completed at {time}",
+        "UPDATED_SECS_AGO": "Last update {secs}s ago",
+        "UPDATED_MINS_AGO": "Last update {mins}min ago"
       },
       "WHATSAPP_PROVIDER_URL_TITLE": "Provider URL",
       "WHATSAPP_PROVIDER_URL_SUBHEADER": "If the provider is not running locally, please provide the URL.",
