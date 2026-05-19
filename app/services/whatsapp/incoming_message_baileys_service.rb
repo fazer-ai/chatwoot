@@ -38,41 +38,45 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
     Current.history_import = nil
   end
 
+  # Window of inactivity (in seconds) after which the watchdog declares the
+  # import complete. Baileys can fire `messaging-history.set` repeatedly for
+  # the same pairing, so we can't rely on the per-firing `importBatch.index`
+  # to detect the end. Once batches stop arriving for this long, we mark it
+  # done.
+  HISTORY_IMPORT_IDLE_WINDOW = 45.seconds
+
   private
 
-  # Mirrors the `importBatch: { index, total, phase }` envelope the Baileys
-  # node sends with each backfill chunk so the channel page can show progress
-  # and we can mark the import done on the final batch.
+  # Updates a running tally on the channel and schedules a watchdog job that
+  # finalises the import once no new batches arrive for HISTORY_IMPORT_IDLE_WINDOW.
+  # Each batch reschedules a fresh watchdog; the last surviving watchdog wins.
   def track_history_import_batch
     channel = inbox.channel
     return unless channel.respond_to?(:update_history_import_state!)
 
     channel.update_history_import_state!(next_history_import_state(channel))
+    Channels::Whatsapp::BaileysHistoryImportFinalizeJob
+      .set(wait: HISTORY_IMPORT_IDLE_WINDOW + 15.seconds)
+      .perform_later(channel.id)
   rescue StandardError => e
     Rails.logger.error "Failed to track Baileys history import batch for inbox #{inbox.id}: #{e.message}"
   end
 
-  def next_history_import_state(channel) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
-    batch = processed_params[:importBatch].is_a?(Hash) ? processed_params[:importBatch] : {}
+  def next_history_import_state(channel)
     msgs_in_batch = processed_params.dig(:data, :messages)&.size || 0
     current_state = channel.history_import_state || {}
-    total = batch[:total].to_i
+    now_iso = Time.current.iso8601
 
-    new_state = {
+    # Status always reverts to 'in_progress' on a fresh batch: Baileys may
+    # emit additional `messaging-history.set` events after a previous chunk
+    # already had its watchdog flip the status to 'completed'.
+    {
       status: 'in_progress',
-      started_at: current_state['started_at'] || Time.current.iso8601,
-      total_batches: total.positive? ? total : current_state['total_batches'],
+      started_at: current_state['started_at'] || now_iso,
+      last_batch_at: now_iso,
       processed_batches: current_state.fetch('processed_batches', 0) + 1,
-      messages_imported: current_state.fetch('messages_imported', 0) + msgs_in_batch
+      messages_imported: current_state.fetch('messages_imported', 0) + msgs_in_batch,
+      finished_at: nil
     }
-    if last_history_import_batch?(batch, total)
-      new_state[:status] = 'completed'
-      new_state[:finished_at] = Time.current.iso8601
-    end
-    new_state
-  end
-
-  def last_history_import_batch?(batch, total)
-    total.positive? && batch[:index].present? && batch[:index].to_i == total - 1
   end
 end

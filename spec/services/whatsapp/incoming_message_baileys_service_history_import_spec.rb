@@ -73,24 +73,33 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
     described_class.new(inbox: inbox, params: base_params).perform
 
     state = whatsapp_channel.reload.history_import_state
-    expect(state['status']).to eq('completed')
-    expect(state['processed_batches']).to eq(1)
-    expect(state['total_batches']).to eq(1)
-    expect(state['messages_imported']).to eq(1)
-    expect(state['started_at']).to be_present
-    expect(state['finished_at']).to be_present
-  end
-
-  it 'keeps status in_progress on non-final batches' do
-    intermediate_params = base_params.merge(importBatch: { index: 0, total: 3, phase: 'history' })
-
-    described_class.new(inbox: inbox, params: intermediate_params).perform
-
-    state = whatsapp_channel.reload.history_import_state
+    # Status stays `in_progress` until the watchdog flips it — Baileys can
+    # keep firing `messaging-history.set` after the supposed "last" batch.
     expect(state['status']).to eq('in_progress')
     expect(state['processed_batches']).to eq(1)
-    expect(state['total_batches']).to eq(3)
+    expect(state['messages_imported']).to eq(1)
+    expect(state['started_at']).to be_present
+    expect(state['last_batch_at']).to be_present
     expect(state['finished_at']).to be_nil
+  end
+
+  it 'accumulates messages_imported across multiple history events' do
+    described_class.new(inbox: inbox, params: base_params).perform
+    described_class.new(inbox: inbox, params: base_params.merge(
+      data: { type: 'notify', messages: [raw_message.merge(key: { id: 'history_msg_2', remoteJid: raw_message[:key][:remoteJid], fromMe: false })] }
+    )).perform
+
+    state = whatsapp_channel.reload.history_import_state
+    expect(state['processed_batches']).to eq(2)
+    expect(state['messages_imported']).to eq(2)
+    expect(state['status']).to eq('in_progress')
+  end
+
+  it 'schedules a watchdog job to finalize the import after the idle window' do
+    expect do
+      described_class.new(inbox: inbox, params: base_params).perform
+    end.to have_enqueued_job(Channels::Whatsapp::BaileysHistoryImportFinalizeJob)
+      .with(whatsapp_channel.id)
   end
 
   it 'resets Current.history_import after perform so subsequent live events behave normally' do
@@ -128,7 +137,7 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
 
       state = whatsapp_channel.reload.history_import_state
       expect(state).to be_present
-      expect(state['status']).to eq('completed')
+      expect(state['status']).to eq('in_progress')
       expect(state['messages_imported']).to eq(1)
     end
   end

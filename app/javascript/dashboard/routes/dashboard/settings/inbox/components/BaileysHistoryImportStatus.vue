@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onBeforeUnmount, watch, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
+import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const props = defineProps({
   inbox: {
@@ -22,31 +23,54 @@ const historyImport = computed(
 );
 
 const status = computed(() => historyImport.value?.status);
-const total = computed(() => historyImport.value?.total_batches);
-const processed = computed(() => historyImport.value?.processed_batches || 0);
 const messages = computed(() => historyImport.value?.messages_imported || 0);
 
-const percent = computed(() => {
-  if (!total.value || total.value <= 0) return null;
-  const ratio = (processed.value / total.value) * 100;
-  return Math.min(100, Math.max(0, Math.round(ratio)));
-});
-
-const formatDate = iso => {
+// Parse helpers — Baileys batches land with ISO timestamps generated on the
+// Rails side, so timezones are already resolved before they reach us.
+const parseIso = iso => {
   if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const startedAt = computed(() => formatDate(historyImport.value?.started_at));
-const finishedAt = computed(() => formatDate(historyImport.value?.finished_at));
+const formattedTime = computed(() => {
+  const iso =
+    historyImport.value?.finished_at || historyImport.value?.last_batch_at;
+  const date = parseIso(iso);
+  return date ? date.toLocaleTimeString() : null;
+});
 
-// Poll the inbox list while an import is running so the progress bar advances
-// without the user having to refresh the page. Five seconds is rough enough
-// that the network noise stays low; batches arrive in seconds anyway.
+// Re-render every second so the relative time stays fresh without polling
+// the backend. Polling is throttled to every 5s separately.
+const now = ref(Date.now());
+let tickHandle = null;
+
+const lastBatchSecondsAgo = computed(() => {
+  const date = parseIso(historyImport.value?.last_batch_at);
+  if (!date) return null;
+  return Math.max(0, Math.floor((now.value - date.getTime()) / 1000));
+});
+
+const relativeUpdated = computed(() => {
+  const secs = lastBatchSecondsAgo.value;
+  if (secs === null) return null;
+  if (secs < 60) {
+    return t(
+      'INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.UPDATED_SECS_AGO',
+      { secs }
+    );
+  }
+  const mins = Math.floor(secs / 60);
+  return t(
+    'INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.UPDATED_MINS_AGO',
+    {
+      mins,
+    }
+  );
+});
+
+// Backend marks completed via a watchdog Sidekiq job after ~45s of no new
+// batches. Polling stays light (5s) and stops as soon as we see the flip.
 const POLL_INTERVAL_MS = 5000;
 const pollHandle = ref(null);
 
@@ -76,26 +100,37 @@ watch(
   { immediate: true }
 );
 
-onBeforeUnmount(stopPolling);
+onMounted(() => {
+  tickHandle = setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
+});
+
+onBeforeUnmount(() => {
+  stopPolling();
+  if (tickHandle) clearInterval(tickHandle);
+});
 </script>
 
 <template>
   <div
     v-if="historyImport"
-    class="flex flex-col gap-3 p-4 rounded-xl bg-n-solid-2 outline outline-1 outline-n-container"
+    class="flex flex-col gap-2 p-4 rounded-xl bg-n-solid-2 outline outline-1 outline-n-container"
   >
     <div class="flex items-center justify-between gap-2">
       <span class="text-sm font-medium text-n-slate-12">
         {{ t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.TITLE') }}
       </span>
       <span
-        class="text-xs px-2 py-0.5 rounded-md"
+        class="text-xs px-2 py-0.5 rounded-md inline-flex items-center gap-1.5"
         :class="
           status === 'completed'
             ? 'bg-n-teal-3 text-n-teal-11'
             : 'bg-n-blue-3 text-n-blue-11'
         "
       >
+        <Spinner v-if="status !== 'completed'" :size="10" />
+        <i v-else class="i-lucide-check w-3 h-3" />
         {{
           status === 'completed'
             ? t(
@@ -108,47 +143,27 @@ onBeforeUnmount(stopPolling);
       </span>
     </div>
 
-    <div
-      v-if="percent !== null"
-      class="w-full h-2 rounded-full bg-n-alpha-2 overflow-hidden"
-    >
-      <div
-        class="h-full bg-n-blue-9 transition-all duration-300"
-        :style="{ width: `${percent}%` }"
-      />
-    </div>
+    <p class="text-sm text-n-slate-12 m-0">
+      {{
+        t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.MESSAGES', {
+          count: messages.toLocaleString(),
+        })
+      }}
+    </p>
 
-    <div class="flex flex-wrap gap-x-6 gap-y-1 text-xs text-n-slate-11">
-      <span v-if="total">
-        {{
-          t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.BATCHES', {
-            processed,
-            total,
-          })
-        }}
-      </span>
-      <span>
-        {{
-          t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.MESSAGES', {
-            count: messages.toLocaleString(),
-          })
-        }}
-      </span>
-      <span v-if="startedAt">
-        {{
-          t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.STARTED_AT', {
-            time: startedAt,
-          })
-        }}
-      </span>
-      <span v-if="finishedAt">
-        {{
-          t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.FINISHED_AT', {
-            time: finishedAt,
-          })
-        }}
-      </span>
-    </div>
+    <p
+      v-if="status === 'completed' && formattedTime"
+      class="text-xs text-n-slate-11 m-0"
+    >
+      {{
+        t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.FINISHED_AT', {
+          time: formattedTime,
+        })
+      }}
+    </p>
+    <p v-else-if="relativeUpdated" class="text-xs text-n-slate-11 m-0">
+      {{ relativeUpdated }}
+    </p>
   </div>
   <!-- vue/no-root-v-if needs a sibling: this is intentional, the widget is hidden until the Baileys node pushes the first batch. -->
   <span v-else class="hidden" />
