@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.21.1
+  published_at: '2026-05-19T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.1
+  notes:
+    en: |-
+      Internal improvements to the unofficial WhatsApp connection (Baileys).
+    pt_BR: |-
+      Melhorias internas na conexão WhatsApp não oficial (Baileys).
 - tag: v4.13.0-auris.1.21
   published_at: '2026-05-17T14:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21
@@ -486,34 +494,3 @@
       na caixa, a mensagem da campanha entra nessa thread em vez de abrir uma nova
       conversa pendente em paralelo. Conversas resolvidas são reabertas (como pendentes).
       Já as adiadas e as pendentes são preservadas."
-- tag: v4.13.0-auris.1.3
-  published_at: '2026-05-01T03:02:06Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.3
-  notes:
-    en: "### ✨ What's new\n\n- **WhatsApp campaign messages now show up in the conversations
-      view.** Templates sent through the WhatsApp campaigns menu create a conversation
-      and a message in the dashboard, so agents can see exactly what was sent — instead
-      of finding out only when the contact replies.\n- **Pick how many contacts to
-      show per page.** The contacts list now lets you choose 15, 50, or 100 contacts
-      per page. Your choice is remembered between sessions.\n\n### ⚡ Improvements\n\n-
-      **Switching an inbox's WhatsApp provider is administrator-only.** This operation
-      drops session state and can break message delivery for the entire inbox, so
-      it's restricted to administrators. The \"Converter\" button on the inbox settings
-      page is now hidden for managers.\n\n### \U0001F41B Fixes\n\n- **Managers can
-      reply on any conversation again.** Managers could not send messages on conversations
-      in inboxes they were not a member of — the bubble turned red and the message
-      never reached the contact. Fixed."
-    pt_BR: "### ✨ Novidades\n\n- **Mensagens de campanha do WhatsApp aparecem na tela
-      de conversas.** Templates enviados pelo menu de campanhas do WhatsApp agora
-      criam uma conversa e uma mensagem no dashboard, então o agente vê exatamente
-      o que foi enviado — sem precisar esperar o contato responder pra ver o histórico.\n-
-      **Escolha quantos contatos exibir por página.** A lista de contatos passa a
-      permitir 15, 50 ou 100 itens por página. A escolha fica memorizada entre sessões.\n\n###
-      ⚡ Melhorias\n\n- **Trocar provedor de WhatsApp da caixa de entrada agora é exclusivo
-      do administrador.** A operação derruba a sessão e pode quebrar o envio de mensagens
-      da caixa toda, então fica restrita ao perfil de administrador. O botão \"Converter\"
-      na tela de configurações da caixa fica oculto pro perfil de gerente.\n\n###
-      \U0001F41B Correções\n\n- **Gerentes voltam a conseguir responder em qualquer
-      conversa.** Usuários com perfil de gerente não conseguiam enviar mensagens em
-      conversas de caixas das quais não eram membros — a bolha ficava vermelha e a
-      mensagem não chegava ao contato. Corrigido."
