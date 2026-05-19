@@ -118,6 +118,33 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
     end
   end
 
+  context 'when the history payload has only a @lid remoteJid (no phone fallback)' do
+    # Regression: `messaging-history.set` events frequently arrive with
+    # `remoteJid: "<lid>@lid"` and neither `addressingMode` nor
+    # `remoteJidAlt`. The previous extract_from_jid blindly returned the lid
+    # part for `type: 'pn'`, so contacts got created with the LID stored as
+    # a fake phone number (e.g. "+258982249787509").
+    let(:lid_only_message) do
+      {
+        key: { id: 'lid_only_1', remoteJid: '258982249787509@lid', fromMe: false },
+        messageTimestamp: timestamp - (2 * 86_400),
+        message: { conversation: 'Olá do histórico' }
+      }
+    end
+    let(:lid_only_params) do
+      base_params.merge(data: { type: 'notify', messages: [lid_only_message] })
+    end
+
+    it 'does not store the LID as a phone number on the new contact' do
+      described_class.new(inbox: inbox, params: lid_only_params).perform
+
+      contact = inbox.contacts.last
+      expect(contact).to be_present
+      expect(contact.identifier).to eq('258982249787509@lid')
+      expect(contact.phone_number).to be_blank
+    end
+  end
+
   context 'when a connection.update event arrives mid-import' do
     # Regression: `update_provider_connection!` replaces the JSONB, so the
     # connection_update handler used to wipe `history_import` every time the
