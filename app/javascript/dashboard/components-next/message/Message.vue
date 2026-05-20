@@ -785,7 +785,7 @@ provideMessageContext({
             :current-user-id="currentUserId"
             :pending-emojis="pendingEmojis"
             :alignment="orientation === ORIENTATION.RIGHT ? 'right' : 'left'"
-            :read-only="!inboxSupportsReactions"
+            :read-only="!inboxSupportsReactions && !props.private"
             :overlap="!isAudioBubble"
             @toggle="handleToggleReaction"
           />
