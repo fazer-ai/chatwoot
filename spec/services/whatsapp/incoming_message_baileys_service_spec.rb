@@ -1084,6 +1084,35 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(Rails.logger).to have_received(:warn)
         end
+
+        it 'marks the message as failed and stores the stub description with code' do
+          update_payload[:update][:status] = 0
+          update_payload[:update][:messageStubParameters] = ['463', 'Your account has been restricted']
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to eq('Your account has been restricted (463)')
+        end
+
+        it 'falls back to a generic message when only the error code is present on failure' do
+          update_payload[:update][:status] = 0
+          update_payload[:update][:messageStubParameters] = ['429']
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to eq('WhatsApp error 429')
+        end
+
+        it 'leaves external_error blank on failure when stub parameters are absent' do
+          update_payload[:update][:status] = 0
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to be_blank
+        end
       end
 
       context 'when is a content update' do

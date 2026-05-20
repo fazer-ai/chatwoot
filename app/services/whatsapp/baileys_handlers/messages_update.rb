@@ -29,7 +29,19 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
   def update_status
     status = status_mapper
     update_last_seen_at if incoming? && status == 'read'
-    @message.update!(status: status) if status.present? && status_transition_allowed?(status)
+    return unless status.present? && status_transition_allowed?(status)
+
+    attrs = { status: status }
+    attrs[:external_error] = extract_external_error if status == 'failed'
+    @message.update!(attrs)
+  end
+
+  def extract_external_error
+    stub = Array(@raw_message.dig(:update, :messageStubParameters))
+    return if stub.empty?
+
+    code, description = stub
+    description.present? ? "#{description} (#{code})" : "WhatsApp error #{code}"
   end
 
   def status_mapper
