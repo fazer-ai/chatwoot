@@ -6,6 +6,12 @@
     "DOWNLOAD_CONVERSATION_REPORTS": "Download conversation reports",
     "DATA_FETCHING_FAILED": "Failed to fetch data, please try again later.",
     "SUMMARY_FETCHING_FAILED": "Failed to fetch summary, please try again later.",
+    "TIME_UNITS": {
+      "SEC": "Sec",
+      "MIN": "Min",
+      "HR": "Hr",
+      "DAY": "Day"
+    },
     "METRICS": {
       "CONVERSATIONS": {
         "NAME": "Conversations",

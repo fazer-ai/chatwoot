@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
   monthName,
   yearName,
@@ -12,6 +14,7 @@ import {
   CALENDAR_TYPES,
   CALENDAR_PERIODS,
 } from '../helpers/DatePickerHelper';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 
 import CalendarWeekLabel from './CalendarWeekLabel.vue';
 import CalendarAction from './CalendarAction.vue';
@@ -37,6 +40,9 @@ const emit = defineEmits([
   'next',
   'setView',
 ]);
+
+const { locale } = useI18n();
+const dateFnsLocale = computed(() => resolveDateFnsLocale(locale.value));
 
 const { START_CALENDAR } = CALENDAR_TYPES;
 const { MONTH } = CALENDAR_PERIODS;
@@ -128,7 +134,8 @@ const dayClasses = day => ({
       :calendar-type="calendarType"
       :first-button-label="
         monthName(
-          calendarType === START_CALENDAR ? startCurrentDate : endCurrentDate
+          calendarType === START_CALENDAR ? startCurrentDate : endCurrentDate,
+          dateFnsLocale
         )
       "
       :button-label="
