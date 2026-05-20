@@ -418,8 +418,7 @@ const contextMenuEnabledOptions = computed(() => {
     copyLink: !isFailedOrProcessing,
     translate: !isFailedOrProcessing && !isMessageDeleted.value && hasText,
     replyTo:
-      !props.private &&
-      props.inboxSupportsReplyTo.outgoing &&
+      (props.private || props.inboxSupportsReplyTo.outgoing) &&
       !isFailedOrProcessing,
     edit:
       isOutgoing &&
@@ -431,17 +430,19 @@ const contextMenuEnabledOptions = computed(() => {
 });
 
 const canShowReactionToolbar = computed(() => {
-  if (!props.inboxSupportsReactions) return false;
   if (!isBubble.value) return false;
   if (isMessageDeleted.value) return false;
   if (props.contentAttributes?.isUnsupported) return false;
   if (props.status === MESSAGE_STATUS.FAILED) return false;
   if (props.status === MESSAGE_STATUS.PROGRESS) return false;
-  if (props.private) return false;
   if (props.messageType === MESSAGE_TYPES.TEMPLATE) return false;
-  // Mirror ReactionsController#target_unreactable_error: a message without a
-  // provider source_id can't be reacted to on WhatsApp, so the API would 422
-  // if the user clicked. Hide the picker instead of offering a dead action.
+  // Private notes are agent-only and never leave Chatwoot, so reactions on
+  // them don't depend on inbox channel capabilities or a provider source_id.
+  if (props.private) return true;
+  if (!props.inboxSupportsReactions) return false;
+  // Mirror ReactionsController#target_unreactable_error: a non-private message
+  // without a provider source_id can't be reacted to on WhatsApp, so the API
+  // would 422 if the user clicked. Hide the picker instead of a dead action.
   if (!props.sourceId) return false;
   return true;
 });

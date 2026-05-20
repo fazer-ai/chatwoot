@@ -1,6 +1,6 @@
 class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1::Accounts::Conversations::BaseController
-  before_action :ensure_channel_supports_reactions
   before_action :fetch_target_message
+  before_action :ensure_channel_supports_reactions
   before_action :ensure_target_is_reactable
 
   MAX_EMOJI_BYTES = 32 # an emoji with skin tone + ZWJ sequences fits in <=32 bytes
@@ -124,6 +124,10 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   end
 
   def ensure_channel_supports_reactions
+    # Private notes are agent-only and never leave Chatwoot, so we don't gate
+    # reactions on them by the inbox channel's external capabilities.
+    return if @target_message&.private?
+
     channel = @conversation.inbox.channel
     return if channel.respond_to?(:supports_reactions?) && channel.supports_reactions?
 
@@ -146,14 +150,14 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
   # so a crafted POST cannot persist a reaction (and enqueue a provider send)
   # against a target the UI would never let the user pick.
   def target_unreactable_error # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
-    return 'Cannot react to private messages' if @target_message.private?
     return 'Cannot react to a reaction' if @target_message.reaction?
     return 'Cannot react to deleted messages' if @target_message.content_attributes['deleted']
     return 'Cannot react to activity messages' if @target_message.activity?
     return 'Cannot react to template messages' if @target_message.template?
     return 'Cannot react to failed messages' if @target_message.failed?
     return 'Cannot react to unsupported messages' if @target_message.content_attributes['is_unsupported']
-    return 'Target message is not deliverable to WhatsApp' if @target_message.source_id.blank?
+    # Private notes never reach the provider, so the source_id gate doesn't apply.
+    return 'Target message is not deliverable to WhatsApp' if @target_message.source_id.blank? && !@target_message.private?
 
     nil
   end
@@ -204,6 +208,9 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
         message_type: 'outgoing',
         content: emoji,
         echo_id: reaction_params[:echo_id],
+        # Inherits the target's privacy so SendOnChannelService short-circuits
+        # in `message.private?` and the reaction never reaches the provider.
+        private: @target_message.private?,
         content_attributes: {
           is_reaction: true,
           in_reply_to: @target_message.id

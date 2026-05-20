@@ -222,12 +222,14 @@ export default {
       );
     },
     shouldShowReplyToMessage() {
+      if (!this.inReplyTo?.id) return false;
+      if (this.copilot.isActive.value) return false;
+      // Private notes are agent-only and don't depend on an external channel
+      // for reply propagation, so the channel feature gates don't apply.
+      if (this.isPrivate) return true;
       return (
-        this.inReplyTo?.id &&
-        !this.isPrivate &&
         this.inboxHasFeature(INBOX_FEATURES.REPLY_TO) &&
-        !this.is360DialogWhatsAppChannel &&
-        !this.copilot.isActive.value
+        !this.is360DialogWhatsAppChannel
       );
     },
     showWhatsappTemplates() {
@@ -1317,12 +1319,21 @@ export default {
         this.conversationId
       );
 
-      this.inReplyTo = this.currentChat?.messages?.find(message => {
+      const target = this.currentChat?.messages?.find(message => {
         if (message.id === replyToMessageId) {
           return true;
         }
         return false;
       });
+
+      // Replying to a private note must keep the composer internal: switching
+      // to NOTE mode prevents leaking the note's id into an outbound reply's
+      // `in_reply_to` and keeps the cited preview visible to agents only.
+      if (target?.private && !this.isOnPrivateNote) {
+        this.setReplyMode(REPLY_EDITOR_MODES.NOTE);
+      }
+
+      this.inReplyTo = target;
     },
     onReplyToMessage() {
       this.fetchAndSetReplyTo();
