@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.21.2
+  published_at: '2026-05-20T01:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.2
+  notes:
+    en: |-
+      Internal improvements to the unofficial WhatsApp connection (Baileys).
+    pt_BR: |-
+      Melhorias internas na conexão WhatsApp não oficial (Baileys).
 - tag: v4.13.0-auris.1.21.1
   published_at: '2026-05-19T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.1
@@ -459,38 +467,3 @@
       - **Ações rápidas em cada card e linha.** Abrir o resumo da conversa, ir direto pra conversa, ou abrir o contato — os mesmos três atalhos no card do Quadro e na linha da Lista.
       - **Filtros.** Filtre o funil por caixa de entrada, intervalo de entrada do lead, ou oculte fases finalizadas com um clique.
       - **Hover no título da coluna.** Um tooltip mostra qual etiqueta sustenta a fase (ex.: "Etiqueta kb-confirmado") — fica claro qual marcação será aplicada quando uma conversa entrar lá.
-- tag: v4.13.0-auris.1.4
-  published_at: '2026-05-01T23:37:55Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.4
-  notes:
-    en: "### ✨ What's new\n\n- **Contact labels show up directly on the contacts list.**
-      Each contact now shows their assigned labels as colored pills next to the name,
-      so triaging by tag doesn't require expanding every row.\n- **Unassign labels
-      in bulk.** A new \"Desatribuir rótulo\" button on the contacts list lets you
-      remove labels from many contacts at once, mirroring the existing \"Atribuir
-      rótulo\" action.\n- **Campaign cards show the template and audience.** WhatsApp
-      campaign cards now display the chosen template name and the audience labels
-      as colored pills, making it easier to scan campaigns at a glance.\n\n### ⚡ Improvements\n\n-
-      **Managers can now run campaigns.** Users with the manager role have access
-      to the Campaigns menu (Live Chat, SMS, WhatsApp) and the full campaign lifecycle
-      — create, edit, follow status, delete.\n\n### \U0001F41B Fixes\n\n- **Campaigns
-      no longer create duplicate conversations.** When a contact already has an active
-      conversation in the inbox, the campaign message lands in that thread instead
-      of opening a new pending conversation alongside. Resolved conversations are
-      reopened (as pending). Snoozed and pending threads stay untouched."
-    pt_BR: "### ✨ Novidades\n\n- **Etiquetas dos contatos aparecem direto na lista.**
-      Cada contato agora exibe as etiquetas atribuídas como pills coloridas ao lado
-      do nome, então pra triar por etiqueta você não precisa expandir cada linha.\n-
-      **Desatribuir rótulos em massa.** Novo botão \"Desatribuir rótulo\" na lista
-      de contatos permite remover etiquetas de vários contatos de uma vez, espelhando
-      o \"Atribuir rótulo\" que já existia.\n- **Cards de campanha mostram o template
-      e o público.** Cada cartão de campanha do WhatsApp passa a exibir o nome do
-      template escolhido e as etiquetas do público como pills coloridas, facilitando
-      olhar a lista em um relance.\n\n### ⚡ Melhorias\n\n- **Gerentes podem operar
-      campanhas.** Usuários com perfil de gerente passam a acessar o menu Campanhas
-      (Chat ao vivo, SMS, WhatsApp) e o ciclo completo da campanha — criar, editar,
-      acompanhar status e excluir.\n\n### \U0001F41B Correções\n\n- **Campanhas deixam
-      de criar conversas duplicadas.** Quando o contato já tem uma conversa ativa
-      na caixa, a mensagem da campanha entra nessa thread em vez de abrir uma nova
-      conversa pendente em paralelo. Conversas resolvidas são reabertas (como pendentes).
-      Já as adiadas e as pendentes são preservadas."
