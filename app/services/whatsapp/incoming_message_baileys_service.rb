@@ -63,7 +63,7 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
   end
 
   def next_history_import_state(channel)
-    msgs_in_batch = processed_params.dig(:data, :messages)&.size || 0
+    counts = classify_history_batch_messages
     current_state = channel.history_import_state || {}
     now_iso = Time.current.iso8601
 
@@ -75,8 +75,38 @@ class Whatsapp::IncomingMessageBaileysService < Whatsapp::IncomingMessageBaseSer
       started_at: current_state['started_at'] || now_iso,
       last_batch_at: now_iso,
       processed_batches: current_state.fetch('processed_batches', 0) + 1,
-      messages_imported: current_state.fetch('messages_imported', 0) + msgs_in_batch,
+      messages_imported: current_state.fetch('messages_imported', 0) + counts[:imported],
+      messages_dropped_groups: current_state.fetch('messages_dropped_groups', 0) + counts[:dropped_groups],
       finished_at: nil
     }
+  end
+
+  # Splits the batch into two buckets based on `remoteJid` server suffix:
+  # `@g.us` rows go to the dropped-groups bucket when group ingestion is off
+  # (the default), everything else counts as imported. We classify on the
+  # webhook payload (not on persisted messages) so the counters stay
+  # consistent regardless of dedup, ignore_message? guards or stub handlers
+  # — those produce noise we don't surface, and the UI just wants a clear
+  # "X individuais / Y de grupos descartadas" breakdown.
+  def classify_history_batch_messages
+    messages = processed_params.dig(:data, :messages) || []
+    return { imported: 0, dropped_groups: 0 } if messages.empty?
+
+    groups_enabled = Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
+    imported = 0
+    dropped_groups = 0
+
+    messages.each do |msg|
+      jid = msg.dig(:key, :remoteJid).to_s
+      server = jid.split('@').last
+
+      if server == 'g.us' && !groups_enabled
+        dropped_groups += 1
+      else
+        imported += 1
+      end
+    end
+
+    { imported: imported, dropped_groups: dropped_groups }
   end
 end

@@ -24,6 +24,9 @@ const historyImport = computed(
 
 const status = computed(() => historyImport.value?.status);
 const messages = computed(() => historyImport.value?.messages_imported || 0);
+const droppedGroups = computed(
+  () => historyImport.value?.messages_dropped_groups || 0
+);
 
 // Parse helpers — Baileys batches land with ISO timestamps generated on the
 // Rails side, so timezones are already resolved before they reach us.
@@ -147,6 +150,13 @@ onBeforeUnmount(() => {
       {{
         t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.MESSAGES', {
           count: messages.toLocaleString(),
+        })
+      }}
+    </p>
+    <p v-if="droppedGroups > 0" class="text-xs text-n-slate-11 m-0">
+      {{
+        t('INBOX_MGMT.SETTINGS_POPUP.BAILEYS_HISTORY_IMPORT.DROPPED_GROUPS', {
+          count: droppedGroups.toLocaleString(),
         })
       }}
     </p>

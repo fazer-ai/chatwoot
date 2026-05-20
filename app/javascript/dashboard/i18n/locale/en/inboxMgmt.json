@@ -880,6 +880,7 @@
         "STATUS_IN_PROGRESS": "Importing",
         "STATUS_COMPLETED": "Completed",
         "MESSAGES": "{count} messages imported",
+        "DROPPED_GROUPS": "{count} skipped (group messages)",
         "FINISHED_AT": "Completed at {time}",
         "UPDATED_SECS_AGO": "Last update {secs}s ago",
         "UPDATED_MINS_AGO": "Last update {mins}min ago"
