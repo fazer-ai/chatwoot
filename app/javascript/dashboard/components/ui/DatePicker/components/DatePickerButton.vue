@@ -1,7 +1,9 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { dateRanges } from '../helpers/DatePickerHelper';
 import { format, isSameYear, isValid } from 'date-fns';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
@@ -28,6 +30,9 @@ const props = defineProps({
 
 const emit = defineEmits(['open', 'navigateMonth']);
 
+const { locale } = useI18n();
+const dateFnsLocale = computed(() => resolveDateFnsLocale(locale.value));
+
 const formatDateRange = computed(() => {
   const startDate = props.selectedStartDate;
   const endDate = props.selectedEndDate;
@@ -37,14 +42,15 @@ const formatDateRange = computed(() => {
   }
 
   const crossesYears = !isSameYear(startDate, endDate);
+  const opts = { locale: dateFnsLocale.value };
 
   // Always show years when crossing year boundaries
   if (crossesYears) {
-    return `${format(startDate, 'MMM d, yyyy')} - ${format(endDate, 'MMM d, yyyy')}`;
+    return `${format(startDate, 'MMM d, yyyy', opts)} - ${format(endDate, 'MMM d, yyyy', opts)}`;
   }
 
   // For same year, always show the year for clarity
-  return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+  return `${format(startDate, 'MMM d', opts)} - ${format(endDate, 'MMM d, yyyy', opts)}`;
 });
 
 const activeDateRange = computed(

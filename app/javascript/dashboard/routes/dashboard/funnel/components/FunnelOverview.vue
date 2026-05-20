@@ -1,7 +1,7 @@
 <script setup>
 import { computed, h, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { formatTime } from '@chatwoot/utils';
+import { formatTimeLocalized } from 'dashboard/helper/timeFormatter';
 import subDays from 'date-fns/subDays';
 
 import { useStore, useMapGetter } from 'dashboard/composables/store';
@@ -46,7 +46,7 @@ const labelOptions = computed(() =>
 
 const renderCount = value =>
   typeof value === 'number' ? value.toLocaleString() : '--';
-const renderTime = value => (value ? formatTime(value) : '--');
+const renderTime = value => (value ? formatTimeLocalized(value, t) : '--');
 
 const columnHelper = createColumnHelper();
 const nowrapHeader = label => () =>

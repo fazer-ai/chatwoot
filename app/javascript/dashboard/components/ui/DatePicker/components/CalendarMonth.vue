@@ -1,11 +1,13 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { format, getMonth, setMonth, startOfMonth } from 'date-fns';
 import {
   yearName,
   CALENDAR_TYPES,
   CALENDAR_PERIODS,
 } from '../helpers/DatePickerHelper';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 
 import CalendarAction from './CalendarAction.vue';
 
@@ -22,8 +24,15 @@ const emit = defineEmits(['selectMonth', 'prev', 'next', 'setView']);
 const { START_CALENDAR } = CALENDAR_TYPES;
 const { MONTH, YEAR } = CALENDAR_PERIODS;
 
-const months = Array.from({ length: 12 }, (_, index) =>
-  format(setMonth(startOfMonth(new Date()), index), 'MMM')
+const { locale } = useI18n();
+const dateFnsLocale = computed(() => resolveDateFnsLocale(locale.value));
+
+const months = computed(() =>
+  Array.from({ length: 12 }, (_, index) =>
+    format(setMonth(startOfMonth(new Date()), index), 'MMM', {
+      locale: dateFnsLocale.value,
+    })
+  )
 );
 
 const activeMonthIndex = computed(() => {

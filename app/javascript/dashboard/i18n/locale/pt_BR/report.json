@@ -6,6 +6,12 @@
     "DOWNLOAD_CONVERSATION_REPORTS": "Baixar relatórios de conversas",
     "DATA_FETCHING_FAILED": "Falha ao buscar dados, tente novamente mais tarde.",
     "SUMMARY_FETCHING_FAILED": "Não foi possível obter o resumo. Tente novamente mais tarde.",
+    "TIME_UNITS": {
+      "SEC": "seg",
+      "MIN": "min",
+      "HR": "h",
+      "DAY": "dia"
+    },
     "METRICS": {
       "CONVERSATIONS": {
         "NAME": "Conversas",

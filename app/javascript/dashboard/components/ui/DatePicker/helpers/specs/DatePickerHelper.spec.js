@@ -29,6 +29,11 @@ describe('Date formatting functions', () => {
     expect(monthName(testDate)).toBe('May');
   });
 
+  it('honors an explicit date-fns locale when provided', async () => {
+    const { ptBR } = await import('date-fns/locale');
+    expect(monthName(testDate, ptBR)).toBe('maio');
+  });
+
   it('returns the correct year from a date', () => {
     expect(yearName(testDate)).toBe('2020');
   });

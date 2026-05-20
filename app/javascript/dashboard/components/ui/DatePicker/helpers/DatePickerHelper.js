@@ -81,8 +81,11 @@ export const CALENDAR_PERIODS = {
   YEAR: 'year',
 };
 
-// Utility functions for date operations
-export const monthName = currentDate => format(currentDate, 'MMMM');
+// Utility functions for date operations. `locale` is an optional date-fns
+// Locale object — when omitted, date-fns defaults to en-US, preserving the
+// previous behavior for callers that haven't been i18n-wired yet.
+export const monthName = (currentDate, locale) =>
+  format(currentDate, 'MMMM', locale ? { locale } : undefined);
 export const yearName = currentDate => format(currentDate, 'yyyy');
 
 export const getIntlDateFormatForLocale = () => {
