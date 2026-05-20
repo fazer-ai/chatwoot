@@ -65,4 +65,38 @@ RSpec.describe Conversations::ResolutionJob do
     described_class.perform_now(account: account)
     expect(account.conversations.resolved.count).to eq(Limits::BULK_ACTIONS_LIMIT)
   end
+
+  describe 'concurrent execution on the same conversation' do
+    # Regression: production saw a single conversation receive 4 copies of the
+    # auto-resolve template + 4 "marked resolved by system" activity messages
+    # within ~2 seconds. The root cause was 4 ResolutionJob instances each
+    # reading `status: :open` from the outer `find_each` query before any of
+    # them committed `toggle_status`. The `with_lock` + `status == :open`
+    # double-check inside the lock makes the second-through-Nth attempts skip.
+    it 'skips the conversation when a concurrent job already resolved the row' do
+      account.update!(auto_resolve_after: 14_400, auto_resolve_ignore_waiting: true,
+                      auto_resolve_label: 'auto-resolved')
+      stale = create(:conversation, account: account, last_activity_at: 13.days.ago, waiting_since: nil)
+
+      # Reload-snapshot the conversation as the outer `find_each` query would
+      # — `status: :open` in Ruby memory — and only then flip the DB row to
+      # resolved. The job's `with_lock` reloads the record inside the
+      # transaction, so after the reload `status` is `:resolved` and our
+      # guard short-circuits.
+      in_memory = Conversation.find(stale.id)
+      expect(in_memory.status).to eq('open')
+      # rubocop:disable Rails/SkipsModelValidations
+      Conversation.where(id: stale.id).update_all(status: Conversation.statuses[:resolved])
+      # rubocop:enable Rails/SkipsModelValidations
+
+      expect do
+        described_class.new.send(:resolve_conversation, account, in_memory)
+      end.not_to(change { stale.messages.count })
+
+      # Row stays resolved (status didn't flip back via toggle_status) and
+      # no auto-resolve label leaked through.
+      expect(stale.reload.status).to eq('resolved')
+      expect(stale.reload.label_list).not_to include('auto-resolved')
+    end
+  end
 end
