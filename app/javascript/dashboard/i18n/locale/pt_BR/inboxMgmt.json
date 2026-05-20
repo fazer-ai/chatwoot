@@ -881,6 +881,7 @@
         "STATUS_IN_PROGRESS": "Importando",
         "STATUS_COMPLETED": "Concluída",
         "MESSAGES": "{count} mensagens importadas",
+        "DROPPED_GROUPS": "{count} descartadas (mensagens de grupo)",
         "FINISHED_AT": "Concluída às {time}",
         "UPDATED_SECS_AGO": "Última atualização há {secs}s",
         "UPDATED_MINS_AGO": "Última atualização há {mins}min"

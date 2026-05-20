@@ -92,7 +92,33 @@ describe Whatsapp::IncomingMessageBaileysService, type: :service do
     state = whatsapp_channel.reload.history_import_state
     expect(state['processed_batches']).to eq(2)
     expect(state['messages_imported']).to eq(2)
+    expect(state['messages_dropped_groups']).to eq(0)
     expect(state['status']).to eq('in_progress')
+  end
+
+  context 'when the batch mixes individual and group messages' do
+    # Groups are off by default in this fork; the handler routes `@g.us` to a
+    # silent no-op. The breakdown counters split the totals so the UI can
+    # show "X importadas / Y descartadas (grupos)".
+    let(:group_message) do
+      {
+        key: { id: 'history_msg_group', remoteJid: '12345-67890@g.us', fromMe: false },
+        messageTimestamp: timestamp - (3 * 86_400),
+        message: { conversation: 'group greeting' }
+      }
+    end
+    let(:mixed_params) do
+      base_params.merge(data: { type: 'notify', messages: [raw_message, group_message] })
+    end
+
+    it 'tracks individuals as imported and groups as dropped' do
+      described_class.new(inbox: inbox, params: mixed_params).perform
+
+      state = whatsapp_channel.reload.history_import_state
+      expect(state['messages_imported']).to eq(1)
+      expect(state['messages_dropped_groups']).to eq(1)
+      expect(state['processed_batches']).to eq(1)
+    end
   end
 
   it 'schedules a watchdog job to finalize the import after the idle window' do
