@@ -1333,7 +1333,7 @@ export default {
         this.setReplyMode(REPLY_EDITOR_MODES.NOTE);
       }
 
-      this.inReplyTo = target;
+      this.inReplyTo = target ?? {};
     },
     onReplyToMessage() {
       this.fetchAndSetReplyTo();
