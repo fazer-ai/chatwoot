@@ -20,8 +20,9 @@ class ContactInboxBuilder
   # the exact number registered there. For Brazilian mobile numbers the leading
   # "9" may or may not be present in the user-typed value; sending to the wrong
   # variant fails silently. Use on_whatsapp to resolve the canonical number and
-  # align the contact (and source_id) with what Baileys expects. Any provider
-  # error is swallowed so the original flow continues unchanged.
+  # align the contact (and source_id) with what Baileys expects. Provider
+  # lookup errors are swallowed; write/merge errors must surface so the caller
+  # sees inconsistent state.
   def normalize_phone_for_baileys!
     return if @contact.phone_number.blank?
 
@@ -33,8 +34,6 @@ class ContactInboxBuilder
     apply_canonical_phone(canonical_phone)
 
     @source_id = canonical_phone.delete('+') if @source_id == old_source_id_candidate
-  rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP][BAILEYS] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
   end
 
   def fetch_canonical_baileys_phone
@@ -45,6 +44,9 @@ class ContactInboxBuilder
     return if jid_digits.blank?
 
     "+#{jid_digits}"
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP][BAILEYS] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
+    nil
   end
 
   def apply_canonical_phone(canonical_phone)

@@ -383,7 +383,7 @@ describe ContactInboxBuilder do
 
         expect(contact_inbox.contact_id).to eq(existing_contact.id)
         expect(existing_contact.reload.phone_number).to eq(canonical_phone)
-        expect { contact.reload }.to raise_error(ActiveRecord::RecordNotFound)
+        expect { contact.reload }.to(raise_error { |error| expect(error.class.name).to eq('ActiveRecord::RecordNotFound') })
       end
 
       it 'does nothing when on_whatsapp returns the same canonical phone' do
