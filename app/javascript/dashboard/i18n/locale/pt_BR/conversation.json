@@ -400,6 +400,11 @@
       "TITLE": "Criar respostas prontas",
       "DESCRIPTION": "Os modelos de respostas prontas ajudam você a responder rapidamente a uma conversa. Os agentes podem digitar o caractere '/' seguido pelo atalho para inserir uma resposta.",
       "NEW_LINK": "Clique aqui para criar uma resposta pronta"
+    },
+    "TEST_ENVIRONMENT": {
+      "DESCRIPTION_PREFIX": "Obrigado por se inscrever. Queremos que você aproveite o máximo de {installationName}. A sua empresa está em ambiente de teste e antes de prosseguirmos para produção é necessário que simule o atendimento de um cliente no link abaixo:",
+      "SIMULATOR_BUTTON": "Abrir simulador do WhatsApp",
+      "DESCRIPTION_SUFFIX": "Aqui estão algumas coisas que você consegue fazer em {installationName} para que tenha uma experiência agradável."
     }
   },
   "CONVERSATION_SIDEBAR": {
