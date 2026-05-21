@@ -30,7 +30,7 @@
 #  index_accounts_on_status  (status)
 #
 
-class Account < ApplicationRecord
+class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   # used for single column multi flags
   include FlagShihTzu
   include Reportable
@@ -106,6 +106,7 @@ class Account < ApplicationRecord
   has_many :twitter_profiles, dependent: :destroy_async, class_name: '::Channel::TwitterProfile'
   has_many :users, through: :account_users
   has_many :web_widgets, dependent: :destroy_async, class_name: '::Channel::WebWidget'
+  has_many :simulator_channels, dependent: :destroy_async, class_name: '::Channel::Simulator'
   has_many :webhooks, dependent: :destroy_async
   has_many :whatsapp_channels, dependent: :destroy_async, class_name: '::Channel::Whatsapp'
   has_many :working_hours, dependent: :destroy_async
@@ -127,6 +128,7 @@ class Account < ApplicationRecord
   after_create_commit :notify_creation
   after_create_commit :setup_internal_chat
   after_destroy :remove_account_sequences
+  after_commit :ensure_simulator_inbox!, on: %i[create update], if: :env_test?
 
   def agents
     users.where(account_users: { role: :agent })
@@ -214,6 +216,24 @@ class Account < ApplicationRecord
 
   def setup_internal_chat
     InternalChat::DefaultChannelSetupService.new(account: self).perform
+  end
+
+  # Provisions the "Simulador" inbox the WhatsApp simulator widget will talk
+  # to. Idempotent: skips when there's already a cached `simulator_inbox_id`
+  # pointing at a live inbox (an account that flips test→prod→test keeps its
+  # original inbox + history). When the cached id is stale (inbox manually
+  # deleted), we silently reprovision so the simulator never breaks for the
+  # user opening the banner button.
+  def ensure_simulator_inbox!
+    return if simulator_inbox_id.present? && Inbox.exists?(id: simulator_inbox_id)
+
+    ActiveRecord::Base.transaction do
+      channel = Channel::Simulator.create!(account: self)
+      inbox = inboxes.create!(name: 'Simulador', channel: channel)
+      # rubocop:disable Rails/SkipsModelValidations
+      update_column(:simulator_inbox_id, inbox.id)
+      # rubocop:enable Rails/SkipsModelValidations
+    end
   end
 
   trigger.after(:insert).for_each(:row) do

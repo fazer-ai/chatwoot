@@ -63,16 +63,71 @@ RSpec.describe Account do
 
   describe 'simulator_inbox association' do
     it 'is optional' do
-      account = create(:account)
+      account = create(:account, environment: :production)
       expect(account.simulator_inbox).to be_nil
       expect(account).to be_valid
     end
 
     it 'returns the linked inbox when set' do
-      account = create(:account)
+      account = create(:account, environment: :production)
       inbox = create(:inbox, account: account)
       account.update!(simulator_inbox_id: inbox.id)
       expect(account.reload.simulator_inbox).to eq(inbox)
+    end
+  end
+
+  describe 'simulator inbox auto-provisioning' do
+    it 'creates a Channel::Simulator + "Simulador" inbox when a test account is created' do
+      account = create(:account)
+
+      expect(account.reload.simulator_inbox).to be_present
+      expect(account.simulator_inbox.name).to eq('Simulador')
+      expect(account.simulator_inbox.channel).to be_a(Channel::Simulator)
+    end
+
+    it 'does not provision the inbox for production accounts' do
+      account = create(:account, environment: :production)
+
+      expect(account.reload.simulator_inbox).to be_nil
+      expect(account.simulator_channels.count).to eq(0)
+    end
+
+    it 'provisions on the first flip from production -> test and reuses it on subsequent flips' do
+      account = create(:account, environment: :production)
+      expect(account.reload.simulator_inbox).to be_nil
+
+      account.update!(environment: :test)
+      first_inbox_id = account.reload.simulator_inbox_id
+      expect(first_inbox_id).to be_present
+
+      account.update!(environment: :production)
+      account.update!(environment: :test)
+
+      # Same inbox is reused — no churn, no fresh tokens, no fresh history.
+      expect(account.reload.simulator_inbox_id).to eq(first_inbox_id)
+      expect(account.simulator_channels.count).to eq(1)
+    end
+
+    it 'is idempotent across multiple saves on the same record' do
+      account = create(:account)
+      expect(account.simulator_channels.count).to eq(1)
+
+      account.update!(name: "#{account.name} (renamed)")
+      account.update!(name: "#{account.name} again")
+
+      expect(account.simulator_channels.count).to eq(1)
+    end
+
+    it 'reprovisions a fresh inbox when the cached one was manually deleted' do
+      account = create(:account)
+      old_inbox_id = account.simulator_inbox_id
+      account.simulator_inbox.destroy!
+
+      account.update!(name: "#{account.name} (triggering after_commit)")
+
+      reloaded = account.reload
+      expect(reloaded.simulator_inbox_id).to be_present
+      expect(reloaded.simulator_inbox_id).not_to eq(old_inbox_id)
     end
   end
 
