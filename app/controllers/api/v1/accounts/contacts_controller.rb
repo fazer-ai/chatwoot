@@ -1,4 +1,4 @@
-class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController # rubocop:disable Metrics/ClassLength
   include Sift
   sort_on :email, type: :string
   sort_on :name, internal_name: :order_on_name, type: :scope, scope_params: [:direction]
@@ -96,6 +96,9 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
       @contact = Current.account.contacts.new(permitted_params.except(:avatar_url))
       @contact.save!
       @contact_inbox = build_contact_inbox
+      # Baileys phone normalization in the builder may merge @contact into an
+      # existing contact with the canonical phone; switch to the surviving record.
+      @contact = @contact_inbox.contact if @contact_inbox&.contact.present?
       process_avatar_from_url
     end
   end
@@ -175,7 +178,8 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     ContactInboxBuilder.new(
       contact: @contact,
       inbox: inbox,
-      source_id: params[:source_id]
+      source_id: params[:source_id],
+      validate_baileys_phone: true
     ).perform
   end
 

@@ -247,7 +247,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
       contact: @contact,
       inbox: @inbox,
       source_id: params[:source_id],
-      hmac_verified: hmac_verified?
+      hmac_verified: hmac_verified?,
+      validate_baileys_phone: true
     ).perform
   end
 

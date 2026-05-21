@@ -406,7 +406,8 @@ RSpec.describe 'Conversations API', type: :request do
         it 'calls contact inbox builder if contact_id and inbox_id is present' do
           builder = double
           allow(Rails.configuration.dispatcher).to receive(:dispatch)
-          allow(ContactInboxBuilder).to receive(:new).with(contact: contact, inbox: inbox, source_id: nil, hmac_verified: false).and_return(builder)
+          allow(ContactInboxBuilder).to receive(:new)
+            .with(contact: contact, inbox: inbox, source_id: nil, hmac_verified: false, validate_baileys_phone: true).and_return(builder)
           allow(builder).to receive(:perform)
           expect(builder).to receive(:perform)
 
