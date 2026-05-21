@@ -41,6 +41,41 @@ RSpec.describe Account do
     end
   end
 
+  describe 'environment' do
+    it 'defaults to test for freshly created accounts' do
+      account = create(:account)
+      expect(account.environment).to eq('test')
+      expect(account.env_test?).to be(true)
+      expect(account.env_production?).to be(false)
+    end
+
+    it 'accepts production as a valid value' do
+      account = create(:account, environment: :production)
+      expect(account.env_production?).to be(true)
+    end
+
+    it 'raises on unknown environment values' do
+      account = build(:account)
+      expect { account.environment = :staging }
+        .to raise_error(ArgumentError, /'staging' is not a valid environment/)
+    end
+  end
+
+  describe 'simulator_inbox association' do
+    it 'is optional' do
+      account = create(:account)
+      expect(account.simulator_inbox).to be_nil
+      expect(account).to be_valid
+    end
+
+    it 'returns the linked inbox when set' do
+      account = create(:account)
+      inbox = create(:inbox, account: account)
+      account.update!(simulator_inbox_id: inbox.id)
+      expect(account.reload.simulator_inbox).to eq(inbox)
+    end
+  end
+
   describe 'usage_limits' do
     let(:account) { create(:account) }
 

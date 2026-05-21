@@ -33,6 +33,7 @@ class AccountDashboard < Administrate::BaseDashboard
     conversations: CountField,
     locale: Field::Select.with_options(collection: LANGUAGES_CONFIG.map { |_x, y| y[:iso_639_1_code] }),
     status: Field::Select.with_options(collection: [%w[Active active], %w[Suspended suspended]]),
+    environment: EnvironmentField.with_options(collection: [%w[Test test], %w[Production production]]),
     average_ticket: Field::Number.with_options(decimals: 2, step: 0.01),
     auris_settings: AurisAccountSettingsField,
     auris_menus: AurisAccountMenusField,
@@ -56,6 +57,7 @@ class AccountDashboard < Administrate::BaseDashboard
     users
     conversations
     status
+    environment
     average_ticket
     funnel_enabled
     ai_status_uses_attribute
@@ -78,6 +80,7 @@ class AccountDashboard < Administrate::BaseDashboard
     updated_at
     locale
     status
+    environment
     average_ticket
     auris_settings
     auris_menus
@@ -100,6 +103,7 @@ class AccountDashboard < Administrate::BaseDashboard
     name
     locale
     status
+    environment
     average_ticket
     auris_settings
     auris_menus
