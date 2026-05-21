@@ -127,4 +127,34 @@ RSpec.describe 'Super Admin accounts API', type: :request do
       end
     end
   end
+
+  describe 'PUT /super_admin/accounts/{account_id} (environment toggle)' do
+    before { sign_in(super_admin, scope: :super_admin) }
+
+    it 'flips the environment to production when submitted' do
+      account.update!(environment: :test)
+
+      put "/super_admin/accounts/#{account.id}",
+          params: { account: { name: account.name, environment: 'production' } }
+
+      expect(response).to have_http_status(:redirect)
+      expect(account.reload.environment).to eq('production')
+    end
+
+    it 'flips the environment to test when submitted' do
+      account.update!(environment: :production)
+
+      put "/super_admin/accounts/#{account.id}",
+          params: { account: { name: account.name, environment: 'test' } }
+
+      expect(account.reload.environment).to eq('test')
+    end
+
+    it 'renders the EnvironmentField dropdown with the confirmation script on edit' do
+      get "/super_admin/accounts/#{account.id}/edit"
+
+      expect(response.body).to include('data-environment-select="true"')
+      expect(response.body).to include('AMBIENTE DE TESTE')
+    end
+  end
 end

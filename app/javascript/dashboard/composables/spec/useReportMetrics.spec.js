@@ -4,8 +4,13 @@ import { useMapGetter } from 'dashboard/composables/store';
 import { summary, botSummary } from './fixtures/reportFixtures';
 
 vi.mock('dashboard/composables/store');
-vi.mock('@chatwoot/utils', () => ({
-  formatTime: vi.fn(time => `formatted_${time}`),
+vi.mock('vue-i18n', () => ({
+  // The composable only reads `t`; return the key unchanged so the spec
+  // stays focused on the metric-routing logic, not translation output.
+  useI18n: () => ({ t: key => key }),
+}));
+vi.mock('dashboard/helper/timeFormatter', () => ({
+  formatTimeLocalized: vi.fn(time => `formatted_${time}`),
 }));
 
 describe('useReportMetrics', () => {

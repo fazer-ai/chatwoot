@@ -8,6 +8,7 @@
 #  average_ticket           :decimal(12, 2)
 #  custom_attributes        :jsonb
 #  domain                   :string(100)
+#  environment              :integer          default("test"), not null
 #  feature_flags            :bigint           default(0), not null
 #  funnel_enabled           :boolean          default(FALSE), not null
 #  help_center_menu_enabled :boolean          default(FALSE), not null
@@ -22,6 +23,7 @@
 #  support_email            :string(100)
 #  created_at               :datetime         not null
 #  updated_at               :datetime         not null
+#  simulator_inbox_id       :bigint
 #
 # Indexes
 #
@@ -112,6 +114,12 @@ class Account < ApplicationRecord
 
   enum :locale, LANGUAGES_CONFIG.map { |key, val| [val[:iso_639_1_code], key] }.to_h, prefix: true
   enum :status, { active: 0, suspended: 1 }
+  # `test` is the default for freshly created accounts; migrations backfill
+  # existing accounts to `production` so the simulator banner/badge never
+  # surfaces on live customer accounts without an explicit Super Admin flip.
+  enum :environment, { test: 0, production: 1 }, prefix: :env, default: :test
+
+  belongs_to :simulator_inbox, class_name: 'Inbox', optional: true
 
   scope :with_auto_resolve, -> { where("(settings ->> 'auto_resolve_after')::int IS NOT NULL") }
 

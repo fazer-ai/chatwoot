@@ -1,0 +1,37 @@
+<div class="field-unit__label">
+  <%= f.label field.attribute %>
+</div>
+<div class="field-unit__field">
+  <%= f.select field.attribute,
+        options_for_select(field.selectable_options, field.data),
+        { include_blank: false },
+        data: { 'environment-select': true, 'original-value': field.data } %>
+</div>
+
+<script>
+  (function () {
+    const select = document.querySelector('select[data-environment-select="true"]');
+    if (!select) return;
+    const form = select.closest('form');
+    if (!form) return;
+
+    const original = select.dataset.originalValue;
+    form.addEventListener('submit', function (event) {
+      if (original !== 'test') return;
+      if (select.value !== 'production') return;
+
+      const ok = window.confirm(
+        'Tem certeza que deseja mover esta conta para o ambiente de PRODUÇÃO?\n\n' +
+        'Após a confirmação:\n' +
+        '• O badge "AMBIENTE DE TESTE" desaparece do sidebar dos usuários.\n' +
+        '• O banner com o link do simulador some da tela inicial.\n' +
+        '• Conversas e contatos de teste continuam visíveis no histórico.'
+      );
+
+      if (!ok) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+  })();
+</script>

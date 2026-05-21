@@ -1,5 +1,6 @@
+import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store';
-import { formatTime } from '@chatwoot/utils';
+import { formatTimeLocalized } from 'dashboard/helper/timeFormatter';
 
 /**
  * A composable function for report metrics calculations and display.
@@ -13,6 +14,7 @@ export function useReportMetrics(
 ) {
   const accountSummary = useMapGetter(accountSummaryKey);
   const fetchingStatus = useMapGetter(summarFetchingKey);
+  const { t } = useI18n();
 
   /**
    * Calculates the trend percentage for a given metric.
@@ -48,7 +50,7 @@ export function useReportMetrics(
    */
   const displayMetric = key => {
     if (isAverageMetricType(key)) {
-      return formatTime(accountSummary.value[key]);
+      return formatTimeLocalized(accountSummary.value[key], t);
     }
     return Number(accountSummary.value[key] || '').toLocaleString();
   };
