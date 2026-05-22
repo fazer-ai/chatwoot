@@ -7,7 +7,14 @@ import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const { t } = useI18n();
 
+// `hasOpened` flips on the first sidebar click and stays true for the
+// lifetime of the dashboard session. Together with `v-show` (not v-if)
+// it means the iframe is created once and survives every close/reopen:
+// the conversation the operator is testing in the simulator persists
+// even if they minimise the modal, switch apps, navigate elsewhere in
+// the dashboard, and click the sidebar pill again to come back.
 const isOpen = ref(false);
+const hasOpened = ref(false);
 
 const accountId = useMapGetter('getCurrentAccountId');
 const accountGetter = useMapGetter('accounts/getAccount');
@@ -19,47 +26,35 @@ const simulatorInbox = computed(() =>
 );
 const websiteToken = computed(() => simulatorInbox.value?.website_token || '');
 
-// `?_=<timestamp>` is a cache-buster: the user expects the modal to start
-// fresh every time they open it from the sidebar, so the iframe never
-// resumes a half-finished previous test session.
 const iframeSrc = computed(() => {
   if (!websiteToken.value) return '';
-  return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}&_=${Date.now()}`;
+  return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}`;
 });
 
 const open = () => {
   isOpen.value = true;
+  hasOpened.value = true;
 };
 const close = () => {
   isOpen.value = false;
 };
 
-const onBackdropClick = event => {
-  if (event.target === event.currentTarget) close();
-};
-const onKeydown = event => {
-  if (event.key === 'Escape') close();
-};
-
 onMounted(() => {
   emitter.on(BUS_EVENTS.OPEN_SIMULATOR, open);
-  window.addEventListener('keydown', onKeydown);
 });
 
 onUnmounted(() => {
   emitter.off(BUS_EVENTS.OPEN_SIMULATOR, open);
-  window.removeEventListener('keydown', onKeydown);
 });
 </script>
 
 <template>
   <Teleport to="body">
     <div
-      v-if="isOpen"
-      class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+      v-show="hasOpened && isOpen"
+      class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 pointer-events-auto"
       role="dialog"
       aria-modal="true"
-      @mousedown="onBackdropClick"
     >
       <div
         class="simulator-modal-frame relative rounded-xl bg-white shadow-2xl overflow-hidden flex flex-col"
@@ -73,7 +68,7 @@ onUnmounted(() => {
           <i class="i-lucide-x size-5" />
         </button>
         <iframe
-          v-if="iframeSrc"
+          v-if="hasOpened && iframeSrc"
           :src="iframeSrc"
           :title="t('SIMULATOR.PLACEHOLDER.TITLE')"
           class="w-full h-full border-0"
