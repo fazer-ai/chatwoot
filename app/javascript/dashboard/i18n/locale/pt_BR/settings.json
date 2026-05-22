@@ -1023,6 +1023,9 @@
       "MINIMISE": "Minimizar simulador",
       "CLOSE": "Fechar simulador"
     },
+    "LAUNCHER": {
+      "OPEN": "Abrir simulador"
+    },
     "UNAVAILABLE": {
       "TITLE": "O simulador só está disponível em modo de teste",
       "MESSAGE": "Volte esta conta para o ambiente de teste para usar o simulador."

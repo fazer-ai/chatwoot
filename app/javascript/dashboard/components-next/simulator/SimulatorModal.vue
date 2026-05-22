@@ -12,6 +12,7 @@ const { t } = useI18n();
 const {
   hasOpened,
   isVisible,
+  isMinimised,
   openSimulator,
   minimiseSimulator,
   closeSimulator,
@@ -94,6 +95,24 @@ onUnmounted(() => {
         {{ t('SIMULATOR.LOADING') }}
       </div>
     </div>
+    <!--
+      Floating launcher bubble that surfaces only while the simulator
+      is minimised. Mirrors the pattern used by Intercom / Tawk / etc.
+      and gives the operator a second, more visible affordance to
+      restore the panel (in addition to the pulsing sidebar pill).
+      Tinted with the same amber tokens as the MODO TESTE badge so
+      the relationship is obvious.
+    -->
+    <button
+      v-show="isMinimised"
+      type="button"
+      class="simulator-launcher fixed bottom-4 right-4 z-[9998] w-14 h-14 flex items-center justify-center rounded-full bg-n-amber-3 text-n-amber-11 outline outline-1 outline-n-amber-5 hover:bg-n-amber-4 shadow-lg transition-colors"
+      :title="t('SIMULATOR.LAUNCHER.OPEN')"
+      :aria-label="t('SIMULATOR.LAUNCHER.OPEN')"
+      @click="openSimulator"
+    >
+      <i class="i-lucide-message-circle size-7" />
+    </button>
   </Teleport>
 </template>
 
@@ -109,5 +128,22 @@ onUnmounted(() => {
   width: 30vw;
   min-width: 360px;
   height: 80vh;
+}
+
+// Pulse the floating launcher the same way the sidebar pill pulses
+// when minimised, so the two "click here to come back" affordances
+// feel like one connected gesture.
+@keyframes simulator-launcher-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+.simulator-launcher {
+  animation: simulator-launcher-pulse 1.6s ease-in-out infinite;
 }
 </style>
