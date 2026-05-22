@@ -3,6 +3,8 @@ import OnboardingFeatureCard from './OnboardingFeatureCard.vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStoreGetters, useMapGetter } from 'dashboard/composables/store';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const getters = useStoreGetters();
 const { t } = useI18n();
@@ -17,11 +19,8 @@ const accountGetter = useMapGetter('accounts/getAccount');
 const isTestEnvironment = computed(
   () => accountGetter.value(accountId.value)?.environment === 'test'
 );
-const simulatorUrl = computed(
-  () => `/app/accounts/${accountId.value}/simulator`
-);
 const openSimulator = () => {
-  window.open(simulatorUrl.value, '_blank', 'noopener,noreferrer');
+  emitter.emit(BUS_EVENTS.OPEN_SIMULATOR);
 };
 
 const greetingMessage = computed(() => {

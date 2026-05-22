@@ -330,8 +330,8 @@
     "COLLAPSE": "Collapse sidebar",
     "EXPAND": "Expand sidebar",
     "TEST_ENVIRONMENT_BADGE": {
-      "LABEL": "TEST ENVIRONMENT",
-      "TOOLTIP": "This account is in test mode. Click to open the WhatsApp simulator in a new tab."
+      "LABEL": "TEST MODE",
+      "TOOLTIP": "This account is in test mode. Click to open the WhatsApp simulator."
     },
     "INBOX_VIEW": "Inbox View",
     "CONVERSATIONS": "Conversations",
@@ -965,6 +965,9 @@
       "MESSAGE": "The simulator chat interface is on its way. While this page settles in, you can already test conversations against the Simulator inbox from the regular dashboard."
     },
     "LOADING": "Loading the simulator inbox…",
+    "MODAL": {
+      "CLOSE": "Close simulator"
+    },
     "UNAVAILABLE": {
       "TITLE": "Simulator is only available in test mode",
       "MESSAGE": "Switch this account back to the test environment to use the simulator."

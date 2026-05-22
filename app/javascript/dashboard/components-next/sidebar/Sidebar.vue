@@ -82,15 +82,13 @@ const isHelpCenterMenuEnabled = computed(
 // account is flipped to the test environment in Super Admin. Hidden as soon
 // as the account moves back to production — without removing the simulator
 // inbox (Phase 2 keeps the inbox around). Clicking it opens the simulator
-// in a new tab; the route itself ships in Phase 4.
+// in a modal overlay on the current page. The modal lives at
+// Dashboard.vue and listens for OPEN_SIMULATOR over the shared mitt bus.
 const isTestEnvironment = computed(
   () => accountGetter.value(accountId.value)?.environment === 'test'
 );
-const simulatorUrl = computed(
-  () => `/app/accounts/${accountId.value}/simulator`
-);
 const openSimulator = () => {
-  window.open(simulatorUrl.value, '_blank', 'noopener,noreferrer');
+  emitter.emit(BUS_EVENTS.OPEN_SIMULATOR);
 };
 
 const toggleShortcutModalFn = show => {

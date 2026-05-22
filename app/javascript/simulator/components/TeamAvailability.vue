@@ -23,27 +23,55 @@ const startConversation = () => {
     });
   }
 };
+
+// Reset the simulator session and reload the iframe so the next bootstrap
+// provisions a fresh contact_inbox + conversation. Clearing both storages
+// and the cookie jar is the cleanest way to wipe whatever the widget SDK
+// persisted (auth token, cw_conversation, source_id).
+const startFreshConversation = () => {
+  try {
+    window.localStorage?.clear();
+    window.sessionStorage?.clear();
+    document.cookie.split(';').forEach(rawCookie => {
+      const name = rawCookie.split('=')[0].trim();
+      if (!name) return;
+      document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/`;
+    });
+  } finally {
+    window.location.reload();
+  }
+};
 </script>
 
 <template>
   <div
     class="flex flex-col gap-3 w-full shadow outline-1 outline outline-n-container rounded-xl bg-n-background dark:bg-n-solid-2 px-5 py-4"
   >
-    <AvailabilityContainer :agents="availableAgents" show-header show-avatars />
+    <AvailabilityContainer :agents="availableAgents" show-avatars />
 
-    <button
-      class="inline-flex items-center gap-1 font-medium text-n-slate-12"
-      :style="{ color: widgetColor }"
-      @click="startConversation"
-    >
-      <span>
-        {{
-          hasConversation
-            ? $t('CONTINUE_CONVERSATION')
-            : $t('START_CONVERSATION')
-        }}
-      </span>
-      <i class="i-lucide-chevron-right size-5 mt-px" />
-    </button>
+    <div class="flex flex-col gap-2">
+      <button
+        class="inline-flex items-center gap-1 font-medium text-n-slate-12"
+        :style="{ color: widgetColor }"
+        @click="startConversation"
+      >
+        <span>
+          {{
+            hasConversation
+              ? $t('CONTINUE_CONVERSATION')
+              : $t('START_CONVERSATION')
+          }}
+        </span>
+        <i class="i-lucide-chevron-right size-5 mt-px" />
+      </button>
+      <button
+        v-if="hasConversation"
+        class="inline-flex items-center gap-1 text-n-slate-11 hover:text-n-slate-12"
+        @click="startFreshConversation"
+      >
+        <span>{{ $t('START_NEW_CONVERSATION') }}</span>
+        <i class="i-lucide-rotate-cw size-4 mt-px" />
+      </button>
+    </div>
   </div>
 </template>

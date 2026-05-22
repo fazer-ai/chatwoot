@@ -330,8 +330,8 @@
     "COLLAPSE": "Recolher barra lateral",
     "EXPAND": "Expandir barra lateral",
     "TEST_ENVIRONMENT_BADGE": {
-      "LABEL": "AMBIENTE DE TESTE",
-      "TOOLTIP": "Esta conta está em modo de teste. Clique para abrir o simulador de WhatsApp em uma nova aba."
+      "LABEL": "MODO TESTE",
+      "TOOLTIP": "Esta conta está em modo de teste. Clique para abrir o simulador de WhatsApp."
     },
     "INBOX_VIEW": "Caixa de entrada",
     "CONVERSATIONS": "Conversas",
@@ -1017,6 +1017,9 @@
       "MESSAGE": "A interface de chat do simulador está chegando. Enquanto isso, você já pode testar conversas pela caixa Simulador no dashboard normal."
     },
     "LOADING": "Carregando a caixa do simulador…",
+    "MODAL": {
+      "CLOSE": "Fechar simulador"
+    },
     "UNAVAILABLE": {
       "TITLE": "O simulador só está disponível em modo de teste",
       "MESSAGE": "Volte esta conta para o ambiente de teste para usar o simulador."
