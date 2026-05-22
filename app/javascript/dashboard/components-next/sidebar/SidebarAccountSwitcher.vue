@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
@@ -30,11 +30,6 @@ const globalConfig = useMapGetter('globalConfig/get');
 
 const userAccounts = useMapGetter('getUserAccounts');
 
-// Surface the search input only when the operator actually has more
-// accounts than they can comfortably scan; below that the input would
-// just be visual noise above a 2- or 3-row list.
-const SEARCH_THRESHOLD = 5;
-
 const searchQuery = ref('');
 const searchInputRef = ref(null);
 
@@ -47,10 +42,6 @@ const sortedCurrentUserAccounts = computed(() => {
     a.name.localeCompare(b.name)
   );
 });
-
-const showSearch = computed(
-  () => sortedCurrentUserAccounts.value.length >= SEARCH_THRESHOLD
-);
 
 const filteredAccounts = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -68,10 +59,6 @@ const onChangeAccount = newId => {
 const emitNewAccount = () => {
   emit('showCreateAccountModal');
 };
-
-watch(showSearch, value => {
-  if (!value) searchQuery.value = '';
-});
 </script>
 
 <template>
@@ -121,7 +108,7 @@ watch(showSearch, value => {
       v-if="showAccountSwitcher || isCollapsed"
       class="min-w-80 z-50 max-h-[80vh] overflow-y-auto"
     >
-      <div v-if="showSearch" class="px-2 pt-2 pb-1">
+      <div class="px-2 pt-2 pb-1">
         <div class="relative">
           <span
             aria-hidden="true"
@@ -142,7 +129,7 @@ watch(showSearch, value => {
         </div>
       </div>
       <div
-        v-if="showSearch && filteredAccounts.length === 0"
+        v-if="filteredAccounts.length === 0"
         class="px-4 py-3 text-sm text-n-slate-11 text-center"
       >
         {{ t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_NO_RESULTS') }}
