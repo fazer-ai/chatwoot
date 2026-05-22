@@ -14,6 +14,7 @@ import funnelRoutes from './funnel/funnel.routes';
 import releaseNotesRoutes from './releaseNotes/releaseNotes.routes';
 import dashboardAppsRoutes from './dashboardApps/dashboardApps.routes';
 import internalChatRoutes from './internalChat/internalChat.routes';
+import simulatorRoutes from './simulator/simulator.routes';
 import AppContainer from './Dashboard.vue';
 import Suspended from './suspended/Index.vue';
 import NoAccounts from './noAccounts/Index.vue';
@@ -39,6 +40,7 @@ export default {
         ...releaseNotesRoutes.routes,
         ...dashboardAppsRoutes.routes,
         ...internalChatRoutes.routes,
+        ...simulatorRoutes.routes,
       ],
     },
     {
