@@ -125,7 +125,7 @@ const emitNewAccount = () => {
               t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
             "
             :aria-label="t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')"
-            class="flex-grow text-sm bg-transparent text-n-slate-12 placeholder:text-n-slate-10 outline-none"
+            class="reset-base flex-grow text-sm bg-transparent text-n-slate-12 placeholder:text-n-slate-10 outline-none border-0 p-0 h-auto"
             @keydown.esc.stop="searchQuery = ''"
           />
         </label>
