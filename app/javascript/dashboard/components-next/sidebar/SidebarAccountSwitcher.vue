@@ -109,10 +109,12 @@ const emitNewAccount = () => {
       class="min-w-80 z-50 max-h-[80vh] overflow-y-auto"
     >
       <div class="px-2 pt-2 pb-1">
-        <div class="relative">
+        <label
+          class="flex gap-2 items-center px-2 py-1 w-full h-7 rounded-lg outline outline-1 outline-n-weak bg-n-button-color transition-all duration-100 ease-out focus-within:outline-n-brand"
+        >
           <span
             aria-hidden="true"
-            class="i-lucide-search size-4 text-n-slate-10 absolute top-1/2 -translate-y-1/2 ltr:left-2 rtl:right-2"
+            class="flex-shrink-0 i-lucide-search size-4 text-n-slate-10"
           />
           <input
             ref="searchInputRef"
@@ -123,10 +125,10 @@ const emitNewAccount = () => {
               t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
             "
             :aria-label="t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')"
-            class="w-full text-sm bg-n-alpha-1 text-n-slate-12 placeholder:text-n-slate-10 border border-n-strong focus:border-n-brand rounded-md py-1.5 ltr:pl-8 rtl:pr-8 ltr:pr-2 rtl:pl-2 outline-none"
+            class="flex-grow text-sm bg-transparent text-n-slate-12 placeholder:text-n-slate-10 outline-none"
             @keydown.esc.stop="searchQuery = ''"
           />
-        </div>
+        </label>
       </div>
       <div
         v-if="filteredAccounts.length === 0"
