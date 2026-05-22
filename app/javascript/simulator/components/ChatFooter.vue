@@ -32,7 +32,6 @@ export default {
       widgetColor: 'appConfig/getWidgetColor',
       conversationSize: 'conversation/getConversationSize',
       currentUser: 'contacts/getCurrentUser',
-      isWidgetStyleFlat: 'appConfig/isWidgetStyleFlat',
     }),
     textColor() {
       return getContrastingTextColor(this.widgetColor);
@@ -112,10 +111,9 @@ export default {
 <template>
   <footer
     v-if="!hideReplyBox"
-    class="relative z-50 mb-1"
+    class="chat-footer relative z-50 py-2"
     :class="{
-      'rounded-lg': !isWidgetStyleFlat,
-      'pt-2.5 shadow-[0px_-20px_20px_1px_rgba(0,_0,_0,_0.05)] dark:shadow-[0px_-20px_20px_1px_rgba(0,_0,_0,_0.15)] rounded-t-none':
+      'pt-2.5 shadow-[0px_-20px_20px_1px_rgba(0,_0,_0,_0.05)] dark:shadow-[0px_-20px_20px_1px_rgba(0,_0,_0,_0.15)]':
         hasReplyTo,
     }"
   >
@@ -125,7 +123,7 @@ export default {
       @dismiss="inReplyTo = null"
     />
     <ChatInputWrap
-      class="shadow-sm"
+      class="chat-input-wrap"
       :on-send-message="handleSendMessage"
       :on-send-attachment="handleSendAttachment"
     />
@@ -150,3 +148,21 @@ export default {
     </CustomButton>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.chat-footer {
+  background-color: transparent;
+}
+
+.chat-footer :deep(.chat-input-wrap) {
+  background-color: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+}
+
+:root[data-theme='dark'] .chat-footer :deep(.chat-input-wrap),
+.dark .chat-footer :deep(.chat-input-wrap) {
+  background-color: #2a3942;
+  box-shadow: none;
+}
+</style>
