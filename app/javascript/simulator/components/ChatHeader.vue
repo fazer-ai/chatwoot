@@ -42,7 +42,7 @@ const onBackButtonClick = () => {
       />
       <div
         v-else
-        class="w-10 h-10 ltr:mr-3 rtl:ml-3 rounded-full flex items-center justify-center text-white text-sm font-semibold bg-white/20"
+        class="initial-avatar w-10 h-10 ltr:mr-3 rtl:ml-3 rounded-full flex items-center justify-center text-sm font-semibold"
       >
         {{ (title || '?').charAt(0).toUpperCase() }}
       </div>
@@ -60,7 +60,7 @@ const onBackButtonClick = () => {
           :agents="availableAgents"
           :show-header="false"
           :show-avatars="false"
-          text-classes="!text-white text-xs leading-3"
+          text-classes="header-availability-text text-xs leading-3"
         />
       </div>
     </div>
@@ -76,10 +76,32 @@ const onBackButtonClick = () => {
   :deep(button) {
     color: #ffffff;
   }
+
+  // The shared AvailabilityText baked in `text-n-slate-11` on its root
+  // <span>; overriding via a Tailwind class on the prop loses the
+  // specificity battle in dev (JIT scan misses `!text-white`). Pin it
+  // with a deep selector here so the subtitle is always solid white.
+  :deep(.header-availability-text),
+  :deep(.header-availability-text span) {
+    color: #ffffff !important;
+  }
+}
+
+// Light-green pill behind the title initial when the inbox has no avatar
+// configured. Mirrors WhatsApp Business' default avatar treatment.
+.initial-avatar {
+  background-color: #dcf8c6;
+  color: #075e54;
 }
 
 :root[data-theme='dark'] .chat-header,
 .dark .chat-header {
   background-color: #1f2c34;
+}
+
+:root[data-theme='dark'] .initial-avatar,
+.dark .initial-avatar {
+  background-color: #2a3942;
+  color: #d1d7db;
 }
 </style>
