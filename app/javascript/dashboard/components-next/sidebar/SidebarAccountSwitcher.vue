@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
@@ -30,6 +30,14 @@ const globalConfig = useMapGetter('globalConfig/get');
 
 const userAccounts = useMapGetter('getUserAccounts');
 
+// Surface the search input only when the operator actually has more
+// accounts than they can comfortably scan; below that the input would
+// just be visual noise above a 2- or 3-row list.
+const SEARCH_THRESHOLD = 5;
+
+const searchQuery = ref('');
+const searchInputRef = ref(null);
+
 const showAccountSwitcher = computed(
   () => userAccounts.value.length > 1 && currentAccount.value.name
 );
@@ -37,6 +45,18 @@ const showAccountSwitcher = computed(
 const sortedCurrentUserAccounts = computed(() => {
   return [...(currentUser.value.accounts || [])].sort((a, b) =>
     a.name.localeCompare(b.name)
+  );
+});
+
+const showSearch = computed(
+  () => sortedCurrentUserAccounts.value.length >= SEARCH_THRESHOLD
+);
+
+const filteredAccounts = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  if (!query) return sortedCurrentUserAccounts.value;
+  return sortedCurrentUserAccounts.value.filter(account =>
+    account.name.toLowerCase().includes(query)
   );
 });
 
@@ -48,10 +68,14 @@ const onChangeAccount = newId => {
 const emitNewAccount = () => {
   emit('showCreateAccountModal');
 };
+
+watch(showSearch, value => {
+  if (!value) searchQuery.value = '';
+});
 </script>
 
 <template>
-  <DropdownContainer>
+  <DropdownContainer @close="searchQuery = ''">
     <template #trigger="{ toggle, isOpen }">
       <!-- Collapsed view: Logo trigger -->
       <button
@@ -97,9 +121,38 @@ const emitNewAccount = () => {
       v-if="showAccountSwitcher || isCollapsed"
       class="min-w-80 z-50 max-h-[80vh] overflow-y-auto"
     >
-      <DropdownSection :title="t('SIDEBAR_ITEMS.SWITCH_ACCOUNT')">
+      <div v-if="showSearch" class="px-2 pt-2 pb-1">
+        <div class="relative">
+          <span
+            aria-hidden="true"
+            class="i-lucide-search size-4 text-n-slate-10 absolute top-1/2 -translate-y-1/2 ltr:left-2 rtl:right-2"
+          />
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            autofocus
+            :placeholder="
+              t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
+            "
+            :aria-label="t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')"
+            class="w-full text-sm bg-n-alpha-1 text-n-slate-12 placeholder:text-n-slate-10 border border-n-strong focus:border-n-brand rounded-md py-1.5 ltr:pl-8 rtl:pr-8 ltr:pr-2 rtl:pl-2 outline-none"
+            @keydown.esc.stop="searchQuery = ''"
+          />
+        </div>
+      </div>
+      <div
+        v-if="showSearch && filteredAccounts.length === 0"
+        class="px-4 py-3 text-sm text-n-slate-11 text-center"
+      >
+        {{ t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_NO_RESULTS') }}
+      </div>
+      <DropdownSection
+        v-if="filteredAccounts.length > 0"
+        :title="t('SIDEBAR_ITEMS.SWITCH_ACCOUNT')"
+      >
         <DropdownItem
-          v-for="account in sortedCurrentUserAccounts"
+          v-for="account in filteredAccounts"
           :id="`account-${account.id}`"
           :key="account.id"
           class="cursor-pointer"
