@@ -203,6 +203,7 @@ export default {
               :message-id="message.id"
               :message-type="messageType"
               :message="message.content"
+              :created-at="message.created_at"
             />
             <div
               v-if="hasAttachments"

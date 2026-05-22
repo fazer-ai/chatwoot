@@ -18,12 +18,24 @@ export default {
 </script>
 
 <template>
-  <div
-    class="flex flex-col flex-1 overflow-hidden rounded-b-lg bg-n-slate-2 dark:bg-n-solid-1"
-  >
+  <div class="messages-view flex flex-col flex-1 overflow-hidden rounded-b-lg">
     <div class="flex flex-1 overflow-auto">
       <ConversationWrap :grouped-messages="groupedMessages" />
     </div>
-    <ChatFooter class="px-5" />
+    <ChatFooter class="px-4" />
   </div>
 </template>
+
+<style scoped lang="scss">
+// Keep the bottom row (input bar) on a flat white background that sits
+// flush against the WhatsApp-styled chat area instead of the Chatwoot
+// slate fill.
+.messages-view {
+  background-color: #f0f2f5;
+}
+
+:root[data-theme='dark'] .messages-view,
+.dark .messages-view {
+  background-color: #1f2c34;
+}
+</style>

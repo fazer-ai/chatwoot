@@ -1,8 +1,32 @@
+// WhatsApp visual layer for the simulator's conversation surface.
+// Color palette mirrors WhatsApp Web (light + dark) closely enough to feel
+// native. Bubble tails are drawn with CSS pseudo-elements so we don't need
+// SVG assets; the tail attaches to the first bubble of each consecutive
+// sender run and is suppressed on the rest of the run so groups read as a
+// single thread.
+
+$wa-bubble-out-light: #d9fdd3;
+$wa-bubble-out-dark: #005c4b;
+$wa-bubble-in-light: #fff;
+$wa-bubble-in-dark: #202c33;
+$wa-text-light: #111b21;
+$wa-text-dark: #e9edef;
+$wa-meta-light: #667781;
+$wa-meta-dark: #8696a0;
+$wa-link: #027eb5;
+$wa-tick-read: #53bdeb;
+$wa-failed-bg: #fdecea;
+$wa-failed-text: #b3261e;
+$wa-bubble-shadow-light: rgba(11, 20, 26, 0.13);
+$wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
+
 .file-uploads .attachment-button + label {
   cursor: pointer;
 }
 
 .conversation-wrap {
+  @apply max-w-3xl mx-auto;
+
   .agent-message {
     @apply items-end flex flex-row justify-start mt-0 ltr:mr-0 rtl:mr-2 mb-0.5 ltr:ml-2 rtl:ml-0 max-w-[88%];
 
@@ -33,6 +57,8 @@
 
   .agent-name {
     @apply text-xs font-medium my-2 ltr:pl-0.5 rtl:pr-0.5;
+
+    color: $wa-meta-light;
   }
 
   .has-attachment {
@@ -47,29 +73,39 @@
     }
   }
 
+  // Consecutive messages from the same sender collapse the tail: only the
+  // first bubble in a run gets the WhatsApp wedge.
   .agent-message-wrap {
     + .agent-message-wrap {
       @apply mt-0.5;
 
       .agent-message .chat-bubble {
-        @apply ltr:rounded-tl-[0.25rem] rtl:rounded-tr-[0.25rem];
+        @apply rounded-[0.5rem];
+
+        &::before {
+          display: none;
+        }
       }
     }
 
     + .user-message-wrap {
-      @apply mt-4;
+      @apply mt-2;
     }
 
     &.has-response + .user-message-wrap {
       @apply mt-0.5;
 
       .chat-bubble {
-        @apply ltr:rounded-tr-[0.25rem] rtl:rounded-tl-[0.25rem];
+        @apply rounded-[0.5rem];
+
+        &::before {
+          display: none;
+        }
       }
     }
 
     &.has-response + .agent-message-wrap {
-      @apply mt-4;
+      @apply mt-2;
     }
   }
 
@@ -88,18 +124,19 @@
       @apply flex items-end flex-row-reverse;
 
       .chat-bubble.user {
-        @apply bg-n-ruby-9 dark:bg-n-ruby-9 #{!important};
+        background-color: $wa-failed-bg !important;
+        color: $wa-failed-text !important;
       }
     }
   }
 
   .user.has-attachment {
     .icon-wrap {
-      @apply text-white;
+      color: $wa-meta-light;
     }
 
     .download {
-      @apply text-white;
+      color: $wa-meta-light;
     }
   }
 
@@ -108,17 +145,21 @@
       @apply mt-0.5;
 
       .user-message .chat-bubble {
-        @apply ltr:rounded-tr-[0.25rem] rtl:rounded-tl-[0.25rem];
+        @apply rounded-[0.5rem];
+
+        &::before {
+          display: none;
+        }
       }
     }
 
     + .agent-message-wrap {
-      @apply mt-4;
+      @apply mt-2;
     }
   }
 
   p:not(:last-child) {
-    @apply mb-4;
+    @apply mb-2;
   }
 }
 
@@ -133,48 +174,25 @@
     }
 
     .chat-bubble {
-      @apply border border-solid border-n-slate-5 dark:border-n-slate-11/50 text-n-black;
-    }
-
-    + .chat-bubble-wrap {
-      .chat-bubble {
-        @apply ltr:rounded-tl-[0.25rem] rtl:rounded-tr-[0.25rem];
-      }
-    }
-
-    &:last-child .chat-bubble {
-      @apply ltr:rounded-bl-[1.25rem] rtl:rounded-br-[1.25rem];
+      background-color: $wa-bubble-in-light;
+      border: 0;
+      color: $wa-text-light;
     }
   }
 }
 
 .is-widget-right .unread-wrap {
   @apply ltr:text-right rtl:text-left overflow-hidden;
-
-  .chat-bubble-wrap {
-    .chat-bubble {
-      @apply ltr:rounded-br-[0.25rem] rtl:rounded-bl-[0.25rem] rounded-[1.25rem];
-    }
-
-    + .chat-bubble-wrap {
-      .chat-bubble {
-        @apply ltr:rounded-tr-[0.25rem] rtl:rounded-tl-[0.25rem];
-      }
-    }
-
-    &:last-child .chat-bubble {
-      @apply ltr:rounded-br-[1.25rem] rtl:rounded-bl-[1.25rem];
-    }
-  }
-
-  .close-unread-wrap {
-    text-align: right;
-  }
 }
 
 .chat-bubble {
-  @apply shadow-[0_0.25rem_6px_rgba(50,50,93,0.08),0_1px_3px_rgba(0,0,0,0.05)] rounded-[1.25rem] inline-block text-sm leading-[1.5] max-w-full ltr:text-left rtl:text-right py-3 px-4 text-white;
+  @apply inline-block text-sm leading-[1.4] max-w-full py-1.5 ltr:text-left rtl:text-right;
 
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 0.5px $wa-bubble-shadow-light;
+  padding-inline-end: 0.625rem;
+  padding-inline-start: 0.625rem;
+  position: relative;
   word-break: break-word;
 
   :not([audio]) {
@@ -182,7 +200,7 @@
   }
 
   > a {
-    @apply text-n-brand;
+    color: $wa-link;
     word-break: break-all;
   }
 
@@ -190,20 +208,102 @@
     text-decoration: underline;
   }
 
+  // Outgoing bubble: light green (the user is the "customer" in WhatsApp's
+  // simulator). Tail on the top-right corner.
   &.user {
-    @apply ltr:rounded-br-[0.25rem] rtl:rounded-bl-[0.25rem];
+    @apply rounded-tr-[0.125rem];
+
+    background-color: $wa-bubble-out-light;
+    color: $wa-text-light;
 
     > a {
-      @apply text-white;
+      color: $wa-link;
+    }
+
+    &::before {
+      border-color: transparent $wa-bubble-out-light transparent transparent;
+      border-style: solid;
+      border-width: 0 8px 8px 0;
+      content: '';
+      height: 0;
+      position: absolute;
+      right: -8px;
+      top: 0;
+      width: 0;
     }
   }
 
+  // Incoming bubble: white. Tail on the top-left corner.
   &.agent {
-    @apply ltr:rounded-bl-[0.25rem] rtl:rounded-br-[0.25rem] text-n-slate-12;
+    @apply rounded-tl-[0.125rem];
+
+    background-color: $wa-bubble-in-light;
+    color: $wa-text-light;
 
     .link {
-      @apply text-n-brand;
+      color: $wa-link;
       word-break: break-word;
+    }
+
+    &::before {
+      border-color: transparent transparent $wa-bubble-in-light;
+      border-style: solid;
+      border-width: 0 0 8px 8px;
+      content: '';
+      height: 0;
+      left: -8px;
+      position: absolute;
+      top: 0;
+      width: 0;
+    }
+  }
+
+  // Dark mode mirrors WhatsApp Web's dark theme palette.
+  .dark & {
+    box-shadow: 0 1px 0.5px $wa-bubble-shadow-dark;
+
+    &.user {
+      background-color: $wa-bubble-out-dark;
+      color: $wa-text-dark;
+
+      &::before {
+        border-color: transparent $wa-bubble-out-dark transparent transparent;
+      }
+    }
+
+    &.agent {
+      background-color: $wa-bubble-in-dark;
+      color: $wa-text-dark;
+
+      &::before {
+        border-color: transparent transparent $wa-bubble-in-dark;
+      }
+    }
+  }
+}
+
+// Timestamp + tick container at the bottom-right of every bubble.
+.message-meta {
+  @apply inline-flex items-center gap-0.5 select-none;
+
+  color: $wa-meta-light;
+  float: right;
+  font-size: 0.6875rem;
+  line-height: 1;
+  margin-left: 0.5rem;
+  margin-top: 0.125rem;
+
+  .dark & {
+    color: $wa-meta-dark;
+  }
+
+  .ticks {
+    @apply inline-block;
+
+    margin-left: 2px;
+
+    &.ticks-read {
+      color: $wa-tick-read;
     }
   }
 }

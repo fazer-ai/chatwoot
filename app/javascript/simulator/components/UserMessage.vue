@@ -125,13 +125,9 @@ export default {
               v-if="showTextBubble"
               :message="message.content"
               :status="message.status"
-              :widget-color="widgetColor"
+              :created-at="message.created_at"
             />
-            <div
-              v-if="hasAttachments"
-              class="chat-bubble has-attachment user"
-              :style="{ backgroundColor: widgetColor }"
-            >
+            <div v-if="hasAttachments" class="chat-bubble has-attachment user">
               <div
                 v-for="attachment in message.attachments"
                 :key="attachment.id"

@@ -25,39 +25,61 @@ const onBackButtonClick = () => {
 </script>
 
 <template>
-  <header class="flex justify-between w-full p-5 bg-n-background gap-2">
+  <header class="chat-header flex justify-between w-full px-4 py-3 gap-2">
     <div class="flex items-center">
       <button
         v-if="showBackButton"
         class="px-2 ltr:-ml-3 rtl:-mr-3"
         @click="onBackButtonClick"
       >
-        <FluentIcon icon="chevron-left" size="24" class="text-n-slate-12" />
+        <FluentIcon icon="chevron-left" size="24" class="text-white" />
       </button>
       <img
         v-if="avatarUrl"
-        class="w-8 h-8 ltr:mr-3 rtl:ml-3 rounded-full"
+        class="w-10 h-10 ltr:mr-3 rtl:ml-3 rounded-full object-cover"
         :src="avatarUrl"
         alt="avatar"
       />
-      <div class="flex flex-col gap-1">
+      <div
+        v-else
+        class="w-10 h-10 ltr:mr-3 rtl:ml-3 rounded-full flex items-center justify-center text-white text-sm font-semibold bg-white/20"
+      >
+        {{ (title || '?').charAt(0).toUpperCase() }}
+      </div>
+      <div class="flex flex-col gap-0.5">
         <div
-          class="flex items-center text-base font-medium leading-4 text-n-slate-12"
+          class="flex items-center text-base font-medium leading-tight text-white"
         >
           <span v-dompurify-html="title" class="ltr:mr-1 rtl:ml-1" />
           <div
             :class="`h-2 w-2 rounded-full
-              ${isOnline ? 'bg-n-teal-10' : 'hidden'}`"
+              ${isOnline ? 'bg-emerald-300' : 'hidden'}`"
           />
         </div>
         <AvailabilityContainer
           :agents="availableAgents"
           :show-header="false"
           :show-avatars="false"
-          text-classes="text-xs leading-3"
+          text-classes="text-xs leading-3 text-white/80"
         />
       </div>
     </div>
     <HeaderActions :show-popout-button="showPopoutButton" />
   </header>
 </template>
+
+<style lang="scss" scoped>
+.chat-header {
+  background-color: #008069;
+  color: #ffffff;
+
+  :deep(button) {
+    color: #ffffff;
+  }
+}
+
+:root[data-theme='dark'] .chat-header,
+.dark .chat-header {
+  background-color: #1f2c34;
+}
+</style>

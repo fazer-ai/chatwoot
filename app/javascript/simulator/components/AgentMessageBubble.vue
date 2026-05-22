@@ -1,5 +1,6 @@
 <script>
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import { messageStamp } from 'shared/helpers/timeHelper';
 import ChatCard from 'shared/components/ChatCard.vue';
 import ChatForm from 'shared/components/ChatForm.vue';
 import ChatOptions from 'shared/components/ChatOptions.vue';
@@ -27,6 +28,10 @@ export default {
     messageContentAttributes: {
       type: Object,
       default: () => {},
+    },
+    createdAt: {
+      type: [String, Number],
+      default: '',
     },
   },
   setup() {
@@ -64,6 +69,18 @@ export default {
     isIntegrations() {
       return this.contentType === 'integrations';
     },
+    readableTime() {
+      return this.createdAt ? messageStamp(this.createdAt) : '';
+    },
+    isPlainTextBubble() {
+      return (
+        !this.isCards &&
+        !this.isOptions &&
+        !this.isForm &&
+        !this.isArticle &&
+        !this.isCSAT
+      );
+    },
   },
   methods: {
     onResponse(messageResponse) {
@@ -91,15 +108,10 @@ export default {
 
 <template>
   <div class="chat-bubble-wrap">
-    <div
-      v-if="
-        !isCards && !isOptions && !isForm && !isArticle && !isCards && !isCSAT
-      "
-      class="chat-bubble agent bg-n-background dark:bg-n-solid-3 text-n-slate-12"
-    >
-      <div
+    <div v-if="isPlainTextBubble" class="chat-bubble agent">
+      <span
         v-dompurify-html="formatMessage(message, false)"
-        class="message-content text-n-slate-12"
+        class="message-content"
       />
       <EmailInput
         v-if="isTemplateEmail"
@@ -112,6 +124,9 @@ export default {
         :message-id="messageId"
         :meeting-data="messageContentAttributes.data"
       />
+      <span v-if="readableTime" class="message-meta">
+        <span>{{ readableTime }}</span>
+      </span>
     </div>
     <div v-if="isOptions">
       <ChatOptions
