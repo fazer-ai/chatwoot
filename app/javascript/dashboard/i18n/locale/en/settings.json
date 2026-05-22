@@ -331,10 +331,6 @@
     "SWITCH": "Switch",
     "COLLAPSE": "Collapse sidebar",
     "EXPAND": "Expand sidebar",
-    "TEST_ENVIRONMENT_BADGE": {
-      "LABEL": "TEST MODE",
-      "TOOLTIP": "This account is in test mode. Click to open the WhatsApp simulator."
-    },
     "INBOX_VIEW": "Inbox View",
     "CONVERSATIONS": "Conversations",
     "INBOX": "My Inbox",

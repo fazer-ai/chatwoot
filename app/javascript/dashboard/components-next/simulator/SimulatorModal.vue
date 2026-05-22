@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { vOnClickOutside } from '@vueuse/components';
 import { useMapGetter } from 'dashboard/composables/store';
@@ -8,28 +9,50 @@ import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const { t } = useI18n();
+const route = useRoute();
 
-const {
-  hasOpened,
-  isVisible,
-  isMinimised,
-  openSimulator,
-  minimiseSimulator,
-  closeSimulator,
-} = useSimulatorState();
+const { hasOpened, isVisible, openSimulator, minimiseSimulator } =
+  useSimulatorState();
 
 const accountId = useMapGetter('getCurrentAccountId');
 const accountGetter = useMapGetter('accounts/getAccount');
 const inboxGetter = useMapGetter('inboxes/getInbox');
+const currentChat = useMapGetter('getSelectedChat');
 
 const account = computed(() => accountGetter.value(accountId.value));
 const simulatorInbox = computed(() =>
   inboxGetter.value(account.value?.simulator_inbox_id)
 );
+const simulatorInboxId = computed(() => simulatorInbox.value?.id);
+
 const websiteToken = computed(() => simulatorInbox.value?.website_token || '');
 const iframeSrc = computed(() => {
   if (!websiteToken.value) return '';
   return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}`;
+});
+
+// The launcher becomes a *contextual* entry point: it only appears
+// when the operator is actually viewing the Simulador inbox in the
+// dashboard. Two routes match:
+//   1) the inbox conversation list  -> `route.params.inbox_id` set.
+//   2) a specific conversation that belongs to the simulator inbox
+//      -> route may not have :inbox_id, so fall back to the
+//      currently-selected chat's `inbox_id`.
+const isOnSimulatorInbox = computed(() => {
+  if (!simulatorInboxId.value) return false;
+  const routeInboxId = Number(route.params.inbox_id);
+  if (routeInboxId && routeInboxId === simulatorInboxId.value) return true;
+  const chatInboxId = currentChat.value?.inbox_id;
+  return !!chatInboxId && chatInboxId === simulatorInboxId.value;
+});
+
+// When the operator navigates away from the simulator inbox while
+// the panel is open, auto-minimise so the panel doesn't keep
+// floating over an unrelated dashboard surface.
+watch(isOnSimulatorInbox, value => {
+  if (!value && isVisible.value) {
+    minimiseSimulator();
+  }
 });
 
 // onClickOutside fires for any click whose target is outside the panel
@@ -63,24 +86,14 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="false"
     >
-      <div class="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-        <button
-          type="button"
-          class="w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
-          :aria-label="t('SIMULATOR.MODAL.MINIMISE')"
-          @click="minimiseSimulator"
-        >
-          <i class="i-lucide-minus size-5" />
-        </button>
-        <button
-          type="button"
-          class="w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
-          :aria-label="t('SIMULATOR.MODAL.CLOSE')"
-          @click="closeSimulator"
-        >
-          <i class="i-lucide-x size-5" />
-        </button>
-      </div>
+      <button
+        type="button"
+        class="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
+        :aria-label="t('SIMULATOR.MODAL.MINIMISE')"
+        @click="minimiseSimulator"
+      >
+        <i class="i-lucide-minus size-5" />
+      </button>
       <iframe
         v-if="hasOpened && iframeSrc"
         :src="iframeSrc"
@@ -96,15 +109,14 @@ onUnmounted(() => {
       </div>
     </div>
     <!--
-      Floating launcher bubble that surfaces only while the simulator
-      is minimised. Mirrors the pattern used by Intercom / Tawk / etc.
-      and gives the operator a second, more visible affordance to
-      restore the panel (in addition to the pulsing sidebar pill).
-      Tinted with the same amber tokens as the MODO TESTE badge so
-      the relationship is obvious.
+      Floating launcher bubble. Visibility is contextual: it only
+      appears when the operator is actually viewing the Simulador
+      inbox in the dashboard, and only while the simulator panel is
+      not already on screen. Clicking on a different inbox or any
+      other dashboard surface hides the bubble automatically.
     -->
     <button
-      v-show="isMinimised"
+      v-show="isOnSimulatorInbox && !isVisible"
       type="button"
       class="simulator-launcher fixed bottom-4 right-4 z-[9998] w-14 h-14 flex items-center justify-center rounded-full bg-n-amber-3 text-n-amber-11 outline outline-1 outline-n-amber-5 hover:bg-n-amber-4 shadow-lg transition-colors"
       :title="t('SIMULATOR.LAUNCHER.OPEN')"

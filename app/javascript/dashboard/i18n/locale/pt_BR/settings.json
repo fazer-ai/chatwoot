@@ -331,10 +331,6 @@
     "SWITCH": "Trocar",
     "COLLAPSE": "Recolher barra lateral",
     "EXPAND": "Expandir barra lateral",
-    "TEST_ENVIRONMENT_BADGE": {
-      "LABEL": "MODO TESTE",
-      "TOOLTIP": "Esta conta está em modo de teste. Clique para abrir o simulador de WhatsApp."
-    },
     "INBOX_VIEW": "Caixa de entrada",
     "CONVERSATIONS": "Conversas",
     "INBOX": "Caixa de Entrada",
