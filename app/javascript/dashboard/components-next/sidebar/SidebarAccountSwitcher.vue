@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
@@ -30,11 +30,6 @@ const globalConfig = useMapGetter('globalConfig/get');
 
 const userAccounts = useMapGetter('getUserAccounts');
 
-// Surface the search input only when the operator actually has more
-// accounts than they can comfortably scan; below that the input would
-// just be visual noise above a 2- or 3-row list.
-const SEARCH_THRESHOLD = 5;
-
 const searchQuery = ref('');
 const searchInputRef = ref(null);
 
@@ -47,10 +42,6 @@ const sortedCurrentUserAccounts = computed(() => {
     a.name.localeCompare(b.name)
   );
 });
-
-const showSearch = computed(
-  () => sortedCurrentUserAccounts.value.length >= SEARCH_THRESHOLD
-);
 
 const filteredAccounts = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -68,10 +59,6 @@ const onChangeAccount = newId => {
 const emitNewAccount = () => {
   emit('showCreateAccountModal');
 };
-
-watch(showSearch, value => {
-  if (!value) searchQuery.value = '';
-});
 </script>
 
 <template>
@@ -121,11 +108,13 @@ watch(showSearch, value => {
       v-if="showAccountSwitcher || isCollapsed"
       class="min-w-80 z-50 max-h-[80vh] overflow-y-auto"
     >
-      <div v-if="showSearch" class="px-2 pt-2 pb-1">
-        <div class="relative">
+      <div class="px-2 pt-2 pb-1">
+        <label
+          class="flex gap-2 items-center px-2 py-1 w-full h-7 rounded-lg outline outline-1 outline-n-weak bg-n-button-color transition-all duration-100 ease-out focus-within:outline-n-brand"
+        >
           <span
             aria-hidden="true"
-            class="i-lucide-search size-4 text-n-slate-10 absolute top-1/2 -translate-y-1/2 ltr:left-2 rtl:right-2"
+            class="flex-shrink-0 i-lucide-search size-4 text-n-slate-10"
           />
           <input
             ref="searchInputRef"
@@ -136,13 +125,13 @@ watch(showSearch, value => {
               t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
             "
             :aria-label="t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')"
-            class="w-full text-sm bg-n-alpha-1 text-n-slate-12 placeholder:text-n-slate-10 border border-n-strong focus:border-n-brand rounded-md py-1.5 ltr:pl-8 rtl:pr-8 ltr:pr-2 rtl:pl-2 outline-none"
+            class="reset-base flex-grow text-sm bg-transparent text-n-slate-12 placeholder:text-n-slate-10 outline-none border-0 p-0 h-auto"
             @keydown.esc.stop="searchQuery = ''"
           />
-        </div>
+        </label>
       </div>
       <div
-        v-if="showSearch && filteredAccounts.length === 0"
+        v-if="filteredAccounts.length === 0"
         class="px-4 py-3 text-sm text-n-slate-11 text-center"
       >
         {{ t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_NO_RESULTS') }}
