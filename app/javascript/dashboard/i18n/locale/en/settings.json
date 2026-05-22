@@ -971,6 +971,9 @@
       "MINIMISE": "Minimise simulator",
       "CLOSE": "Close simulator"
     },
+    "LAUNCHER": {
+      "OPEN": "Open simulator"
+    },
     "UNAVAILABLE": {
       "TITLE": "Simulator is only available in test mode",
       "MESSAGE": "Switch this account back to the test environment to use the simulator."
