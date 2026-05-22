@@ -2,12 +2,27 @@
 import OnboardingFeatureCard from './OnboardingFeatureCard.vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useStoreGetters } from 'dashboard/composables/store';
+import { useStoreGetters, useMapGetter } from 'dashboard/composables/store';
 
 const getters = useStoreGetters();
 const { t } = useI18n();
 const globalConfig = computed(() => getters['globalConfig/get'].value);
 const currentUser = computed(() => getters.getCurrentUser.value);
+
+// Account-level test/production flag drives the alternate banner copy +
+// CTA button below. We read it via the same getter pattern the sidebar
+// uses so a Super Admin flip propagates without page reload.
+const accountId = useMapGetter('getCurrentAccountId');
+const accountGetter = useMapGetter('accounts/getAccount');
+const isTestEnvironment = computed(
+  () => accountGetter.value(accountId.value)?.environment === 'test'
+);
+const simulatorUrl = computed(
+  () => `/app/accounts/${accountId.value}/simulator`
+);
+const openSimulator = () => {
+  window.open(simulatorUrl.value, '_blank', 'noopener,noreferrer');
+};
 
 const greetingMessage = computed(() => {
   const hours = new Date().getHours();
@@ -36,7 +51,32 @@ const greetingMessage = computed(() => {
       >
         {{ greetingMessage }}
       </p>
-      <p class="text-n-slate-11 max-w-2xl text-base">
+      <template v-if="isTestEnvironment">
+        <p class="text-n-slate-11 max-w-2xl text-base">
+          {{
+            $t('ONBOARDING.TEST_ENVIRONMENT.DESCRIPTION_PREFIX', {
+              installationName: globalConfig.installationName,
+            })
+          }}
+        </p>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-n-amber-9 hover:bg-n-amber-10 text-white text-sm font-medium shadow-sm"
+          @click="openSimulator"
+        >
+          <span class="i-lucide-flask-conical size-4" />
+          {{ $t('ONBOARDING.TEST_ENVIRONMENT.SIMULATOR_BUTTON') }}
+          <span class="i-lucide-external-link size-3.5" />
+        </button>
+        <p class="text-n-slate-11 max-w-2xl text-base mt-4">
+          {{
+            $t('ONBOARDING.TEST_ENVIRONMENT.DESCRIPTION_SUFFIX', {
+              installationName: globalConfig.installationName,
+            })
+          }}
+        </p>
+      </template>
+      <p v-else class="text-n-slate-11 max-w-2xl text-base">
         {{
           $t('ONBOARDING.DESCRIPTION', {
             installationName: globalConfig.installationName,

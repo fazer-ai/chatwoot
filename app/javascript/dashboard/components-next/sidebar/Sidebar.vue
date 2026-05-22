@@ -78,6 +78,21 @@ const isHelpCenterMenuEnabled = computed(
   () => accountGetter.value(accountId.value)?.help_center_menu_enabled === true
 );
 
+// Surfaces the "AMBIENTE DE TESTE" pill at the top of the sidebar when the
+// account is flipped to the test environment in Super Admin. Hidden as soon
+// as the account moves back to production — without removing the simulator
+// inbox (Phase 2 keeps the inbox around). Clicking it opens the simulator
+// in a new tab; the route itself ships in Phase 4.
+const isTestEnvironment = computed(
+  () => accountGetter.value(accountId.value)?.environment === 'test'
+);
+const simulatorUrl = computed(
+  () => `/app/accounts/${accountId.value}/simulator`
+);
+const openSimulator = () => {
+  window.open(simulatorUrl.value, '_blank', 'noopener,noreferrer');
+};
+
 const toggleShortcutModalFn = show => {
   if (show) {
     emit('openKeyShortcutModal');
@@ -777,6 +792,30 @@ const menuItems = computed(() => {
           </button>
         </template>
       </div>
+      <button
+        v-if="isTestEnvironment"
+        type="button"
+        :title="t('SIDEBAR.TEST_ENVIRONMENT_BADGE.TOOLTIP')"
+        :aria-label="t('SIDEBAR.TEST_ENVIRONMENT_BADGE.LABEL')"
+        class="flex items-center gap-1.5 font-semibold uppercase tracking-wide bg-n-amber-3 text-n-amber-11 outline outline-1 outline-n-amber-5 hover:bg-n-amber-4 transition-colors"
+        :class="
+          isEffectivelyCollapsed
+            ? 'mx-auto justify-center w-9 h-9 rounded-lg text-[10px]'
+            : 'mx-2 justify-between px-2 py-1.5 rounded-md text-xs'
+        "
+        @click="openSimulator"
+      >
+        <template v-if="isEffectivelyCollapsed">
+          <span class="i-lucide-flask-conical size-4" />
+        </template>
+        <template v-else>
+          <span class="flex items-center gap-1.5">
+            <span class="i-lucide-flask-conical size-3.5" />
+            {{ t('SIDEBAR.TEST_ENVIRONMENT_BADGE.LABEL') }}
+          </span>
+          <span class="i-lucide-external-link size-3" />
+        </template>
+      </button>
       <div
         class="flex gap-2"
         :class="isEffectivelyCollapsed ? 'flex-col items-center' : 'px-2'"

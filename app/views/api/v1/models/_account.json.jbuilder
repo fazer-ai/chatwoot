@@ -29,4 +29,6 @@ json.inbox_view_menu_enabled @account.inbox_view_menu_enabled
 json.help_center_menu_enabled @account.help_center_menu_enabled
 json.support_email @account.support_email
 json.status @account.status
+json.environment @account.environment
+json.simulator_inbox_id @account.simulator_inbox_id
 json.cache_keys @account.cache_keys
