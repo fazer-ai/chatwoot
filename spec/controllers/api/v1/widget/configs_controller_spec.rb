@@ -74,5 +74,22 @@ RSpec.describe '/api/v1/widget/config', type: :request do
         expect(response_data.keys).to include(*response_keys)
       end
     end
+
+    context 'when the website token belongs to a Channel::Simulator inbox' do
+      let(:simulator_channel) { account.simulator_channels.first }
+
+      it 'resolves the simulator channel and creates a contact on its inbox' do
+        expect do
+          post '/api/v1/widget/config',
+               params: { website_token: simulator_channel.website_token },
+               as: :json
+        end.to change(Contact, :count).by(1)
+
+        expect(response).to have_http_status(:success)
+        response_data = response.parsed_body
+        expect(response_data.keys).to include(*response_keys)
+        expect(ContactInbox.last.inbox_id).to eq(simulator_channel.inbox.id)
+      end
+    end
   end
 end

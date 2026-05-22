@@ -958,5 +958,15 @@
       "CONFIRM_BUTTON_LABEL": "Delete",
       "CANCEL_BUTTON_LABEL": "Cancel"
     }
+  },
+  "SIMULATOR": {
+    "PLACEHOLDER": {
+      "TITLE": "WhatsApp simulator",
+      "MESSAGE": "The simulator chat interface is on its way. While this page settles in, you can already test conversations against the Simulator inbox from the regular dashboard."
+    },
+    "UNAVAILABLE": {
+      "TITLE": "Simulator is only available in test mode",
+      "MESSAGE": "Switch this account back to the test environment to use the simulator."
+    }
   }
 }
