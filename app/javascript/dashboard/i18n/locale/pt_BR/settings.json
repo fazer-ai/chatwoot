@@ -1016,6 +1016,7 @@
       "TITLE": "Simulador do WhatsApp",
       "MESSAGE": "A interface de chat do simulador está chegando. Enquanto isso, você já pode testar conversas pela caixa Simulador no dashboard normal."
     },
+    "LOADING": "Carregando a caixa do simulador…",
     "UNAVAILABLE": {
       "TITLE": "O simulador só está disponível em modo de teste",
       "MESSAGE": "Volte esta conta para o ambiente de teste para usar o simulador."

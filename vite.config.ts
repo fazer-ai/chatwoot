@@ -82,6 +82,7 @@ export default defineConfig({
       shared: path.resolve('./app/javascript/shared'),
       survey: path.resolve('./app/javascript/survey'),
       widget: path.resolve('./app/javascript/widget'),
+      simulator: path.resolve('./app/javascript/simulator'),
       assets: path.resolve('./app/javascript/dashboard/assets'),
     },
   },

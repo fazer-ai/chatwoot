@@ -31,6 +31,7 @@ Rails.application.routes.draw do
     get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_email_inbox_settings'
 
     resource :widget, only: [:show]
+    resource :simulator, only: [:show]
     namespace :survey do
       resources :responses, only: [:show]
     end
