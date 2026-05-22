@@ -71,19 +71,11 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
     }
   }
 
-  // Consecutive messages from the same sender collapse the tail: only the
-  // first bubble in a run gets the WhatsApp wedge.
+  // Visual rhythm between consecutive senders. The bubble shape stays
+  // symmetric (no tails), so we just tighten / loosen the gap.
   .agent-message-wrap {
     + .agent-message-wrap {
       @apply mt-0.5;
-
-      .agent-message .chat-bubble {
-        @apply rounded-[0.5rem];
-
-        &::before {
-          display: none;
-        }
-      }
     }
 
     + .user-message-wrap {
@@ -92,14 +84,6 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
 
     &.has-response + .user-message-wrap {
       @apply mt-0.5;
-
-      .chat-bubble {
-        @apply rounded-[0.5rem];
-
-        &::before {
-          display: none;
-        }
-      }
     }
 
     &.has-response + .agent-message-wrap {
@@ -141,14 +125,6 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
   .user-message-wrap {
     + .user-message-wrap {
       @apply mt-0.5;
-
-      .user-message .chat-bubble {
-        @apply rounded-[0.5rem];
-
-        &::before {
-          display: none;
-        }
-      }
     }
 
     + .agent-message-wrap {
@@ -206,53 +182,25 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
     text-decoration: underline;
   }
 
-  // Outgoing bubble: light green (the user is the "customer" in WhatsApp's
-  // simulator). Tail on the top-right corner.
+  // Outgoing bubble: light green (the user is the "customer" in the
+  // simulator role-play). Symmetric rounded corners, no tail.
   &.user {
-    @apply rounded-tr-[0.125rem];
-
     background-color: $wa-bubble-out-light;
     color: $wa-text-light;
 
     > a {
       color: $wa-link;
     }
-
-    &::before {
-      border-color: transparent $wa-bubble-out-light transparent transparent;
-      border-style: solid;
-      border-width: 0 8px 8px 0;
-      content: '';
-      height: 0;
-      position: absolute;
-      right: -8px;
-      top: 0;
-      width: 0;
-    }
   }
 
-  // Incoming bubble: white. Tail on the top-left corner.
+  // Incoming bubble: white. Symmetric rounded corners, no tail.
   &.agent {
-    @apply rounded-tl-[0.125rem];
-
     background-color: $wa-bubble-in-light;
     color: $wa-text-light;
 
     .link {
       color: $wa-link;
       word-break: break-word;
-    }
-
-    &::before {
-      border-color: transparent transparent $wa-bubble-in-light;
-      border-style: solid;
-      border-width: 0 0 8px 8px;
-      content: '';
-      height: 0;
-      left: -8px;
-      position: absolute;
-      top: 0;
-      width: 0;
     }
   }
 
@@ -263,19 +211,11 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
     &.user {
       background-color: $wa-bubble-out-dark;
       color: $wa-text-dark;
-
-      &::before {
-        border-color: transparent $wa-bubble-out-dark transparent transparent;
-      }
     }
 
     &.agent {
       background-color: $wa-bubble-in-dark;
       color: $wa-text-dark;
-
-      &::before {
-        border-color: transparent transparent $wa-bubble-in-dark;
-      }
     }
   }
 }
