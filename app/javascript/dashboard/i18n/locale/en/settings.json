@@ -968,6 +968,7 @@
     },
     "LOADING": "Loading the simulator inbox…",
     "MODAL": {
+      "MINIMISE": "Minimise simulator",
       "CLOSE": "Close simulator"
     },
     "UNAVAILABLE": {

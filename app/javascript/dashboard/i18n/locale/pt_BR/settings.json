@@ -1020,6 +1020,7 @@
     },
     "LOADING": "Carregando a caixa do simulador…",
     "MODAL": {
+      "MINIMISE": "Minimizar simulador",
       "CLOSE": "Fechar simulador"
     },
     "UNAVAILABLE": {
