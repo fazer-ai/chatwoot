@@ -25,6 +25,8 @@ import CopilotContainer from 'dashboard/components/copilot/CopilotContainer.vue'
 
 import MobileSidebarLauncher from 'dashboard/components-next/sidebar/MobileSidebarLauncher.vue';
 import ReleaseAnnouncementModal from 'dashboard/components-next/release/ReleaseAnnouncementModal.vue';
+import SimulatorModal from 'dashboard/components-next/simulator/SimulatorModal.vue';
+
 import { useCallsStore } from 'dashboard/stores/calls';
 
 export default {
@@ -39,6 +41,7 @@ export default {
     FloatingCallWidget,
     MobileSidebarLauncher,
     ReleaseAnnouncementModal,
+    SimulatorModal,
   },
   setup() {
     const upgradePageRef = ref(null);
@@ -176,6 +179,7 @@ export default {
         @clickaway="closeKeyShortcutModal"
       />
       <ReleaseAnnouncementModal />
+      <SimulatorModal />
     </main>
   </div>
 </template>

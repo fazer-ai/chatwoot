@@ -60,7 +60,7 @@ const onBackButtonClick = () => {
           :agents="availableAgents"
           :show-header="false"
           :show-avatars="false"
-          text-classes="text-xs leading-3 text-white/80"
+          text-classes="!text-white text-xs leading-3"
         />
       </div>
     </div>

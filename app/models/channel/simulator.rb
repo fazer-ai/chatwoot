@@ -42,10 +42,18 @@ class Channel::Simulator < ApplicationRecord
   # simulator inbox interchangeably with a `Channel::WebWidget` — the
   # whole point of the simulator (a logged-in dashboard user
   # role-playing as a customer through the public widget API).
+  # Always tag the contact as "Simulador" instead of letting Chatwoot mint
+  # a Haikunator name. The simulator's role-play uses a stable customer
+  # identity so the dashboard side reads a recognizable contact row.
+  SIMULATOR_CONTACT_NAME = 'Simulador'.freeze
+
   def create_contact_inbox(additional_attributes = {})
     ::ContactInboxWithContactBuilder.new(
       inbox: inbox,
-      contact_attributes: { additional_attributes: additional_attributes }
+      contact_attributes: {
+        name: SIMULATOR_CONTACT_NAME,
+        additional_attributes: additional_attributes
+      }
     ).perform
   end
 

@@ -402,7 +402,7 @@
       "NEW_LINK": "Click here to create a canned response"
     },
     "TEST_ENVIRONMENT": {
-      "DESCRIPTION_PREFIX": "Thanks for signing up. We want you to get the most out of {installationName}. Your company is in a test environment, and before moving to production you need to simulate a customer interaction via the link below:",
+      "DESCRIPTION_PREFIX": "Thanks for signing up. We want you to get the most out of {installationName}. Your company is in test mode, and before moving to production you need to simulate a customer interaction via the link below:",
       "SIMULATOR_BUTTON": "Open WhatsApp simulator",
       "DESCRIPTION_SUFFIX": "Here are a few things you can do in {installationName} to make the experience delightful."
     }

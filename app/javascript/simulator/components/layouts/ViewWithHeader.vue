@@ -1,6 +1,6 @@
 <script>
 import Banner from '../Banner.vue';
-import Branding from 'shared/components/Branding.vue';
+import Branding from 'simulator/components/SimulatorBranding.vue';
 import ChatHeader from '../ChatHeader.vue';
 import ChatHeaderExpanded from '../ChatHeaderExpanded.vue';
 import configMixin from '../../mixins/configMixin';

@@ -25,8 +25,6 @@ $wa-bubble-shadow-dark: rgba(0, 0, 0, 0.4);
 }
 
 .conversation-wrap {
-  @apply max-w-3xl mx-auto;
-
   .agent-message {
     @apply items-end flex flex-row justify-start mt-0 ltr:mr-0 rtl:mr-2 mb-0.5 ltr:ml-2 rtl:ml-0 max-w-[88%];
 
