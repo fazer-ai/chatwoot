@@ -281,6 +281,8 @@ linters:
 exclude:
   - 'app/javascript/widget/assets/scss/_reset.scss'
   - 'app/javascript/widget/assets/scss/sdk.css'
+  - 'app/javascript/simulator/assets/scss/_reset.scss'
+  - 'app/javascript/simulator/assets/scss/sdk.css'
   - 'app/assets/stylesheets/administrate/reset/_normalize.scss'
   - 'app/javascript/shared/assets/stylesheets/*.scss'
   - 'app/javascript/dashboard/assets/scss/_woot.scss'
