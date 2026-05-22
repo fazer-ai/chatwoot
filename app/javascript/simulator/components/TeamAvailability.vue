@@ -47,7 +47,11 @@ const startFreshConversation = () => {
   <div
     class="flex flex-col gap-3 w-full shadow outline-1 outline outline-n-container rounded-xl bg-n-background dark:bg-n-solid-2 px-5 py-4"
   >
-    <AvailabilityContainer :agents="availableAgents" show-avatars />
+    <AvailabilityContainer
+      :agents="availableAgents"
+      :show-header="false"
+      show-avatars
+    />
 
     <div class="flex flex-col gap-2">
       <button
