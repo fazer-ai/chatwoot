@@ -23,6 +23,7 @@ const {
   isAnEmailChannel,
   isAnInstagramChannel,
   isATiktokChannel,
+  isASimulatorInbox,
 } = useInbox();
 
 const { t, locale } = useI18n();
@@ -180,7 +181,9 @@ const isDelivered = computed(() => {
   // API inbox messages use real delivered status from the external system.
   if (isAPIInbox.value) return status.value === MESSAGE_STATUS.DELIVERED;
   // All messages marked as delivered for the web widget inbox once they are sent.
-  if (isAWebWidgetInbox.value) {
+  // The simulator shares the public widget pipeline, so its outgoing
+  // messages flip out of PROGRESS the same way.
+  if (isAWebWidgetInbox.value || isASimulatorInbox.value) {
     return status.value === MESSAGE_STATUS.SENT;
   }
   if (isALineChannel.value) {
@@ -203,7 +206,7 @@ const isRead = computed(() => {
     return sourceId.value && status.value === MESSAGE_STATUS.READ;
   }
 
-  if (isAWebWidgetInbox.value || isAPIInbox.value) {
+  if (isAWebWidgetInbox.value || isAPIInbox.value || isASimulatorInbox.value) {
     return status.value === MESSAGE_STATUS.READ;
   }
 

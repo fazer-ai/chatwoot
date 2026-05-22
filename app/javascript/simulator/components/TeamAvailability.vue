@@ -1,8 +1,11 @@
 <script setup>
+import { computed } from 'vue';
 import { IFrameHelper } from 'simulator/helpers/utils';
 import { CHATWOOT_ON_START_CONVERSATION } from '../constants/sdkEvents';
-import AvailabilityContainer from 'simulator/components/Availability/AvailabilityContainer.vue';
+import GroupedAvatars from 'simulator/components/GroupedAvatars.vue';
+import { useAvailability } from 'simulator/composables/useAvailability';
 import { useMapGetter } from 'dashboard/composables/store.js';
+import { toRef } from 'vue';
 
 const props = defineProps({
   availableAgents: { type: Array, default: () => [] },
@@ -12,6 +15,11 @@ const props = defineProps({
 const emit = defineEmits(['startConversation']);
 
 const widgetColor = useMapGetter('appConfig/getWidgetColor');
+
+const { isOnline } = useAvailability(toRef(props, 'availableAgents'));
+const showAvatars = computed(
+  () => isOnline.value && props.availableAgents.length
+);
 
 const startConversation = () => {
   emit('startConversation');
@@ -47,11 +55,7 @@ const startFreshConversation = () => {
   <div
     class="flex flex-col gap-3 w-full shadow outline-1 outline outline-n-container rounded-xl bg-n-background dark:bg-n-solid-2 px-5 py-4"
   >
-    <AvailabilityContainer
-      :agents="availableAgents"
-      :show-header="false"
-      show-avatars
-    />
+    <GroupedAvatars v-if="showAvatars" :users="availableAgents" />
 
     <div class="flex flex-col gap-2">
       <button

@@ -1,13 +1,21 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { vOnClickOutside } from '@vueuse/components';
 import { useMapGetter } from 'dashboard/composables/store';
+import { useSimulatorState } from 'dashboard/composables/useSimulatorState';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const { t } = useI18n();
 
-const isOpen = ref(false);
+const {
+  hasOpened,
+  isVisible,
+  openSimulator,
+  minimiseSimulator,
+  closeSimulator,
+} = useSimulatorState();
 
 const accountId = useMapGetter('getCurrentAccountId');
 const accountGetter = useMapGetter('accounts/getAccount');
@@ -18,73 +26,72 @@ const simulatorInbox = computed(() =>
   inboxGetter.value(account.value?.simulator_inbox_id)
 );
 const websiteToken = computed(() => simulatorInbox.value?.website_token || '');
-
-// `?_=<timestamp>` is a cache-buster: the user expects the modal to start
-// fresh every time they open it from the sidebar, so the iframe never
-// resumes a half-finished previous test session.
 const iframeSrc = computed(() => {
   if (!websiteToken.value) return '';
-  return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}&_=${Date.now()}`;
+  return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}`;
 });
 
-const open = () => {
-  isOpen.value = true;
-};
-const close = () => {
-  isOpen.value = false;
+// onClickOutside fires for any click whose target is outside the panel
+// element. Iframe clicks are absorbed by the iframe document context
+// and never bubble to the parent, so clicking inside the simulator UI
+// won't trigger the minimise. Sidebar / dashboard / settings clicks
+// will, which is the whole point: the operator can switch between the
+// simulator and AurisChat without explicitly closing the modal.
+const onClickOutside = () => {
+  if (!isVisible.value) return;
+  minimiseSimulator();
 };
 
-const onBackdropClick = event => {
-  if (event.target === event.currentTarget) close();
-};
-const onKeydown = event => {
-  if (event.key === 'Escape') close();
-};
+const handleOpenEvent = () => openSimulator();
 
 onMounted(() => {
-  emitter.on(BUS_EVENTS.OPEN_SIMULATOR, open);
-  window.addEventListener('keydown', onKeydown);
+  emitter.on(BUS_EVENTS.OPEN_SIMULATOR, handleOpenEvent);
 });
 
 onUnmounted(() => {
-  emitter.off(BUS_EVENTS.OPEN_SIMULATOR, open);
-  window.removeEventListener('keydown', onKeydown);
+  emitter.off(BUS_EVENTS.OPEN_SIMULATOR, handleOpenEvent);
 });
 </script>
 
 <template>
   <Teleport to="body">
     <div
-      v-if="isOpen"
-      class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+      v-show="hasOpened && isVisible"
+      v-on-click-outside="onClickOutside"
+      class="simulator-modal-frame fixed z-[9999] bg-white shadow-2xl rounded-xl overflow-hidden flex flex-col"
       role="dialog"
-      aria-modal="true"
-      @mousedown="onBackdropClick"
+      aria-modal="false"
     >
-      <div
-        class="simulator-modal-frame relative rounded-xl bg-white shadow-2xl overflow-hidden flex flex-col"
-      >
+      <div class="absolute top-2 right-2 z-10 flex items-center gap-1.5">
         <button
           type="button"
-          class="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
+          class="w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
+          :aria-label="t('SIMULATOR.MODAL.MINIMISE')"
+          @click="minimiseSimulator"
+        >
+          <i class="i-lucide-minus size-5" />
+        </button>
+        <button
+          type="button"
+          class="w-8 h-8 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 text-white"
           :aria-label="t('SIMULATOR.MODAL.CLOSE')"
-          @click="close"
+          @click="closeSimulator"
         >
           <i class="i-lucide-x size-5" />
         </button>
-        <iframe
-          v-if="iframeSrc"
-          :src="iframeSrc"
-          :title="t('SIMULATOR.PLACEHOLDER.TITLE')"
-          class="w-full h-full border-0"
-          allow="clipboard-read; clipboard-write"
-        />
-        <div
-          v-else
-          class="flex flex-1 items-center justify-center p-6 text-center text-sm text-n-slate-11"
-        >
-          {{ t('SIMULATOR.LOADING') }}
-        </div>
+      </div>
+      <iframe
+        v-if="hasOpened && iframeSrc"
+        :src="iframeSrc"
+        :title="t('SIMULATOR.PLACEHOLDER.TITLE')"
+        class="w-full h-full border-0"
+        allow="clipboard-read; clipboard-write"
+      />
+      <div
+        v-else
+        class="flex flex-1 items-center justify-center p-6 text-center text-sm text-n-slate-11"
+      >
+        {{ t('SIMULATOR.LOADING') }}
       </div>
     </div>
   </Teleport>
@@ -92,9 +99,13 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .simulator-modal-frame {
-  // 30vw wide x 80vh tall mirrors the brief the team agreed on; the 360px
-  // floor keeps the iframe legible on smaller laptop displays where 30%
-  // collapses below the WhatsApp widget's minimum usable width.
+  // Anchored to the bottom-right so the operator can keep dashboard
+  // surfaces visible while the simulator is open. 30vw x 80vh sizing
+  // mirrors the original brief; the 360px floor keeps the iframe
+  // legible on smaller displays. The fixed offsets give it a little
+  // breathing room from the edges.
+  bottom: 1rem;
+  right: 1rem;
   width: 30vw;
   min-width: 360px;
   height: 80vh;

@@ -12,6 +12,7 @@ import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { useWindowSize, useEventListener } from '@vueuse/core';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
+import { useSimulatorState } from 'dashboard/composables/useSimulatorState';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import SidebarGroup from './SidebarGroup.vue';
@@ -82,13 +83,16 @@ const isHelpCenterMenuEnabled = computed(
 // account is flipped to the test environment in Super Admin. Hidden as soon
 // as the account moves back to production — without removing the simulator
 // inbox (Phase 2 keeps the inbox around). Clicking it opens the simulator
-// in a modal overlay on the current page. The modal lives at
-// Dashboard.vue and listens for OPEN_SIMULATOR over the shared mitt bus.
+// in a floating panel on the current page. The panel lives at
+// Dashboard.vue; the sidebar pill toggles it via the shared simulator
+// composable so we can also reflect the minimised state with a pulse.
 const isTestEnvironment = computed(
   () => accountGetter.value(accountId.value)?.environment === 'test'
 );
+const { isMinimised: isSimulatorMinimised, toggleSimulator } =
+  useSimulatorState();
 const openSimulator = () => {
-  emitter.emit(BUS_EVENTS.OPEN_SIMULATOR);
+  toggleSimulator();
 };
 
 const toggleShortcutModalFn = show => {
@@ -795,12 +799,13 @@ const menuItems = computed(() => {
         type="button"
         :title="t('SIDEBAR.TEST_ENVIRONMENT_BADGE.TOOLTIP')"
         :aria-label="t('SIDEBAR.TEST_ENVIRONMENT_BADGE.LABEL')"
-        class="flex items-center gap-1.5 font-semibold uppercase tracking-wide bg-n-amber-3 text-n-amber-11 outline outline-1 outline-n-amber-5 hover:bg-n-amber-4 transition-colors"
-        :class="
+        class="simulator-pill flex items-center gap-1.5 font-semibold uppercase tracking-wide bg-n-amber-3 text-n-amber-11 outline outline-1 outline-n-amber-5 hover:bg-n-amber-4 transition-colors"
+        :class="[
           isEffectivelyCollapsed
             ? 'mx-auto justify-center w-9 h-9 rounded-lg text-[10px]'
-            : 'mx-2 justify-between px-2 py-1.5 rounded-md text-xs'
-        "
+            : 'mx-2 justify-between px-2 py-1.5 rounded-md text-xs',
+          { 'simulator-pill--pulsing': isSimulatorMinimised },
+        ]"
         @click="openSimulator"
       >
         <template v-if="isEffectivelyCollapsed">
@@ -811,7 +816,13 @@ const menuItems = computed(() => {
             <span class="i-lucide-flask-conical size-3.5" />
             {{ t('SIDEBAR.TEST_ENVIRONMENT_BADGE.LABEL') }}
           </span>
-          <span class="i-lucide-external-link size-3" />
+          <span
+            :class="
+              isSimulatorMinimised
+                ? 'i-lucide-chevrons-up-down size-3'
+                : 'i-lucide-external-link size-3'
+            "
+          />
         </template>
       </button>
       <div
@@ -929,3 +940,21 @@ const menuItems = computed(() => {
     </div>
   </aside>
 </template>
+
+<style lang="scss" scoped>
+// Pulse the test-mode pill while the simulator modal is minimised so
+// the operator always has a clear way back into the running test.
+@keyframes simulator-pill-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+}
+
+.simulator-pill--pulsing {
+  animation: simulator-pill-pulse 1.6s ease-in-out infinite;
+}
+</style>

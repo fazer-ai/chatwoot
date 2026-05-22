@@ -275,6 +275,7 @@ describe('useInbox', () => {
         'isAnInstagramChannel',
         'isATiktokChannel',
         'isAVoiceChannel',
+        'isASimulatorInbox',
       ];
 
       expectedProperties.forEach(prop => {

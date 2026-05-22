@@ -152,6 +152,10 @@ export const useInbox = (inboxId = null) => {
     return channelType.value === INBOX_TYPES.VOICE;
   });
 
+  const isASimulatorInbox = computed(() => {
+    return channelType.value === INBOX_TYPES.SIMULATOR;
+  });
+
   return {
     inbox,
     isAFacebookInbox,
@@ -173,5 +177,6 @@ export const useInbox = (inboxId = null) => {
     isAnInstagramChannel,
     isATiktokChannel,
     isAVoiceChannel,
+    isASimulatorInbox,
   };
 };

@@ -11,7 +11,11 @@ import {
 const state = {
   hideMessageBubble: false,
   isCampaignViewClicked: false,
-  showUnreadMessagesDialog: true,
+  // The simulator skips the public widget's "X new messages" splash:
+  // when the operator reopens the panel after the agent replied from
+  // AurisChat, they should land directly in the conversation, not on
+  // an extra intermediate confirmation view.
+  showUnreadMessagesDialog: false,
   isWebWidgetTriggered: false,
   isWidgetOpen: false,
   position: 'right',
