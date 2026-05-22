@@ -121,35 +121,36 @@ watch(showSearch, value => {
       v-if="showAccountSwitcher || isCollapsed"
       class="min-w-80 z-50 max-h-[80vh] overflow-y-auto"
     >
-      <DropdownSection :title="t('SIDEBAR_ITEMS.SWITCH_ACCOUNT')">
-        <div v-if="showSearch" class="px-2 pt-1 pb-2">
-          <div class="relative">
-            <span
-              aria-hidden="true"
-              class="i-lucide-search size-4 text-n-slate-10 absolute top-1/2 -translate-y-1/2 ltr:left-2 rtl:right-2"
-            />
-            <input
-              ref="searchInputRef"
-              v-model="searchQuery"
-              type="text"
-              autofocus
-              :placeholder="
-                t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
-              "
-              :aria-label="
-                t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
-              "
-              class="w-full text-sm bg-n-alpha-1 text-n-slate-12 placeholder:text-n-slate-10 border border-n-strong focus:border-n-brand rounded-md py-1.5 ltr:pl-8 rtl:pr-8 ltr:pr-2 rtl:pl-2 outline-none"
-              @keydown.esc.stop="searchQuery = ''"
-            />
-          </div>
+      <div v-if="showSearch" class="px-2 pt-2 pb-1">
+        <div class="relative">
+          <span
+            aria-hidden="true"
+            class="i-lucide-search size-4 text-n-slate-10 absolute top-1/2 -translate-y-1/2 ltr:left-2 rtl:right-2"
+          />
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            autofocus
+            :placeholder="
+              t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')
+            "
+            :aria-label="t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER')"
+            class="w-full text-sm bg-n-alpha-1 text-n-slate-12 placeholder:text-n-slate-10 border border-n-strong focus:border-n-brand rounded-md py-1.5 ltr:pl-8 rtl:pr-8 ltr:pr-2 rtl:pl-2 outline-none"
+            @keydown.esc.stop="searchQuery = ''"
+          />
         </div>
-        <div
-          v-if="showSearch && filteredAccounts.length === 0"
-          class="px-3 py-3 text-sm text-n-slate-11 text-center"
-        >
-          {{ t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_NO_RESULTS') }}
-        </div>
+      </div>
+      <div
+        v-if="showSearch && filteredAccounts.length === 0"
+        class="px-4 py-3 text-sm text-n-slate-11 text-center"
+      >
+        {{ t('SIDEBAR_ITEMS.ACCOUNT_SWITCHER_NO_RESULTS') }}
+      </div>
+      <DropdownSection
+        v-if="filteredAccounts.length > 0"
+        :title="t('SIDEBAR_ITEMS.SWITCH_ACCOUNT')"
+      >
         <DropdownItem
           v-for="account in filteredAccounts"
           :id="`account-${account.id}`"
