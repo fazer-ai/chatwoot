@@ -1313,7 +1313,8 @@
       "API": "Canal da API",
       "INSTAGRAM": "Instagram",
       "TIKTOK": "TikTok",
-      "VOICE": "Voz"
+      "VOICE": "Voz",
+      "SIMULATOR": "Simulador"
     }
   }
 }
