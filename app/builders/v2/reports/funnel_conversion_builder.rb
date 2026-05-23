@@ -12,7 +12,7 @@ class V2::Reports::FunnelConversionBuilder
   # on FunnelStage means updating these constants in lockstep.
   SCHEDULING_CHART_GROUP = 'Agendamento'.freeze
   CONFIRMATION_STAGE_NAME = 'Confirmado'.freeze
-  ATTENDANCE_STAGE_NAME = 'Comparecimento ( ganho )'.freeze
+  ATTENDANCE_STAGE_NAME = 'Comparecimento (ganho)'.freeze
   NO_SHOW_STAGE_NAME = 'No-Show'.freeze
 
   attr_reader :account, :params
