@@ -977,6 +977,26 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(contact.reload.name).to eq('John Doe')
         end
 
+        it 'updates contact name when stored name is a phone variant missing the Brazilian 9' do
+          # The contact was registered without the "9"; phone normalization later aligned
+          # phone_number to the canonical number, but the name kept the stale digits.
+          contact = create(:contact, account: inbox.account, name: '551112345678', phone_number: '+5511912345678', identifier: '12345678@lid')
+          create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(contact.reload.name).to eq('John Doe')
+        end
+
+        it 'updates contact name when stored name is a phone number with a leading +' do
+          contact = create(:contact, account: inbox.account, name: '+5511912345678', phone_number: '+5511912345678', identifier: '12345678@lid')
+          create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(contact.reload.name).to eq('John Doe')
+        end
+
         it 'updates contact name if it matches LID source_id' do
           contact = create(:contact, account: inbox.account, name: '12345678', phone_number: '+5511912345678', identifier: '12345678@lid')
           create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
@@ -1002,6 +1022,15 @@ describe Whatsapp::IncomingMessageBaileysService do
           described_class.new(inbox: inbox, params: params).perform
 
           expect(contact.reload.name).to eq('Existing Name')
+        end
+
+        it 'does not overwrite a digit-only name that is not this contact phone or LID' do
+          contact = create(:contact, account: inbox.account, name: '99887766', phone_number: '+5511912345678', identifier: '12345678@lid')
+          create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(contact.reload.name).to eq('99887766')
         end
       end
     end

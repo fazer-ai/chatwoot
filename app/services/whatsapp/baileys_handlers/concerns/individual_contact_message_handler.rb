@@ -75,14 +75,14 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
-    update_contact_info(phone, source_id, identifier)
+    update_contact_info(phone, identifier)
   end
 
-  def update_contact_info(phone, source_id, identifier)
+  def update_contact_info(phone, identifier)
     update_params = {
       phone_number: ("+#{phone}" if phone),
       identifier: (identifier if @contact.identifier != identifier),
-      name: (contact_name if @contact.name.in?([phone, source_id, identifier]))
+      name: (contact_name if placeholder_contact_name?(@contact.name, phone: phone, identifier: identifier))
     }.compact
 
     @contact.update!(update_params) if update_params.present?

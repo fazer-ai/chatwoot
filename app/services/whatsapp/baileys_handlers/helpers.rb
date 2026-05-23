@@ -171,6 +171,38 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer.new.normalize(phone_number)
   end
 
+  # A name equal to the contact's WhatsApp phone (in any normalized "9"-variant),
+  # its LID, or the "<lid>@lid" identifier is an auto-generated placeholder rather
+  # than a human-entered name. Matching normalized phone variants lets the real
+  # pushName replace a number stranded by phone normalization, e.g. when the
+  # Brazilian "9" digit is added/removed and phone_number no longer matches the
+  # digits saved as the name.
+  def placeholder_contact_name?(name, phone:, identifier:)
+    return true if name.blank?
+    return true if name == identifier
+
+    digits = name.delete('+')
+    return false unless digits.match?(/\A\d+\z/)
+
+    lid = identifier&.delete_suffix('@lid')
+    return true if digits.in?([phone, lid].compact)
+
+    phone.present? && same_whatsapp_number?(digits, phone)
+  end
+
+  def same_whatsapp_number?(left, right)
+    normalizer = phone_normalizer_for(left) || phone_normalizer_for(right)
+    return false unless normalizer
+
+    normalizer.normalize(left) == normalizer.normalize(right)
+  end
+
+  def phone_normalizer_for(value)
+    Whatsapp::PhoneNumberNormalizationService::NORMALIZERS
+      .map(&:new)
+      .find { |normalizer| normalizer.handles_country?(value) }
+  end
+
   def ignore_message?
     message_type.in?(%w[protocol context edited])
   end

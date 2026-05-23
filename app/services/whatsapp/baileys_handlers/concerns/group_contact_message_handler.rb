@@ -94,7 +94,7 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
     update_params = {
       phone_number: ("+#{phone}" if should_update_contact_phone?(contact, phone)),
       identifier: (identifier if should_update_contact_identifier?(contact, identifier)),
-      name: (name if should_update_contact_name?(contact, name))
+      name: (name if should_update_contact_name?(contact, phone, identifier, name))
     }.compact
 
     contact.update!(update_params) if update_params.present?
@@ -109,8 +109,8 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
     identifier && contact.identifier.blank?
   end
 
-  def should_update_contact_name?(contact, name)
-    name && (contact.name.blank? || contact.name.match?(/^\d+/))
+  def should_update_contact_name?(contact, phone, identifier, name)
+    name && placeholder_contact_name?(contact.name, phone: phone, identifier: identifier)
   end
 
   def extract_lid_from_participant(participant)
