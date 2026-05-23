@@ -8,7 +8,7 @@ class Funnel::DefaultStagesSeederService
     { name: 'Confirmado',      description: 'Paciente confirmou presença',       position: 4, closed: false, color: '#8DA43F' },
     { name: 'No-Show',         description: 'Não compareceu',                    position: 5, closed: true,  color: '#f97316' },
     { name: 'Perdido',         description: 'Paciente perdido / desistiu',       position: 6, closed: true,  color: '#dc2626' },
-    { name: 'Comparecimento ( ganho )', description: 'Paciente compareceu',         position: 7, closed: true,  color: '#086944' }
+    { name: 'Comparecimento (ganho)', description: 'Paciente compareceu',         position: 7, closed: true,  color: '#086944' }
   ].freeze
 
   def self.seed_global_stages!
