@@ -732,7 +732,7 @@ Rails.application.routes.draw do
       resources :loss_reasons, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resource :instance_status, only: [:show]
       namespace :reports do
-        resource :baileys_inbox_status, only: [:show], controller: :baileys_inbox_status do
+        resource :inbox_status, only: [:show], controller: :inbox_status do
           get :data, on: :member
         end
       end

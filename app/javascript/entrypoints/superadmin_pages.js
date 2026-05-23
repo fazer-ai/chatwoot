@@ -4,12 +4,12 @@ import VueDOMPurifyHTML from 'vue-dompurify-html';
 
 import PlaygroundIndex from '../superadmin_pages/views/playground/Index.vue';
 import DashboardIndex from '../superadmin_pages/views/dashboard/Index.vue';
-import BaileysInboxStatusIndex from '../superadmin_pages/views/reports/BaileysInboxStatus.vue';
+import InboxStatusIndex from '../superadmin_pages/views/reports/InboxStatus.vue';
 
 const ComponentMapping = {
   PlaygroundIndex: PlaygroundIndex,
   DashboardIndex: DashboardIndex,
-  BaileysInboxStatusIndex: BaileysInboxStatusIndex,
+  InboxStatusIndex: InboxStatusIndex,
 };
 
 const renderComponent = (componentName, props) => {

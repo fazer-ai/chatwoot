@@ -17,6 +17,7 @@ const lastFetchedAt = ref(null);
 
 const filters = ref({
   status: 'all',
+  provider: 'all',
   phone: '',
   account_name: '',
   inbox_name: '',
@@ -24,6 +25,16 @@ const filters = ref({
 });
 
 const selectedInbox = ref(null);
+
+// Provider labels and pill colors so the table reads at a glance.
+const PROVIDER_LABELS = {
+  baileys: 'Baileys',
+  zapi: 'Z-API',
+  whatsapp_cloud: 'WhatsApp Cloud',
+  default: '360Dialog',
+};
+
+const providerLabel = provider => PROVIDER_LABELS[provider] || provider || '—';
 
 const fetchData = async () => {
   loading.value = true;
@@ -51,6 +62,11 @@ const filteredInboxes = computed(() => {
   return inboxes.value.filter(row => {
     if (filters.value.status === 'connected' && !row.connected) return false;
     if (filters.value.status === 'disconnected' && row.connected) return false;
+    if (
+      filters.value.provider !== 'all' &&
+      row.provider !== filters.value.provider
+    )
+      return false;
     if (
       filters.value.phone &&
       !String(row.phone_number || '')
@@ -91,6 +107,13 @@ const inboxNameOptions = computed(() => {
   return Array.from(set).sort();
 });
 
+// Providers actually present in the loaded data — keeps the dropdown
+// from showing options that would always match zero rows.
+const providerOptions = computed(() => {
+  const set = new Set(inboxes.value.map(i => i.provider).filter(Boolean));
+  return Array.from(set).sort();
+});
+
 const filteredCounts = computed(() =>
   filteredInboxes.value.reduce(
     (acc, row) => ({
@@ -116,6 +139,10 @@ const lastFetchedLabel = computed(() => {
 });
 
 const openConnectModal = inbox => {
+  // The QR / reconnect modal only makes sense for socket-paired
+  // providers (Baileys + Z-API). Cloud / 360Dialog inboxes are
+  // always-on from our side, so don't even open the modal for them.
+  if (!inbox.reconnect_supported) return;
   selectedInbox.value = inbox;
 };
 
@@ -130,6 +157,7 @@ const onModalUpdated = async () => {
 const resetFilters = () => {
   filters.value = {
     status: 'all',
+    provider: 'all',
     phone: '',
     account_name: '',
     inbox_name: '',
@@ -144,7 +172,7 @@ const resetFilters = () => {
       <header class="flex flex-col gap-1 pt-6 pb-5">
         <div class="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 class="text-heading-1 text-n-slate-12">Inbox status Baileys</h1>
+            <h1 class="text-heading-1 text-n-slate-12">Inbox status</h1>
             <p class="text-sm text-n-slate-11 mt-1">
               Última atualização: {{ lastFetchedLabel }}
             </p>
@@ -219,7 +247,7 @@ const resetFilters = () => {
       <div
         class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-6 py-5 mb-6"
       >
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
           <label class="flex flex-col text-xs text-n-slate-11">
             Status
             <select
@@ -229,6 +257,22 @@ const resetFilters = () => {
               <option value="all">Todos</option>
               <option value="connected">Conectado</option>
               <option value="disconnected">Desconectado</option>
+            </select>
+          </label>
+          <label class="flex flex-col text-xs text-n-slate-11">
+            Provider
+            <select
+              v-model="filters.provider"
+              class="mt-1 bg-n-alpha-black2 outline outline-1 outline-n-weak rounded-lg px-2 py-1.5 text-sm text-n-slate-12 focus:outline-n-brand"
+            >
+              <option value="all">Todos</option>
+              <option
+                v-for="provider in providerOptions"
+                :key="provider"
+                :value="provider"
+              >
+                {{ providerLabel(provider) }}
+              </option>
             </select>
           </label>
           <label class="flex flex-col text-xs text-n-slate-11">
@@ -294,6 +338,7 @@ const resetFilters = () => {
                 Account ID
               </th>
               <th class="text-left px-5 py-3 font-medium text-sm">Inbox</th>
+              <th class="text-left px-5 py-3 font-medium text-sm">Provider</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Telefone</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Status</th>
               <th
@@ -312,6 +357,9 @@ const resetFilters = () => {
               <td class="px-5 py-4">{{ row.account_name }}</td>
               <td class="px-5 py-4 text-n-slate-11">{{ row.account_id }}</td>
               <td class="px-5 py-4">{{ row.inbox_name }}</td>
+              <td class="px-5 py-4 text-n-slate-11">
+                {{ providerLabel(row.provider) }}
+              </td>
               <td class="px-5 py-4 font-mono text-xs">
                 {{ row.phone_number }}
               </td>
@@ -332,27 +380,32 @@ const resetFilters = () => {
                 </span>
               </td>
               <td class="px-5 py-4 w-px whitespace-nowrap">
-                <button
-                  v-if="!row.connected"
-                  type="button"
-                  class="px-2.5 py-1 rounded-lg bg-n-brand text-white text-xs font-medium hover:bg-n-brand/90"
-                  @click="openConnectModal(row)"
-                >
-                  Conectar dispositivo
-                </button>
-                <button
-                  v-else
-                  type="button"
-                  class="px-2.5 py-1 rounded-lg bg-n-alpha-2 text-n-slate-12 text-xs font-medium hover:bg-n-alpha-3"
-                  @click="openConnectModal(row)"
-                >
-                  Detalhes
-                </button>
+                <!-- Only the socket-paired providers expose a
+                     reconnect-via-QR flow; cloud / 360Dialog don't. -->
+                <template v-if="row.reconnect_supported">
+                  <button
+                    v-if="!row.connected"
+                    type="button"
+                    class="px-2.5 py-1 rounded-lg bg-n-brand text-white text-xs font-medium hover:bg-n-brand/90"
+                    @click="openConnectModal(row)"
+                  >
+                    Conectar dispositivo
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="px-2.5 py-1 rounded-lg bg-n-alpha-2 text-n-slate-12 text-xs font-medium hover:bg-n-alpha-3"
+                    @click="openConnectModal(row)"
+                  >
+                    Detalhes
+                  </button>
+                </template>
+                <span v-else class="text-xs text-n-slate-10">—</span>
               </td>
             </tr>
             <tr v-if="!filteredInboxes.length">
-              <td colspan="6" class="px-5 py-8 text-center text-n-slate-11">
-                Nenhuma inbox Baileys encontrada com os filtros atuais.
+              <td colspan="7" class="px-5 py-8 text-center text-n-slate-11">
+                Nenhuma inbox encontrada com os filtros atuais.
               </td>
             </tr>
           </tbody>

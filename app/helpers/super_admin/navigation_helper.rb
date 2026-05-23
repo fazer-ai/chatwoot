@@ -15,13 +15,13 @@ module SuperAdmin::NavigationHelper
   end
 
   def reports_open?
-    params[:controller].in? %w[super_admin/reports/baileys_inbox_status super_admin/instance_statuses]
+    params[:controller].in? %w[super_admin/reports/inbox_status super_admin/instance_statuses]
   end
 
   def reports_pages
     [
-      { label: 'Inbox status Baileys', url: super_admin_reports_baileys_inbox_status_url },
-      { label: 'Instance Health',      url: super_admin_instance_status_url }
+      { label: 'Inbox status',    url: super_admin_reports_inbox_status_url },
+      { label: 'Instance Health', url: super_admin_instance_status_url }
     ]
   end
 end
