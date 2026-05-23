@@ -9,7 +9,8 @@ import { messageStamp } from 'shared/helpers/timeHelper';
 import messageMixin from '../mixins/messageMixin';
 import ReplyToChip from 'simulator/components/ReplyToChip.vue';
 import DragWrapper from 'simulator/components/DragWrapper.vue';
-import MessageReactions from 'simulator/components/MessageReactions.vue';
+import MessageReactionTrigger from 'simulator/components/MessageReactionTrigger.vue';
+import MessageReactionChips from 'simulator/components/MessageReactionChips.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 import { mapGetters } from 'vuex';
@@ -25,7 +26,8 @@ export default {
     FluentIcon,
     ReplyToChip,
     DragWrapper,
-    MessageReactions,
+    MessageReactionTrigger,
+    MessageReactionChips,
   },
   mixins: [messageMixin],
   props: {
@@ -114,12 +116,16 @@ export default {
         <div v-if="hasReplyTo" class="flex justify-end mt-2 mb-1 text-xs">
           <ReplyToChip :reply-to="replyTo" />
         </div>
-        <div class="flex justify-end gap-1">
-          <div class="flex flex-col justify-end">
-            <MessageReplyButton
-              v-if="!isInProgress && !isFailed"
-              class="transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
-              @click="toggleReply"
+        <div class="flex justify-end gap-1 items-center">
+          <div
+            v-if="!isInProgress && !isFailed"
+            class="flex flex-col items-center gap-1 transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
+          >
+            <MessageReplyButton @click="toggleReply" />
+            <MessageReactionTrigger
+              v-if="typeof message.id === 'number'"
+              :message-id="message.id"
+              alignment="left"
             />
           </div>
           <DragWrapper direction="left" @dragged="toggleReply">
@@ -130,7 +136,7 @@ export default {
                 :status="message.status"
                 :created-at="message.created_at"
               />
-              <MessageReactions
+              <MessageReactionChips
                 v-if="
                   !isInProgress && !isFailed && typeof message.id === 'number'
                 "

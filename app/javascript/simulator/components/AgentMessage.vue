@@ -12,7 +12,8 @@ import configMixin from '../mixins/configMixin';
 import messageMixin from '../mixins/messageMixin';
 import { isASubmittedFormMessage } from 'shared/helpers/MessageTypeHelper';
 import ReplyToChip from 'simulator/components/ReplyToChip.vue';
-import MessageReactions from 'simulator/components/MessageReactions.vue';
+import MessageReactionTrigger from 'simulator/components/MessageReactionTrigger.vue';
+import MessageReactionChips from 'simulator/components/MessageReactionChips.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 
@@ -27,7 +28,8 @@ export default {
     FileBubble,
     MessageReplyButton,
     ReplyToChip,
-    MessageReactions,
+    MessageReactionTrigger,
+    MessageReactionChips,
   },
   mixins: [configMixin, messageMixin],
   props: {
@@ -208,7 +210,7 @@ export default {
                 :message="message.content"
                 :created-at="message.created_at"
               />
-              <MessageReactions
+              <MessageReactionChips
                 v-if="
                   shouldDisplayAgentMessage && typeof message.id === 'number'
                 "
@@ -250,10 +252,14 @@ export default {
               </div>
             </div>
           </div>
-          <div class="flex flex-col justify-end">
-            <MessageReplyButton
-              class="transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
-              @click="toggleReply"
+          <div
+            class="flex flex-col items-center gap-1 self-center transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
+          >
+            <MessageReplyButton @click="toggleReply" />
+            <MessageReactionTrigger
+              v-if="shouldDisplayAgentMessage && typeof message.id === 'number'"
+              :message-id="message.id"
+              alignment="right"
             />
           </div>
         </div>
