@@ -13,7 +13,6 @@ import MessageReactionTrigger from 'simulator/components/MessageReactionTrigger.
 import MessageReactionChips from 'simulator/components/MessageReactionChips.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
-import { mapGetters } from 'vuex';
 
 export default {
   name: 'UserMessage',
@@ -47,10 +46,6 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
-      widgetColor: 'appConfig/getWidgetColor',
-    }),
-
     isInProgress() {
       const { status = '' } = this.message;
       return status === 'in_progress';
@@ -167,7 +162,6 @@ export default {
                   v-else
                   :url="attachment.data_url"
                   :is-in-progress="isInProgress"
-                  :widget-color="widgetColor"
                   is-user-bubble
                 />
               </div>
