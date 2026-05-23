@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.22.1
+  published_at: '2026-05-23T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Simulator inbox shows the correct label.** On test accounts, the **Simulator** inbox was listed with a raw technical key instead of a readable name; it now shows up as "Simulator" in the inbox list.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Caixa de entrada do Simulador com o rótulo certo.** Em contas de teste, a inbox **Simulador** estava sendo listada com um texto técnico ilegível; agora aparece como "Simulador" na lista de caixas de entrada.
 - tag: v4.13.0-auris.1.22
   published_at: '2026-05-22T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22
@@ -445,39 +457,3 @@
       token: loss_reason`.\n- **Página inicial do super admin.** Carregar `/super_admin`
       quebrava com erro 500 logo após o ship do 2FA porque os controllers novos de
       MFA estavam sendo auto-detectados na navegação lateral. Removidos da nav auto-gerada."
-- tag: v4.13.0-auris.1.6
-  published_at: '2026-05-04T22:43:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.6
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Friendlier funnel stages.** Stages now have human-friendly names (Novo Contato, Em Qualificação, Em Agendamento, Agendado, Reagendado, Confirmado, No-Show, Ganho, Perdido), each with its own color, replacing the old technical labels.
-      - **Per-account average ticket.** Set an average ticket value in super admin; every funnel card displays the value and each column shows the stage total, all formatted using the account's region.
-      - **Drag without reload.** Moving a conversation between stages updates instantly — no full refresh and no success toast.
-      - **Required loss reason.** Moving a conversation to **Perdido** prompts you to pick a loss reason (Achou caro, Busca convênio, Parou de responder, ...). Reasons stay in the audit history and can be managed through the API.
-      - **Contact avatar on cards.** Each card shows the contact picture next to the name with the AI badge on the same line, making the card more compact.
-      - **Loss reason inline on the card.** Cards in **Perdido** have a red button that reveals the loss reason recorded on the latest move, mirroring the summary toggle.
-      - **New funnel_updated webhook event.** Subscribe to it on the webhook form to plug funnel moves into external systems.
-      - **Pause Baileys WhatsApp auto-reconnection.** Administrators can now cancel and resume auto-reconnection for each Baileys WhatsApp inbox directly on the inbox configuration page, avoiding storms of reconnection attempts when many numbers are disconnected.
-
-      ### ⚡ Improvements
-
-      - **More useful funnel list view.** The #ID column is gone; **Valor** (ticket value) and **Tempo desde abertura** (time open) are in.
-      - **Stage description tooltip.** The column description now appears as a tooltip over the stage name instead of taking a permanent line on the header.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Funil mais claro.** As fases agora têm nomes amigáveis (Novo Contato, Em Qualificação, Em Agendamento, Agendado, Reagendado, Confirmado, No-Show, Ganho, Perdido), cada uma com sua cor, no lugar dos antigos rótulos técnicos.
-      - **Ticket médio por conta.** Defina o valor médio de ticket no super admin; cada card do funil exibe o valor e cada coluna mostra o total da fase, tudo formatado pela região da conta.
-      - **Arraste sem recarregar.** Mover uma conversa entre fases atualiza na hora — sem reload e sem mensagem de confirmação.
-      - **Motivo da perda obrigatório.** Ao mover uma conversa para **Perdido**, o sistema pede um motivo (Achou caro, Busca convênio, Parou de responder, ...). Os motivos ficam no histórico e podem ser gerenciados pela API.
-      - **Avatar do contato no card.** Cada card mostra a foto do contato ao lado do nome, com o badge da IA na mesma linha — card mais compacto.
-      - **Motivo da perda direto no card.** Cards na fase **Perdido** têm um botão vermelho que revela inline o motivo registrado na última movimentação, no mesmo padrão do resumo da conversa.
-      - **Novo evento de webhook funnel_updated.** Marque a opção no formulário de webhooks para integrar as movimentações do funil com sistemas externos.
-      - **Pausar reconexão do WhatsApp Baileys.** Administradores agora podem cancelar e reativar a reconexão automática de cada caixa WhatsApp Baileys direto na tela de configuração da inbox, evitando picos de tentativas quando muitos números estão desconectados.
-
-      ### ⚡ Melhorias
-
-      - **Visualização em Lista do funil mais útil.** A coluna #ID saiu; entraram **Valor** (ticket) e **Tempo desde abertura**.
-      - **Tooltip da descrição.** A descrição da fase aparece em tooltip sobre o nome da coluna em vez de ocupar uma linha fixa no cabeçalho.
