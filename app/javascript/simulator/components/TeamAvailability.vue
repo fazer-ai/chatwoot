@@ -6,6 +6,7 @@ import GroupedAvatars from 'simulator/components/GroupedAvatars.vue';
 import { useAvailability } from 'simulator/composables/useAvailability';
 import { useMapGetter } from 'dashboard/composables/store.js';
 import { toRef } from 'vue';
+import { toggleStatus as toggleStatusAPI } from 'simulator/api/conversation';
 
 const props = defineProps({
   availableAgents: { type: Array, default: () => [] },
@@ -33,10 +34,20 @@ const startConversation = () => {
 };
 
 // Reset the simulator session and reload the iframe so the next bootstrap
-// provisions a fresh contact_inbox + conversation. Clearing both storages
-// and the cookie jar is the cleanest way to wipe whatever the widget SDK
-// persisted (auth token, cw_conversation, source_id).
-const startFreshConversation = () => {
+// provisions a fresh contact_inbox + conversation. Before clearing local
+// state we resolve the *current* conversation server-side via the widget
+// `toggle_status` endpoint, so the dashboard side doesn't accumulate
+// abandoned `open` conversations every time the operator starts over.
+// `await` ensures the resolve has been acknowledged before the reload
+// wipes the auth token we need to authenticate the request.
+const startFreshConversation = async () => {
+  try {
+    await toggleStatusAPI();
+  } catch (error) {
+    // Network / 403 / etc -- swallow so the operator can still reset.
+    // The worst case is a stale `open` conversation on the dashboard,
+    // which is just noise, not a blocker.
+  }
   try {
     window.localStorage?.clear();
     window.sessionStorage?.clear();

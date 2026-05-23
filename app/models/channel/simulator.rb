@@ -57,8 +57,14 @@ class Channel::Simulator < ApplicationRecord
     ).perform
   end
 
+  # Authorises the widget `toggle_status` endpoint so the simulator's
+  # "Iniciar uma nova conversa" flow can resolve the current
+  # conversation on the AurisChat side before the iframe reloads. The
+  # public widget exposes a "Close" affordance off this flag too, but
+  # we control the SDK UI here -- `end_conversation` is intentionally
+  # absent from `selected_feature_flags`, so no SDK-side button shows.
   def end_conversation?
-    false
+    true
   end
 
   def hmac_mandatory

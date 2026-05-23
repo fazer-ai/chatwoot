@@ -35,8 +35,8 @@ RSpec.describe Channel::Simulator do
     let(:account) { create(:account) }
     let(:channel) { account.simulator_channels.first }
 
-    it 'reports end_conversation? as false so the simulator UI cannot self-close' do
-      expect(channel.end_conversation?).to be false
+    it 'reports end_conversation? as true so the widget toggle_status endpoint resolves the conversation' do
+      expect(channel.end_conversation?).to be true
     end
 
     it 'reports hmac_mandatory as false (no HMAC for the simulator)' do
