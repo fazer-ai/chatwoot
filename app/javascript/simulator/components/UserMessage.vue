@@ -9,9 +9,10 @@ import { messageStamp } from 'shared/helpers/timeHelper';
 import messageMixin from '../mixins/messageMixin';
 import ReplyToChip from 'simulator/components/ReplyToChip.vue';
 import DragWrapper from 'simulator/components/DragWrapper.vue';
+import MessageReactionTrigger from 'simulator/components/MessageReactionTrigger.vue';
+import MessageReactionChips from 'simulator/components/MessageReactionChips.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
-import { mapGetters } from 'vuex';
 
 export default {
   name: 'UserMessage',
@@ -24,6 +25,8 @@ export default {
     FluentIcon,
     ReplyToChip,
     DragWrapper,
+    MessageReactionTrigger,
+    MessageReactionChips,
   },
   mixins: [messageMixin],
   props: {
@@ -43,10 +46,6 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
-      widgetColor: 'appConfig/getWidgetColor',
-    }),
-
     isInProgress() {
       const { status = '' } = this.message;
       return status === 'in_progress';
@@ -112,21 +111,33 @@ export default {
         <div v-if="hasReplyTo" class="flex justify-end mt-2 mb-1 text-xs">
           <ReplyToChip :reply-to="replyTo" />
         </div>
-        <div class="flex justify-end gap-1">
-          <div class="flex flex-col justify-end">
-            <MessageReplyButton
-              v-if="!isInProgress && !isFailed"
-              class="transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
-              @click="toggleReply"
+        <div class="flex justify-end gap-1 items-center">
+          <div
+            v-if="!isInProgress && !isFailed"
+            class="flex flex-col items-center gap-1 transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
+          >
+            <MessageReplyButton @click="toggleReply" />
+            <MessageReactionTrigger
+              v-if="typeof message.id === 'number'"
+              :message-id="message.id"
+              alignment="left"
             />
           </div>
           <DragWrapper direction="left" @dragged="toggleReply">
-            <UserMessageBubble
-              v-if="showTextBubble"
-              :message="message.content"
-              :status="message.status"
-              :created-at="message.created_at"
-            />
+            <div class="relative">
+              <UserMessageBubble
+                v-if="showTextBubble"
+                :message="message.content"
+                :status="message.status"
+                :created-at="message.created_at"
+              />
+              <MessageReactionChips
+                v-if="
+                  !isInProgress && !isFailed && typeof message.id === 'number'
+                "
+                :message-id="message.id"
+              />
+            </div>
             <div v-if="hasAttachments" class="chat-bubble has-attachment user">
               <div
                 v-for="attachment in message.attachments"
@@ -151,7 +162,6 @@ export default {
                   v-else
                   :url="attachment.data_url"
                   :is-in-progress="isInProgress"
-                  :widget-color="widgetColor"
                   is-user-bubble
                 />
               </div>

@@ -9,6 +9,7 @@ import {
   setCustomAttributes,
   deleteCustomAttribute,
 } from 'simulator/api/conversation';
+import MessageApi from 'simulator/api/message';
 
 import { ON_CONVERSATION_CREATED } from 'simulator/constants/widgetBusEvents';
 import { createTemporaryMessage, getNonDeletedMessages } from './helpers';
@@ -236,6 +237,20 @@ export const actions = {
       await deleteCustomAttribute(customAttribute);
     } catch (error) {
       // IgnoreError
+    }
+  },
+  // Toggle a reaction emoji on a target message. Sending an empty string
+  // is the explicit "remove my reaction" signal; sending the same emoji
+  // that's already active also removes (mirrors WhatsApp behaviour).
+  // The new / updated / soft-deleted reaction message comes back over
+  // Action Cable, so no optimistic mutation is needed here.
+  toggleReaction: async (_ctx, { messageId, emoji }) => {
+    try {
+      await MessageApi.toggleReaction({ messageId, emoji });
+    } catch (error) {
+      // Swallow: the cable broadcast won't fire on failure, so the UI
+      // simply stays on its current state (no chip update). A future
+      // pass could surface a toast.
     }
   },
 };

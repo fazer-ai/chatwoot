@@ -35,8 +35,8 @@ RSpec.describe Channel::Simulator do
     let(:account) { create(:account) }
     let(:channel) { account.simulator_channels.first }
 
-    it 'reports end_conversation? as false so the simulator UI cannot self-close' do
-      expect(channel.end_conversation?).to be false
+    it 'reports end_conversation? as true so the widget toggle_status endpoint resolves the conversation' do
+      expect(channel.end_conversation?).to be true
     end
 
     it 'reports hmac_mandatory as false (no HMAC for the simulator)' do
@@ -54,6 +54,14 @@ RSpec.describe Channel::Simulator do
       contact_inbox = ContactInbox.last
       expect(contact_inbox.inbox_id).to eq(channel.inbox.id)
       expect(contact_inbox.contact.additional_attributes['country']).to eq('BR')
+    end
+
+    it 'enables the attachments + emoji_picker feature flags by default' do
+      expect(channel.selected_feature_flags).to match_array(%w[attachments emoji_picker])
+    end
+
+    it 'reports supports_reactions? as true so the reaction toolbar lights up' do
+      expect(channel.supports_reactions?).to be true
     end
   end
 end

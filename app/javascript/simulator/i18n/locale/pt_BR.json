@@ -106,6 +106,9 @@
     "NOT_FOUND": "Nenhum emoji corresponde à sua pesquisa",
     "ARIA_LABEL": "Seletor de emoji"
   },
+  "REACTIONS": {
+    "REACT_LABEL": "Reagir"
+  },
   "CSAT": {
     "TITLE": "Avalie sua conversa",
     "SUBMITTED_TITLE": "Obrigado por enviar a classificação",

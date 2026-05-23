@@ -106,6 +106,9 @@
     "NOT_FOUND": "No emoji match your search",
     "ARIA_LABEL": "Emoji picker"
   },
+  "REACTIONS": {
+    "REACT_LABEL": "React"
+  },
   "CSAT": {
     "TITLE": "Rate your conversation",
     "SUBMITTED_TITLE": "Thank you for submitting the rating",

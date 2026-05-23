@@ -62,6 +62,9 @@ export default {
     isAVoiceChannel() {
       return this.channelType === INBOX_TYPES.VOICE;
     },
+    isASimulatorInbox() {
+      return this.channelType === INBOX_TYPES.SIMULATOR;
+    },
     isAnEmailChannel() {
       return this.channelType === INBOX_TYPES.EMAIL;
     },

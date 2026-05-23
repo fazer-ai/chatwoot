@@ -143,6 +143,7 @@ const props = defineProps({
   sourceId: { type: String, default: '' }, // eslint-disable-line vue/no-unused-properties
   reactions: { type: Array, default: () => [] },
   inboxSupportsReactions: { type: Boolean, default: false },
+  inboxReactionRequiresSourceId: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['retry', 'toggleReaction']);
@@ -441,7 +442,9 @@ const canShowReactionToolbar = computed(() => {
   // Mirror ReactionsController#target_unreactable_error: a message without a
   // provider source_id can't be reacted to on WhatsApp, so the API would 422
   // if the user clicked. Hide the picker instead of offering a dead action.
-  if (!props.sourceId) return false;
+  // The simulator inbox doesn't round-trip through a provider, so it opts
+  // out of this guard via `inboxReactionRequiresSourceId = false`.
+  if (props.inboxReactionRequiresSourceId && !props.sourceId) return false;
   return true;
 });
 
