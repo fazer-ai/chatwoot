@@ -1,4 +1,38 @@
 ---
+- tag: v4.13.0-auris.1.22
+  published_at: '2026-05-22T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **WhatsApp simulator for test accounts.** Chat with your own account as if you were a customer — full WhatsApp look, attachments, reactions, and a floating window you can open whenever you need it.
+      - **Account environment (test or production).** Mark each account as test or production from Super Admin. Test accounts get a banner inside the app and a clear label on the sidebar so nobody confuses them with real ones.
+      - **Quick search on the account switcher.** Type part of an account name in the sidebar to find and switch accounts without scrolling the list.
+
+      ### ⚡ Improvements
+
+      - **Inbox status report now covers every WhatsApp provider.** See Baileys, Z-API, and WhatsApp Cloud side by side from Super Admin, each with its current connection state.
+      - **Report dates and durations in your language.** Report charts and stats now follow the account language — dates and time units appear in the right format for pt-BR or en.
+
+      ### 🐛 Fixes
+
+      - **Auto-resolve no longer fires twice.** Conversations that reach the idle timeout are closed once, without duplicate events in the history.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Simulador de WhatsApp para contas de teste.** Converse com a própria conta como se fosse um cliente — visual de WhatsApp, anexos, reações e janela flutuante que você abre a qualquer momento.
+      - **Ambiente da conta (teste ou produção).** Defina se uma conta é de teste ou produção pelo Super Admin. Contas de teste ganham aviso dentro do app e identificação clara na lateral, evitando confusão com contas reais.
+      - **Busca rápida no seletor de contas.** Digite parte do nome da conta direto na barra lateral para encontrar e trocar de conta sem rolar a lista.
+
+      ### ⚡ Melhorias
+
+      - **Relatório de status de caixas de entrada agora cobre todos os provedores de WhatsApp.** Veja Baileys, Z-API e WhatsApp Cloud lado a lado no Super Admin, cada um com o seu status de conexão.
+      - **Datas e durações dos relatórios no idioma da conta.** Gráficos e métricas passam a respeitar o idioma — datas e unidades de tempo aparecem no formato certo para pt-BR ou en.
+
+      ### 🐛 Correções
+
+      - **Resolução automática não dispara mais em duplicidade.** Conversas que atingem o tempo de inatividade são fechadas apenas uma vez, sem eventos repetidos no histórico.
 - tag: v4.13.0-auris.1.21.2
   published_at: '2026-05-20T01:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.2
@@ -447,23 +481,3 @@
 
       - **Visualização em Lista do funil mais útil.** A coluna #ID saiu; entraram **Valor** (ticket) e **Tempo desde abertura**.
       - **Tooltip da descrição.** A descrição da fase aparece em tooltip sobre o nome da coluna em vez de ocupar uma linha fixa no cabeçalho.
-- tag: v4.13.0-auris.1.5
-  published_at: '2026-05-03T22:38:51Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.5
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **New Funil menu.** A kanban-style view of conversations grouped by funnel stage, mapped to the existing labels (`kb-novo`, `kb-triagem`, `kb-em_agendamento`, …). Available to administrators, managers and agents.
-      - **Two views per page.** Switch between **Quadro** (kanban board) and **Lista** (collapsible grouped table) at the top of the page. The board comes with drag-and-drop between columns; each move re-tags the conversation with the matching label and records the change for audit.
-      - **Quick actions on every card and row.** Open the conversation summary, jump straight to the conversation, or open the contact — same three shortcuts on Quadro cards and Lista rows.
-      - **Filters.** Narrow the funnel by inbox, lead-entry date range, or hide closed stages with a single checkbox.
-      - **Hover the column title.** A small tip shows which label backs the stage (e.g. "Etiqueta kb-confirmado") so it's clear which tag will be applied when a conversation lands there.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Novo menu Funil.** Visão estilo kanban das conversas agrupadas por fase do funil, atreladas às etiquetas existentes (`kb-novo`, `kb-triagem`, `kb-em_agendamento`, …). Disponível para administradores, gerentes e agentes.
-      - **Duas visualizações na mesma tela.** Alterne entre **Quadro** (board kanban) e **Lista** (tabela agrupada e colapsável) no topo da página. O quadro tem arrastar-e-soltar entre as colunas; cada movimentação re-atribui a etiqueta correspondente e registra a mudança no histórico.
-      - **Ações rápidas em cada card e linha.** Abrir o resumo da conversa, ir direto pra conversa, ou abrir o contato — os mesmos três atalhos no card do Quadro e na linha da Lista.
-      - **Filtros.** Filtre o funil por caixa de entrada, intervalo de entrada do lead, ou oculte fases finalizadas com um clique.
-      - **Hover no título da coluna.** Um tooltip mostra qual etiqueta sustenta a fase (ex.: "Etiqueta kb-confirmado") — fica claro qual marcação será aplicada quando uma conversa entrar lá.
