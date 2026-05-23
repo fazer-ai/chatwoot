@@ -130,6 +130,14 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
     render json: { error: 'Reactions are not supported on this channel' }, status: :unprocessable_entity
   end
 
+  # Provider-routed channels (WhatsApp) need a real `source_id` on the
+  # target before a reaction is deliverable. Channels that round-trip
+  # through Chatwoot only (e.g. Channel::Simulator) don't, so we skip
+  # that guard for them.
+  def reaction_requires_source_id?
+    @conversation.inbox.channel.is_a?(Channel::Whatsapp)
+  end
+
   def fetch_target_message
     @target_message = @conversation.messages.find(params[:message_id])
   end
@@ -153,7 +161,7 @@ class Api::V1::Accounts::Conversations::Messages::ReactionsController < Api::V1:
     return 'Cannot react to template messages' if @target_message.template?
     return 'Cannot react to failed messages' if @target_message.failed?
     return 'Cannot react to unsupported messages' if @target_message.content_attributes['is_unsupported']
-    return 'Target message is not deliverable to WhatsApp' if @target_message.source_id.blank?
+    return 'Target message is not deliverable to WhatsApp' if reaction_requires_source_id? && @target_message.source_id.blank?
 
     nil
   end

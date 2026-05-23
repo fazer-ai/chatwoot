@@ -9,4 +9,8 @@ export default {
       message: { submitted_values: values },
     });
   },
+  toggleReaction: ({ messageId, emoji }) => {
+    const urlData = authEndPoint.toggleReaction(messageId, emoji);
+    return API.post(urlData.url, urlData.params);
+  },
 };

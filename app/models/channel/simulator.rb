@@ -69,8 +69,12 @@ class Channel::Simulator < ApplicationRecord
     nil
   end
 
+  # Feature flags the widget SDK reads at boot to toggle the attachment
+  # button and the emoji picker in the chat footer. We turn both on by
+  # default for the simulator so role-playing matches WhatsApp's
+  # behaviour (image / document send + reaction-style emoji picking).
   def selected_feature_flags
-    []
+    %w[attachments emoji_picker]
   end
 
   def pre_chat_form_enabled
@@ -96,5 +100,14 @@ class Channel::Simulator < ApplicationRecord
   # Matches the WhatsApp brand green so the simulator UI feels native.
   def widget_color
     '#25D366'
+  end
+
+  # Mirror the WhatsApp channel's reactions support so the dashboard's
+  # reaction toolbar lights up for messages in the Simulador inbox and
+  # so `Api::V1::Accounts::Conversations::Messages::ReactionsController`
+  # accepts the toggle. The simulator-side widget endpoint at
+  # `Api::V1::Widget::ReactionsController` also checks this method.
+  def supports_reactions?
+    true
   end
 end

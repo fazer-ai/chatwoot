@@ -55,5 +55,13 @@ RSpec.describe Channel::Simulator do
       expect(contact_inbox.inbox_id).to eq(channel.inbox.id)
       expect(contact_inbox.contact.additional_attributes['country']).to eq('BR')
     end
+
+    it 'enables the attachments + emoji_picker feature flags by default' do
+      expect(channel.selected_feature_flags).to match_array(%w[attachments emoji_picker])
+    end
+
+    it 'reports supports_reactions? as true so the reaction toolbar lights up' do
+      expect(channel.supports_reactions?).to be true
+    end
   end
 end

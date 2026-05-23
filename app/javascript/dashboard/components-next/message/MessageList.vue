@@ -42,6 +42,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  inboxReactionRequiresSourceId: {
+    type: Boolean,
+    default: true,
+  },
   messages: {
     type: Array,
     default: () => [],
@@ -300,6 +304,7 @@ const getInReplyToMessage = parentMessage => {
         :inbox-supports-reply-to="inboxSupportsReplyTo"
         :inbox-supports-edit="inboxSupportsEdit"
         :inbox-supports-reactions="inboxSupportsReactions"
+        :inbox-reaction-requires-source-id="inboxReactionRequiresSourceId"
         :reactions="reactionsByMessageId.get(message.id) || []"
         :current-user-id="currentUserId"
         data-clarity-mask="True"

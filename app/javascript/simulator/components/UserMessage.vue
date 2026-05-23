@@ -9,6 +9,7 @@ import { messageStamp } from 'shared/helpers/timeHelper';
 import messageMixin from '../mixins/messageMixin';
 import ReplyToChip from 'simulator/components/ReplyToChip.vue';
 import DragWrapper from 'simulator/components/DragWrapper.vue';
+import MessageReactions from 'simulator/components/MessageReactions.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 import { mapGetters } from 'vuex';
@@ -24,6 +25,7 @@ export default {
     FluentIcon,
     ReplyToChip,
     DragWrapper,
+    MessageReactions,
   },
   mixins: [messageMixin],
   props: {
@@ -121,12 +123,20 @@ export default {
             />
           </div>
           <DragWrapper direction="left" @dragged="toggleReply">
-            <UserMessageBubble
-              v-if="showTextBubble"
-              :message="message.content"
-              :status="message.status"
-              :created-at="message.created_at"
-            />
+            <div class="relative">
+              <UserMessageBubble
+                v-if="showTextBubble"
+                :message="message.content"
+                :status="message.status"
+                :created-at="message.created_at"
+              />
+              <MessageReactions
+                v-if="
+                  !isInProgress && !isFailed && typeof message.id === 'number'
+                "
+                :message-id="message.id"
+              />
+            </div>
             <div v-if="hasAttachments" class="chat-bubble has-attachment user">
               <div
                 v-for="attachment in message.attachments"

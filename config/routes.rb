@@ -484,7 +484,9 @@ Rails.application.routes.draw do
         resource :config, only: [:create]
         resources :campaigns, only: [:index]
         resources :events, only: [:create]
-        resources :messages, only: [:index, :create, :update]
+        resources :messages, only: [:index, :create, :update] do
+          resource :reactions, only: [:create]
+        end
         resources :conversations, only: [:index, :create] do
           collection do
             post :destroy_custom_attributes

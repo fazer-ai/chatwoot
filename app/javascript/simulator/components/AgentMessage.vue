@@ -12,6 +12,7 @@ import configMixin from '../mixins/configMixin';
 import messageMixin from '../mixins/messageMixin';
 import { isASubmittedFormMessage } from 'shared/helpers/MessageTypeHelper';
 import ReplyToChip from 'simulator/components/ReplyToChip.vue';
+import MessageReactions from 'simulator/components/MessageReactions.vue';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 
@@ -26,6 +27,7 @@ export default {
     FileBubble,
     MessageReplyButton,
     ReplyToChip,
+    MessageReactions,
   },
   mixins: [configMixin, messageMixin],
   props: {
@@ -196,15 +198,23 @@ export default {
                 !messageContentAttributes?.submitted_values,
             }"
           >
-            <AgentMessageBubble
-              v-if="shouldDisplayAgentMessage"
-              :content-type="contentType"
-              :message-content-attributes="messageContentAttributes"
-              :message-id="message.id"
-              :message-type="messageType"
-              :message="message.content"
-              :created-at="message.created_at"
-            />
+            <div class="relative">
+              <AgentMessageBubble
+                v-if="shouldDisplayAgentMessage"
+                :content-type="contentType"
+                :message-content-attributes="messageContentAttributes"
+                :message-id="message.id"
+                :message-type="messageType"
+                :message="message.content"
+                :created-at="message.created_at"
+              />
+              <MessageReactions
+                v-if="
+                  shouldDisplayAgentMessage && typeof message.id === 'number'
+                "
+                :message-id="message.id"
+              />
+            </div>
             <div
               v-if="hasAttachments"
               class="space-y-2 chat-bubble has-attachment agent bg-n-background dark:bg-n-solid-3"

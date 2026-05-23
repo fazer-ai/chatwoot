@@ -87,6 +87,11 @@ const updateMessage = id => ({
   url: `/api/v1/widget/messages/${id}${window.location.search}`,
 });
 
+const toggleReaction = (messageId, emoji) => ({
+  url: `/api/v1/widget/messages/${messageId}/reactions${window.location.search}`,
+  params: { emoji },
+});
+
 const getAvailableAgents = token => ({
   url: '/api/v1/widget/inbox_members',
   params: {
@@ -130,6 +135,7 @@ export default {
   sendAttachment,
   getConversation,
   updateMessage,
+  toggleReaction,
   getAvailableAgents,
   getCampaigns,
   triggerCampaign,

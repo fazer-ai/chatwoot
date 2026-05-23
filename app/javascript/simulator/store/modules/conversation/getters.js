@@ -3,6 +3,17 @@ import { groupBy } from 'simulator/helpers/utils';
 import { groupConversationBySender } from './helpers';
 import { formatUnixDate } from 'shared/helpers/DateHelper';
 
+// A reaction message is stored as a regular Message row with
+// `content_attributes.is_reaction: true`. We strip these from the
+// scrollable message feed and instead surface them as a chip on the
+// target bubble (see `getReactionsByMessageId`).
+const isReactionMessage = message => !!message?.content_attributes?.is_reaction;
+
+const isActiveReaction = message =>
+  isReactionMessage(message) &&
+  message.content &&
+  !message.content_attributes?.deleted;
+
 export const getters = {
   getAllMessagesLoaded: _state => _state.uiFlags.allMessagesLoaded,
   getIsCreating: _state => _state.uiFlags.isCreating,
@@ -24,14 +35,36 @@ export const getters = {
     return {};
   },
   getGroupedConversation: _state => {
-    const conversationGroupedByDate = groupBy(
-      Object.values(_state.conversations),
-      message => formatUnixDate(message.created_at)
+    const messagesForFeed = Object.values(_state.conversations).filter(
+      message => !isReactionMessage(message)
+    );
+    const conversationGroupedByDate = groupBy(messagesForFeed, message =>
+      formatUnixDate(message.created_at)
     );
     return Object.keys(conversationGroupedByDate).map(date => ({
       date,
       messages: groupConversationBySender(conversationGroupedByDate[date]),
     }));
+  },
+  // Returns a map keyed by target_message_id with the latest active
+  // reaction from each side ("contact" = simulator user, "agent" =
+  // dashboard user replying from AurisChat). Used by the bubble
+  // components to render a small chip below the message.
+  getReactionsByMessageId: _state => {
+    const map = {};
+    Object.values(_state.conversations).forEach(message => {
+      if (!isActiveReaction(message)) return;
+      const targetId = message.content_attributes?.in_reply_to;
+      if (!targetId) return;
+      if (!map[targetId]) map[targetId] = {};
+      const side =
+        message.message_type === MESSAGE_TYPE.INCOMING ? 'contact' : 'agent';
+      map[targetId][side] = {
+        id: message.id,
+        emoji: message.content,
+      };
+    });
+    return map;
   },
   getPendingCustomAttributes: _state => _state.pendingCustomAttributes,
   getPendingLabels: _state => _state.pendingLabels,

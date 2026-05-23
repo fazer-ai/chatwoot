@@ -282,6 +282,18 @@ export default {
       return (
         this.isAWhatsAppCloudChannel ||
         this.isAWhatsAppBaileysChannel ||
+        this.isAWhatsAppZapiChannel ||
+        this.isASimulatorInbox
+      );
+    },
+    // WhatsApp reactions need a provider-side message id (source_id) so
+    // the toolbar hides it until the message is delivered. The simulator
+    // doesn't round-trip through a provider, so we let the operator
+    // react on every message regardless of source_id.
+    inboxReactionRequiresSourceId() {
+      return (
+        this.isAWhatsAppCloudChannel ||
+        this.isAWhatsAppBaileysChannel ||
         this.isAWhatsAppZapiChannel
       );
     },
@@ -872,6 +884,7 @@ export default {
       :inbox-supports-reply-to="inboxSupportsReplyTo"
       :inbox-supports-edit="inboxSupportsEdit"
       :inbox-supports-reactions="inboxSupportsReactions"
+      :inbox-reaction-requires-source-id="inboxReactionRequiresSourceId"
       :messages="getMessages"
       @retry="handleMessageRetry"
       @toggle-reaction="handleToggleReaction"
