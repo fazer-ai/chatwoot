@@ -1,4 +1,18 @@
 ---
+- tag: v4.13.0-auris.1.23
+  published_at: '2026-05-24T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Toggle AI on or off in bulk from the conversation list.** Pick multiple conversations, open the new toolbar button, and choose to enable (green) or disable (red) the AI on all of them at once.
+      - **AI status in Automation Rules.** You can now use the AI status as a condition ("equals AI Enabled / AI Disabled") and as an action ("Enable AI" / "Disable AI") in any rule — available across every event (conversation created, updated, opened, resolved, and message created).
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Ativar ou desativar a IA em massa direto da lista de conversas.** Selecione várias conversas, abra o novo botão no toolbar de seleção e escolha entre ativar (verde) ou desativar (vermelho) a IA em todas de uma vez.
+      - **Status da IA nas Regras de Automação.** Agora dá pra usar o status da IA como condição ("Igual a IA Ativada / IA Desativada") e como ação ("Ativar IA" / "Desativar IA") em qualquer regra — disponível em todos os eventos (conversa criada, atualizada, aberta, resolvida e mensagem criada).
 - tag: v4.13.0-auris.1.22.2
   published_at: '2026-05-23T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.2
@@ -408,21 +422,3 @@
       é preservado (aberta continua aberta, pendente continua pendente, adiada continua
       adiada). Conversas resolvidas voltam como **Pendente** em vez de pular pra Aberta,
       e conversas novas também entram como **Pendente**."
-- tag: v4.13.0-auris.1.8
-  published_at: '2026-05-05T22:22:55Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.8
-  notes:
-    en: "### ⚡ Improvements\n\n- **Super admin accounts grid.** The accounts list
-      on `/super_admin/accounts` now shows **Average ticket** and **Funnel menu enabled**
-      directly as columns, no need to open each account.\n\n### \U0001F41B Fixes\n\n-
-      **Baileys WhatsApp pairing.** The **Conectar dispositivo** modal no longer gets
-      stuck on **Conectando...** and stops flickering between the QR code and the
-      spinner on customers in reconnect loops. The QR stays visible until the connection
-      actually leaves the connecting state."
-    pt_BR: "### ⚡ Melhorias\n\n- **Grid de contas no super admin.** A lista de contas
-      em `/super_admin/accounts` agora mostra **Ticket médio** e **Menu Funil ativo**
-      direto nas colunas, sem precisar abrir cada conta.\n\n### \U0001F41B Correções\n\n-
-      **Pareamento WhatsApp Baileys.** O modal **Conectar dispositivo** parou de travar
-      em **Conectando...** e parou de piscar entre o QR code e o spinner em clientes
-      em loop de reconexão. O QR fica visível até a conexão realmente sair do estado
-      de connecting."
