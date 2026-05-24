@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.23.1
+  published_at: '2026-05-24T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Enable/Disable AI actions in Automation Rules can be saved again.** Adding **Enable AI** or **Disable AI** as an automation action was showing an "Action parameters are required" error and blocking the form. The actions now save without asking for parameters.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Ações Ativar/Desativar IA voltam a salvar nas Regras de Automação.** Selecionar **Ativar IA** ou **Desativar IA** como ação estava exibindo o erro "Os parâmetros de ação são necessários" e bloqueando o salvamento. Agora as ações são aceitas sem exigir parâmetro.
 - tag: v4.13.0-auris.1.23
   published_at: '2026-05-24T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23
@@ -404,21 +416,3 @@
       **Sem mais \"undefined\" no assunto.** Conversas novas de e-mail/WhatsApp sem
       assunto não escrevem mais a string literal \"undefined\" como assunto. Conversas
       antigas com esse valor foram limpas automaticamente."
-- tag: v4.13.0-auris.1.9
-  published_at: '2026-05-06T11:20:52Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.9
-  notes:
-    en: "### \U0001F41B Fixes\n\n- **Campaign dispatch no longer hijacks the agent
-      queue.** WhatsApp campaign messages were forcing every conversation to **Open**
-      on dispatch — campaign traffic was mixing with live conversations the agent
-      was already handling. The status of existing conversations is now preserved
-      (open stays open, pending stays pending, snoozed stays snoozed). Resolved conversations
-      come back as **Pending** instead of jumping to Open, and brand-new conversations
-      are also created as **Pending**."
-    pt_BR: "### \U0001F41B Correções\n\n- **Disparo de campanha não atropela mais
-      a fila do agente.** Mensagens de campanha no WhatsApp estavam forçando toda
-      conversa para **Aberta** no disparo — o tráfego de campanha se misturava com
-      as conversas vivas que o agente já estava atendendo. Agora o status existente
-      é preservado (aberta continua aberta, pendente continua pendente, adiada continua
-      adiada). Conversas resolvidas voltam como **Pendente** em vez de pular pra Aberta,
-      e conversas novas também entram como **Pendente**."
