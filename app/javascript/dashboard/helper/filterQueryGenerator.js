@@ -1,5 +1,10 @@
+const isOptionObject = value =>
+  value !== null && typeof value === 'object' && 'id' in value;
+
 const setArrayValues = item => {
-  return item.values[0]?.id ? item.values.map(val => val.id) : item.values;
+  return isOptionObject(item.values[0])
+    ? item.values.map(val => val.id)
+    : item.values;
 };
 
 const generateValues = item => {
