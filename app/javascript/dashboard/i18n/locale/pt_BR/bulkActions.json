@@ -42,6 +42,16 @@
       "ASSIGN_SELECTED_TEAMS": "Atribuir time selecionado.",
       "ASSIGN_SUCCESFUL": "Times atribuídos com sucesso.",
       "ASSIGN_FAILED": "Falha ao atribuir time. Por favor, tente novamente."
+    },
+    "AI_STATUS": {
+      "TOOLTIP": "Ativar/desativar IA",
+      "TITLE": "Atualizar status da IA",
+      "ENABLE": "Ativar IA",
+      "DISABLE": "Desativar IA",
+      "APPLY": "Aplicar nas selecionadas",
+      "ENABLE_SUCCESFUL": "IA ativada nas conversas selecionadas.",
+      "DISABLE_SUCCESFUL": "IA desativada nas conversas selecionadas.",
+      "UPDATE_FAILED": "Falha ao atualizar o status da IA. Por favor, tente novamente."
     }
   }
 }

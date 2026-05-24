@@ -124,6 +124,26 @@ export function useBulkActions() {
     }
   }
 
+  async function onSetAiStatus(aiEnabled, conversationId = null) {
+    try {
+      await store.dispatch('bulkActions/process', {
+        type: 'Conversation',
+        ids: conversationId ? [conversationId] : selectedConversations.value,
+        fields: {
+          ai_enabled: aiEnabled,
+        },
+      });
+      store.dispatch('bulkActions/clearSelectedConversationIds');
+      useAlert(
+        aiEnabled
+          ? t('BULK_ACTION.AI_STATUS.ENABLE_SUCCESFUL')
+          : t('BULK_ACTION.AI_STATUS.DISABLE_SUCCESFUL')
+      );
+    } catch (err) {
+      useAlert(t('BULK_ACTION.AI_STATUS.UPDATE_FAILED'));
+    }
+  }
+
   async function onAssignTeamsForBulk(team) {
     try {
       await store.dispatch('bulkActions/process', {
@@ -213,6 +233,7 @@ export function useBulkActions() {
     onAssignLabels,
     onRemoveLabels,
     onAssignTeamsForBulk,
+    onSetAiStatus,
     onUpdateConversations,
   };
 }

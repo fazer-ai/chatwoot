@@ -14,6 +14,7 @@ import AgentSelector from './AgentSelector.vue';
 import UpdateActions from './UpdateActions.vue';
 import LabelActions from './LabelActions.vue';
 import TeamActions from './TeamActions.vue';
+import AiStatusActions from './AiStatusActions.vue';
 import CustomSnoozeModal from 'dashboard/components/CustomSnoozeModal.vue';
 export default {
   components: {
@@ -21,6 +22,7 @@ export default {
     UpdateActions,
     LabelActions,
     TeamActions,
+    AiStatusActions,
     CustomSnoozeModal,
     NextButton,
   },
@@ -56,6 +58,7 @@ export default {
     'updateConversations',
     'assignLabels',
     'assignTeam',
+    'setAiStatus',
     'resolveConversations',
   ],
   data() {
@@ -64,6 +67,7 @@ export default {
       showUpdateActions: false,
       showLabelActions: false,
       showTeamsList: false,
+      showAiStatusActions: false,
       popoverPositions: {},
       showCustomTimeSnoozeModal: false,
     };
@@ -136,6 +140,10 @@ export default {
     assignTeam(team) {
       this.$emit('assignTeam', team);
     },
+    setAiStatus(aiEnabled) {
+      this.showAiStatusActions = false;
+      this.$emit('setAiStatus', aiEnabled);
+    },
     resolveConversations() {
       this.$emit('resolveConversations');
     },
@@ -150,6 +158,9 @@ export default {
     },
     toggleTeamsList() {
       this.showTeamsList = !this.showTeamsList;
+    },
+    toggleAiStatusActions() {
+      this.showAiStatusActions = !this.showAiStatusActions;
     },
   },
 };
@@ -207,6 +218,14 @@ export default {
           faded
           @click="toggleTeamsList"
         />
+        <NextButton
+          v-tooltip="$t('BULK_ACTION.AI_STATUS.TOOLTIP')"
+          icon="i-lucide-bot"
+          slate
+          xs
+          faded
+          @click="toggleAiStatusActions"
+        />
       </div>
       <transition name="popover-animation">
         <LabelActions
@@ -245,6 +264,14 @@ export default {
           class="team-actions-box"
           @assign-team="assignTeam"
           @close="showTeamsList = false"
+        />
+      </transition>
+      <transition name="popover-animation">
+        <AiStatusActions
+          v-if="showAiStatusActions"
+          class="ai-status-actions-box"
+          @set-ai-status="setAiStatus"
+          @close="showAiStatusActions = false"
         />
       </transition>
     </div>
@@ -310,15 +337,18 @@ export default {
 }
 
 .label-actions-box {
-  --triangle-position: 5.3125rem;
+  --triangle-position: 7.0625rem;
 }
 .update-actions-box {
-  --triangle-position: 3.5rem;
+  --triangle-position: 5.25rem;
 }
 .agent-actions-box {
-  --triangle-position: 1.75rem;
+  --triangle-position: 3.5rem;
 }
 .team-actions-box {
+  --triangle-position: 1.875rem;
+}
+.ai-status-actions-box {
   --triangle-position: 0.125rem;
 }
 </style>

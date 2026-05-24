@@ -81,5 +81,52 @@ RSpec.describe BulkActionsJob do
       expect(Conversation.second.snoozed_until).to be_present
       expect(Conversation.third.snoozed_until).to be_present
     end
+
+    context 'with ai_enabled in attribute mode' do
+      before { account.update!(ai_status_uses_attribute: true) }
+
+      it 'flips ai_enabled to false across the selected conversations' do
+        params = {
+          type: 'Conversation',
+          fields: { ai_enabled: false },
+          ids: Conversation.first(3).pluck(:display_id)
+        }
+
+        expect(Conversation.first.ai_enabled).to be true
+
+        described_class.perform_now(account: account, params: params, user: agent)
+
+        expect(conversation_1.reload.ai_enabled).to be false
+        expect(conversation_2.reload.ai_enabled).to be false
+        expect(conversation_3.reload.ai_enabled).to be false
+      end
+
+      it 'coexists with other field updates in the same payload' do
+        params = {
+          type: 'Conversation',
+          fields: { ai_enabled: false, status: 'snoozed' },
+          ids: Conversation.first(3).pluck(:display_id)
+        }
+
+        described_class.perform_now(account: account, params: params, user: agent)
+
+        expect(conversation_1.reload).to have_attributes(ai_enabled: false, status: 'snoozed')
+      end
+    end
+
+    context 'with ai_enabled in legacy label mode' do
+      it 'toggles the agente-off label instead of the ai_enabled column' do
+        params = {
+          type: 'Conversation',
+          fields: { ai_enabled: false },
+          ids: Conversation.first(3).pluck(:display_id)
+        }
+
+        described_class.perform_now(account: account, params: params, user: agent)
+
+        expect(conversation_1.reload.label_list).to include('agente-off')
+        expect(conversation_1.ai_enabled).to be true # column untouched in legacy mode
+      end
+    end
   end
 end
