@@ -1,4 +1,18 @@
 ---
+- tag: v4.13.0-auris.1.22.2
+  published_at: '2026-05-23T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.2
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Simulator panel loads again in production.** The floating WhatsApp simulator panel was opening empty on production due to a header conflict on the embedded view; it now mounts correctly.
+      - **Funnel stage label tidied up.** The "Comparecimento (ganho)" stage and the matching KPI in the Conversion report no longer carry extra spaces inside the parentheses.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Painel do Simulador volta a abrir em produção.** O painel flutuante do Simulador de WhatsApp estava abrindo vazio em produção por um conflito de cabeçalho na tela embedada; agora carrega normalmente.
+      - **Nome da fase do funil sem espaços sobrando.** A fase "Comparecimento (ganho)" e o KPI equivalente no relatório de Conversão não têm mais espaços extras dentro dos parênteses.
 - tag: v4.13.0-auris.1.22.1
   published_at: '2026-05-23T14:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.1
@@ -412,48 +426,3 @@
       em **Conectando...** e parou de piscar entre o QR code e o spinner em clientes
       em loop de reconexão. O QR fica visível até a conexão realmente sair do estado
       de connecting."
-- tag: v4.13.0-auris.1.7
-  published_at: '2026-05-05T19:54:07Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.7
-  notes:
-    en: "### ✨ What's new\n\n- **Two-factor authentication for super admins.** Super
-      admins can now turn on TOTP 2FA from `/super_admin/profile/mfa`. Once enabled,
-      the super admin sign-in flow asks for a 6-digit code (or a backup code) before
-      granting access. Backup codes can be regenerated and 2FA can be disabled at
-      any time.\n- **Sidebar collapse toggle.** A new icon next to the account name
-      collapses the sidebar with one click; the same icon expands it back when collapsed.
-      Also bound to the macOS-style **⌘\\\\** shortcut.\n- **Per-account Funnel toggle.**
-      From `/super_admin/accounts/:id/edit`, super admins can enable or disable the
-      **Funil** menu per customer. The flag is **off by default**; flip it on for
-      the customers that should see the funnel.\n\n### ⚡ Improvements\n\n- **Funnel
-      polish.** Slightly smaller contact name on cards, channel icon next to the inbox
-      name, tighter column width, and the ticket value falls back to `R$ 0,00` instead
-      of disappearing when no average ticket is set on the account. The list view
-      replaces the `#ID` column with **Valor** (ticket value) and **Tempo desde abertura**
-      (time open).\n\n### \U0001F41B Fixes\n\n- **Swagger UI on hosted environments.**
-      `/swagger` returned 404 outside development; now it renders whenever `ENABLE_SWAGGER_DOCS=true`
-      is set in the environment. ReDoc no longer breaks with `Invalid reference token:
-      loss_reason`.\n- **Super admin home page.** Loading `/super_admin` returned
-      a 500 right after the 2FA work shipped because the new MFA controllers were
-      being auto-detected as sidebar entries. Skipped from the auto-generated nav."
-    pt_BR: "### ✨ Novidades\n\n- **Autenticação em dois fatores para super admins.**
-      Super admins agora ativam o 2FA via TOTP em `/super_admin/profile/mfa`. Com
-      o 2FA ligado, o login do super admin pede um código de 6 dígitos (ou um backup
-      code) antes de liberar o acesso. Os backup codes podem ser regerados a qualquer
-      momento e o 2FA pode ser desativado.\n- **Botão de recolher a barra lateral.**
-      Um ícone novo ao lado do nome da conta recolhe a sidebar com um clique; o mesmo
-      ícone expande ela de volta quando recolhida. Também atalhado em **⌘\\\\** no
-      macOS.\n- **Funil habilitável por conta.** Em `/super_admin/accounts/:id/edit`,
-      super admins agora ligam ou desligam o menu **Funil** por cliente. A flag vem
-      **desligada por padrão**; super admin liga só para os clientes que vão usar
-      o funil.\n\n### ⚡ Melhorias\n\n- **Polimento do funil.** Fonte do nome do contato
-      um pouco menor no card, ícone do canal ao lado do nome da caixa de entrada,
-      raia da coluna mais estreita, e o valor do ticket cai para `R$ 0,00` quando
-      a conta não tem ticket médio configurado, em vez de sumir. A visão Lista trocou
-      a coluna `#ID` por **Valor** (ticket) e **Tempo desde abertura**.\n\n### \U0001F41B
-      Correções\n\n- **Swagger UI em ambientes hospedados.** O `/swagger` retornava
-      404 fora de desenvolvimento; agora abre sempre que `ENABLE_SWAGGER_DOCS=true`
-      está setado no ambiente. O ReDoc também parou de quebrar com `Invalid reference
-      token: loss_reason`.\n- **Página inicial do super admin.** Carregar `/super_admin`
-      quebrava com erro 500 logo após o ship do 2FA porque os controllers novos de
-      MFA estavam sendo auto-detectados na navegação lateral. Removidos da nav auto-gerada."
