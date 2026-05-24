@@ -78,10 +78,13 @@ class SimulatorsController < ActionController::Base
 
   # The simulator is always embedded inside the dashboard at
   # `/app/accounts/:id/simulator`, which is same-origin with the
-  # Rails server. Drop X-Frame-Options unconditionally so the
-  # dashboard iframe can mount it; the underlying Devise-gated
-  # dashboard route already restricts who reaches this URL.
+  # Rails server. Drop X-Frame-Options and pin
+  # `Content-Security-Policy: frame-ancestors 'self'` so any CSP
+  # injected by an upstream proxy (nginx / Cloudflare) doesn't
+  # block the same-origin iframe. The Devise-gated dashboard
+  # route already restricts who reaches this URL.
   def allow_iframe_requests
     response.headers.delete('X-Frame-Options')
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'self'"
   end
 end
