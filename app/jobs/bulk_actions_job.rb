@@ -23,11 +23,29 @@ class BulkActionsJob < ApplicationJob
 
   def bulk_conversation_update
     params = available_params(@params)
+    ai_enabled = extract_ai_enabled(params)
     records.each do |conversation|
       bulk_add_labels(conversation)
       bulk_snoozed_until(conversation)
-      conversation.update!(params) if params
+      bulk_set_ai_status(conversation, ai_enabled)
+      conversation.update!(params) if params.present?
     end
+  end
+
+  # `ai_enabled` can't ride the generic `update!`: the canonical entrypoint is
+  # `Conversation#set_ai_status!`, which dispatches between the legacy
+  # `agente-off` label and the persisted `ai_enabled` column depending on the
+  # account's mode. Pull it out of the field bag and route it ourselves.
+  def extract_ai_enabled(params)
+    return nil unless params&.key?('ai_enabled')
+
+    ActiveModel::Type::Boolean.new.cast(params.delete('ai_enabled'))
+  end
+
+  def bulk_set_ai_status(conversation, ai_enabled)
+    return if ai_enabled.nil?
+
+    conversation.set_ai_status!(ai_enabled)
   end
 
   def bulk_remove_labels

@@ -146,6 +146,7 @@ const {
   onAssignLabels,
   onRemoveLabels,
   onAssignTeamsForBulk,
+  onSetAiStatus,
   onUpdateConversations,
 } = useBulkActions();
 
@@ -907,6 +908,7 @@ provide('assignAgent', onAssignAgent);
 provide('assignTeam', onAssignTeam);
 provide('assignLabels', onAssignLabels);
 provide('removeLabels', onRemoveLabels);
+provide('setAiStatus', onSetAiStatus);
 provide('updateConversationStatus', handleResolveConversation);
 provide('toggleContextMenu', onContextMenuToggle);
 provide('markAsUnread', markAsUnread);
@@ -1021,6 +1023,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       @update-conversations="onUpdateConversations"
       @assign-labels="onAssignLabels"
       @assign-team="onAssignTeamsForBulk"
+      @set-ai-status="onSetAiStatus"
     />
     <div
       ref="conversationListRef"
