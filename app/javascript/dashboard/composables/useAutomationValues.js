@@ -71,6 +71,11 @@ export default function useAutomationValues() {
     }))
   );
 
+  const aiStatusOptions = computed(() => [
+    { id: true, name: t('AUTOMATION.AI_STATUS_TYPES.ENABLED') },
+    { id: false, name: t('AUTOMATION.AI_STATUS_TYPES.DISABLED') },
+  ]);
+
   const priorityOptions = computed(() =>
     PRIORITY_CONDITION_VALUES.map(item => ({
       id: item.id,
@@ -99,6 +104,7 @@ export default function useAutomationValues() {
   const getConditionDropdownValues = type => {
     return getConditionOptions({
       agents: agents.value,
+      aiStatusOptions: aiStatusOptions.value,
       booleanFilterOptions: booleanFilterOptions.value,
       campaigns: campaigns.value,
       contacts: contacts.value,
@@ -145,6 +151,7 @@ export default function useAutomationValues() {
   };
 
   return {
+    aiStatusOptions,
     booleanFilterOptions,
     statusFilterItems,
     statusFilterOptions,

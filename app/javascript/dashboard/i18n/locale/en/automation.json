@@ -163,7 +163,9 @@
       "CHANGE_PRIORITY": "Change Priority",
       "ADD_SLA": "Add SLA",
       "OPEN_CONVERSATION": "Open conversation",
-      "PENDING_CONVERSATION": "Mark conversation as pending"
+      "PENDING_CONVERSATION": "Mark conversation as pending",
+      "ENABLE_AI": "Enable AI",
+      "DISABLE_AI": "Disable AI"
     },
     "MESSAGE_TYPES": {
       "INCOMING": "Incoming Message",
@@ -192,7 +194,12 @@
       "ASSIGNEE_NAME": "Assignee",
       "TEAM_NAME": "Team",
       "PRIORITY": "Priority",
-      "LABELS": "Labels"
+      "LABELS": "Labels",
+      "AI_ENABLED": "AI Status"
+    },
+    "AI_STATUS_TYPES": {
+      "ENABLED": "AI Enabled",
+      "DISABLED": "AI Disabled"
     }
   }
 }

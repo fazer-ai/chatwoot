@@ -162,7 +162,9 @@
       "CHANGE_PRIORITY": "Alterar Prioridade",
       "ADD_SLA": "Adicionar SLA",
       "OPEN_CONVERSATION": "Abrir conversa",
-      "PENDING_CONVERSATION": "Marcar conversa como pendente"
+      "PENDING_CONVERSATION": "Marcar conversa como pendente",
+      "ENABLE_AI": "Ativar IA",
+      "DISABLE_AI": "Desativar IA"
     },
     "MESSAGE_TYPES": {
       "INCOMING": "Mensagem Recebida",
@@ -191,7 +193,12 @@
       "ASSIGNEE_NAME": "Agente atribuído",
       "TEAM_NAME": "Time",
       "PRIORITY": "Prioridade",
-      "LABELS": "Etiquetas"
+      "LABELS": "Etiquetas",
+      "AI_ENABLED": "Status da IA"
+    },
+    "AI_STATUS_TYPES": {
+      "ENABLED": "IA Ativada",
+      "DISABLED": "IA Desativada"
     }
   }
 }

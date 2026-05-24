@@ -50,6 +50,12 @@ conversations:
     filter_operators:
       - "equal_to"
       - "not_equal_to"
+  ai_enabled:
+    attribute_type: "standard"
+    data_type: "boolean"
+    filter_operators:
+      - "equal_to"
+      - "not_equal_to"
   display_id:
     attribute_type: "standard"
     data_type: "Number"

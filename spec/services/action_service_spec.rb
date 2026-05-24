@@ -40,6 +40,46 @@ describe ActionService do
     end
   end
 
+  describe '#enable_ai / #disable_ai' do
+    let(:conversation) { create(:conversation, account: account) }
+    let(:action_service) { described_class.new(conversation) }
+
+    context 'when account is in attribute mode' do
+      before { account.update!(ai_status_uses_attribute: true) }
+
+      it 'flips ai_enabled to false' do
+        expect(conversation.ai_enabled).to be true
+
+        action_service.disable_ai(nil)
+
+        expect(conversation.reload.ai_enabled).to be false
+      end
+
+      it 'flips ai_enabled back to true' do
+        conversation.update!(ai_enabled: false)
+
+        action_service.enable_ai(nil)
+
+        expect(conversation.reload.ai_enabled).to be true
+      end
+    end
+
+    context 'when account is in legacy label mode' do
+      it 'adds the agente-off label on disable and removes it on enable' do
+        action_service.disable_ai(nil)
+        expect(conversation.reload.label_list).to include('agente-off')
+
+        action_service.enable_ai(nil)
+        expect(conversation.reload.label_list).not_to include('agente-off')
+      end
+
+      it 'does not touch the ai_enabled column in legacy mode' do
+        action_service.disable_ai(nil)
+        expect(conversation.reload.ai_enabled).to be true
+      end
+    end
+  end
+
   describe '#assign_agent' do
     let(:agent) { create(:user, account: account, role: :agent) }
     let(:inbox_member) { create(:inbox_member, inbox: conversation.inbox, user: agent) }
