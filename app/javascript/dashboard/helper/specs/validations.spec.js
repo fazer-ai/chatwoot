@@ -83,4 +83,24 @@ describe('validateAutomation', () => {
     const errors = validateAutomation(automationWithNoParamAction);
     expect(errors).toEqual({});
   });
+
+  it.each(['enable_ai', 'disable_ai'])(
+    'accepts the AI toggle action %s without action_params',
+    actionName => {
+      const automation = {
+        name: 'AI toggle',
+        description: 'desc',
+        event_name: 'conversation_updated',
+        conditions: [
+          {
+            attribute_key: 'status',
+            filter_operator: 'equal_to',
+            values: ['open'],
+          },
+        ],
+        actions: [{ action_name: actionName }],
+      };
+      expect(validateAutomation(automation)).toEqual({});
+    }
+  );
 });
