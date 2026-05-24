@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.23.2
+  published_at: '2026-05-24T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.2
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Automation rules with "AI status = AI Disabled" stay saved.** Saving a rule with the new "AI Disabled" condition was silently losing the value on save — reopening the rule showed an empty dropdown and the trigger never fired. The condition now persists and the rule triggers correctly.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Regras de automação com "Status da IA = IA Desativada" são salvas corretamente.** Salvar uma regra com a condição **IA Desativada** estava perdendo o valor silenciosamente — ao reabrir, o dropdown vinha vazio e o gatilho não disparava. Agora a condição persiste e a regra dispara como esperado.
 - tag: v4.13.0-auris.1.23.1
   published_at: '2026-05-24T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.1
@@ -353,66 +365,3 @@
       - **Badge da IA consistente em todo o produto.** A visualização de lista do menu **Funil** agora mostra o mesmo badge compacto **ia** usado na lista de conversas, no cabeçalho da conversa e nos cartões do funil — verde quando ligada, vermelho quando desligada, clicável pra alternar.
       - **Etiquetas dos contatos com o mesmo estilo das conversas.** As etiquetas em **Contatos** passaram para o mesmo estilo suave e pequeno usado nos cartões de conversa, em vez da pílula sólida antiga.
       - **Menus de navegação mais limpos.** Removidos os itens **Relatórios → Robôs** e **Configurações → Robôs** do sidebar, junto com a aba **Configuração do Bot** dentro das configurações de uma caixa de entrada — não usamos o sistema legado de bots. Os demais menus e abas continuam iguais.
-- tag: v4.13.0-auris.1.10
-  published_at: '2026-05-07T02:50:23Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.10
-  notes:
-    en: "### ✨ What's new\n\n- **AI on/off per conversation.** A new **ai** badge
-      shows up on every conversation card, on the conversation header and on the funnel
-      card. Click it to turn AI on or off for that specific conversation — green means
-      on, red means off. Useful when you want to take a single conversation off the
-      AI flow without disabling it for the whole account.\n- **WhatsApp emoji reactions.**
-      React to messages with emojis right from the agent panel, and see reactions
-      sent by contacts on their messages.\n- **Enable WhatsApp Campaigns yourself.**
-      Administrators can now turn the **Campaigns → WhatsApp** menu on directly from
-      the WhatsApp Cloud inbox settings, without asking support to flip a flag.\n\n###
-      ⚡ Improvements\n\n- **Pending conversations come back to the queue when the
-      customer replies.** When a conversation was set to *Pending* and the customer
-      sent a new message, the conversation used to stay invisible in pending — operators
-      missed leads and SLAs slipped. Now any incoming reply automatically reopens
-      the conversation to *Open* and notifies the assigned agent.\n- **Cleaner conversation
-      header.** The summary chip now sits right below the **ai** badge in the action
-      area, no longer squeezed between buttons. The header keeps the same height with
-      or without a summary, the contact name and inbox name are on their own rows,
-      and contact labels in the **Contacts** list now match the smooth small style
-      used in conversations.\n- **New-conversation modal works on narrow screens.**
-      The \"New conversation\" modal no longer overflows on small viewports.\n- **Internal
-      notes show up in the conversation preview.** When the most recent activity in
-      a conversation is a private note, the preview line in the conversation list
-      now reflects that note.\n\n### \U0001F41B Fixes\n\n- **Managers can now reconnect
-      WhatsApp.** When a WhatsApp inbox dropped, the *Connect device* button on the
-      disconnection banner only showed for administrators — managers saw the warning
-      with no way to act on it. The button is now available to managers as well, with
-      the same flow as administrators.\n- **No more \"undefined\" as email subject.**
-      New email/WhatsApp conversations without a subject no longer write the literal
-      text \"undefined\" as the subject. Existing conversations carrying that bad
-      value are cleaned up automatically."
-    pt_BR: "### ✨ Novidades\n\n- **IA ligada/desligada por conversa.** Um novo badge
-      **ia** aparece em todo cartão de conversa, no cabeçalho da conversa e no cartão
-      do funil. Clica para ligar ou desligar a IA naquela conversa específica — verde
-      é ligada, vermelho é desligada. Útil quando você quer tirar uma conversa do
-      fluxo de IA sem desligar a IA da conta inteira.\n- **Reações com emoji no WhatsApp.**
-      Reagir a mensagens com emojis direto do painel do agente, e ver as reações que
-      o contato envia nas mensagens dele.\n- **Habilitar Campanhas de WhatsApp sem
-      precisar de suporte.** Administrador agora liga o menu **Campanhas → WhatsApp**
-      direto na configuração da caixa do WhatsApp Cloud, sem precisar pedir pra suporte
-      ativar a flag.\n\n### ⚡ Melhorias\n\n- **Conversas pendentes voltam pra fila
-      quando o cliente responde.** Quando uma conversa estava em *Pendente* e o cliente
-      mandava uma nova mensagem, ela ficava parada lá — leads sumiam e SLA queimava
-      sem ninguém ver. Agora qualquer resposta do cliente reabre a conversa automaticamente
-      para *Aberta* e notifica o agente atribuído.\n- **Cabeçalho da conversa mais
-      limpo.** O resumo aparece logo abaixo do badge **ia** na área de ações, em vez
-      de ficar espremido entre os botões. O cabeçalho fica do mesmo tamanho com ou
-      sem resumo, o nome do contato e o nome da caixa ficam em linhas próprias, e
-      as etiquetas em **Contatos** agora seguem o mesmo estilo suave e pequeno usado
-      nas conversas.\n- **Modal de nova conversa funciona em telas estreitas.** O
-      modal \"Nova conversa\" não estoura mais em viewports pequenas.\n- **Notas internas
-      aparecem no preview da conversa.** Quando a última atividade da conversa é uma
-      nota privada, a prévia na lista de conversas passa a refletir essa nota.\n\n###
-      \U0001F41B Correções\n\n- **Manager consegue reconectar o WhatsApp.** Quando
-      uma caixa do WhatsApp caía, o botão *Conectar dispositivo* no aviso de desconexão
-      só aparecia para administradores — o manager via o aviso sem poder fazer nada.
-      Agora o botão também aparece para o manager, com o mesmo fluxo do administrador.\n-
-      **Sem mais \"undefined\" no assunto.** Conversas novas de e-mail/WhatsApp sem
-      assunto não escrevem mais a string literal \"undefined\" como assunto. Conversas
-      antigas com esse valor foram limpas automaticamente."
