@@ -80,6 +80,12 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_3,
       },
+      {
+        key: 'ai_enabled',
+        name: 'AI_ENABLED',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
     ],
     actions: [
       {
@@ -149,6 +155,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'enable_ai',
+        name: 'ENABLE_AI',
+      },
+      {
+        key: 'disable_ai',
+        name: 'DISABLE_AI',
       },
     ],
   },
@@ -220,6 +234,12 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_3,
       },
+      {
+        key: 'ai_enabled',
+        name: 'AI_ENABLED',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
     ],
     actions: [
       {
@@ -281,6 +301,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'enable_ai',
+        name: 'ENABLE_AI',
+      },
+      {
+        key: 'disable_ai',
+        name: 'DISABLE_AI',
       },
     ],
   },
@@ -364,6 +392,12 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_3,
       },
+      {
+        key: 'ai_enabled',
+        name: 'AI_ENABLED',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
     ],
     actions: [
       {
@@ -425,6 +459,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'enable_ai',
+        name: 'ENABLE_AI',
+      },
+      {
+        key: 'disable_ai',
+        name: 'DISABLE_AI',
       },
     ],
   },
@@ -502,6 +544,12 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_3,
       },
+      {
+        key: 'ai_enabled',
+        name: 'AI_ENABLED',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
     ],
     actions: [
       {
@@ -559,6 +607,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'enable_ai',
+        name: 'ENABLE_AI',
+      },
+      {
+        key: 'disable_ai',
+        name: 'DISABLE_AI',
       },
     ],
   },
@@ -630,6 +686,12 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_1,
       },
+      {
+        key: 'ai_enabled',
+        name: 'AI_ENABLED',
+        inputType: 'multi_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
     ],
     actions: [
       {
@@ -671,6 +733,14 @@ export const AUTOMATIONS = {
       {
         key: 'send_attachment',
         name: 'SEND_ATTACHMENT',
+      },
+      {
+        key: 'enable_ai',
+        name: 'ENABLE_AI',
+      },
+      {
+        key: 'disable_ai',
+        name: 'DISABLE_AI',
       },
     ],
   },
@@ -799,6 +869,16 @@ export const AUTOMATION_ACTION_TYPES = [
     key: 'add_sla',
     label: 'ADD_SLA',
     inputType: 'search_select',
+  },
+  {
+    key: 'enable_ai',
+    label: 'ENABLE_AI',
+    inputType: null,
+  },
+  {
+    key: 'disable_ai',
+    label: 'DISABLE_AI',
+    inputType: null,
   },
 ];
 

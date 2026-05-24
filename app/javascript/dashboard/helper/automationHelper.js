@@ -117,6 +117,7 @@ export const getActionOptions = ({
 
 export const getConditionOptions = ({
   agents,
+  aiStatusOptions,
   booleanFilterOptions,
   campaigns,
   contacts,
@@ -157,6 +158,7 @@ export const getConditionOptions = ({
       { id: 'group', name: 'Group' },
     ],
     labels: generateConditionOptions(labels, 'title'),
+    ai_enabled: aiStatusOptions,
   };
 
   return conditionFilterMaps[type];

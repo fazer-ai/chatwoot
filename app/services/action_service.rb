@@ -34,6 +34,17 @@ class ActionService
     @conversation.update!(priority: (priority[0] == 'nil' ? nil : priority[0]))
   end
 
+  # AI toggles route through Conversation#set_ai_status! so accounts in legacy
+  # label mode (agente-off) and accounts in attribute mode (ai_enabled column)
+  # share a single entrypoint.
+  def enable_ai(_params)
+    @conversation.set_ai_status!(true)
+  end
+
+  def disable_ai(_params)
+    @conversation.set_ai_status!(false)
+  end
+
   def add_label(labels)
     return if labels.empty?
 
