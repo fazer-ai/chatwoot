@@ -64,4 +64,17 @@ describe('#filterQueryGenerator', () => {
       filterQueryGenerator(testData).payload.every(i => Array.isArray(i.values))
     ).toBe(true);
   });
+
+  it('unwraps option objects whose id is a falsy value (e.g. boolean false)', () => {
+    const input = [
+      {
+        attribute_key: 'ai_enabled',
+        filter_operator: 'equal_to',
+        values: [{ id: false, name: 'IA Desativada' }],
+        query_operator: 'and',
+      },
+    ];
+
+    expect(filterQueryGenerator(input).payload[0].values).toEqual([false]);
+  });
 });
