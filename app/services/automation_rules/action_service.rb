@@ -7,13 +7,19 @@ class AutomationRules::ActionService < ActionService
   end
 
   def perform
-    @rule.actions.each do |action|
-      @conversation.reload
-      action = action.with_indifferent_access
-      begin
-        send(action[:action_name], action[:action_params])
-      rescue StandardError => e
-        ChatwootExceptionTracker.new(e, account: @account).capture_exception
+    # The listener runs outside a controller, so `I18n.locale` defaults to
+    # `:en`. Without this wrapper every activity message generated as a
+    # side effect of the rule (assignee/team/label/ai-status) gets persisted
+    # in English regardless of the account's configured language.
+    I18n.with_locale(account_locale) do
+      @rule.actions.each do |action|
+        @conversation.reload
+        action = action.with_indifferent_access
+        begin
+          send(action[:action_name], action[:action_params])
+        rescue StandardError => e
+          ChatwootExceptionTracker.new(e, account: @account).capture_exception
+        end
       end
     end
   ensure
@@ -21,6 +27,13 @@ class AutomationRules::ActionService < ActionService
   end
 
   private
+
+  def account_locale
+    locale = @account&.locale.presence
+    return I18n.default_locale unless locale
+
+    I18n.available_locales.map(&:to_s).include?(locale) ? locale : I18n.default_locale
+  end
 
   def send_attachment(blob_ids)
     return if conversation_a_tweet?

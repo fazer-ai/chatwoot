@@ -21,6 +21,30 @@ RSpec.describe AutomationRules::ActionService do
       end
     end
 
+    context 'when the account is configured to pt_BR' do
+      let(:pt_account) { create(:account, locale: 'pt_BR') }
+      let(:pt_conversation) { create(:conversation, account: pt_account, ai_enabled: true) }
+      let(:pt_rule) do
+        create(:automation_rule, account: pt_account,
+                                 actions: [{ action_name: 'disable_ai', action_params: [] }])
+      end
+
+      before { pt_account.update!(ai_status_uses_attribute: true) }
+
+      it 'renders activity messages in the account language even outside a controller' do
+        # Listener runs in a Sidekiq job, where I18n.locale falls back to :en.
+        # Simulate that and assert the wrapper still produces pt_BR copy.
+        I18n.with_locale(:en) do
+          perform_enqueued_jobs do
+            described_class.new(pt_rule, pt_account, pt_conversation).perform
+          end
+        end
+
+        activity = pt_conversation.messages.where(message_type: :activity).last
+        expect(activity.content).to eq(I18n.t('conversations.activity.ai_status.disabled_system', locale: :pt_BR))
+      end
+    end
+
     describe '#perform with send_attachment action' do
       let(:message_builder) { double }
 
