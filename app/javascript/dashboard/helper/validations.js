@@ -129,6 +129,8 @@ const validateSingleAction = action => {
     'remove_assigned_team',
     'open_conversation',
     'pending_conversation',
+    'enable_ai',
+    'disable_ai',
   ];
 
   if (
