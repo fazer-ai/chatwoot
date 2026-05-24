@@ -61,10 +61,10 @@ import {
   getUserPermissions,
   getUserRole,
   filterItemsByPermission,
+  getVisibleAssigneeTabPermissions,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
-import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions.js';
 
 const props = defineProps({
   conversationInbox: { type: [String, Number], default: 0 },
@@ -201,23 +201,11 @@ const userPermissions = computed(() => {
 });
 
 const assigneeTabPermissions = computed(() => {
-  if (getUserRole(currentUser.value, currentAccountId.value) !== 'agent') {
-    return ASSIGNEE_TYPE_TAB_PERMISSIONS;
-  }
-
-  const accountSettings =
-    getAccount.value(currentAccountId.value)?.settings || {};
-  const hideUnassigned = Boolean(accountSettings.hide_agent_unassigned_tab);
-  const hideAll = hideUnassigned || Boolean(accountSettings.hide_agent_all_tab);
-
-  if (!hideUnassigned && !hideAll) return ASSIGNEE_TYPE_TAB_PERMISSIONS;
-
-  const { unassigned, all, ...rest } = ASSIGNEE_TYPE_TAB_PERMISSIONS;
-  return {
-    ...rest,
-    ...(hideUnassigned ? {} : { unassigned }),
-    ...(hideAll ? {} : { all }),
-  };
+  return getVisibleAssigneeTabPermissions({
+    conversationType: props.conversationType,
+    userRole: getUserRole(currentUser.value, currentAccountId.value),
+    accountSettings: getAccount.value(currentAccountId.value)?.settings || {},
+  });
 });
 
 const assigneeTabItems = computed(() => {

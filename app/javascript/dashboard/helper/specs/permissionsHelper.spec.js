@@ -3,7 +3,9 @@ import {
   getUserPermissions,
   hasPermissions,
   filterItemsByPermission,
+  getVisibleAssigneeTabPermissions,
 } from '../permissionsHelper';
+import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions';
 
 describe('#getCurrentAccount', () => {
   it('should return the current account', () => {
@@ -149,5 +151,78 @@ describe('filterItemsByPermission', () => {
     expect(result).toContainEqual(
       expect.objectContaining({ key: 'item1', name: 'Item 1' })
     );
+  });
+});
+
+describe('#getVisibleAssigneeTabPermissions', () => {
+  const hideBoth = {
+    hide_agent_unassigned_tab: true,
+    hide_agent_all_tab: true,
+  };
+
+  it('returns all tabs for non-agent roles regardless of settings', () => {
+    expect(
+      getVisibleAssigneeTabPermissions({
+        userRole: 'administrator',
+        accountSettings: hideBoth,
+      })
+    ).toEqual(ASSIGNEE_TYPE_TAB_PERMISSIONS);
+  });
+
+  it('returns all tabs for agents when no toggle is set', () => {
+    expect(
+      getVisibleAssigneeTabPermissions({
+        userRole: 'agent',
+        accountSettings: {},
+      })
+    ).toEqual(ASSIGNEE_TYPE_TAB_PERMISSIONS);
+  });
+
+  it('hides unassigned and all when unassigned toggle is on', () => {
+    const result = getVisibleAssigneeTabPermissions({
+      userRole: 'agent',
+      accountSettings: { hide_agent_unassigned_tab: true },
+    });
+
+    expect(Object.keys(result)).toEqual(['me']);
+  });
+
+  it('hides only all when the all toggle is on by itself', () => {
+    const result = getVisibleAssigneeTabPermissions({
+      userRole: 'agent',
+      accountSettings: { hide_agent_all_tab: true },
+    });
+
+    expect(Object.keys(result)).toEqual(['me', 'unassigned']);
+  });
+
+  it('keeps all tabs on the mention view even with toggles on', () => {
+    expect(
+      getVisibleAssigneeTabPermissions({
+        conversationType: 'mention',
+        userRole: 'agent',
+        accountSettings: hideBoth,
+      })
+    ).toEqual(ASSIGNEE_TYPE_TAB_PERMISSIONS);
+  });
+
+  it('keeps all tabs on the participating view even with toggles on', () => {
+    expect(
+      getVisibleAssigneeTabPermissions({
+        conversationType: 'participating',
+        userRole: 'agent',
+        accountSettings: hideBoth,
+      })
+    ).toEqual(ASSIGNEE_TYPE_TAB_PERMISSIONS);
+  });
+
+  it('still applies toggles on the unattended view', () => {
+    const result = getVisibleAssigneeTabPermissions({
+      conversationType: 'unattended',
+      userRole: 'agent',
+      accountSettings: hideBoth,
+    });
+
+    expect(Object.keys(result)).toEqual(['me']);
   });
 });
