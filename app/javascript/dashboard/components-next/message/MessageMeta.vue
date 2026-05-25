@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 import { useI18n } from 'vue-i18n';
 import { useFunctionGetter } from 'dashboard/composables/store';
 
@@ -40,10 +41,13 @@ const {
   currentUserId,
 } = useMessageContext();
 
+const dateFnsLocale = computed(() => resolveDateFnsLocale(locale.value));
+
 const readableTime = computed(() =>
   messageTimestamp(
     contentAttributes?.value?.externalCreatedAt ?? createdAt.value,
-    'LLL d, h:mm a'
+    'LLL d, h:mm a',
+    dateFnsLocale.value
   )
 );
 

@@ -1,13 +1,20 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 import BaseBubble from './Base.vue';
 import { useMessageContext } from '../provider.js';
 
 const { content, createdAt } = useMessageContext();
+const { locale } = useI18n();
 
 const readableTime = computed(() =>
-  messageTimestamp(createdAt.value, 'LLL d, h:mm a')
+  messageTimestamp(
+    createdAt.value,
+    'LLL d, h:mm a',
+    resolveDateFnsLocale(locale.value)
+  )
 );
 </script>
 

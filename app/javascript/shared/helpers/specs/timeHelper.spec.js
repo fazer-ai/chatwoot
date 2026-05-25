@@ -1,3 +1,4 @@
+import { ptBR } from 'date-fns/locale';
 import {
   messageStamp,
   messageTimestamp,
@@ -26,6 +27,13 @@ describe('#messageStamp', () => {
       'Feb 10, 3:35 PM'
     );
   });
+
+  it('honours the locale when provided', () => {
+    // TZ-safe assertion: 1612971343 is Feb 10 2021 15:35 UTC and
+    // stays on Feb 10 across every common timezone, so we only
+    // assert on the localised month + day to avoid CI/dev TZ drift.
+    expect(messageStamp(1612971343, 'LLL d', ptBR)).toEqual('fev 10');
+  });
 });
 
 describe('#messageTimestamp', () => {
@@ -34,6 +42,11 @@ describe('#messageTimestamp', () => {
   });
   it('should return the message date and time in a different format if the message was sent in a different year', () => {
     expect(messageTimestamp(1612971343)).toEqual('Feb 10 2021, 3:35 PM');
+  });
+
+  it('honours the locale when provided', () => {
+    // Same TZ-safety as messageStamp above.
+    expect(messageTimestamp(1680777464, 'LLL d', ptBR)).toEqual('abr 6');
   });
 });
 
