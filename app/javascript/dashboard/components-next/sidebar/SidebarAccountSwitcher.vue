@@ -46,9 +46,11 @@ const sortedCurrentUserAccounts = computed(() => {
 const filteredAccounts = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   if (!query) return sortedCurrentUserAccounts.value;
-  return sortedCurrentUserAccounts.value.filter(account =>
-    account.name.toLowerCase().includes(query)
-  );
+  return sortedCurrentUserAccounts.value.filter(account => {
+    const nameMatches = account.name.toLowerCase().includes(query);
+    const idMatches = String(account.id).includes(query);
+    return nameMatches || idMatches;
+  });
 });
 
 const onChangeAccount = newId => {
