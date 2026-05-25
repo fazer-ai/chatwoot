@@ -259,7 +259,7 @@
     "CHANGE_AVAILABILITY_STATUS": "Trocar",
     "CHANGE_ACCOUNTS": "Alterar conta",
     "SWITCH_ACCOUNT": "Alterar conta",
-    "ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER": "Buscar contas",
+    "ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER": "Buscar por nome ou ID",
     "ACCOUNT_SWITCHER_NO_RESULTS": "Nenhuma conta encontrada",
     "CONTACT_SUPPORT": "Contate o suporte",
     "SELECTOR_SUBTITLE": "Selecione uma conta da lista a seguir",

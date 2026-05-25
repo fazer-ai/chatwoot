@@ -259,7 +259,7 @@
     "CHANGE_AVAILABILITY_STATUS": "Change",
     "CHANGE_ACCOUNTS": "Switch account",
     "SWITCH_ACCOUNT": "Switch account",
-    "ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER": "Search accounts",
+    "ACCOUNT_SWITCHER_SEARCH_PLACEHOLDER": "Search by name or ID",
     "ACCOUNT_SWITCHER_NO_RESULTS": "No accounts match your search",
     "CONTACT_SUPPORT": "Contact support",
     "SELECTOR_SUBTITLE": "Select an account from the following list",
