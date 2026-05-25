@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.23.3
+  published_at: '2026-05-25T01:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.3
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Automation activity messages now match the account language.** Activity entries triggered by automation rules (assignment, team, label, AI status changes) were always rendered in English, even on Portuguese accounts. They now follow the account's configured language.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Mensagens de atividade das automações no idioma da conta.** Os eventos gerados por regras de automação (atribuição, time, etiquetas, mudança de status da IA) apareciam sempre em inglês, mesmo em contas configuradas em português. Agora respeitam o idioma da conta.
 - tag: v4.13.0-auris.1.23.2
   published_at: '2026-05-24T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.2
@@ -349,19 +361,3 @@
       - **Cabeçalho da conversa mais limpo.** Nome do contato e da caixa à esquerda, resumo da conversa centralizado no meio, e badge da IA junto com Resolver/Adiar/Pendente alinhados à direita. Ao passar o mouse no resumo, agora aparece um balão compacto em vez de uma faixa que pegava a tela inteira.
       - **Etiquetas dos contatos aparecem por inteiro.** Etiquetas longas em Contatos não são mais cortadas com "...".
       - **Criação de inbox WhatsApp mais limpa.** Removidos os dois banners verdes promocionais do Z-API na tela de configuração da caixa do WhatsApp.
-- tag: v4.13.0-auris.1.11
-  published_at: '2026-05-07T18:21:20Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.11
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Consistent AI badge across the product.** The list view in the **Funnel** menu now shows the same compact **ai** badge used in the conversation list, conversation header and funnel cards — green when AI is on, red when off, and clickable to toggle.
-      - **Consistent label style on the Contacts list.** Contact labels now match the smooth small style used on conversation cards, instead of the older solid pill.
-      - **Cleaner navigation menus.** Removed the **Reports → Bots** and **Settings → Bots** sidebar entries, plus the **Bot Configuration** tab inside an inbox's settings, since we don't use the legacy bot system. Other menus and tabs are unchanged.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Badge da IA consistente em todo o produto.** A visualização de lista do menu **Funil** agora mostra o mesmo badge compacto **ia** usado na lista de conversas, no cabeçalho da conversa e nos cartões do funil — verde quando ligada, vermelho quando desligada, clicável pra alternar.
-      - **Etiquetas dos contatos com o mesmo estilo das conversas.** As etiquetas em **Contatos** passaram para o mesmo estilo suave e pequeno usado nos cartões de conversa, em vez da pílula sólida antiga.
-      - **Menus de navegação mais limpos.** Removidos os itens **Relatórios → Robôs** e **Configurações → Robôs** do sidebar, junto com a aba **Configuração do Bot** dentro das configurações de uma caixa de entrada — não usamos o sistema legado de bots. Os demais menus e abas continuam iguais.
