@@ -10,25 +10,35 @@ import {
  * Formats a Unix timestamp into a human-readable time format.
  * @param {number} time - Unix timestamp.
  * @param {string} [dateFormat='h:mm a'] - Desired format of the time.
+ * @param {object} [locale] - Optional date-fns Locale object. Defaults to date-fns's enUS.
  * @returns {string} Formatted time string.
  */
-export const messageStamp = (time, dateFormat = 'h:mm a') => {
+export const messageStamp = (
+  time,
+  dateFormat = 'h:mm a',
+  locale = undefined
+) => {
   const unixTime = fromUnixTime(time);
-  return format(unixTime, dateFormat);
+  return format(unixTime, dateFormat, { locale });
 };
 
 /**
  * Provides a formatted timestamp, adjusting the format based on the current year.
  * @param {number} time - Unix timestamp.
  * @param {string} [dateFormat='MMM d, yyyy'] - Desired date format.
+ * @param {object} [locale] - Optional date-fns Locale object. Defaults to date-fns's enUS.
  * @returns {string} Formatted date string.
  */
-export const messageTimestamp = (time, dateFormat = 'MMM d, yyyy') => {
+export const messageTimestamp = (
+  time,
+  dateFormat = 'MMM d, yyyy',
+  locale = undefined
+) => {
   const messageTime = fromUnixTime(time);
   const now = new Date();
-  const messageDate = format(messageTime, dateFormat);
+  const messageDate = format(messageTime, dateFormat, { locale });
   if (!isSameYear(messageTime, now)) {
-    return format(messageTime, 'LLL d y, h:mm a');
+    return format(messageTime, 'LLL d y, h:mm a', { locale });
   }
   return messageDate;
 };

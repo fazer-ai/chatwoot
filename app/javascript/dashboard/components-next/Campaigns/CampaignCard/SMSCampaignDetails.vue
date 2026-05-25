@@ -1,9 +1,11 @@
 <script setup>
+import { computed } from 'vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import { messageStamp } from 'shared/helpers/timeHelper';
+import { resolveDateFnsLocale } from 'dashboard/helper/dateFnsLocale';
 
 import { useI18n } from 'vue-i18n';
-defineProps({
+const props = defineProps({
   inboxName: {
     type: String,
     default: '',
@@ -18,7 +20,15 @@ defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const dateFnsLocale = computed(() => resolveDateFnsLocale(locale.value));
+const scheduledAtLabel = computed(() =>
+  messageStamp(
+    new Date(props.scheduledAt),
+    'LLL d, h:mm a',
+    dateFnsLocale.value
+  )
+);
 </script>
 
 <template>
@@ -36,6 +46,6 @@ const { t } = useI18n();
     {{ t('CAMPAIGN.SMS.CARD.CAMPAIGN_DETAILS.ON') }}
   </span>
   <span class="flex-1 text-sm font-medium truncate text-n-slate-12">
-    {{ messageStamp(new Date(scheduledAt), 'LLL d, h:mm a') }}
+    {{ scheduledAtLabel }}
   </span>
 </template>
