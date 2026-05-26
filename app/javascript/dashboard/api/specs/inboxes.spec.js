@@ -70,10 +70,12 @@ describe('#InboxesAPI', () => {
       inboxesAPI.dataManager.initDb = vi
         .fn()
         .mockRejectedValue(new Error('no idb'));
+      inboxesAPI.dataManager.update = vi.fn();
 
       await expect(
         inboxesAPI.updateCachedProviderConnection(7, { connection: 'open' })
       ).resolves.toBeUndefined();
+      expect(inboxesAPI.dataManager.update).not.toHaveBeenCalled();
     });
   });
 });

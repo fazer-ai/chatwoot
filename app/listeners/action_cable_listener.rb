@@ -45,8 +45,11 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
     # QR code / error are admin-only (mirrors Channel::Whatsapp#provider_connection_data):
     # the QR grants full access to the WhatsApp account, so it must not reach agents.
+    # `account.agents` and `account.administrators` are disjoint (single role per
+    # account_user), so query each once instead of via `user_tokens` (which would
+    # re-query administrators on this hot path).
     admin_tokens = account.administrators.pluck(:pubsub_token)
-    agent_tokens = user_tokens(account, account.agents) - admin_tokens
+    agent_tokens = account.agents.pluck(:pubsub_token)
 
     connection = { connection: provider_connection['connection'] }
     broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
