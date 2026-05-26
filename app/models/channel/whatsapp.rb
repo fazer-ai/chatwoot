@@ -86,6 +86,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   def update_provider_connection!(provider_connection)
+    provider_connection ||= {} # deep_stringify_keys below requires a hash
     # Normalize to string keys to match the persisted jsonb (which always reads back as
     # strings) so an unchanged status is recognized as a no-op and skipped.
     normalized = provider_connection.deep_stringify_keys
