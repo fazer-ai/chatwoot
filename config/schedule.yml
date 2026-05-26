@@ -8,6 +8,14 @@ internal_check_new_versions_job:
   cron: '0 0 * * *'
   class: 'Internal::TriggerDailyScheduledItemsJob'
   queue: scheduled_jobs
+
+# executed daily at 0300 UTC
+# computes the per-account health score snapshot consumed by the
+# super_admin Health Score report (one row per account per day)
+super_admin_health_score_daily_snapshot_job:
+  cron: '0 3 * * *'
+  class: 'SuperAdmin::HealthScore::DailySnapshotJob'
+  queue: scheduled_jobs
 # # executed At every 5th minute..
 trigger_scheduled_items_job:
   cron: '*/5 * * * *'
