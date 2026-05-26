@@ -1,4 +1,26 @@
 ---
+- tag: v4.13.0-auris.1.24
+  published_at: '2026-05-25T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Per-account Health Score report.** New **Reports → Health Score** entry in super admin with a 0-100 score per account and per group (Outcomes, Operational, Engagement). Colors flag churn risk at a glance (red / yellow / green) and clicking any row expands the 5 underlying metrics with raw values and the reason behind each missing metric. Snapshots are computed daily.
+      - **Search accounts by ID in the sidebar switcher.** Beyond the name, the "Switch account" dropdown now also matches the account ID — handy when you already know the ID by heart.
+
+      ### ⚡ Improvements
+
+      - **Chat and campaign timestamps in the account language.** Message timestamps in the chat (including system activity messages) and dates on campaign cards now follow the account's configured language — Portuguese accounts see pt-BR copy, English accounts stay in English.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Relatório de Health Score por conta.** Novo item **Relatórios → Health Score** no super admin com nota de 0 a 100 por conta e por grupo (Outcomes, Operational, Engagement). As cores sinalizam o risco de churn rapidamente (vermelho / amarelo / verde) e clicando em qualquer linha expande as 5 métricas que compõem a nota com valores brutos e a razão de cada métrica indisponível. Snapshots calculados diariamente.
+      - **Buscar conta pelo ID no seletor da barra lateral.** Além do nome, o dropdown "Alterar conta" agora também casa pelo ID da conta — útil quando você já sabe o ID de cor.
+
+      ### ⚡ Melhorias
+
+      - **Datas do chat e das campanhas no idioma da conta.** O timestamp das mensagens no chat (incluindo as mensagens de atividade do sistema) e a data dos cards de campanha agora respeitam o idioma configurado da conta — em contas pt-BR aparecem em português, em contas em inglês continuam em inglês.
 - tag: v4.13.0-auris.1.23.3
   published_at: '2026-05-25T01:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.3
@@ -335,29 +357,3 @@
       - **Tela de login mostra a versão atual.** Uma linha discreta abaixo do botão *Entrar* mostra a versão atualmente publicada, ajudando o suporte a confirmar o que está no ar em cada ambiente.
       - **Linha do tempo da conversa mais limpa.** A etiqueta interna `agente-off` não aparece mais como atividade na conversa — a mensagem da IA já explica a mudança. As demais etiquetas continuam sendo registradas como antes.
       - **Nome de contato com uma palavra só funciona nos modelos.** Um contato salvo como *Maria* agora resolve `{{contact.first_name}}` e `{{contact.last_name}}` como *Maria*, em vez de deixar o campo vazio.
-- tag: v4.13.0-auris.1.12
-  published_at: '2026-05-08T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.12
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **In-app release notes.** A new "What's new" modal pops up the first time you open the dashboard after a release lands, with the changes shown in your interface language. The full history is available under your profile menu → Release notes.
-
-      ### ⚡ Improvements
-
-      - **Funnel stages now end with Perdido → Ganho.** Reordered the closing lanes so a lost lead sits before a won one — matching the standard CRM convention where a loss can still come back as a win later.
-      - **Cleaner conversation header.** Contact and inbox name stay on the left, the summary chip is centered in the middle, and the AI badge plus the Resolver/Adiar/Pendente combo are aligned to the right. The summary tooltip on hover is now a compact balloon instead of stretching across the screen.
-      - **Contact labels show their full text.** Long labels on the Contacts list are no longer truncated with "...".
-      - **Cleaner WhatsApp inbox creation.** Removed the two green Z-API promotional banners from the WhatsApp inbox setup flow.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Notas de versão dentro do sistema.** Um modal "O que há de novo" aparece na primeira vez que você abre o painel após uma nova versão, no idioma da interface. O histórico completo fica disponível no menu do seu perfil → Notas de versão.
-
-      ### ⚡ Melhorias
-
-      - **Funil agora termina em Perdido → Ganho.** As raias finais foram reordenadas — um lead perdido vem antes do ganho, seguindo o padrão de CRM onde uma perda ainda pode virar ganho depois.
-      - **Cabeçalho da conversa mais limpo.** Nome do contato e da caixa à esquerda, resumo da conversa centralizado no meio, e badge da IA junto com Resolver/Adiar/Pendente alinhados à direita. Ao passar o mouse no resumo, agora aparece um balão compacto em vez de uma faixa que pegava a tela inteira.
-      - **Etiquetas dos contatos aparecem por inteiro.** Etiquetas longas em Contatos não são mais cortadas com "...".
-      - **Criação de inbox WhatsApp mais limpa.** Removidos os dois banners verdes promocionais do Z-API na tela de configuração da caixa do WhatsApp.
