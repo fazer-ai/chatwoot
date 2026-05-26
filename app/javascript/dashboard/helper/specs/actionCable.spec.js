@@ -118,4 +118,31 @@ describe('ActionCableConnector - Copilot Tests', () => {
       );
     });
   });
+
+  describe('inbox.provider_connection_updated event handler', () => {
+    it('should register the inbox.provider_connection_updated event handler', () => {
+      expect(Object.keys(actionCable.events)).toContain(
+        'inbox.provider_connection_updated'
+      );
+      expect(actionCable.events['inbox.provider_connection_updated']).toBe(
+        actionCable.onInboxProviderConnectionUpdated
+      );
+    });
+
+    it('should dispatch inboxes/updateProviderConnection with the inbox id and connection', () => {
+      actionCable.onReceived({
+        event: 'inbox.provider_connection_updated',
+        data: {
+          inbox_id: 7,
+          provider_connection: { connection: 'open' },
+          account_id: 1,
+        },
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'inboxes/updateProviderConnection',
+        { id: 7, providerConnection: { connection: 'open' } }
+      );
+    });
+  });
 });

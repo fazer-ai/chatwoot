@@ -86,9 +86,19 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   def update_provider_connection!(provider_connection)
-    assign_attributes(provider_connection: provider_connection)
-    # NOTE: Skip `validate_provider_config?` check
-    save!(validate: false)
+    # Normalize to string keys to match the persisted jsonb (which always reads back as
+    # strings) so an unchanged status is recognized as a no-op and skipped.
+    normalized = provider_connection.deep_stringify_keys
+    return if normalized == self.provider_connection
+
+    assign_attributes(provider_connection: normalized)
+    # NOTE: Skip `validate_provider_config?` check.
+    # `Inbox.no_touching` suppresses the `has_one :inbox, touch: true` callback
+    # (inherited from Channelable) so this high-frequency connection-status change does
+    # NOT touch the inbox and invalidate the whole account inbox cache. The change is
+    # pushed to clients via a targeted `inbox.provider_connection_updated` event.
+    Inbox.no_touching { save!(validate: false) }
+    broadcast_provider_connection_updated
   end
 
   def provider_connection_data
@@ -300,6 +310,18 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   private
+
+  # Pushes the connection status to the account's agents over the websocket without
+  # going through the full dispatcher, which would always enqueue an EventDispatcherJob
+  # (wasteful for such a high-frequency event). Sync-only keeps it cheap.
+  def broadcast_provider_connection_updated
+    return if inbox.blank?
+
+    Rails.configuration.dispatcher.sync_dispatcher.dispatch(
+      Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED, Time.zone.now,
+      inbox: inbox, provider_connection: provider_connection
+    )
+  end
 
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])

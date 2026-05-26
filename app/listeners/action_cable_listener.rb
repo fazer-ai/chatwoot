@@ -38,6 +38,27 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
               })
   end
 
+  def inbox_provider_connection_updated(event)
+    inbox = event.data[:inbox]
+    account = inbox.account
+    provider_connection = event.data[:provider_connection] || {}
+
+    # QR code / error are admin-only (mirrors Channel::Whatsapp#provider_connection_data):
+    # the QR grants full access to the WhatsApp account, so it must not reach agents.
+    admin_tokens = account.administrators.pluck(:pubsub_token)
+    agent_tokens = user_tokens(account, account.agents) - admin_tokens
+
+    connection = { connection: provider_connection['connection'] }
+    broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
+    broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
+                inbox_id: inbox.id,
+                provider_connection: connection.merge(
+                  qr_data_url: provider_connection['qr_data_url'],
+                  error: provider_connection['error']
+                )
+              })
+  end
+
   def message_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation

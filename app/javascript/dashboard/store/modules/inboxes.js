@@ -200,6 +200,14 @@ export const actions = {
       // Ignore error
     }
   },
+  updateProviderConnection: async ({ commit }, { id, providerConnection }) => {
+    commit(types.default.SET_INBOX_PROVIDER_CONNECTION, {
+      id,
+      providerConnection,
+    });
+    // Keep the local cache fresh without bumping the cache key (no full refetch).
+    await InboxesAPI.updateCachedProviderConnection(id, providerConnection);
+  },
   get: async ({ commit }) => {
     commit(types.default.SET_INBOXES_UI_FLAG, { isFetching: true });
     try {
@@ -440,6 +448,15 @@ export const mutations = {
   [types.default.ADD_INBOXES]: MutationHelpers.create,
   [types.default.EDIT_INBOXES]: MutationHelpers.update,
   [types.default.DELETE_INBOXES]: MutationHelpers.destroy,
+  [types.default.SET_INBOX_PROVIDER_CONNECTION](
+    $state,
+    { id, providerConnection }
+  ) {
+    const inbox = $state.records.find(record => record.id === Number(id));
+    if (inbox) {
+      inbox.provider_connection = providerConnection;
+    }
+  },
 };
 
 export default {

@@ -270,4 +270,38 @@ describe ActionCableListener do
   describe '#scheduled_message_deleted' do
     it_behaves_like 'scheduled message event broadcast', :scheduled_message_deleted, 'scheduled_message.deleted'
   end
+
+  describe '#inbox_provider_connection_updated' do
+    let(:event_name) { :'inbox.provider_connection_updated' }
+    let(:provider_connection) do
+      { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,qr', 'error' => nil }
+    end
+    let(:event) { Events::Base.new(event_name, Time.zone.now, inbox: inbox, provider_connection: provider_connection) }
+
+    it 'sends only the connection status to non-admin agents' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'inbox.provider_connection_updated',
+        { inbox_id: inbox.id, provider_connection: { connection: 'connecting' }, account_id: account.id }
+      )
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+      listener.inbox_provider_connection_updated(event)
+    end
+
+    it 'sends the QR code and error only to administrators' do
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([agent.pubsub_token], anything, anything)
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [admin.pubsub_token],
+        'inbox.provider_connection_updated',
+        {
+          inbox_id: inbox.id,
+          provider_connection: { connection: 'connecting', qr_data_url: 'data:image/png;base64,qr', error: nil },
+          account_id: account.id
+        }
+      )
+
+      listener.inbox_provider_connection_updated(event)
+    end
+  end
 end

@@ -36,6 +36,8 @@ class ActionCableConnector extends BaseActionCableConnector {
       'conversation.read': this.onConversationRead,
       'conversation.updated': this.onConversationUpdated,
       'account.cache_invalidated': this.onCacheInvalidate,
+      'inbox.provider_connection_updated':
+        this.onInboxProviderConnectionUpdated,
       'account.enrichment_completed': this.onEnrichmentCompleted,
       'copilot.message.created': this.onCopilotMessageCreated,
       'scheduled_message.created': this.onScheduledMessageCreated,
@@ -276,6 +278,13 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.app.$store.dispatch('labels/revalidate', { newKey: keys.label });
     this.app.$store.dispatch('inboxes/revalidate', { newKey: keys.inbox });
     this.app.$store.dispatch('teams/revalidate', { newKey: keys.team });
+  };
+
+  onInboxProviderConnectionUpdated = data => {
+    this.app.$store.dispatch('inboxes/updateProviderConnection', {
+      id: data.inbox_id,
+      providerConnection: data.provider_connection,
+    });
   };
 
   onInternalChatMessageCreated = data => {

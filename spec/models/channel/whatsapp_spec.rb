@@ -505,6 +505,47 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe '#update_provider_connection!' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
+    end
+
+    it 'does not bump the inbox timestamp (avoids invalidating the account inbox cache)' do
+      inbox = channel.inbox
+
+      expect do
+        channel.update_provider_connection!(connection: 'open')
+      end.not_to(change { inbox.reload.updated_at })
+    end
+
+    it 'persists the new connection status' do
+      channel.update_provider_connection!(connection: 'open')
+
+      expect(channel.reload.provider_connection).to eq('connection' => 'open')
+    end
+
+    it 'pushes a targeted event through the sync dispatcher only' do
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).to receive(:dispatch).with(
+        Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED,
+        anything,
+        hash_including(inbox: channel.inbox, provider_connection: { 'connection' => 'open' })
+      )
+
+      channel.update_provider_connection!(connection: 'open')
+    end
+
+    it 'does not push or save when the connection status is unchanged' do
+      channel.update_provider_connection!(connection: 'open')
+
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).not_to receive(:dispatch)
+      expect(channel).not_to receive(:save!)
+
+      channel.update_provider_connection!(connection: 'open')
+    end
+  end
+
   describe '#provider_connection_data' do
     let(:channel) do
       create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
