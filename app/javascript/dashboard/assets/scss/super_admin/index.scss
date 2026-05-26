@@ -89,6 +89,21 @@ body {
     --gray-11: 100 100 100;
     --gray-12: 32 32 32;
 
+    // Health Score uses a blue chip for Operational. Mirrored from the
+    // dashboard theme so super_admin pages render the same blue.
+    --blue-1: 251 253 255;
+    --blue-2: 245 249 255;
+    --blue-3: 233 243 255;
+    --blue-4: 218 236 255;
+    --blue-5: 201 226 255;
+    --blue-6: 181 213 255;
+    --blue-7: 155 195 252;
+    --blue-8: 117 171 247;
+    --blue-9: 39 129 246;
+    --blue-10: 16 115 233;
+    --blue-11: 8 109 224;
+    --blue-12: 11 50 101;
+
     --background-color: 253 253 253;
     --text-blue: 8 109 224;
     --border-container: 236 236 236;
@@ -189,6 +204,21 @@ body {
     --gray-10: 123 123 123;
     --gray-11: 180 180 180;
     --gray-12: 238 238 238;
+
+    // Mirrored from the dashboard theme so the Health Score Operational
+    // chip renders correctly in dark mode too.
+    --blue-1: 10 17 28;
+    --blue-2: 15 24 38;
+    --blue-3: 15 39 72;
+    --blue-4: 10 49 99;
+    --blue-5: 18 61 117;
+    --blue-6: 29 84 134;
+    --blue-7: 40 89 156;
+    --blue-8: 48 106 186;
+    --blue-9: 39 129 246;
+    --blue-10: 21 116 231;
+    --blue-11: 126 182 255;
+    --blue-12: 205 227 255;
 
     --background-color: 18 18 19;
     --border-strong: 52 52 52;

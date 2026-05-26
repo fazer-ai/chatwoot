@@ -58,11 +58,11 @@ const GROUP_LABELS = {
   engagement: 'Engagement',
 };
 
-// Chip colors are chosen to avoid clashing with the score band palette
-// (red / amber / teal): violet / blue / iris are all present in the
-// design tokens and visually distinct from the bands.
+// Chip colors avoid the score band palette (red / amber / teal) AND keep
+// the 3 groups visually distinct from each other: gray (neutral) for
+// Outcomes, blue for Operational, iris (lavender) for Engagement.
 const GROUP_CHIP_CLASSES = {
-  outcomes: 'bg-n-violet-3 text-n-violet-12 border-n-violet-6',
+  outcomes: 'bg-n-gray-3 text-n-gray-12 border-n-gray-6',
   operational: 'bg-n-blue-3 text-n-blue-12 border-n-blue-6',
   engagement: 'bg-n-iris-3 text-n-iris-12 border-n-iris-6',
 };
