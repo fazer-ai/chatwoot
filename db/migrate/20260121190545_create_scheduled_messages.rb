@@ -44,14 +44,17 @@ class CreateScheduledMessages < ActiveRecord::Migration[7.1]
   end
 
   def down
-    drop_table :scheduled_messages, if_exists: true
+    raise ActiveRecord::IrreversibleMigration,
+          'CreateScheduledMessages cannot be rolled back: up may relocate an imported ' \
+          'scheduled_messages table or be stamped manually, so dropping the table here ' \
+          'could destroy pre-existing data.'
   end
 
   private
 
   def relocate_conflicting_table
     if fork_table?
-      raise <<~MSG.squish
+      raise ActiveRecord::MigrationError, <<~MSG.squish
         scheduled_messages already exists with the fazer-ai fork schema, but migration
         20260121190545 is missing from schema_migrations. This is an inconsistent
         database (partial restore / out-of-sync schema_migrations), not a migration
