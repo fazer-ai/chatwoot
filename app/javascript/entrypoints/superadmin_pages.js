@@ -5,11 +5,13 @@ import VueDOMPurifyHTML from 'vue-dompurify-html';
 import PlaygroundIndex from '../superadmin_pages/views/playground/Index.vue';
 import DashboardIndex from '../superadmin_pages/views/dashboard/Index.vue';
 import InboxStatusIndex from '../superadmin_pages/views/reports/InboxStatus.vue';
+import HealthScoreIndex from '../superadmin_pages/views/reports/HealthScore.vue';
 
 const ComponentMapping = {
   PlaygroundIndex: PlaygroundIndex,
   DashboardIndex: DashboardIndex,
   InboxStatusIndex: InboxStatusIndex,
+  HealthScoreIndex: HealthScoreIndex,
 };
 
 const renderComponent = (componentName, props) => {

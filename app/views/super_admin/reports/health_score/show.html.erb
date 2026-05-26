@@ -1,0 +1,7 @@
+<% content_for(:title) do %>
+  Health Score
+<% end %>
+
+<%= render_vue_component('HealthScoreIndex', {
+  data_url: data_super_admin_reports_health_score_url(format: :json)
+}) %>
