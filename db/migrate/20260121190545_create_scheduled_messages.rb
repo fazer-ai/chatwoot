@@ -1,13 +1,25 @@
 class CreateScheduledMessages < ActiveRecord::Migration[7.1]
-  # Columns the fazer-ai fork table has had since creation. They act as a
-  # signature to tell our table apart from a scheduled_messages coming from
-  # another Chatwoot version/fork, whose schema we don't know up front.
-  FORK_SIGNATURE_COLUMNS = %w[
-    id content template_params scheduled_at status
-    account_id conversation_id inbox_id
-    author_type author_id message_id
-    created_at updated_at
-  ].freeze
+  # Columns (name => cast type) the fazer-ai fork table has had since creation.
+  # They act as a fingerprint to tell our table apart from a scheduled_messages
+  # coming from another Chatwoot version/fork, whose schema we don't know up
+  # front. Nullability is intentionally not matched: 20260201162122 relaxes
+  # author_id/author_type to nullable, so it varies across fork schema stages.
+  # The PostgreSQL adapter reports bigint columns as :integer.
+  FORK_SIGNATURE_COLUMNS = {
+    'id' => :integer,
+    'content' => :text,
+    'template_params' => :jsonb,
+    'scheduled_at' => :datetime,
+    'status' => :integer,
+    'account_id' => :integer,
+    'conversation_id' => :integer,
+    'inbox_id' => :integer,
+    'author_type' => :string,
+    'author_id' => :integer,
+    'message_id' => :integer,
+    'created_at' => :datetime,
+    'updated_at' => :datetime
+  }.freeze
 
   def up
     relocate_conflicting_table if table_exists?(:scheduled_messages)
@@ -60,8 +72,11 @@ class CreateScheduledMessages < ActiveRecord::Migration[7.1]
   end
 
   def fork_table?
-    existing = connection.columns(:scheduled_messages).map(&:name)
-    (FORK_SIGNATURE_COLUMNS - existing).empty?
+    columns = connection.columns(:scheduled_messages).index_by(&:name)
+    FORK_SIGNATURE_COLUMNS.all? do |name, type|
+      column = columns[name]
+      column && column.type == type
+    end
   end
 
   def add_scheduled_messages_indexes
