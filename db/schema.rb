@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_23_140000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_25_140000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -34,6 +34,18 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_23_140000) do
     t.datetime "updated_at", null: false
     t.index ["owner_type", "owner_id"], name: "index_access_tokens_on_owner_type_and_owner_id"
     t.index ["token"], name: "index_access_tokens_on_token", unique: true
+  end
+
+  create_table "account_health_scores", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.integer "score", null: false
+    t.jsonb "breakdown", default: {}, null: false
+    t.date "captured_on", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "captured_on"], name: "index_account_health_scores_on_account_id_and_captured_on", unique: true
+    t.index ["account_id"], name: "index_account_health_scores_on_account_id"
+    t.index ["captured_on"], name: "index_account_health_scores_on_captured_on"
   end
 
   create_table "account_saml_settings", force: :cascade do |t|
@@ -1649,6 +1661,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_23_140000) do
     t.index ["inbox_id"], name: "index_working_hours_on_inbox_id"
   end
 
+  add_foreign_key "account_health_scores", "accounts", on_delete: :cascade
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "contacts", "languages"
