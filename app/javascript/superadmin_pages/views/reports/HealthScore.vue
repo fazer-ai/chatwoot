@@ -41,6 +41,32 @@ const METRIC_LABELS = {
   manager_engagement: 'Engajamento do manager',
 };
 
+// Each metric belongs to one of the 3 score groups. The drill-down shows a
+// colored chip per card so the operator can tell at a glance which group
+// is dragging the score down.
+const METRIC_GROUP = {
+  ai_active_rate: 'outcomes',
+  handoff_rate: 'outcomes',
+  inbox_uptime: 'operational',
+  daily_agent_activity: 'engagement',
+  manager_engagement: 'engagement',
+};
+
+const GROUP_LABELS = {
+  outcomes: 'Outcomes',
+  operational: 'Operational',
+  engagement: 'Engagement',
+};
+
+// Chip colors are chosen to avoid clashing with the score band palette
+// (red / amber / teal): violet / blue / iris are all present in the
+// design tokens and visually distinct from the bands.
+const GROUP_CHIP_CLASSES = {
+  outcomes: 'bg-n-violet-3 text-n-violet-12 border-n-violet-6',
+  operational: 'bg-n-blue-3 text-n-blue-12 border-n-blue-6',
+  engagement: 'bg-n-iris-3 text-n-iris-12 border-n-iris-6',
+};
+
 const MISSING_REASON_LABELS = {
   account_in_implementation_phase: 'Conta em fase de implementação (0–45 dias)',
   insufficient_volume: 'Volume de conversas insuficiente para avaliação',
@@ -191,7 +217,26 @@ const formatRawValue = (key, value) => {
     return String(value);
   }
   if (typeof value === 'boolean') return value ? 'sim' : 'não';
-  if (Array.isArray(value)) return value.join(', ');
+  if (Array.isArray(value)) {
+    // `inboxes` arrives as [{ phone_number, connected }]: render each as
+    // "phone (conectada|desconectada)" so the operator sees the offending
+    // line, not the useless "[object Object]" toString.
+    if (
+      key === 'inboxes' &&
+      value.every(item => item && typeof item === 'object')
+    ) {
+      return value
+        .map(
+          ({ phone_number: phone, connected }) =>
+            `${phone || '—'} (${connected ? 'conectada' : 'desconectada'})`
+        )
+        .join(', ');
+    }
+    if (value.every(item => typeof item !== 'object' || item === null)) {
+      return value.join(', ');
+    }
+    return value.map(item => JSON.stringify(item)).join(', ');
+  }
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 };
@@ -491,9 +536,16 @@ const arrow = column => {
                         <div
                           class="flex items-baseline justify-between gap-2 mb-1"
                         >
-                          <span class="text-sm font-medium text-n-slate-12">
-                            {{ METRIC_LABELS[key] || key }}
-                          </span>
+                          <div class="flex items-center gap-2 min-w-0">
+                            <span
+                              :class="`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide border ${GROUP_CHIP_CLASSES[METRIC_GROUP[key]] || ''}`"
+                            >
+                              {{ GROUP_LABELS[METRIC_GROUP[key]] || '—' }}
+                            </span>
+                            <span class="text-sm font-medium text-n-slate-12">
+                              {{ METRIC_LABELS[key] || key }}
+                            </span>
+                          </div>
                           <span
                             v-if="!metric.missing"
                             :class="`inline-flex items-center justify-center min-w-10 px-2 py-0.5 rounded-md text-xs font-medium ${bandClasses(bandForScore(metric.sub_score))}`"
