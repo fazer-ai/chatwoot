@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.24.2
+  published_at: '2026-05-26T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.2
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Incoming WhatsApp messages processed with higher priority.** We tuned how WhatsApp webhooks are handled internally so real customer messages are picked up ahead of secondary events (typing indicators, delivery receipts, template/quality notifications), reducing delays during traffic spikes.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Mensagens recebidas do WhatsApp com mais prioridade no processamento.** Ajustamos como os webhooks de WhatsApp são tratados internamente para que mensagens reais dos clientes sejam atendidas antes de eventos secundários (indicador de digitação, recibos de leitura, notificações de template/qualidade), reduzindo atrasos em picos de tráfego.
 - tag: v4.13.0-auris.1.24.1
   published_at: '2026-05-26T16:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.1
@@ -319,25 +331,3 @@
 
       - **Filtros de contato respeitam contatos criados em tempo real.** Um contato novo (ou recebido por mensagem) agora aparece ou some da lista corretamente conforme os filtros aplicados.
       - **Pequenas correções de tradução em português** no fluxo de configuração do WhatsApp.
-- tag: v4.13.0-auris.1.14
-  published_at: '2026-05-11T00:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.14
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Audience labels on the WhatsApp campaign list now appear with their colors.** Same smooth chip style already used on the campaign form and on the contacts and conversations lists.
-      - **Funnel stages and loss reasons are now standard across the installation.** They moved out of each account's settings and into Super Admin, so every team sees the same Auris funnel pipeline.
-
-      ### 🐛 Fixes
-
-      - **Protected labels stay protected for everyone.** Internal labels like `agente-off` and `kb-*` can no longer be renamed or deleted from the labels settings screen — not even by an account administrator. The AI on/off contract is preserved.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Etiquetas do público na lista de campanhas WhatsApp aparecem com cor.** Mesmo estilo suave colorido já presente no formulário de campanha e nas listas de contatos e conversas.
-      - **Raias do funil e motivos de perda agora são padrão da instalação.** Saíram das configurações de cada conta e foram para o Super Admin, garantindo que todos os clientes Auris usem o mesmo pipeline do funil.
-
-      ### 🐛 Correções
-
-      - **Etiquetas protegidas continuam protegidas pra todo mundo.** Etiquetas internas como `agente-off` e `kb-*` não podem mais ser renomeadas ou excluídas pela tela de Configurações → Etiquetas — nem por administradores. Isso preserva a regra de ligar/desligar a IA.
