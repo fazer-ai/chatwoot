@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.24.1
+  published_at: '2026-05-26T16:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.1
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Group chip and readable inbox list on the Health Score drill-down.** Each metric card in the expanded view of the Health Score report now shows a colored chip identifying its group (Outcomes / Operational / Engagement), and the Inbox uptime metric lists the phone numbers and connection state instead of the raw "[object Object]" placeholder.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Etiqueta de grupo e lista de inboxes legível no drill-down do Health Score.** Cada card de métrica na visão expandida do relatório Health Score agora mostra uma etiqueta colorida indicando o grupo (Outcomes / Operational / Engagement), e a métrica de uptime das inboxes lista os números de telefone com o status de conexão em vez do "[object Object]" anterior.
 - tag: v4.13.0-auris.1.24
   published_at: '2026-05-25T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24
@@ -329,31 +341,3 @@
       ### 🐛 Correções
 
       - **Etiquetas protegidas continuam protegidas pra todo mundo.** Etiquetas internas como `agente-off` e `kb-*` não podem mais ser renomeadas ou excluídas pela tela de Configurações → Etiquetas — nem por administradores. Isso preserva a regra de ligar/desligar a IA.
-- tag: v4.13.0-auris.1.13
-  published_at: '2026-05-09T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.13
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Personalize WhatsApp campaign messages per contact.** When picking variables for a campaign template, type `{{` to insert tokens like `{{contact.first_name}}`, `{{contact.email}}`, `{{contact.phone}}` or `{{agent.name}}`. Each recipient gets the message rendered with their own data, so a single campaign can send "Olá Maria!" to one person and "Olá João!" to another.
-      - **AI on/off shows up in the conversation timeline.** Whenever the AI is turned on or off — by the **ai** badge, by an integration via the API or by editing the conversation — a small note appears in the chat: *"John turned the AI on"* / *"John turned the AI off"*. Other open tabs and operators see the change in real time.
-
-      ### ⚡ Improvements
-
-      - **Audience labels now appear with their colors on WhatsApp campaigns.** Selecting the public for a campaign uses the same smooth color chips already used on the contacts and conversation lists, so it's easier to tell the labels apart at a glance.
-      - **Login screen shows the running version.** A small line below the *Sign in* button shows the version currently deployed, helping support confirm what's live in each environment.
-      - **Cleaner conversation timeline.** The internal `agente-off` label no longer shows up as a separate activity in the chat — the AI status note alone explains the change. Other labels still appear on the timeline as before.
-      - **Single-word contact names render cleanly in templates.** A contact saved as just *Maria* now resolves both `{{contact.first_name}}` and `{{contact.last_name}}` to *Maria* instead of leaving the field blank.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Personalize mensagens de campanha por contato no WhatsApp.** Ao preencher variáveis de um modelo de campanha, digite `{{` para inserir tokens como `{{contact.first_name}}`, `{{contact.email}}`, `{{contact.phone}}` ou `{{agent.name}}`. Cada destinatário recebe a mensagem com os próprios dados, então uma única campanha manda "Olá Maria!" pra uma pessoa e "Olá João!" pra outra.
-      - **A IA ligada/desligada agora aparece na conversa.** Sempre que a IA é acionada ou desligada — pelo badge **ia**, por uma integração via API ou pela edição da conversa — uma mensagem aparece no fluxo: *"John acionou a IA"* / *"John desligou a IA"*. Outras abas abertas e outros operadores veem a mudança em tempo real.
-
-      ### ⚡ Melhorias
-
-      - **Etiquetas do público nas campanhas WhatsApp aparecem com cor.** Selecionar o público da campanha usa o mesmo estilo suave colorido das listas de contatos e de conversas, facilitando reconhecer cada etiqueta de relance.
-      - **Tela de login mostra a versão atual.** Uma linha discreta abaixo do botão *Entrar* mostra a versão atualmente publicada, ajudando o suporte a confirmar o que está no ar em cada ambiente.
-      - **Linha do tempo da conversa mais limpa.** A etiqueta interna `agente-off` não aparece mais como atividade na conversa — a mensagem da IA já explica a mudança. As demais etiquetas continuam sendo registradas como antes.
-      - **Nome de contato com uma palavra só funciona nos modelos.** Um contato salvo como *Maria* agora resolve `{{contact.first_name}}` e `{{contact.last_name}}` como *Maria*, em vez de deixar o campo vazio.
