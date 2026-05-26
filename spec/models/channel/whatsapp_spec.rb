@@ -544,6 +544,11 @@ RSpec.describe Channel::Whatsapp do
 
       channel.update_provider_connection!(connection: 'open')
     end
+
+    it 'treats a nil payload as a no-op instead of raising' do
+      expect { channel.update_provider_connection!(nil) }.not_to raise_error
+      expect(channel.reload.provider_connection).to eq({})
+    end
   end
 
   describe '#provider_connection_data' do
