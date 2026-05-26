@@ -23,13 +23,87 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
   end
 
   describe 'POST /webhooks/whatsapp/{:phone_number}' do
-    it 'calls the whatsapp events job asynchronously with perform_later when awaitResponse is not present' do
-      allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+    # Capture queue-routed enqueues for the WhatsappEventsJob. The controller
+    # always reaches the job through `.set(queue: ...).perform_later(...)`,
+    # so we stub `set` to return a spy that records which queue it landed in.
+    let(:configured_job) { instance_double(ActiveJob::ConfiguredJob, perform_later: true) }
+    let(:queues_seen) { [] }
 
+    before do
+      allow(Webhooks::WhatsappEventsJob).to receive(:set) do |opts|
+        queues_seen << opts[:queue]
+        configured_job
+      end
+    end
+
+    it 'enqueues the job when awaitResponse is not present' do
       post '/webhooks/whatsapp/123221321', params: { content: 'hello' }
 
-      expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later)
+      expect(configured_job).to have_received(:perform_later)
       expect(response).to have_http_status(:ok)
+    end
+
+    it 'routes status / account / presence payloads to :low (default fallback)' do
+      post '/webhooks/whatsapp/123221321', params: { content: 'hello' }
+
+      expect(queues_seen).to eq([:low])
+    end
+
+    context 'when the payload is an inbound Baileys message' do
+      it 'routes to the :whatsapp_messages queue' do
+        post '/webhooks/whatsapp/123221321', params: { event: 'messages.upsert', data: { messages: [] } }
+
+        expect(queues_seen).to eq([:whatsapp_messages])
+      end
+    end
+
+    context 'when the payload is a non-message Baileys event (presence/status)' do
+      it 'routes to :low' do
+        post '/webhooks/whatsapp/123221321', params: { event: 'presence.update', data: {} }
+
+        expect(queues_seen).to eq([:low])
+      end
+    end
+
+    context 'when the payload is an inbound WhatsApp Cloud message' do
+      it 'routes "messages" field to :whatsapp_messages' do
+        post '/webhooks/whatsapp/123221321',
+             params: { object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'messages', value: {} }] }] }
+
+        expect(queues_seen).to eq([:whatsapp_messages])
+      end
+
+      it 'routes "smb_message_echoes" field to :whatsapp_messages' do
+        post '/webhooks/whatsapp/123221321',
+             params: { object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'smb_message_echoes', value: {} }] }] }
+
+        expect(queues_seen).to eq([:whatsapp_messages])
+      end
+    end
+
+    context 'when the payload is a non-message WhatsApp Cloud event (template/quality/etc.)' do
+      it 'routes to :low' do
+        post '/webhooks/whatsapp/123221321',
+             params: { object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'message_template_status_update', value: {} }] }] }
+
+        expect(queues_seen).to eq([:low])
+      end
+    end
+
+    context 'when the payload is an inbound Z-API message' do
+      it 'routes ReceivedCallback to :whatsapp_messages' do
+        post '/webhooks/whatsapp/123221321', params: { type: 'ReceivedCallback' }
+
+        expect(queues_seen).to eq([:whatsapp_messages])
+      end
+    end
+
+    context 'when the payload is a non-message Z-API event (status/delivery/connection)' do
+      it 'routes to :low' do
+        post '/webhooks/whatsapp/123221321', params: { type: 'MessageStatusCallback' }
+
+        expect(queues_seen).to eq([:low])
+      end
     end
 
     context 'when phone number is in inactive list' do
@@ -54,28 +128,24 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
 
       it 'processes the webhook normally' do
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
-
         post '/webhooks/whatsapp/+1234567890', params: { content: 'hello' }
 
-        expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later)
+        expect(configured_job).to have_received(:perform_later)
         expect(response).to have_http_status(:ok)
       end
     end
 
     context 'when importMode is true (Baileys history backfill)' do
-      it 'routes the job to the dedicated whatsapp_history queue' do
-        # ActiveJob's `set(queue: ...)` returns a ConfiguredJob proxy; we stub
-        # at that layer to assert the queue swap without booting Sidekiq.
-        configured = instance_double(ActiveJob::ConfiguredJob, perform_later: true)
-        allow(Webhooks::WhatsappEventsJob).to receive(:set).with(queue: :whatsapp_history).and_return(configured)
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
-
+      it 'routes the job to the dedicated :whatsapp_history queue' do
         post '/webhooks/whatsapp/123221321', params: { content: 'hello', importMode: true }
 
-        expect(Webhooks::WhatsappEventsJob).to have_received(:set).with(queue: :whatsapp_history)
-        expect(configured).to have_received(:perform_later)
-        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+        expect(queues_seen).to eq([:whatsapp_history])
+      end
+
+      it 'wins over the live-message routing even when the payload looks like a real message' do
+        post '/webhooks/whatsapp/123221321', params: { event: 'messages.upsert', data: {}, importMode: true }
+
+        expect(queues_seen).to eq([:whatsapp_history])
       end
     end
 

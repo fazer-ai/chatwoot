@@ -21,6 +21,7 @@
   - default
   - mailers
   - action_mailbox_routing
+  - whatsapp_messages
   - low
   - whatsapp_history
   - scheduled_jobs
