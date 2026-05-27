@@ -67,6 +67,11 @@ export default {
   data() {
     return {
       showSearchModal: false,
+      // Tracks the messageId we've already scrolled to. `setActiveChat` re-runs
+      // whenever the conversation list length or route state changes (incoming
+      // cables, filters), so this keeps the query-driven scroll a one-shot and
+      // stops it from yanking the viewport back on every list update.
+      scrolledToMessageId: null,
     };
   },
   computed: {
@@ -100,6 +105,9 @@ export default {
   },
   watch: {
     conversationId() {
+      // Switching conversations clears the consumed marker so a fresh
+      // messageId on the next conversation is honored.
+      this.scrolledToMessageId = null;
       this.fetchConversationIfUnavailable();
     },
   },
@@ -171,16 +179,23 @@ export default {
         }
 
         const { messageId } = this.$route.query;
+        // The query messageId is a one-shot "jump to this message" instruction.
+        // Treat it as actionable only the first time we see it; re-runs of this
+        // method (list-length/route watchers) must not re-scroll to it.
+        const shouldScrollToMessage =
+          messageId && messageId !== this.scrolledToMessageId;
 
         // Same conversation but new messageId — fetch around that message
         if (selectedConversation.id === this.currentChat.id) {
-          if (messageId) {
+          if (shouldScrollToMessage) {
+            this.scrolledToMessageId = messageId;
             this.scrollToMessageById(messageId);
           }
           return;
         }
 
-        if (messageId) {
+        if (shouldScrollToMessage) {
+          this.scrolledToMessageId = messageId;
           const dismissSearch = usePendingAlert(
             this.$t('SCHEDULED_MESSAGES.ITEM.SEARCHING_MESSAGE')
           );
