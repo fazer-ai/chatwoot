@@ -30,7 +30,9 @@ module Whatsapp::BaileysHandlers::PresenceUpdate
     lid = extract_jid_user(jid) if jid&.include?('@lid')
     phone = extract_jid_user(jid) if jid&.include?('@s.whatsapp.net')
     phone ||= extract_jid_user(data[:jidAlt]) if data[:jidAlt].present?
-    [lid, phone]
+    # Canonicalize the phone at the boundary so consolidation / lookups
+    # don't drift between Brazilian 12-digit and 13-digit formats.
+    [lid, normalize_phone_number(phone)]
   end
 
   def handle_presence(lid, phone, presence_data)
