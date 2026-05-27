@@ -21,17 +21,21 @@ class SuperAdmin::Reports::HealthScoreController < SuperAdmin::ApplicationContro
 
   private
 
-  # One row per account: the most recent `account_health_scores` entry. We
-  # eager-load the account so per-row serialization stays N+1-free.
+  # One row per account: the most recent `account_health_scores` entry,
+  # scoped to active accounts only. Suspended accounts drop off the report
+  # so Ops focuses on the live fleet. We eager-load the account so per-row
+  # serialization stays N+1-free.
   def latest_snapshots_by_account
     AccountHealthScore
       .where(id: AccountHealthScore.select('DISTINCT ON (account_id) id').order(:account_id, captured_on: :desc))
+      .joins(:account)
+      .merge(Account.active)
       .includes(:account)
   end
 
   def accounts_without_score
     scored_ids = AccountHealthScore.distinct.pluck(:account_id)
-    Account.where.not(id: scored_ids)
+    Account.active.where.not(id: scored_ids)
   end
 
   def serialize(snapshot)
