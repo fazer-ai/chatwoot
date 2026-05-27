@@ -555,6 +555,26 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(reaction.in_reply_to_external_id).to eq(message.source_id)
         end
 
+        it 'anchors the reaction to the target message conversation when it is resolved instead of opening a new one' do
+          message.conversation.update!(status: :resolved)
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '12345678@lid', fromMe: true, id: 'msg_123' },
+              text: '👍'
+            }
+          }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to change(Conversation, :count)
+
+          reaction = message.conversation.reload.messages.last
+          expect(reaction.is_reaction).to be(true)
+          expect(reaction.conversation_id).to eq(message.conversation.id)
+          expect(reaction.in_reply_to_external_id).to eq(message.source_id)
+        end
+
         it 'does not create the reaction if content is empty' do
           raw_message[:key][:id] = 'reaction_123'
           raw_message[:message] = {

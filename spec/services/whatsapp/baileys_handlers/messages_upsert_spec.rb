@@ -638,6 +638,34 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(message.attachments.count).to eq(1)
       expect(message.sender).not_to eq(message.conversation.contact)
     end
+
+    it 'anchors a group reaction to the target message conversation when it is resolved instead of opening a new one' do
+      Whatsapp::IncomingMessageBaileysService.new(
+        inbox: inbox,
+        params: build_params(build_group_raw_message(id: 'grp_target_001', text: 'Original group message'))
+      ).perform
+
+      conversation = inbox.conversations.last
+      target_message = conversation.messages.last
+      conversation.update!(status: :resolved)
+
+      reaction_raw = {
+        key: { id: 'grp_reaction_001', remoteJid: group_jid, participant: "#{sender_lid}@lid",
+               participantAlt: "#{sender_phone}@s.whatsapp.net", fromMe: false },
+        pushName: 'Sender User',
+        messageTimestamp: timestamp,
+        message: { reactionMessage: { key: { id: target_message.source_id }, text: '👍' } }
+      }
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: build_params(reaction_raw)).perform
+      end.not_to change(Conversation, :count)
+
+      reaction = conversation.reload.messages.last
+      expect(reaction.is_reaction).to be(true)
+      expect(reaction.conversation_id).to eq(conversation.id)
+      expect(reaction.in_reply_to_external_id).to eq(target_message.source_id)
+    end
   end
 
   describe 'conversation duplication after deletion or resolution' do

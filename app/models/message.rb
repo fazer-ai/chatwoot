@@ -384,6 +384,13 @@ class Message < ApplicationRecord
   end
 
   def set_waiting_since_on_incoming_message
+    # Reactions are annotations, not a new turn awaiting a reply; treating an
+    # incoming reaction as one would push an already-attended conversation back
+    # into the unattended queue (and leave it stuck there, since removals don't
+    # create a Message that could clear it). Mirrors the reaction guard on the
+    # outgoing side (`human_response?`).
+    return if reaction?
+
     # Set waiting_since when customer sends a message (if currently blank)
     conversation.update!(waiting_since: created_at) if incoming? && conversation.waiting_since.blank?
   end

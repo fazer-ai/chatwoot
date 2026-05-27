@@ -1002,5 +1002,15 @@ RSpec.describe Message do
              content_attributes: { is_reaction: true, in_reply_to: 1 })
       expect(conversation.reload.first_reply_created_at).to be_nil
     end
+
+    it 'does not push an attended conversation back into the unattended queue' do
+      conversation.update!(first_reply_created_at: Time.current, waiting_since: nil)
+      create(:message,
+             conversation: conversation,
+             message_type: :incoming,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(conversation.reload.waiting_since).to be_nil
+    end
   end
 end

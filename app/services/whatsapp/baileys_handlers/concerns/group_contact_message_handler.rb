@@ -49,7 +49,10 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
       return mark_existing_reaction_as_removed(sender: @sender_contact)
     end
 
-    @conversation = find_or_create_group_conversation(@group_contact_inbox)
+    # A reaction must land in the conversation holding the target message, not
+    # follow the reopen policy: reacting to a message in a resolved group thread
+    # would otherwise spawn a stray blank group conversation.
+    @conversation = conversation_for_reaction || find_or_create_group_conversation(@group_contact_inbox)
     add_group_member(@group_contact, @sender_contact) if @sender_contact
 
     build_and_save_message(

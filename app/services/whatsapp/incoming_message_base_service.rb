@@ -239,16 +239,41 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def set_conversation
-    # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved
-    @conversation = if @inbox.lock_to_single_conversation
-                      @inbox.conversations.where(contact_id: @contact_inbox.contact_id).last
-                    else
-                      @contact_inbox.conversations
-                                    .where.not(status: :resolved).last
-                    end
+    # A reaction annotates an existing message, so it must land in that message's
+    # conversation, not follow the inbox reopen policy. Without this, reacting to a
+    # message in a resolved thread (with lock_to_single_conversation off) would open
+    # a stray blank conversation, or attach the reaction to the wrong active one.
+    # Mirrors the inbox-scoped lookup used by the reaction-removal flow; falls back
+    # to the normal logic when the target isn't stored locally.
+    @conversation = conversation_for_reaction || conversation_by_inbox_config
     return if @conversation
 
     @conversation = ::Conversation.create!(conversation_params)
+  end
+
+  def conversation_for_reaction
+    return unless message_type == 'reaction'
+
+    external_id = reaction_target_external_id
+    return if external_id.blank?
+
+    inbox.messages.find_by(source_id: external_id)&.conversation
+  end
+
+  # Cloud/Z-API set @in_reply_to_external_id before set_conversation; the Baileys
+  # handler overrides this to read it straight from the raw webhook.
+  def reaction_target_external_id
+    @in_reply_to_external_id
+  end
+
+  def conversation_by_inbox_config
+    # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved
+    if @inbox.lock_to_single_conversation
+      @inbox.conversations.where(contact_id: @contact_inbox.contact_id).last
+    else
+      @contact_inbox.conversations
+                    .where.not(status: :resolved).last
+    end
   end
 
   def attach_files

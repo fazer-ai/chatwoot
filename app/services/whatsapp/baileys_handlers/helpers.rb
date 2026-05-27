@@ -211,6 +211,13 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     message_type == 'reaction' && message_content.blank?
   end
 
+  # Baileys doesn't set @in_reply_to_external_id before set_conversation (it's
+  # written later in build_message_content_attributes), so read the target id
+  # straight from the raw reaction webhook here.
+  def reaction_target_external_id
+    unwrap_ephemeral_message(@raw_message[:message]).dig(:reactionMessage, :key, :id)
+  end
+
   def try_update_contact_avatar(contact = nil)
     # TODO: Current logic will never update the contact avatar if their profile picture changes on WhatsApp.
     target_contact = contact || @contact
