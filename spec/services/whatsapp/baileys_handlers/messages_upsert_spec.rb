@@ -260,6 +260,70 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'Brazilian phone number normalization (9th-digit issue)' do
+    # WhatsApp routes Brazilian mobile messages with either 12 digits
+    # (pre-2012 format, no leading 9) or 13 digits (post-2012, with the 9).
+    # Without normalization at the boundary, the same physical number
+    # produces two duplicate contacts — one per format.
+    let(:short_phone) { '556181382566' }  # 12 digits, no 9
+    let(:long_phone)  { '5561981382566' } # 13 digits, with the 9
+    let(:lid) { '191761766953174' }
+    let(:identifier) { "#{lid}@lid" }
+
+    it 'normalizes a 12-digit JID and reuses an existing 13-digit contact' do
+      # Simulate the user's incident: a contact already exists (e.g.
+      # created via API) with the 13-digit phone, and Baileys delivers a
+      # message whose JID carries the 12-digit form.
+      existing_contact = create(:contact, account: inbox.account, phone_number: "+#{long_phone}", identifier: nil)
+
+      raw_message = {
+        key: { id: 'msg_br_001', remoteJid: "#{lid}@lid", remoteJidAlt: "#{short_phone}@s.whatsapp.net", fromMe: false,
+               addressingMode: 'lid' },
+        pushName: 'Daniel Nunes',
+        messageTimestamp: timestamp,
+        message: { conversation: 'Olá' }
+      }
+      params = {
+        webhookVerifyToken: webhook_verify_token,
+        event: 'messages.upsert',
+        data: { type: 'notify', messages: [raw_message] }
+      }
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+      end.not_to(change { inbox.account.contacts.count })
+
+      existing_contact.reload
+      expect(existing_contact.phone_number).to eq("+#{long_phone}")
+      expect(existing_contact.identifier).to eq(identifier)
+
+      message = inbox.messages.find_by(source_id: 'msg_br_001')
+      expect(message).to be_present
+      expect(message.sender).to eq(existing_contact)
+    end
+
+    it 'stores the canonical 13-digit phone even when the JID arrives with 12 digits' do
+      raw_message = {
+        key: { id: 'msg_br_002', remoteJid: "#{lid}@lid", remoteJidAlt: "#{short_phone}@s.whatsapp.net", fromMe: false,
+               addressingMode: 'lid' },
+        pushName: 'Daniel Nunes',
+        messageTimestamp: timestamp,
+        message: { conversation: 'Olá' }
+      }
+      params = {
+        webhookVerifyToken: webhook_verify_token,
+        event: 'messages.upsert',
+        data: { type: 'notify', messages: [raw_message] }
+      }
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+      created_contact = inbox.account.contacts.find_by(identifier: identifier)
+      expect(created_contact).to be_present
+      expect(created_contact.phone_number).to eq("+#{long_phone}")
+    end
+  end
+
   describe 'ephemeral message handling' do
     let(:phone) { '5511912345678' }
     let(:lid) { '12345678' }

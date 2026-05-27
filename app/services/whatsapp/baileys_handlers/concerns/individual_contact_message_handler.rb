@@ -13,7 +13,9 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
 
     # Lock by contact phone to prevent race conditions when multiple messages
     # from the same contact arrive simultaneously (e.g., WhatsApp albums).
-    contact_phone = extract_from_jid(type: 'pn') || extract_from_jid(type: 'lid')
+    # Normalizing here keeps concurrent messages from the same Brazilian
+    # number using different formats (12 vs 13 digits) on the same lock.
+    contact_phone = normalize_phone_number(extract_from_jid(type: 'pn')) || extract_from_jid(type: 'lid')
     with_contact_lock(contact_phone) do
       # Re-check after acquiring lock to handle race conditions where:
       # 1. An agent sends a message from Chatwoot (slow API call)
@@ -55,7 +57,12 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
   end
 
   def set_contact
-    phone = extract_from_jid(type: 'pn')
+    # Normalize at the boundary so every downstream consumer (consolidation
+    # service, contact builder, contact attributes update) works on the
+    # canonical phone form. Without this, Brazilian numbers in pre-9th-digit
+    # format (12 digits) and post-9th-digit format (13 digits) create
+    # duplicate contacts for the same physical line.
+    phone = normalize_phone_number(extract_from_jid(type: 'pn'))
     source_id = extract_from_jid(type: 'lid')
     identifier = "#{source_id}@lid"
 
