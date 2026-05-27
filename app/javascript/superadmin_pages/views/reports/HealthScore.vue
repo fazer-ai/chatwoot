@@ -58,6 +58,32 @@ const GROUP_LABELS = {
   engagement: 'Engagement',
 };
 
+// Tooltip copy for the column headers (?) — explains what each group
+// measures and why it matters for churn.
+const GROUP_HINTS = {
+  outcomes:
+    'Mede se a IA está entregando o valor que o cliente contratou. Pesa 40% do score. Queda aqui é o sinal mais forte de churn iminente — o cliente está perdendo confiança no produto.',
+  operational:
+    'Mede se a plataforma está tecnicamente operacional (inboxes WhatsApp conectadas). Pesa 25% do score. Inbox derrubada gera revenue impact imediato e é causa comum de cancelamento.',
+  engagement:
+    'Mede se o time do cliente está usando o produto no dia a dia. Pesa 35% do score. Sinal leading de churn — time que não loga não percebe valor entregue.',
+};
+
+// Tooltip copy for each metric card (?) in the drill-down — explica o que
+// a métrica mede e o porquê do peso dela no risco de churn.
+const METRIC_HINTS = {
+  ai_active_rate:
+    '% das conversas dos últimos 30 dias com a IA ativa (modo coluna ai_enabled ou label legado agente-off). Inclui penalização por tendência: se a IA está sendo desligada nas últimas 4 semanas, o score cai mais. Cliente desligando a IA = perdendo a confiança no produto.',
+  handoff_rate:
+    '% das conversas com IA ativa onde um agente humano precisou intervir. Diferente do uso de IA — aqui a IA está ligada mas não consegue resolver sozinha. Alta taxa = qualidade insuficiente, cliente cansando de "ajudar" a IA.',
+  inbox_uptime:
+    '% das inboxes WhatsApp atualmente conectadas, considerando o pior caso entre todas. Inbox desconectada significa mensagens perdidas. Quando todas estão fora por > 48h, o score total fica capeado em 40 (vermelho).',
+  daily_agent_activity:
+    '% dos dias úteis (Seg-Sex) dos últimos 14 dias com pelo menos um agente enviando mensagem. Mede a adoção real do produto. Time que não usa diariamente está se desengajando — pode ser o início de migração para outra ferramenta.',
+  manager_engagement:
+    'Se o usuário com perfil manager logou nos últimos 7 dias. O manager é o decisor — quando ele para de acompanhar o produto, o churn é questão de tempo. A métrica fica indisponível se a conta não tem manager.',
+};
+
 // Chip colors avoid the score band palette (red / amber / teal) AND keep
 // the 3 groups visually distinct from each other: gray (neutral) for
 // Outcomes, blue for Operational, iris (lavender) for Engagement.
@@ -396,19 +422,46 @@ const arrow = column => {
                 class="text-center px-5 py-3 font-medium text-sm cursor-pointer select-none"
                 @click="toggleSort('outcomes')"
               >
-                Outcomes {{ arrow('outcomes') }}
+                <span class="inline-flex items-center gap-1">
+                  Outcomes {{ arrow('outcomes') }}
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-n-gray-3 text-n-slate-12 text-xs font-bold cursor-help border border-n-gray-6"
+                    :title="GROUP_HINTS.outcomes"
+                    @click.stop
+                  >
+                    ?
+                  </span>
+                </span>
               </th>
               <th
                 class="text-center px-5 py-3 font-medium text-sm cursor-pointer select-none"
                 @click="toggleSort('operational')"
               >
-                Operational {{ arrow('operational') }}
+                <span class="inline-flex items-center gap-1">
+                  Operational {{ arrow('operational') }}
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-n-gray-3 text-n-slate-12 text-xs font-bold cursor-help border border-n-gray-6"
+                    :title="GROUP_HINTS.operational"
+                    @click.stop
+                  >
+                    ?
+                  </span>
+                </span>
               </th>
               <th
                 class="text-center px-5 py-3 font-medium text-sm cursor-pointer select-none"
                 @click="toggleSort('engagement')"
               >
-                Engagement {{ arrow('engagement') }}
+                <span class="inline-flex items-center gap-1">
+                  Engagement {{ arrow('engagement') }}
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-n-gray-3 text-n-slate-12 text-xs font-bold cursor-help border border-n-gray-6"
+                    :title="GROUP_HINTS.engagement"
+                    @click.stop
+                  >
+                    ?
+                  </span>
+                </span>
               </th>
               <th class="text-left px-5 py-3 font-medium text-sm">
                 Atualizado
@@ -544,6 +597,13 @@ const arrow = column => {
                             </span>
                             <span class="text-sm font-medium text-n-slate-12">
                               {{ METRIC_LABELS[key] || key }}
+                            </span>
+                            <span
+                              v-if="METRIC_HINTS[key]"
+                              class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-n-gray-3 text-n-slate-12 text-xs font-bold cursor-help border border-n-gray-6 flex-shrink-0"
+                              :title="METRIC_HINTS[key]"
+                            >
+                              ?
                             </span>
                           </div>
                           <span
