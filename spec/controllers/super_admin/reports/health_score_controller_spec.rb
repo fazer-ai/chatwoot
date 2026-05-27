@@ -87,5 +87,18 @@ RSpec.describe 'Super Admin health score report', type: :request do
       row = response.parsed_body['accounts'].find { |a| a['account_id'] == account_two.id }
       expect(row['kill_clause']).to eq('no_agent_activity')
     end
+
+    it 'excludes suspended accounts (both scored and unscored)' do
+      suspended_with_score = create(:account, name: 'Suspended scored', status: :suspended)
+      create(:account_health_score, account: suspended_with_score, score: 90, captured_on: Date.current)
+      create(:account, name: 'Suspended unscored', status: :suspended)
+
+      sign_in(super_admin, scope: :super_admin)
+      get '/super_admin/reports/health_score/data'
+
+      account_ids = response.parsed_body['accounts'].pluck('account_id')
+      expect(account_ids).to contain_exactly(account_one.id, account_two.id, account_three.id)
+      expect(account_ids).not_to include(suspended_with_score.id)
+    end
   end
 end
