@@ -30,5 +30,31 @@ RSpec.describe Agents::DestroyJob do
       expect(user.notification_settings.length).to eq 0
       expect(user.assigned_conversations.where(account: account).length).to eq 0
     end
+
+    context 'when preserving internal chat DM names' do
+      let(:other_user) { create(:user, account: account) }
+
+      it 'sets the removed user name on DM channels that have no name' do
+        dm_channel = create(:internal_chat_channel, :dm, account: account)
+        create(:internal_chat_channel_member, channel: dm_channel, user: user)
+        create(:internal_chat_channel_member, channel: dm_channel, user: other_user)
+
+        described_class.perform_now(account, user)
+
+        dm_channel.reload
+        expect(dm_channel.name).to eq(user.name)
+      end
+
+      it 'does not overwrite DM channels that already have a name' do
+        dm_channel = create(:internal_chat_channel, :dm, account: account, name: 'Custom Name')
+        create(:internal_chat_channel_member, channel: dm_channel, user: user)
+        create(:internal_chat_channel_member, channel: dm_channel, user: other_user)
+
+        described_class.perform_now(account, user)
+
+        dm_channel.reload
+        expect(dm_channel.name).to eq('Custom Name')
+      end
+    end
   end
 end

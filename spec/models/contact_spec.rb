@@ -16,6 +16,13 @@ RSpec.describe Contact do
 
   describe 'concerns' do
     it_behaves_like 'avatarable'
+
+    it 'accepts webp avatars' do
+      contact = build(:contact, account: create(:account))
+      contact.avatar.attach(get_blob_for(Rails.root.join('spec/assets/avatar.png'), 'image/webp'))
+
+      expect(contact).to be_valid
+    end
   end
 
   context 'when prepare contact attributes before validation' do
@@ -194,6 +201,16 @@ RSpec.describe Contact do
         expect(resolved_new).to include(lead_with_email, lead_without_email)
         expect(resolved_new).not_to include(visitor_contact, customer_contact)
       end
+    end
+  end
+
+  describe 'group_type' do
+    it 'provides type check methods' do
+      individual_contact = create(:contact, group_type: :individual)
+      group_contact = create(:contact, group_type: :group)
+
+      expect(individual_contact).to be_group_type_individual
+      expect(group_contact).to be_group_type_group
     end
   end
 end

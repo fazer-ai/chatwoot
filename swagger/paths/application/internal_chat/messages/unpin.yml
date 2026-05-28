@@ -1,0 +1,32 @@
+tags:
+  - Internal Chat Messages
+operationId: unpin-internal-chat-message
+summary: Unpin a message
+security:
+  - userApiKey: []
+description: Unpin a message in an internal chat channel
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_message'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Message not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

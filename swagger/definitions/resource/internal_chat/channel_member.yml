@@ -1,0 +1,50 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the channel member
+  user_id:
+    type: integer
+    description: The ID of the user
+  role:
+    type: string
+    enum:
+      - admin
+      - member
+    description: The role of the member in the channel
+  muted:
+    type: boolean
+    description: Whether the channel is muted for this member
+  favorited:
+    type: boolean
+    description: Whether the channel is favorited by this member
+  hidden:
+    type: boolean
+    description: Whether the channel is hidden for this member (used to close DMs)
+  availability_status:
+    type:
+      - string
+      - 'null'
+    description: Availability status of the member's user
+  last_read_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: The time the member last read messages
+  name:
+    type: string
+    description: The name of the user
+  avatar_url:
+    type:
+      - string
+      - 'null'
+    description: The avatar URL of the user
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the member was added
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the member record was last updated

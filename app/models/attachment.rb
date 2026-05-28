@@ -37,6 +37,7 @@ class Attachment < ApplicationRecord
   belongs_to :account
   belongs_to :message
   has_one_attached :file
+  before_save :set_extension
   validate :acceptable_file
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
@@ -56,7 +57,10 @@ class Attachment < ApplicationRecord
   # NOTE: for External services use this methods since redirect doesn't work effectively in a lot of cases
   def download_url
     ActiveStorage::Current.url_options = Rails.application.routes.default_url_options if ActiveStorage::Current.url_options.blank?
-    file.attached? ? file.blob.url : ''
+    return '' unless file.attached?
+
+    normalize_opus_blob_content_type!
+    file.blob.url
   end
 
   def thumb_url
@@ -89,7 +93,7 @@ class Attachment < ApplicationRecord
     when :embed
       embed_data
     else
-      file_metadata
+      file.attached? ? file_metadata : { data_url: external_url, thumb_url: '' }
     end
   end
 
@@ -103,14 +107,23 @@ class Attachment < ApplicationRecord
     audio_file_data = base_data.merge(file_metadata)
     audio_file_data.merge(
       {
+        # Keep audio playback inline while avoiding the ActiveStorage proxy path.
+        data_url: inline_audio_url,
         transcribed_text: meta&.[]('transcribed_text') || ''
       }
     )
   end
 
+  def inline_audio_url
+    return '' unless file.attached?
+
+    Rails.application.routes.url_helpers.rails_storage_redirect_url(file, disposition: 'inline')
+  end
+
   def file_metadata
     metadata = {
       extension: extension,
+      content_type: file.content_type,
       data_url: file_url,
       thumb_url: thumb_url,
       file_size: file.byte_size,
@@ -118,7 +131,7 @@ class Attachment < ApplicationRecord
       height: file.metadata[:height]
     }
 
-    metadata[:data_url] = metadata[:thumb_url] = external_url if message.inbox.instagram? && message.incoming?
+    metadata[:data_url] = metadata[:thumb_url] = external_url if instagram_incoming_message?
     metadata
   end
 
@@ -155,6 +168,21 @@ class Attachment < ApplicationRecord
     }
   end
 
+  def instagram_incoming_message?
+    return false unless message.incoming?
+
+    return true if message.inbox.instagram_direct?
+
+    message.inbox.instagram? && message.conversation&.additional_attributes&.dig('type') == 'instagram_direct_message'
+  end
+
+  def set_extension
+    return unless file.attached?
+    return if extension.present?
+
+    self.extension = File.extname(file.filename.to_s).delete_prefix('.').presence
+  end
+
   def should_validate_file?
     return false unless file.attached?
     # we are only limiting attachment types in case of website widget
@@ -183,6 +211,16 @@ class Attachment < ApplicationRecord
 
   def media_file?(file_content_type)
     file_content_type.start_with?('image/', 'video/', 'audio/')
+  end
+
+  # Marcel gem may detect OGG/Opus files as audio/opus instead of audio/ogg.
+  # Lazily normalize existing blobs so presigned URLs serve the correct Content-Type.
+  # Only applies to .ogg files — .opus files legitimately use audio/opus.
+  def normalize_opus_blob_content_type!
+    blob = file.blob
+    return unless blob.content_type == 'audio/opus' && blob.filename.to_s.end_with?('.ogg')
+
+    blob.update_column(:content_type, 'audio/ogg') # rubocop:disable Rails/SkipsModelValidations
   end
 end
 

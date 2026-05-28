@@ -23,6 +23,8 @@ module Events::Types
   # FIXME: deprecate the opened and resolved events in future in favor of status changed event.
   CONVERSATION_OPENED = 'conversation.opened'
   CONVERSATION_RESOLVED = 'conversation.resolved'
+  CONVERSATION_CAPTAIN_INFERENCE_RESOLVED = 'conversation.captain_inference_resolved'
+  CONVERSATION_CAPTAIN_INFERENCE_HANDOFF = 'conversation.captain_inference_handoff'
 
   CONVERSATION_STATUS_CHANGED = 'conversation.status_changed'
   CONVERSATION_CONTACT_CHANGED = 'conversation.contact_changed'
@@ -41,15 +43,27 @@ module Events::Types
   MESSAGE_UPDATED = 'message.updated'
   MESSAGES_READ = 'messages.read'
 
+  # scheduled message events
+  SCHEDULED_MESSAGE_CREATED = 'scheduled_message.created'
+  SCHEDULED_MESSAGE_UPDATED = 'scheduled_message.updated'
+  SCHEDULED_MESSAGE_DELETED = 'scheduled_message.deleted'
+
+  # recurring scheduled message events
+  RECURRING_SCHEDULED_MESSAGE_CREATED = 'recurring_scheduled_message.created'
+  RECURRING_SCHEDULED_MESSAGE_UPDATED = 'recurring_scheduled_message.updated'
+  RECURRING_SCHEDULED_MESSAGE_DELETED = 'recurring_scheduled_message.deleted'
+
   # contact events
   CONTACT_CREATED = 'contact.created'
   CONTACT_UPDATED = 'contact.updated'
   CONTACT_MERGED = 'contact.merged'
   CONTACT_DELETED = 'contact.deleted'
+  CONTACT_GROUP_SYNCED = 'contact.group_synced'
 
   # contact events
   INBOX_CREATED = 'inbox.created'
   INBOX_UPDATED = 'inbox.updated'
+  INBOX_PROVIDER_CONNECTION_UPDATED = 'inbox.provider_connection_updated'
 
   # notification events
   NOTIFICATION_CREATED = 'notification.created'
@@ -62,4 +76,15 @@ module Events::Types
 
   # copilot events
   COPILOT_MESSAGE_CREATED = 'copilot.message.created'
+
+  # internal chat events
+  INTERNAL_CHAT_MESSAGE_CREATED = 'internal_chat.message.created'
+  INTERNAL_CHAT_MESSAGE_UPDATED = 'internal_chat.message.updated'
+  INTERNAL_CHAT_MESSAGE_DELETED = 'internal_chat.message.deleted'
+  INTERNAL_CHAT_CHANNEL_UPDATED = 'internal_chat.channel.updated'
+  INTERNAL_CHAT_TYPING_ON = 'internal_chat.typing_on'
+  INTERNAL_CHAT_TYPING_OFF = 'internal_chat.typing_off'
+  INTERNAL_CHAT_REACTION_CREATED = 'internal_chat.reaction.created'
+  INTERNAL_CHAT_REACTION_DELETED = 'internal_chat.reaction.deleted'
+  INTERNAL_CHAT_POLL_VOTED = 'internal_chat.poll.voted'
 end

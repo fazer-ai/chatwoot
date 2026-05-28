@@ -2,11 +2,13 @@ import { computed } from 'vue';
 import { useStore, useStoreGetters } from 'dashboard/composables/store';
 
 export const DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER = Object.freeze([
+  { name: 'scheduled_messages' },
   { name: 'conversation_actions' },
   { name: 'macros' },
   { name: 'conversation_info' },
   { name: 'contact_attributes' },
   { name: 'contact_notes' },
+  { name: 'shared_files' },
   { name: 'previous_conversation' },
   { name: 'conversation_participants' },
   { name: 'linear_issues' },
@@ -45,7 +47,11 @@ const useConversationSidebarItemsOrder = uiSettings => {
     // If the sidebar order doesn't have the new elements, then add them to the list.
     DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER.forEach(item => {
       if (!itemsOrderCopy.find(i => i.name === item.name)) {
-        itemsOrderCopy.push(item);
+        if (item.name === 'scheduled_messages') {
+          itemsOrderCopy.unshift(item);
+        } else {
+          itemsOrderCopy.push(item);
+        }
       }
     });
     return itemsOrderCopy;

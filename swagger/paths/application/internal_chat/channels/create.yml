@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Channels
+operationId: create-internal-chat-channel
+summary: Create a channel
+security:
+  - userApiKey: []
+description: Create a new internal chat channel or direct message. For DMs, set channel_type to "dm" and provide member_ids.
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/internal_chat_channel_create_payload'
+responses:
+  '201':
+    description: Created
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_channel_show'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '402':
+    description: Pro feature required (e.g. private channel limit reached)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

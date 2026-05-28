@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Drafts
+operationId: delete-internal-chat-draft
+summary: Delete a draft
+security:
+  - userApiKey: []
+description: Delete a message draft for the current user in the specified channel
+parameters:
+  - name: parent_id
+    in: query
+    schema:
+      type: integer
+    description: The parent message ID (for thread drafts)
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Draft not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

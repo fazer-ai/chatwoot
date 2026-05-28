@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Polls
+operationId: unvote-internal-chat-poll
+summary: Remove a vote from a poll
+security:
+  - userApiKey: []
+description: Remove the current user's vote from a poll. Optionally specify an option_id to remove a specific vote in multiple-choice polls.
+parameters:
+  - name: option_id
+    in: query
+    schema:
+      type: integer
+    description: The ID of the poll option to unvote (optional, for multiple-choice polls)
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_message'
+  '400':
+    description: Bad request (e.g. poll expired)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Poll or vote not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

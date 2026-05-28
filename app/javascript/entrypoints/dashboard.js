@@ -5,7 +5,6 @@ import axios from 'axios';
 // Global Components
 import hljsVuePlugin from '@highlightjs/vue-plugin';
 
-import Multiselect from 'vue-multiselect';
 import { plugin, defaultConfig } from '@formkit/vue';
 import WootWizard from 'components/ui/Wizard.vue';
 import FloatingVue from 'floating-vue';
@@ -89,10 +88,15 @@ app.use(FloatingVue, {
   instantMove: true,
   arrowOverflow: false,
   disposeTimeout: 5000000,
+  themes: {
+    'naked-popover': {
+      $extend: 'dropdown',
+      $resetCss: true,
+    },
+  },
 });
 app.use(hljsVuePlugin);
 
-app.component('multiselect', Multiselect);
 app.component('woot-wizard', WootWizard);
 app.component('fluent-icon', FluentIcon);
 

@@ -1,0 +1,33 @@
+tags:
+  - Internal Chat Search
+operationId: search-internal-chat
+summary: Search internal chat
+security:
+  - userApiKey: []
+description: Search across channels, direct messages, and messages in the account's internal chat
+parameters:
+  - name: q
+    in: query
+    required: true
+    schema:
+      type: string
+    description: Search query (minimum 3 characters, case- and accent-insensitive)
+  - name: page
+    in: query
+    schema:
+      type: integer
+      default: 1
+    description: Page number for message results pagination
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_search_result'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

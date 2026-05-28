@@ -2,6 +2,10 @@ require 'rails_helper'
 
 describe Whatsapp::IncomingMessageWhatsappCloudService do
   describe '#perform' do
+    after do
+      Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
+    end
+
     let!(:whatsapp_channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
     let(:params) do
       {
@@ -41,10 +45,7 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
       it 'increments reauthorization count if fetching attachment fails' do
         stub_request(
           :get,
-          whatsapp_channel.media_url(
-            'b1c68f38-8734-4ad3-b4a1-ef0c10d683',
-            whatsapp_channel.provider_config['phone_number_id']
-          )
+          whatsapp_channel.media_url('b1c68f38-8734-4ad3-b4a1-ef0c10d683')
         ).to_return(
           status: 401
         )
@@ -105,6 +106,277 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         expect(whatsapp_channel.inbox.messages.count).to eq(0)
       end
     end
+
+    context 'when document attachment has filename with spaces' do
+      let(:document_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Sojan Jose' }, wa_id: '2423423243' }],
+                messages: [{
+                  from: '2423423243',
+                  document: {
+                    id: 'b1c68f38-8734-4ad3-b4a1-ef0c10d683',
+                    mime_type: 'application/pdf',
+                    sha256: '29ed500fa64eb55fc19dc4124acb300e5dcca0f822a301ae99944db',
+                    filename: 'Sample File Ação.pdf',
+                    caption: 'Check this document'
+                  },
+                  timestamp: '1664799904', type: 'document'
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      it 'uses the filename from the message payload instead of Content-Disposition' do
+        stub_media_url_request
+        stub_request(:get, 'https://chatwoot-assets.local/sample.png').to_return(
+          status: 200,
+          body: File.read('spec/assets/attachment.pdf'),
+          headers: {
+            'content-type' => 'application/pdf',
+            'content-disposition' =>
+              "attachment; filename=Sample_File_Ao.pdf; filename*=utf-8''Sample%20File%20A%C3%A7%C3%A3o.pdf"
+          }
+        )
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: document_params).perform
+
+        attachment = whatsapp_channel.inbox.messages.first.attachments.first
+        expect(attachment).to be_present
+        expect(attachment.file.filename.to_s).to eq('Sample File Ação.pdf')
+      end
+    end
+
+    context 'when dispatching provider events' do
+      let(:message_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              field: 'messages',
+              value: {
+                contacts: [{ profile: { name: 'Sojan Jose' }, wa_id: '2423423243' }],
+                messages: [{
+                  from: '2423423243',
+                  text: { body: 'Hello' },
+                  timestamp: '1664799904', type: 'text'
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      before do
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+      end
+
+      it 'dispatches provider_event_received with the webhook field as event type' do
+        described_class.new(inbox: whatsapp_channel.inbox, params: message_params).perform
+
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+          'provider.event_received',
+          anything,
+          hash_including(
+            inbox: whatsapp_channel.inbox,
+            event: 'messages',
+            payload: message_params[:entry][0][:changes][0][:value]
+          )
+        )
+      end
+
+      it 'does not dispatch when processed_params is blank' do
+        empty_params = { phone_number: whatsapp_channel.phone_number, object: 'whatsapp_business_account', entry: {} }.with_indifferent_access
+        described_class.new(inbox: whatsapp_channel.inbox, params: empty_params).perform
+
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with('provider.event_received', anything, anything)
+      end
+    end
+
+    context 'when message is a reply (has context)' do
+      let(:reply_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Pranav' }, wa_id: '16503071063' }],
+                messages: [{
+                  context: {
+                    from: '16503071063',
+                    id: 'wamid.ORIGINAL_MESSAGE_ID'
+                  },
+                  from: '16503071063',
+                  id: 'wamid.REPLY_MESSAGE_ID',
+                  timestamp: '1770407829',
+                  text: { body: 'This is a reply' },
+                  type: 'text'
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      context 'when the original message exists in Chatwoot' do
+        it 'sets in_reply_to to reference the existing message' do
+          # Create a conversation and the original message that will be replied to first
+          contact = create(:contact, phone_number: '+16503071063', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '16503071063')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+
+          original_message = create(:message,
+                                    conversation: conversation,
+                                    source_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                                    content: 'Original message')
+
+          described_class.new(inbox: whatsapp_channel.inbox, params: reply_params).perform
+
+          reply_message = whatsapp_channel.inbox.messages.last
+          expect(reply_message.content).to eq('This is a reply')
+          expect(reply_message.content_attributes['in_reply_to']).to eq(original_message.id)
+          expect(reply_message.content_attributes['in_reply_to_external_id']).to eq('wamid.ORIGINAL_MESSAGE_ID')
+        end
+      end
+
+      context 'when the original message does not exist in Chatwoot' do
+        it 'does not set in_reply_to (discards the reply reference)' do
+          described_class.new(inbox: whatsapp_channel.inbox, params: reply_params).perform
+
+          reply_message = whatsapp_channel.inbox.messages.last
+          expect(reply_message.content).to eq('This is a reply')
+          expect(reply_message.content_attributes['in_reply_to']).to be_nil
+          expect(reply_message.content_attributes['in_reply_to_external_id']).to be_nil
+        end
+      end
+    end
+
+    context 'when message is a reaction' do
+      let(:reaction_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Gabriel Jablonski' }, wa_id: '553499503261' }],
+                messages: [{
+                  from: '553499503261',
+                  id: 'wamid.REACTION_MESSAGE_ID',
+                  timestamp: '1776974260',
+                  type: 'reaction',
+                  reaction: {
+                    message_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                    emoji: '❤️'
+                  }
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      context 'when the reacted message exists in Chatwoot' do
+        it 'creates a reaction message linked to the original message' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          original_message = create(:message,
+                                    conversation: conversation,
+                                    source_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                                    content: 'Original message')
+
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_params).perform
+
+          reaction_message = whatsapp_channel.inbox.messages.find_by(source_id: 'wamid.REACTION_MESSAGE_ID')
+          expect(reaction_message).to be_present
+          expect(reaction_message.content).to eq('❤️')
+          expect(reaction_message.message_type).to eq('incoming')
+          expect(reaction_message.attachments).to be_empty
+          expect(reaction_message.content_attributes['is_reaction']).to be true
+          expect(reaction_message.content_attributes['in_reply_to']).to eq(original_message.id)
+          expect(reaction_message.content_attributes['in_reply_to_external_id']).to eq('wamid.ORIGINAL_MESSAGE_ID')
+        end
+      end
+
+      context 'when the reacted message does not exist in Chatwoot' do
+        it 'still creates the reaction message but discards the reply reference' do
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_params).perform
+
+          reaction_message = whatsapp_channel.inbox.messages.find_by(source_id: 'wamid.REACTION_MESSAGE_ID')
+          expect(reaction_message).to be_present
+          expect(reaction_message.content).to eq('❤️')
+          expect(reaction_message.content_attributes['is_reaction']).to be true
+          expect(reaction_message.content_attributes['in_reply_to']).to be_nil
+          expect(reaction_message.content_attributes['in_reply_to_external_id']).to be_nil
+        end
+      end
+
+      context 'when the reaction emoji is blank (reaction removed)' do
+        let(:reaction_removal_params) do
+          reaction_params.deep_dup.tap do |payload|
+            payload[:entry][0][:changes][0][:value][:messages][0][:reaction][:emoji] = ''
+          end
+        end
+
+        it 'does not create a message' do
+          expect do
+            described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          end.not_to(change { whatsapp_channel.inbox.messages.count })
+        end
+
+        it 'marks a matching existing reaction as removed in place' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
+          existing_reaction = create(:message,
+                                     conversation: conversation,
+                                     sender: contact,
+                                     message_type: :incoming,
+                                     content: '❤️',
+                                     content_attributes: { is_reaction: true,
+                                                           in_reply_to_external_id: 'wamid.ORIGINAL_MESSAGE_ID' })
+
+          expect do
+            described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+          end.not_to(change { whatsapp_channel.inbox.messages.count })
+
+          existing_reaction.reload
+          expect(existing_reaction.content).to eq('')
+          expect(existing_reaction.content_attributes['deleted']).to be true
+        end
+
+        it 'dispatches conversation.updated after marking a reaction as removed' do
+          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
+          create(:message,
+                 conversation: conversation,
+                 sender: contact,
+                 message_type: :incoming,
+                 content: '❤️',
+                 content_attributes: { is_reaction: true, in_reply_to_external_id: 'wamid.ORIGINAL_MESSAGE_ID' })
+          dispatched = []
+          allow_any_instance_of(Conversation).to receive(:dispatch_conversation_updated_event) do |conv| # rubocop:disable RSpec/AnyInstance
+            dispatched << conv.id
+          end
+
+          described_class.new(inbox: whatsapp_channel.inbox, params: reaction_removal_params).perform
+
+          expect(dispatched).to include(conversation.id)
+        end
+      end
+    end
   end
 
   # Métodos auxiliares para reduzir o tamanho do exemplo
@@ -112,10 +384,7 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
   def stub_media_url_request
     stub_request(
       :get,
-      whatsapp_channel.media_url(
-        'b1c68f38-8734-4ad3-b4a1-ef0c10d683',
-        whatsapp_channel.provider_config['phone_number_id']
-      )
+      whatsapp_channel.media_url('b1c68f38-8734-4ad3-b4a1-ef0c10d683')
     ).to_return(
       status: 200,
       body: {

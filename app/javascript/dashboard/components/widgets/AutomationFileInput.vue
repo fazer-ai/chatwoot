@@ -36,7 +36,8 @@ export default {
         );
         this.$emit('update:modelValue', [id]);
         this.uploadState = 'uploaded';
-        this.label = this.$t('AUTOMATION.ATTACHMENT.LABEL_UPLOADED');
+        this.label =
+          file?.name || this.$t('AUTOMATION.ATTACHMENT.LABEL_UPLOADED');
       } catch (error) {
         this.uploadState = 'failed';
         this.label = this.$t('AUTOMATION.ATTACHMENT.LABEL_UPLOAD_FAILED');
@@ -79,7 +80,7 @@ input[type='file'] {
   @apply hidden;
 }
 .input-wrapper {
-  @apply flex h-9 bg-n-background py-1 px-2 items-center text-xs cursor-pointer rounded-sm border border-dashed border-n-strong;
+  @apply flex h-8 bg-n-background py-1 px-2 items-center text-xs cursor-pointer rounded-lg border border-dashed border-n-strong;
 }
 .success-icon {
   @apply text-n-teal-9 mr-2;

@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
+import { vOnClickOutside } from '@vueuse/components';
 import { isValidURL } from 'dashboard/helper/URLHelper.js';
 import { getRegexp } from 'shared/helpers/Validators';
 
@@ -26,6 +27,7 @@ const emit = defineEmits(['update', 'delete']);
 const { t } = useI18n();
 const isEditingValue = ref(false);
 const editedValue = ref(props.attribute.value || '');
+const initialEditValue = ref('');
 
 const isAttributeTypeLink = computed(
   () => props.attribute.attributeDisplayType === 'link'
@@ -49,7 +51,11 @@ const rules = computed(() => ({
       props.attribute.regexPattern && {
         regexValidation: value => {
           if (!value) return true;
-          return getRegexp(props.attribute.regexPattern).test(value);
+          try {
+            return getRegexp(props.attribute.regexPattern).test(value);
+          } catch {
+            return false;
+          }
         },
       }),
   },
@@ -101,6 +107,7 @@ const toggleEditValue = value => {
   if (isEditingValue.value) {
     v$.value.$reset();
     editedValue.value = props.attribute.value || '';
+    initialEditValue.value = editedValue.value;
   }
 };
 
@@ -110,6 +117,14 @@ const handleInputUpdate = async () => {
 
   emit('update', editedValue.value);
   toggleEditValue(false);
+};
+
+const handleClickOutside = () => {
+  if (editedValue.value === initialEditValue.value) {
+    toggleEditValue(false);
+    return;
+  }
+  handleInputUpdate();
 };
 </script>
 
@@ -128,7 +143,7 @@ const handleInputUpdate = async () => {
         'cursor-pointer text-n-slate-11 hover:text-n-slate-12 py-2 select-none font-medium':
           !isEditingView,
         'text-n-slate-12 truncate': isEditingView && !isAttributeTypeLink,
-        'truncate hover:text-n-brand text-n-blue-text':
+        'truncate hover:text-n-brand text-n-blue-11':
           isEditingView && isAttributeTypeLink,
       }"
       @click="toggleEditValue(!isEditingView)"
@@ -175,7 +190,7 @@ const handleInputUpdate = async () => {
 
     <div
       v-if="isEditingValue"
-      v-on-clickaway="() => toggleEditValue(false)"
+      v-on-click-outside="handleClickOutside"
       class="flex items-center w-full"
     >
       <Input
@@ -187,7 +202,7 @@ const handleInputUpdate = async () => {
         :message="attributeErrorMessage"
         :message-type="hasError ? 'error' : 'info'"
         custom-input-class="h-8 ltr:rounded-r-none rtl:rounded-l-none"
-        @keyup.enter="handleInputUpdate"
+        @enter="handleInputUpdate"
       />
       <Button
         icon="i-lucide-check"

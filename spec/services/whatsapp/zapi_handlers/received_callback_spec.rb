@@ -428,6 +428,122 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
     end
 
+    context 'when phone contact exists without contact_inbox and a separate LID contact exists (provider conversion)' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: 'old_baileys_lid@lid',
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:lid_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the conflict and uses the phone contact' do
+        service.perform
+
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+
+      context 'when the LID contact has a contact_inbox in this inbox' do
+        let!(:lid_contact_inbox) do
+          create(:contact_inbox, inbox: inbox, contact: lid_contact, source_id: '123456789')
+        end
+
+        it 'adopts the contact_inbox and uses the phone contact for the message' do
+          service.perform
+
+          expect(lid_contact_inbox.reload.contact_id).to eq(phone_contact.id)
+          expect(phone_contact.reload.identifier).to eq('123456789@lid')
+          message = Message.last
+          expect(message.sender).to eq(phone_contact)
+        end
+      end
+    end
+
+    context 'when phone contact has contact_inbox with phone as source_id and a separate LID contact exists' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: nil,
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:phone_contact_inbox) do
+        create(:contact_inbox, inbox: inbox, contact: phone_contact, source_id: '5511987654321')
+      end
+      let!(:lid_contact) do # rubocop:disable RSpec/LetSetup
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the identifier conflict, migrates the contact_inbox, and uses the phone contact' do
+        service.perform
+
+        expect(phone_contact_inbox.reload.source_id).to eq('123456789')
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+    end
+
+    context 'when phone contact has contact_inbox with old source_id and a separate LID contact exists' do
+      let!(:phone_contact) do
+        create(:contact,
+               account: inbox.account,
+               identifier: 'old_lid@lid',
+               phone_number: '+5511987654321',
+               name: 'Phone Contact')
+      end
+      let!(:old_contact_inbox) do
+        create(:contact_inbox, inbox: inbox, contact: phone_contact, source_id: '999999999')
+      end
+      let!(:lid_contact) do # rubocop:disable RSpec/LetSetup
+        create(:contact,
+               account: inbox.account,
+               identifier: '123456789@lid',
+               phone_number: nil,
+               name: 'LID Contact')
+      end
+      let(:params) do
+        base_params.merge(
+          phone: '5511987654321',
+          chatLid: '123456789@lid'
+        )
+      end
+
+      it 'resolves the identifier conflict, updates the contact_inbox, and uses the phone contact' do
+        service.perform
+
+        expect(old_contact_inbox.reload.source_id).to eq('123456789')
+        expect(phone_contact.reload.identifier).to eq('123456789@lid')
+        message = Message.last
+        expect(message.sender).to eq(phone_contact)
+      end
+    end
+
     context 'when handling avatar' do
       let(:params) do
         base_params.merge(
@@ -468,6 +584,132 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         expect(Avatar::AvatarFromUrlJob).not_to receive(:perform_later)
 
         service.perform
+      end
+    end
+
+    describe 'conversation duplication after deletion or resolution' do
+      let(:phone) { '5511912345678' }
+      let(:lid) { '12345678' }
+
+      def build_params(message_id:, text:)
+        {
+          type: 'ReceivedCallback',
+          messageId: message_id,
+          momment: Time.current.to_i * 1000,
+          fromMe: false,
+          phone: phone,
+          chatLid: "#{lid}@lid",
+          chatName: 'John Doe',
+          text: { message: text }
+        }
+      end
+
+      shared_examples 'routes messages to the new conversation' do |first_msg_id:, second_msg_id:|
+        it 'routes incoming messages to the new conversation, not a third one' do
+          # Step 1: Create contact and first contact_inbox with phone as source_id
+          contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: nil)
+          first_contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+          first_conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: first_contact_inbox)
+
+          # Step 2: Contact responds - this updates contact_inbox source_id from phone to LID
+          Whatsapp::IncomingMessageZapiService.new(
+            inbox: inbox,
+            params: build_params(message_id: first_msg_id, text: 'First response')
+          ).perform
+
+          # Verify message landed in first conversation and source_id migrated
+          expect(first_conversation.messages.count).to eq(1)
+          expect(first_contact_inbox.reload.source_id).to eq(lid)
+
+          # Step 3: Either delete or resolve the first conversation
+          close_first_conversation.call(first_conversation)
+
+          # Step 4: Create a new conversation (simulating UI creating a new contact_inbox)
+          second_contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+          second_conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: second_contact_inbox, status: :open)
+          expect(inbox.contact_inboxes.where(contact: contact).count).to eq(2)
+
+          # Step 5: Contact responds again - should NOT create a third conversation
+          expect do
+            Whatsapp::IncomingMessageZapiService.new(
+              inbox: inbox,
+              params: build_params(message_id: second_msg_id, text: 'Second response')
+            ).perform
+          end.not_to change(Conversation, :count)
+
+          # The message should arrive in the second conversation
+          expect(second_conversation.reload.messages.last.content).to eq('Second response')
+
+          # The duplicate contact_inboxes should be consolidated
+          expect(inbox.contact_inboxes.where(contact: contact).count).to eq(1)
+        end
+      end
+
+      context 'when a conversation is deleted and a new one is created for the same contact' do
+        let(:close_first_conversation) { ->(conv) { conv.destroy! } }
+
+        it_behaves_like 'routes messages to the new conversation', first_msg_id: 'msg_001', second_msg_id: 'msg_002'
+      end
+
+      context 'when a conversation is resolved and a new one is created for the same contact' do
+        let(:close_first_conversation) { ->(conv) { conv.update!(status: :resolved) } }
+
+        it_behaves_like 'routes messages to the new conversation', first_msg_id: 'msg_003', second_msg_id: 'msg_004'
+      end
+    end
+
+    describe 'single conversation mode' do
+      let(:phone) { '5511912345678' }
+      let(:lid) { '12345678' }
+
+      before { inbox.update!(lock_to_single_conversation: true) }
+
+      def build_params(message_id:, text:)
+        {
+          type: 'ReceivedCallback',
+          messageId: message_id,
+          momment: Time.current.to_i * 1000,
+          fromMe: false,
+          phone: phone,
+          chatLid: "#{lid}@lid",
+          chatName: 'John Doe',
+          text: { message: text }
+        }
+      end
+
+      it 'reopens resolved conversation when contact sends new message' do
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_1', text: 'First')).perform
+        conversation = Conversation.last
+        conversation.update!(status: :resolved)
+
+        expect { Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_2', text: 'Second')).perform }
+          .not_to change(Conversation, :count)
+
+        expect(conversation.reload.status).to eq('open')
+      end
+
+      it 'migrates phone source_id to LID and routes to existing conversation' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: phone)
+        conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_3', text: 'Response')).perform
+
+        expect(contact_inbox.reload.source_id).to eq(lid)
+        expect(conversation.messages.count).to eq(1)
+      end
+
+      it 'finds conversation via ConversationBuilder when agent creates new contact_inbox with phone' do
+        Whatsapp::IncomingMessageZapiService.new(inbox: inbox, params: build_params(message_id: 'msg_4', text: 'Hello')).perform
+        first_conversation = Conversation.last
+        first_conversation.update!(status: :resolved)
+
+        contact = Contact.last
+        phone_contact_inbox = ContactInboxBuilder.new(contact: contact, inbox: inbox, source_id: nil).perform
+
+        conversation = ConversationBuilder.new(params: ActionController::Parameters.new({}), contact_inbox: phone_contact_inbox).perform
+
+        expect(conversation.id).to eq(first_conversation.id)
       end
     end
   end
@@ -730,16 +972,26 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
         expect(message.content_attributes[:in_reply_to_external_id]).to eq('original_123')
       end
 
-      it 'creates empty reaction message' do
+      it 'no-ops on empty value when there is no existing reaction to remove' do
         params[:reaction][:value] = ''
 
         expect do
           service.perform
-        end.to change(Message, :count).by(1)
+        end.not_to change(Message, :count)
+      end
 
-        message = Message.last
-        expect(message.content).to eq('')
-        expect(message.content_attributes[:is_reaction]).to be(true)
+      it 'marks the existing contact reaction as deleted when value is blank' do
+        existing = create(:message, inbox: inbox, conversation: conversation, sender: contact,
+                                    content: '👍', content_attributes: {
+                                      is_reaction: true,
+                                      in_reply_to_external_id: 'original_123'
+                                    })
+        params[:reaction][:value] = ''
+
+        expect { service.perform }.not_to change(Message, :count)
+        existing.reload
+        expect(existing.content).to eq('')
+        expect(existing.content_attributes['deleted']).to be(true)
       end
     end
 
@@ -825,9 +1077,10 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
 
       it 'does not create message if it is already being processed' do
-        allow(Redis::Alfred).to receive(:get)
-          .with(format_message_source_key('duplicate_123'))
-          .and_return(true)
+        # Simulate lock already acquired by returning false from SETNX
+        allow(Redis::Alfred).to receive(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
+          .and_return(false)
 
         expect do
           service.perform
@@ -835,14 +1088,26 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
 
       it 'caches and clears message source id in Redis' do
-        allow(Redis::Alfred).to receive(:setex)
+        allow(Redis::Alfred).to receive(:set).and_return(true)
         allow(Redis::Alfred).to receive(:delete)
 
         service.perform
 
-        expect(Redis::Alfred).to have_received(:setex)
-          .with(format_message_source_key('duplicate_123'), true)
+        expect(Redis::Alfred).to have_received(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
         expect(Redis::Alfred).to have_received(:delete)
+          .with(format_message_source_key('duplicate_123'))
+      end
+
+      it 'does not clear lock when acquisition fails' do
+        allow(Redis::Alfred).to receive(:set)
+          .with(format_message_source_key('duplicate_123'), true, nx: true, ex: 1.day)
+          .and_return(false)
+        allow(Redis::Alfred).to receive(:delete)
+
+        service.perform
+
+        expect(Redis::Alfred).not_to have_received(:delete)
           .with(format_message_source_key('duplicate_123'))
       end
     end
@@ -1194,12 +1459,13 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
           create(:account_user, account: inbox.account)
         end
 
-        it 'creates outgoing message' do
+        it 'creates outgoing message with nil sender (sent from WhatsApp)' do
           service.perform
 
           message = Message.last
           expect(message.message_type).to eq('outgoing')
-          expect(message.sender_type).to eq('User')
+          expect(message.sender).to be_nil
+          expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
         end
 
         it 'creates contact attachment for outgoing message' do
@@ -1238,6 +1504,10 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
     end
 
     it 'waits for the lock if it is already acquired' do
+      # Stub the message processing lock to always succeed
+      allow(Redis::Alfred).to receive(:set)
+        .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
+        .and_return(true)
       allow(Redis::Alfred).to receive(:set).with('ZAPI::CONTACT_LOCK::5511987654321', 1, nx: true, ex: 5.seconds).and_return(false, true)
       allow(Redis::Alfred).to receive(:delete)
 

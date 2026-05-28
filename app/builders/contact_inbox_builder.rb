@@ -2,14 +2,62 @@
 # For Specific Channels like whatsapp, email etc . it smartly generated appropriate the source id when none is provided.
 
 class ContactInboxBuilder
-  pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false }]
+  pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false, validate_baileys_phone: false }]
 
   def perform
+    normalize_phone_for_baileys! if validate_baileys_phone && baileys_whatsapp_inbox?
     @source_id ||= generate_source_id
     create_contact_inbox if source_id.present?
   end
 
   private
+
+  def baileys_whatsapp_inbox?
+    @inbox.channel_type == 'Channel::Whatsapp' && @inbox.channel.provider == 'baileys'
+  end
+
+  # WhatsApp matches the canonical phone for an account, but Baileys requires
+  # the exact number registered there. For Brazilian mobile numbers the leading
+  # "9" may or may not be present in the user-typed value; sending to the wrong
+  # variant fails silently. Use on_whatsapp to resolve the canonical number and
+  # align the contact (and source_id) with what Baileys expects. Provider
+  # lookup errors are swallowed; write/merge errors must surface so the caller
+  # sees inconsistent state.
+  def normalize_phone_for_baileys!
+    return if @contact.phone_number.blank?
+
+    old_source_id_candidate = @contact.phone_number.delete('+')
+
+    canonical_phone = fetch_canonical_baileys_phone
+    return if canonical_phone.blank? || canonical_phone == @contact.phone_number
+
+    apply_canonical_phone(canonical_phone)
+
+    @source_id = canonical_phone.delete('+') if @source_id == old_source_id_candidate
+  end
+
+  def fetch_canonical_baileys_phone
+    response = @inbox.channel.on_whatsapp(@contact.phone_number)
+    return unless response.is_a?(Hash) && response['exists']
+
+    jid_digits = response['jid'].to_s.split('@').first
+    return if jid_digits.blank?
+
+    "+#{jid_digits}"
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP][BAILEYS] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
+    nil
+  end
+
+  def apply_canonical_phone(canonical_phone)
+    existing = @inbox.account.contacts.where.not(id: @contact.id).find_by(phone_number: canonical_phone)
+
+    if existing
+      @contact = ContactMergeAction.new(account: @inbox.account, base_contact: existing, mergee_contact: @contact).perform
+    else
+      @contact.update!(phone_number: canonical_phone)
+    end
+  end
 
   def generate_source_id
     case @inbox.channel_type

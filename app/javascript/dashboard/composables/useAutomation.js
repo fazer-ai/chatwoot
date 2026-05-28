@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useStoreGetters } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
@@ -15,6 +15,7 @@ import {
   // AUTOMATION_RULE_EVENTS,
   // AUTOMATION_ACTION_TYPES,
   AUTOMATIONS,
+  DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES,
 } from 'dashboard/routes/dashboard/settings/automation/constants.js';
 
 /**
@@ -40,7 +41,7 @@ export function useAutomation(startValue = null) {
   } = useAutomationValues();
 
   const automation = ref(startValue);
-  const automationTypes = structuredClone(AUTOMATIONS);
+  const automationTypes = reactive(structuredClone(AUTOMATIONS));
   const eventName = computed(() => automation.value?.event_name);
 
   /**
@@ -123,10 +124,18 @@ export function useAutomation(startValue = null) {
    * @param {number} index - The index of the action to reset.
    */
   const resetAction = index => {
+    const action = automation.value.actions[index];
     const newActions = [...automation.value.actions];
+
+    // For scheduled messages, initialize with default delay
+    const actionParams =
+      action.action_name === 'create_scheduled_message'
+        ? [{ delay_minutes: DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES }]
+        : [];
+
     newActions[index] = {
       ...newActions[index],
-      action_params: [],
+      action_params: actionParams,
     };
 
     automation.value.actions = newActions;
@@ -160,14 +169,24 @@ export function useAutomation(startValue = null) {
       t('AUTOMATION.CONDITION.CONTACT_CUSTOM_ATTR_LABEL')
     );
 
+    const CUSTOM_ATTR_HEADER_KEYS = new Set([
+      'conversation_custom_attribute',
+      'contact_custom_attribute',
+    ]);
+
     [
       'message_created',
       'conversation_created',
       'conversation_updated',
       'conversation_opened',
     ].forEach(eventToUpdate => {
+      const standardConditions = automationTypes[
+        eventToUpdate
+      ].conditions.filter(
+        c => !c.customAttributeType && !CUSTOM_ATTR_HEADER_KEYS.has(c.key)
+      );
       automationTypes[eventToUpdate].conditions = [
-        ...automationTypes[eventToUpdate].conditions,
+        ...standardConditions,
         ...manifestedCustomAttributes,
       ];
     });

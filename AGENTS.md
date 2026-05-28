@@ -4,14 +4,18 @@
 
 - **Setup**: `bundle install && pnpm install`
 - **Run Dev**: `pnpm dev` or `overmind start -f ./Procfile.dev`
+- **Seed Local Test Data**: `bundle exec rails db:seed` (quickly populates minimal data for standard feature verification)
+- **Seed Search Test Data**: `bundle exec rails search:setup_test_data` (bulk fixture generation for search/performance/manual load scenarios)
+- **Seed Account Sample Data (richer test data)**: `Seeders::AccountSeeder` is available as an internal utility and is exposed through Super Admin `Accounts#seed`, but can be used directly in dev workflows too:
+  - UI path: Super Admin → Accounts → Seed (enqueues `Internal::SeedAccountJob`).
+  - CLI path: `bundle exec rails runner "Internal::SeedAccountJob.perform_now(Account.find(<id>))"` (or call `Seeders::AccountSeeder.new(account: Account.find(<id>)).perform!` directly).
 - **Lint JS/Vue**: `pnpm eslint` / `pnpm eslint:fix`
 - **Lint Ruby**: `bundle exec rubocop -a`
 - **Test JS**: `pnpm test` or `pnpm test:watch`
 - **Test Ruby**: `bundle exec rspec spec/path/to/file_spec.rb`
 - **Single Test**: `bundle exec rspec spec/path/to/file_spec.rb:LINE_NUMBER`
 - **Run Project**: `overmind start -f Procfile.dev`
-- **Ruby Version**: Manage Ruby via `rbenv` and install the version listed in `.ruby-version` (e.g., `rbenv install $(cat .ruby-version)`)
-- **rbenv setup**: Before running any `bundle` or `rspec` commands, init rbenv in your shell (`eval "$(rbenv init -)"`) so the correct Ruby/Bundler versions are used
+- **Ruby Version**: Manage Ruby via `rvm`
 - Always prefer `bundle exec` for Ruby CLI tasks (rspec, rake, rubocop, etc.)
 
 ## Code Style
@@ -44,11 +48,23 @@
 - Prefer minimal, readable code over elaborate abstractions; clarity beats cleverness
 - Break down complex tasks into small, testable units
 - Iterate after confirmation
-- Avoid writing specs unless explicitly asked
+- New features must include specs covering the main flows (happy path + critical edge cases). Bugfixes should add a regression spec when the fix is non-trivial. Skip specs only for purely cosmetic changes (CSS tweaks, copy adjustments, log message edits) or when the user explicitly asks to skip.
 - Remove dead/unreachable/unused code
 - Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
 - Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs
 - Specs in parallel/reloading environments: prefer comparing `error.class.name` over constant class equality when asserting raised errors
+
+## Codex Worktree Workflow
+
+- Use a separate git worktree + branch per task to keep changes isolated.
+- Keep Codex-specific local setup under `.codex/` and use `Procfile.worktree` for worktree process orchestration.
+- The setup workflow in `.codex/environments/environment.toml` should dynamically generate per-worktree DB/port values (Rails, Vite, Redis DB index) to avoid collisions.
+- Start each worktree with its own Overmind socket/title so multiple instances can run at the same time.
+
+## Release Notes
+
+- Every GitHub release cut from this repo must include the bilingual `user-notes` blocks (pt-BR + en) in the release body, written for non-technical end users.
+- Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-notes` skill at `.claude/skills/release-notes/SKILL.md` to draft and validate the blocks.
 
 ## Commit Messages
 
@@ -56,12 +72,21 @@
 - Example: `feat(auth): add user authentication`
 - Don't reference Claude in commit messages
 
+## PR Description Format
+
+- Start with a short, user-facing paragraph describing the product change.
+- Add a `Closes` section with relevant issue links (GitHub, Linear, etc.).
+- For feature PRs, add `How to test` from a product/UX standpoint.
+- For bugfix PRs, use `How to reproduce` when helpful.
+- Optionally add a `What changed` section for implementation highlights.
+- Do not add a `How this was tested` section listing specs/commands.
+
 ## Project-Specific
 
 - **Translations**:
-  - Only update `en.yml` and `en.json`
+  - Update `en.yml`/`en.json` and `pt_BR.yml`/`pt_BR.json`
   - Other languages are handled by the community
-  - Backend i18n → `en.yml`, Frontend i18n → `en.json`
+  - Backend i18n → `.yml`, Frontend i18n → `.json`
 - **Frontend**:
   - Use `components-next/` for message bubbles (the rest is being deprecated)
 
@@ -86,3 +111,22 @@ Practical checklist for any change impacting core logic or public APIs
 - When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
 - Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
 - When modifying existing OSS features for Enterprise-only behavior, add an Enterprise module (via `prepend_mod_with`/`include_mod_with`) instead of editing OSS files directly—especially for policies, controllers, and services. For Enterprise-exclusive features, place code directly under `enterprise/`.
+
+## Branding / White-labeling note
+
+- For user-facing strings that currently contain "Chatwoot" but should adapt to branded/self-hosted installs, prefer applying `replaceInstallationName` from `shared/composables/useBranding` in the UI layer (for example tooltip and suggestion labels) instead of adding hardcoded brand-specific copy.
+
+## Account-level toggles: do NOT extend `config/features.yml`
+
+- `Account#feature_flags` is a `bigint` driven by FlagShihTzu, with each YAML entry mapped to bit position `index` (0-based). Signed bigint can only hold bits 0..63. Adding a 65th entry produces values >= 2^64 that overflow the column on write and silently break high-bit features.
+- `chatwoot-pro-main` already inserts `kanban` and `internal_chat_pro` mid-list, pushing upstream features to bits 60+. After merging into Pro, any new flag added on `main` lands at an even higher bit, accelerating the overflow. The `Featurable.feature_flag_value` helper applies a two's-complement workaround that only fixes manual SQL queries (`feature_flags & ? != 0`); it does NOT fix the FlagShihTzu write path used by the superadmin form.
+- Local DB pitfall: bit positions differ between `main` and `chatwoot-pro-main` because of the kanban/internal_chat_pro insertion. The same bit set on one branch maps to a different feature on the other. Use separate dev DBs per branch or reset `feature_flags` when switching.
+
+For NEW account-level toggles, prefer the `settings` jsonb column instead of `feature_flags`:
+
+1. Declare a `store_accessor :settings, :your_toggle` in `app/models/account.rb` and override the writer to cast (`super(ActiveModel::Type::Boolean.new.cast(value))` for booleans) so JSON schema validation accepts the value.
+2. Add the key to `SETTINGS_PARAMS_SCHEMA` in `app/models/concerns/account_settings_schema.rb`.
+3. Register it as a `Field::Boolean` (or appropriate field) in `app/dashboards/account_dashboard.rb` (`ATTRIBUTE_TYPES`, `FORM_ATTRIBUTES`, `SHOW_PAGE_ATTRIBUTES`).
+4. The frontend reads it from `account.settings.your_toggle` (already serialized via `app/views/api/v1/models/_account.json.jbuilder` as `json.settings resource.settings`).
+
+This keeps toggles keyed by name (immune to bit-position drift between branches) and unbounded by the bigint width.

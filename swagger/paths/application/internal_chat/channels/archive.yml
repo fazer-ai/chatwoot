@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Channels
+operationId: archive-internal-chat-channel
+summary: Archive a channel
+security:
+  - userApiKey: []
+description: Archive an internal chat channel (admin only)
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_channel_show'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '422':
+    description: Unprocessable entity (e.g., attempting to archive a direct message)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

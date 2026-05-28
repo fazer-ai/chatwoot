@@ -1,14 +1,16 @@
 <script setup>
-import { onMounted, computed, ref, toRefs } from 'vue';
+import { onMounted, onUnmounted, computed, ref, toRefs } from 'vue';
 import { useTimeoutFn } from '@vueuse/core';
 import { provideMessageContext } from './provider.js';
 import { useTrack } from 'dashboard/composables';
+import { useMapGetter } from 'dashboard/composables/store';
 import { emitter } from 'shared/helpers/mitt';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import { ACCOUNT_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
+import { getInboxIconByType } from 'dashboard/helper/inbox';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   MESSAGE_TYPES,
@@ -41,6 +43,9 @@ import VoiceCallBubble from './bubbles/VoiceCall.vue';
 
 import MessageError from './MessageError.vue';
 import ContextMenu from 'dashboard/modules/conversations/components/MessageContextMenu.vue';
+import EmojiReactionPicker from './EmojiReactionPicker.vue';
+import ReactionDisplay from './ReactionDisplay.vue';
+import { useBranding } from 'shared/composables/useBranding';
 
 /**
  * @typedef {Object} Attachment
@@ -94,11 +99,12 @@ import ContextMenu from 'dashboard/modules/conversations/components/MessageConte
  * @property {boolean} [isEmailInbox=false] - Whether the message is from an email inbox
  * @property {number} conversationId - The ID of the conversation to which the message belongs
  * @property {number} inboxId - The ID of the inbox to which the message belongs
+ * @property {Object} [additionalAttributes={}] - Additional attributes of the message
  */
 
 // eslint-disable-next-line vue/define-macros-order
 const props = defineProps({
-  id: { type: Number, required: true },
+  id: { type: [Number, String], required: true },
   messageType: {
     type: Number,
     required: true,
@@ -110,6 +116,7 @@ const props = defineProps({
     validator: value => Object.values(MESSAGE_STATUS).includes(value),
   },
   attachments: { type: Array, default: () => [] },
+  call: { type: Object, default: null }, // eslint-disable-line vue/no-unused-properties
   content: { type: String, default: null },
   contentAttributes: { type: Object, default: () => ({}) },
   contentType: {
@@ -117,28 +124,40 @@ const props = defineProps({
     default: 'text',
     validator: value => Object.values(CONTENT_TYPES).includes(value),
   },
+  // eslint-disable-next-line vue/no-unused-properties
+  additionalAttributes: { type: Object, default: () => ({}) },
   conversationId: { type: Number, required: true },
   createdAt: { type: Number, required: true }, // eslint-disable-line vue/no-unused-properties
   currentUserId: { type: Number, required: true }, // eslint-disable-line vue/no-unused-properties
   groupWithNext: { type: Boolean, default: false },
+  groupWithPrevious: { type: Boolean, default: false },
   inboxId: { type: Number, default: null }, // eslint-disable-line vue/no-unused-properties
   inboxSupportsReplyTo: { type: Object, default: () => ({}) },
+  inboxSupportsEdit: { type: Boolean, default: false },
   inReplyTo: { type: Object, default: null }, // eslint-disable-line vue/no-unused-properties
   isEmailInbox: { type: Boolean, default: false },
+  isGroupConversation: { type: Boolean, default: false },
   private: { type: Boolean, default: false },
   sender: { type: Object, default: null },
   senderId: { type: Number, default: null },
   senderType: { type: String, default: null },
   sourceId: { type: String, default: '' }, // eslint-disable-line vue/no-unused-properties
+  reactions: { type: Array, default: () => [] },
+  inboxSupportsReactions: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['retry']);
+const emit = defineEmits(['retry', 'toggleReaction']);
 
 const contextMenuPosition = ref({});
 const showBackgroundHighlight = ref(false);
 const showContextMenu = ref(false);
+const reactionPickerOpen = ref(false);
 const { t } = useI18n();
 const route = useRoute();
+const inboxGetter = useMapGetter('inboxes/getInbox');
+const inbox = computed(() => inboxGetter.value(props.inboxId) || {});
+const router = useRouter();
+const { replaceInstallationName } = useBranding();
 
 /**
  * Computes the message variant based on props
@@ -162,7 +181,14 @@ const variant = computed(() => {
   if (props.contentAttributes?.isUnsupported)
     return MESSAGE_VARIANTS.UNSUPPORTED;
 
-  const isBot = !props.sender || props.sender.type === SENDER_TYPES.AGENT_BOT;
+  if (props.contentAttributes?.externalEcho) {
+    return MESSAGE_VARIANTS.AGENT;
+  }
+
+  const isBot =
+    props.sender?.type === SENDER_TYPES.AGENT_BOT ||
+    props.senderType === SENDER_TYPES.AGENT_BOT ||
+    (!props.sender && !props.additionalAttributes?.senderName);
   if (isBot && props.messageType === MESSAGE_TYPES.OUTGOING) {
     return MESSAGE_VARIANTS.BOT;
   }
@@ -231,7 +257,21 @@ const flexOrientationClass = computed(() => {
   return map[orientation.value];
 });
 
+const isGroupIncoming = computed(() => {
+  return (
+    props.isGroupConversation && props.messageType === MESSAGE_TYPES.INCOMING
+  );
+});
+
+const showGroupSenderAvatar = computed(() => {
+  return isGroupIncoming.value && !props.groupWithPrevious;
+});
+
 const gridClass = computed(() => {
+  if (orientation.value === ORIENTATION.LEFT && isGroupIncoming.value) {
+    return 'grid grid-cols-[24px_1fr]';
+  }
+
   const map = {
     [ORIENTATION.LEFT]: 'grid grid-cols-1fr',
     [ORIENTATION.RIGHT]: 'grid grid-cols-[1fr_24px]',
@@ -241,6 +281,13 @@ const gridClass = computed(() => {
 });
 
 const gridTemplate = computed(() => {
+  if (orientation.value === ORIENTATION.LEFT && isGroupIncoming.value) {
+    return `
+      "avatar bubble"
+      "spacer meta"
+    `;
+  }
+
   const map = {
     [ORIENTATION.LEFT]: `
       "bubble"
@@ -303,6 +350,7 @@ const componentToRender = computed(() => {
   const instagramSharedTypes = [
     ATTACHMENT_TYPES.STORY_MENTION,
     ATTACHMENT_TYPES.IG_STORY,
+    ATTACHMENT_TYPES.IG_STORY_REPLY,
     ATTACHMENT_TYPES.IG_POST,
   ];
   if (instagramSharedTypes.includes(props.contentAttributes.imageType)) {
@@ -327,6 +375,8 @@ const componentToRender = computed(() => {
 
   return TextBubble;
 });
+
+const isAudioBubble = computed(() => componentToRender.value === AudioBubble);
 
 const shouldShowContextMenu = computed(() => {
   return !props.contentAttributes?.isUnsupported;
@@ -368,10 +418,76 @@ const contextMenuEnabledOptions = computed(() => {
     copyLink: !isFailedOrProcessing,
     translate: !isFailedOrProcessing && !isMessageDeleted.value && hasText,
     replyTo:
-      !props.private &&
-      props.inboxSupportsReplyTo.outgoing &&
+      (props.private || props.inboxSupportsReplyTo.outgoing) &&
       !isFailedOrProcessing,
+    edit:
+      isOutgoing &&
+      hasText &&
+      !isFailedOrProcessing &&
+      !isMessageDeleted.value &&
+      props.inboxSupportsEdit,
   };
+});
+
+const canShowReactionToolbar = computed(() => {
+  if (!isBubble.value) return false;
+  if (isMessageDeleted.value) return false;
+  if (props.contentAttributes?.isUnsupported) return false;
+  if (props.status === MESSAGE_STATUS.FAILED) return false;
+  if (props.status === MESSAGE_STATUS.PROGRESS) return false;
+  if (props.messageType === MESSAGE_TYPES.TEMPLATE) return false;
+  // Private notes are agent-only and never leave Chatwoot, so reactions on
+  // them don't depend on inbox channel capabilities or a provider source_id.
+  if (props.private) return true;
+  if (!props.inboxSupportsReactions) return false;
+  // Mirror ReactionsController#target_unreactable_error: a non-private message
+  // without a provider source_id can't be reacted to on WhatsApp, so the API
+  // would 422 if the user clicked. Hide the picker instead of a dead action.
+  if (!props.sourceId) return false;
+  return true;
+});
+
+// Short cooldown after a click so a quick double-tap (or open-pick-reopen-pick
+// on the picker) doesn't fire two POSTs against the same emoji. Watching
+// reactions is not enough — the optimistic add mutates them synchronously, so
+// we'd unblock before the human could react.
+const REACTION_COOLDOWN_MS = 500;
+const pendingEmojis = ref(new Set());
+
+const currentUserReactionEmoji = computed(() => {
+  const own = props.reactions.find(
+    r =>
+      (r.senderType === 'user' && r.senderId === props.currentUserId) ||
+      (r.messageType === 1 && r.senderId == null)
+  );
+  return own?.emoji ?? null;
+});
+
+// Track pending cooldown timers so we can clear them on unmount and avoid
+// touching `pendingEmojis` after the component is gone.
+const pendingTimeouts = new Set();
+
+function handleToggleReaction(emoji) {
+  if (pendingEmojis.value.has(emoji)) return;
+  pendingEmojis.value = new Set([...pendingEmojis.value, emoji]);
+  emit('toggleReaction', {
+    messageId: props.id,
+    targetSourceId: props.sourceId,
+    emoji,
+  });
+  const timeoutId = setTimeout(() => {
+    pendingTimeouts.delete(timeoutId);
+    if (!pendingEmojis.value.has(emoji)) return;
+    const next = new Set(pendingEmojis.value);
+    next.delete(emoji);
+    pendingEmojis.value = next;
+  }, REACTION_COOLDOWN_MS);
+  pendingTimeouts.add(timeoutId);
+}
+
+onUnmounted(() => {
+  pendingTimeouts.forEach(clearTimeout);
+  pendingTimeouts.clear();
 });
 
 const shouldRenderMessage = computed(() => {
@@ -380,13 +496,17 @@ const shouldRenderMessage = computed(() => {
   const isUnsupported = props.contentAttributes?.isUnsupported;
   const isAnIntegrationMessage =
     props.contentType === CONTENT_TYPES.INTEGRATIONS;
+  const isFailedMessage = props.status === MESSAGE_STATUS.FAILED;
+  const hasExternalError = !!props.contentAttributes?.externalError;
 
   return (
     hasAttachments ||
     props.content ||
     isEmailContentType ||
     isUnsupported ||
-    isAnIntegrationMessage
+    isAnIntegrationMessage ||
+    isFailedMessage ||
+    hasExternalError
   );
 });
 
@@ -423,12 +543,33 @@ function handleReplyTo() {
 }
 
 const avatarInfo = computed(() => {
-  // If no sender, return bot info
-  if (!props.sender) {
+  if (props.contentAttributes?.externalEcho) {
+    const { name, avatar_url, channel_type, medium } = inbox.value;
+    const iconName = avatar_url
+      ? null
+      : getInboxIconByType(channel_type, medium);
     return {
-      name: t('CONVERSATION.BOT'),
-      src: '',
+      name: iconName ? '' : name || t('CONVERSATION.NATIVE_APP'),
+      src: avatar_url || '',
+      iconName,
     };
+  }
+
+  // If no sender, check for external sender name or integration sender info
+  if (!props.sender) {
+    const externalSenderName = props.contentAttributes?.externalSenderName;
+    if (externalSenderName === 'WhatsApp') {
+      return {
+        name: t('CONVERSATION.WHATSAPP'),
+        src: '',
+        iconName: 'i-woot-whatsapp',
+      };
+    }
+    const { senderName, senderAvatarUrl } = props.additionalAttributes || {};
+    if (senderName) {
+      return { name: senderName, src: senderAvatarUrl ?? '' };
+    }
+    return { name: t('CONVERSATION.BOT'), src: '' };
   }
 
   const { sender } = props;
@@ -450,9 +591,53 @@ const avatarInfo = computed(() => {
 });
 
 const avatarTooltip = computed(() => {
+  if (props.contentAttributes?.externalEcho) {
+    return replaceInstallationName(t('CONVERSATION.NATIVE_APP_ADVISORY'));
+  }
   if (avatarInfo.value.name === '') return '';
   return `${t('CONVERSATION.SENT_BY')} ${avatarInfo.value.name}`;
 });
+
+// Colors for group sender names, matching AVATAR_COLORS from Avatar component
+const SENDER_NAME_COLORS = {
+  light: ['#C2298A', '#99543A', '#60646C', '#008573', '#4747C2', '#3A5BC7'],
+  dark: ['#FF8DCC', '#FFA366', '#ADB1B8', '#0BD8B6', '#A19EFF', '#9EB1FF'],
+};
+
+const showGroupSenderName = computed(() => {
+  return (
+    props.isGroupConversation &&
+    props.messageType === MESSAGE_TYPES.INCOMING &&
+    !props.groupWithPrevious &&
+    props.sender?.name
+  );
+});
+
+const senderNameStyle = computed(() => {
+  if (!showGroupSenderName.value) return {};
+  const name = props.sender?.name || '';
+  const index = name.length % SENDER_NAME_COLORS.light.length;
+  return {
+    color: SENDER_NAME_COLORS.light[index],
+    '--dark-sender-color': SENDER_NAME_COLORS.dark[index],
+  };
+});
+
+const navigateToGroupSender = event => {
+  if (
+    !isGroupIncoming.value ||
+    !props.sender?.id ||
+    props.sender.type?.toLowerCase() !== 'contact'
+  )
+    return;
+  const accountId = route.params.accountId;
+  const url = `/app/accounts/${accountId}/contacts/${props.sender.id}`;
+  if (event?.ctrlKey || event?.metaKey) {
+    window.open(url, '_blank');
+  } else {
+    router.push(url);
+  }
+};
 
 const setupHighlightTimer = () => {
   if (Number(route.query.messageId) !== Number(props.id)) {
@@ -466,7 +651,23 @@ const setupHighlightTimer = () => {
   }, HIGHLIGHT_TIMER);
 };
 
-onMounted(setupHighlightTimer);
+const HIGHLIGHT_DURATION = 1000;
+const onHighlightMessage = ({ messageId } = {}) => {
+  if (Number(messageId) !== Number(props.id)) return;
+  showBackgroundHighlight.value = true;
+  useTimeoutFn(() => {
+    showBackgroundHighlight.value = false;
+  }, HIGHLIGHT_DURATION);
+};
+
+onMounted(() => {
+  setupHighlightTimer();
+  emitter.on(BUS_EVENTS.HIGHLIGHT_MESSAGE, onHighlightMessage);
+});
+
+onUnmounted(() => {
+  emitter.off(BUS_EVENTS.HIGHLIGHT_MESSAGE, onHighlightMessage);
+});
 
 provideMessageContext({
   ...toRefs(props),
@@ -483,7 +684,7 @@ provideMessageContext({
   <div
     v-if="shouldRenderMessage"
     :id="`message${props.id}`"
-    class="flex mb-2 w-full message-bubble-container"
+    class="flex w-full mb-2 message-bubble-container group"
     :data-message-id="props.id"
     :class="[
       flexOrientationClass,
@@ -511,22 +712,84 @@ provideMessageContext({
       }"
     >
       <div
+        v-if="showGroupSenderAvatar"
+        class="[grid-area:avatar] flex items-end"
+      >
+        <Avatar
+          v-tooltip.right-end="avatarTooltip"
+          v-bind="avatarInfo"
+          :size="24"
+          class="cursor-pointer"
+          @click="navigateToGroupSender($event)"
+        />
+      </div>
+      <div
         v-if="!shouldGroupWithNext && shouldShowAvatar"
         v-tooltip.left-end="avatarTooltip"
         class="[grid-area:avatar] flex items-end"
       >
         <Avatar v-bind="avatarInfo" :size="24" />
       </div>
-      <div
-        class="[grid-area:bubble] flex"
-        :class="{
-          'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
-          'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
-          'min-w-0': variant === MESSAGE_VARIANTS.EMAIL,
-        }"
-        @contextmenu="openContextMenu($event)"
-      >
-        <Component :is="componentToRender" />
+      <div class="[grid-area:bubble]" @contextmenu="openContextMenu($event)">
+        <span
+          v-if="showGroupSenderName"
+          class="text-xs font-medium mb-0.5 inline-block ltr:mr-8 rtl:ml-8 cursor-pointer hover:underline dark:!text-[var(--dark-sender-color)]"
+          :style="senderNameStyle"
+          @click="navigateToGroupSender($event)"
+        >
+          {{ sender?.name }}
+        </span>
+        <div
+          class="flex"
+          :class="{
+            'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
+            'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
+            'min-w-0': variant === MESSAGE_VARIANTS.EMAIL,
+          }"
+        >
+          <div class="relative">
+            <Component :is="componentToRender" />
+            <div
+              v-if="canShowReactionToolbar"
+              class="absolute top-1/2 -translate-y-1/2 z-10 flex items-center gap-0.5 rounded-full border border-n-slate-6 bg-n-solid-2 shadow-sm p-0.5 transition-opacity [@media(hover:none)]:opacity-100"
+              :class="[
+                reactionPickerOpen
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                orientation === ORIENTATION.RIGHT
+                  ? 'ltr:right-full ltr:mr-2 rtl:left-full rtl:ml-2'
+                  : 'ltr:left-full ltr:ml-2 rtl:right-full rtl:mr-2',
+              ]"
+            >
+              <EmojiReactionPicker
+                :alignment="
+                  orientation === ORIENTATION.RIGHT ? 'right' : 'left'
+                "
+                :current-user-emoji="currentUserReactionEmoji"
+                @select="handleToggleReaction"
+                @update:open="value => (reactionPickerOpen = value)"
+              />
+            </div>
+          </div>
+        </div>
+        <div
+          v-if="reactions.length > 0"
+          class="flex"
+          :class="{
+            'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
+            'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
+          }"
+        >
+          <ReactionDisplay
+            :reactions="reactions"
+            :current-user-id="currentUserId"
+            :pending-emojis="pendingEmojis"
+            :alignment="orientation === ORIENTATION.RIGHT ? 'right' : 'left'"
+            :read-only="!inboxSupportsReactions && !props.private"
+            :overlap="!isAudioBubble"
+            @toggle="handleToggleReaction"
+          />
+        </div>
       </div>
       <MessageError
         v-if="contentAttributes.externalError"

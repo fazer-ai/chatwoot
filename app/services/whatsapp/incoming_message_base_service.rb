@@ -1,42 +1,95 @@
 # Mostly modeled after the intial implementation of the service based on 360 Dialog
 # https://docs.360dialog.com/whatsapp-api/whatsapp-api/media
 # https://developers.facebook.com/docs/whatsapp/api/media/
-class Whatsapp::IncomingMessageBaseService
+class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   include ::Whatsapp::IncomingMessageServiceHelpers
 
-  pattr_initialize [:inbox!, :params!]
+  pattr_initialize [:inbox!, :params!, :outgoing_echo]
 
   def perform
     processed_params
 
     if processed_params.try(:[], :statuses).present?
       process_statuses
-    elsif processed_params.try(:[], :messages).present?
+    elsif messages_data.present?
       process_messages
     end
   end
 
+  # Returns messages array for both regular messages and echo events
+  def messages_data
+    @processed_params&.dig(:messages) || @processed_params&.dig(:message_echoes)
+  end
+
   private
 
-  def process_messages
-    # We don't support reactions & ephemeral message now, we need to skip processing the message
-    # if the webhook event is a reaction or an ephermal message or an unsupported message.
-    return if unprocessable_message_type?(message_type)
+  def process_messages # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/AbcSize,Metrics/MethodLength
+    @lock_acquired = false
+
+    # We don't support ephemeral message now, we need to skip processing the message
+    # if the webhook event is an ephermal message or an unsupported message.
+    # Reactions removed by the user arrive with an empty emoji and are skipped to match Baileys behavior.
+    return if skip_message?
 
     # Multiple webhook event can be received against the same message due to misconfigurations in the Meta
     # business manager account. While we have not found the core reason yet, the following line ensure that
     # there are no duplicate messages created.
-    return if find_message_by_source_id(@processed_params[:messages].first[:id]) || message_under_process?
+    return if find_message_by_source_id(messages_data.first[:id])
 
-    cache_message_source_id_in_redis
-    set_contact
-    return unless @contact
+    @lock_acquired = acquire_message_processing_lock
+    return unless @lock_acquired
 
-    ActiveRecord::Base.transaction do
-      set_conversation
-      create_messages
-      clear_message_source_id_from_redis
+    # Lock by contact phone to prevent race conditions when multiple messages
+    # from the same contact arrive simultaneously (e.g., WhatsApp albums).
+    with_contact_lock(contact_phone_for_lock) do
+      # Re-check after acquiring lock to handle race conditions where an outgoing message
+      # was sent from Chatwoot and the webhook arrived before source_id was saved
+      next if find_message_by_source_id(messages_data.first[:id])
+
+      # Reaction removals don't persist anything new, so peek for an existing
+      # reaction row before set_contact: a removal webhook for a sender we
+      # never stored has nothing to mark and shouldn't auto-create a contact
+      # just to no-op. The match is sender-agnostic on purpose; the precise
+      # filter happens inside `mark_existing_reaction_as_removed`.
+      process_in_reply_to(messages_data.first)
+      next if reaction_removal? && !existing_reaction_row?
+
+      set_contact
+      next if @contact.blank?
+
+      # Reactions don't create a new Message row, so handle them outside the
+      # transaction to avoid set_conversation opening/creating a stray thread
+      # for a blank webhook. We also intentionally run this BEFORE
+      # contact_processable? so blocked contacts can still reconcile an
+      # existing reaction row.
+      next mark_existing_reaction_as_removed if reaction_removal?
+
+      next unless contact_processable?
+
+      ActiveRecord::Base.transaction do
+        set_conversation
+        create_messages
+      end
     end
+  ensure
+    # Clear lock AFTER transaction commits to prevent race conditions where another request
+    # acquires the lock before this transaction is visible to other connections
+    clear_message_source_id_from_redis if @lock_acquired
+  end
+
+  def skip_message?
+    unprocessable_message_type?(message_type)
+  end
+
+  # For regular messages the contact phone is in :from; for echoes it's in :to.
+  def contact_phone_for_lock
+    outgoing_echo ? messages_data.first[:to] : messages_data.first[:from]
+  end
+
+  # Blocked contacts should not generate new incoming messages, but we still
+  # accept echoes so outgoing messages tracked from native apps are preserved.
+  def contact_processable?
+    @contact.present? && !(@contact.blocked? && !outgoing_echo)
   end
 
   def process_statuses
@@ -57,30 +110,116 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def create_messages
-    message = @processed_params[:messages].first
+    message = messages_data.first
     log_error(message) && return if error_webhook_event?(message)
-
-    process_in_reply_to(message)
 
     message_type == 'contacts' ? create_contact_messages(message) : create_regular_message(message)
   end
 
+  # Cloud delivers a reaction removal as a webhook with empty emoji. Our schema
+  # keeps a single Message row per (target, sender) with `deleted` toggled on it,
+  # so we update that row in place.
+  #
+  # Two paths converge here:
+  # - Incoming: contact removed their reaction; mark the contact-owned row.
+  # - Outgoing echo (multi-device, agent un-reacted from the connected phone):
+  #   mark the senderless outgoing row. The Chatwoot-originated removal echo
+  #   also lands here, but the active-only filter drops it (the controller
+  #   already toggled the row to deleted) so it no-ops harmlessly.
+  #
+  # Lookup is intentionally NOT scoped to `@conversation`: the reaction may live
+  # in an older/resolved thread, while `set_conversation` could have just picked
+  # (or created) a different one for this webhook. Find the row globally, then
+  # operate on its real `existing.conversation`.
+  # Sender-agnostic existence check used to skip set_contact for removal
+  # webhooks that have nothing to act on. Mirrors the inbox/in_reply_to scope
+  # of `mark_existing_reaction_as_removed`.
+  def existing_reaction_row?
+    return false if @in_reply_to_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    Message.where(inbox_id: inbox.id)
+           .where("#{json_path}->>'is_reaction' = 'true'")
+           .exists?(["#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id])
+  end
+
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+    return if @in_reply_to_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    # Scope by inbox so a colliding WhatsApp id from another inbox can't match
+    # here and hand us back the wrong row.
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", @in_reply_to_external_id)
+    matches = if outgoing_echo
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              else
+                base.where(sender: @contact)
+              end
+    # Active-only: when the only matches are already deleted, return nil so
+    # the caller no-ops instead of re-deleting and bumping the conversation
+    # for an echoed Chatwoot-originated removal.
+    existing = matches.where.not(content: '')
+                      .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
+                      .reorder(created_at: :desc)
+                      .first
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    target_conversation = existing.conversation
+    # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
+    # chat.messages on the client, so the conversation card preview stays stale
+    # without an explicit conversation.updated dispatch. Touch updated_at so
+    # the frontend out-of-order guard can drop stale cables.
+    target_conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    target_conversation.dispatch_conversation_updated_event
+  end
+
   def create_contact_messages(message)
     message['contacts'].each do |contact|
-      create_message(contact)
+      # Pass source_id from parent message since contact objects don't have :id
+      create_message(contact, source_id: message[:id])
       attach_contact(contact)
       @message.save!
     end
   end
 
   def create_regular_message(message)
-    create_message(message)
+    create_message(message, source_id: message[:id])
     attach_files
     attach_location if message_type == 'location'
     @message.save!
   end
 
   def set_contact
+    if outgoing_echo
+      set_contact_from_echo
+    else
+      set_contact_from_message
+    end
+  end
+
+  def set_contact_from_echo
+    # For echo messages, contact phone is in the 'to' field
+    phone_number = messages_data.first[:to]
+    waid = processed_waid(phone_number)
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: waid,
+      inbox: inbox,
+      contact_attributes: { name: "+#{phone_number}", phone_number: "+#{phone_number}" }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+  end
+
+  def set_contact_from_message
     contact_params = @processed_params[:contacts]&.first
     return if contact_params.blank?
 
@@ -89,7 +228,7 @@ class Whatsapp::IncomingMessageBaseService
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: waid,
       inbox: inbox,
-      contact_attributes: { name: contact_params.dig(:profile, :name), phone_number: "+#{@processed_params[:messages].first[:from]}" }
+      contact_attributes: { name: contact_params.dig(:profile, :name), phone_number: "+#{messages_data.first[:from]}" }
     ).perform
 
     @contact_inbox = contact_inbox
@@ -102,7 +241,7 @@ class Whatsapp::IncomingMessageBaseService
   def set_conversation
     # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved
     @conversation = if @inbox.lock_to_single_conversation
-                      @contact_inbox.conversations.last
+                      @inbox.conversations.where(contact_id: @contact_inbox.contact_id).last
                     else
                       @contact_inbox.conversations
                                     .where.not(status: :resolved).last
@@ -113,9 +252,9 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def attach_files
-    return if %w[text button interactive location contacts].include?(message_type)
+    return if %w[text button interactive location contacts reaction].include?(message_type)
 
-    attachment_payload = @processed_params[:messages].first[message_type.to_sym]
+    attachment_payload = messages_data.first[message_type.to_sym]
     @message.content ||= attachment_payload[:caption]
 
     attachment_file = download_attachment_file(attachment_payload)
@@ -126,7 +265,7 @@ class Whatsapp::IncomingMessageBaseService
       file_type: file_content_type(message_type),
       file: {
         io: attachment_file,
-        filename: attachment_file.original_filename,
+        filename: attachment_payload[:filename].presence || attachment_file.original_filename,
         content_type: attachment_file.content_type
       },
       meta: ({ is_recorded_audio: true } if attachment_payload[:voice])
@@ -134,7 +273,7 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def attach_location
-    location = @processed_params[:messages].first['location']
+    location = messages_data.first['location']
     location_name = location['name'] ? "#{location['name']}, #{location['address']}" : ''
     @message.attachments.new(
       account_id: @message.account_id,
@@ -146,16 +285,26 @@ class Whatsapp::IncomingMessageBaseService
     )
   end
 
-  def create_message(message)
+  def create_message(message, source_id: nil)
     @message = @conversation.messages.build(
       content: message_content(message),
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
-      message_type: :incoming,
-      sender: @contact,
-      source_id: message[:id].to_s,
-      in_reply_to_external_id: @in_reply_to_external_id
+      message_type: outgoing_echo ? :outgoing : :incoming,
+      # Set status to :delivered for echo messages to prevent SendReplyJob from trying to send them
+      status: outgoing_echo ? :delivered : :sent,
+      sender: outgoing_echo ? nil : @contact,
+      source_id: (source_id || message[:id]).to_s,
+      content_attributes: build_content_attributes(message)
     )
+  end
+
+  def build_content_attributes(message)
+    content_attrs = outgoing_echo ? { external_echo: true } : {}
+    content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
+    content_attrs[:external_created_at] = message[:timestamp].to_i
+    content_attrs[:is_reaction] = true if message_type == 'reaction'
+    content_attrs
   end
 
   def attach_contact(contact)
@@ -190,7 +339,7 @@ class Whatsapp::IncomingMessageBaseService
   end
 
   def contact_name_matches_phone_number?
-    phone_number = "+#{@processed_params[:messages].first[:from]}"
+    phone_number = "+#{messages_data.first[:from]}"
     formatted_phone_number = TelephoneNumber.parse(phone_number).international_number
     @contact.name == phone_number || @contact.name == formatted_phone_number
   end

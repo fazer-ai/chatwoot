@@ -8,13 +8,16 @@ json.page_title portal.page_title
 json.slug portal.slug
 json.archived portal.archived
 json.account_id portal.account_id
+json.custom_head_html portal.custom_head_html
+json.custom_body_html portal.custom_body_html
 
 json.config do
   json.allowed_locales do
-    json.array! portal.config['allowed_locales'].each do |locale|
+    json.array! portal.allowed_locale_codes.each do |locale|
       json.partial! 'api/v1/models/portal_config', formats: [:json], locale: locale, portal: portal
     end
   end
+  json.show_author portal.show_author?
 end
 
 if portal.channel_web_widget

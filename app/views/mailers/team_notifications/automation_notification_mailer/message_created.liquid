@@ -1,8 +1,7 @@
-<p>Hi {{user.available_name}}</p>
-
+<p>{{ 'mailer.common.hi' | t: 'name', user.available_name }}</p>
 
 <p>{{ custom_message }}</p>
 
 <p>
-Click <a href="{{ action_url }}">here</a> to get cracking.
+{{ 'mailer.common.click_here_to_get_cracking' | t: 'url', action_url }}
 </p>

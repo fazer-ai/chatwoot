@@ -1,16 +1,16 @@
-<p>Hi {{user.available_name}}, </p>
+<p>{{ 'mailer.common.hi' | t: 'name', user.available_name }}, </p>
 
-<p>You've been mentioned in a conversation. <b>{{message.sender_display_name}}</b> wrote:</p>
+<p>{{ 'mailer.agent_notifications.conversation_mention.body' | t: 'sender_name', message.sender_display_name }}</p>
 <blockquote style="box-sizing:border-box; padding:8px 16px; margin:0 0 20px; font-size:14px; border-left:5px solid #eeeeee">
   {{message.text_content}}
 </blockquote>
 
-<p><b>Previous messages:</b></p>
+<p><b>{{ 'mailer.agent_notifications.conversation_mention.previous_messages' | t }}</b></p>
 {% for chat_message in conversation.recent_messages %}
   <div>
     <h4 style="margin: 0;">
       {% if chat_message.sender == user.available_name %}
-        You
+        {{ 'mailer.common.you' | t }}
       {% else %}
         {{chat_message.sender}}
       {% endif %}
@@ -24,11 +24,11 @@
 
     {% if chat_message.attachments %}
       {% for attachment in chat_message.attachments %}
-        Attachment [<a href="{{ attachment }}" _target="blank">Click here to view</a>]
+        {{ 'mailer.common.attachment_click_to_view' | t: 'url', attachment }}
       {% endfor %}
     {% endif %}
   </div>
 {% endfor %}
 <p>
-  <a href="{{ action_url }}">View Message</a>
+  <a href="{{ action_url }}">{{ 'mailer.agent_notifications.conversation_mention.view_message' | t }}</a>
 </p>

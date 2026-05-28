@@ -1,8 +1,7 @@
-<p>Hi</p>
+<p>{{ 'mailer.common.hi_plain' | t }}</p>
 
-
-<p>Your contact export file is ready to download.</p>
+<p>{{ 'mailer.administrator_notifications.account_notifications.contact_export_complete.body' | t }}</p>
 
 <p>
-Click <a href="{{ action_url }}">here</a> to download the export file.
+{{ 'mailer.administrator_notifications.account_notifications.contact_export_complete.action' | t: 'url', action_url }}
 </p>

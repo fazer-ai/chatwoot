@@ -73,7 +73,9 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     msg = unwrap_ephemeral_message(@raw_message[:message])
     case message_type
     when 'text'
-      msg[:conversation] || msg.dig(:extendedTextMessage, :text)
+      text = msg[:conversation] || msg.dig(:extendedTextMessage, :text)
+      context_info = msg.dig(:extendedTextMessage, :contextInfo)
+      convert_incoming_mentions(text, context_info)
     when 'image'
       msg.dig(:imageMessage, :caption)
     when 'video'
@@ -169,27 +171,55 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer.new.normalize(phone_number)
   end
 
+  # A name equal to the contact's WhatsApp phone (in any normalized "9"-variant),
+  # its LID, or the "<lid>@lid" identifier is an auto-generated placeholder rather
+  # than a human-entered name. Matching normalized phone variants lets the real
+  # pushName replace a number stranded by phone normalization, e.g. when the
+  # Brazilian "9" digit is added/removed and phone_number no longer matches the
+  # digits saved as the name.
+  def placeholder_contact_name?(name, phone:, identifier:)
+    return true if name.blank?
+    return true if name == identifier
+
+    digits = name.delete('+')
+    return false unless digits.match?(/\A\d+\z/)
+
+    lid = identifier&.delete_suffix('@lid')
+    return true if digits.in?([phone, lid].compact)
+
+    phone.present? && same_whatsapp_number?(digits, phone)
+  end
+
+  def same_whatsapp_number?(left, right)
+    normalizer = phone_normalizer_for(left) || phone_normalizer_for(right)
+    return false unless normalizer
+
+    normalizer.normalize(left) == normalizer.normalize(right)
+  end
+
+  def phone_normalizer_for(value)
+    Whatsapp::PhoneNumberNormalizationService::NORMALIZERS
+      .map(&:new)
+      .find { |normalizer| normalizer.handles_country?(value) }
+  end
+
   def ignore_message?
-    message_type.in?(%w[protocol context edited]) ||
-      (message_type == 'reaction' && message_content.blank?)
+    message_type.in?(%w[protocol context edited])
   end
 
-  def fetch_profile_picture_url(phone_number)
-    jid = "#{phone_number}@s.whatsapp.net"
-    response = inbox.channel.provider_service.get_profile_pic(jid)
-    response&.dig('data', 'profilePictureUrl')
-  rescue StandardError => e
-    Rails.logger.error "Failed to fetch profile picture for #{phone_number}: #{e.message}"
-    nil
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
   end
 
-  def try_update_contact_avatar
+  def try_update_contact_avatar(contact = nil)
     # TODO: Current logic will never update the contact avatar if their profile picture changes on WhatsApp.
-    return if @contact.avatar.attached?
+    target_contact = contact || @contact
+    return if target_contact.avatar.attached?
 
-    phone = extract_from_jid(type: 'pn')
-    profile_pic_url = fetch_profile_picture_url(phone) if phone
-    ::Avatar::AvatarFromUrlJob.perform_later(@contact, profile_pic_url) if profile_pic_url
+    phone = contact ? target_contact.phone_number&.delete('+') : extract_from_jid(type: 'pn')
+    return if phone.blank?
+
+    Channels::Whatsapp::BaileysUpdateContactAvatarJob.perform_later(target_contact, inbox, phone)
   end
 
   def message_under_process?
@@ -197,13 +227,19 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     Redis::Alfred.get(key)
   end
 
-  def cache_message_source_id_in_redis
+  def acquire_message_processing_lock
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{raw_message_id}")
-    ::Redis::Alfred.setex(key, true)
+    Redis::Alfred.set(key, true, nx: true, ex: 1.day)
   end
 
   def clear_message_source_id_from_redis
     key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{inbox.id}_#{raw_message_id}")
     ::Redis::Alfred.delete(key)
+  end
+
+  def convert_incoming_mentions(text, context_info)
+    return text if text.blank? || context_info.blank?
+
+    Whatsapp::MentionConverterService.convert_incoming_mentions(text, context_info, inbox.account, inbox)
   end
 end

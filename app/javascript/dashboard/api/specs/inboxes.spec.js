@@ -49,4 +49,33 @@ describe('#InboxesAPI', () => {
       );
     });
   });
+
+  describe('#updateCachedProviderConnection', () => {
+    it('patches the cached inbox record without touching the cache key', async () => {
+      inboxesAPI.dataManager.initDb = vi.fn().mockResolvedValue();
+      inboxesAPI.dataManager.update = vi.fn().mockResolvedValue();
+
+      await inboxesAPI.updateCachedProviderConnection(7, {
+        connection: 'open',
+      });
+
+      expect(inboxesAPI.dataManager.update).toHaveBeenCalledWith({
+        modelName: 'inbox',
+        id: 7,
+        data: { provider_connection: { connection: 'open' } },
+      });
+    });
+
+    it('swallows errors when IndexedDB is unavailable', async () => {
+      inboxesAPI.dataManager.initDb = vi
+        .fn()
+        .mockRejectedValue(new Error('no idb'));
+      inboxesAPI.dataManager.update = vi.fn();
+
+      await expect(
+        inboxesAPI.updateCachedProviderConnection(7, { connection: 'open' })
+      ).resolves.toBeUndefined();
+      expect(inboxesAPI.dataManager.update).not.toHaveBeenCalled();
+    });
+  });
 });

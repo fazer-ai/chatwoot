@@ -1,0 +1,29 @@
+tags:
+  - Internal Chat Channel Members
+operationId: list-internal-chat-channel-members
+summary: List channel members
+security:
+  - userApiKey: []
+description: List all members of an internal chat channel
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: array
+          description: Array of channel members
+          items:
+            $ref: '#/components/schemas/internal_chat_channel_member'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

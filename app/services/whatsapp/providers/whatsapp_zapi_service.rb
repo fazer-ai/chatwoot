@@ -116,6 +116,26 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
     response.parsed_response || { 'exists' => false, 'phone' => nil, 'lid' => nil }
   end
 
+  def delete_message(recipient_id, message)
+    return false if recipient_id.blank?
+
+    phone = recipient_id.delete('+')
+
+    response = HTTParty.delete(
+      "#{api_instance_path_with_token}/messages",
+      headers: api_headers,
+      query: {
+        messageId: message.source_id,
+        phone: phone,
+        owner: message.message_type == 'outgoing'
+      }
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
   private
 
   def api_instance_path

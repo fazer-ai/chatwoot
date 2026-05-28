@@ -2,6 +2,7 @@ import axios from 'axios';
 import { actions } from '../../inboxes';
 import * as types from '../../../mutation-types';
 import inboxList from './fixtures';
+import InboxesAPI from '../../../../api/inboxes';
 
 const commit = vi.fn();
 global.axios = axios;
@@ -253,6 +254,26 @@ describe('#actions', () => {
       await expect(actions.syncTemplates({ commit }, 123)).rejects.toThrow(
         errorMessage
       );
+    });
+  });
+
+  describe('#updateProviderConnection', () => {
+    it('commits the targeted mutation and patches the local cache', async () => {
+      const cacheSpy = vi
+        .spyOn(InboxesAPI, 'updateCachedProviderConnection')
+        .mockResolvedValue();
+      const providerConnection = { connection: 'open' };
+
+      await actions.updateProviderConnection(
+        { commit },
+        { id: 7, providerConnection }
+      );
+
+      expect(commit).toHaveBeenCalledWith(
+        types.default.SET_INBOX_PROVIDER_CONNECTION,
+        { id: 7, providerConnection }
+      );
+      expect(cacheSpy).toHaveBeenCalledWith(7, providerConnection);
     });
   });
 });

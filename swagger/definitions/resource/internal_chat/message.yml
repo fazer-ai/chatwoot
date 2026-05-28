@@ -1,0 +1,90 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the message
+  content:
+    type:
+      - string
+      - 'null'
+    description: The content of the message
+  content_type:
+    type: string
+    description: The type of the message content
+  content_attributes:
+    type:
+      - object
+      - 'null'
+    description: Additional attributes for the message content
+  internal_chat_channel_id:
+    type: integer
+    description: The ID of the channel this message belongs to
+  sender:
+    type:
+      - object
+      - 'null'
+    description: The sender of the message
+  parent_id:
+    type:
+      - integer
+      - 'null'
+    description: The ID of the parent message (for threaded replies)
+  echo_id:
+    type:
+      - string
+      - 'null'
+    description: Client-generated ID for optimistic updates
+  replies_count:
+    type: integer
+    description: The number of replies to this message
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the message was created
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the message was last updated
+  reactions:
+    type: array
+    description: Array of reactions on this message
+    items:
+      $ref: ./reaction.yml
+  attachments:
+    type: array
+    description: Array of file attachments on this message
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The ID of the attachment
+        file_type:
+          type: string
+          enum:
+            - image
+            - audio
+            - video
+            - file
+          description: The type of the attached file
+        external_url:
+          type:
+            - string
+            - 'null'
+          description: External URL for the attachment
+        extension:
+          type:
+            - string
+            - 'null'
+          description: File extension of the attachment
+        file_url:
+          type:
+            - string
+            - 'null'
+          description: URL to download the attached file
+  poll:
+    type:
+      - object
+      - 'null'
+    description: Poll data, present when the message carries a poll
+    $ref: ./poll.yml

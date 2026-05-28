@@ -9,23 +9,34 @@ import { required } from '@vuelidate/validators';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
-import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
+
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: value => ['create', 'convert'].includes(value),
+  },
+  inbox: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isConvertMode = computed(() => props.mode === 'convert');
 
 const router = useRouter();
 const store = useStore();
 const { t } = useI18n();
 
-const inboxName = ref('');
-const phoneNumber = ref('');
+const inboxName = ref(isConvertMode.value ? props.inbox?.name || '' : '');
+const phoneNumber = ref(
+  isConvertMode.value ? props.inbox?.phone_number || '' : ''
+);
 const instanceId = ref('');
 const token = ref('');
 const clientToken = ref('');
 
 const uiFlags = computed(() => store.getters['inboxes/getUIFlags']);
-
-// NOTE: Affiliate link is left intentionally hardcoded.
-const zapiAffiliateUrl =
-  'https://app.z-api.io/app/auth/new-account?afilliate=3E0B31343E6CB0297B567AC1D8277FBB';
 
 const rules = computed(() => ({
   inboxName: { required },
@@ -43,6 +54,12 @@ const v$ = useVuelidate(rules, {
   clientToken,
 });
 
+const buildProviderConfig = () => ({
+  instance_id: instanceId.value,
+  token: token.value,
+  client_token: clientToken.value,
+});
+
 const createChannel = async () => {
   v$.value.$touch();
   if (v$.value.$invalid) {
@@ -50,17 +67,31 @@ const createChannel = async () => {
   }
 
   try {
+    if (isConvertMode.value) {
+      await store.dispatch('inboxes/convertProvider', {
+        inboxId: props.inbox.id,
+        provider: 'zapi',
+        providerConfig: buildProviderConfig(),
+      });
+
+      useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
+      router.replace({
+        name: 'settings_inbox_show',
+        params: {
+          accountId: router.currentRoute.value.params.accountId,
+          inboxId: props.inbox.id,
+        },
+      });
+      return;
+    }
+
     const whatsappChannel = await store.dispatch('inboxes/createChannel', {
       name: inboxName.value,
       channel: {
         type: 'whatsapp',
         phone_number: phoneNumber.value,
         provider: 'zapi',
-        provider_config: {
-          instance_id: instanceId.value,
-          token: token.value,
-          client_token: clientToken.value,
-        },
+        provider_config: buildProviderConfig(),
       },
     });
 
@@ -72,34 +103,27 @@ const createChannel = async () => {
       },
     });
   } catch (error) {
-    useAlert(error.message || t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'));
+    useAlert(
+      error.message ||
+        t(
+          isConvertMode.value
+            ? 'INBOX_MGMT.CONVERT.API.ERROR_MESSAGE'
+            : 'INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'
+        )
+    );
   }
 };
 </script>
 
 <template>
   <form class="flex flex-wrap mx-0" @submit.prevent="createChannel()">
-    <div class="w-full mb-6">
-      <PromoBanner
-        :title="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.TITLE')"
-        :description="
-          $t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.DESCRIPTION')
-        "
-        variant="success"
-        logo-src="/assets/images/dashboard/channels/z-api/z-api-dark-green.png"
-        logo-alt="Z-API"
-        :cta-text="$t('INBOX_MGMT.ADD.WHATSAPP.ZAPI_PROMO.SETUP_BANNER.CTA')"
-        cta-external
-        :cta-link="zapiAffiliateUrl"
-      />
-    </div>
-
     <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
       <label :class="{ error: v$.inboxName.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.LABEL') }}
         <input
           v-model="inboxName"
           type="text"
+          :disabled="isConvertMode"
           :placeholder="$t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.PLACEHOLDER')"
           @blur="v$.inboxName.$touch"
         />
@@ -115,6 +139,7 @@ const createChannel = async () => {
         <input
           v-model="phoneNumber"
           type="text"
+          :disabled="isConvertMode"
           :placeholder="$t('INBOX_MGMT.ADD.WHATSAPP.PHONE_NUMBER.PLACEHOLDER')"
           @blur="v$.phoneNumber.$touch"
         />
@@ -171,11 +196,15 @@ const createChannel = async () => {
 
     <div class="w-full">
       <NextButton
-        :is-loading="uiFlags.isCreating"
+        :is-loading="uiFlags.isCreating || uiFlags.isUpdating"
         type="submit"
         solid
         blue
-        :label="$t('INBOX_MGMT.ADD.WHATSAPP.SUBMIT_BUTTON')"
+        :label="
+          isConvertMode
+            ? $t('INBOX_MGMT.CONVERT.SUBMIT_BUTTON')
+            : $t('INBOX_MGMT.ADD.WHATSAPP.SUBMIT_BUTTON')
+        "
       />
     </div>
   </form>

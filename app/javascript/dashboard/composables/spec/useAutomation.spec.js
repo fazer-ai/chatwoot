@@ -8,6 +8,7 @@ import {
   agents,
   teams,
   labels,
+  booleanFilterOptions,
   statusFilterOptions,
   messageTypeOptions,
   priorityOptions,
@@ -38,7 +39,7 @@ describe('useAutomation', () => {
     });
     useMapGetter.mockImplementation(getter => {
       const getterMap = {
-        'agents/getAgents': agents,
+        'agents/getVerifiedAgents': agents,
         'campaigns/getAllCampaigns': campaigns,
         'contacts/getContacts': contacts,
         'inboxes/getInboxes': inboxes,
@@ -73,6 +74,8 @@ describe('useAutomation', () => {
           return countries;
         case 'message_type':
           return messageTypeOptions;
+        case 'private_note':
+          return booleanFilterOptions;
         case 'priority':
           return priorityOptions;
         default:
@@ -89,7 +92,9 @@ describe('useAutomation', () => {
         case 'assign_team':
           return teams;
         case 'assign_agent':
-          return agents;
+          return options.addNoneToListFn
+            ? options.addNoneToListFn(options.agents)
+            : options.agents;
         case 'send_email_to_team':
           return teams;
         case 'send_message':
@@ -190,6 +195,27 @@ describe('useAutomation', () => {
     expect(automation.value.actions[0].action_params).toEqual([]);
   });
 
+  it('resets scheduled message action with default delay_minutes', () => {
+    const { resetAction, automation } = useAutomation();
+    automation.value = {
+      event_name: 'message_created',
+      conditions: [],
+      actions: [
+        {
+          action_name: 'create_scheduled_message',
+          action_params: [{ content: 'test', delay_minutes: 60 }],
+        },
+      ],
+    };
+
+    resetAction(0);
+
+    // Should reset with default delay of 24 hours (1440 minutes)
+    expect(automation.value.actions[0].action_params).toEqual([
+      { delay_minutes: 1440 },
+    ]);
+  });
+
   it('manifests custom attributes correctly', () => {
     const { manifestCustomAttributes, automationTypes } = useAutomation();
     automationTypes.message_created = { conditions: [] };
@@ -226,6 +252,9 @@ describe('useAutomation', () => {
     expect(getConditionDropdownValues('message_type')).toEqual(
       messageTypeOptions
     );
+    expect(getConditionDropdownValues('private_note')).toEqual(
+      booleanFilterOptions
+    );
     expect(getConditionDropdownValues('priority')).toEqual(priorityOptions);
   });
 
@@ -234,7 +263,11 @@ describe('useAutomation', () => {
 
     expect(getActionDropdownValues('add_label')).toEqual(labels);
     expect(getActionDropdownValues('assign_team')).toEqual(teams);
-    expect(getActionDropdownValues('assign_agent')).toEqual(agents);
+    expect(getActionDropdownValues('assign_agent')).toEqual([
+      { id: 'nil', name: 'AUTOMATION.NONE_OPTION' },
+      { id: 'last_responding_agent', name: 'AUTOMATION.LAST_RESPONDING_AGENT' },
+      ...agents,
+    ]);
     expect(getActionDropdownValues('send_email_to_team')).toEqual(teams);
     expect(getActionDropdownValues('send_message')).toEqual([]);
     expect(getActionDropdownValues('add_sla')).toEqual(slaPolicies);

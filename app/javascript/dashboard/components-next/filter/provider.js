@@ -7,7 +7,6 @@ import {
   buildAttributesFilterTypes,
   CONVERSATION_ATTRIBUTES,
 } from './helper/filterHelper';
-import countries from 'shared/constants/countries.js';
 import languages from 'dashboard/components/widgets/conversation/advancedFilterItems/languages.js';
 
 /**
@@ -219,17 +218,6 @@ export function useConversationFilterContext() {
       attributeModel: 'additional',
     },
     {
-      attributeKey: CONVERSATION_ATTRIBUTES.COUNTRY_CODE,
-      value: CONVERSATION_ATTRIBUTES.COUNTRY_CODE,
-      attributeName: t('FILTER.ATTRIBUTES.COUNTRY_NAME'),
-      label: t('FILTER.ATTRIBUTES.COUNTRY_NAME'),
-      inputType: 'searchSelect',
-      options: countries,
-      dataType: 'text',
-      filterOperators: equalityOperators.value,
-      attributeModel: 'additional',
-    },
-    {
       attributeKey: CONVERSATION_ATTRIBUTES.REFERER,
       value: CONVERSATION_ATTRIBUTES.REFERER,
       attributeName: t('FILTER.ATTRIBUTES.REFERER_LINK'),
@@ -257,6 +245,20 @@ export function useConversationFilterContext() {
       inputType: 'date',
       dataType: 'text',
       filterOperators: dateOperators.value,
+      attributeModel: 'standard',
+    },
+    {
+      attributeKey: CONVERSATION_ATTRIBUTES.GROUP_TYPE,
+      value: CONVERSATION_ATTRIBUTES.GROUP_TYPE,
+      attributeName: t('FILTER.ATTRIBUTES.GROUP_TYPE'),
+      label: t('FILTER.ATTRIBUTES.GROUP_TYPE'),
+      inputType: 'multiSelect',
+      options: ['individual', 'group'].map(id => ({
+        id,
+        name: t(`GROUP.FILTER.${id.toUpperCase()}`),
+      })),
+      dataType: 'text',
+      filterOperators: equalityOperators.value,
       attributeModel: 'standard',
     },
     ...customFilterTypes.value,

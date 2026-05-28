@@ -23,9 +23,13 @@ export const buildCreatePayload = ({
     files.forEach(file => {
       payload.append('attachments[]', file);
     });
-    isRecordedAudio?.forEach(filename => {
-      payload.append('is_recorded_audio[]', filename);
-    });
+    if (isRecordedAudio === true) {
+      payload.append('is_recorded_audio', true);
+    } else if (Array.isArray(isRecordedAudio)) {
+      isRecordedAudio.forEach(filename => {
+        payload.append('is_recorded_audio[]', filename);
+      });
+    }
     payload.append('private', isPrivate);
     payload.append('echo_id', echoId);
     payload.append('cc_emails', ccEmails);
@@ -92,6 +96,13 @@ class MessageApi extends ApiClient {
     return axios.delete(`${this.url}/${conversationID}/messages/${messageId}`);
   }
 
+  editContent(conversationID, messageId, content) {
+    return axios.patch(
+      `${this.url}/${conversationID}/messages/${messageId}/edit_content`,
+      { content }
+    );
+  }
+
   retry(conversationID, messageId) {
     return axios.post(
       `${this.url}/${conversationID}/messages/${messageId}/retry`
@@ -112,6 +123,13 @@ class MessageApi extends ApiClient {
       {
         target_language: targetLanguage,
       }
+    );
+  }
+
+  toggleReaction(conversationId, messageId, emoji, echoId) {
+    return axios.post(
+      `${this.url}/${conversationId}/messages/${messageId}/reactions`,
+      { emoji, echo_id: echoId }
     );
   }
 }

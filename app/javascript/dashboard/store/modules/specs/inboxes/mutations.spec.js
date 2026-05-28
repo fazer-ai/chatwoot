@@ -91,4 +91,50 @@ describe('#mutations', () => {
       expect(state.uiFlags).toEqual({ isFetchingItem: true });
     });
   });
+
+  describe('#SET_INBOX_PROVIDER_CONNECTION', () => {
+    it('updates only the provider_connection of the matching inbox', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            name: 'Inbox 1',
+            provider_connection: { connection: 'close' },
+          },
+          {
+            id: 2,
+            name: 'Inbox 2',
+            provider_connection: { connection: 'open' },
+          },
+        ],
+      };
+      mutations[types.default.SET_INBOX_PROVIDER_CONNECTION](state, {
+        id: 1,
+        providerConnection: {
+          connection: 'open',
+          qr_data_url: 'data:image/png;base64,qr',
+        },
+      });
+      expect(state.records[0].provider_connection).toEqual({
+        connection: 'open',
+        qr_data_url: 'data:image/png;base64,qr',
+      });
+      expect(state.records[1].provider_connection).toEqual({
+        connection: 'open',
+      });
+    });
+
+    it('is a no-op when the inbox is not in the store', () => {
+      const state = {
+        records: [{ id: 1, provider_connection: { connection: 'open' } }],
+      };
+      mutations[types.default.SET_INBOX_PROVIDER_CONNECTION](state, {
+        id: 999,
+        providerConnection: { connection: 'close' },
+      });
+      expect(state.records[0].provider_connection).toEqual({
+        connection: 'open',
+      });
+    });
+  });
 });

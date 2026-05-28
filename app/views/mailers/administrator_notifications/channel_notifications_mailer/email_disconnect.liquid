@@ -1,8 +1,8 @@
-<p>Hello,</p>
+<p>{{ 'mailer.common.hello' | t }}</p>
 
-<p>Your email inbox has been disconnected due to configuration errors. </p>
-<p>Please update it to continue receiving messages.</p>
+<p>{{ 'mailer.administrator_notifications.channel_notifications.email_disconnect.body' | t }}</p>
+<p>{{ 'mailer.administrator_notifications.channel_notifications.email_disconnect.action' | t }}</p>
 
 <p>
-Click <a href="{{action_url}}">here</a> to re-connect.
+{{ 'mailer.administrator_notifications.channel_notifications.email_disconnect.click_to_reconnect' | t: 'url', action_url }}
 </p>

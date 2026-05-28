@@ -1,0 +1,50 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the channel
+  name:
+    type:
+      - string
+      - 'null'
+    description: The name of the channel (null for DMs)
+  description:
+    type:
+      - string
+      - 'null'
+    description: The description of the channel
+  channel_type:
+    type: string
+    enum:
+      - public_channel
+      - private_channel
+      - dm
+    description: The type of channel
+  is_dm:
+    type: boolean
+    description: Whether this channel is a direct message
+  status:
+    type: string
+    enum:
+      - active
+      - archived
+    description: The status of the channel
+  category_id:
+    type:
+      - integer
+      - 'null'
+    description: The ID of the category this channel belongs to
+  last_activity_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: The time of the last activity in the channel
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the channel was created
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the channel was last updated

@@ -36,10 +36,14 @@ article:
   $ref: ./resource/article.yml
 contact:
   $ref: ./resource/contact.yml
+group_member:
+  $ref: ./resource/group_member.yml
 conversation:
   $ref: ./resource/conversation.yml
 message:
   $ref: ./resource/message.yml
+scheduled_message:
+  $ref: ./resource/scheduled_message.yml
 user:
   $ref: ./resource/user.yml
 agent:
@@ -70,6 +74,8 @@ platform_account:
   $ref: ./resource/platform_account.yml
 team:
   $ref: ./resource/team.yml
+label:
+  $ref: ./resource/label.yml
 integrations_app:
   $ref: ./resource/integrations/app.yml
 integrations_hook:
@@ -80,12 +86,40 @@ audit_log:
 ## public resources
 public_contact:
   $ref: ./resource/public/contact.yml
+public_contact_record:
+  $ref: ./resource/public/contact_record.yml
 public_conversation:
   $ref: ./resource/public/conversation.yml
 public_message:
   $ref: ./resource/public/message.yml
+public_message_attachment:
+  $ref: ./resource/public/message_attachment.yml
+public_message_sender:
+  $ref: ./resource/public/message_sender.yml
 public_inbox:
   $ref: ./resource/public/inbox.yml
+
+## internal chat resources
+internal_chat_category:
+  $ref: ./resource/internal_chat/category.yml
+internal_chat_channel:
+  $ref: ./resource/internal_chat/channel.yml
+internal_chat_channel_index:
+  $ref: ./resource/internal_chat/channel_index.yml
+internal_chat_channel_show:
+  $ref: ./resource/internal_chat/channel_show.yml
+internal_chat_channel_member:
+  $ref: ./resource/internal_chat/channel_member.yml
+internal_chat_message:
+  $ref: ./resource/internal_chat/message.yml
+internal_chat_reaction:
+  $ref: ./resource/internal_chat/reaction.yml
+internal_chat_draft:
+  $ref: ./resource/internal_chat/draft.yml
+internal_chat_poll:
+  $ref: ./resource/internal_chat/poll.yml
+internal_chat_search_result:
+  $ref: ./resource/internal_chat/search_result.yml
 
 ## ---------- REQUEST ------------- ##
 ## -------------------------------- ##
@@ -132,6 +166,10 @@ conversation_create_payload:
 conversation_message_create_payload:
   $ref: ./request/conversation/create_message_payload.yml
 
+## Scheduled Message
+scheduled_message_create_update_payload:
+  $ref: ./request/scheduled_message/create_update_payload.yml
+
 # Inbox
 inbox_create_payload:
   $ref: ./request/inbox/create_payload.yml
@@ -141,6 +179,10 @@ inbox_update_payload:
 # Team
 team_create_update_payload:
   $ref: ./request/team/create_update_payload.yml
+
+# Label
+label_create_update_payload:
+  $ref: ./request/label/create_update_payload.yml
 
 # Custom Filter
 custom_filter_create_update_payload:
@@ -166,6 +208,22 @@ category_create_update_payload:
   $ref: ./request/portal/category_create_update_payload.yml
 article_create_update_payload:
   $ref: ./request/portal/article_create_update_payload.yml
+
+## Internal Chat
+internal_chat_category_create_update_payload:
+  $ref: ./request/internal_chat/category_create_update_payload.yml
+internal_chat_channel_create_payload:
+  $ref: ./request/internal_chat/channel_create_payload.yml
+internal_chat_channel_update_payload:
+  $ref: ./request/internal_chat/channel_update_payload.yml
+internal_chat_message_create_payload:
+  $ref: ./request/internal_chat/message_create_payload.yml
+internal_chat_member_create_payload:
+  $ref: ./request/internal_chat/member_create_payload.yml
+internal_chat_draft_save_payload:
+  $ref: ./request/internal_chat/draft_save_payload.yml
+internal_chat_poll_create_payload:
+  $ref: ./request/internal_chat/poll_create_payload.yml
 
 ## public requests
 public_contact_create_update_payload:
@@ -223,6 +281,20 @@ account_summary:
   $ref: './resource/reports/summary.yml'
 agent_conversation_metrics:
   $ref: './resource/reports/conversation/agent.yml'
+channel_summary:
+  $ref: './resource/reports/channel_summary.yml'
+first_response_time_distribution:
+  $ref: './resource/reports/first_response_time_distribution.yml'
+inbox_label_matrix:
+  $ref: './resource/reports/inbox_label_matrix.yml'
+outgoing_messages_count:
+  $ref: './resource/reports/outgoing_messages_count.yml'
+inbox_summary:
+  $ref: './resource/reports/inbox_summary.yml'
+agent_summary:
+  $ref: './resource/reports/agent_summary.yml'
+team_summary:
+  $ref: './resource/reports/team_summary.yml'
 
 contact_detail:
   $ref: ./resource/contact_detail.yml

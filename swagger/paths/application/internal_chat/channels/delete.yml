@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Channels
+operationId: delete-internal-chat-channel
+summary: Delete a channel
+security:
+  - userApiKey: []
+description: Delete an internal chat channel (admin only)
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

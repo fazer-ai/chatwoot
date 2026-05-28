@@ -1,0 +1,46 @@
+type: object
+properties:
+  channel:
+    type: object
+    properties:
+      name:
+        type: string
+        description: The name of the channel
+      description:
+        type: string
+        description: The description of the channel
+      channel_type:
+        type: string
+        enum:
+          - public_channel
+          - private_channel
+          - dm
+        description: The type of channel to create
+      category_id:
+        type: integer
+        description: The ID of the category to assign the channel to
+      member_ids:
+        type: array
+        items:
+          type: integer
+        description: IDs of users to add as initial members (nested)
+      team_ids:
+        type: array
+        items:
+          type: integer
+        description: IDs of teams whose members are added as initial members (nested)
+  channel_type:
+    type: string
+    enum:
+      - dm
+    description: Top-level shortcut to request a direct message channel
+  member_ids:
+    type: array
+    items:
+      type: integer
+    description: IDs of users to add as initial members (top-level fallback)
+  team_ids:
+    type: array
+    items:
+      type: integer
+    description: IDs of teams whose members are added as initial members (top-level fallback)

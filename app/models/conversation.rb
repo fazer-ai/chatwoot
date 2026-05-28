@@ -10,6 +10,7 @@
 #  contact_last_seen_at   :datetime
 #  custom_attributes      :jsonb
 #  first_reply_created_at :datetime
+#  group_type             :integer          default("individual"), not null
 #  identifier             :string
 #  last_activity_at       :datetime         not null
 #  priority               :integer
@@ -23,7 +24,7 @@
 #  assignee_agent_bot_id  :bigint
 #  assignee_id            :integer
 #  campaign_id            :bigint
-#  contact_id             :bigint
+#  contact_id             :bigint           not null
 #  contact_inbox_id       :bigint
 #  display_id             :integer          not null
 #  inbox_id               :integer          not null
@@ -35,6 +36,7 @@
 #  conv_acid_inbid_stat_asgnid_idx                    (account_id,inbox_id,status,assignee_id)
 #  index_conversations_on_account_id                  (account_id)
 #  index_conversations_on_account_id_and_display_id   (account_id,display_id) UNIQUE
+#  index_conversations_on_account_id_and_group_type   (account_id,group_type)
 #  index_conversations_on_assignee_id_and_account_id  (assignee_id,account_id)
 #  index_conversations_on_campaign_id                 (campaign_id)
 #  index_conversations_on_contact_id                  (contact_id)
@@ -43,6 +45,7 @@
 #  index_conversations_on_id_and_account_id           (account_id,id)
 #  index_conversations_on_identifier_and_account_id   (identifier,account_id)
 #  index_conversations_on_inbox_id                    (inbox_id)
+#  index_conversations_on_inbox_id_and_group_type     (inbox_id,group_type)
 #  index_conversations_on_priority                    (priority)
 #  index_conversations_on_status_and_account_id       (status,account_id)
 #  index_conversations_on_status_and_priority         (status,priority)
@@ -74,6 +77,7 @@ class Conversation < ApplicationRecord
 
   enum status: { open: 0, resolved: 1, pending: 2, snoozed: 3 }
   enum priority: { low: 0, medium: 1, high: 2, urgent: 3 }
+  enum group_type: { individual: 0, group: 1 }, _prefix: true
 
   scope :unassigned, -> { where(assignee_id: nil) }
   scope :assigned, -> { where.not(assignee_id: nil) }
@@ -113,6 +117,8 @@ class Conversation < ApplicationRecord
   has_many :notifications, as: :primary_actor, dependent: :destroy_async
   has_many :attachments, through: :messages
   has_many :reporting_events, dependent: :destroy_async
+  has_many :scheduled_messages, dependent: :destroy
+  has_many :recurring_scheduled_messages, dependent: :destroy
 
   before_save :ensure_snooze_until_reset
   before_create :determine_conversation_status
@@ -143,7 +149,7 @@ class Conversation < ApplicationRecord
   end
 
   def last_incoming_message
-    messages&.incoming&.last
+    messages.where(account_id: account_id)&.incoming&.last
   end
 
   def toggle_status
@@ -159,12 +165,17 @@ class Conversation < ApplicationRecord
   end
 
   def bot_handoff!
+    update!(waiting_since: Time.current) if waiting_since.blank?
     open!
     dispatcher_dispatch(CONVERSATION_BOT_HANDOFF)
   end
 
   def unread_messages
     agent_last_seen_at.present? ? messages.created_since(agent_last_seen_at) : messages
+  end
+
+  def assignee_unread_messages
+    assignee_last_seen_at.present? ? messages.created_since(assignee_last_seen_at) : messages
   end
 
   def unread_incoming_messages
@@ -207,8 +218,8 @@ class Conversation < ApplicationRecord
     "#{ENV.fetch('FRONTEND_URL', nil)}/survey/responses/#{uuid}"
   end
 
-  def dispatch_conversation_updated_event(previous_changes = nil)
-    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes)
+  def dispatch_conversation_updated_event(previous_changes = nil, broadcast_metadata: nil)
+    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes, broadcast_metadata: broadcast_metadata)
   end
 
   private
@@ -304,10 +315,11 @@ class Conversation < ApplicationRecord
     end
   end
 
-  def dispatcher_dispatch(event_name, changed_attributes = nil)
-    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
-                                                                       changed_attributes: changed_attributes,
-                                                                       performed_by: Current.executed_by)
+  def dispatcher_dispatch(event_name, changed_attributes = nil, broadcast_metadata: nil)
+    payload = { conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
+                changed_attributes: changed_attributes, performed_by: Current.executed_by }
+    payload[:broadcast_metadata] = broadcast_metadata unless broadcast_metadata.nil?
+    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, **payload)
   end
 
   def conversation_status_changed_to_open?

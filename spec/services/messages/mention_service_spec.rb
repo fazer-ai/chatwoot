@@ -117,6 +117,26 @@ describe Messages::MentionService do
 
         expect(conversation.conversation_participants.map(&:user_id)).to include(first_agent.id)
       end
+
+      it 'adds the mentioned user as a participant before generating the notification' do
+        message = build(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "hi (mention://user/#{first_agent.id}/#{first_agent.name})",
+          private: true
+        )
+
+        participant_user_ids_when_notified = nil
+        allow(NotificationBuilder).to receive(:new) do |**_kwargs|
+          participant_user_ids_when_notified = conversation.conversation_participants.reload.map(&:user_id)
+          builder
+        end
+
+        described_class.new(message: message).perform
+
+        expect(participant_user_ids_when_notified).to include(first_agent.id)
+      end
     end
 
     context 'when message contains multiple user mentions' do
@@ -161,6 +181,36 @@ describe Messages::MentionService do
           contain_exactly(first_agent.id.to_s, second_agent.id.to_s),
           conversation.id,
           account.id
+        )
+      end
+    end
+
+    context 'when the message sender mentions themselves' do
+      it 'skips the sender notification while notifying other mentioned users' do
+        message = build(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "hey (mention://user/#{first_agent.id}/#{first_agent.name}) and (mention://user/#{second_agent.id}/#{second_agent.name})",
+          private: true,
+          sender: first_agent
+        )
+
+        described_class.new(message: message).perform
+
+        expect(NotificationBuilder).not_to have_received(:new).with(
+          notification_type: 'conversation_mention',
+          user: first_agent,
+          account: account,
+          primary_actor: message.conversation,
+          secondary_actor: message
+        )
+        expect(NotificationBuilder).to have_received(:new).with(
+          notification_type: 'conversation_mention',
+          user: second_agent,
+          account: account,
+          primary_actor: message.conversation,
+          secondary_actor: message
         )
       end
     end
@@ -502,6 +552,72 @@ describe Messages::MentionService do
 
       expect(NotificationBuilder).not_to have_received(:new)
       expect(Conversations::UserMentionJob).not_to have_received(:perform_later)
+    end
+  end
+
+  describe 'contact mentions' do
+    let(:group_contact) { create(:contact, account: account, group_type: :group) }
+
+    context 'when message contains contact mentions' do
+      it 'stores mentioned contact IDs in content_attributes' do
+        message = create(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "hey (mention://contact/#{group_contact.id}/Alice) check this out",
+          private: false
+        )
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.content_attributes['mentioned_contacts']).to eq([group_contact.id.to_s])
+      end
+
+      it 'does not trigger user mention notifications for contact mentions' do
+        message = create(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "hey (mention://contact/#{group_contact.id}/Alice)",
+          private: false
+        )
+
+        described_class.new(message: message).perform
+
+        expect(NotificationBuilder).not_to have_received(:new)
+        expect(Conversations::UserMentionJob).not_to have_received(:perform_later)
+      end
+
+      it 'deduplicates repeated contact mentions' do
+        message = create(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "(mention://contact/#{group_contact.id}/Alice) and again (mention://contact/#{group_contact.id}/Alice)",
+          private: false
+        )
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.content_attributes['mentioned_contacts']).to eq([group_contact.id.to_s])
+      end
+    end
+
+    context 'when message has no contact mentions' do
+      it 'does not update content_attributes' do
+        message = create(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: 'just a regular group message',
+          private: false
+        )
+        original_attrs = message.content_attributes.dup
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.content_attributes).to eq(original_attrs)
+      end
     end
   end
 end

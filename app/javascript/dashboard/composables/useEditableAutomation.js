@@ -46,11 +46,26 @@ export function useEditableAutomation() {
       if (inputType === 'comma_separated_plain_text') {
         return { ...condition, values: condition.values.join(',') };
       }
+      const dropdownValues = getConditionDropdownValues(
+        condition.attribute_key
+      );
+      const hasBooleanOptions =
+        inputType === 'search_select' &&
+        dropdownValues.length &&
+        dropdownValues.every(item => typeof item.id === 'boolean');
+
+      if (hasBooleanOptions) {
+        return {
+          ...condition,
+          query_operator: condition.query_operator || 'and',
+          values: dropdownValues.find(item => item.id === condition.values[0]),
+        };
+      }
       return {
         ...condition,
         query_operator: condition.query_operator || 'and',
-        values: [...getConditionDropdownValues(condition.attribute_key)].filter(
-          item => [...condition.values].includes(item.id)
+        values: [...dropdownValues].filter(item =>
+          [...condition.values].includes(item.id)
         ),
       };
     });
@@ -71,6 +86,10 @@ export function useEditableAutomation() {
       return [...getActionDropdownValues(action.action_name)].filter(item =>
         [...params].includes(item.id)
       );
+    }
+    if (inputType === 'scheduled_message') {
+      // Keep as array to maintain consistent format with how the component emits updates
+      return params[0] ? [params[0]] : [];
     }
     if (inputType === 'team_message') {
       return {

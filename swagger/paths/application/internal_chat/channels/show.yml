@@ -1,0 +1,26 @@
+tags:
+  - Internal Chat Channels
+operationId: show-internal-chat-channel
+summary: Get a channel
+security:
+  - userApiKey: []
+description: Get the details of an internal chat channel including recent messages and members
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_channel_show'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

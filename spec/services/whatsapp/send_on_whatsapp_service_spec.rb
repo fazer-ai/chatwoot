@@ -57,9 +57,9 @@ describe Whatsapp::SendOnWhatsappService do
       it 'calls channel.send_message when with in 24 hour limit' do
         # to handle the case of 24 hour window limit.
         create(:message, message_type: :incoming, content: 'test',
-                         conversation: conversation)
+                         conversation: conversation, account: conversation.account)
         message = create(:message, message_type: :outgoing, content: 'test',
-                                   conversation: conversation)
+                                   conversation: conversation, account: conversation.account)
 
         stub_request(:post, 'https://waba.360dialog.io/v1/messages')
           .with(
@@ -88,7 +88,8 @@ describe Whatsapp::SendOnWhatsappService do
         message = create(:message,
                          additional_attributes: { template_params: invalid_template_params },
                          conversation: conversation,
-                         message_type: :outgoing)
+                         message_type: :outgoing,
+                         account: conversation.account)
 
         described_class.new(message: message).perform
 
@@ -98,7 +99,8 @@ describe Whatsapp::SendOnWhatsappService do
 
       it 'calls channel.send_template when after 24 hour limit' do
         message = create(:message, message_type: :outgoing, content: 'Your package has been shipped. It will be delivered in 3 business days.',
-                                   conversation: conversation, additional_attributes: { template_params: template_params })
+                                   conversation: conversation, additional_attributes: { template_params: template_params },
+                                   account: conversation.account)
 
         stub_request(:post, 'https://waba.360dialog.io/v1/messages')
           .with(
@@ -112,7 +114,8 @@ describe Whatsapp::SendOnWhatsappService do
 
       it 'calls channel.send_template if template_params are present' do
         message = create(:message, additional_attributes: { template_params: template_params },
-                                   content: 'Your package will be delivered in 3 business days.', conversation: conversation, message_type: :outgoing)
+                                   content: 'Your package will be delivered in 3 business days.', conversation: conversation, message_type: :outgoing,
+                                   account: conversation.account)
         stub_request(:post, 'https://waba.360dialog.io/v1/messages')
           .with(
             headers: headers,
@@ -148,7 +151,8 @@ describe Whatsapp::SendOnWhatsappService do
           ).to_return(status: 200, body: success_response, headers: { 'content-type' => 'application/json' })
         message = create(:message,
                          additional_attributes: { template_params: named_template_params },
-                         content: 'Your package will be delivered in 3 business days.', conversation: cloud_conversation, message_type: :outgoing)
+                         content: 'Your package will be delivered in 3 business days.', conversation: cloud_conversation, message_type: :outgoing,
+                         account: cloud_conversation.account)
 
         described_class.new(message: message).perform
         expect(message.reload.source_id).to eq('123456789')
@@ -192,7 +196,7 @@ describe Whatsapp::SendOnWhatsappService do
         }
 
         message = create(:message, additional_attributes: { template_params: empty_template_params },
-                                   conversation: conversation, message_type: :outgoing)
+                                   conversation: conversation, message_type: :outgoing, account: conversation.account)
 
         stub_request(:post, 'https://waba.360dialog.io/v1/messages')
           .with(
@@ -396,14 +400,71 @@ describe Whatsapp::SendOnWhatsappService do
           .to_return(status: 200, body: '', headers: {})
       end
 
-      it 'calls channel.send_message if channel is not locked on outgoing message' do
+      it 'uses phone number as recipient_id for individual contacts' do
         conversation.contact.update!(phone_number: '+123456789')
         message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
         allow(whatsapp_channel).to receive(:send_message).with('123456789', message).and_return('123456789')
 
         described_class.new(message: message).perform
 
         expect(message.reload.source_id).to eq('123456789')
+      end
+
+      it 'falls back to identifier when contact has no phone_number' do
+        conversation.contact.update!(phone_number: nil, identifier: '99999999@lid')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+        allow(whatsapp_channel).to receive(:send_message).with('99999999@lid', message).and_return('msg_lid')
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.source_id).to eq('msg_lid')
+      end
+
+      it 'uses identifier as recipient_id for group contacts' do
+        conversation.contact.update!(identifier: '123456789123456789@g.us', group_type: :group)
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+        allow(whatsapp_channel).to receive(:send_message).with('123456789123456789@g.us', message).and_return('msg_group')
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.source_id).to eq('msg_group')
+      end
+
+      describe 'duplicate send on Net::ReadTimeout retry' do
+        let(:send_message_url) do
+          "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"
+        end
+        let(:setup_url) do
+          "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+        end
+        let(:success_body) { { data: { key: { id: 'wa_msg_123' }, messageTimestamp: '123' } }.to_json }
+
+        before do
+          conversation.contact.update!(phone_number: '+123456789')
+          create(:message, message_type: :incoming, content: 'hi', conversation: conversation)
+          stub_request(:post, setup_url).to_return(status: 200, body: '', headers: {})
+        end
+
+        it 'sends the message twice when first attempt times out and job is retried' do
+          message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
+
+          stub = stub_request(:post, send_message_url)
+                 .with { |req| JSON.parse(req.body)['chatwootMessageId'].to_s.start_with?("#{message.id}:") }
+                 .to_raise(Net::ReadTimeout.new('Net::ReadTimeout'))
+                 .then
+                 .to_return(status: 200, body: success_body, headers: { 'Content-Type' => 'application/json' })
+
+          expect { SendReplyJob.perform_now(message.id) }.to(raise_error { |e| expect(e.class.name).to eq('Net::ReadTimeout') })
+          expect(message.reload.source_id).to be_nil
+
+          SendReplyJob.perform_now(message.id)
+          expect(message.reload.source_id).to eq('wa_msg_123')
+
+          expect(stub).to have_been_requested.twice
+        end
       end
     end
 
@@ -435,6 +496,16 @@ describe Whatsapp::SendOnWhatsappService do
           message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
 
           expect(whatsapp_channel).to receive(:send_message).with('123456789@lid', message).and_return('msg_123')
+
+          described_class.new(message: message).perform
+        end
+
+        it 'uses identifier as recipient_id for group contacts' do
+          conversation.contact.update!(identifier: '120363123456789@g.us', group_type: :group)
+          create(:message, message_type: :incoming, content: 'test', conversation: conversation)
+          message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+          expect(whatsapp_channel).to receive(:send_message).with('120363123456789@g.us', message).and_return('msg_group')
 
           described_class.new(message: message).perform
         end

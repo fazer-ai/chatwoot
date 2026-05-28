@@ -1,0 +1,32 @@
+tags:
+  - Internal Chat Messages
+operationId: create-internal-chat-message
+summary: Create a message
+security:
+  - userApiKey: []
+description: Create a new message in an internal chat channel
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/internal_chat_message_create_payload'
+responses:
+  '201':
+    description: Created
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_message'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

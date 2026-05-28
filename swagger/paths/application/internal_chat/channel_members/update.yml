@@ -1,0 +1,48 @@
+tags:
+  - Internal Chat Channel Members
+operationId: update-internal-chat-channel-member
+summary: Update a channel member
+security:
+  - userApiKey: []
+description: Update a channel member's settings (mute/favorite)
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          muted:
+            type: boolean
+            description: Whether the channel is muted for this member
+          favorited:
+            type: boolean
+            description: Whether the channel is favorited by this member
+          hidden:
+            type: boolean
+            description: Whether the channel is hidden for this member (used to close DMs)
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_channel_member'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Member not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

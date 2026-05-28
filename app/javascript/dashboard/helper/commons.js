@@ -26,21 +26,24 @@ export const isJSONValid = value => {
 };
 
 export const getTypingUsersText = (users = []) => {
-  const count = users.length;
-  const [firstUser, secondUser] = users;
+  const anyRecording = users.some(u => u.recording);
+  const prefix = anyRecording ? 'RECORDING' : 'TYPING';
+  const activeUsers = anyRecording ? users.filter(u => u.recording) : users;
+  const count = activeUsers.length;
+  const [firstUser, secondUser] = activeUsers;
 
   if (count === 1) {
-    return ['TYPING.ONE', { user: firstUser.name }];
+    return [`${prefix}.ONE`, { user: firstUser.name }];
   }
 
   if (count === 2) {
     return [
-      'TYPING.TWO',
+      `${prefix}.TWO`,
       { user: firstUser.name, secondUser: secondUser.name },
     ];
   }
 
-  return ['TYPING.MULTIPLE', { user: firstUser.name, count: count - 1 }];
+  return [`${prefix}.MULTIPLE`, { user: firstUser.name, count: count - 1 }];
 };
 
 export const createPendingMessage = data => {

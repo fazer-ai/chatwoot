@@ -19,7 +19,7 @@
 #  message_signature      :text
 #  name                   :string           not null
 #  otp_backup_codes       :text
-#  otp_required_for_login :boolean          default(FALSE)
+#  otp_required_for_login :boolean          default(FALSE), not null
 #  otp_secret             :string
 #  provider               :string           default("email"), not null
 #  pubsub_token           :string
@@ -37,6 +37,7 @@
 #
 # Indexes
 #
+#  idx_users_name_unaccent_trgm           (f_unaccent((name)::text) gin_trgm_ops) USING gin
 #  index_users_on_email                   (email)
 #  index_users_on_otp_required_for_login  (otp_required_for_login)
 #  index_users_on_otp_secret              (otp_secret) UNIQUE

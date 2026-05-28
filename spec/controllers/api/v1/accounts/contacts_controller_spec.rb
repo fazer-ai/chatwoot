@@ -45,6 +45,7 @@ RSpec.describe 'Contacts API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         response_body = response.parsed_body
         contact_emails = response_body['payload'].pluck('email')
         contact_inboxes_source_ids = response_body['payload'].flat_map { |c| c['contact_inboxes'].pluck('source_id') }
@@ -80,7 +81,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(contact_emails).to include(contact.email)
         first_inbox = contact_inboxes[0]['inbox']
         expect(first_inbox).to be_a(Hash)
-        expect(first_inbox).to include('id', 'channel_id', 'channel_type', 'name', 'avatar_url', 'provider')
+        expect(first_inbox).to include('id', 'channel_id', 'channel_type', 'account_id', 'name', 'avatar_url', 'provider')
 
         expect(first_inbox).not_to include('imap_login',
                                            'imap_password',
@@ -100,7 +101,7 @@ RSpec.describe 'Contacts API', type: :request do
       end
 
       it 'returns all contacts with company name desc order' do
-        get "/api/v1/accounts/#{account.id}/contacts?include_contact_inboxes=false&sort=-company",
+        get "/api/v1/accounts/#{account.id}/contacts?include_contact_inboxes=false&sort=-company_name",
             headers: admin.create_new_auth_token,
             as: :json
 
@@ -111,7 +112,7 @@ RSpec.describe 'Contacts API', type: :request do
       end
 
       it 'returns all contacts with company name asc order with null values at last' do
-        get "/api/v1/accounts/#{account.id}/contacts?include_contact_inboxes=false&sort=-company",
+        get "/api/v1/accounts/#{account.id}/contacts?include_contact_inboxes=false&sort=-company_name",
             headers: admin.create_new_auth_token,
             as: :json
 
@@ -331,6 +332,7 @@ RSpec.describe 'Contacts API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(response.body).to include(contact2.email)
         expect(response.body).not_to include(contact1.email)
       end
@@ -357,18 +359,6 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).not_to include(contact1.email)
       end
 
-      it 'searches contacts using company name' do
-        contact2.update!(additional_attributes: { company_name: 'acme.inc' })
-        get "/api/v1/accounts/#{account.id}/contacts/search",
-            params: { q: 'acme.inc' },
-            headers: admin.create_new_auth_token,
-            as: :json
-
-        expect(response).to have_http_status(:success)
-        expect(response.body).to include(contact2.email)
-        expect(response.body).not_to include(contact1.email)
-      end
-
       it 'matches the resolved contact respecting the identifier character casing' do
         contact_normal = create(:contact, name: 'testcontact', account: account, identifier: 'testidentifer')
         contact_special = create(:contact, name: 'testcontact', account: account, identifier: 'TestIdentifier')
@@ -380,6 +370,50 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response).to have_http_status(:success)
         expect(response.body).to include(contact_special.identifier)
         expect(response.body).not_to include(contact_normal.identifier)
+      end
+
+      it 'returns has_more as false when results fit in one page' do
+        get "/api/v1/accounts/#{account.id}/contacts/search",
+            params: { q: contact2.email },
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_body = response.parsed_body
+        expect(response_body['meta']['has_more']).to be(false)
+        expect(response_body['meta']['count']).to eq(1)
+      end
+
+      it 'returns has_more as true when there are more results' do
+        # Create 16 contacts (more than RESULTS_PER_PAGE which is 15)
+        create_list(:contact, 16, account: account, name: 'searchable_contact')
+
+        get "/api/v1/accounts/#{account.id}/contacts/search",
+            params: { q: 'searchable_contact' },
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_body = response.parsed_body
+        expect(response_body['meta']['has_more']).to be(true)
+        expect(response_body['meta']['count']).to eq(15)
+        expect(response_body['payload'].length).to eq(15)
+      end
+
+      it 'returns has_more as false on the last page' do
+        # Create 16 contacts
+        create_list(:contact, 16, account: account, name: 'searchable_contact')
+
+        get "/api/v1/accounts/#{account.id}/contacts/search",
+            params: { q: 'searchable_contact', page: 2 },
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_body = response.parsed_body
+        expect(response_body['meta']['has_more']).to be(false)
+        expect(response_body['meta']['count']).to eq(1)
+        expect(response_body['payload'].length).to eq(1)
       end
     end
   end
@@ -411,6 +445,7 @@ RSpec.describe 'Contacts API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(response.body).to include(contact2.email)
         expect(response.body).to include(contact1.email)
       end
@@ -465,6 +500,7 @@ RSpec.describe 'Contacts API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(response.body).to include(contact.name)
       end
     end
@@ -588,6 +624,7 @@ RSpec.describe 'Contacts API', type: :request do
               as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(contact.reload.name).to eq('Test Blub')
         # custom attributes are merged properly without overwriting existing ones
         expect(contact.custom_attributes).to eq({ 'test' => 'new test', 'test1' => 'test1', 'test2' => 'test2' })
@@ -748,6 +785,50 @@ RSpec.describe 'Contacts API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(contact.reload.custom_attributes).to eq({ 'test1' => 'test1' })
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/contacts/:id/sync_group' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:contact) { create(:contact, account: account, group_type: :group, identifier: '12345678901234567890@g.us') }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      it 'enqueues SyncGroupJob and returns accepted' do
+        post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:accepted)
+        expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact)
+      end
+
+      it 'returns bad request when contact is not a group' do
+        individual_contact = create(:contact, account: account, group_type: :individual)
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{individual_contact.id}/sync_group",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      it 'returns bad request when contact has no identifier' do
+        group_without_id = create(:contact, account: account, group_type: :group, identifier: nil)
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_without_id.id}/sync_group",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:bad_request)
       end
     end
   end

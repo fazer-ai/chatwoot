@@ -1,0 +1,19 @@
+type: object
+properties:
+  user_ids:
+    type: array
+    items:
+      type: integer
+    description: IDs of users to add as channel members
+  user_id:
+    type: integer
+    description: ID of a single user to add as a channel member
+  role:
+    type: string
+    enum:
+      - admin
+      - member
+    description: |
+      Role to assign to the new members. Only account administrators can
+      promote a new member to `admin` via this field; for any other caller
+      the role is silently coerced to `member`.

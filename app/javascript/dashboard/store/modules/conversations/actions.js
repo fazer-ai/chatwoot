@@ -6,6 +6,7 @@ import { createPendingMessage } from 'dashboard/helper/commons';
 import {
   buildConversationList,
   isOnMentionsView,
+  isOnParticipatingView,
   isOnUnattendedView,
   isOnFoldersView,
 } from './helpers/actionHelpers';
@@ -15,6 +16,7 @@ import * as Sentry from '@sentry/vue';
 import {
   handleVoiceCallCreated,
   handleVoiceCallUpdated,
+  syncConversationCallVisibility,
 } from 'dashboard/helper/voice';
 
 export const hasMessageFailedWithExternalError = pendingMessage => {
@@ -96,7 +98,7 @@ const actions = {
         data: payload,
       });
       if (!payload.length) {
-        commit(types.SET_ALL_MESSAGES_LOADED);
+        commit(types.SET_ALL_MESSAGES_LOADED, data.conversationId);
       }
     } catch (error) {
       // Handle error
@@ -191,7 +193,7 @@ const actions = {
 
   async setActiveChat({ commit, dispatch }, { data, after }) {
     commit(types.SET_CURRENT_CHAT_WINDOW, data);
-    commit(types.CLEAR_ALL_MESSAGES_LOADED);
+    commit(types.CLEAR_ALL_MESSAGES_LOADED, data.id);
     if (data.dataFetched === undefined) {
       try {
         await dispatch('fetchPreviousMessages', {
@@ -199,11 +201,12 @@ const actions = {
           before: data.messages[0].id,
           conversationId: data.id,
         });
-        data.dataFetched = true;
+        commit(types.SET_CHAT_DATA_FETCHED, data.id);
       } catch (error) {
         // Ignore error
       }
     }
+    ConversationApi.presenceSubscribe(data.id)?.catch(() => {});
   },
 
   assignAgent: async ({ dispatch }, { conversationId, agentId }) => {
@@ -212,14 +215,17 @@ const actions = {
         conversationId,
         agentId,
       });
-      dispatch('setCurrentChatAssignee', response.data);
+      dispatch('setCurrentChatAssignee', {
+        conversationId,
+        assignee: response.data,
+      });
     } catch (error) {
       // Handle error
     }
   },
 
-  setCurrentChatAssignee({ commit }, assignee) {
-    commit(types.ASSIGN_AGENT, assignee);
+  setCurrentChatAssignee({ commit }, { conversationId, assignee }) {
+    commit(types.ASSIGN_AGENT, { conversationId, assignee });
   },
 
   assignTeam: async ({ dispatch }, { conversationId, teamId }) => {
@@ -240,9 +246,21 @@ const actions = {
 
   toggleStatus: async (
     { commit },
-    { conversationId, status, snoozedUntil = null }
+    { conversationId, status, snoozedUntil = null, customAttributes = null }
   ) => {
     try {
+      // Update custom attributes first if provided
+      if (customAttributes) {
+        await ConversationApi.updateCustomAttributes({
+          conversationId,
+          customAttributes,
+        });
+        commit(types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES, {
+          conversationId,
+          customAttributes,
+        });
+      }
+
       const {
         data: {
           payload: {
@@ -333,6 +351,35 @@ const actions = {
     }
   },
 
+  toggleMessageReaction: function toggleMessageReaction(
+    _context,
+    { conversationId, messageId, emoji, echoId }
+  ) {
+    // The optimistic Message is dispatched to the store by the caller.
+    // Backend echoes back the same echo_id via ActionCable MESSAGE_CREATED, and
+    // findPendingMessageIndex in the ADD_MESSAGE mutation swaps the fake for
+    // the real one. Returning the promise lets callers reconcile if the cable
+    // echo is delayed/missing.
+    return MessageApi.toggleReaction(conversationId, messageId, emoji, echoId);
+  },
+
+  editMessage: async function editMessage(
+    { commit },
+    { conversationId, messageId, content }
+  ) {
+    try {
+      const { data } = await MessageApi.editContent(
+        conversationId,
+        messageId,
+        content
+      );
+      commit(types.ADD_MESSAGE, data);
+      return data;
+    } catch (error) {
+      throw new Error(error);
+    }
+  },
+
   deleteConversation: async ({ commit, dispatch }, conversationId) => {
     try {
       await ConversationApi.delete(conversationId);
@@ -356,6 +403,7 @@ const actions = {
       !hasAppliedFilters &&
       !isOnFoldersView(rootState) &&
       !isOnMentionsView(rootState) &&
+      !isOnParticipatingView(rootState) &&
       !isOnUnattendedView(rootState) &&
       isMatchingInboxFilter
     ) {
@@ -376,18 +424,18 @@ const actions = {
     }
   },
 
-  updateConversation({ commit, dispatch }, conversation) {
-    const {
-      meta: { sender },
-    } = conversation;
+  updateConversation({ commit, dispatch, rootGetters }, conversation) {
+    const sender = conversation.meta?.sender;
+
     commit(types.UPDATE_CONVERSATION, conversation);
+    syncConversationCallVisibility(conversation, rootGetters?.getCurrentUserID);
 
     dispatch('conversationLabels/setConversationLabel', {
       id: conversation.id,
       data: conversation.labels,
     });
 
-    dispatch('contacts/setContact', sender);
+    if (sender) dispatch('contacts/setContact', sender);
   },
 
   updateConversationLastActivity(
@@ -408,6 +456,10 @@ const actions = {
     commit(types.CHANGE_CHAT_SORT_FILTER, data);
   },
 
+  setChatGroupTypeFilter({ commit }, data) {
+    commit(types.CHANGE_CHAT_GROUP_TYPE_FILTER, data);
+  },
+
   updateAssignee({ commit }, data) {
     commit(types.UPDATE_ASSIGNEE, data);
   },
@@ -417,6 +469,48 @@ const actions = {
       commit(`contacts/${types.SET_CONTACT_ITEM}`, data);
     }
     commit(types.UPDATE_CONVERSATION_CONTACT, data);
+  },
+
+  handleScheduledMessageCreated({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/upsertFromEvent', scheduledMessage);
+  },
+
+  handleScheduledMessageUpdated({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/upsertFromEvent', scheduledMessage);
+  },
+
+  handleScheduledMessageDeleted({ dispatch }, scheduledMessage) {
+    dispatch('scheduledMessages/removeFromEvent', scheduledMessage);
+  },
+
+  handleRecurringScheduledMessageCreated(
+    { dispatch },
+    recurringScheduledMessage
+  ) {
+    dispatch(
+      'recurringScheduledMessages/upsertFromEvent',
+      recurringScheduledMessage
+    );
+  },
+
+  handleRecurringScheduledMessageUpdated(
+    { dispatch },
+    recurringScheduledMessage
+  ) {
+    dispatch(
+      'recurringScheduledMessages/upsertFromEvent',
+      recurringScheduledMessage
+    );
+  },
+
+  handleRecurringScheduledMessageDeleted(
+    { dispatch },
+    recurringScheduledMessage
+  ) {
+    dispatch(
+      'recurringScheduledMessages/removeFromEvent',
+      recurringScheduledMessage
+    );
   },
 
   setActiveInbox({ commit }, inboxId) {
@@ -442,11 +536,7 @@ const actions = {
   },
 
   sendEmailTranscript: async (_, { conversationId, email }) => {
-    try {
-      await ConversationApi.sendEmailTranscript({ conversationId, email });
-    } catch (error) {
-      throw new Error(error);
-    }
+    await ConversationApi.sendEmailTranscript({ conversationId, email });
   },
 
   updateCustomAttributes: async (
@@ -459,7 +549,10 @@ const actions = {
         customAttributes,
       });
       const { custom_attributes } = response.data;
-      commit(types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES, custom_attributes);
+      commit(types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES, {
+        conversationId,
+        customAttributes: custom_attributes,
+      });
     } catch (error) {
       // Handle error
     }

@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Categories
+operationId: delete-internal-chat-category
+summary: Delete a category
+security:
+  - userApiKey: []
+description: Delete an internal chat category (admin only)
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Category not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

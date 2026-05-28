@@ -64,9 +64,12 @@ class Inbox < ApplicationRecord
   has_many :contacts, through: :contact_inboxes
 
   has_many :inbox_members, dependent: :destroy_async
+  has_many :inbox_signatures, dependent: :destroy_async
   has_many :members, through: :inbox_members, source: :user
   has_many :conversations, dependent: :destroy_async
   has_many :messages, dependent: :destroy_async
+  has_many :scheduled_messages, dependent: :destroy_async
+  has_many :recurring_scheduled_messages, dependent: :destroy_async
 
   has_one :inbox_assignment_policy, dependent: :destroy
   has_one :assignment_policy, through: :inbox_assignment_policy
@@ -102,12 +105,16 @@ class Inbox < ApplicationRecord
 
   # Sanitizes inbox name for balanced email provider compatibility
   # ALLOWS: /'._- and Unicode letters/numbers/emojis
-  # REMOVES: Forbidden chars (\<>@") + spam-trigger symbols (!#$%&*+=?^`{|}~)
+  # REMOVES: Forbidden chars (\<>@"()) + spam-trigger symbols (!#$%&*+=?^`{|}~)
   def sanitized_name
     return default_name_for_blank_name if name.blank?
 
     sanitized = apply_sanitization_rules(name)
     sanitized.blank? && email? ? display_name_from_email : sanitized
+  end
+
+  def sanitized_business_name
+    sanitize_raw_name(business_name) || sanitized_name
   end
 
   def sms?
@@ -156,6 +163,10 @@ class Inbox < ApplicationRecord
 
   def whatsapp?
     channel_type == 'Channel::Whatsapp'
+  end
+
+  def twilio_whatsapp?
+    channel_type == 'Channel::TwilioSms' && channel.medium == 'whatsapp'
   end
 
   def assignable_agents
@@ -207,8 +218,15 @@ class Inbox < ApplicationRecord
     email? ? display_name_from_email : ''
   end
 
+  def sanitize_raw_name(raw)
+    return nil if raw.blank?
+
+    result = apply_sanitization_rules(raw)
+    result.presence
+  end
+
   def apply_sanitization_rules(name)
-    name.gsub(/[\\<>@"!#$%&*+=?^`{|}~:;]/, '')         # Remove forbidden chars
+    name.gsub(/[\\<>@"!#$%&*+=?^`{|}~:;()]/, '')        # Remove forbidden chars
         .gsub(/[\x00-\x1F\x7F]/, ' ')                   # Replace control chars with spaces
         .gsub(/\A[[:punct:]]+|[[:punct:]]+\z/, '')      # Remove leading/trailing punctuation
         .gsub(/\s+/, ' ')                               # Normalize spaces

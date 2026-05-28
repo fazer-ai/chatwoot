@@ -323,6 +323,15 @@ RSpec.describe Message do
     end
   end
 
+  describe '#mark_pending_conversation_as_open_for_human_response' do
+    let(:conversation) { create(:conversation, status: :pending) }
+
+    it 'does not mark the conversation open when pending is used without captain' do
+      create(:message, message_type: :outgoing, conversation: conversation)
+      expect(conversation.reload.pending?).to be true
+    end
+  end
+
   describe '#waiting since' do
     let(:conversation) { create(:conversation) }
     let(:agent) { create(:user, account: conversation.account) }
@@ -352,6 +361,82 @@ RSpec.describe Message do
 
       expect(conversation.waiting_since).to eq old_waiting_since
     end
+
+    context 'when bot has responded to the conversation' do
+      let(:agent_bot) { create(:agent_bot, account: conversation.account) }
+
+      before do
+        # Create initial customer message
+        create(:message, conversation: conversation, message_type: :incoming,
+                         created_at: 2.hours.ago)
+        conversation.update!(waiting_since: 2.hours.ago)
+
+        # Bot responds
+        create(:message, conversation: conversation, message_type: :outgoing,
+                         sender: agent_bot, created_at: 1.hour.ago)
+      end
+
+      it 'resets waiting_since when customer sends a new message after bot response' do
+        new_message = build(:message, conversation: conversation, message_type: :incoming)
+        new_message.save!
+
+        conversation.reload
+        expect(conversation.waiting_since).to be_within(1.second).of(new_message.created_at)
+      end
+
+      it 'does not reset waiting_since if last response was from human agent' do
+        # Human agent responds (clears waiting_since)
+        create(:message, conversation: conversation, message_type: :outgoing,
+                         sender: agent)
+        conversation.reload
+        expect(conversation.waiting_since).to be_nil
+
+        # Customer sends new message
+        new_message = build(:message, conversation: conversation, message_type: :incoming)
+        new_message.save!
+
+        conversation.reload
+        expect(conversation.waiting_since).to be_within(1.second).of(new_message.created_at)
+      end
+
+      it 'clears waiting_since when bot responds' do
+        # After the bot response in before block, waiting_since should already be cleared
+        conversation.reload
+        expect(conversation.waiting_since).to be_nil
+
+        # Customer sends another message
+        create(:message, conversation: conversation, message_type: :incoming,
+                         created_at: 30.minutes.ago)
+        conversation.reload
+        expect(conversation.waiting_since).to be_within(1.second).of(30.minutes.ago)
+
+        # Another bot response should clear it again
+        create(:message, conversation: conversation, message_type: :outgoing,
+                         sender: agent_bot, created_at: 15.minutes.ago)
+
+        conversation.reload
+        expect(conversation.waiting_since).to be_nil
+      end
+    end
+
+    context 'when bot response should preserve waiting_since' do
+      let(:agent_bot) { create(:agent_bot, account: conversation.account) }
+
+      it 'does not clear waiting_since when preserve_waiting_since is set' do
+        original_waiting_since = 45.minutes.ago
+        conversation.update!(waiting_since: original_waiting_since)
+
+        create(
+          :message,
+          conversation: conversation,
+          message_type: :outgoing,
+          sender: agent_bot,
+          preserve_waiting_since: true
+        )
+
+        expect(conversation.reload.waiting_since).to be_within(1.second).of(original_waiting_since)
+      end
+    end
   end
 
   context 'with webhook_data' do
@@ -368,12 +453,11 @@ RSpec.describe Message do
       expect(message.webhook_data.key?(:attachments)).to be false
     end
 
-    it 'uses outgoing_content for webhook content' do
-      message = create(:message, content: 'Test content')
-      expect(message).to receive(:outgoing_content).and_return('Outgoing test content')
+    it 'uses raw content without markdown rendering for webhook content' do
+      message = create(:message, content: 'Test **bold** content')
 
       webhook_data = message.webhook_data
-      expect(webhook_data[:content]).to eq('Outgoing test content')
+      expect(webhook_data[:content]).to eq('Test **bold** content')
     end
 
     it 'includes CSAT survey link in webhook content for input_csat messages' do
@@ -381,7 +465,6 @@ RSpec.describe Message do
       conversation = create(:conversation, inbox: inbox)
       message = create(:message, conversation: conversation, content_type: 'input_csat', content: 'Rate your experience')
 
-      expect(message.outgoing_content).to include('survey/responses/')
       expect(message.webhook_data[:content]).to include('survey/responses/')
     end
   end
@@ -835,6 +918,89 @@ RSpec.describe Message do
         expect(message).not_to receive(:reindex_for_search)
         message.save!
       end
+    end
+  end
+
+  describe '#reaction?' do
+    let(:conversation) { create(:conversation) }
+
+    it 'returns true when content_attributes carries is_reaction' do
+      message = create(:message, conversation: conversation, content_attributes: { is_reaction: true })
+      expect(message.reaction?).to be true
+    end
+
+    it 'returns false for regular messages' do
+      message = create(:message, conversation: conversation, content_attributes: {})
+      expect(message.reaction?).to be false
+    end
+  end
+
+  describe '.hide_removed_reactions' do
+    let(:conversation) { create(:conversation) }
+
+    it 'keeps regular non-reaction messages' do
+      regular = create(:message, conversation: conversation, content: 'Hello')
+      expect(conversation.messages.hide_removed_reactions).to include(regular)
+    end
+
+    it 'keeps active reactions (content present, not deleted)' do
+      reaction = create(:message,
+                        conversation: conversation,
+                        content: '👍',
+                        content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(conversation.messages.hide_removed_reactions).to include(reaction)
+    end
+
+    it 'hides reactions flagged as deleted' do
+      # Non-blank content here so the assertion can only succeed via the
+      # `deleted: true` branch (blank-content branch is covered separately).
+      removed = create(:message,
+                       conversation: conversation,
+                       content: '👍',
+                       content_attributes: { is_reaction: true, deleted: true })
+      expect(conversation.messages.hide_removed_reactions).not_to include(removed)
+    end
+
+    it 'hides reactions with blank content even when not flagged as deleted' do
+      blank_reaction = create(:message,
+                              conversation: conversation,
+                              content: '',
+                              content_attributes: { is_reaction: true })
+      expect(conversation.messages.hide_removed_reactions).not_to include(blank_reaction)
+    end
+  end
+
+  describe 'reactions do not trigger conversation lifecycle hooks' do
+    let(:conversation) { create(:conversation) }
+
+    it 'does not reopen a resolved conversation' do
+      conversation.resolved!
+      create(:message,
+             conversation: conversation,
+             message_type: :incoming,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(conversation.reload.open?).to be false
+    end
+
+    it 'does not flip a pending conversation to open' do
+      pending_conv = create(:conversation, status: :pending)
+      create(:message,
+             conversation: pending_conv,
+             message_type: :incoming,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to_external_id: 'EXT' })
+      expect(pending_conv.reload.pending?).to be true
+    end
+
+    it 'does not count toward first_reply_created_at' do
+      expect(conversation.first_reply_created_at).to be_nil
+      create(:message,
+             conversation: conversation,
+             message_type: :outgoing,
+             content: '👍',
+             content_attributes: { is_reaction: true, in_reply_to: 1 })
+      expect(conversation.reload.first_reply_created_at).to be_nil
     end
   end
 end

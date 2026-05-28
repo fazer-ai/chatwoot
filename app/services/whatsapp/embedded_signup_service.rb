@@ -16,8 +16,15 @@ class Whatsapp::EmbeddedSignupService
     validate_token_access(access_token)
 
     channel = create_or_reauthorize_channel(access_token, phone_info)
+    # NOTE: We call setup_webhooks explicitly here instead of relying on after_commit callback because:
+    # 1. Reauthorization flow updates an existing channel (not a create), so after_commit on: :create won't trigger
+    # 2. We need to run check_channel_health_and_prompt_reauth after webhook setup completes
+    # 3. The channel is marked with source: 'embedded_signup' to skip the after_commit callback
     channel.setup_webhooks
-    check_channel_health_and_prompt_reauth(channel)
+    # Skip health check during reauthorization — phone numbers in pending provisioning state
+    # (platform_type: NOT_APPLICABLE) would incorrectly trigger a disconnect email right after
+    # a successful reauth. Only run health check for new channel creation.
+    check_channel_health_and_prompt_reauth(channel) if @inbox_id.blank?
     channel
 
   rescue StandardError => e
@@ -41,16 +48,34 @@ class Whatsapp::EmbeddedSignupService
 
   def create_or_reauthorize_channel(access_token, phone_info)
     if @inbox_id.present?
-      Whatsapp::ReauthorizationService.new(
-        account: @account,
-        inbox_id: @inbox_id,
-        phone_number_id: @phone_number_id,
-        business_id: @business_id
-      ).perform(access_token, phone_info)
+      channel = @account.inboxes.find(@inbox_id).channel
+      if channel.provider == 'whatsapp_cloud'
+        Whatsapp::ReauthorizationService.new(
+          account: @account,
+          inbox_id: @inbox_id,
+          phone_number_id: @phone_number_id,
+          waba_id: @waba_id
+        ).perform(access_token, phone_info)
+      else
+        convert_channel_to_cloud(channel, access_token)
+      end
     else
       waba_info = { waba_id: @waba_id, business_name: phone_info[:business_name] }
       Whatsapp::ChannelCreationService.new(@account, waba_info, phone_info, access_token).perform
     end
+  end
+
+  def convert_channel_to_cloud(channel, access_token)
+    channel.convert_provider!(
+      new_provider: 'whatsapp_cloud',
+      new_provider_config: {
+        'api_key' => access_token,
+        'phone_number_id' => @phone_number_id,
+        'business_account_id' => @waba_id,
+        'source' => 'embedded_signup'
+      }
+    )
+    channel
   end
 
   def check_channel_health_and_prompt_reauth(channel)

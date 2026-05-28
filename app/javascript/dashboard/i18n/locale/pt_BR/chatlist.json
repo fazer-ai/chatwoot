@@ -76,6 +76,9 @@
       },
       "waiting_since_desc": {
         "TEXT": "Resposta pendente: Curtas primeiro"
+      },
+      "priority_desc_created_at_asc": {
+        "TEXT": "Prioridade: Maior primeiro, Criação: Mais antiga primeiro"
       }
     },
     "ATTACHMENTS": {
@@ -104,7 +107,7 @@
         "CONTENT": "Contato compartilhado"
       },
       "embed": {
-        "CONTENT": "Embedded content"
+        "CONTENT": "Conteúdo incorporado"
       }
     },
     "CHAT_SORT_BY_FILTER": {
@@ -128,15 +131,20 @@
     "RECEIVED_VIA_EMAIL": "Recebido por e-mail",
     "VIEW_TWEET_IN_TWITTER": "Ver tweet no Twitter",
     "REPLY_TO_TWEET": "Responder a este tweet",
-    "LINK_TO_STORY": "Vá para o Story do Instagram",
+    "LINK_TO_STORY": "Ir para o Story do Instagram",
     "SENT": "Enviado com sucesso",
     "READ": "Lido com sucesso",
     "DELIVERED": "Entregue com sucesso",
     "NO_MESSAGES": "Nova Mensagem",
+    "TYPING": "digitando...",
+    "RECORDING": "gravando...",
     "NO_CONTENT": "Nenhum conteúdo disponível",
+    "REACTED": "{sender} reagiu {emoji}",
+    "REACTED_TO_SNIPPET": "{sender} reagiu {emoji} a \"{snippet}\"",
     "HIDE_QUOTED_TEXT": "Ocultar Texto Citado",
     "SHOW_QUOTED_TEXT": "Mostrar Texto Citado",
     "MESSAGE_READ": "Lida",
-    "SENDING": "Enviando"
+    "SENDING": "Enviando",
+    "UNREAD_COUNT_OVERFLOW": "9+"
   }
 }

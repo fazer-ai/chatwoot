@@ -19,7 +19,7 @@
 #  message_signature      :text
 #  name                   :string           not null
 #  otp_backup_codes       :text
-#  otp_required_for_login :boolean          default(FALSE)
+#  otp_required_for_login :boolean          default(FALSE), not null
 #  otp_secret             :string
 #  provider               :string           default("email"), not null
 #  pubsub_token           :string
@@ -37,6 +37,7 @@
 #
 # Indexes
 #
+#  idx_users_name_unaccent_trgm           (f_unaccent((name)::text) gin_trgm_ops) USING gin
 #  index_users_on_email                   (email)
 #  index_users_on_otp_required_for_login  (otp_required_for_login)
 #  index_users_on_otp_secret              (otp_secret) UNIQUE
@@ -75,6 +76,7 @@ class User < ApplicationRecord
   # work because :validatable in devise overrides this.
   # validates_uniqueness_of :email, scope: :account_id
 
+  validates :name, presence: true
   validates :email, presence: true
 
   serialize :otp_backup_codes, type: Array
@@ -90,13 +92,21 @@ class User < ApplicationRecord
   has_many :assigned_conversations, foreign_key: 'assignee_id', class_name: 'Conversation', dependent: :nullify, inverse_of: :assignee
   alias_attribute :conversations, :assigned_conversations
   has_many :csat_survey_responses, foreign_key: 'assigned_agent_id', dependent: :nullify, inverse_of: :assigned_agent
+  has_many :reviewed_csat_survey_responses, foreign_key: 'review_notes_updated_by_id', class_name: 'CsatSurveyResponse',
+                                            dependent: :nullify, inverse_of: :review_notes_updated_by
   has_many :conversation_participants, dependent: :destroy_async
   has_many :participating_conversations, through: :conversation_participants, source: :conversation
 
   has_many :inbox_members, dependent: :destroy_async
+  has_many :inbox_signatures, dependent: :destroy_async
   has_many :inboxes, through: :inbox_members, source: :inbox
+  has_many :internal_chat_channel_memberships, class_name: 'InternalChat::ChannelMember', dependent: :destroy_async
+  has_many :internal_chat_channels, through: :internal_chat_channel_memberships, source: :channel
   has_many :messages, as: :sender, dependent: :nullify
   has_many :invitees, through: :account_users, class_name: 'User', foreign_key: 'inviter_id', source: :inviter, dependent: :nullify
+
+  has_many :scheduled_messages, as: :author, dependent: :nullify
+  has_many :recurring_scheduled_messages, as: :author, dependent: :nullify
 
   has_many :custom_filters, dependent: :destroy_async
   has_many :dashboard_apps, dependent: :nullify
@@ -123,7 +133,8 @@ class User < ApplicationRecord
   end
 
   def send_devise_notification(notification, *)
-    devise_mailer.with(account: Current.account).send(notification, self, *).deliver_later
+    account = Current.account || accounts.first
+    devise_mailer.with(account: account).send(notification, self, *).deliver_later
   end
 
   def set_password_and_uid
@@ -188,6 +199,25 @@ class User < ApplicationRecord
 
   def mfa_feature_available?
     Chatwoot.mfa_enabled?
+  end
+
+  # Workaround for Devise 4.9.x race condition vulnerability (GHSA-57hq-95w6-v4fc).
+  #
+  # The Confirmable module's reconfirmable flow has a race condition where concurrent
+  # email change requests can desynchronize confirmation tokens, allowing an attacker
+  # to confirm an email they don't own. Fixed in Devise 5.0.3 by persisting
+  # unconfirmed_email before regenerating the confirmation token.
+  #
+  # We can't upgrade to Devise 5.0.3 because devise-two-factor only added Devise 5
+  # support in v6.4.0, which simultaneously raised its Rails minimum to 7.2+.
+  # No released version supports both Devise 5 and Rails 7.1.
+  #
+  # This override applies the same fix locally: force-mark unconfirmed_email
+  # as dirty before assignment so ActiveRecord always writes it, keeping it
+  # in sync with the regenerated confirmation token. Remove once on Devise 5+.
+  def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+    unconfirmed_email_will_change!
+    super
   end
 
   def signature_position

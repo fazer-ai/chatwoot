@@ -1,0 +1,25 @@
+<div class="field-unit__label">
+  <%= f.label field.attribute %>
+</div>
+<div class="field-unit__field">
+  <%= f.check_box field.attribute %>
+  <script>
+    (function () {
+      var unassigned = document.getElementById('account_hide_agent_unassigned_tab');
+      var all = document.getElementById('account_hide_agent_all_tab');
+      if (!unassigned || !all) return;
+
+      function sync() {
+        if (unassigned.checked) {
+          all.checked = true;
+          all.disabled = true;
+        } else {
+          all.disabled = false;
+        }
+      }
+
+      unassigned.addEventListener('change', sync);
+      sync();
+    })();
+  </script>
+</div>

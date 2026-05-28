@@ -14,6 +14,7 @@ const state = {
   listLoadingStatus: true,
   chatStatusFilter: wootConstants.STATUS_TYPE.OPEN,
   chatSortFilter: wootConstants.SORT_BY_TYPE.LATEST,
+  chatGroupTypeFilter: '',
   currentInbox: null,
   selectedChatId: null,
   appliedFilters: [],
@@ -63,14 +64,18 @@ export const mutations = {
     _state.allConversations = [];
     _state.selectedChatId = null;
   },
-  [types.SET_ALL_MESSAGES_LOADED](_state) {
-    const [chat] = getSelectedChatConversation(_state);
-    chat.allMessagesLoaded = true;
+  [types.SET_ALL_MESSAGES_LOADED](_state, conversationId) {
+    const chat = getConversationById(_state)(conversationId);
+    if (chat) {
+      chat.allMessagesLoaded = true;
+    }
   },
 
-  [types.CLEAR_ALL_MESSAGES_LOADED](_state) {
-    const [chat] = getSelectedChatConversation(_state);
-    chat.allMessagesLoaded = false;
+  [types.CLEAR_ALL_MESSAGES_LOADED](_state, conversationId) {
+    const chat = getConversationById(_state)(conversationId);
+    if (chat) {
+      chat.allMessagesLoaded = false;
+    }
   },
   [types.CLEAR_CURRENT_CHAT_WINDOW](_state) {
     _state.selectedChatId = null;
@@ -91,15 +96,24 @@ export const mutations = {
     chat.messages = data;
   },
 
+  [types.SET_CHAT_DATA_FETCHED](_state, conversationId) {
+    const chat = getConversationById(_state)(conversationId);
+    if (chat) {
+      chat.dataFetched = true;
+    }
+  },
+
   [types.SET_CURRENT_CHAT_WINDOW](_state, activeChat) {
     if (activeChat) {
       _state.selectedChatId = activeChat.id;
     }
   },
 
-  [types.ASSIGN_AGENT](_state, assignee) {
-    const [chat] = getSelectedChatConversation(_state);
-    chat.meta.assignee = assignee;
+  [types.ASSIGN_AGENT](_state, { conversationId, assignee }) {
+    const chat = getConversationById(_state)(conversationId);
+    if (chat) {
+      chat.meta.assignee = assignee;
+    }
   },
 
   [types.ASSIGN_TEAM](_state, { team, conversationId }) {
@@ -121,9 +135,19 @@ export const mutations = {
     chat.priority = priority;
   },
 
-  [types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES](_state, custom_attributes) {
-    const [chat] = getSelectedChatConversation(_state);
-    chat.custom_attributes = custom_attributes;
+  [types.UPDATE_CONVERSATION_CUSTOM_ATTRIBUTES](
+    _state,
+    { conversationId, customAttributes }
+  ) {
+    const conversation = _state.allConversations.find(
+      c => c.id === conversationId
+    );
+    if (conversation) {
+      conversation.custom_attributes = {
+        ...conversation.custom_attributes,
+        ...customAttributes,
+      };
+    }
   },
 
   [types.CHANGE_CONVERSATION_STATUS](
@@ -192,20 +216,39 @@ export const mutations = {
 
     const pendingMessageIndex = findPendingMessageIndex(chat, message);
     if (pendingMessageIndex !== -1) {
+      // MESSAGE_UPDATED cables can arrive out of order when the user toggles a
+      // reaction quickly: each Sidekiq job reads the message at run time, so a
+      // late-arriving cable for an older state would clobber the fresher one.
+      // Drop updates that are older than what we already have.
+      const existing = chat.messages[pendingMessageIndex];
+      const incomingTs = Date.parse(message.updated_at);
+      const existingTs = Date.parse(existing?.updated_at);
+      const hasIncomingTs = Number.isFinite(incomingTs);
+      const hasExistingTs = Number.isFinite(existingTs);
+      // If the incoming timestamp is unparseable, treat it as stale so a
+      // malformed cable can't clobber the local row.
+      if (hasExistingTs && (!hasIncomingTs || incomingTs < existingTs)) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
       chat.messages.push(message);
       chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;
-      if (selectedChatId === conversationId) {
+      // Reactions render as chips on their parent bubble, not as standalone
+      // rows, so jumping the viewport to the bottom on every toggle would
+      // yank the user away from whatever older message they reacted to.
+      const isReaction = message.content_attributes?.is_reaction === true;
+      if (selectedChatId === conversationId && !isReaction) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     }
   },
 
   [types.ADD_CONVERSATION](_state, conversation) {
-    _state.allConversations.push(conversation);
+    const exists = _state.allConversations.some(c => c.id === conversation.id);
+    if (!exists) {
+      _state.allConversations.push(conversation);
+    }
   },
 
   [types.DELETE_CONVERSATION](_state, conversationId) {
@@ -226,13 +269,28 @@ export const mutations = {
         return;
       }
 
-      const { messages, ...updates } = conversation;
+      const {
+        messages,
+        event_metadata: eventMetadata,
+        ...updates
+      } = conversation;
       allConversations[index] = { ...selectedConversation, ...updates };
-      if (_state.selectedChatId === conversation.id) {
+      // The reactions controller dispatches CONVERSATION_UPDATED solely to
+      // refresh the chat list preview after a toggle (add/replace/remove); the
+      // open conversation should stay put. The backend tags the broadcast with
+      // `event_metadata.source = 'reaction_toggle'` so we can skip scroll
+      // unconditionally — heuristics on `last_non_activity_message` miss the
+      // case where newer non-reaction messages exist after the reacted target.
+      const isReactionUpdate = eventMetadata?.source === 'reaction_toggle';
+      if (_state.selectedChatId === conversation.id && !isReactionUpdate) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     } else {
-      _state.allConversations.push(conversation);
+      const { conversationType } = _state.conversationFilters || {};
+      const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
+      if (![MENTION, PARTICIPATING].includes(conversationType)) {
+        _state.allConversations.push(conversation);
+      }
     }
   },
 
@@ -262,10 +320,16 @@ export const mutations = {
     _state.chatSortFilter = data;
   },
 
+  [types.CHANGE_CHAT_GROUP_TYPE_FILTER](_state, data) {
+    _state.chatGroupTypeFilter = data;
+  },
+
   // Update assignee on action cable message
   [types.UPDATE_ASSIGNEE](_state, payload) {
-    const [chat] = _state.allConversations.filter(c => c.id === payload.id);
-    chat.meta.assignee = payload.assignee;
+    const chat = getConversationById(_state)(payload.id);
+    if (chat) {
+      chat.meta.assignee = payload.assignee;
+    }
   },
 
   [types.UPDATE_CONVERSATION_CONTACT](_state, { conversationId, ...payload }) {
@@ -275,34 +339,21 @@ export const mutations = {
     }
   },
 
-  [types.UPDATE_CONVERSATION_CALL_STATUS](
+  [types.UPDATE_MESSAGE_CALL_STATUS](
     _state,
-    { conversationId, callStatus }
+    { conversationId, callStatus, callSid }
   ) {
     const chat = getConversationById(_state)(conversationId);
     if (!chat) return;
 
-    chat.additional_attributes = {
-      ...chat.additional_attributes,
-      call_status: callStatus,
-    };
-  },
-
-  [types.UPDATE_MESSAGE_CALL_STATUS](_state, { conversationId, callStatus }) {
-    const chat = getConversationById(_state)(conversationId);
-    if (!chat) return;
-
-    const lastCall = (chat.messages || []).findLast(
-      m => m.content_type === CONTENT_TYPES.VOICE_CALL
+    const message = (chat.messages || []).find(
+      m =>
+        m.content_type === CONTENT_TYPES.VOICE_CALL &&
+        m.call?.provider_call_id === callSid
     );
+    if (!message?.call) return;
 
-    if (!lastCall) return;
-
-    lastCall.content_attributes ??= {};
-    lastCall.content_attributes.data = {
-      ...lastCall.content_attributes.data,
-      status: callStatus,
-    };
+    message.call = { ...message.call, status: callStatus };
   },
 
   [types.SET_ACTIVE_INBOX](_state, inboxId) {

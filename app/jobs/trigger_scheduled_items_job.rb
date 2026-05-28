@@ -22,9 +22,6 @@ class TriggerScheduledItemsJob < ApplicationJob
 
     # Job to check WhatsApp connection status
     Channels::Whatsapp::BaileysConnectionCheckSchedulerJob.perform_later
-
-    # Job to clear notifications which are older than 1 month
-    Notification::RemoveOldNotificationJob.perform_later
   end
 end
 

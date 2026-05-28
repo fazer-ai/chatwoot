@@ -50,7 +50,7 @@ const reauthorizeWhatsApp = async params => {
   isRequestingAuthorization.value = true;
 
   try {
-    const response = await whatsappChannel.reauthorizeWhatsApp({
+    const response = await whatsappChannel.postEmbeddedSignupAuthorization({
       inboxId: props.inbox.id,
       ...params,
     });
@@ -201,7 +201,7 @@ defineExpose({
 
 <template>
   <InboxReconnectionRequired
-    class="mx-8 mt-5"
+    class="mx-6"
     :is-loading="isRequestingAuthorization"
     :action-label="actionLabel"
     :description="description"

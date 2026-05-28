@@ -1,0 +1,78 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the poll
+  question:
+    type: string
+    description: The poll question
+  multiple_choice:
+    type: boolean
+    description: Whether multiple options can be selected
+  public_results:
+    type: boolean
+    description: Whether vote results are publicly visible
+  allow_revote:
+    type: boolean
+    description: Whether users can change their vote
+  expires_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: When the poll expires
+  internal_chat_message_id:
+    type: integer
+    description: The ID of the message this poll belongs to
+  options:
+    type: array
+    description: The poll options
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The option ID
+        text:
+          type: string
+          description: The option text
+        emoji:
+          type:
+            - string
+            - 'null'
+          description: Optional emoji for the option
+        image_url:
+          type:
+            - string
+            - 'null'
+          description: Optional image URL for the option
+        position:
+          type: integer
+          description: Display order position
+        votes_count:
+          type: integer
+          description: Number of votes for this option
+        voted:
+          type: boolean
+          description: Whether the current user voted for this option
+        voters:
+          type: array
+          description: Voters (only present when public_results is true). Minimal user payload with id and name.
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+  total_votes:
+    type: integer
+    description: Total number of votes across all options
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the poll was created
+  updated_at:
+    type: string
+    format: date-time
+    description: The time at which the poll was last updated

@@ -282,4 +282,47 @@ RSpec.describe User do
       expect(user.signature_separator).to eq('--')
     end
   end
+
+  describe '#send_devise_notification' do
+    let(:account) { create(:account, locale: 'pt_BR') }
+    let(:recipient) { create(:user, account: account) }
+    let(:mailer_double) { double(reset_password_instructions: double(deliver_later: nil)) } # rubocop:disable RSpec/VerifiedDoubles
+
+    before do
+      Current.reset
+      allow(Devise::Mailer).to receive(:with).and_return(mailer_double)
+    end
+
+    it 'falls back to the user account when Current.account is nil' do
+      recipient.send_reset_password_instructions
+
+      expect(Devise::Mailer).to have_received(:with).with(account: account)
+    end
+
+    it 'prefers Current.account when it is set' do
+      other_account = create(:account)
+      create(:account_user, user: recipient, account: other_account)
+      Current.account = other_account
+
+      recipient.send_reset_password_instructions
+
+      expect(Devise::Mailer).to have_received(:with).with(account: other_account)
+    end
+  end
+
+  describe 'destroy' do
+    it 'nullifies scheduled messages author when user has sent scheduled messages' do
+      account = create(:account)
+      create(:account_user, user: user, account: account)
+      inbox = create(:inbox, account: account)
+      contact = create(:contact, account: account)
+      conversation = create(:conversation, account: account, inbox: inbox, contact: contact)
+      scheduled_message = create(:scheduled_message, account: account, inbox: inbox, conversation: conversation, author: user)
+      scheduled_message.update_column(:status, ScheduledMessage.statuses[:sent]) # rubocop:disable Rails/SkipsModelValidations
+
+      user.destroy!
+
+      expect(scheduled_message.reload.author_id).to be_nil
+    end
+  end
 end

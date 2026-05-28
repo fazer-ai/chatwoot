@@ -6,6 +6,14 @@ describe Whatsapp::IncomingMessageService do
       stub_request(:post, 'https://waba.360dialog.io/v1/configs/webhook')
     end
 
+    after do
+      # The atomic dedup lock lives in Redis and is not rolled back by
+      # transactional fixtures. Clean up any keys created during the test.
+      Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') do |key|
+        Redis::Alfred.delete(key)
+      end
+    end
+
     let!(:whatsapp_channel) { create(:channel_whatsapp, sync_templates: false) }
     let(:wa_id) { '2423423243' }
     let!(:params) do
@@ -24,6 +32,12 @@ describe Whatsapp::IncomingMessageService do
         expect(whatsapp_channel.inbox.messages.first.content).to eq('Test')
       end
 
+      it 'stores the external_created_at timestamp from the message' do
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        message = whatsapp_channel.inbox.messages.first
+        expect(message.external_created_at).to eq(1_633_034_394)
+      end
+
       it 'appends to last conversation when if conversation already exists' do
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
         2.times.each { create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox) }
@@ -38,7 +52,7 @@ describe Whatsapp::IncomingMessageService do
       it 'reopen last conversation if last conversation is resolved and lock to single conversation is enabled' do
         whatsapp_channel.inbox.update!(lock_to_single_conversation: true)
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         last_conversation.update!(status: 'resolved')
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # no new conversation should be created
@@ -77,6 +91,153 @@ describe Whatsapp::IncomingMessageService do
         # this shouldn't create a duplicate message
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         expect(whatsapp_channel.inbox.messages.count).to eq(1)
+      end
+
+      it 'will not create duplicate conversations when same message is received for new contact' do
+        # First call creates contact, conversation and message
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+
+        # Second call with same message ID should not create duplicate conversation
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+      end
+
+      it 'will not create duplicate conversations when same message is processed concurrently' do
+        # Simulate concurrent processing by having Redis key cleared before second call
+        # but message not yet visible in database due to transaction isolation
+        service1 = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+        service2 = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+
+        # Process first message
+        service1.perform
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+
+        # Even if we clear the Redis key manually, should still not create duplicates
+        key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: params[:messages].first[:id])
+        Redis::Alfred.delete(key)
+
+        # Second call should check database and find existing message
+        service2.perform
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+      end
+
+      it 'prevents race condition with atomic lock when two requests arrive simultaneously' do
+        # This test simulates the exact race condition that was causing duplicate conversations
+        # Two concurrent webhook deliveries for the same message should result in only one being processed
+        threads_started = Concurrent::CountDownLatch.new(2)
+
+        thread1 = Thread.new do
+          threads_started.count_down
+          threads_started.wait # Wait for both threads to be ready
+          service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+          service.perform
+        end
+
+        thread2 = Thread.new do
+          threads_started.count_down
+          threads_started.wait # Wait for both threads to be ready
+          service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+          service.perform
+        end
+
+        thread1.join
+        thread2.join
+
+        # Only one conversation and one message should exist
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+      end
+
+      it 'only allows one of two concurrent requests to process the same message' do
+        # Simulates atomic SETNX: first caller gets the lock, second is rejected
+        message_source_key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{whatsapp_channel.inbox.id}_#{params[:messages].first[:id]}")
+        lock_acquired = false
+
+        # Allow all Redis::Alfred calls (contact lock uses different keys)
+        allow(Redis::Alfred).to receive(:set).and_call_original
+        allow(Redis::Alfred).to receive(:delete).and_call_original
+
+        # Stub message lock specifically
+        allow(Redis::Alfred).to receive(:set).with(message_source_key, true, nx: true, ex: 1.day) do
+          result = !lock_acquired
+          lock_acquired = true
+          result
+        end
+
+        service1 = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+        service2 = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+
+        # Both bypass find_message_by_source_id (simulating race before DB commit)
+        allow(service1).to receive(:find_message_by_source_id).and_return(nil)
+        allow(service2).to receive(:find_message_by_source_id).and_return(nil)
+
+        service1.perform
+        service2.perform
+
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+      end
+
+      it 'clears lock outside transaction to prevent race conditions' do
+        # Bug: lock was cleared INSIDE transaction before commit, allowing:
+        # 1. Request A creates message, clears lock (transaction uncommitted)
+        # 2. Request B acquires lock, can't see A's uncommitted message
+        # 3. Both create duplicates
+        #
+        # Fix: clear lock in ensure block AFTER transaction commits
+        message_source_key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{whatsapp_channel.inbox.id}_#{params[:messages].first[:id]}")
+        lock_cleared_at_depth = nil
+
+        # Allow all Redis::Alfred calls (contact lock uses different keys)
+        allow(Redis::Alfred).to receive(:set).and_call_original
+        allow(Redis::Alfred).to receive(:delete).and_call_original
+
+        # Stub message lock specifically
+        allow(Redis::Alfred).to receive(:set).with(message_source_key, true, nx: true, ex: 1.day).and_return(true)
+        allow(Redis::Alfred).to receive(:delete).with(message_source_key) do
+          lock_cleared_at_depth = ActiveRecord::Base.connection.open_transactions
+        end
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+
+        # Depth 1 = only RSpec's wrapper transaction, meaning our transaction completed
+        expect(lock_cleared_at_depth).to eq(1),
+                                         "Lock cleared at depth #{lock_cleared_at_depth}, expected 1. " \
+                                         'Lock must be cleared AFTER transaction commits to prevent duplicates.'
+      end
+
+      it 'creates message in second inbox when same source_id exists in different inbox' do
+        # Create a message with same source_id in a different inbox
+        other_whatsapp_channel = create(:channel_whatsapp, sync_templates: false)
+        other_inbox = other_whatsapp_channel.inbox
+        other_contact = create(:contact, account: other_inbox.account)
+        other_contact_inbox = create(:contact_inbox, inbox: other_inbox, contact: other_contact)
+        other_conversation = create(:conversation, inbox: other_inbox, contact_inbox: other_contact_inbox)
+        create(:message, conversation: other_conversation, inbox: other_inbox, source_id: params[:messages].first[:id])
+
+        # Should still create message in our inbox since source_id check should be inbox-scoped
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        expect(whatsapp_channel.inbox.conversations.count).to eq(1)
+        expect(whatsapp_channel.inbox.messages.count).to eq(1)
+      end
+
+      it 'acquires contact-level lock to prevent album race conditions' do
+        # When multiple messages from same contact arrive simultaneously (e.g., album),
+        # the contact lock prevents race conditions in conversation creation.
+        # This test verifies the lock is actually being acquired.
+        phone_number = '2423423243'
+        contact_lock_key = "WHATSAPP::CONTACT_LOCK::#{whatsapp_channel.inbox.id}_#{phone_number}"
+
+        allow(Redis::Alfred).to receive(:set).and_call_original
+        allow(Redis::Alfred).to receive(:delete).and_call_original
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+
+        expect(Redis::Alfred).to have_received(:set).with(contact_lock_key, 1, nx: true, ex: 5.seconds)
       end
     end
 
@@ -415,8 +576,8 @@ describe Whatsapp::IncomingMessageService do
       end
     end
 
-    describe 'when message processing is in progress' do
-      it 'ignores the current message creation request' do
+    describe 'when another worker already holds the dedup lock' do
+      it 'skips message creation' do
         params = { 'contacts' => [{ 'profile' => { 'name' => 'Kedar' }, 'wa_id' => '919746334593' }],
                    'messages' => [{ 'from' => '919446284490',
                                     'id' => 'wamid.SDFADSf23sfasdafasdfa',
@@ -432,16 +593,16 @@ describe Whatsapp::IncomingMessageService do
                                     ] }] }.with_indifferent_access
 
         expect(Message.find_by(source_id: 'wamid.SDFADSf23sfasdafasdfa')).not_to be_present
-        key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: 'wamid.SDFADSf23sfasdafasdfa')
+        # Key is scoped by inbox.id to prevent cross-inbox lock collisions
+        key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: "#{whatsapp_channel.inbox.id}_wamid.SDFADSf23sfasdafasdfa")
 
         Redis::Alfred.setex(key, true)
         expect(Redis::Alfred.get(key)).to be_truthy
 
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         expect(whatsapp_channel.inbox.messages.count).to eq(0)
-        expect(Message.find_by(source_id: 'wamid.SDFADSf23sfasdafasdfa')).not_to be_present
-
-        expect(Redis::Alfred.get(key)).to be_truthy
+      ensure
+        key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: 'wamid.SDFADSf23sfasdafasdfa')
         Redis::Alfred.delete(key)
       end
     end

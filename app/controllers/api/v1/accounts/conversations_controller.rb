@@ -1,9 +1,9 @@
-class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseController # rubocop:disable Metrics/ClassLength
   include Events::Types
   include DateRangeHelper
   include HmacConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter]
+  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -15,7 +15,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def meta
-    result = conversation_finder.perform
+    result = conversation_finder.perform_meta_only
     @conversations_count = result[:count]
   end
 
@@ -28,10 +28,15 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def attachments
     @attachments_count = @conversation.attachments.count
     @attachments = @conversation.attachments
-                                .includes(:message)
+                                .includes({ file_attachment: :blob }, message: [:inbox, { sender: { avatar_attachment: :blob } }])
                                 .order(created_at: :desc)
                                 .page(attachment_params[:page])
                                 .per(ATTACHMENT_RESULTS_PER_PAGE)
+  end
+
+  def presence_subscribe_bulk
+    Conversations::PresenceSubscribeService.new(Current.account, presence_subscribe_params[:conversation_ids]).perform
+    head :ok
   end
 
   def show; end
@@ -70,8 +75,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def transcript
     render json: { error: 'email param missing' }, status: :unprocessable_entity and return if params[:email].blank?
+    return render_payment_required('Email transcript is not available on your plan') unless @conversation.account.email_transcript_enabled?
+    return head :too_many_requests unless @conversation.account.within_email_rate_limit?
 
     ConversationReplyMailer.with(account: @conversation.account).conversation_transcript(@conversation, params[:email])&.deliver_later
+    @conversation.account.increment_email_sent_count
     head :ok
   end
 
@@ -104,12 +112,27 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def toggle_typing_status
-    typing_status_manager = ::Conversations::TypingStatusManager.new(@conversation, current_user, params)
+    typing_status_manager = ::Conversations::TypingStatusManager.new(@conversation, Current.user, params)
     typing_status_manager.toggle_typing_status
     head :ok
   end
 
+  def presence_subscribe
+    Conversations::PresenceSubscribeService.new(Current.account, [@conversation.display_id]).perform
+    head :ok
+  end
+
   def update_last_seen
+    # High-traffic accounts generate excessive DB writes when agents frequently switch between conversations.
+    # Throttle last_seen updates to once per hour when there are no unread messages to reduce DB load.
+    # Always update immediately if there are unread messages to maintain accurate read/unread state.
+    # Visiting a conversation should clear any unread inbox notifications for this conversation.
+    Notification::MarkConversationReadService.new(user: Current.user, account: Current.account, conversation: @conversation).perform
+    has_unread = assignee? ? @conversation.assignee_unread_messages.any? : @conversation.unread_messages.any?
+
+    # No unread messages - apply throttling to limit DB writes
+    return if !has_unread && !should_update_last_seen?
+
     dispatch_messages_read_event if assignee?
 
     update_last_seen_on_conversation(DateTime.now.utc, assignee?)
@@ -145,11 +168,36 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     params.permit(:page)
   end
 
+  def presence_subscribe_params
+    params.permit(conversation_ids: [])
+  end
+
   def update_last_seen_on_conversation(last_seen_at, update_assignee)
+    updates = { agent_last_seen_at: last_seen_at }
+    updates[:assignee_last_seen_at] = last_seen_at if update_assignee.present?
+
     # rubocop:disable Rails/SkipsModelValidations
-    @conversation.update_column(:agent_last_seen_at, last_seen_at)
-    @conversation.update_column(:assignee_last_seen_at, last_seen_at) if update_assignee.present?
+    @conversation.update_columns(updates)
     # rubocop:enable Rails/SkipsModelValidations
+  end
+
+  def unseen_activity?
+    @conversation.last_activity_at.present? &&
+      (@conversation.agent_last_seen_at.blank? || @conversation.last_activity_at > @conversation.agent_last_seen_at)
+  end
+
+  def should_update_last_seen?
+    # Always update when there's unseen activity (e.g. soft-disabled group conversations that don't create messages)
+    return true if unseen_activity?
+
+    # Update if at least one relevant timestamp is older than 1 hour or not set
+    # This prevents redundant DB writes when agents repeatedly view the same conversation
+    agent_needs_update = @conversation.agent_last_seen_at.blank? || @conversation.agent_last_seen_at < 1.hour.ago
+    return agent_needs_update unless assignee?
+
+    # For assignees, check both timestamps - update if either is old
+    assignee_needs_update = @conversation.assignee_last_seen_at.blank? || @conversation.assignee_last_seen_at < 1.hour.ago
+    agent_needs_update || assignee_needs_update
   end
 
   def set_conversation_status
@@ -199,7 +247,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
       contact: @contact,
       inbox: @inbox,
       source_id: params[:source_id],
-      hmac_verified: hmac_verified?
+      hmac_verified: hmac_verified?,
+      validate_baileys_phone: true
     ).perform
   end
 

@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Messages
+operationId: delete-internal-chat-message
+summary: Delete a message
+security:
+  - userApiKey: []
+description: Delete an internal chat message (soft-delete, marks content as deleted)
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Message not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

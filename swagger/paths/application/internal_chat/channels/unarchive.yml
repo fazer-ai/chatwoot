@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Channels
+operationId: unarchive-internal-chat-channel
+summary: Unarchive a channel
+security:
+  - userApiKey: []
+description: Unarchive an internal chat channel (admin only)
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_channel_show'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '402':
+    description: Pro feature required (private channel limit reached)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

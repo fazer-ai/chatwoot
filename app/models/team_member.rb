@@ -18,6 +18,18 @@ class TeamMember < ApplicationRecord
   belongs_to :user
   belongs_to :team
   validates :user_id, uniqueness: { scope: :team_id }
+
+  after_create :add_to_linked_internal_chat_channels
+
+  private
+
+  def add_to_linked_internal_chat_channels
+    return unless InternalChat::ChannelTeam.table_exists?
+
+    InternalChat::ChannelTeam.where(team_id: team_id).find_each do |channel_team|
+      channel_team.channel.channel_members.find_or_create_by!(user_id: user_id) { |m| m.role = :member }
+    end
+  end
 end
 
 TeamMember.include_mod_with('Audit::TeamMember')

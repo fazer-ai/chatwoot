@@ -1,0 +1,35 @@
+type: object
+properties:
+  content:
+    type: string
+    description: The content of the message
+  content_type:
+    type: string
+    description: The type of message content
+  parent_id:
+    type: integer
+    description: The ID of the parent message for threaded replies
+  echo_id:
+    type: string
+    description: Client-generated ID for optimistic updates
+  also_send_in_channel:
+    type: boolean
+    description: When sending a thread reply, also mirror it into the main channel view
+  attachments:
+    type: array
+    description: File attachments to include with the message
+    items:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The file to attach
+        file_type:
+          type: string
+          enum:
+            - image
+            - audio
+            - video
+            - file
+          description: The type of the attached file

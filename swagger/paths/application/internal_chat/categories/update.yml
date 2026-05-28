@@ -1,0 +1,38 @@
+tags:
+  - Internal Chat Categories
+operationId: update-internal-chat-category
+summary: Update a category
+security:
+  - userApiKey: []
+description: Update an internal chat category (admin only)
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/internal_chat_category_create_update_payload'
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_category'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Category not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

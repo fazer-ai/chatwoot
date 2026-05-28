@@ -10,6 +10,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  excludeUserId: {
+    type: Number,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['selectAgent']);
@@ -27,6 +31,7 @@ const items = computed(() => {
 
   const buildItems = (list, type, infoKey) =>
     list
+      .filter(item => !props.excludeUserId || item.id !== props.excludeUserId)
       .map(item => ({
         ...item,
         type,

@@ -1,0 +1,28 @@
+tags:
+  - Internal Chat Channel Members
+operationId: remove-internal-chat-channel-member
+summary: Remove a channel member
+security:
+  - userApiKey: []
+description: Remove a member from an internal chat channel
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Member not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

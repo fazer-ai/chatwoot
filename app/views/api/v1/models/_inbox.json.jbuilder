@@ -3,6 +3,7 @@ json.avatar_url resource.try(:avatar_url)
 json.channel_id resource.channel_id
 json.name resource.name
 json.channel_type resource.channel_type
+json.account_id resource.account_id
 json.greeting_enabled resource.greeting_enabled
 json.greeting_message resource.greeting_message
 json.working_hours_enabled resource.working_hours_enabled
@@ -72,6 +73,7 @@ if resource.twilio?
   if Current.account_user&.administrator?
     json.auth_token resource.channel.try(:auth_token)
     json.account_sid resource.channel.try(:account_sid)
+    json.api_key_sid resource.channel.try(:api_key_sid)
   end
 end
 
@@ -89,6 +91,7 @@ if resource.email?
     json.imap_port resource.channel.try(:imap_port)
     json.imap_enabled resource.channel.try(:imap_enabled)
     json.imap_enable_ssl resource.channel.try(:imap_enable_ssl)
+    json.imap_authentication resource.channel.try(:imap_authentication)
 
     if resource.channel.try(:microsoft?) || resource.channel.try(:google?) || resource.channel.try(:legacy_google?)
       json.reauthorization_required resource.channel.try(:provider_config).empty? || resource.channel.try(:reauthorization_required?)
@@ -113,12 +116,14 @@ end
 ## API Channel Attributes
 if resource.api?
   json.hmac_token resource.channel.try(:hmac_token) if Current.account_user&.administrator?
+  json.secret resource.channel.try(:secret) if Current.account_user&.administrator?
   json.webhook_url resource.channel.try(:webhook_url)
   json.inbox_identifier resource.channel.try(:identifier)
   json.additional_attributes resource.channel.try(:additional_attributes)
 end
 
 json.provider resource.channel.try(:provider)
+json.allow_group_creation resource.channel.try(:allow_group_creation?) || false
 
 ## Telegram Attributes
 json.bot_name resource.channel.try(:bot_name) if resource.telegram?
@@ -131,8 +136,16 @@ if resource.whatsapp?
   json.provider_connection resource.channel.try(:provider_connection_data)
 end
 
-## Voice Channel Attributes
-if resource.channel_type == 'Channel::Voice'
-  json.voice_call_webhook_url resource.channel.try(:voice_call_webhook_url)
-  json.voice_status_webhook_url resource.channel.try(:voice_status_webhook_url)
+## Voice attributes for TwilioSms
+if resource.twilio? && resource.channel.respond_to?(:voice_enabled?)
+  json.voice_enabled resource.channel.voice_enabled?
+  json.voice_configured resource.channel.try(:twiml_app_sid).present?
+  json.has_api_key_secret resource.channel.try(:api_key_secret).present?
+  if resource.channel.try(:twiml_app_sid).present?
+    json.voice_call_webhook_url resource.channel.try(:voice_call_webhook_url)
+    json.voice_status_webhook_url resource.channel.try(:voice_status_webhook_url)
+  end
 end
+
+## Voice attribute for WhatsApp Cloud (only embedded-signup channels surface true)
+json.voice_enabled resource.channel.voice_enabled? if resource.channel_type == 'Channel::Whatsapp' && resource.channel.respond_to?(:voice_enabled?)

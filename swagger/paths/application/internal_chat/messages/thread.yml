@@ -1,0 +1,34 @@
+tags:
+  - Internal Chat Messages
+operationId: get-internal-chat-message-thread
+summary: Get message thread
+security:
+  - userApiKey: []
+description: Get a message and all its threaded replies
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            parent:
+              $ref: '#/components/schemas/internal_chat_message'
+            replies:
+              type: array
+              description: Array of reply messages
+              items:
+                $ref: '#/components/schemas/internal_chat_message'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Message not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

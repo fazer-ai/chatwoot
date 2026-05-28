@@ -79,14 +79,6 @@ const filterTypes = [
     attributeModel: 'additional',
   },
   {
-    attributeKey: 'country_code',
-    attributeI18nKey: 'COUNTRY_NAME',
-    inputType: 'search_select',
-    dataType: 'text',
-    filterOperators: OPERATOR_TYPES_1,
-    attributeModel: 'additional',
-  },
-  {
     attributeKey: 'referer',
     attributeI18nKey: 'REFERER_LINK',
     inputType: 'plain_text',
@@ -116,6 +108,14 @@ const filterTypes = [
     inputType: 'plain_text',
     dataType: 'text',
     filterOperators: OPERATOR_TYPES_5,
+    attributeModel: 'standard',
+  },
+  {
+    attributeKey: 'group_type',
+    attributeI18nKey: 'GROUP_TYPE',
+    inputType: 'multi_select',
+    dataType: 'text',
+    filterOperators: OPERATOR_TYPES_1,
     attributeModel: 'standard',
   },
 ];
@@ -161,6 +161,10 @@ export const filterAttributeGroups = [
         key: 'last_activity_at',
         i18nKey: 'LAST_ACTIVITY',
       },
+      {
+        key: 'group_type',
+        i18nKey: 'GROUP_TYPE',
+      },
     ],
   },
   {
@@ -170,10 +174,6 @@ export const filterAttributeGroups = [
       {
         key: 'browser_language',
         i18nKey: 'BROWSER_LANGUAGE',
-      },
-      {
-        key: 'country_code',
-        i18nKey: 'COUNTRY_NAME',
       },
       {
         key: 'referer',

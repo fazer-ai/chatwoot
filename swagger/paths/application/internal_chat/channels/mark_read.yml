@@ -1,0 +1,22 @@
+tags:
+  - Internal Chat Channels
+operationId: mark-internal-chat-channel-read
+summary: Mark channel as read
+security:
+  - userApiKey: []
+description: Mark all messages in the channel as read for the current user
+responses:
+  '200':
+    description: Success
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

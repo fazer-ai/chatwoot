@@ -1,0 +1,32 @@
+tags:
+  - Internal Chat Drafts
+operationId: save-internal-chat-draft
+summary: Save a draft
+security:
+  - userApiKey: []
+description: Create or update a message draft for the current user in the specified channel
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/internal_chat_draft_save_payload'
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_draft'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

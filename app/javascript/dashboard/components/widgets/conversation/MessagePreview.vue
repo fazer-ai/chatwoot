@@ -1,6 +1,7 @@
 <script>
 import { MESSAGE_TYPE } from 'widget/helpers/constants';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import { useMapGetter } from 'dashboard/composables/store';
 import { ATTACHMENT_ICONS } from 'shared/constants/messages';
 
 export default {
@@ -21,11 +22,40 @@ export default {
   },
   setup() {
     const { getPlainText } = useMessageFormatter();
+    const currentUserId = useMapGetter('getCurrentUserID');
     return {
       getPlainText,
+      currentUserId,
     };
   },
   computed: {
+    isReactionMessage() {
+      const attrs = this.message?.content_attributes;
+      // Treat removed reactions (deleted toggled or content cleared) as not a
+      // reaction so the preview falls back to plain text/no-content branches
+      // instead of rendering "X reagiu " with an empty emoji.
+      return (
+        attrs?.is_reaction === true &&
+        !attrs?.deleted &&
+        !!this.message?.content
+      );
+    },
+    reactionPreviewText() {
+      if (!this.isReactionMessage) return '';
+      const senderId = this.message?.sender?.id;
+      const isOwnInboxEcho =
+        this.message?.message_type === MESSAGE_TYPE.OUTGOING && !senderId;
+      const senderName =
+        senderId === this.currentUserId || isOwnInboxEcho
+          ? this.$t('CONVERSATION.REACTIONS.YOU')
+          : this.message?.sender?.name || '';
+      const emoji = this.message?.content;
+      const snippet = this.message?.in_reply_to_snippet;
+      const params = { sender: senderName, emoji, snippet };
+      return snippet
+        ? this.$t('CHAT_LIST.REACTED_TO_SNIPPET', params)
+        : this.$t('CHAT_LIST.REACTED', params);
+    },
     messageByAgent() {
       const { message_type: messageType } = this.message;
       return messageType === MESSAGE_TYPE.OUTGOING;
@@ -82,7 +112,10 @@ export default {
         icon="info"
       />
     </template>
-    <span v-if="message.content && isMessageSticker">
+    <span v-if="isReactionMessage">
+      {{ reactionPreviewText }}
+    </span>
+    <span v-else-if="message.content && isMessageSticker">
       <fluent-icon
         size="16"
         class="-mt-0.5 align-middle inline-block text-n-slate-11"
@@ -93,7 +126,7 @@ export default {
     <span v-else-if="message.content">
       {{ parsedLastMessage }}
     </span>
-    <span v-else-if="message.attachments">
+    <span v-else-if="message.attachments?.length">
       <fluent-icon
         v-if="attachmentIcon && showMessageType"
         size="16"

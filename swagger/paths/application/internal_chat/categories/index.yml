@@ -1,0 +1,23 @@
+tags:
+  - Internal Chat Categories
+operationId: list-internal-chat-categories
+summary: List all categories
+security:
+  - userApiKey: []
+description: List all internal chat categories in the account
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: array
+          description: Array of categories
+          items:
+            $ref: '#/components/schemas/internal_chat_category'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

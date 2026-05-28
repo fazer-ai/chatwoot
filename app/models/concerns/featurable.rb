@@ -12,6 +12,16 @@ module Featurable
     result[result.keys.size + 1] = "feature_#{feature['name']}".to_sym
   end
 
+  def self.feature_flag_value(feature_name)
+    feature_index = FEATURE_LIST.index { |f| f['name'] == feature_name }
+    return 0 if feature_index.nil?
+
+    value = 2**feature_index
+    # Convert to signed 64-bit representation for PostgreSQL bigint compatibility.
+    # Values >= 2^63 overflow signed bigint; two's complement conversion fixes this.
+    value >= (1 << 63) ? value - (1 << 64) : value
+  end
+
   included do
     include FlagShihTzu
     has_flags FEATURES.merge(column: 'feature_flags').merge(QUERY_MODE)

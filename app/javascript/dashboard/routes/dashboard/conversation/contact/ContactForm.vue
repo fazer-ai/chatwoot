@@ -11,11 +11,13 @@ import { isPhoneNumberValid } from 'shared/helpers/Validators';
 import parsePhoneNumber from 'libphonenumber-js';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Avatar from 'next/avatar/Avatar.vue';
+import ComboBox from 'dashboard/components-next/combobox/ComboBox.vue';
 
 export default {
   components: {
     NextButton,
     Avatar,
+    ComboBox,
   },
   props: {
     contact: {
@@ -56,14 +58,17 @@ export default {
         twitter: '',
         linkedin: '',
         github: '',
+        telegram: '',
       },
       socialProfileKeys: [
         { key: 'facebook', prefixURL: 'https://facebook.com/' },
         { key: 'twitter', prefixURL: 'https://twitter.com/' },
         { key: 'linkedin', prefixURL: 'https://linkedin.com/' },
         { key: 'github', prefixURL: 'https://github.com/' },
+        { key: 'telegram', prefixURL: 'https://t.me/' },
         { key: 'tiktok', prefixURL: 'https://tiktok.com/@' },
       ],
+      initialData: null,
     };
   },
   validations: {
@@ -100,8 +105,27 @@ export default {
       }
       return '';
     },
+    hasUnsavedChanges() {
+      if (!this.initialData) return false;
+      const socialProfilesChanged = this.socialProfileKeys.some(
+        ({ key }) =>
+          (this.socialProfileUserNames[key] || '') !==
+          (this.initialData.socialProfileUserNames[key] || '')
+      );
+      return (
+        this.name !== this.initialData.name ||
+        this.email !== this.initialData.email ||
+        this.phoneNumber !== this.initialData.phoneNumber ||
+        this.companyName !== this.initialData.companyName ||
+        this.description !== this.initialData.description ||
+        this.city !== this.initialData.city ||
+        (this.country?.id || '') !== (this.initialData.countryId || '') ||
+        this.avatarFile !== null ||
+        socialProfilesChanged
+      );
+    },
     setPhoneNumber() {
-      if (this.parsePhoneNumber && this.parsePhoneNumber.countryCallingCode) {
+      if (this.parsePhoneNumber?.countryCallingCode) {
         return this.phoneNumber;
       }
       if (this.phoneNumber === '' && this.activeDialCode !== '') {
@@ -132,6 +156,12 @@ export default {
       if (!id) return name;
       if (!name && !id) return '';
       return `${name} (${id})`;
+    },
+    onCountryChange(value) {
+      const selected = this.countries.find(c => c.id === value);
+      this.country = selected
+        ? { id: selected.id, name: selected.name }
+        : { id: '', name: '' };
     },
     setDialCode() {
       if (
@@ -167,13 +197,26 @@ export default {
       const {
         social_profiles: socialProfiles = {},
         screen_name: twitterScreenName,
+        social_telegram_user_name: telegramUserName,
       } = additionalAttributes;
       this.socialProfileUserNames = {
         twitter: socialProfiles.twitter || twitterScreenName || '',
         facebook: socialProfiles.facebook || '',
         linkedin: socialProfiles.linkedin || '',
         github: socialProfiles.github || '',
+        telegram: socialProfiles.telegram || telegramUserName || '',
         instagram: socialProfiles.instagram || '',
+        tiktok: socialProfiles.tiktok || '',
+      };
+      this.initialData = {
+        name: this.name,
+        email: this.email,
+        phoneNumber: this.phoneNumber,
+        companyName: this.companyName,
+        description: this.description,
+        city: this.city,
+        countryId: this.country.id,
+        socialProfileUserNames: { ...this.socialProfileUserNames },
       };
     },
     getContactObject() {
@@ -253,7 +296,7 @@ export default {
     },
     async handleAvatarDelete() {
       try {
-        if (this.contact && this.contact.id) {
+        if (this.contact?.id) {
           await this.$store.dispatch('contacts/deleteAvatar', this.contact.id);
           useAlert(this.$t('CONTACT_FORM.DELETE_AVATAR.API.SUCCESS_MESSAGE'));
         }
@@ -362,26 +405,23 @@ export default {
       :label="$t('CONTACT_FORM.FORM.COMPANY_NAME.LABEL')"
       :placeholder="$t('CONTACT_FORM.FORM.COMPANY_NAME.PLACEHOLDER')"
     />
-    <div>
-      <div class="w-full">
-        <label>
-          {{ $t('CONTACT_FORM.FORM.COUNTRY.LABEL') }}
-        </label>
-        <multiselect
-          v-model="country"
-          track-by="id"
-          label="name"
-          :placeholder="$t('CONTACT_FORM.FORM.COUNTRY.PLACEHOLDER')"
-          selected-label
-          :select-label="$t('CONTACT_FORM.FORM.COUNTRY.SELECT_PLACEHOLDER')"
-          :deselect-label="$t('CONTACT_FORM.FORM.COUNTRY.REMOVE')"
-          :custom-label="countryNameWithCode"
-          :max-height="160"
-          :options="countries"
-          allow-empty
-          :option-height="104"
-        />
-      </div>
+    <div class="w-full mb-4">
+      <label>
+        {{ $t('CONTACT_FORM.FORM.COUNTRY.LABEL') }}
+      </label>
+      <ComboBox
+        :model-value="country.id"
+        :options="
+          countries.map(c => ({
+            value: c.id,
+            label: countryNameWithCode(c),
+          }))
+        "
+        class="[&>div>button]:!bg-n-alpha-black2"
+        :placeholder="$t('CONTACT_FORM.FORM.COUNTRY.PLACEHOLDER')"
+        :search-placeholder="$t('CONTACT_FORM.FORM.COUNTRY.SELECT_PLACEHOLDER')"
+        @update:model-value="onCountryChange"
+      />
     </div>
     <woot-input
       v-model="city"
@@ -425,11 +465,3 @@ export default {
     </div>
   </form>
 </template>
-
-<style scoped lang="scss">
-::v-deep {
-  .multiselect .multiselect__tags .multiselect__single {
-    @apply pl-0;
-  }
-}
-</style>

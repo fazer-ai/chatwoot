@@ -1,0 +1,44 @@
+tags:
+  - Internal Chat Messages
+operationId: update-internal-chat-message
+summary: Update a message
+security:
+  - userApiKey: []
+description: Update the content of an internal chat message
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        required:
+          - content
+        properties:
+          content:
+            type: string
+            description: The updated content of the message
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/internal_chat_message'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '403':
+    description: Access denied
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Message not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

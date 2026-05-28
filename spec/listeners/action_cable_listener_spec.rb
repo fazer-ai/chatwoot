@@ -94,6 +94,26 @@ describe ActionCableListener do
     end
   end
 
+  describe '#typing_on with agent bot' do
+    let(:event_name) { :'conversation.typing_on' }
+    let!(:agent_bot) { create(:agent_bot, account: account) }
+    let!(:event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation, user: agent_bot, is_private: false) }
+
+    it 'sends message to account admins, inbox agents and the contact' do
+      expect(conversation.inbox.reload.inbox_members.count).to eq(1)
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        a_collection_containing_exactly(
+          admin.pubsub_token, agent.pubsub_token, conversation.contact_inbox.pubsub_token
+        ),
+        'conversation.typing_on', { conversation: conversation.push_event_data,
+                                    user: agent_bot.push_event_data,
+                                    account_id: account.id,
+                                    is_private: false }
+      )
+      listener.conversation_typing_on(event)
+    end
+  end
+
   describe '#typing_off' do
     let(:event_name) { :'conversation.typing_off' }
     let!(:event) { Events::Base.new(event_name, Time.zone.now, conversation: conversation, user: agent, is_private: false) }
@@ -117,13 +137,14 @@ describe ActionCableListener do
   describe '#contact_deleted' do
     let(:event_name) { :'contact.deleted' }
     let!(:contact) { create(:contact, account: account) }
-    let!(:event) { Events::Base.new(event_name, Time.zone.now, contact: contact) }
+    let(:contact_data) { contact.push_event_data.merge(account_id: contact.account_id) }
+    let!(:event) { Events::Base.new(event_name, Time.zone.now, contact_data: contact_data) }
 
     it 'sends message to account admins, inbox agents' do
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
         ["account_#{account.id}"],
         'contact.deleted',
-        contact.push_event_data.merge(account_id: account.id)
+        contact_data
       )
       listener.contact_deleted(event)
     end
@@ -132,7 +153,14 @@ describe ActionCableListener do
   describe '#notification_deleted' do
     let(:event_name) { :'notification.deleted' }
     let!(:notification) { create(:notification, account: account, user: agent) }
-    let!(:event) { Events::Base.new(event_name, Time.zone.now, notification: notification) }
+    let(:notification_data) do
+      {
+        id: notification.id,
+        user_id: agent.id,
+        account_id: account.id
+      }
+    end
+    let!(:event) { Events::Base.new(event_name, Time.zone.now, notification_data: notification_data) }
 
     it 'sends message to account admins, inbox agents' do
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
@@ -201,6 +229,79 @@ describe ActionCableListener do
         conversation.push_event_data.merge(account_id: account.id)
       )
       listener.conversation_updated(event)
+    end
+
+    it 'merges broadcast_metadata into the payload as event_metadata' do
+      metadata = { source: 'reaction_toggle' }
+      tagged_event = Events::Base.new(event_name, Time.zone.now, conversation: conversation, broadcast_metadata: metadata)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token, admin.pubsub_token, conversation.contact_inbox.pubsub_token],
+        'conversation.updated',
+        conversation.push_event_data.merge(account_id: account.id, event_metadata: metadata)
+      )
+      listener.conversation_updated(tagged_event)
+    end
+  end
+
+  shared_examples 'scheduled message event broadcast' do |method_name, event_name|
+    it 'broadcasts to account admins and inbox members' do
+      scheduled_message = create(:scheduled_message, account: account, inbox: inbox, conversation: conversation, author: agent)
+      event = Events::Base.new(event_name, Time.zone.now, scheduled_message: scheduled_message)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
+        event_name,
+        scheduled_message.push_event_data.merge(account_id: account.id)
+      )
+
+      listener.public_send(method_name, event)
+    end
+  end
+
+  describe '#scheduled_message_created' do
+    it_behaves_like 'scheduled message event broadcast', :scheduled_message_created, 'scheduled_message.created'
+  end
+
+  describe '#scheduled_message_updated' do
+    it_behaves_like 'scheduled message event broadcast', :scheduled_message_updated, 'scheduled_message.updated'
+  end
+
+  describe '#scheduled_message_deleted' do
+    it_behaves_like 'scheduled message event broadcast', :scheduled_message_deleted, 'scheduled_message.deleted'
+  end
+
+  describe '#inbox_provider_connection_updated' do
+    let(:event_name) { :'inbox.provider_connection_updated' }
+    let(:provider_connection) do
+      { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,qr', 'error' => nil }
+    end
+    let(:event) { Events::Base.new(event_name, Time.zone.now, inbox: inbox, provider_connection: provider_connection) }
+
+    it 'sends only the connection status to non-admin agents' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'inbox.provider_connection_updated',
+        { inbox_id: inbox.id, provider_connection: { connection: 'connecting' }, account_id: account.id }
+      )
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+      listener.inbox_provider_connection_updated(event)
+    end
+
+    it 'sends the QR code and error only to administrators' do
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([agent.pubsub_token], anything, anything)
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [admin.pubsub_token],
+        'inbox.provider_connection_updated',
+        {
+          inbox_id: inbox.id,
+          provider_connection: { connection: 'connecting', qr_data_url: 'data:image/png;base64,qr', error: nil },
+          account_id: account.id
+        }
+      )
+
+      listener.inbox_provider_connection_updated(event)
     end
   end
 end

@@ -331,6 +331,105 @@ describe ContactInboxBuilder do
       end
     end
 
+    describe 'baileys whatsapp inbox phone normalization' do
+      let(:baileys_channel) do
+        create(:channel_whatsapp, account: account, provider: 'baileys',
+                                  sync_templates: false, validate_provider_config: false)
+      end
+      let(:baileys_inbox) { baileys_channel.inbox }
+      let(:contact) { create(:contact, phone_number: '+5511912345678', account: account) }
+      let(:canonical_phone) { '+551112345678' }
+      let(:canonical_jid) { "#{canonical_phone.delete('+')}@s.whatsapp.net" }
+
+      it 'updates the contact phone when on_whatsapp returns a different canonical jid' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .with(contact.phone_number)
+          .and_return({ 'jid' => canonical_jid, 'exists' => true })
+
+        contact_inbox = described_class.new(
+          contact: contact,
+          inbox: baileys_inbox,
+          validate_baileys_phone: true
+        ).perform
+
+        expect(contact.reload.phone_number).to eq(canonical_phone)
+        expect(contact_inbox.source_id).to eq(canonical_phone.delete('+'))
+      end
+
+      it 'rewrites the caller-provided source_id derived from the pre-normalization phone' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => canonical_jid, 'exists' => true })
+
+        contact_inbox = described_class.new(
+          contact: contact,
+          inbox: baileys_inbox,
+          source_id: '5511912345678',
+          validate_baileys_phone: true
+        ).perform
+
+        expect(contact_inbox.source_id).to eq(canonical_phone.delete('+'))
+      end
+
+      it 'merges into an existing contact when the canonical phone is already taken' do
+        existing_contact = create(:contact, name: 'Existing Maria', phone_number: canonical_phone, account: account)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => canonical_jid, 'exists' => true })
+
+        contact_inbox = described_class.new(
+          contact: contact,
+          inbox: baileys_inbox,
+          validate_baileys_phone: true
+        ).perform
+
+        expect(contact_inbox.contact_id).to eq(existing_contact.id)
+        expect(existing_contact.reload.phone_number).to eq(canonical_phone)
+        expect { contact.reload }.to(raise_error { |error| expect(error.class.name).to eq('ActiveRecord::RecordNotFound') })
+      end
+
+      it 'does nothing when on_whatsapp returns the same canonical phone' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => "#{contact.phone_number.delete('+')}@s.whatsapp.net", 'exists' => true })
+
+        expect do
+          described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+        end.not_to(change { contact.reload.phone_number })
+      end
+
+      it 'does nothing when on_whatsapp reports exists=false' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => canonical_jid, 'exists' => false })
+
+        expect do
+          described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+        end.not_to(change { contact.reload.phone_number })
+      end
+
+      it 'swallows provider errors and proceeds with the original phone' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_raise(StandardError, 'baileys boom')
+
+        contact_inbox = nil
+        expect do
+          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+        end.not_to(change { contact.reload.phone_number })
+
+        expect(contact_inbox.source_id).to eq(contact.phone_number.delete('+'))
+      end
+
+      it 'does not call on_whatsapp when validate_baileys_phone is not requested' do
+        expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+
+        described_class.new(contact: contact, inbox: baileys_inbox).perform
+      end
+
+      it 'does not call on_whatsapp for whatsapp inboxes on non-baileys providers' do
+        non_baileys_inbox = create(:channel_whatsapp, account: account, sync_templates: false, validate_provider_config: false).inbox
+        expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+
+        described_class.new(contact: contact, inbox: non_baileys_inbox, validate_baileys_phone: true).perform
+      end
+    end
+
     context 'when there is a race condition' do
       let(:account) { create(:account) }
       let(:contact) { create(:contact, account: account) }

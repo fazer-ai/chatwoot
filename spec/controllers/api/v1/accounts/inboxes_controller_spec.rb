@@ -32,6 +32,7 @@ RSpec.describe 'Inboxes API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(JSON.parse(response.body, symbolize_names: true)[:payload].size).to eq(2)
       end
 
@@ -95,6 +96,7 @@ RSpec.describe 'Inboxes API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(JSON.parse(response.body, symbolize_names: true)[:id]).to eq(inbox.id)
       end
 
@@ -383,6 +385,7 @@ RSpec.describe 'Inboxes API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(response.body).to include('test.com')
       end
 
@@ -478,6 +481,7 @@ RSpec.describe 'Inboxes API', type: :request do
               as: :json
 
         expect(response).to have_http_status(:success)
+        expect(response).to conform_schema(200)
         expect(inbox.reload.enable_auto_assignment).to be_falsey
         expect(inbox.reload.portal_id).to eq(portal.id)
         expect(response.parsed_body['name']).to eq 'new test inbox'
@@ -564,8 +568,10 @@ RSpec.describe 'Inboxes API', type: :request do
         email_channel = create(:channel_email, account: account)
         email_inbox = create(:inbox, channel: email_channel, account: account)
 
-        imap_connection = double
-        allow(Mail).to receive(:connection).and_return(imap_connection)
+        imap_connection = instance_double(Net::IMAP, disconnected?: false)
+        allow(Net::IMAP).to receive(:new).and_return(imap_connection)
+        allow(imap_connection).to receive(:login)
+        allow(imap_connection).to receive(:disconnect)
 
         patch "/api/v1/accounts/#{account.id}/inboxes/#{email_inbox.id}",
               headers: admin.create_new_auth_token,
@@ -574,7 +580,8 @@ RSpec.describe 'Inboxes API', type: :request do
                   imap_enabled: true,
                   imap_address: 'imap.gmail.com',
                   imap_port: 993,
-                  imap_login: 'imaptest@gmail.com'
+                  imap_login: 'imaptest@gmail.com',
+                  imap_authentication: 'login'
                 }
               },
               as: :json
@@ -583,6 +590,7 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(email_channel.reload.imap_enabled).to be true
         expect(email_channel.reload.imap_address).to eq('imap.gmail.com')
         expect(email_channel.reload.imap_port).to eq(993)
+        expect(email_channel.reload.imap_authentication).to eq('login')
       end
 
       it 'updates avatar when administrator' do
@@ -631,6 +639,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
       it 'updates smtp configuration with starttls encryption' do
         smtp_connection = double
+        allow(smtp_connection).to receive(:open_timeout=).and_return(10)
         allow(smtp_connection).to receive(:start).and_return(true)
         allow(smtp_connection).to receive(:finish).and_return(true)
         allow(smtp_connection).to receive(:respond_to?).and_return(true)
@@ -661,6 +670,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
       it 'updates smtp configuration with ssl/tls encryption' do
         smtp_connection = double
+        allow(smtp_connection).to receive(:open_timeout=).and_return(10)
         allow(smtp_connection).to receive(:start).and_return(true)
         allow(smtp_connection).to receive(:finish).and_return(true)
         allow(smtp_connection).to receive(:respond_to?).and_return(true)
@@ -691,6 +701,7 @@ RSpec.describe 'Inboxes API', type: :request do
 
       it 'updates smtp configuration with authentication mechanism' do
         smtp_connection = double
+        allow(smtp_connection).to receive(:open_timeout=).and_return(10)
         allow(smtp_connection).to receive(:start).and_return(true)
         allow(smtp_connection).to receive(:finish).and_return(true)
         allow(smtp_connection).to receive(:respond_to?).and_return(true)
@@ -996,6 +1007,19 @@ RSpec.describe 'Inboxes API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'does not allow binding an agent bot from another account' do
+        other_account = create(:account)
+        foreign_bot = create(:agent_bot, account: other_account)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/set_agent_bot",
+             headers: admin.create_new_auth_token,
+             params: { agent_bot: foreign_bot.id },
+             as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(inbox.reload.agent_bot).to be_nil
       end
     end
   end
@@ -1338,6 +1362,140 @@ RSpec.describe 'Inboxes API', type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(channel.reload.provider_connection).to eq('connection' => 'close')
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/convert_provider' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:inbox) { channel.inbox }
+    let(:new_cloud_config) do
+      { api_key: 'new_cloud_key', phone_number_id: 'new_phone_id', business_account_id: 'new_waba_id' }
+    end
+
+    before do
+      stub_request(:delete, "#{channel.provider_config['provider_url']}/connections/#{channel.phone_number}")
+        .to_return(status: 200)
+      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*/message_templates.*})
+        .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
+      webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
+      allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
+    end
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config }
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated as an agent' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: agent.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'returns unauthorized even when the agent is assigned to the inbox' do
+        create(:inbox_member, user: agent, inbox: inbox)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: agent.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated as an administrator' do
+      it 'converts the channel to the new provider' do # rubocop:disable RSpec/MultipleExpectations
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body['provider']).to eq('whatsapp_cloud')
+        expect(body['provider_config']).to include(
+          'api_key' => 'new_cloud_key',
+          'phone_number_id' => 'new_phone_id',
+          'business_account_id' => 'new_waba_id'
+        )
+        expect(body['provider_config']).not_to have_key('provider_url')
+        channel.reload
+        expect(channel.provider).to eq('whatsapp_cloud')
+        expect(channel.provider_config).to include(
+          'api_key' => 'new_cloud_key',
+          'phone_number_id' => 'new_phone_id',
+          'business_account_id' => 'new_waba_id'
+        )
+        expect(channel.provider_config).not_to have_key('provider_url')
+        expect(channel.provider_connection).to be_blank
+        expect(channel.message_templates).to be_blank
+      end
+
+      it 'returns 422 when the channel does not support conversion' do
+        other_inbox = create(:inbox, account: account)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{other_inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to match(/does not support provider conversion/i)
+      end
+
+      it 'returns 400 when the provider param is missing' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:bad_request)
+        expect(response.parsed_body['message']).to match(/provider/i)
+      end
+
+      it 'returns 422 when the new provider config is invalid' do
+        cloud_service = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: false)
+        allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_service)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: { api_key: 'bad' } },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/invalid credentials/i)
+      end
+
+      it 'returns 422 with a fallback message when conversion raises a generic error' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:convert_provider!).and_raise(StandardError, 'boom') # rubocop:disable RSpec/AnyInstance
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: 'whatsapp_cloud', provider_config: new_cloud_config },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/provider conversion failed/i)
+      end
+
+      it 'returns 422 when converting to the same provider' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/convert_provider",
+             headers: admin.create_new_auth_token,
+             params: { provider: channel.provider, provider_config: {} },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to match(/must be different/i)
       end
     end
   end

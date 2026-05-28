@@ -3,16 +3,19 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback
+  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
     @contact = nil
+    @lock_acquired = false
 
     return unless should_process_message?
-    return if find_message_by_source_id(raw_message_id) || message_under_process?
+    return if find_message_by_source_id(raw_message_id)
 
-    cache_message_source_id_in_redis
+    # Atomically acquire lock to prevent race conditions with concurrent webhook deliveries
+    @lock_acquired = acquire_message_processing_lock
+    return unless @lock_acquired
 
     return handle_edited_message if @raw_message[:isEdit]
 
@@ -24,11 +27,15 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
         return
       end
 
+      # Reaction removals don't produce a new Message row — handle them before
+      # set_conversation so a blank webhook can't open/create a stray thread.
+      next mark_existing_reaction_as_removed if reaction_removal?
+
       set_conversation
       handle_create_message
     end
   ensure
-    clear_message_source_id_from_redis
+    clear_message_source_id_from_redis if @lock_acquired
   end
 
   def should_process_message?
@@ -73,7 +80,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     @raw_message[:senderName] || @raw_message[:chatName] || @raw_message[:phone]
   end
 
-  def set_contact
+  def set_contact # rubocop:disable Metrics/MethodLength
     push_name = contact_name
     source_id = @raw_message[:chatLid].to_s.gsub(/[^\d]/, '')
     identifier = @raw_message[:chatLid]
@@ -82,7 +89,12 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
     unless @raw_message[:phone].ends_with?('@lid')
       contact_attributes[:phone_number] = "+#{@raw_message[:phone]}"
-      update_existing_contact_inbox(@raw_message[:phone], source_id, identifier)
+      Whatsapp::ContactInboxConsolidationService.new(
+        inbox: inbox,
+        phone: @raw_message[:phone],
+        lid: source_id,
+        identifier: identifier
+      ).perform
     end
 
     contact_inbox = ::ContactInboxWithContactBuilder.new(
@@ -97,20 +109,6 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     @contact.update!(name: push_name) if @contact.name == @raw_message[:phone]
     update_contact_phone_number
     try_update_contact_avatar
-  end
-
-  def update_existing_contact_inbox(phone, source_id, identifier)
-    # NOTE: This is useful when we create a new contact manually, so we don't have information about contact LID;
-    # With this, when we receive a message from that contact, we can link it properly.
-    existing_contact = inbox.account.contacts.find_by(phone_number: "+#{phone}")
-    return unless existing_contact
-
-    existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox_id: inbox.id)
-
-    ActiveRecord::Base.transaction do
-      existing_contact.update!(identifier: identifier)
-      existing_contact_inbox&.update!(source_id: source_id)
-    end
   end
 
   def update_contact_phone_number
@@ -133,6 +131,62 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     else
       create_message(attach_media: %w[image sticker file video audio].include?(message_type))
     end
+  end
+
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
+  end
+
+  # Z-API delivers a reaction removal as a webhook with empty value. Our schema
+  # keeps a single Message row per (target, sender) toggling `deleted` on it,
+  # so we update that row in place.
+  #
+  # `fromMe` removals can come from two paths and we want both handled:
+  # - Chatwoot-originated echo: the controller already toggled the row to
+  #   deleted, so the active-first lookup finds nothing and this no-ops.
+  # - Multi-device removal (agent un-reacts from the connected phone): the row
+  #   is still active and stored sender-less outgoing, so we mark it deleted.
+  # Lookup is intentionally NOT scoped to `@conversation`: the reaction may
+  # live in an older/resolved thread, while `set_conversation` could have
+  # picked (or created) a different one for this webhook. Find the row first,
+  # then operate on its real `existing.conversation`.
+  def mark_existing_reaction_as_removed # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+    target_external_id = @raw_message.dig(:reaction, :referencedMessage, :messageId)
+    return if target_external_id.blank?
+
+    json_path = "(content_attributes#>>'{}')::jsonb"
+    # Scope by inbox: the senderless outgoing branch would otherwise match any
+    # reaction with the same provider message id, and two inboxes that ever
+    # receive colliding WhatsApp ids would step on each other's rows.
+    base = Message.where(inbox_id: inbox.id)
+                  .where("#{json_path}->>'is_reaction' = 'true'")
+                  .where("#{json_path}->>'in_reply_to_external_id' = ?", target_external_id)
+    matches = if incoming_message?
+                base.where(sender: @contact)
+              else
+                # Multi-device: agent reacted via the connected phone, so the
+                # local row has no agent (sender_id IS NULL) and is outgoing.
+                base.where(sender_id: nil, sender_type: nil)
+                    .where(message_type: Message.message_types[:outgoing])
+              end
+    # Active-only: when the only matches are already deleted, return nil so
+    # the caller no-ops instead of re-deleting and bumping the conversation
+    # for an echoed Chatwoot-originated removal.
+    existing = matches.where.not(content: '')
+                      .where("COALESCE(#{json_path}->>'deleted', 'false') != 'true'")
+                      .reorder(created_at: :desc)
+                      .first
+    return if existing.nil?
+
+    new_attrs = existing.content_attributes.merge('deleted' => true)
+    existing.update!(content: '', content_attributes: new_attrs)
+    target_conversation = existing.conversation
+    # Refresh the chat list snapshot; cable MESSAGE_UPDATED only touches
+    # chat.messages on the client, so the conversation card preview stays stale
+    # without an explicit conversation.updated dispatch. Touch updated_at so
+    # the frontend out-of-order guard can drop stale cables.
+    target_conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    target_conversation.dispatch_conversation_updated_event
   end
 
   def create_contact_message
@@ -162,8 +216,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: raw_message_id,
-      sender: incoming_message? ? @contact : @inbox.account.account_users.first.user,
-      sender_type: incoming_message? ? 'Contact' : 'User',
+      sender: incoming_message? ? @contact : nil,
       message_type: incoming_message? ? :incoming : :outgoing,
       content_attributes: message_content_attributes
     )
@@ -176,6 +229,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
   def message_content_attributes
     type = message_type
     content_attributes = { external_created_at: @raw_message[:momment] / 1000 }
+    content_attributes[:external_sender_name] = 'WhatsApp' unless incoming_message?
 
     if type == 'reaction'
       content_attributes[:in_reply_to_external_id] = @raw_message.dig(:reaction, :referencedMessage, :messageId)
@@ -272,10 +326,12 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
     @message = find_message_by_source_id(@raw_message[:messageId])
     return unless @message
 
+    # Preserve original previous_content if message was already edited
+    previous_content_to_save = @message.is_edited ? @message.previous_content : @message.content
     @message.update!(
       content: message_content,
       is_edited: true,
-      previous_content: @message.content
+      previous_content: previous_content_to_save
     )
   end
 end

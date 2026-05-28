@@ -67,7 +67,9 @@ describe('#actions', () => {
     });
     it('sends correct actions if API is error', async () => {
       axios.delete.mockRejectedValue({ message: 'Incorrect header' });
-      await expect(actions.delete({ commit }, 1)).rejects.toThrow(Error);
+      await expect(
+        actions.delete({ commit }, { id: 1, filterType: 'contact' })
+      ).rejects.toEqual({ message: 'Incorrect header' });
       expect(commit.mock.calls).toEqual([
         [types.default.SET_CUSTOM_VIEW_UI_FLAG, { isDeleting: true }],
         [types.default.SET_CUSTOM_VIEW_UI_FLAG, { isDeleting: false }],

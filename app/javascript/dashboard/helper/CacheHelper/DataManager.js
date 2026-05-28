@@ -64,6 +64,15 @@ export class DataManager {
     return this.db.getAll(modelName);
   }
 
+  // Patches a single cached record in place, without touching the cache key, so it
+  // does not trigger a full refetch on the next cold load.
+  async update({ modelName, id, data }) {
+    this.validateModel(modelName);
+    const record = await this.db.get(modelName, Number(id));
+    if (!record) return;
+    await this.db.put(modelName, { ...record, ...data });
+  }
+
   async setCacheKeys(cacheKeys) {
     Object.keys(cacheKeys).forEach(async modelName => {
       this.db.put('cache-keys', cacheKeys[modelName], modelName);

@@ -11,6 +11,8 @@ import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import Button from 'next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import ConditionRow from './ConditionRow.vue';
+import VisibilitySelector from './VisibilitySelector.vue';
+import { useMapGetter } from 'dashboard/composables/store';
 
 const props = defineProps({
   isFolderView: {
@@ -20,6 +22,10 @@ const props = defineProps({
   folderName: {
     type: String,
     default: '',
+  },
+  folderVisibility: {
+    type: String,
+    default: 'personal',
   },
 });
 
@@ -31,6 +37,9 @@ const filters = defineModel({
   default: [],
 });
 const folderNameLocal = ref(props.folderName);
+const folderVisibilityLocal = ref(props.folderVisibility);
+const currentRole = useMapGetter('getCurrentRole');
+const isAdmin = computed(() => currentRole.value === 'administrator');
 
 const DEFAULT_FILTER = {
   attributeKey: 'status',
@@ -66,7 +75,12 @@ const isConditionsValid = () => {
 
 const updateSavedCustomViews = () => {
   if (isConditionsValid()) {
-    emit('updateFolder', filters.value, folderNameLocal.value);
+    emit(
+      'updateFolder',
+      filters.value,
+      folderNameLocal.value,
+      folderVisibilityLocal.value
+    );
   }
 };
 
@@ -111,11 +125,16 @@ const outsideClickHandler = [
       {{ filterModalHeaderTitle }}
     </h3>
     <div v-if="props.isFolderView">
-      <div class="border-b border-n-weak pb-6">
+      <div class="border-b border-n-weak pb-6 grid gap-4">
         <Input
           v-model="folderNameLocal"
           :label="t('FILTER.FOLDER_LABEL')"
           :placeholder="t('FILTER.INPUT_PLACEHOLDER')"
+        />
+        <VisibilitySelector
+          v-if="isAdmin"
+          v-model="folderVisibilityLocal"
+          i18n-prefix="FILTER.CUSTOM_VIEWS.VISIBILITY"
         />
       </div>
     </div>

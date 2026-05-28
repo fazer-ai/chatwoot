@@ -11,10 +11,10 @@ export const CONVERSATION_ATTRIBUTES = {
   CAMPAIGN_ID: 'campaign_id',
   LABELS: 'labels',
   BROWSER_LANGUAGE: 'browser_language',
-  COUNTRY_CODE: 'country_code',
   REFERER: 'referer',
   CREATED_AT: 'created_at',
   LAST_ACTIVITY_AT: 'last_activity_at',
+  GROUP_TYPE: 'group_type',
 };
 
 export const CONTACT_ATTRIBUTES = {
@@ -24,6 +24,7 @@ export const CONTACT_ATTRIBUTES = {
   IDENTIFIER: 'identifier',
   COUNTRY_CODE: 'country_code',
   CITY: 'city',
+  COMPANY_NAME: 'company_name',
   CREATED_AT: 'created_at',
   LAST_ACTIVITY_AT: 'last_activity_at',
   REFERER: 'referer',

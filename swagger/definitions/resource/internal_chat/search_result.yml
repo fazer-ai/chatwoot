@@ -1,0 +1,108 @@
+type: object
+properties:
+  channels:
+    type: array
+    description: Matching channels
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The channel ID
+        name:
+          type: string
+          description: The channel name
+        description:
+          type:
+            - string
+            - 'null'
+          description: The channel description
+        channel_type:
+          type: string
+          description: The channel type
+  dms:
+    type: array
+    description: Matching direct message channels
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The channel ID
+        channel_type:
+          type: string
+          description: The channel type
+        peer:
+          type: object
+          properties:
+            user_id:
+              type: integer
+              description: The peer user ID
+            name:
+              type: string
+              description: The peer user name
+            avatar_url:
+              type:
+                - string
+                - 'null'
+              description: The peer user avatar URL
+  messages:
+    type: array
+    description: Matching messages
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The message ID
+        content:
+          type: string
+          description: The message content
+        parent_id:
+          type:
+            - integer
+            - 'null'
+          description: The parent message ID (when the hit is a thread reply)
+        channel_id:
+          type: integer
+          description: The channel ID
+        channel_name:
+          type:
+            - string
+            - 'null'
+          description: The channel name
+        channel_type:
+          type:
+            - string
+            - 'null'
+          description: The channel type
+        created_at:
+          type: string
+          format: date-time
+          description: The time at which the message was created
+        sender:
+          type:
+            - object
+            - 'null'
+          description: The message sender
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            avatar_url:
+              type:
+                - string
+                - 'null'
+  meta:
+    type: object
+    properties:
+      messages_page:
+        type: integer
+        description: Current page of message results
+      messages_has_more:
+        type: boolean
+        description: Whether there are more message results
+      search_limited:
+        type: boolean
+        description: Whether the search history is capped for the current plan

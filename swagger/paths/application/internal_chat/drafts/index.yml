@@ -1,0 +1,23 @@
+tags:
+  - Internal Chat Drafts
+operationId: list-internal-chat-drafts
+summary: List all drafts
+security:
+  - userApiKey: []
+description: List all message drafts for the current user across accessible channels
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: array
+          description: Array of drafts
+          items:
+            $ref: '#/components/schemas/internal_chat_draft'
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

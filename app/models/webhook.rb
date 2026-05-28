@@ -4,8 +4,9 @@
 #
 #  id            :bigint           not null, primary key
 #  name          :string
+#  secret        :string
 #  subscriptions :jsonb
-#  url           :string
+#  url           :text
 #  webhook_type  :integer          default("account_type")
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null
@@ -21,14 +22,18 @@ class Webhook < ApplicationRecord
   belongs_to :account
   belongs_to :inbox, optional: true
 
+  include WebhookSecretable
+
   validates :account_id, presence: true
   validates :url, uniqueness: { scope: [:account_id] }, format: URI::DEFAULT_PARSER.make_regexp(%w[http https])
   validate :validate_webhook_subscriptions
   enum webhook_type: { account_type: 0, inbox_type: 1 }
 
   ALLOWED_WEBHOOK_EVENTS = %w[conversation_status_changed conversation_updated conversation_created contact_created contact_updated
-                              message_created message_updated webwidget_triggered inbox_created inbox_updated
-                              conversation_typing_on conversation_typing_off provider_event_received].freeze
+                              message_created message_incoming message_outgoing message_updated webwidget_triggered
+                              inbox_created inbox_updated conversation_typing_on conversation_typing_off conversation_recording
+                              provider_event_received internal_chat_message_created internal_chat_message_updated
+                              internal_chat_message_deleted internal_chat_channel_updated].freeze
 
   private
 

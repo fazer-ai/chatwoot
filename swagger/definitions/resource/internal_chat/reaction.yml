@@ -1,0 +1,27 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the reaction
+  emoji:
+    type: string
+    description: The emoji used for the reaction
+  user_id:
+    type: integer
+    description: The ID of the user who reacted
+  user:
+    type: object
+    description: Minimal user payload for the reacting user
+    properties:
+      name:
+        type:
+          - string
+          - 'null'
+        description: Display name of the reacting user
+  internal_chat_message_id:
+    type: integer
+    description: The ID of the message this reaction belongs to
+  created_at:
+    type: string
+    format: date-time
+    description: The time at which the reaction was created

@@ -4,11 +4,16 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :fetch_agent_bot, only: [:set_agent_bot]
   before_action :validate_limit, only: [:create]
   # we are already handling the authorization in fetch inbox
+  # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in WhatsappHealthManagement concern
   before_action :check_authorization, except: [:show, :health, :setup_channel_provider]
   before_action :validate_whatsapp_cloud_channel, only: [:health]
+  # rubocop:enable Rails/LexicallyScopedActionFilter
+  include Api::V1::Accounts::Concerns::WhatsappHealthManagement
 
   def index
-    @inboxes = policy_scope(Current.account.inboxes.order_by_name.includes(:channel, { avatar_attachment: [:blob] }))
+    @inboxes = policy_scope(Current.account.inboxes)
+               .includes(:channel, :portal, :working_hours, { avatar_attachment: :blob })
+               .order_by_name
   end
 
   def show; end
@@ -65,6 +70,12 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     head :ok
   end
 
+  def reset_secret
+    return head :not_found unless @inbox.api?
+
+    @inbox.channel.reset_secret!
+  end
+
   def setup_channel_provider
     channel = @inbox.channel
 
@@ -89,26 +100,31 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     channel.update_provider_connection!(connection: 'close') if channel.respond_to?(:update_provider_connection!)
   end
 
+  def convert_provider
+    channel = @inbox.channel
+
+    unless channel.respond_to?(:convert_provider!)
+      render json: { error: 'Channel does not support provider conversion' }, status: :unprocessable_entity and return
+    end
+
+    new_provider = params.require(:provider)
+    new_provider_config = (params.permit(provider_config: {})[:provider_config] || {}).to_h
+
+    channel.convert_provider!(new_provider: new_provider, new_provider_config: new_provider_config)
+    render :show
+  rescue ActionController::ParameterMissing => e
+    render json: { message: e.message }, status: :bad_request
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { message: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP] Provider conversion failed for inbox #{@inbox.id}: #{e.class}: #{e.message}"
+    render json: { message: 'Provider conversion failed. Please check your credentials and the previous provider session, then try again.' },
+           status: :unprocessable_entity
+  end
+
   def destroy
     ::DeleteObjectJob.perform_later(@inbox, Current.user, request.ip) if @inbox.present?
     render status: :ok, json: { message: I18n.t('messages.inbox_deletetion_response') }
-  end
-
-  def sync_templates
-    return render status: :unprocessable_entity, json: { error: 'Template sync is only available for WhatsApp channels' } unless whatsapp_channel?
-
-    trigger_template_sync
-    render status: :ok, json: { message: 'Template sync initiated successfully' }
-  rescue StandardError => e
-    render status: :internal_server_error, json: { error: e.message }
-  end
-
-  def health
-    health_data = Whatsapp::HealthService.new(@inbox.channel).fetch_health_status
-    render json: health_data
-  rescue StandardError => e
-    Rails.logger.error "[INBOX HEALTH] Error fetching health data: #{e.message}"
-    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def on_whatsapp
@@ -133,13 +149,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   end
 
   def fetch_agent_bot
-    @agent_bot = AgentBot.find(params[:agent_bot]) if params[:agent_bot]
-  end
-
-  def validate_whatsapp_cloud_channel
-    return if @inbox.channel.is_a?(Channel::Whatsapp) && @inbox.channel.provider == 'whatsapp_cloud'
-
-    render json: { error: 'Health data only available for WhatsApp Cloud API channels' }, status: :bad_request
+    @agent_bot = AgentBot.accessible_to(Current.account).find(params[:agent_bot]) if params[:agent_bot]
   end
 
   def create_channel
@@ -214,7 +224,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
      :lock_to_single_conversation, :portal_id, :sender_name_type, :business_name,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
-                       template: [:name, :template_id, :created_at, :language] }] }]
+                       template: [:name, :template_id, :friendly_name, :content_sid, :approval_sid,
+                                  :created_at, :linked_at, :language, :source, :status, { body_variables: {} }] }] }]
   end
 
   def permitted_params(channel_attributes = [])
@@ -237,18 +248,6 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
   def get_channel_attributes(channel_type)
     channel_type.constantize.const_defined?(:EDITABLE_ATTRS) ? channel_type.constantize::EDITABLE_ATTRS.presence : []
-  end
-
-  def whatsapp_channel?
-    @inbox.whatsapp? || (@inbox.twilio? && @inbox.channel.whatsapp?)
-  end
-
-  def trigger_template_sync
-    if @inbox.whatsapp?
-      Channels::Whatsapp::TemplatesSyncJob.perform_later(@inbox.channel)
-    elsif @inbox.twilio? && @inbox.channel.whatsapp?
-      Channels::Twilio::TemplatesSyncJob.perform_later(@inbox.channel)
-    end
   end
 end
 

@@ -1,0 +1,40 @@
+allOf:
+  - $ref: ./channel.yml
+  - type: object
+    properties:
+      members_count:
+        type: integer
+        description: The number of members in the channel
+      unread_count:
+        type: integer
+        description: The number of unread messages for the current user
+      has_unread_mention:
+        type: boolean
+        description: Whether the current user has unread mentions in the channel
+      muted:
+        type: boolean
+        description: Whether the current user muted this channel
+      favorited:
+        type: boolean
+        description: Whether the current user favorited this channel
+      hidden:
+        type: boolean
+        description: Whether the current user hid this channel (used to close DMs)
+      members:
+        type: array
+        description: Lightweight members list, only returned for direct message channels
+        items:
+          type: object
+          properties:
+            user_id:
+              type: integer
+            name:
+              type: string
+            avatar_url:
+              type:
+                - string
+                - 'null'
+            availability_status:
+              type:
+                - string
+                - 'null'

@@ -1,4 +1,4 @@
-openapi: '3.0.4'
+openapi: '3.1.0'
 info:
   title: Chatwoot
   description: This is the API documentation for Chatwoot server.
@@ -67,8 +67,12 @@ tags:
     description: Communication channels setup
   - name: Integrations
     description: Third-party integrations
+  - name: Labels
+    description: Account label management APIs
   - name: Messages
     description: Message management APIs
+  - name: Scheduled Messages
+    description: Scheduled message management APIs
   - name: Profile
     description: User profile APIs
   - name: Reports
@@ -87,6 +91,22 @@ tags:
     description: Public conversation APIs
   - name: Messages API
     description: Public message APIs
+  - name: Internal Chat Categories
+    description: Internal chat category management APIs
+  - name: Internal Chat Channels
+    description: Internal chat channel management APIs
+  - name: Internal Chat Channel Members
+    description: Internal chat channel member management APIs
+  - name: Internal Chat Messages
+    description: Internal chat message management APIs
+  - name: Internal Chat Reactions
+    description: Internal chat reaction management APIs
+  - name: Internal Chat Polls
+    description: Internal chat poll management APIs
+  - name: Internal Chat Drafts
+    description: Internal chat draft management APIs
+  - name: Internal Chat Search
+    description: Internal chat search APIs
   - name: CSAT Survey Page
     description: Customer satisfaction survey
 x-tagGroups:
@@ -112,13 +132,23 @@ x-tagGroups:
       - Custom Filters
       - Inboxes
       - Integrations
+      - Labels
       - Messages
+      - Scheduled Messages
       - Profile
       - Reports
       - Teams
       - Webhooks
       - Automation Rule
       - Help Center
+      - Internal Chat Categories
+      - Internal Chat Channels
+      - Internal Chat Channel Members
+      - Internal Chat Messages
+      - Internal Chat Reactions
+      - Internal Chat Polls
+      - Internal Chat Drafts
+      - Internal Chat Search
   - name: Client
     tags:
       - Contacts API

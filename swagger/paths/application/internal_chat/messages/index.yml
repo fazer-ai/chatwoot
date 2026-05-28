@@ -1,0 +1,56 @@
+tags:
+  - Internal Chat Messages
+operationId: list-internal-chat-messages
+summary: List messages
+security:
+  - userApiKey: []
+description: List messages in an internal chat channel with cursor-based pagination
+parameters:
+  - name: before
+    in: query
+    schema:
+      type: string
+      format: date-time
+    description: Fetch messages created before this timestamp
+  - name: after
+    in: query
+    schema:
+      type: string
+      format: date-time
+    description: Fetch messages created after this timestamp
+  - name: around
+    in: query
+    schema:
+      type: integer
+    description: Fetch a window of messages centered around a given message ID
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            messages:
+              type: array
+              description: Array of messages
+              items:
+                $ref: '#/components/schemas/internal_chat_message'
+            meta:
+              type: object
+              properties:
+                has_more:
+                  type: boolean
+                  description: Whether there are more messages available
+  '401':
+    description: Unauthorized
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'
+  '404':
+    description: Channel not found
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/bad_request_error'

@@ -18,6 +18,9 @@
 #available at https://guides.rubyonrails.org/i18n.html.
 pt_BR:
   hello: 'Olá, mundo'
+  internal_chat:
+    default_category_name: 'Canais'
+    default_channel_name: 'Geral'
   inbox:
     reauthorization:
       success: 'Canal reautenticado com sucesso'
@@ -28,13 +31,17 @@ pt_BR:
       invalid_email: 'Por favor, insira um endereço de e-mail válido'
       authentication_failed: 'Falha na autenticação. Por favor, verifique suas credenciais e tente novamente.'
   messages:
-    reset_password_success: Legal! A solicitação de alteração de senha foi bem sucedida. Verifique seu e-mail para obter instruções.
-    reset_password_failure: Uh ho! Não conseguimos encontrar nenhum usuário com o e-mail especificado.
+    reset_password: A solicitação de redefinição de senha foi realizada com sucesso. Um e-mail com instruções será enviado para o seu endereço de e-mail, caso ele exista em nosso sistema.
     reset_password_saml_user: Esta conta usa autenticação SAML. A redefinição de senha não está disponível. Por favor, contate o administrador.
     login_saml_user: Esta conta usa autenticação SAML. Por favor, faça login através do provedor SAML da sua organização.
     saml_not_available: A autenticação SAML não está disponível nesta instalação.
     inbox_deletetion_response: Seu pedido de exclusão da caixa de entrada será processado dentro de algum tempo.
   errors:
+    account:
+      reporting_timezone:
+        invalid: não é um fuso horário válido
+      support_email:
+        invalid: is not a valid email address
     validations:
       presence: não pode ficar em branco
     webhook:
@@ -46,11 +53,27 @@ pt_BR:
       email_already_exists: 'Você já se cadastrou para uma conta com %{email}'
       invalid_params: 'Inválido, por favor, verifique os parâmetros de inscrição e tente novamente'
       failed: Registro falhou
+    voice:
+      call_already_accepted: '%{agent_name} já está atendendo a chamada.'
     assignment_policy:
       not_found: Política de atribuição não encontrada
+    attachments:
+      invalid: Anexo inválido
+    upload:
+      missing_input: 'Nenhum arquivo ou URL fornecido'
+      invalid_url: 'URL fornecida inválida'
+      fetch_failed: 'Falha ao recuperar o arquivo da URL'
+      fetch_failed_with_message: 'Falha ao recuperar o arquivo da URL: %{message}'
+      file_too_large: 'O arquivo excede o tamanho máximo permitido'
+      unsupported_content_type: 'Tipo de arquivo não suportado (apenas imagens e vídeos são permitidos)'
+      unexpected: 'Ocorreu um erro inesperado'
+    automation:
+      scheduled_message:
+        delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias
+        content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou template
     saml:
       feature_not_enabled: SAML não está habilitado para esta conta
-      sso_not_enabled: SAML SSO is not enabled for this installation
+      sso_not_enabled: O SSO via SAML não está habilitado para esta instalação
     data_import:
       data_type:
         invalid: Tipo de dado inválido
@@ -65,9 +88,12 @@ pt_BR:
         invalid: deve estar no formato e164
     companies:
       domain:
-        invalid: must be a valid domain name
+        invalid: deve ser um nome de domínio válido
       search:
-        query_missing: Specify search string with parameter q
+        query_missing: Especifique a string de busca com o parâmetro q
+    messages:
+      search:
+        time_range_limit_exceeded: 'A pesquisa está limitada aos últimos %{days} dias'
     categories:
       locale:
         unique: deve ser único na categoria e no portal
@@ -79,10 +105,19 @@ pt_BR:
       token_exchange_failed: 'Falha ao trocar o código por um token de acesso. Por favor, tente novamente.'
       invalid_token_permissions: 'O token de acesso não tem as permissões necessárias para o WhatsApp.'
       phone_info_fetch_failed: 'Falha ao obter a informação do número de telefone. Por favor, tente novamente.'
-      phone_number_already_exists: 'Channel already exists for this phone number: %{phone_number}, please contact support if the error persists'
+      phone_number_already_exists: 'Já existe um canal para este número de telefone: %{phone_number}. Entre em contato com o suporte se o erro persistir'
       reauthorization:
         generic: 'Falha ao reautenticar o WhatsApp. Por favor, tente novamente.'
         not_supported: 'Reautenticação não é suportado por este tipo de canal WhatsApp.'
+      calls:
+        not_enabled: 'As chamadas não estão habilitadas para esta caixa de entrada'
+        no_recording: 'Nenhum arquivo de gravação fornecido'
+        no_message: 'A chamada não possui mensagem associada'
+        sdp_offer_required: 'sdp_offer é obrigatório'
+        contact_phone_required: 'Número de telefone do contato é obrigatório'
+        permission_request_failed: 'Falha ao enviar solicitação de permissão de chamada'
+    openai:
+      invalid_api_key: 'OpenAI API key is invalid or revoked. Please check your key in your OpenAI dashboard.'
     inboxes:
       imap:
         socket_error: Por favor, verifique a conexão de rede, endereço IMAP e tente novamente.
@@ -90,6 +125,11 @@ pt_BR:
         host_unreachable_error: Servidor inacessível, por favor, verifique o endereço e a porta de IMAP e tente novamente.
         connection_timed_out_error: Tempo esgotado de conexão para %{address}:%{port}
         connection_closed_error: Conexão fechada.
+      smtp:
+        authentication_error: Autenticação SMTP falhou. Por favor, verifique suas credenciais de acesso.
+        connection_error: Não foi possível conectar ao servidor SMTP. Por favor, verifique o endereço do servidor e a porta.
+        ssl_error: Erro de SSL/TLS. Por favor, verifique suas configurações de criptografia.
+        smtp_error: Erro no servidor SMTP. Por favor, verifique sua configuração e tente novamente.
       validations:
         name: 'não deve iniciar ou terminar com símbolos e não deve ter os caracteres: < > / \ @.'
       channel:
@@ -102,6 +142,7 @@ pt_BR:
       invalid_query_operator: Operador de consulta deve ser "E" ou "OU".
       invalid_value: Valor inválido. Os valores fornecidos para %{attribute_name} são inválidos
     custom_attribute_definition:
+      attribute_key_format: deve conter apenas letras, números, sublinhados, hífens, e pontos
       key_conflict: A chave fornecida não é permitida pois pode entrar em conflito com os atributos padrão.
     mfa:
       already_enabled: MFA já está habilitado
@@ -112,12 +153,14 @@ pt_BR:
       invalid_credentials: Credenciais ou código de verificação inválidos
       feature_unavailable: O recurso MFA não está disponível. Por favor, configure as chaves de criptografia.
     topup:
-      credits_required: Credits amount is required
-      invalid_credits: Invalid credits amount
-      invalid_option: Invalid topup option
-      plan_not_eligible: Top-ups are only available for paid plans. Please upgrade your plan first.
-      stripe_customer_not_configured: Stripe customer not configured
-      no_payment_method: No payment methods found. Please add a payment method before making a purchase.
+      credits_required: A quantidade de créditos é obrigatória
+      invalid_credits: Quantidade de créditos inválida
+      invalid_option: Opção de recarga inválida
+      plan_not_eligible: As recargas estão disponíveis apenas para planos pagos. Por favor, faça o upgrade do seu plano primeiro.
+      stripe_customer_not_configured: Cliente do Stripe não configurado
+      no_payment_method: Nenhum método de pagamento encontrado. Por favor, adicione um método de pagamento antes de realizar uma compra.
+    reports:
+      date_range_too_long: O intervalo de datas não pode exceder 6 meses
   profile:
     mfa:
       enabled: MFA habilitado com sucesso
@@ -154,6 +197,14 @@ pt_BR:
       avg_resolution_time: Tempo médio de resolução
       resolution_count: Contagem de Resolução
       avg_customer_waiting_time: Tempo médio de espera do cliente
+    conversation_csv:
+      conversations_count: Conversas
+      incoming_messages_count: Mensagens Recebidas
+      outgoing_messages_count: Mensagens enviadas
+      avg_first_response_time: Tempo médio de primeira resposta
+      avg_resolution_time: Tempo médio de resolução
+      resolution_count: Quantidade de resoluções
+      avg_customer_waiting_time: Tempo médio de espera do cliente
     conversation_traffic_csv:
       timezone: Fuso horário
     sla_csv:
@@ -176,9 +227,10 @@ pt_BR:
         rating: Classificação
         feedback: Comentário de Feedback
         recorded_at: Data de gravação
+        review_notes: Notas de Avaliação
   notifications:
     notification_title:
-      conversation_creation: ''
+      conversation_creation: 'A conversa (#%{display_id}) foi criada em %{inbox_name}'
       conversation_assignment: 'Uma conversa (#%{display_id}) foi atribuída a você'
       assigned_conversation_new_message: 'Uma nova mensagem foi criada na conversa (#%{display_id})'
       conversation_mention: 'Você foi mencionado em uma conversa (#%{display_id})'
@@ -193,19 +245,27 @@ pt_BR:
     messages:
       instagram_story_content: '%{story_sender} mencionou você na conversa: '
       instagram_deleted_story_content: Este Story não está mais disponível.
-      instagram_shared_story_content: 'Shared story'
-      instagram_shared_post_content: 'Shared post'
+      instagram_shared_story_content: 'Story compartilhado'
+      instagram_shared_post_content: 'Post compartilhado'
       deleted: Esta mensagem foi excluída
       whatsapp:
         list_button_label: 'Escolha um item'
+        call_permission_request_body: 'Gostaríamos de ligar para você em relação à sua conversa.'
+      voice_call:
+        twilio: 'Chamada de Voz'
+        whatsapp: 'Chamada do WhatsApp'
       delivery_status:
         error_code: 'Código de erro: %{error_code}'
     activity:
       captain:
         resolved: 'A conversa foi marcada como resolvida por %{user_name} por inatividade'
+        resolved_with_reason: 'A conversa foi marcada como resolvida por %{user_name} (%{reason})'
+        resolved_by_tool: 'A conversa foi marcada como resolvida por %{user_name}: %{reason}'
         open: 'A conversa foi aberta por %{user_name}'
+        open_with_reason: 'A conversa foi marcada como aberta por %{user_name} (%{reason})'
+        auto_opened_after_agent_reply: 'A conversa foi marcada como aberta automaticamente após a resposta de um agente'
       agent_bot:
-        error_moved_to_open: 'Conversation was marked open by system due to an error with the agent bot.'
+        error_moved_to_open: 'A conversa foi marcada como aberta pelo sistema devido a um erro com o robô de atendimento.'
       status:
         resolved: 'Conversa foi marcada como resolvida por %{user_name}'
         contact_resolved: 'A conversa foi resolvida por %{contact_name}'
@@ -238,12 +298,50 @@ pt_BR:
         issue_created: 'Problema linear %{issue_id} foi criado por %{user_name}'
         issue_linked: 'Problema linear %{issue_id} foi vinculado por %{user_name}'
         issue_unlinked: 'Problema linear %{issue_id} foi desvinculado por %{user_name}'
+      group_participants:
+        add:
+          single: '%{author_name} adicionou %{contact_name} ao grupo'
+          multiple: '%{author_name} adicionou %{contact_names} e %{last_contact_name} ao grupo'
+        join: '%{contact_name} entrou usando o link do grupo'
+        leave: '%{contact_name} saiu do grupo'
+        remove:
+          single: '%{author_name} removeu %{contact_name} do grupo'
+          multiple: '%{author_name} removeu %{contact_names} e %{last_contact_name} do grupo'
+        promote:
+          single: '%{author_name} promoveu %{contact_name} a admin'
+          multiple: '%{author_name} promoveu %{contact_names} e %{last_contact_name} a admin'
+        demote:
+          single: '%{author_name} rebaixou %{contact_name} a membro'
+          multiple: '%{author_name} rebaixou %{contact_names} e %{last_contact_name} a membro'
+      groups_update:
+        subject_changed: '%{author_name} alterou o nome do grupo para "%{value}"'
+        description_changed: '%{author_name} alterou a descrição do grupo'
+        description_removed: '%{author_name} removeu a descrição do grupo'
+        restrict_enabled: '%{author_name} mudou as configurações para permitir que somente admins editem as configurações do grupo'
+        restrict_disabled: '%{author_name} mudou as configurações para permitir que todos os membros editem as configurações do grupo'
+        announce_enabled: '%{author_name} mudou as configurações desse grupo para permitir que somente admins enviem mensagens ao grupo'
+        announce_disabled: '%{author_name} mudou as configurações do grupo para permitir que todos os membros enviem mensagens'
+        member_add_mode_enabled: '%{author_name} mudou as configurações do grupo para permitir que todos os membros adicionem outras pessoas'
+        member_add_mode_disabled: '%{author_name} mudou as configurações deste grupo para permitir que somente admins adicionem outras pessoas ao grupo'
+        join_approval_mode_enabled: '%{author_name} ativou a autorização de admins para entrar neste grupo'
+        join_approval_mode_disabled: '%{author_name} desativou a autorização de admins para entrar neste grupo'
+        invite_link_reset: '%{author_name} redefiniu o link do grupo para convidar outras pessoas'
+        membership_request_created: '%{contact_name} deseja entrar no grupo'
+        membership_request_revoked: '%{contact_name} não deseja mais fazer parte do grupo'
+        icon_changed: '%{author_name} alterou a imagem do grupo'
+      whatsapp_call:
+        permission_requested: 'Solicitação de permissão de chamada enviada para %{contact_name}.'
+        permission_granted: '%{contact_name} aceitou a solicitação de permissão de chamada.'
       csat:
         not_sent_due_to_messaging_window: 'Pesquisa CSAT não foi enviada devido a restrições de envio de mensagens'
       auto_resolve:
         not_sent_due_to_messaging_window: 'Auto-resolver mensagem não enviada devido a restrições de envio de mensagens'
       muted: '%{user_name} silenciou a conversa'
       unmuted: '%{user_name} reativou a conversa'
+      recurring_message_failed: 'Mensagem agendada recorrente falhou ao enviar. Próxima ocorrência agendada para %{next_date}.'
+      recurring_message_completed: 'Série de mensagem agendada recorrente concluída após %{count} ocorrências.'
+      recurring_message_cancelled: 'Recorrência de mensagem agendada foi interrompida por %{agent}.'
+      unknown_agent: 'Desconhecido'
       auto_resolution_message: 'Resolvendo a conversa dado que está inativa por um tempo. Por favor, inicie uma nova conversa se precisar de mais ajuda.'
     templates:
       greeting_message_body: '%{account_name} normalmente responde em algumas horas.'
@@ -269,6 +367,11 @@ pt_BR:
   contacts:
     online:
       delete: '%{contact_name} está Online, por favor, tente novamente mais tarde'
+    sync_group:
+      not_a_group: 'O contato não é um grupo'
+      no_identifier: 'O contato não possui um identificador de grupo'
+      no_supported_inbox: 'Nenhuma caixa de entrada com suporte a sincronização de grupo encontrada para este contato'
+      metadata_unavailable: 'Não foi possível obter os metadados do grupo do provedor'
   integration_apps:
     #Note: webhooks and dashboard_apps don't need short_description as they use different modal components
     dashboard_apps:
@@ -302,6 +405,7 @@ pt_BR:
       name: 'Linear'
       short_description: 'Crie e vincule issues do Linear diretamente de conversas.'
       description: 'Crie issues em Linear diretamente da sua janela de conversa. Alternativamente, vincule as issues lineares existentes para um processo de rastreamento de problemas mais simples e eficiente.'
+      attachment_link_title: 'Conversa (#%{conversation_id}) com %{name}'
     notion:
       name: 'Notion'
       short_description: 'Integre banco de dados, documentos e páginas diretamente com o Capitão.'
@@ -318,6 +422,9 @@ pt_BR:
     copilot_message_required: A mensagem é obrigatória
     copilot_error: 'Conecte com um assistente a esta caixa de entrada para usar Copilot'
     copilot_limit: 'Você está sem créditos de Copilot. Pode comprar mais créditos na seção de faturamento.'
+    upgrade: 'Atualize seu plano para habilitar o Capitão IA'
+    disabled: 'O Capitão IA está desativado para esta conta.'
+    api_key_missing: 'A chave de API do Capitão IA não está configurada.'
     copilot:
       using_tool: 'Usando a ferramenta %{function_name}'
       completed_tool_call: 'Uso da ferramenta %{function_name} concluída'
@@ -327,24 +434,28 @@ pt_BR:
       limit_exceeded: 'Limite de documento excedido'
       pdf_format_error: 'Deve ser um arquivo PDF'
       pdf_size_error: 'Deve ser menor que 10 MB'
+      sync_not_supported_for_pdf: 'A sincronização não é suportada para documentos PDF'
+      sync_only_available_documents: 'A sincronização só está disponível para documentos processados'
+      sync_already_in_progress: 'Sincronização de documentos já está em andamento'
       pdf_upload_failed: 'Falha ao enviar PDF para OpenAI'
       pdf_upload_success: 'PDF enviado com sucesso com file_id: %{file_id}'
       pdf_processing_failed: 'Falha ao processar o documento PDF %{document_id}: %{error}'
       pdf_processing_success: 'Documento PDF processado com sucesso %{document_id}'
-      faq_generation_complete: 'FAQ generation complete. Total FAQs created: %{count}'
-      using_paginated_faq: ''
-      using_standard_faq: 'Using standard FAQ generation for document %{document_id}'
-      response_creation_error: 'Error in creating response document: %{error}'
+      faq_generation_complete: 'Geração de FAQs concluída. Total de FAQs criadas: %{count}'
+      using_paginated_faq: 'Usando geração de FAQ''s paginada para o documento %{document_id}'
+      using_standard_faq: 'Usando geração padrão de FAQs para o documento %{document_id}'
+      response_creation_error: 'Erro ao criar o documento de resposta: %{error}'
       missing_openai_file_id: 'O documento deve ter openai_file_id para processamento paginado'
       openai_api_error: 'Erro da API OpenAI: %{error}'
-      starting_paginated_faq: 'Starting paginated FAQ generation (%{pages_per_chunk} pages per chunk)'
+      starting_paginated_faq: 'Iniciando a geração paginada de FAQs (%{pages_per_chunk} páginas por bloco)'
       stopping_faq_generation: 'Processamento interrompido. Motivo: %{reason}'
       paginated_faq_complete: 'Geração de paginação completa. Total de FAQs: %{total_faqs}, Páginas processadas: %{pages_processed}'
       processing_pages: 'Processando páginas %{start}-%{end} (iteração %{iteration})'
-      chunk_generated: 'Chunk generated %{chunk_faqs} FAQs. Total so far: %{total_faqs}'
+      chunk_generated: 'Bloco gerado com %{chunk_faqs} FAQs. Total até agora: %{total_faqs}'
       page_processing_error: 'Erro ao processar as páginas %{start}-%{end}: %{error}'
     custom_tool:
-      slug_generation_failed: 'Unable to generate unique slug after 5 attempts'
+      slug_generation_failed: 'Não foi possível gerar um slug único após 5 tentativas'
+      limit_exceeded: 'Você pode criar no máximo %{limit} ferramentas personalizadas por conta'
   public_portal:
     search:
       search_placeholder: Pesquisar por artigo por título ou corpo...
@@ -381,6 +492,10 @@ pt_BR:
       title: Página não encontrada
       description: Não conseguimos encontrar a página que você estava procurando.
       back_to_home: Ir para a página inicial
+    not_active:
+      title: Central de Ajuda Indisponível
+      description: Entre em contato com o administrador do site para mais informações.
+      action: Se você é o administrador, por favor atualize seu plano para restaurar o acesso.
   slack_unfurl:
     fields:
       name: Nome
@@ -403,6 +518,9 @@ pt_BR:
     seconds:
       one: '%{count} segundo'
       other: '%{count} segundos'
+  auto_assignment:
+    default_policy_name: 'Política Padrão'
+    policy_actor: 'Sistema de Automação via %{policy_name}'
   automation:
     system_name: 'Sistema de Automação'
   crm:
@@ -428,6 +546,12 @@ pt_BR:
   agent_capacity_policy:
     inbox_already_assigned: 'A caixa de entrada já foi atribuída a esta política'
   portals:
+    articles:
+      captain_not_available: 'A tradução requer que o Capitão esteja ativado para esta conta'
+      locale_not_available: 'Localidade não disponível neste portal'
+      category_not_found: 'Categoria não encontrada neste portal'
+      no_articles_found: 'Nenhum artigo encontrado para processar'
+      invalid_status: 'Valor de status inválido'
     send_instructions:
       email_required: 'E-mail é obrigatório'
       invalid_email_format: 'Formato inválido de e-mail'
@@ -436,3 +560,249 @@ pt_BR:
       subject: 'Termine de configurar %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Domínio personalizado não está configurado'
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: "Todos os dias"
+        other: "A cada %{count} dias"
+      weekly:
+        one: "Semanal"
+        other: "A cada %{count} semanas"
+      weekly_on: "%{prefix}: %{days}"
+      monthly:
+        one: "Mensal"
+        other: "A cada %{count} meses"
+      monthly_on_weekday: "%{prefix} no(a) %{ordinal} %{weekday}"
+      yearly:
+        one: "Anual"
+        other: "A cada %{count} anos"
+      until_date: "até %{date}"
+      after_count:
+        one: "%{count} ocorrência"
+        other: "%{count} ocorrências"
+      ordinals:
+        first: "primeiro(a)"
+        second: "segundo(a)"
+        third: "terceiro(a)"
+        fourth: "quarto(a)"
+        fifth: "quinto(a)"
+        last: "último(a)"
+  mailer:
+    common:
+      hi: Olá %{name}
+      hi_plain: Olá
+      hello: Olá,
+      hello_there: Olá,
+      click_here: "Clique <a href=\"%{url}\">aqui</a>"
+      powered_by: Desenvolvido por
+      sent_by_prefix: Este e-mail foi enviado por
+      you: Você
+      attachment_click_to_view: "Anexo [<a href=\"%{url}\" target=\"_blank\">Clique aqui para visualizar</a>]"
+      click_here_to_get_cracking: "Clique <a href=\"%{url}\">aqui</a> para acessar."
+      the_chatwoot_team: Equipe %{brand_name}
+    agent_notifications:
+      conversation_creation:
+        subject: "%{agent_name}, Uma nova conversa [ID - %{conversation_id}] foi criada em %{inbox_name}."
+        body: "Uma nova conversa (<a href=\"%{url}\">#%{conversation_id}</a>) foi criada em %{inbox_name}. <strong>%{contact_name}</strong> escreveu:"
+      conversation_assignment:
+        subject: "%{agent_name}, Uma nova conversa [ID - %{conversation_id}] foi atribuída a você."
+        body: Uma nova conversa foi atribuída a você
+      conversation_mention:
+        subject: "%{agent_name}, Você foi mencionado na conversa [ID - %{conversation_id}]"
+        body: "Você foi mencionado em uma conversa. <b>%{sender_name}</b> escreveu:"
+        previous_messages: "Mensagens anteriores:"
+        view_message: Ver Mensagem
+      assigned_conversation_new_message:
+        subject: "%{agent_name}, Nova mensagem na sua conversa atribuída [ID - %{conversation_id}]."
+        body: Você recebeu uma nova mensagem na sua conversa atribuída.
+      participating_conversation_new_message:
+        subject: "%{agent_name}, Nova mensagem na sua conversa participante [ID - %{conversation_id}]."
+        body: Você recebeu uma nova mensagem em uma conversa da qual você participa.
+      sla_missed_first_response:
+        subject: Conversa [ID - %{conversation_id}] violou o SLA de primeira resposta
+        body: violou o SLA de primeira resposta da política
+        full_body: "A conversa #%{conversation_id} em %{inbox_name} violou o SLA de primeira resposta da política %{sla_policy_name}."
+        action: Resolva imediatamente.
+      sla_missed_next_response:
+        subject: Conversa [ID - %{conversation_id}] violou o SLA de próxima resposta
+        body: violou o SLA de próxima resposta da política
+        full_body: "A conversa #%{conversation_id} em %{inbox_name} violou o SLA de próxima resposta da política %{sla_policy_name}."
+        action: Resolva imediatamente.
+      sla_missed_resolution:
+        subject: Conversa [ID - %{conversation_id}] violou o SLA de tempo de resolução
+        body: violou o SLA de tempo de resolução da política
+        full_body: "A conversa #%{conversation_id} em %{inbox_name} violou o SLA de tempo de resolução da política %{sla_policy_name}."
+        action: Resolva imediatamente.
+    administrator_notifications:
+      channel_notifications:
+        whatsapp_disconnect:
+          subject: Sua conexão com o WhatsApp expirou
+          body: Seu acesso ao WhatsApp expirou.
+          action: Por favor, reconecte o WhatsApp para continuar recebendo mensagens.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+        facebook_disconnect:
+          subject: Sua conexão com a página do Facebook expirou
+          body: Seu acesso à caixa de entrada do Facebook expirou.
+          action: Por favor, reconecte a página do Facebook para continuar recebendo mensagens.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+        instagram_disconnect:
+          subject: Sua conexão com o Instagram expirou
+          body: Seu acesso à caixa de entrada do Instagram expirou.
+          action: Por favor, reconecte o Instagram para continuar recebendo mensagens.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+        tiktok_disconnect:
+          subject: Sua conexão com o TikTok expirou
+          body: Seu acesso à caixa de entrada do TikTok expirou.
+          action: Por favor, reconecte o TikTok para continuar recebendo mensagens.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+        email_disconnect:
+          subject: Sua caixa de entrada de e-mail foi desconectada. Por favor, atualize as credenciais SMTP/IMAP
+          body: Sua caixa de entrada de e-mail foi desconectada devido a erros de configuração.
+          action: Por favor, atualize-a para continuar recebendo mensagens.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+      account_notifications:
+        automation_rule_disabled:
+          subject: Regra de automação desativada devido a erros de validação.
+          body: "A regra de automação <b>%{rule_name}</b> foi desativada porque possui condições inválidas."
+          explanation: Isso normalmente acontece quando você exclui atributos personalizados que ainda estão sendo usados em regras de automação.
+          action: "Clique <a href=\"%{url}\">aqui</a> para atualizar as condições."
+        contact_import_complete:
+          subject: Importação de Contatos Concluída
+          body: Sua importação de contatos foi concluída. Verifique a aba de contatos para visualizar os contatos importados.
+          imported_records: "Número de registros importados: %{count}"
+          failed_records: "Número de registros com falha: %{count}"
+          click_to_view_imported: "Clique <a href=\"%{url}\">aqui</a> para visualizar os contatos importados."
+          click_to_view_failed: "Clique <a href=\"%{url}\" target=\"_blank\">aqui</a> para visualizar os registros com falha."
+        contact_import_failed:
+          subject: Falha na Importação de Contatos
+          body: Sua importação de contatos falhou. Parece que o arquivo CSV enviado pode não ser válido. Por favor, revise o arquivo e garanta que ele esteja no formato correto.
+        contact_export_complete:
+          subject: Seu arquivo de exportação de contatos está disponível para download.
+          body: Seu arquivo de exportação de contatos está pronto para download.
+          action: "Clique <a href=\"%{url}\">aqui</a> para baixar o arquivo de exportação."
+        account_deletion_user_initiated:
+          subject: A exclusão da sua conta %{brand_name} foi agendada
+          body: "Um administrador da conta solicitou a exclusão da conta %{brand_name} <strong>%{account_name}</strong>. A conta está agendada para exclusão em <strong>%{deletion_date}</strong>."
+          what_happens_next: O que acontece a seguir?
+          remains_accessible: A conta permanecerá acessível até a data de exclusão agendada.
+          data_permanently_removed: Após essa data, todos os dados, incluindo conversas, contatos, integrações e configurações, serão permanentemente removidos.
+          cancel_request: "Se você mudar de ideia antes da data de exclusão, pode <a href=\"%{url}\">cancelar esta solicitação</a> acessando as configurações da sua conta."
+        account_deletion_for_inactivity:
+          subject: Sua conta %{brand_name} está agendada para exclusão por inatividade
+          body: "Notamos que sua conta %{brand_name} <strong>%{account_name}</strong> está inativa há algum tempo. Por isso, ela está agendada para exclusão em <strong>%{deletion_date}</strong>."
+          how_to_keep: Como manter minha conta?
+          how_to_keep_body: "Faça login na sua conta %{brand_name} antes de <strong>%{deletion_date}</strong>. Nas configurações da sua conta, você pode <a href=\"%{url}\">cancelar a exclusão</a> e continuar usando sua conta."
+          what_if_no_cancel: O que acontece se eu não cancelar?
+          what_if_no_cancel_body: "A menos que você cancele a exclusão da conta antes de <strong>%{deletion_date}</strong>, sua conta e todos os dados associados, incluindo conversas, contatos, relatórios e configurações, serão permanentemente excluídos."
+          why_doing_this: Por que estamos fazendo isso?
+          why_doing_this_body: Para manter tudo seguro e eficiente, removemos regularmente contas inativas para que nossos sistemas permaneçam otimizados para equipes ativas.
+          contact_us: "Se você tiver alguma dúvida, entre em contato conosco em <a href=\"mailto:%{email}\">%{email}</a>."
+      integrations_notifications:
+        slack_disconnect:
+          subject: Sua integração com o Slack expirou
+          body: Sua integração com o Slack expirou. Para continuar recebendo mensagens no Slack, exclua a integração e conecte seu workspace novamente.
+          click_to_reconnect: "Clique <a href=\"%{url}\">aqui</a> para reconectar."
+        dialogflow_disconnect:
+          subject: Sua integração com o Dialogflow foi desconectada
+          body: Sua integração com o Dialogflow foi desconectada devido a problemas de permissão. Para resolver isso, exclua a integração do painel de administração e reconecte-a usando novas credenciais.
+      account_compliance:
+        account_deleted:
+          subject: Notificação de Exclusão de Conta para %{account_id} - %{account_name}
+          body: Esta é uma notificação para informar que uma conta foi permanentemente excluída da sua instância %{brand_name}.
+          installation: "Instalação %{brand_name}:"
+          account_id: "ID da Conta:"
+          account_name: "Nome da Conta:"
+          deletion_due_at: "Exclusão prevista para:"
+          deleted_at: "Excluída em:"
+          deletion_reason: "Motivo da Exclusão:"
+          deleted_users: "Usuários Excluídos (%{count}):"
+          deleted_users_none: "Usuários Excluídos: Nenhum"
+          user_id: "ID do Usuário:"
+          compliance_notice: Este e-mail serve como registro para fins de conformidade.
+          thank_you: Obrigado,
+          system_name: Sistema %{brand_name}
+    team_notifications:
+      automation:
+        subject: Este e-mail foi enviado via ações de regra de automação.
+        automation_system: Este e-mail foi enviado pelo Sistema de Automação
+    portal:
+      cname_instructions:
+        greeting: Olá,
+        intro: "Para concluir a configuração do seu centro de ajuda, você precisará atualizar as configurações de DNS do seu domínio personalizado: <strong>%{domain}</strong>."
+        add_cname: "Adicione o seguinte registro CNAME na configuração do seu provedor de DNS:"
+        steps_title: "Instruções passo a passo:"
+        step_1: Acesse o painel do seu provedor de DNS
+        step_2: Vá para a seção de gerenciamento de DNS
+        step_3: Crie um novo registro CNAME usando as informações acima
+        step_4: Salve as alterações e aguarde até 24 horas para a propagação do DNS
+        ssl_notice: Quando o registro DNS estiver ativo, seu domínio personalizado será automaticamente protegido com um certificado SSL.
+        support_message: Se você tiver alguma dúvida ou precisar de ajuda, entre em contato com nossa equipe de suporte. Estamos aqui para ajudar.
+    devise:
+      confirmation_instructions:
+        secure_link: este link seguro
+        button_fallback_html: "Se o botão não funcionar, abra %{link}."
+        labels:
+          invited_by: Convidado por
+          workspace: Espaço de trabalho
+          sign_in_method: Método de acesso
+          sign_in_method_value: Single Sign-On (SSO)
+          new_email: Novo e-mail
+        welcome:
+          eyebrow: Boas-vindas
+          heading: Confirme seu e-mail para começar
+          intro_html: "Boas-vindas ao %{brand_name}. Só precisamos verificar seu endereço de e-mail antes que você possa começar a usar sua conta."
+          supporting_text: Leva só um instante.
+          action_text: Confirmar minha conta
+        email_update:
+          eyebrow: Atualização de e-mail
+          heading: Confirme seu novo endereço de e-mail
+          intro_html: "Recebemos um pedido para atualizar o endereço de e-mail da sua conta %{brand_name}."
+          supporting_text: Confirme o novo endereço abaixo para concluir a alteração.
+          action_text: Confirmar endereço de e-mail
+        account_ready:
+          eyebrow: Conta pronta
+          heading: Sua conta está pronta
+          intro_html: "Sua conta %{brand_name} já está ativa."
+          supporting_text: Use o botão abaixo para acessar e continuar de onde parou.
+          action_text: Abrir minha conta
+        invitation:
+          eyebrow: Convite para o espaço de trabalho
+          heading_with_account: "Você foi convidado para entrar em %{account_name}"
+          heading_default: "Você foi convidado para experimentar o %{brand_name}"
+          intro_with_account_html: "%{inviter_name} convidou você para entrar no espaço de trabalho %{account_name} no %{brand_name}."
+          intro_default_html: "%{inviter_name} convidou você para experimentar o %{brand_name}."
+          supporting_text: Crie sua conta para começar a colaborar com sua equipe.
+          action_text: Aceitar convite
+        sso_access_ready:
+          heading: Seu acesso está pronto
+          intro_html: "Seu acesso ao %{brand_name} já está configurado."
+          supporting_html: "Use o portal Single Sign-On (SSO) da sua organização para acessar o %{brand_name}."
+          info_title: "Acesse pelo SSO da sua organização"
+          info_text_html: "Você não precisará de uma senha separada para o %{brand_name}. Comece pelo portal de identidade da sua empresa."
+        sso_invitation:
+          intro_with_account_html: "%{inviter_name} convidou você para acessar o espaço de trabalho %{account_name} no %{brand_name}."
+          intro_default_html: "%{inviter_name} convidou você para acessar o %{brand_name}."
+          supporting_html: "Sua organização usa Single Sign-On (SSO), então você não precisará criar uma senha separada."
+          info_title: "Use o portal SSO da sua organização"
+          info_text_html: "Continue pelo portal de identidade da sua empresa para acessar o %{brand_name}."
+      reset_password_instructions:
+        greeting_html: Olá %{name}!
+        body_html: Alguém solicitou um link para alterar sua senha. Você pode fazer isso através do link abaixo.
+        action: Alterar minha senha
+        copy_paste_html: "Copie e cole a URL no seu navegador se o link acima não funcionar:"
+        ignore_html: Se você não solicitou isso, ignore este e-mail.
+        no_change_html: Sua senha não será alterada até que você acesse o link acima e crie uma nova.
+      password_change:
+        greeting_html: Olá %{name}!
+        body_html: Estamos entrando em contato para informar que sua senha foi alterada.
+      unlock_instructions:
+        greeting_html: Olá %{name}!
+        body_html: Sua conta foi bloqueada devido a um número excessivo de tentativas de login malsucedidas.
+        action_prompt_html: "Clique no link abaixo para desbloquear sua conta:"
+        unlock_account: Desbloquear minha conta
+  super_admin:
+    push_diagnostics:
+      user_not_found: 'Usuário não encontrado.'
+      no_subscriptions_to_test: 'Selecione pelo menos uma assinatura para teste.'
+      no_subscriptions_to_delete: 'Selecione pelo menos uma assinatura para excluir.'
+      subscriptions_deleted: "Excluída(s) %{count} inscrição(ões). O(s) dispositivo(s) do usuário será(ão) registrado(s) novamente na próxima inicialização do aplicativo."

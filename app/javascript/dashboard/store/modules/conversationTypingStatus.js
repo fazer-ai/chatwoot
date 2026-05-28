@@ -38,10 +38,17 @@ export const mutations = {
     { conversationId, user }
   ) => {
     const records = $state.records[conversationId] || [];
-    const hasUserRecordAlready = !!records.filter(
+    const existingIndex = records.findIndex(
       record => record.id === user.id && record.type === user.type
-    ).length;
-    if (!hasUserRecordAlready) {
+    );
+    if (existingIndex >= 0) {
+      const updatedRecords = [...records];
+      updatedRecords[existingIndex] = user;
+      $state.records = {
+        ...$state.records,
+        [conversationId]: updatedRecords,
+      };
+    } else {
       $state.records = {
         ...$state.records,
         [conversationId]: [...records, user],

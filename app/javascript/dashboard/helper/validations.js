@@ -125,8 +125,10 @@ const validateSingleAction = action => {
     'mute_conversation',
     'snooze_conversation',
     'resolve_conversation',
+    'remove_assigned_agent',
     'remove_assigned_team',
     'open_conversation',
+    'pending_conversation',
   ];
 
   if (
@@ -134,6 +136,27 @@ const validateSingleAction = action => {
     (!action.action_params || action.action_params.length === 0)
   ) {
     return ACTION_PARAMETERS_REQUIRED;
+  }
+
+  if (action.action_name === 'create_scheduled_message') {
+    const params = action.action_params?.[0];
+    if (!params || typeof params !== 'object') {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
+    const hasContent = params.content?.trim?.();
+    const hasAttachment = params.blob_id;
+    const hasTemplateParams =
+      params.template_params &&
+      typeof params.template_params === 'object' &&
+      !Array.isArray(params.template_params) &&
+      Object.keys(params.template_params).length > 0;
+    const hasDelay = params.delay_minutes && params.delay_minutes >= 1;
+    if (!hasContent && !hasAttachment && !hasTemplateParams) {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
+    if (!hasDelay) {
+      return ACTION_PARAMETERS_REQUIRED;
+    }
   }
 
   return null;

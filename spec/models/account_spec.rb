@@ -198,11 +198,93 @@ RSpec.describe Account do
         expect(account.settings['auto_resolve_message']).to eq(message)
       end
 
+      it 'defaults captain_auto_resolve_mode to legacy when captain_tasks is disabled' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(false)
+
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account).to be_captain_auto_resolve_legacy
+      end
+
+      it 'defaults captain_auto_resolve_mode to evaluated when captain_tasks is enabled' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(true)
+
+        expect(account.captain_auto_resolve_mode).to eq('evaluated')
+        expect(account).to be_captain_auto_resolve_evaluated
+      end
+
+      it 'correctly gets and sets captain_auto_resolve_mode' do
+        account.captain_auto_resolve_mode = 'legacy'
+
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account.settings['captain_auto_resolve_mode']).to eq('legacy')
+        expect(account).to be_captain_auto_resolve_legacy
+      end
+
+      it 'allows clearing captain_auto_resolve_mode to fall back to feature defaults' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(false)
+        account.captain_auto_resolve_mode = nil
+
+        expect(account).to be_valid
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account.settings['captain_auto_resolve_mode']).to be_nil
+      end
+
+      it 'falls back to disabled mode from legacy settings key' do
+        account.settings = { 'captain_disable_auto_resolve' => true }
+
+        expect(account.captain_auto_resolve_mode).to eq('disabled')
+        expect(account).to be_captain_auto_resolve_disabled
+      end
+
       it 'handles nil values correctly' do
         account.auto_resolve_after = nil
         account.auto_resolve_message = nil
         expect(account.auto_resolve_after).to be_nil
         expect(account.auto_resolve_message).to be_nil
+      end
+    end
+
+    context 'when toggling agent assignee tab visibility' do
+      it 'casts truthy form input to boolean true' do
+        account.hide_agent_unassigned_tab = '1'
+        account.hide_agent_all_tab = 'true'
+
+        expect(account.hide_agent_unassigned_tab).to be true
+        expect(account.hide_agent_all_tab).to be true
+        expect(account.settings['hide_agent_unassigned_tab']).to be true
+        expect(account.settings['hide_agent_all_tab']).to be true
+      end
+
+      it 'casts falsy form input to boolean false' do
+        account.hide_agent_unassigned_tab = '0'
+        account.hide_agent_all_tab = 'false'
+
+        expect(account.hide_agent_unassigned_tab).to be false
+        expect(account.hide_agent_all_tab).to be false
+      end
+
+      it 'persists across save with the schema validator passing' do
+        account.update!(hide_agent_unassigned_tab: '0', hide_agent_all_tab: '1')
+        reloaded = described_class.find(account.id)
+
+        expect(reloaded.hide_agent_unassigned_tab).to be false
+        expect(reloaded.hide_agent_all_tab).to be true
+      end
+
+      it 'rejects non-boolean values via the JSON schema validator' do
+        account.settings = { hide_agent_unassigned_tab: 'maybe' }
+        expect(account).to be_invalid
+        expect(account.errors.messages).to have_key(:hide_agent_unassigned_tab)
+      end
+
+      it 'forces hide_agent_all_tab to true when hide_agent_unassigned_tab is enabled' do
+        account.update!(hide_agent_unassigned_tab: true, hide_agent_all_tab: false)
+        expect(account.reload.hide_agent_all_tab).to be true
+      end
+
+      it 'leaves hide_agent_all_tab untouched when hide_agent_unassigned_tab is false' do
+        account.update!(hide_agent_unassigned_tab: false, hide_agent_all_tab: false)
+        expect(account.reload.hide_agent_all_tab).to be false
       end
     end
 
@@ -215,6 +297,99 @@ RSpec.describe Account do
       it 'does not find accounts without auto_resolve_after' do
         account.update!(auto_resolve_after: nil)
         expect(described_class.with_auto_resolve.pluck(:id)).not_to include(account.id)
+      end
+    end
+
+    context 'when support_email is set' do
+      it 'allows a plain email address' do
+        account.support_email = 'support@example.com'
+        expect(account).to be_valid
+      end
+
+      it 'allows display-name format' do
+        account.support_email = 'Support Team <support@example.com>'
+        expect(account).to be_valid
+      end
+
+      it 'allows blank values' do
+        account.support_email = ''
+        expect(account).to be_valid
+      end
+
+      it 'rejects malformed strings with no email part' do
+        account.support_email = 'Smith Smith'
+        expect(account).not_to be_valid
+        expect(account.errors[:support_email]).to include(I18n.t('errors.account.support_email.invalid'))
+      end
+    end
+
+    context 'when reporting_timezone is set' do
+      it 'allows valid timezone names' do
+        account.reporting_timezone = 'America/New_York'
+
+        expect(account).to be_valid
+      end
+
+      it 'rejects invalid timezone names' do
+        account.reporting_timezone = 'Invalid/Timezone'
+
+        expect(account).not_to be_valid
+        expect(account.errors[:reporting_timezone]).to include(I18n.t('errors.account.reporting_timezone.invalid'))
+      end
+    end
+  end
+
+  describe 'captain_preferences' do
+    let(:account) { create(:account) }
+
+    describe 'with no saved preferences' do
+      it 'returns defaults from llm.yml' do
+        prefs = account.captain_preferences
+
+        expect(prefs[:features].values).to all(be false)
+
+        Llm::Models.feature_keys.each do |feature|
+          expect(prefs[:models][feature]).to eq(Llm::Models.default_model_for(feature))
+        end
+      end
+    end
+
+    describe 'with saved model preferences' do
+      it 'returns saved preferences merged with defaults' do
+        account.update!(captain_models: { 'editor' => 'gpt-4.1-mini', 'assistant' => 'gpt-5.2' })
+
+        prefs = account.captain_preferences
+
+        expect(prefs[:models]['editor']).to eq('gpt-4.1-mini')
+        expect(prefs[:models]['assistant']).to eq('gpt-5.2')
+        expect(prefs[:models]['copilot']).to eq(Llm::Models.default_model_for('copilot'))
+      end
+    end
+
+    describe 'with saved feature preferences' do
+      it 'returns saved feature states' do
+        account.update!(captain_features: { 'editor' => true, 'assistant' => true })
+
+        prefs = account.captain_preferences
+
+        expect(prefs[:features]['editor']).to be true
+        expect(prefs[:features]['assistant']).to be true
+        expect(prefs[:features]['copilot']).to be false
+      end
+    end
+
+    describe 'validation' do
+      it 'rejects invalid model for a feature' do
+        account.captain_models = { 'label_suggestion' => 'gpt-5.1' }
+
+        expect(account).not_to be_valid
+        expect(account.errors[:captain_models].first).to include('not a valid model for label_suggestion')
+      end
+
+      it 'accepts valid model for a feature' do
+        account.captain_models = { 'editor' => 'gpt-4.1-mini', 'label_suggestion' => 'gpt-4.1-nano' }
+
+        expect(account).to be_valid
       end
     end
   end

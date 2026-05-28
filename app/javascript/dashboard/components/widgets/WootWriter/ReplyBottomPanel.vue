@@ -9,14 +9,25 @@ import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getAllowedFileTypesByChannel } from '@chatwoot/utils';
 import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
 import VideoCallButton from '../VideoCallButton.vue';
-import AIAssistanceButton from '../AIAssistanceButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
+import DropdownContainer from 'next/dropdown-menu/base/DropdownContainer.vue';
+import DropdownBody from 'next/dropdown-menu/base/DropdownBody.vue';
+import DropdownSection from 'next/dropdown-menu/base/DropdownSection.vue';
+import DropdownItem from 'next/dropdown-menu/base/DropdownItem.vue';
 
 export default {
   name: 'ReplyBottomPanel',
-  components: { NextButton, FileUpload, VideoCallButton, AIAssistanceButton },
+  components: {
+    NextButton,
+    FileUpload,
+    VideoCallButton,
+    DropdownContainer,
+    DropdownBody,
+    DropdownSection,
+    DropdownItem,
+  },
   mixins: [inboxMixin],
   props: {
     isNote: {
@@ -98,6 +109,7 @@ export default {
       type: Number,
       required: true,
     },
+    // eslint-disable-next-line vue/no-unused-properties
     message: {
       type: String,
       default: '',
@@ -122,15 +134,23 @@ export default {
       type: Boolean,
       default: false,
     },
+    isEditorDisabled: {
+      type: Boolean,
+      default: false,
+    },
+    showScheduleOptions: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
-    'replaceText',
     'toggleInsertArticle',
     'selectWhatsappTemplate',
     'selectContentTemplate',
     'toggleQuotedReply',
+    'scheduleMessage',
   ],
-  setup() {
+  setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
       useUISettings();
 
@@ -139,6 +159,9 @@ export default {
     const keyboardEvents = {
       '$mod+Alt+KeyA': {
         action: () => {
+          // Skip if editor is disabled (e.g., WhatsApp 24-hour window expired)
+          if (props.isEditorDisabled) return;
+
           // TODO: This is really hacky, we need to replace the file picker component with
           // a custom one, where the logic and the component markup is isolated.
           // Once we have the custom component, we can remove the hacky logic below.
@@ -146,7 +169,7 @@ export default {
           const uploadTriggerButton = document.querySelector(
             '#conversationAttachment'
           );
-          uploadTriggerButton.click();
+          if (uploadTriggerButton) uploadTriggerButton.click();
         },
         allowOnFocusedInput: true,
       },
@@ -177,10 +200,12 @@ export default {
       };
     },
     showAttachButton() {
+      if (this.isEditorDisabled) return false;
       return this.showFileUpload || this.isNote;
     },
     showAudioRecorderButton() {
-      if (this.isALineChannel) {
+      if (this.isEditorDisabled) return false;
+      if (this.isALineChannel || this.isATiktokChannel) {
         return false;
       }
       // Disable audio recorder for safari browser as recording is not supported
@@ -197,6 +222,7 @@ export default {
       );
     },
     showAudioPlayStopButton() {
+      if (this.isEditorDisabled) return false;
       return this.showAudioRecorder && this.isRecordingAudio;
     },
     isInstagramDM() {
@@ -236,6 +262,7 @@ export default {
       }
     },
     showMessageSignatureButton() {
+      if (this.isEditorDisabled) return false;
       return !this.isOnPrivateNote;
     },
     sendWithSignature() {
@@ -266,11 +293,11 @@ export default {
     toggleMessageSignature() {
       this.setSignatureFlagForInbox(this.channelType, !this.sendWithSignature);
     },
-    replaceText(text) {
-      this.$emit('replaceText', text);
-    },
     toggleInsertArticle() {
       this.$emit('toggleInsertArticle');
+    },
+    openScheduleModal() {
+      this.$emit('scheduleMessage');
     },
   },
 };
@@ -280,6 +307,7 @@ export default {
   <div class="flex justify-between p-3" :class="wrapClass">
     <div class="left-wrap">
       <NextButton
+        v-if="!isEditorDisabled"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_EMOJI_ICON')"
         icon="i-ph-smiley-sticker"
         slate
@@ -288,6 +316,7 @@ export default {
         @click="toggleEmojiPicker"
       />
       <FileUpload
+        v-if="showAttachButton"
         ref="uploadRef"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_ATTACH_ICON')"
         input-id="conversationAttachment"
@@ -367,15 +396,12 @@ export default {
         @click="$emit('selectContentTemplate')"
       />
       <VideoCallButton
-        v-if="(isAWebWidgetInbox || isAPIInbox) && !isOnPrivateNote"
+        v-if="
+          (isAWebWidgetInbox || isAPIInbox) &&
+          !isOnPrivateNote &&
+          !isEditorDisabled
+        "
         :conversation-id="conversationId"
-      />
-      <AIAssistanceButton
-        v-if="!isFetchingAppIntegrations"
-        :conversation-id="conversationId"
-        :is-private-note="isOnPrivateNote"
-        :message="message"
-        @replace-text="replaceText"
       />
       <transition name="modal-fade">
         <div
@@ -399,7 +425,42 @@ export default {
       />
     </div>
     <div class="right-wrap">
+      <div v-if="showScheduleOptions && !isNote" class="flex">
+        <NextButton
+          :label="sendButtonText"
+          type="submit"
+          sm
+          blue
+          :disabled="isSendDisabled"
+          class="flex-shrink-0 !rounded-r-none"
+          @click="onSend"
+        />
+        <DropdownContainer>
+          <template #trigger="{ toggle, isOpen }">
+            <NextButton
+              type="button"
+              sm
+              blue
+              icon="i-lucide-chevron-down"
+              :disabled="isSendDisabled"
+              class="flex-shrink-0 !rounded-l-none !border-l border-l-white/20 !px-1.5"
+              :class="{ 'bg-n-blue-11': isOpen }"
+              @click="toggle"
+            />
+          </template>
+          <DropdownBody class="bottom-11 -right-8 min-w-48 z-50" strong>
+            <DropdownSection>
+              <DropdownItem
+                icon="i-lucide-clock"
+                :label="$t('CONVERSATION.REPLYBOX.SCHEDULE_SEND')"
+                :click="openScheduleModal"
+              />
+            </DropdownSection>
+          </DropdownBody>
+        </DropdownContainer>
+      </div>
       <NextButton
+        v-else
         :label="sendButtonText"
         type="submit"
         sm

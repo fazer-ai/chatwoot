@@ -1,0 +1,34 @@
+allOf:
+  - $ref: ./channel.yml
+  - type: object
+    properties:
+      account_id:
+        type: integer
+        description: The ID of the account
+      created_by_id:
+        type:
+          - integer
+          - 'null'
+        description: The ID of the user who created the channel
+      members_count:
+        type: integer
+        description: The number of members in the channel
+      unread_count:
+        type: integer
+        description: The number of unread messages for the current user
+      muted:
+        type: boolean
+        description: Whether the current user muted this channel
+      favorited:
+        type: boolean
+        description: Whether the current user favorited this channel
+      members:
+        type: array
+        description: Array of channel members
+        items:
+          $ref: ./channel_member.yml
+      messages:
+        type: array
+        description: Array of recent messages
+        items:
+          $ref: ./message.yml
