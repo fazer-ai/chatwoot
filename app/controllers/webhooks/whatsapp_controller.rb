@@ -1,6 +1,12 @@
 class Webhooks::WhatsappController < ActionController::API
   include MetaTokenVerifyConcern
 
+  # Folga para o `SendReplyJob` (que persiste o `source_id` da mensagem
+  # enviada) completar antes de o `messages.update` ser reprocessado. No
+  # estado atual o SendReplyJob completa em ~200-500ms; 10 segundos é
+  # margem generosa mesmo durante picos.
+  MESSAGE_NOT_FOUND_RETRY_DELAY = 10.seconds
+
   def process_payload
     if inactive_whatsapp_number?
       Rails.logger.warn("Rejected webhook for inactive WhatsApp number: #{params[:phone_number]}")
@@ -62,7 +68,17 @@ class Webhooks::WhatsappController < ActionController::API
   rescue Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken
     head :unauthorized
   rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
-    head :not_found
+    # Race condition: `messages.update` chegou pelo caminho síncrono antes
+    # do `SendReplyJob` ter persistido o `source_id` da mensagem original.
+    # Reenfileiramos em background com folga e respondemos 200 para que o
+    # Baileys não entre em loop de retry HTTP — o Sidekiq cuida das
+    # retentativas do job (max_retries: 3 com backoff exponencial).
+    Rails.logger.warn(
+      '[whatsapp_webhook] MessageNotFoundError, re-enqueueing with delay ' \
+      "phone=#{params[:phone_number]} event=#{params[:event]}"
+    )
+    Webhooks::WhatsappEventsJob.set(wait: MESSAGE_NOT_FOUND_RETRY_DELAY).perform_later(params.to_unsafe_hash)
+    head :ok
   end
 
   def valid_token?(token)
