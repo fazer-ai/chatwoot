@@ -167,12 +167,32 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
         expect(response).to have_http_status(:unauthorized)
       end
 
-      it 'returns 404 when MessageNotFoundError is raised' do
-        allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
+      context 'when MessageNotFoundError is raised (race with SendReplyJob)' do
+        before do
+          allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)
+            .and_raise(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
+        end
 
-        post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+        it 'responds 200 so Baileys stops retrying the webhook' do
+          post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
 
-        expect(response).to have_http_status(:not_found)
+          expect(response).to have_http_status(:ok)
+        end
+
+        it 're-enqueues the job with a delay to give SendReplyJob time to persist source_id' do
+          post '/webhooks/whatsapp/123221321', params: { content: 'hello', awaitResponse: true }
+
+          expect(Webhooks::WhatsappEventsJob).to have_received(:set).with(wait: Webhooks::WhatsappController::MESSAGE_NOT_FOUND_RETRY_DELAY)
+          expect(configured_job).to have_received(:perform_later)
+        end
+
+        it 'logs a warning so the race can be tracked via log search' do
+          allow(Rails.logger).to receive(:warn)
+
+          post '/webhooks/whatsapp/123221321', params: { event: 'messages.update', awaitResponse: true }
+
+          expect(Rails.logger).to have_received(:warn).with(/MessageNotFoundError, re-enqueueing/)
+        end
       end
     end
   end
