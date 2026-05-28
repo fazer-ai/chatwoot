@@ -1,4 +1,26 @@
 ---
+- tag: v4.13.0-auris.1.24.3
+  published_at: '2026-05-27T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.3
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Inline help on Health Score terms.** The Super Admin report now shows (?) icons next to each group (Outcomes / Operational / Engagement) and each metric, explaining what they measure and why they matter for churn risk.
+      - **Health Score report no longer lists suspended accounts.** Ops now sees only active accounts in the report — suspended ones drop off the list until reactivated.
+
+      ### 🐛 Fixes
+
+      - **Duplicate WhatsApp contacts from the Brazilian "9th-digit" issue resolved.** When the same Brazilian number arrived in different formats (12 digits without the "9" and 13 digits with the "9"), Chatwoot used to create two separate contacts. The formats are now unified at the inbound message boundary, and existing duplicates consolidate automatically on the patient's next interaction.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Ajuda inline nos termos do Health Score.** No relatório do Super Admin, agora aparecem ícones (?) ao lado dos grupos (Outcomes / Operational / Engagement) e de cada métrica, explicando o que cada um mede e por que importa para o risco de churn.
+      - **Relatório de Health Score sem o ruído de contas suspensas.** O Ops passa a ver apenas as contas ativas — contas suspensas somem da lista até serem reativadas.
+
+      ### 🐛 Correções
+
+      - **Contatos duplicados de WhatsApp por causa do "9º dígito" resolvido.** Quando o mesmo número brasileiro chegava em formatos diferentes (12 dígitos sem o "9" e 13 dígitos com o "9"), o Chatwoot criava dois contatos separados. Os formatos agora são unificados na entrada da mensagem, e os duplicados existentes se consolidam automaticamente na próxima interação do paciente.
 - tag: v4.13.0-auris.1.24.2
   published_at: '2026-05-26T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.2
@@ -295,39 +317,3 @@
 
       - **Atividades da conversa permanecem visíveis.** Balões como "Conversa marcada como resolvida", "Reaberta", atribuição de agente, troca de prioridade e troca da IA voltam a permanecer no chat depois que você sai da conversa e volta — antes, o status persistia mas o balão da atividade sumia.
       - **Contatos Z-API não recebem mais o nome do agente.** Quando a primeira mensagem é disparada de fora do Chatwoot (ex.: fluxos no n8n chamando a Z-API direto), o novo contato passa a ser identificado pelo telefone em vez de herdar o nome do dono da instância WhatsApp. Assim que o paciente responder pela primeira vez, o nome real do WhatsApp dele é preenchido automaticamente — corrigindo tanto contatos novos quanto contatos já contaminados.
-- tag: v4.13.0-auris.1.15
-  published_at: '2026-05-12T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.15
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Personal or global visibility for custom filters.** Every contact or conversation filter can now be marked Personal (only you see it) or Global (visible to everyone on the team).
-      - **Patient language on contacts.** You can set each contact's language (Portuguese, English, Spanish, or French) right on the contact card.
-
-      ### ⚡ Improvements
-
-      - **Cleaner variables picker on WhatsApp campaigns.** The `{{agent.*}}` tokens no longer appear when filling campaign variables — campaigns are sent by the bot, so those tokens never resolved meaningfully there and just cluttered the list.
-      - **New inboxes default to "Reopen the same conversation".** Matches the Auris standard for WhatsApp/SMS-style channels. You can switch it off per inbox in the inbox settings if you prefer the old behavior.
-      - **Faster WhatsApp processing under instability.** Contact profile pictures and group avatars now load in the background, keeping message processing snappy when WhatsApp itself is flaky.
-
-      ### 🐛 Fixes
-
-      - **Contact filters respect contacts created in real time.** A brand-new contact (or one arriving through a message) now correctly appears in or disappears from your list according to the filters you have applied.
-      - **Small Portuguese translation fixes** across the WhatsApp setup flow.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Visibilidade pessoal ou global em filtros personalizados.** Cada filtro de contatos ou de conversas agora pode ser marcado como *Pessoal* (só você vê) ou *Global* (visível para toda a equipe).
-      - **Idioma do paciente no contato.** Você pode definir o idioma de cada contato (Português, Inglês, Espanhol ou Francês) diretamente no card do contato.
-
-      ### ⚡ Melhorias
-
-      - **Picker de variáveis em campanhas WhatsApp mais limpo.** Os tokens `{{agent.*}}` não aparecem mais ao montar variáveis de campanha — campanhas são disparadas pelo robô, então esses tokens nunca faziam sentido ali e só poluíam a lista.
-      - **Caixas de entrada novas começam com "Reabrir a mesma conversa" ativado.** Padrão Auris para canais de WhatsApp/SMS. Você pode desativar individualmente nas configurações de cada caixa, se preferir o comportamento antigo.
-      - **WhatsApp mais rápido em momentos de instabilidade.** Fotos de perfil de contatos e avatares de grupos agora carregam em segundo plano, evitando travamentos no processamento de mensagens durante oscilações da própria WhatsApp.
-
-      ### 🐛 Correções
-
-      - **Filtros de contato respeitam contatos criados em tempo real.** Um contato novo (ou recebido por mensagem) agora aparece ou some da lista corretamente conforme os filtros aplicados.
-      - **Pequenas correções de tradução em português** no fluxo de configuração do WhatsApp.
