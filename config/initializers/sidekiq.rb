@@ -2,6 +2,16 @@ require Rails.root.join('lib/redis/config')
 
 schedule_file = 'config/schedule.yml'
 
+# Customise the Sidekiq Web UI mounted at `/monitoring/sidekiq` (see
+# `config/routes.rb`). The middleware adds a "Prioridade" column to the
+# /queues page by injecting a `<script>` tag that pulls
+# `public/sidekiq-priority-column.js`. Wired here (and not via
+# `Sidekiq::Web.custom_javascript=`) because Sidekiq 7.3 removed that
+# setter.
+require 'sidekiq/web'
+require Rails.root.join('lib/sidekiq/priority_column_injector')
+Sidekiq::Web.use Sidekiq::PriorityColumnInjector
+
 Sidekiq.configure_client do |config|
   config.redis = Redis::Config.app
 end
