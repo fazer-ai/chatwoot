@@ -67,12 +67,13 @@ class Webhooks::WhatsappController < ActionController::API
     Webhooks::WhatsappEventsJob.perform_now(params.to_unsafe_hash)
   rescue Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken
     head :unauthorized
-  rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
+  rescue Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError
     # Race condition: `messages.update` chegou pelo caminho síncrono antes
     # do `SendReplyJob` ter persistido o `source_id` da mensagem original.
     # Reenfileiramos em background com folga e respondemos 200 para que o
-    # Baileys não entre em loop de retry HTTP — o Sidekiq cuida das
-    # retentativas do job (max_retries: 3 com backoff exponencial).
+    # Baileys não entre em loop de retry HTTP — o job re-enfileirado tem
+    # `retry_on` configurado para a mesma exceção, então se o race persistir
+    # o Sidekiq segue retentando com folga.
     Rails.logger.warn(
       '[whatsapp_webhook] MessageNotFoundError, re-enqueueing with delay ' \
       "phone=#{params[:phone_number]} event=#{params[:event]}"

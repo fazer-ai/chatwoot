@@ -170,7 +170,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       context 'when MessageNotFoundError is raised (race with SendReplyJob)' do
         before do
           allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)
-            .and_raise(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
+            .and_raise(Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError)
         end
 
         it 'responds 200 so Baileys stops retrying the webhook' do
