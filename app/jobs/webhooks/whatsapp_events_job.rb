@@ -1,6 +1,16 @@
 class Webhooks::WhatsappEventsJob < ApplicationJob
   queue_as :low
 
+  # Race condition: `messages.update` can arrive before `SendReplyJob` has
+  # persisted the `source_id` of the outgoing message. The controller's
+  # `perform_sync` already handles this for webhooks delivered with
+  # `awaitResponse: true`; this `retry_on` covers the async path, where the
+  # webhook lands straight on Sidekiq without going through the controller
+  # rescue.
+  retry_on Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError,
+           wait: 10.seconds,
+           attempts: 4
+
   def perform(params = {})
     channel = find_channel(params)
     if channel_is_inactive?(channel)

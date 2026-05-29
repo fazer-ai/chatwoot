@@ -34,6 +34,20 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       .on_queue('low')
   end
 
+  describe 'race condition handling on the async path' do
+    # The controller's `perform_sync` rescue covers webhooks delivered with
+    # `awaitResponse: true`. Webhooks delivered async (most of the volume)
+    # land on Sidekiq directly, so the job itself needs to retry when the
+    # `SendReplyJob` hasn't persisted the `source_id` yet.
+    it 'has retry_on registered for MessageNotFoundError' do
+      handler = described_class.rescue_handlers.find do |klass, _|
+        klass == 'Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError'
+      end
+
+      expect(handler).to be_present
+    end
+  end
+
   context 'when whatsapp_cloud provider' do
     it 'enqueue Whatsapp::IncomingMessageWhatsappCloudService' do
       allow(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).and_return(process_service)
