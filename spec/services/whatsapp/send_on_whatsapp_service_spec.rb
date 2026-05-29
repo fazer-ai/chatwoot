@@ -422,6 +422,21 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('msg_lid')
       end
 
+      it 'prefers LID identifier over phone_number when contact has both' do
+        # Guards against the pre-2012 Brazilian phone format issue: after we
+        # normalize inbound phones to 13 digits, the phone-derived JID stops
+        # routing for accounts whose WAID is still 12 digits. LID routing
+        # bypasses the format mismatch.
+        conversation.contact.update!(phone_number: '+5553999023881', identifier: '265214297669734@lid')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+        allow(whatsapp_channel).to receive(:send_message).with('265214297669734@lid', message).and_return('msg_lid')
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.source_id).to eq('msg_lid')
+      end
+
       it 'uses identifier as recipient_id for group contacts' do
         conversation.contact.update!(identifier: '123456789123456789@g.us', group_type: :group)
         message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
