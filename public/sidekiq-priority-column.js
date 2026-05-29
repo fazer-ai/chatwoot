@@ -42,6 +42,12 @@
     return /\/queues\/?$/.test(window.location.pathname);
   }
 
+  // Sentinel used when a queue isn't in PRIORITY_ORDER (e.g. transient
+  // gem queues like `sidekiq-alive-*`). Sorting these to the end of the
+  // table mirrors how Sidekiq itself drains them: only after every
+  // known-priority queue is empty.
+  const UNKNOWN_PRIORITY = Number.MAX_SAFE_INTEGER;
+
   function injectColumn() {
     if (!isQueuesPage()) return;
 
@@ -50,29 +56,41 @@
     if (table.dataset.priorityInjected === '1') return;
     table.dataset.priorityInjected = '1';
 
-    // Header: insert "Prioridade" right before the last column (the
-    // actions column, which holds the "Apagar" button).
+    // Header: prepend "Prioridade" as the first column.
     const headerRow = table.querySelector('thead tr');
     if (headerRow) {
       const th = document.createElement('th');
       th.textContent = 'Prioridade';
       th.style.textAlign = 'right';
-      headerRow.insertBefore(th, headerRow.lastElementChild);
+      headerRow.insertBefore(th, headerRow.firstElementChild);
     }
 
-    // Data rows: each row's first cell has an anchor with the queue name.
-    // Transient queues registered by gems (e.g. `sidekiq-alive-*`) won't
-    // be in PRIORITY_ORDER — render an em dash for those.
-    table.querySelectorAll('tbody tr').forEach((row) => {
+    // Data rows: prepend the priority cell, then re-sort rows by priority
+    // ascending. Each row's first cell (now after our insert: second cell)
+    // has an anchor with the queue name.
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.forEach((row) => {
       const link = row.querySelector('td a');
-      if (!link) return;
-      const queueName = link.textContent.trim();
+      const queueName = link ? link.textContent.trim() : '';
       const priority = PRIORITY_BY_QUEUE[queueName];
+
       const td = document.createElement('td');
       td.textContent = priority != null ? String(priority) : '—';
       td.style.textAlign = 'right';
-      row.insertBefore(td, row.lastElementChild);
+      row.insertBefore(td, row.firstElementChild);
+
+      // Stash the sort key on the row so we can reorder without
+      // re-parsing the cell text later.
+      row.dataset.priority = priority != null ? String(priority) : String(UNKNOWN_PRIORITY);
     });
+
+    rows
+      .slice()
+      .sort((a, b) => Number(a.dataset.priority) - Number(b.dataset.priority))
+      .forEach((row) => tbody.appendChild(row));
   }
 
   if (document.readyState === 'loading') {
