@@ -79,8 +79,15 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   def recipient_id
     return message.conversation.contact_inbox.source_id unless %w[baileys zapi].include?(channel.provider)
 
-    # NOTE: `identifier` must be in the WhatsApp LID format
-    message.conversation.contact.phone_number&.gsub(/[^\d]/, '') || message.conversation.contact.identifier
+    contact = message.conversation.contact
+    # Prefer LID when present: phone-derived JIDs only route when the number
+    # matches the format the WhatsApp account was originally registered with,
+    # which for pre-2012 Brazilian accounts is 12 digits. After we started
+    # normalizing inbound phones to 13d, those JIDs stopped routing — LID
+    # routing bypasses the format mismatch.
+    return contact.identifier if contact.identifier&.end_with?('@lid')
+
+    contact.phone_number&.gsub(/[^\d]/, '') || contact.identifier
   end
 
   def template_params
