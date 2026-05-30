@@ -372,7 +372,7 @@ const resetFilters = () => {
               <th class="text-left px-5 py-3 font-medium text-sm">Telefone</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Status</th>
               <th class="text-left px-5 py-3 font-medium text-sm">
-                Falhas 24h
+                Não confirmadas 24h
               </th>
               <th
                 class="text-left px-5 py-3 font-medium text-sm w-px whitespace-nowrap"
