@@ -448,20 +448,70 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('msg_group')
       end
 
-      it 'marks the message as failed when the provider returns no message id' do
-        # Baileys' Signal session can fail to re-establish silently for cold
-        # conversations and sendMessage returns no id — we surface that as
-        # failed so the operator sees the error instead of a misleading "sent".
+      it 'marks the message as failed when the provider returns no message id even after warm-up retry' do
+        # Both attempts return nil — warm-up didn't rescue. Operator must see failed.
         conversation.contact.update!(phone_number: '+123456789')
         message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+        service = described_class.new(message: message)
 
         allow(whatsapp_channel).to receive(:send_message).and_return(nil)
+        allow(whatsapp_channel).to receive(:on_whatsapp)
+        allow(whatsapp_channel).to receive(:presence_subscribe)
+        allow(service).to receive(:sleep)
 
-        described_class.new(message: message).perform
+        service.perform
 
         expect(message.reload.status).to eq('failed')
         expect(message.reload.external_error).to eq('Provider did not return a message id')
         expect(message.reload.source_id).to be_nil
+      end
+
+      it 'warms the Signal session and retries when the first attempt returns no id' do
+        conversation.contact.update!(phone_number: '+123456789')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+        service = described_class.new(message: message)
+
+        allow(whatsapp_channel).to receive(:send_message).and_return(nil, 'msg_after_warmup')
+        expect(whatsapp_channel).to receive(:on_whatsapp).with('123456789@s.whatsapp.net')
+        expect(whatsapp_channel).to receive(:presence_subscribe).with(['123456789@s.whatsapp.net'])
+        allow(service).to receive(:sleep)
+
+        service.perform
+
+        expect(message.reload.source_id).to eq('msg_after_warmup')
+        expect(message.reload.status).not_to eq('failed')
+      end
+
+      it 'passes the LID directly when warming the session for a contact with @lid identifier' do
+        conversation.contact.update!(phone_number: '+5553999023881', identifier: '265214297669734@lid')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+        service = described_class.new(message: message)
+
+        allow(whatsapp_channel).to receive(:send_message).and_return(nil, 'msg_after_warmup')
+        expect(whatsapp_channel).to receive(:on_whatsapp).with('265214297669734@lid')
+        expect(whatsapp_channel).to receive(:presence_subscribe).with(['265214297669734@lid'])
+        allow(service).to receive(:sleep)
+
+        service.perform
+
+        expect(message.reload.source_id).to eq('msg_after_warmup')
+      end
+
+      it 'still retries the send when warm-up itself raises' do
+        conversation.contact.update!(phone_number: '+123456789')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+        service = described_class.new(message: message)
+
+        allow(whatsapp_channel).to receive(:send_message).and_return(nil, 'msg_after_warmup')
+        allow(whatsapp_channel).to receive(:on_whatsapp).and_raise(StandardError, 'baileys-api down')
+        allow(whatsapp_channel).to receive(:presence_subscribe)
+        allow(service).to receive(:sleep)
+
+        service.perform
+
+        # Warm-up failed but second send succeeded — the rescue inside warm_session
+        # must not abort the retry path.
+        expect(message.reload.source_id).to eq('msg_after_warmup')
       end
 
       describe 'duplicate send on Net::ReadTimeout retry' do

@@ -73,6 +73,9 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
   def send_session_message
     message_id = channel.send_message(recipient_id, message)
+
+    message_id = retry_send_after_warmup if message_id.blank? && channel.provider == 'baileys'
+
     if message_id.present?
       message.update!(source_id: message_id)
     else
@@ -83,6 +86,27 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
       # red marker show up so they can retry.
       message.update!(status: :failed, external_error: 'Provider did not return a message id')
     end
+  end
+
+  # When Baileys returns no id, the most common cause is a cold Signal session
+  # that didn't re-establish in time. on_whatsapp + presence_subscribe trigger
+  # a fresh handshake; the short sleep lets it settle before the retry.
+  # baileys-api's idempotency layer releases the lock (without caching) when
+  # the inner send returned null, so the retry with the same key actually
+  # re-executes instead of returning the cached null.
+  def retry_send_after_warmup
+    warm_session
+    Rails.logger.info("[whatsapp-send] retrying after warm-up message_id=#{message.id}")
+    channel.send_message(recipient_id, message)
+  end
+
+  def warm_session
+    jid = recipient_id.include?('@') ? recipient_id : "#{recipient_id}@s.whatsapp.net"
+    channel.on_whatsapp(jid)
+    channel.presence_subscribe([jid])
+    sleep 1.0
+  rescue StandardError => e
+    Rails.logger.warn("[whatsapp-send] warm-up failed conv=#{message.conversation_id} err=#{e.message}")
   end
 
   def recipient_id
