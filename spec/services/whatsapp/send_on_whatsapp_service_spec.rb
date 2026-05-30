@@ -448,6 +448,22 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('msg_group')
       end
 
+      it 'marks the message as failed when the provider returns no message id' do
+        # Baileys' Signal session can fail to re-establish silently for cold
+        # conversations and sendMessage returns no id — we surface that as
+        # failed so the operator sees the error instead of a misleading "sent".
+        conversation.contact.update!(phone_number: '+123456789')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+        allow(whatsapp_channel).to receive(:send_message).and_return(nil)
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.status).to eq('failed')
+        expect(message.reload.external_error).to eq('Provider did not return a message id')
+        expect(message.reload.source_id).to be_nil
+      end
+
       describe 'duplicate send on Net::ReadTimeout retry' do
         let(:send_message_url) do
           "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"
