@@ -1,4 +1,32 @@
 ---
+- tag: v4.13.0-auris.1.24.7
+  published_at: '2026-05-30T15:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.7
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Unconfirmed-message rate in the Inbox status report (Super Admin).** The inbox status page got a new column showing the share of outgoing messages in the last 24 hours that didn't get a confirmation from the WhatsApp provider, with a green/yellow/red chip so it's easy to spot which inboxes are having delivery trouble.
+
+      ### ⚡ Improvements
+
+      - **More reliable WhatsApp delivery on cold conversations.** When a message doesn't reach the patient because the WhatsApp session had been quiet for hours or days, the system now detects it, refreshes the connection automatically and retries — most of these cases get delivered without the operator having to resend.
+
+      ### 🐛 Fixes
+
+      - **Undelivered WhatsApp messages now show as failed.** Previously some sends would fail silently and stay marked as "sent" in the panel even though they never reached the patient. Now, when the provider doesn't confirm receipt of the message, it shows as failed with the red indicator — so you know to resend.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Indicador de mensagens não confirmadas no relatório de Inboxes (Super Admin).** A página de status de inboxes ganhou uma coluna nova mostrando a porcentagem de mensagens enviadas nas últimas 24h que ficaram sem confirmação do provedor de WhatsApp, com chip verde/amarelo/vermelho pra identificar de cara quais caixas estão com problema de entrega.
+
+      ### ⚡ Melhorias
+
+      - **Mensagens WhatsApp mais confiáveis em conversas frias.** Quando uma mensagem não chega ao paciente porque a conversa estava parada há horas ou dias, o sistema agora detecta, refresca a conexão automaticamente e tenta de novo — a maioria desses casos passa a ser entregue sem o operador precisar reenviar.
+
+      ### 🐛 Correções
+
+      - **Mensagens WhatsApp não entregues agora aparecem como erro.** Antes, alguns envios falhavam silenciosamente e ficavam exibindo "enviada" no painel mesmo sem chegar ao paciente. Agora, quando o provedor não confirma o recebimento da mensagem, ela aparece como falha com o indicador vermelho — assim você sabe que precisa reenviar.
 - tag: v4.13.0-auris.1.24.6
   published_at: '2026-05-29T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.6
@@ -283,25 +311,3 @@
       ### 🐛 Correções
 
       - **Páginas de Conta no Super Admin voltam a abrir.** A edição e visualização de contas em Super Admin → Accounts estavam quebradas desde a v1.19 (quando a seção *Auris menus* foi adicionada). Corrigido.
-- tag: v4.13.0-auris.1.19
-  published_at: '2026-05-15T01:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.19
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Two new funnel views inside the Funnel menu.** Alongside *Board* and *List*, you now have **Overview** (per-stage table with entries in the period, average time in stage, won and lost counts) and **Conversion** (a horizontal sales-funnel chart showing how leads narrow down through the stages).
-      - **Per-account sidebar menu controls in Super Admin.** From the new *Auris menus* section under Super Admin → Accounts, you can now toggle the **Inbox** and **Help Center** sidebar menus on or off independently for each account.
-
-      ### ⚡ Improvements
-
-      - **Cleaner sales-funnel display.** The Conversion chart groups the scheduling stages into a single bar, hides closed-without-sale outcomes from the chart (they still count toward the closed-deal KPIs), and uses display names aligned with how a sales team actually talks about leads.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Dois novos modos dentro do menu Funil.** Ao lado de *Quadro* e *Lista*, agora você tem também **Visão geral** (tabela com entradas no período, tempo médio em cada fase, ganhas e perdidas) e **Conversão** (gráfico horizontal de funil de vendas mostrando como os leads avançam até a conclusão).
-      - **Controle de menus por conta no Super Admin.** Na nova seção *Auris menus* em Super Admin → Accounts, você consegue ativar ou desativar os menus **Caixa de Entrada** e **Central de Ajuda** independentemente por conta.
-
-      ### ⚡ Melhorias
-
-      - **Visual do funil de conversão alinhado com vendas.** O gráfico de Conversão agrupa as etapas de agendamento numa fase só ("Agendamento"), esconde os estados terminais sem venda (continuam contando nas métricas de fechamento) e usa nomes alinhados com a forma como o time comercial fala — "Total de leads" no topo, "Vendas realizadas" no fechamento.
