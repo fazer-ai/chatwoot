@@ -73,7 +73,16 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
   def send_session_message
     message_id = channel.send_message(recipient_id, message)
-    message.update!(source_id: message_id) if message_id.present?
+    if message_id.present?
+      message.update!(source_id: message_id)
+    else
+      # Baileys' Signal session can fail to re-establish silently for cold
+      # conversations (e.g., gap > 24h since the last message), in which case
+      # sendMessage returns no id. Leaving the message in the default "sent"
+      # status hides this from the operator; surfacing it as failed makes the
+      # red marker show up so they can retry.
+      message.update!(status: :failed, external_error: 'Provider did not return a message id')
+    end
   end
 
   def recipient_id
