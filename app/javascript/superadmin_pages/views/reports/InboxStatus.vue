@@ -133,6 +133,36 @@ const pct = n => {
   return `${Math.round((n / filteredTotal.value) * 100)}%`;
 };
 
+const failureRate = row => {
+  const total = row.outgoing_24h_total || 0;
+  const failed = row.outgoing_24h_failed || 0;
+  if (total === 0) return null;
+  return (failed / total) * 100;
+};
+
+const failureRateLabel = row => {
+  const rate = failureRate(row);
+  if (rate === null) return '—';
+  return `${rate.toFixed(1)}%`;
+};
+
+// Color tiers chosen so anything ≥ 5% pops red — that's where the operator
+// should actively investigate. Below 1% (or zero traffic) is the baseline.
+const failureRateClass = row => {
+  const rate = failureRate(row);
+  if (rate === null) return 'bg-n-alpha-2 text-n-slate-11';
+  if (rate >= 5) return 'bg-n-ruby-3 text-n-ruby-12';
+  if (rate >= 1) return 'bg-n-amber-3 text-n-amber-12';
+  return 'bg-n-teal-3 text-n-teal-12';
+};
+
+const failureRateTooltip = row => {
+  const total = row.outgoing_24h_total || 0;
+  if (total === 0) return 'Sem mensagens enviadas nas últimas 24h';
+  const failed = row.outgoing_24h_failed || 0;
+  return `${failed} de ${total} mensagens enviadas nas últimas 24h ficaram sem confirmação do provider`;
+};
+
 const lastFetchedLabel = computed(() => {
   if (!lastFetchedAt.value) return '—';
   return lastFetchedAt.value.toLocaleTimeString('pt-BR');
@@ -341,6 +371,9 @@ const resetFilters = () => {
               <th class="text-left px-5 py-3 font-medium text-sm">Provider</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Telefone</th>
               <th class="text-left px-5 py-3 font-medium text-sm">Status</th>
+              <th class="text-left px-5 py-3 font-medium text-sm">
+                Não confirmadas 24h
+              </th>
               <th
                 class="text-left px-5 py-3 font-medium text-sm w-px whitespace-nowrap"
               >
@@ -379,6 +412,15 @@ const resetFilters = () => {
                   {{ row.connection || 'Desconectado' }}
                 </span>
               </td>
+              <td class="px-5 py-4">
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs"
+                  :class="failureRateClass(row)"
+                  :title="failureRateTooltip(row)"
+                >
+                  {{ failureRateLabel(row) }}
+                </span>
+              </td>
               <td class="px-5 py-4 w-px whitespace-nowrap">
                 <!-- Only the socket-paired providers expose a
                      reconnect-via-QR flow; cloud / 360Dialog don't. -->
@@ -404,7 +446,7 @@ const resetFilters = () => {
               </td>
             </tr>
             <tr v-if="!filteredInboxes.length">
-              <td colspan="7" class="px-5 py-8 text-center text-n-slate-11">
+              <td colspan="8" class="px-5 py-8 text-center text-n-slate-11">
                 Nenhuma inbox encontrada com os filtros atuais.
               </td>
             </tr>

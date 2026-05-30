@@ -101,5 +101,49 @@ RSpec.describe 'Super Admin inbox status report', type: :request do
       # 3 connected: baileys-open, zapi-open, cloud-always; 2 disconnected: baileys-close, zapi-close
       expect(body['counts']).to eq('connected' => 3, 'disconnected' => 2)
     end
+
+    describe 'outgoing 24h failure stats' do
+      let(:inbox) { connected_baileys.inbox }
+      let(:conversation) { create(:conversation, inbox: inbox, account: account) }
+
+      it 'counts outgoing messages and ones missing a source_id in the last 24h' do
+        # 3 ok, 2 failed (no source_id), 1 ignored (older than window)
+        3.times { create(:message, conversation: conversation, message_type: :outgoing, source_id: SecureRandom.hex) }
+        2.times { create(:message, conversation: conversation, message_type: :outgoing, source_id: nil) }
+        old = create(:message, conversation: conversation, message_type: :outgoing, source_id: nil)
+        old.update_columns(created_at: 25.hours.ago) # rubocop:disable Rails/SkipsModelValidations
+
+        sign_in(super_admin, scope: :super_admin)
+        get '/super_admin/reports/inbox_status/data'
+
+        row = response.parsed_body['inboxes'].find { |r| r['phone_number'] == connected_baileys.phone_number }
+        expect(row).to include('outgoing_24h_total' => 5, 'outgoing_24h_failed' => 2)
+      end
+
+      it 'reports zero counts for inboxes with no recent outgoing traffic' do
+        sign_in(super_admin, scope: :super_admin)
+        get '/super_admin/reports/inbox_status/data'
+
+        rows = response.parsed_body['inboxes']
+        expect(rows).to all(include('outgoing_24h_total' => 0, 'outgoing_24h_failed' => 0))
+      end
+
+      it 'ignores incoming messages and messages from other inboxes' do
+        # Incoming on the same inbox — must NOT count
+        create(:message, conversation: conversation, message_type: :incoming, source_id: nil)
+        # Outgoing on a different inbox — must NOT bleed into this inbox's stats
+        other_conv = create(:conversation, inbox: cloud_inbox.inbox, account: cloud_inbox.inbox.account)
+        create(:message, conversation: other_conv, message_type: :outgoing, source_id: nil)
+
+        sign_in(super_admin, scope: :super_admin)
+        get '/super_admin/reports/inbox_status/data'
+
+        body = response.parsed_body
+        baileys_row = body['inboxes'].find { |r| r['phone_number'] == connected_baileys.phone_number }
+        cloud_row = body['inboxes'].find { |r| r['phone_number'] == cloud_inbox.phone_number }
+        expect(baileys_row).to include('outgoing_24h_total' => 0, 'outgoing_24h_failed' => 0)
+        expect(cloud_row).to include('outgoing_24h_total' => 1, 'outgoing_24h_failed' => 1)
+      end
+    end
   end
 end
