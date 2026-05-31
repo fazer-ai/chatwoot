@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_02_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_03_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1643,7 +1643,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_02_000000) do
   add_foreign_key "disparo_events", "disparo_targets", on_delete: :cascade
   add_foreign_key "disparo_inboxes", "disparos", on_delete: :cascade
   add_foreign_key "disparo_inboxes", "inboxes", on_delete: :cascade
+  add_foreign_key "disparo_targets", "contacts", on_delete: :cascade
+  add_foreign_key "disparo_targets", "conversations", on_delete: :cascade
   add_foreign_key "disparo_targets", "disparos", on_delete: :cascade
+  add_foreign_key "disparo_targets", "inboxes", on_delete: :nullify
   add_foreign_key "disparos", "accounts", on_delete: :cascade
   add_foreign_key "disparos", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "group_members", "contacts"
