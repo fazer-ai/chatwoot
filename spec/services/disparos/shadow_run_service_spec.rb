@@ -414,6 +414,39 @@ describe Disparos::ShadowRunService do
           .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
       end
 
+      # FIX 1 — the discriminating spec for gap B's account-settings vector. The
+      # fingerprint now folds in the resolved per-account RulesConfig bindings, so
+      # changing one binding (here dedup_window_days) after the dry-run drifts the
+      # hash. Mutate through `disparo.account` (the memoized instance the run
+      # resolves), not the `account` let, so the disparo sees the new settings.
+      it 'raises InvalidShadowRun and persists nothing when an account rule binding changed after the dry-run' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+        disparo.account.update!(
+          settings: disparo.account.settings.merge('disparador_settings' => { 'dedup_window_days' => 14 })
+        )
+
+        expect { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+          .and(not_change { DisparoTarget.where(disparo: disparo).count })
+      end
+
+      # Unchanged settings (even a NON-default binding) -> valid flow still passes
+      # and persists. This also guards the Duration-as-Integer determinism: an
+      # unstable hash would mismatch dry-run vs shadow-run and wrongly raise here.
+      it 'runs and persists targets when a non-default account rule binding is set but unchanged through the run' do
+        disparo.account.update!(
+          settings: disparo.account.settings.merge('disparador_settings' => { 'dedup_window_days' => 14 })
+        )
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+
+        summary = nil
+        expect { summary = described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to change { DisparoTarget.where(disparo: disparo).count }.from(0).to(1)
+
+        expect(summary.total_targets).to eq(1)
+        expect(summary.eligible).to eq(1)
+      end
+
       # (4) valid flow: dry_run -> shadow_run with the fresh snapshot -> passes + persists.
       it 'runs and persists targets with a fresh, matching, unexpired snapshot' do
         snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot

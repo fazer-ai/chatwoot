@@ -266,6 +266,24 @@ describe Disparos::EligibilityEngine do
         expect(res.skip_reasons).to include('marketing_cooldown_7d')
       end
 
+      # COOLDOWN MUST NOT FAIL OPEN ON A MIXED-CASE HISTORICAL MARKER (Codex regression).
+      # The synced template is `promo_blast` (MARKETING) but a historical /
+      # externally-written marker can carry a differently-cased name
+      # (`bulk_template_PROMO_BLAST_sent_at`) that never passed the create-time
+      # exact-case guard. marker_category resolves with the GENEROUS (default,
+      # case-insensitive) classifier, so it STILL maps to MARKETING and the cooldown
+      # trips. If the resolver default were exact (case-sensitive), this marker would
+      # resolve to nil and the cooldown would fail open — the lead would be eligible.
+      it 'trips marketing_cooldown_7d for a recent MIXED-CASE marketing marker (cooldown does not fail open)' do
+        mixed_case_marker = { 'bulk_template_PROMO_BLAST_sent_at' => (now - 1.day).iso8601 }
+        conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: mixed_case_marker)
+        res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :marketing).perform
+
+        expect(res).not_to be_eligible
+        expect(res.skip_reasons).to contain_exactly('marketing_cooldown_7d')
+        expect(res.primary_skip_reason).to eq('marketing_cooldown_7d')
+      end
+
       it 'does NOT trip marketing_cooldown_7d from a recent KNOWN-UTILITY-template marker (GAP E narrowed)' do
         utility_marker = { 'bulk_template_utility_receipt_sent_at' => (now - 1.day).iso8601 }
         conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: utility_marker)

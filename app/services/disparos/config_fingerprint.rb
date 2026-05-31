@@ -16,6 +16,13 @@
 #                        filters in any order hash identically)
 #   - inbox_ids         (disparo.disparo_inboxes.pluck(:inbox_id), SORTED)
 #   - conversation_status ('open' / 'all')
+#   - account_rules     (the resolved per-account Disparos::RulesConfig bindings:
+#                        opt-out label, opt-out kanban stages, the custom-attribute
+#                        keys and the dedup/whatsapp-invalid windows). Eligibility
+#                        depends on these too, so a change to account.disparador_settings
+#                        between dry-run and shadow-run MUST drift the hash — otherwise
+#                        the shadow run would recompute a DIFFERENT eligible set than
+#                        the operator approved (GAP B via the account-settings vector).
 #
 # This is NOT the removed wf15 filter_digest — it is new, simple, and self-contained.
 class Disparos::ConfigFingerprint
@@ -39,7 +46,33 @@ class Disparos::ConfigFingerprint
       template_category: @disparo.template_category,
       audience_filter: canonical_filter,
       inbox_ids: @disparo.disparo_inboxes.pluck(:inbox_id).sort,
-      conversation_status: @disparo.conversation_status
+      conversation_status: @disparo.conversation_status,
+      account_rules: canonical_account_rules
+    }
+  end
+
+  # The resolved per-account rule bindings, in a deterministic, canonical shape.
+  # Resolved INTERNALLY from @disparo.account via the SAME resolver the engine
+  # uses (Disparos::RulesConfig), so DryRunService and ShadowRunService — which
+  # both already call ConfigFingerprint.for(disparo) — fold these in identically
+  # with no per-service threading. A default account (no disparador_settings)
+  # yields the RulesConfig defaults, so the digest is unchanged from today's.
+  #
+  # Determinism: the keys are written as a code literal (stable order);
+  # kanban_opt_out_steps is sorted; the windows are emitted as Integer SECONDS
+  # (Duration#to_i) so an ActiveSupport::Duration never leaks into the JSON.
+  def canonical_account_rules
+    config = Disparos::RulesConfig.new(@disparo.account)
+    {
+      opt_out_label: config.opt_out_label,
+      kanban_opt_out_steps: config.kanban_opt_out_steps.sort,
+      opt_out_lgpd_key: config.opt_out_lgpd_key,
+      followup_locked_key: config.followup_locked_key,
+      window_closes_at_key: config.window_closes_at_key,
+      kanban_step_key: config.kanban_step_key,
+      whatsapp_invalid_at_key: config.whatsapp_invalid_at_key,
+      dedup_window_seconds: config.dedup_window.to_i,
+      whatsapp_invalid_window_seconds: config.whatsapp_invalid_window.to_i
     }
   end
 

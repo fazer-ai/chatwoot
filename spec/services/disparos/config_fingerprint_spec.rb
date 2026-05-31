@@ -64,5 +64,29 @@ describe Disparos::ConfigFingerprint do
       create(:disparo_inbox, disparo: disparo, inbox: second_inbox)
       expect(described_class.for(disparo)).not_to eq(before)
     end
+
+    # FIX 1 (gap B, account-settings vector): eligibility ALSO depends on the
+    # per-account rule bindings resolved by Disparos::RulesConfig, so the
+    # fingerprint must fold them in and drift when any of them changes.
+    it 'changes when a per-account rule binding (opt_out_lgpd_key) changes' do
+      disparo = build_disparo
+      before = described_class.for(disparo)
+      account.update!(settings: account.settings.merge('disparador_settings' => { 'opt_out_lgpd_key' => 'opted_out' }))
+      expect(described_class.for(Disparo.find(disparo.id))).not_to eq(before)
+    end
+
+    it 'changes when a per-account window binding (dedup_window_days) changes' do
+      disparo = build_disparo
+      before = described_class.for(disparo)
+      account.update!(settings: account.settings.merge('disparador_settings' => { 'dedup_window_days' => 14 }))
+      expect(described_class.for(Disparo.find(disparo.id))).not_to eq(before)
+    end
+
+    it 'is stable across reloads when a non-default rule binding is set (Duration folds in as Integer seconds)' do
+      account.update!(settings: account.settings.merge('disparador_settings' => { 'dedup_window_days' => 14 }))
+      disparo = build_disparo
+      first = described_class.for(disparo)
+      expect(described_class.for(Disparo.find(disparo.id))).to eq(first)
+    end
   end
 end

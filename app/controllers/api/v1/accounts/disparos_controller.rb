@@ -142,12 +142,17 @@ class Api::V1::Accounts::DisparosController < Api::V1::Accounts::BaseController
   # template nor bypass the marketing cooldown by omitting the category. The
   # enum-range guard already ran (valid_template_category?), so submitted is a
   # known enum key or blank here.
+  #
+  # exact: true — the operator's submitted template_name must match a synced
+  # approved template EXACTLY (case-sensitive). A mis-cased name resolves to nil
+  # → mismatch → 422, so it is never persisted; the canonical name then keeps the
+  # engine's exact approval allowlist + BulkMarker dedup key aligned end-to-end.
   def template_category_matches?(inboxes)
     submitted = params.dig(:disparo, :template_category).presence || 'utility'
     template_name = params.dig(:disparo, :template_name)
 
     inboxes.all? do |inbox|
-      Disparos::TemplateCategory.for_channel(inbox.channel, template_name) == submitted
+      Disparos::TemplateCategory.for_channel(inbox.channel, template_name, exact: true) == submitted
     end
   end
 

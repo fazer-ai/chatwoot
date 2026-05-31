@@ -41,8 +41,16 @@ describe Disparos::TemplateCategory do
       expect(described_class.for_channel(channel, 'legacy_account')).to eq('utility')
     end
 
-    it 'matches the template name case-insensitively' do
+    it 'matches the template name CASE-INSENSITIVELY by default (generous classifier)' do
       expect(described_class.for_channel(channel, 'PROMO_BLAST')).to eq('marketing')
+    end
+
+    it 'matches the template name EXACT-case when exact: true (a differently-cased name does not resolve)' do
+      expect(described_class.for_channel(channel, 'PROMO_BLAST', exact: true)).to be_nil
+    end
+
+    it 'still resolves the exact-cased name when exact: true' do
+      expect(described_class.for_channel(channel, 'promo_blast', exact: true)).to eq('marketing')
     end
 
     it 'returns nil for a template that is not approved' do

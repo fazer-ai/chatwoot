@@ -257,6 +257,27 @@ RSpec.describe 'Disparos API', type: :request do
           expect(response.parsed_body['error']).to eq('template_category_mismatch')
         end
 
+        # GAP A end-to-end exact-case: template name handling is case-SENSITIVE
+        # the whole way down (TemplateCategory resolver, the engine's
+        # inbox_not_approved allowlist and the BulkMarker dedup/cooldown key all
+        # key off the RAW name). A mis-cased template_name therefore fails
+        # category resolution HERE (no approved entry matches the casing) and is
+        # rejected at the door — never persisted, so it can never reach the engine
+        # to be mis-marked eligible against a canonical-cased dedup marker (no
+        # fail-open).
+        it 'rejects with a 422 when the template_name casing differs from the synced approved template and persists nothing' do
+          params = valid_params.deep_dup
+          params[:disparo][:template_name] = 'sample_shipping_confirmation'.upcase
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.to not_change(Disparo, :count).and not_change(DisparoInbox, :count)
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('template_category_mismatch')
+        end
+
         it 'rejects with a 422 when the category matches in one selected inbox but not the other (multi-inbox strict)' do
           # inbox approves sample_shipping_confirmation -> utility; the second inbox
           # does NOT carry it, so the submitted utility cannot resolve there.
