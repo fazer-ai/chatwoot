@@ -17,6 +17,7 @@
       "INBOX_COUNT": "{count} inbox | {count} inboxes",
       "DRY_RUN": "Dry-run",
       "SHADOW_RUN": "Run shadow",
+      "SHADOW_RUN_DISABLED_HINT": "Run a dry-run first to enable the shadow-run.",
       "VIEW_TARGETS": "View targets",
       "LOAD_ERROR": {
         "TITLE": "Couldn't load disparos",
@@ -47,15 +48,16 @@
           "PLACEHOLDER": "Optional internal note"
         },
         "INBOX": {
-          "LABEL": "WhatsApp Cloud inbox",
+          "LABEL": "WhatsApp Cloud inboxes",
           "PLACEHOLDER": "Select an inbox",
-          "ERROR": "Select a WhatsApp Cloud inbox",
+          "ERROR": "Select at least one WhatsApp Cloud inbox",
           "EMPTY": "No WhatsApp Cloud inbox found. Connect one to use Disparador."
         },
         "TEMPLATE": {
           "LABEL": "Template",
           "PLACEHOLDER": "Select a template",
           "EMPTY": "Select an inbox first to load its templates",
+          "EMPTY_INTERSECTION": "No template is approved in all the selected inboxes. Adjust the selection.",
           "MANAGE_LINK": "Manage templates",
           "ERROR": "Select a template"
         },
@@ -63,7 +65,9 @@
           "LABEL": "Template category",
           "MARKETING": "Marketing",
           "UTILITY": "Utility",
-          "AUTHENTICATION": "Authentication"
+          "AUTHENTICATION": "Authentication",
+          "DERIVED_HINT": "Derived from the selected template.",
+          "MISSING": "This template has no category and can't be used. Pick a template with a Meta category."
         },
         "CONVERSATION_STATUS": {
           "LABEL": "Conversation status",
@@ -88,7 +92,8 @@
         "ERRORS": {
           "UNSUPPORTED_INBOX_PROVIDER": "Only WhatsApp Cloud inboxes are supported in this beta. Pick a Cloud inbox.",
           "INVALID_AUDIENCE_FILTER": "Add at least one stage or label to define the audience.",
-          "INVALID_TEMPLATE": "Select a template before creating the disparo."
+          "INVALID_TEMPLATE": "Select a template before creating the disparo.",
+          "TEMPLATE_CATEGORY_MISMATCH": "This template's category changed or it's no longer approved in every inbox. Reselect the template."
         }
       }
     },
@@ -133,7 +138,8 @@
         "SUCCESS_MESSAGE": "Shadow-run complete: {created} target(s) persisted, {eligible} eligible, {skipped} skipped. No messages were sent.",
         "ERROR_MESSAGE": "Could not run the shadow-run, please try again",
         "ERRORS": {
-          "INVALID_SHADOW_RUN": "This disparo can't be shadow-run yet. Make sure it has a template, a Cloud inbox and an audience filter."
+          "INVALID_SHADOW_RUN": "The dry-run preview expired or the audience rules changed. Run the dry-run again, then shadow-run.",
+          "NEEDS_DRY_RUN": "Run a dry-run first, then shadow-run the approved preview."
         }
       }
     },

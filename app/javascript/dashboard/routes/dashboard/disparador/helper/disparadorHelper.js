@@ -2,6 +2,36 @@
 // API keys (status enum, skip-reason keys) to i18n keys so the UI never renders
 // raw machine values, and they keep that mapping testable in isolation.
 
+// Maps a raw Meta template category to the Disparo `template_category` enum,
+// MIRRORING app/services/disparos/template_category.rb#map_category exactly:
+//   'MARKETING'      -> 'marketing'
+//   'AUTHENTICATION' -> 'authentication'
+//   EVERYTHING ELSE  -> 'utility' (covers 'UTILITY' AND legacy values such as
+//                                  'SHIPPING_UPDATE' / 'ACCOUNT_UPDATE')
+// A blank/absent raw category returns null — the backend's resolver treats a
+// template with no category as a mismatch (422), so the FE must too: null means
+// "uncreatable, block the operator", NOT "default to utility".
+export const mapTemplateCategory = rawCategory => {
+  if (rawCategory === null || rawCategory === undefined || rawCategory === '') {
+    return null;
+  }
+  const upper = String(rawCategory).toUpperCase();
+  if (upper === 'MARKETING') return 'marketing';
+  if (upper === 'AUTHENTICATION') return 'authentication';
+  return 'utility';
+};
+
+// i18n key for a derived (mapped) template category badge. Only the three enum
+// values are ever derived; null is handled by the no-category block, never here.
+export const templateCategoryLabelKey = category => {
+  const map = {
+    marketing: 'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.MARKETING',
+    utility: 'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.UTILITY',
+    authentication: 'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.AUTHENTICATION',
+  };
+  return map[category] || null;
+};
+
 // Disparo status enum (mirrors app/models/disparo.rb). Unknown values fall back
 // to the raw value so a future status never renders as blank.
 export const statusLabelKey = status => {

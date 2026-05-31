@@ -406,9 +406,14 @@ describe('#getters', () => {
   });
 
   describe('getDisparadorWhatsAppTemplates', () => {
-    it('returns empty array when inbox not found', () => {
+    it('returns empty array when inbox not found (scalar back-compat)', () => {
       const state = { records: [] };
       expect(getters.getDisparadorWhatsAppTemplates(state)(999)).toEqual([]);
+    });
+
+    it('returns empty array for an empty inbox id array', () => {
+      const state = { records: [] };
+      expect(getters.getDisparadorWhatsAppTemplates(state)([])).toEqual([]);
     });
 
     it('returns empty array when templates is null or not an array', () => {
@@ -422,13 +427,14 @@ describe('#getters', () => {
           },
         ],
       };
-      expect(getters.getDisparadorWhatsAppTemplates(state)(1)).toEqual([]);
+      expect(getters.getDisparadorWhatsAppTemplates(state)([1])).toEqual([]);
     });
 
     // The core bug: the sanitized prod snapshot strips `components` (PII/egress),
     // so the shared getFilteredWhatsAppTemplates filtered every snapshot template
     // out and the select went empty in staging. This getter must keep an approved
-    // {name, status}-only template (no components) instead of dropping it.
+    // {name, status}-only template (no components) instead of dropping it. A
+    // template with no category derives to null (uncreatable) but stays in the list.
     it('accepts sanitized {name, status} templates without requiring components', () => {
       const sanitizedTemplates = [
         { name: 'welcome_back', status: 'approved' },
@@ -445,16 +451,16 @@ describe('#getters', () => {
         ],
       };
 
-      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
-      expect(result.map(t => t.name)).toEqual([
-        'welcome_back',
-        'reactivation_june',
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1]);
+      expect(result).toEqual([
+        { name: 'welcome_back', category: null },
+        { name: 'reactivation_june', category: null },
       ]);
     });
 
     it('keeps approved status filtering and drops templates missing name or status', () => {
       const mixedTemplates = [
-        { name: 'approved_template', status: 'approved' },
+        { name: 'approved_template', status: 'approved', category: 'UTILITY' },
         { name: 'pending_template', status: 'pending' },
         { name: 'rejected_template', status: 'rejected' },
         { status: 'approved' }, // missing name
@@ -471,7 +477,7 @@ describe('#getters', () => {
         ],
       };
 
-      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1]);
       expect(result.map(t => t.name)).toEqual(['approved_template']);
     });
 
@@ -487,9 +493,121 @@ describe('#getters', () => {
         ],
       };
 
-      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1]);
       expect(result).toHaveLength(1);
       expect(result[0]).not.toHaveProperty('components');
+      expect(result[0]).not.toHaveProperty('status');
+    });
+
+    // GAP A: the derived category MIRRORS the backend mapping —
+    // MARKETING->marketing, AUTHENTICATION->authentication, everything else
+    // (UTILITY + legacy SHIPPING_UPDATE/...) -> utility, absent -> null.
+    it('derives the mapped category from each template (incl. legacy + null)', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'promo', status: 'approved', category: 'MARKETING' },
+              { name: 'code', status: 'approved', category: 'AUTHENTICATION' },
+              { name: 'receipt', status: 'approved', category: 'UTILITY' },
+              {
+                name: 'shipping',
+                status: 'approved',
+                category: 'SHIPPING_UPDATE',
+              },
+              { name: 'nocat', status: 'approved' },
+            ],
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1]);
+      const byName = Object.fromEntries(result.map(t => [t.name, t.category]));
+      expect(byName).toEqual({
+        promo: 'marketing',
+        code: 'authentication',
+        receipt: 'utility',
+        shipping: 'utility',
+        nocat: null,
+      });
+    });
+
+    // GAP D: intersection — only templates approved in ALL selected inboxes.
+    it('returns only templates approved in every selected inbox', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'shared', status: 'approved', category: 'UTILITY' },
+              { name: 'only_in_1', status: 'approved', category: 'UTILITY' },
+            ],
+          },
+          {
+            id: 2,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'shared', status: 'approved', category: 'UTILITY' },
+              { name: 'only_in_2', status: 'approved', category: 'UTILITY' },
+            ],
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1, 2]);
+      expect(result.map(t => t.name)).toEqual(['shared']);
+    });
+
+    it('excludes a template approved in only some inboxes', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'half', status: 'approved', category: 'UTILITY' },
+            ],
+          },
+          {
+            id: 2,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'half', status: 'pending', category: 'UTILITY' },
+            ],
+          },
+        ],
+      };
+
+      expect(getters.getDisparadorWhatsAppTemplates(state)([1, 2])).toEqual([]);
+    });
+
+    // GAP A+D edge: a template approved in all inboxes but with DIFFERENT
+    // categories across them resolves to null (blocked), not silently picked.
+    it('sets category to null when it disagrees across inboxes', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'drift', status: 'approved', category: 'MARKETING' },
+            ],
+          },
+          {
+            id: 2,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: [
+              { name: 'drift', status: 'approved', category: 'UTILITY' },
+            ],
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)([1, 2]);
+      expect(result).toEqual([{ name: 'drift', category: null }]);
     });
   });
 });

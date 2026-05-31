@@ -551,7 +551,11 @@ const menuItems = computed(() => {
             name: 'Disparador',
             label: t('SIDEBAR.DISPARADOR'),
             icon: 'i-lucide-send-horizontal',
-            activeOn: ['disparador_wrapper', 'disparador_list'],
+            activeOn: [
+              'disparador_wrapper',
+              'disparador_list',
+              'disparador_settings',
+            ],
             to: accountScopedRoute('disparador_list'),
           },
         ]

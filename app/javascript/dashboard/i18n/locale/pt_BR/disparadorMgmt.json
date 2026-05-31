@@ -17,6 +17,7 @@
       "INBOX_COUNT": "{count} caixa | {count} caixas",
       "DRY_RUN": "Dry-run",
       "SHADOW_RUN": "Rodar shadow",
+      "SHADOW_RUN_DISABLED_HINT": "Rode um dry-run primeiro para habilitar o shadow-run.",
       "VIEW_TARGETS": "Ver alvos",
       "LOAD_ERROR": {
         "TITLE": "Não foi possível carregar os disparos",
@@ -47,15 +48,16 @@
           "PLACEHOLDER": "Nota interna opcional"
         },
         "INBOX": {
-          "LABEL": "Caixa de WhatsApp Cloud",
+          "LABEL": "Caixas de WhatsApp Cloud",
           "PLACEHOLDER": "Selecione uma caixa",
-          "ERROR": "Selecione uma caixa de WhatsApp Cloud",
+          "ERROR": "Selecione ao menos uma caixa de WhatsApp Cloud",
           "EMPTY": "Nenhuma caixa de WhatsApp Cloud encontrada. Conecte uma para usar o Disparador."
         },
         "TEMPLATE": {
           "LABEL": "Template",
           "PLACEHOLDER": "Selecione um template",
           "EMPTY": "Selecione uma caixa primeiro para carregar os templates",
+          "EMPTY_INTERSECTION": "Nenhum template está aprovado em todas as caixas selecionadas. Ajuste a seleção.",
           "MANAGE_LINK": "Gerenciar templates",
           "ERROR": "Selecione um template"
         },
@@ -63,7 +65,9 @@
           "LABEL": "Categoria do template",
           "MARKETING": "Marketing",
           "UTILITY": "Utilitário",
-          "AUTHENTICATION": "Autenticação"
+          "AUTHENTICATION": "Autenticação",
+          "DERIVED_HINT": "Derivada do template selecionado.",
+          "MISSING": "Este template não tem categoria e não pode ser usado. Escolha um template com categoria Meta."
         },
         "CONVERSATION_STATUS": {
           "LABEL": "Status da conversa",
@@ -88,7 +92,8 @@
         "ERRORS": {
           "UNSUPPORTED_INBOX_PROVIDER": "Apenas caixas de WhatsApp Cloud são suportadas neste beta. Escolha uma caixa Cloud.",
           "INVALID_AUDIENCE_FILTER": "Adicione ao menos uma etapa ou etiqueta para definir a audiência.",
-          "INVALID_TEMPLATE": "Selecione um template antes de criar o disparo."
+          "INVALID_TEMPLATE": "Selecione um template antes de criar o disparo.",
+          "TEMPLATE_CATEGORY_MISMATCH": "A categoria deste template mudou ou ele não está mais aprovado em todas as caixas. Selecione o template novamente."
         }
       }
     },
@@ -133,7 +138,8 @@
         "SUCCESS_MESSAGE": "Shadow-run concluído: {created} alvo(s) persistido(s), {eligible} elegíveis, {skipped} ignorados. Nenhuma mensagem foi enviada.",
         "ERROR_MESSAGE": "Não foi possível rodar o shadow-run, tente novamente",
         "ERRORS": {
-          "INVALID_SHADOW_RUN": "Este disparo ainda não pode ser shadow-run. Garanta que ele tem template, caixa Cloud e filtro de audiência."
+          "INVALID_SHADOW_RUN": "A pré-visualização do dry-run expirou ou as regras de audiência mudaram. Rode o dry-run novamente e então o shadow-run.",
+          "NEEDS_DRY_RUN": "Rode um dry-run primeiro e então o shadow-run da pré-visualização aprovada."
         }
       }
     },

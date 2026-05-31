@@ -20,6 +20,7 @@ const summary = {
   by_inbox: { 3: 12 },
   estimated_cost_cents: null,
   cost_source: 'static_table_beta0',
+  snapshot_id: 'snap-1',
 };
 
 const shadowSummary = {
@@ -125,12 +126,25 @@ describe('disparador store', () => {
     });
 
     describe('#dryRun', () => {
-      it('returns the summary without storing it', async () => {
+      it('returns the summary and commits the snapshot id per disparo', async () => {
         axios.post.mockResolvedValue({ data: summary });
         const result = await actions.dryRun({ commit }, 1);
 
         expect(axios.post).toHaveBeenCalledWith('/api/v1/disparos/1/dry_run');
         expect(result).toEqual(summary);
+        expect(commit.mock.calls).toEqual([
+          [types.default.SET_DISPARADOR_UI_FLAG, { isRunningDryRun: true }],
+          [types.default.SET_DISPARO_SNAPSHOT, { id: 1, snapshotId: 'snap-1' }],
+          [types.default.SET_DISPARADOR_UI_FLAG, { isRunningDryRun: false }],
+        ]);
+      });
+
+      it('does not commit a snapshot when the response carries none', async () => {
+        axios.post.mockResolvedValue({
+          data: { ...summary, snapshot_id: null },
+        });
+        await actions.dryRun({ commit }, 1);
+
         expect(commit.mock.calls).toEqual([
           [types.default.SET_DISPARADOR_UI_FLAG, { isRunningDryRun: true }],
           [types.default.SET_DISPARADOR_UI_FLAG, { isRunningDryRun: false }],
@@ -152,12 +166,16 @@ describe('disparador store', () => {
     });
 
     describe('#shadowRun', () => {
-      it('returns the summary and toggles the flag without storing it', async () => {
+      it('posts the snapshot_id and returns the summary without storing it', async () => {
         axios.post.mockResolvedValue({ data: shadowSummary });
-        const result = await actions.shadowRun({ commit }, { id: 1 });
+        const result = await actions.shadowRun(
+          { commit },
+          { id: 1, snapshotId: 'snap-1' }
+        );
 
         expect(axios.post).toHaveBeenCalledWith(
-          '/api/v1/disparos/1/shadow_run'
+          '/api/v1/disparos/1/shadow_run',
+          { snapshot_id: 'snap-1' }
         );
         expect(result).toEqual(shadowSummary);
         expect(commit.mock.calls).toEqual([
@@ -166,15 +184,16 @@ describe('disparador store', () => {
         ]);
       });
 
-      it('throws invalid_shadow_run on 422 and resets flag', async () => {
+      it('throws invalid_shadow_run on 422, clears the snapshot and resets flag', async () => {
         axios.post.mockRejectedValue({
           response: { data: { error: 'invalid_shadow_run' } },
         });
-        await expect(actions.shadowRun({ commit }, { id: 1 })).rejects.toThrow(
-          'invalid_shadow_run'
-        );
+        await expect(
+          actions.shadowRun({ commit }, { id: 1, snapshotId: 'snap-1' })
+        ).rejects.toThrow('invalid_shadow_run');
         expect(commit.mock.calls).toEqual([
           [types.default.SET_DISPARADOR_UI_FLAG, { isShadowRunning: true }],
+          [types.default.CLEAR_DISPARO_SNAPSHOT, 1],
           [types.default.SET_DISPARADOR_UI_FLAG, { isShadowRunning: false }],
         ]);
       });
@@ -223,6 +242,12 @@ describe('disparador store', () => {
       const state = { uiFlags: { isCreating: true } };
       expect(getters.getUIFlags(state)).toEqual({ isCreating: true });
     });
+
+    it('getSnapshotId returns the held snapshot id for a disparo', () => {
+      const state = { snapshotByDisparo: { 7: 'snap-7' } };
+      expect(getters.getSnapshotId(state)(7)).toBe('snap-7');
+      expect(getters.getSnapshotId(state)(99)).toBeUndefined();
+    });
   });
 
   describe('#mutations', () => {
@@ -241,6 +266,21 @@ describe('disparador store', () => {
         isCreating: true,
         isRunningDryRun: false,
       });
+    });
+
+    it('SET_DISPARO_SNAPSHOT stores the snapshot id keyed by disparo id', () => {
+      const state = { snapshotByDisparo: { 1: 'snap-1' } };
+      mutations[types.default.SET_DISPARO_SNAPSHOT](state, {
+        id: 2,
+        snapshotId: 'snap-2',
+      });
+      expect(state.snapshotByDisparo).toEqual({ 1: 'snap-1', 2: 'snap-2' });
+    });
+
+    it('CLEAR_DISPARO_SNAPSHOT drops only the given disparo snapshot', () => {
+      const state = { snapshotByDisparo: { 1: 'snap-1', 2: 'snap-2' } };
+      mutations[types.default.CLEAR_DISPARO_SNAPSHOT](state, 1);
+      expect(state.snapshotByDisparo).toEqual({ 2: 'snap-2' });
     });
   });
 });

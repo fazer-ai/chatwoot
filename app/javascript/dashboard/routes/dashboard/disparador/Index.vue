@@ -79,7 +79,15 @@ const openCreate = () => createDialog.value?.open();
 const openDryRun = disparo => dryRunDialog.value?.run(disparo);
 const openTargets = disparo => targetsDialog.value?.open(disparo);
 
+// GAP B: shadow-run is only enabled once a disparo has an approved dry-run
+// snapshot. The store holds the latest snapshot id per disparo; this reads it.
+const snapshotIdFor = computed(
+  () => disparo => getters['disparador/getSnapshotId'].value(disparo.id)
+);
+
 const resolveShadowRunError = message => {
+  // A 422 here means the snapshot is missing/expired/config-changed; the store
+  // already dropped it, so the operator must run a fresh dry-run before retrying.
   if (message === 'invalid_shadow_run') {
     return t('DISPARADOR_MGMT.SHADOW_RUN.API.ERRORS.INVALID_SHADOW_RUN');
   }
@@ -87,12 +95,20 @@ const resolveShadowRunError = message => {
 };
 
 // Shadow-run persists the target set, then we surface the headline counts and
-// open the targets view so the QA flow chains run -> inspect.
+// open the targets view so the QA flow chains run -> inspect. It sends the
+// snapshot id captured by the approved dry-run; without one it is a no-op (the
+// button is disabled), and a 422 surfaces the re-dry-run prompt.
 const runShadow = async disparo => {
+  const snapshotId = snapshotIdFor.value(disparo);
+  if (!snapshotId) {
+    useAlert(t('DISPARADOR_MGMT.SHADOW_RUN.API.ERRORS.NEEDS_DRY_RUN'));
+    return;
+  }
   runningShadowId.value = disparo.id;
   try {
     const summary = await store.dispatch('disparador/shadowRun', {
       id: disparo.id,
+      snapshotId,
     });
     useAlert(
       t('DISPARADOR_MGMT.SHADOW_RUN.API.SUCCESS_MESSAGE', {
@@ -231,11 +247,17 @@ onBeforeMount(() => {
                   @click="openDryRun(disparo)"
                 />
                 <Button
+                  v-tooltip="
+                    snapshotIdFor(disparo)
+                      ? undefined
+                      : t('DISPARADOR_MGMT.LIST.SHADOW_RUN_DISABLED_HINT')
+                  "
                   variant="faded"
                   color="slate"
                   size="sm"
                   icon="i-lucide-radio"
                   :label="t('DISPARADOR_MGMT.LIST.SHADOW_RUN')"
+                  :disabled="!snapshotIdFor(disparo)"
                   :is-loading="
                     uiFlags.isShadowRunning && runningShadowId === disparo.id
                   "

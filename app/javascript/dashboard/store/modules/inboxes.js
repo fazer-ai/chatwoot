@@ -11,6 +11,7 @@ import AnalyticsHelper from '../../helper/AnalyticsHelper';
 import camelcaseKeys from 'camelcase-keys';
 import { ACCOUNT_EVENTS } from '../../helper/AnalyticsHelper/events';
 import { channelActions, buildInboxData } from './inboxes/channelActions';
+import { mapTemplateCategory } from 'dashboard/routes/dashboard/disparador/helper/disparadorHelper';
 
 export const state = {
   records: [],
@@ -114,31 +115,67 @@ export const getters = {
   // {name, status} only — `components` is stripped for PII/egress. So it selects
   // on name + approved status WITHOUT requiring (or surfacing) the components blob,
   // which would otherwise make every snapshot-loaded template disappear in staging.
-  getDisparadorWhatsAppTemplates: $state => inboxId => {
-    const [inbox] = $state.records.filter(
-      record => record.id === Number(inboxId)
-    );
+  //
+  // GAP D: accepts an ARRAY of inbox ids (a scalar is normalized to a one-element
+  // array for back-compat) and returns the INTERSECTION by template name — only
+  // templates approved in EVERY selected inbox. Each returned entry carries
+  // `name` + the mapped `category` (GAP A: 'marketing'/'utility'/'authentication'
+  // or null when absent). When the same name resolves to DIFFERENT categories
+  // across inboxes, `category` is set to null (not silently picked): the template
+  // stays in the list but CreateDisparo blocks it, matching the backend, which
+  // requires the submitted category to equal the real one in ALL inboxes.
+  getDisparadorWhatsAppTemplates: $state => inboxIds => {
+    const ids = (Array.isArray(inboxIds) ? inboxIds : [inboxIds])
+      .map(Number)
+      .filter(id => !Number.isNaN(id));
+    if (!ids.length) return [];
 
-    const {
-      message_templates: whatsAppMessageTemplates,
-      additional_attributes: additionalAttributes,
-    } = inbox || {};
+    const approvedTemplatesFor = inboxId => {
+      const [inbox] = $state.records.filter(
+        record => record.id === Number(inboxId)
+      );
 
-    const { message_templates: apiInboxMessageTemplates } =
-      additionalAttributes || {};
-    const templates = whatsAppMessageTemplates || apiInboxMessageTemplates;
+      const {
+        message_templates: whatsAppMessageTemplates,
+        additional_attributes: additionalAttributes,
+      } = inbox || {};
 
-    if (!templates || !Array.isArray(templates)) {
-      return [];
-    }
+      const { message_templates: apiInboxMessageTemplates } =
+        additionalAttributes || {};
+      const templates = whatsAppMessageTemplates || apiInboxMessageTemplates;
 
-    return templates.filter(
-      template =>
-        template &&
-        template.name &&
-        template.status &&
-        template.status.toLowerCase() === 'approved'
-    );
+      if (!templates || !Array.isArray(templates)) return [];
+
+      return templates.filter(
+        template =>
+          template &&
+          template.name &&
+          template.status &&
+          template.status.toLowerCase() === 'approved'
+      );
+    };
+
+    // Build a per-inbox map of name -> mapped category, then intersect by name:
+    // a template is kept only when present (approved) in every selected inbox.
+    const perInbox = ids.map(id => {
+      const map = new Map();
+      approvedTemplatesFor(id).forEach(template => {
+        map.set(template.name, mapTemplateCategory(template.category));
+      });
+      return map;
+    });
+
+    const [first, ...rest] = perInbox;
+    const result = [];
+    first.forEach((category, name) => {
+      if (!rest.every(map => map.has(name))) return;
+      // null wins: an absent category in any inbox, or disagreeing categories
+      // across inboxes, makes the template uncreatable (blocked downstream).
+      const categories = [category, ...rest.map(map => map.get(name))];
+      const allSame = categories.every(c => c === categories[0]);
+      result.push({ name, category: allSame ? categories[0] : null });
+    });
+    return result;
   },
   getNewConversationInboxes($state) {
     return $state.records.filter(inbox => {

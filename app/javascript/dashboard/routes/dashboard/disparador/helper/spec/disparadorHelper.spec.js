@@ -6,9 +6,57 @@ import {
   formatCostCents,
   resolveDisparadorSettings,
   DISPARADOR_SETTINGS_DEFAULTS,
+  mapTemplateCategory,
+  templateCategoryLabelKey,
 } from '../disparadorHelper';
 
 describe('disparadorHelper', () => {
+  // GAP A: this mapping MUST mirror app/services/disparos/template_category.rb
+  // exactly, or the FE will allow a payload the backend 422s (or block one it
+  // would accept).
+  describe('#mapTemplateCategory', () => {
+    it('maps MARKETING -> marketing (case-insensitive)', () => {
+      expect(mapTemplateCategory('MARKETING')).toBe('marketing');
+      expect(mapTemplateCategory('marketing')).toBe('marketing');
+    });
+
+    it('maps AUTHENTICATION -> authentication', () => {
+      expect(mapTemplateCategory('AUTHENTICATION')).toBe('authentication');
+    });
+
+    it('maps UTILITY and legacy values -> utility', () => {
+      expect(mapTemplateCategory('UTILITY')).toBe('utility');
+      expect(mapTemplateCategory('SHIPPING_UPDATE')).toBe('utility');
+      expect(mapTemplateCategory('ACCOUNT_UPDATE')).toBe('utility');
+      expect(mapTemplateCategory('TICKET_UPDATE')).toBe('utility');
+    });
+
+    it('returns null for an absent/blank category (uncreatable, not utility)', () => {
+      expect(mapTemplateCategory(null)).toBeNull();
+      expect(mapTemplateCategory(undefined)).toBeNull();
+      expect(mapTemplateCategory('')).toBeNull();
+    });
+  });
+
+  describe('#templateCategoryLabelKey', () => {
+    it('maps each enum category to its i18n key', () => {
+      expect(templateCategoryLabelKey('marketing')).toBe(
+        'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.MARKETING'
+      );
+      expect(templateCategoryLabelKey('utility')).toBe(
+        'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.UTILITY'
+      );
+      expect(templateCategoryLabelKey('authentication')).toBe(
+        'DISPARADOR_MGMT.CREATE.FORM.CATEGORY.AUTHENTICATION'
+      );
+    });
+
+    it('returns null for null/unknown so no badge is rendered', () => {
+      expect(templateCategoryLabelKey(null)).toBeNull();
+      expect(templateCategoryLabelKey(undefined)).toBeNull();
+    });
+  });
+
   describe('#statusLabelKey', () => {
     it('maps known statuses to i18n keys', () => {
       expect(statusLabelKey('draft')).toBe('DISPARADOR_MGMT.STATUS.DRAFT');

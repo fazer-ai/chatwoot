@@ -28,10 +28,11 @@ describe('#DisparosAPI', () => {
       );
     });
 
-    it('#shadowRun posts to the shadow_run member route', () => {
-      disparos.shadowRun(7);
+    it('#shadowRun posts to the shadow_run member route with the snapshot_id', () => {
+      disparos.shadowRun(7, 'snap-123');
       expect(global.axios.post).toHaveBeenCalledWith(
-        '/api/v1/disparos/7/shadow_run'
+        '/api/v1/disparos/7/shadow_run',
+        { snapshot_id: 'snap-123' }
       );
     });
 

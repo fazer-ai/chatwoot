@@ -11,8 +11,10 @@ import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Select from 'dashboard/components-next/select/Select.vue';
+import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import TagInput from 'dashboard/components-next/taginput/TagInput.vue';
 import { INPUT_TYPES } from 'dashboard/components-next/taginput/helper/tagInputHelper';
+import { templateCategoryLabelKey } from './helper/disparadorHelper';
 
 const emit = defineEmits(['created']);
 
@@ -25,12 +27,10 @@ const dialogRef = ref(null);
 
 const name = ref('');
 const description = ref('');
-const selectedInboxId = ref('');
+// GAP D: a disparo can target multiple WhatsApp Cloud inboxes; the template +
+// derived category must hold across ALL of them. Holds the selected inbox ids.
+const selectedInboxIds = ref([]);
 const selectedTemplate = ref('');
-// Mirrors the backend disparo template_category enum (lowercase). Defaults to
-// 'utility' to match the backend default. MARKETING is what makes the G2
-// marketing-cooldown gate reachable for an operator.
-const selectedCategory = ref('utility');
 // Mirror the backend conversation_status enum (lowercase). Default matches the
 // model default (open).
 const selectedConversationStatus = ref('open');
@@ -39,10 +39,11 @@ const selectedLabels = ref([]);
 
 const rules = {
   name: { required },
-  selectedInboxId: { required },
+  // GAP D: at least one inbox is required (an empty array is invalid).
+  selectedInboxIds: { required },
   selectedTemplate: { required },
 };
-const v$ = useVuelidate(rules, { name, selectedInboxId, selectedTemplate });
+const v$ = useVuelidate(rules, { name, selectedInboxIds, selectedTemplate });
 
 const uiFlags = computed(() => getters['disparador/getUIFlags'].value);
 const isCreating = computed(() => uiFlags.value.isCreating);
@@ -58,16 +59,16 @@ const cloudInboxes = computed(() =>
   )
 );
 
-const inboxOptions = computed(() =>
-  cloudInboxes.value.map(inbox => ({ value: inbox.id, label: inbox.name }))
-);
-
 const hasCloudInbox = computed(() => cloudInboxes.value.length > 0);
 
+const isInboxSelected = inboxId => selectedInboxIds.value.includes(inboxId);
+
+// GAP D: intersection of templates approved in ALL selected inboxes, each entry
+// carrying its derived (mapped) category — or null when absent/inconsistent.
 const templates = computed(() => {
-  if (!selectedInboxId.value) return [];
+  if (!selectedInboxIds.value.length) return [];
   return getters['inboxes/getDisparadorWhatsAppTemplates'].value(
-    selectedInboxId.value
+    selectedInboxIds.value
   );
 });
 
@@ -78,20 +79,30 @@ const templateOptions = computed(() =>
   }))
 );
 
-const categoryOptions = computed(() => [
-  {
-    value: 'marketing',
-    label: t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.MARKETING'),
-  },
-  {
-    value: 'utility',
-    label: t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.UTILITY'),
-  },
-  {
-    value: 'authentication',
-    label: t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.AUTHENTICATION'),
-  },
-]);
+// GAP A: the category is DERIVED from the selected template (never picked). It
+// is the real, backend-matching category of the approved template across every
+// selected inbox, or null when the template carries no category (or disagrees
+// across inboxes) — which blocks creation.
+const derivedCategory = computed(() => {
+  if (!selectedTemplate.value) return undefined;
+  const entry = templates.value.find(
+    template => template.name === selectedTemplate.value
+  );
+  return entry ? entry.category : undefined;
+});
+
+const derivedCategoryLabel = computed(() => {
+  const key = templateCategoryLabelKey(derivedCategory.value);
+  // eslint-disable-next-line @intlify/vue-i18n/no-dynamic-keys
+  return key ? t(key) : '';
+});
+
+// True only when a template is selected AND it has no derivable category. This
+// is the block condition: the backend rejects such a template (422), so the FE
+// must not let the operator submit it.
+const hasMissingCategory = computed(
+  () => Boolean(selectedTemplate.value) && derivedCategory.value === null
+);
 
 const conversationStatusOptions = computed(() => [
   {
@@ -104,15 +115,16 @@ const conversationStatusOptions = computed(() => [
   },
 ]);
 
-// The inbox select is already Cloud-only, so a selected inbox is a Cloud inbox.
-// Link straight to its settings Templates tab to create/manage templates.
+// Each selected inbox is Cloud-only. When exactly one is selected, link straight
+// to its settings Templates tab so the operator can create/manage templates; the
+// link is hidden for a multi-inbox selection (no single target to deep-link to).
 const manageTemplatesRoute = computed(() => {
-  if (!selectedInboxId.value) return null;
+  if (selectedInboxIds.value.length !== 1) return null;
   return {
     name: 'settings_inbox_show',
     params: {
       accountId: route.params.accountId,
-      inboxId: selectedInboxId.value,
+      inboxId: selectedInboxIds.value[0],
       tab: 'whatsapp-templates',
     },
   };
@@ -131,12 +143,31 @@ const hasAudience = computed(
 );
 
 const isSubmitDisabled = computed(
-  () => v$.value.$invalid || !hasAudience.value || isCreating.value
+  () =>
+    v$.value.$invalid ||
+    !hasAudience.value ||
+    hasMissingCategory.value ||
+    isCreating.value
 );
 
-const onInboxChange = () => {
+// Toggling the inbox SET changes the approved-in-all intersection, so a
+// previously-selected template may drop out and its derived category may change.
+// Reset the template (and its validation) whenever membership changes.
+const toggleInbox = inboxId => {
+  if (isInboxSelected(inboxId)) {
+    selectedInboxIds.value = selectedInboxIds.value.filter(
+      id => id !== inboxId
+    );
+  } else {
+    selectedInboxIds.value = [...selectedInboxIds.value, inboxId];
+  }
+  v$.value.selectedInboxIds.$touch();
   selectedTemplate.value = '';
   v$.value.selectedTemplate.$reset();
+};
+
+const onTemplateChange = () => {
+  v$.value.selectedTemplate.$touch();
 };
 
 const resolveCreateError = message => {
@@ -148,6 +179,12 @@ const resolveCreateError = message => {
   }
   if (message === 'invalid_template') {
     return t('DISPARADOR_MGMT.CREATE.API.ERRORS.INVALID_TEMPLATE');
+  }
+  // GAP A: the submitted (derived) category didn't match the template's real
+  // category in every inbox — usually the template was edited/un-approved after
+  // selection. Tell the operator to reselect the template.
+  if (message === 'template_category_mismatch') {
+    return t('DISPARADOR_MGMT.CREATE.API.ERRORS.TEMPLATE_CATEGORY_MISMATCH');
   }
   return message || t('DISPARADOR_MGMT.CREATE.API.ERROR_MESSAGE');
 };
@@ -161,9 +198,12 @@ const submit = async () => {
       name: name.value,
       description: description.value,
       template_name: selectedTemplate.value,
-      template_category: selectedCategory.value,
+      // GAP A: derived from the template, never operator-chosen — matches the
+      // backend's real-category validation across all selected inboxes.
+      template_category: derivedCategory.value,
       conversation_status: selectedConversationStatus.value,
-      inbox_ids: [selectedInboxId.value],
+      // GAP D: send EVERY selected inbox, not a single id.
+      inbox_ids: selectedInboxIds.value,
       audience_filter: {
         kanban_steps: kanbanSteps.value,
         label: selectedLabels.value,
@@ -180,9 +220,8 @@ const submit = async () => {
 const open = () => {
   name.value = '';
   description.value = '';
-  selectedInboxId.value = '';
+  selectedInboxIds.value = [];
   selectedTemplate.value = '';
-  selectedCategory.value = 'utility';
   selectedConversationStatus.value = 'open';
   kanbanSteps.value = [];
   selectedLabels.value = [];
@@ -228,21 +267,32 @@ defineExpose({ open });
         <span class="text-heading-3 text-n-slate-12">
           {{ t('DISPARADOR_MGMT.CREATE.FORM.INBOX.LABEL') }}
         </span>
-        <Select
+        <div
           v-if="hasCloudInbox"
-          v-model="selectedInboxId"
-          class="!w-full [&>select]:w-full"
-          :options="inboxOptions"
-          :placeholder="t('DISPARADOR_MGMT.CREATE.FORM.INBOX.PLACEHOLDER')"
-          :error="
-            v$.selectedInboxId.$error
-              ? t('DISPARADOR_MGMT.CREATE.FORM.INBOX.ERROR')
-              : ''
-          "
-          @update:model-value="onInboxChange"
-        />
+          class="flex flex-col gap-px rounded-lg outline outline-1 outline-n-weak bg-n-alpha-black2"
+        >
+          <label
+            v-for="inbox in cloudInboxes"
+            :key="inbox.id"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
+          >
+            <Checkbox
+              :model-value="isInboxSelected(inbox.id)"
+              @change="toggleInbox(inbox.id)"
+            />
+            <span class="text-sm truncate text-n-slate-12">
+              {{ inbox.name }}
+            </span>
+          </label>
+        </div>
         <p v-else class="mb-0 text-sm text-n-slate-11">
           {{ t('DISPARADOR_MGMT.CREATE.FORM.INBOX.EMPTY') }}
+        </p>
+        <p
+          v-if="hasCloudInbox && v$.selectedInboxIds.$error"
+          class="mb-0 text-sm text-n-ruby-11"
+        >
+          {{ t('DISPARADOR_MGMT.CREATE.FORM.INBOX.ERROR') }}
         </p>
       </div>
 
@@ -261,7 +311,7 @@ defineExpose({ open });
           </router-link>
         </div>
         <Select
-          v-if="selectedInboxId && templateOptions.length"
+          v-if="selectedInboxIds.length && templateOptions.length"
           v-model="selectedTemplate"
           class="!w-full [&>select]:w-full"
           :options="templateOptions"
@@ -271,8 +321,14 @@ defineExpose({ open });
               ? t('DISPARADOR_MGMT.CREATE.FORM.TEMPLATE.ERROR')
               : ''
           "
-          @blur="v$.selectedTemplate.$touch"
+          @update:model-value="onTemplateChange"
         />
+        <p
+          v-else-if="selectedInboxIds.length"
+          class="mb-0 text-sm text-n-slate-11"
+        >
+          {{ t('DISPARADOR_MGMT.CREATE.FORM.TEMPLATE.EMPTY_INTERSECTION') }}
+        </p>
         <p v-else class="mb-0 text-sm text-n-slate-11">
           {{ t('DISPARADOR_MGMT.CREATE.FORM.TEMPLATE.EMPTY') }}
         </p>
@@ -282,11 +338,20 @@ defineExpose({ open });
         <span class="text-heading-3 text-n-slate-12">
           {{ t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.LABEL') }}
         </span>
-        <Select
-          v-model="selectedCategory"
-          class="!w-full [&>select]:w-full"
-          :options="categoryOptions"
-        />
+        <!-- GAP A: read-only derived category. No picker — the operator cannot
+             choose a category different from the template's real one. -->
+        <span
+          v-if="derivedCategoryLabel"
+          class="inline-flex items-center self-start px-2 py-0.5 text-xs font-medium rounded-md text-n-slate-12 bg-n-alpha-2"
+        >
+          {{ derivedCategoryLabel }}
+        </span>
+        <p v-else-if="hasMissingCategory" class="mb-0 text-sm text-n-ruby-11">
+          {{ t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.MISSING') }}
+        </p>
+        <p v-else class="mb-0 text-sm text-n-slate-11">
+          {{ t('DISPARADOR_MGMT.CREATE.FORM.CATEGORY.DERIVED_HINT') }}
+        </p>
       </div>
 
       <div class="flex flex-col gap-1">
