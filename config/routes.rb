@@ -110,6 +110,13 @@ Rails.application.routes.draw do
             end
           end
           resources :canned_responses, only: [:index, :create, :update, :destroy]
+          resources :disparos, only: [:index, :create, :show] do
+            member do
+              post :dry_run
+              post :shadow_run
+              get :targets
+            end
+          end
           resources :automation_rules, only: [:index, :create, :show, :update, :destroy] do
             post :clone
           end
@@ -313,6 +320,7 @@ Rails.application.routes.draw do
             post :convert_provider, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
+            post :submit_template, on: :member
             get :health, on: :member
             post :register_webhook, on: :member
             post :reset_secret, on: :member

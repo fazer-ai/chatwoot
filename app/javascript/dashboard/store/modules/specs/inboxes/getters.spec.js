@@ -404,4 +404,92 @@ describe('#getters', () => {
       expect(result[0].name).toBe('fallback_template');
     });
   });
+
+  describe('getDisparadorWhatsAppTemplates', () => {
+    it('returns empty array when inbox not found', () => {
+      const state = { records: [] };
+      expect(getters.getDisparadorWhatsAppTemplates(state)(999)).toEqual([]);
+    });
+
+    it('returns empty array when templates is null or not an array', () => {
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: 'invalid',
+            additional_attributes: { message_templates: null },
+          },
+        ],
+      };
+      expect(getters.getDisparadorWhatsAppTemplates(state)(1)).toEqual([]);
+    });
+
+    // The core bug: the sanitized prod snapshot strips `components` (PII/egress),
+    // so the shared getFilteredWhatsAppTemplates filtered every snapshot template
+    // out and the select went empty in staging. This getter must keep an approved
+    // {name, status}-only template (no components) instead of dropping it.
+    it('accepts sanitized {name, status} templates without requiring components', () => {
+      const sanitizedTemplates = [
+        { name: 'welcome_back', status: 'approved' },
+        { name: 'reactivation_june', status: 'APPROVED' },
+      ];
+
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: sanitizedTemplates,
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
+      expect(result.map(t => t.name)).toEqual([
+        'welcome_back',
+        'reactivation_june',
+      ]);
+    });
+
+    it('keeps approved status filtering and drops templates missing name or status', () => {
+      const mixedTemplates = [
+        { name: 'approved_template', status: 'approved' },
+        { name: 'pending_template', status: 'pending' },
+        { name: 'rejected_template', status: 'rejected' },
+        { status: 'approved' }, // missing name
+        { name: 'no_status_template' }, // missing status
+      ];
+
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: mixedTemplates,
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
+      expect(result.map(t => t.name)).toEqual(['approved_template']);
+    });
+
+    it('does not surface or require the components blob (no Meta payload leak)', () => {
+      const sanitizedTemplates = [{ name: 'welcome_back', status: 'approved' }];
+      const state = {
+        records: [
+          {
+            id: 1,
+            channel_type: 'Channel::Whatsapp',
+            message_templates: sanitizedTemplates,
+          },
+        ],
+      };
+
+      const result = getters.getDisparadorWhatsAppTemplates(state)(1);
+      expect(result).toHaveLength(1);
+      expect(result[0]).not.toHaveProperty('components');
+    });
+  });
 });

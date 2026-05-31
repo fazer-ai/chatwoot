@@ -704,6 +704,7 @@
       "WIDGET_BUILDER": "Construtor de Widget",
       "BOT_CONFIGURATION": "Configuração do Bot",
       "ACCOUNT_HEALTH": "Saúde da conta",
+      "WHATSAPP_TEMPLATES": "Modelos",
       "CSAT": "CSAT",
       "VOICE": "Voz"
     },
@@ -781,6 +782,71 @@
         "REGISTER_ERROR": "Falha ao cadastrar webhook. Por favor, tente novamente.",
         "CONFIGURED_SUCCESS": "Webhook configurado com sucesso",
         "URL_MISMATCH": "Incompatibilidade na URL do webhook"
+      }
+    },
+    "WHATSAPP_TEMPLATES": {
+      "TITLE": "Modelos de mensagem",
+      "DESCRIPTION": "Veja os modelos de mensagem do WhatsApp disponíveis nesta caixa de entrada e sincronize as versões mais recentes da Meta.",
+      "LAST_SYNCED": "Última sincronização {time}",
+      "EMPTY": "Nenhum modelo ainda — sincronize com a Meta para buscar seus modelos de mensagem do WhatsApp.",
+      "SYNC": {
+        "BUTTON": "Sincronizar com a Meta",
+        "SUCCESS": "Sincronização de modelos iniciada. Os modelos serão atualizados em instantes.",
+        "ERROR": "Falha ao sincronizar os modelos. Por favor, tente novamente."
+      },
+      "NEW_BUTTON": "Novo modelo",
+      "SUBMIT": {
+        "TITLE": "Novo modelo",
+        "DESCRIPTION": "Envie um novo modelo de mensagem do WhatsApp para a Meta. A Meta revisa todos os modelos antes que possam ser usados.",
+        "NAME": {
+          "LABEL": "Nome",
+          "PLACEHOLDER": "atualizacao_pedido",
+          "HINT": "Use apenas letras minúsculas, números e underline.",
+          "ERROR": "Use apenas letras minúsculas, números e underline."
+        },
+        "LANGUAGE": {
+          "LABEL": "Idioma",
+          "PLACEHOLDER": "pt_BR",
+          "ERROR": "O idioma é obrigatório."
+        },
+        "CATEGORY": {
+          "LABEL": "Categoria",
+          "MARKETING": "Marketing",
+          "UTILITY": "Utilidade"
+        },
+        "BODY": {
+          "LABEL": "Corpo",
+          "PLACEHOLDER": "Olá, seu pedido está a caminho.",
+          "HINT": "Adicione variáveis com chaves duplas e um número, como o primeiro e o segundo marcadores.",
+          "ERROR": "O corpo é obrigatório.",
+          "VARIABLES_ERROR": "Numere as variáveis em ordem a partir de um, sem pular números."
+        },
+        "FOOTER": {
+          "LABEL": "Rodapé (opcional)",
+          "PLACEHOLDER": "Responda PARAR para cancelar"
+        },
+        "SAMPLES": {
+          "LABEL": "Exemplo para a variável {index}",
+          "PLACEHOLDER": "Valor de exemplo",
+          "HINT": "A Meta precisa de um valor de exemplo por variável.",
+          "ERROR": "Informe um exemplo para cada variável."
+        },
+        "BUTTON": "Enviar para a Meta",
+        "SUCCESS": "Modelo enviado para a Meta — aguardando revisão.",
+        "SUCCESS_WITH_STATUS": "Modelo enviado para a Meta — status: {status}.",
+        "ERROR": "Falha ao enviar o modelo. Por favor, tente novamente."
+      },
+      "TABLE": {
+        "NAME": "Nome",
+        "STATUS": "Status",
+        "CATEGORY": "Categoria",
+        "LANGUAGE": "Idioma"
+      },
+      "STATUS": {
+        "APPROVED": "Aprovado",
+        "PENDING": "Pendente",
+        "REJECTED": "Rejeitado",
+        "UNKNOWN": "Desconhecido"
       }
     },
     "SETTINGS": "Configurações",

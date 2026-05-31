@@ -334,6 +334,62 @@ RSpec.describe 'Accounts API', type: :request do
         expect(json_response['message']).to eq('Name is too long (maximum is 255 characters)')
       end
     end
+
+    context 'when updating the Disparador (Beta 0) rule bindings' do
+      let(:disparador_settings) do
+        {
+          opt_out_label: 'no-contact',
+          kanban_opt_out_steps: %w[9 12],
+          opt_out_lgpd_key: 'lgpd_opt_out',
+          followup_locked_key: 'fu_locked',
+          window_closes_at_key: 'closes_at',
+          kanban_step_key: 'stage',
+          whatsapp_invalid_at_key: 'wa_invalid_at',
+          dedup_window_days: 5,
+          whatsapp_invalid_window_days: 45
+        }
+      end
+
+      it 'persists the nested disparador_settings hash (incl. the kanban_opt_out_steps array)' do
+        patch "/api/v1/accounts/#{account.id}",
+              params: { disparador_settings: disparador_settings },
+              headers: admin.create_new_auth_token,
+              as: :json
+
+        expect(response).to have_http_status(:success)
+        persisted = account.reload.disparador_settings
+        expect(persisted['opt_out_label']).to eq('no-contact')
+        expect(persisted['kanban_opt_out_steps']).to eq(%w[9 12])
+        expect(persisted['dedup_window_days']).to eq(5)
+        expect(persisted['whatsapp_invalid_window_days']).to eq(45)
+        %w[opt_out_lgpd_key followup_locked_key window_closes_at_key kanban_step_key whatsapp_invalid_at_key].each do |key|
+          expect(persisted[key]).to eq(disparador_settings[key.to_sym])
+        end
+      end
+
+      it 'round-trips the disparador_settings in the account JSON' do
+        patch "/api/v1/accounts/#{account.id}",
+              params: { disparador_settings: disparador_settings },
+              headers: admin.create_new_auth_token,
+              as: :json
+
+        get "/api/v1/accounts/#{account.id}",
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response.parsed_body.dig('settings', 'disparador_settings', 'kanban_opt_out_steps')).to eq(%w[9 12])
+        expect(response.parsed_body.dig('settings', 'disparador_settings', 'opt_out_label')).to eq('no-contact')
+      end
+
+      it 'resolves engine defaults via RulesConfig for an account without disparador_settings' do
+        config = Disparos::RulesConfig.new(account.reload)
+
+        expect(account.disparador_settings).to be_nil
+        expect(config.opt_out_label).to eq(Disparos::RulesConfig::DEFAULT_OPT_OUT_LABEL)
+        expect(config.kanban_opt_out_steps).to eq(Disparos::RulesConfig::DEFAULT_KANBAN_OPT_OUT_STEPS)
+        expect(config.dedup_window).to eq(Disparos::RulesConfig::DEFAULT_DEDUP_WINDOW_DAYS.days)
+      end
+    end
   end
 
   describe 'POST /api/v1/accounts/{account.id}/update_active_at' do

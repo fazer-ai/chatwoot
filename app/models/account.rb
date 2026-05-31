@@ -56,6 +56,12 @@ class Account < ApplicationRecord
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :captain_auto_resolve_mode
   store_accessor :settings, :hide_agent_unassigned_tab, :hide_agent_all_tab
+  # Per-account Disparador (Beta 0) rule bindings — a single jsonb sub-hash
+  # holding the EligibilityEngine's editable bindings (opt-out label, opt-out
+  # kanban stages, custom-attribute keys, dedup/whatsapp-invalid windows).
+  # Resolved/defaulted by Disparos::RulesConfig; an unset value reproduces the
+  # engine's original hardcoded defaults.
+  store_accessor :settings, :disparador_settings
   before_validation :enforce_agent_assignee_tabs_constraint
 
   def hide_agent_unassigned_tab=(value)

@@ -288,6 +288,27 @@ RSpec.describe Account do
       end
     end
 
+    context 'when using the disparador_settings store_accessor (Disparador Beta 0 rule bindings)' do
+      it 'gets and sets the disparador_settings sub-hash and persists it under settings' do
+        bindings = { 'opt_out_label' => 'no-contact', 'kanban_opt_out_steps' => %w[7 8], 'dedup_window_days' => 14 }
+        account.update!(disparador_settings: bindings)
+
+        reloaded = described_class.find(account.id)
+        expect(reloaded.disparador_settings).to eq(bindings)
+        expect(reloaded.settings['disparador_settings']).to eq(bindings)
+      end
+
+      it 'accepts a partial config via the JSON schema validator' do
+        account.disparador_settings = { 'opt_out_label' => 'no-contact' }
+        expect(account).to be_valid
+      end
+
+      it 'allows a nil value' do
+        account.disparador_settings = nil
+        expect(account).to be_valid
+      end
+    end
+
     context 'when using with_auto_resolve scope' do
       it 'finds accounts with auto_resolve_after set' do
         account.update!(auto_resolve_after: 40 * 24 * 60)

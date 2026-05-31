@@ -22,6 +22,8 @@ export const state = {
     isDeleting: false,
     isUpdatingIMAP: false,
     isUpdatingSMTP: false,
+    isSyncingTemplates: false,
+    isSubmittingTemplate: false,
   },
 };
 
@@ -106,6 +108,37 @@ export const getters = {
 
       return true;
     });
+  },
+  // Disparador (Beta 0) template selector. Unlike getFilteredWhatsAppTemplates,
+  // this must work against the sanitized prod snapshot, which stores templates as
+  // {name, status} only — `components` is stripped for PII/egress. So it selects
+  // on name + approved status WITHOUT requiring (or surfacing) the components blob,
+  // which would otherwise make every snapshot-loaded template disappear in staging.
+  getDisparadorWhatsAppTemplates: $state => inboxId => {
+    const [inbox] = $state.records.filter(
+      record => record.id === Number(inboxId)
+    );
+
+    const {
+      message_templates: whatsAppMessageTemplates,
+      additional_attributes: additionalAttributes,
+    } = inbox || {};
+
+    const { message_templates: apiInboxMessageTemplates } =
+      additionalAttributes || {};
+    const templates = whatsAppMessageTemplates || apiInboxMessageTemplates;
+
+    if (!templates || !Array.isArray(templates)) {
+      return [];
+    }
+
+    return templates.filter(
+      template =>
+        template &&
+        template.name &&
+        template.status &&
+        template.status.toLowerCase() === 'approved'
+    );
   },
   getNewConversationInboxes($state) {
     return $state.records.filter(inbox => {
@@ -383,11 +416,38 @@ export const actions = {
       throw new Error(error);
     }
   },
-  syncTemplates: async (_, inboxId) => {
+  syncTemplates: async ({ commit, dispatch }, inboxId) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: true });
     try {
       await InboxesAPI.syncTemplates(inboxId);
+      await dispatch('get');
     } catch (error) {
       throw new Error(error);
+    } finally {
+      commit(types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: false });
+    }
+  },
+  submitTemplate: async ({ commit, dispatch }, { inboxId, payload }) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: true });
+    try {
+      const response = await InboxesAPI.submitTemplate(inboxId, payload);
+      // The Meta write succeeded once the POST resolves. Refreshing the catalog
+      // so the new PENDING template surfaces locally is best-effort: a transient
+      // sync/refetch failure must not turn a successful submission into an error
+      // (re-submitting would orphan a PENDING template — names are unique per WABA).
+      try {
+        await dispatch('syncTemplates', inboxId);
+      } catch (syncError) {
+        // Swallow: the template was already written to Meta.
+      }
+      return response.data;
+    } catch (error) {
+      const errorMessage = error?.response?.data?.error || error.message;
+      throw new Error(errorMessage);
+    } finally {
+      commit(types.default.SET_INBOXES_UI_FLAG, {
+        isSubmittingTemplate: false,
+      });
     }
   },
   createCSATTemplate: async (_, { inboxId, template }) => {

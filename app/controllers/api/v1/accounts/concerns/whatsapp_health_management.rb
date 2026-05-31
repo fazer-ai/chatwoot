@@ -24,6 +24,23 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  def submit_template
+    # The WRITE path to Meta is gated behind its own installation_config flag (default OFF).
+    # When off the endpoint is invisible (404, before any Meta call) so the write capability
+    # is not leaked. The read-only template sync is intentionally NOT gated by this flag.
+    return head :not_found unless whatsapp_template_submit_enabled?
+    return render_not_whatsapp_cloud_error unless whatsapp_cloud_channel?
+
+    result = Whatsapp::TemplateSubmitService.new(
+      whatsapp_channel: @inbox.channel,
+      template_payload: template_submit_params
+    ).perform
+
+    render json: { template_id: result[:template_id], status: result[:status] }, status: :created
+  rescue CustomExceptions::Whatsapp::InvalidTemplate, CustomExceptions::Whatsapp::TemplateSubmissionError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   def register_webhook
     Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
 
@@ -43,6 +60,27 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
 
   def whatsapp_channel?
     @inbox.whatsapp? || (@inbox.twilio? && @inbox.channel.whatsapp?)
+  end
+
+  def whatsapp_cloud_channel?
+    @inbox.channel.is_a?(Channel::Whatsapp) && @inbox.channel.provider == 'whatsapp_cloud'
+  end
+
+  def whatsapp_template_submit_enabled?
+    ActiveModel::Type::Boolean.new.cast(GlobalConfigService.load('WHATSAPP_TEMPLATE_SUBMIT_ENABLED', false))
+  end
+
+  def render_not_whatsapp_cloud_error
+    render json: { error: 'Template submission is only available for WhatsApp Cloud API channels' }, status: :unprocessable_entity
+  end
+
+  def template_submit_params
+    template = params.require(:template)
+    permitted = template.permit(:name, :language, :category).to_h
+    # Meta's components schema is deeply variable (HEADER/BODY/FOOTER/BUTTONS with nested {{N}} samples).
+    # Pass it through whole: it is only serialized and forwarded to Meta (no model/SQL sink), submit is admin-only.
+    permitted['components'] = template[:components].as_json if template[:components].present?
+    permitted
   end
 
   def trigger_template_sync

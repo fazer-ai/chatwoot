@@ -62,6 +62,10 @@ class InboxPolicy < ApplicationPolicy
     @account_user.administrator?
   end
 
+  def submit_template?
+    @account_user.administrator?
+  end
+
   def health?
     @account_user.administrator?
   end

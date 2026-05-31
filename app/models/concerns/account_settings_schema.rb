@@ -41,6 +41,26 @@ module AccountSettingsSchema
             'help_center_search': { 'type': %w[boolean null] }
           },
           'additionalProperties': false
+        },
+        # Per-account Disparador (Beta 0) rule bindings. Permissive on purpose:
+        # an unset key falls back to the engine default in Disparos::RulesConfig,
+        # so a partial config must validate. Each binding is optional/nullable.
+        'disparador_settings': {
+          'type': %w[object null],
+          'properties': {
+            'opt_out_label': { 'type': %w[string null] },
+            # Items may arrive as strings (UI) or integers (super-admin form); RulesConfig
+            # coerces them to strings for the jsonb-text comparison.
+            'kanban_opt_out_steps': { 'type': %w[array null], 'items': { 'type': %w[string integer] } },
+            'opt_out_lgpd_key': { 'type': %w[string null] },
+            'followup_locked_key': { 'type': %w[string null] },
+            'window_closes_at_key': { 'type': %w[string null] },
+            'kanban_step_key': { 'type': %w[string null] },
+            'whatsapp_invalid_at_key': { 'type': %w[string null] },
+            'dedup_window_days': { 'type': %w[integer null] },
+            'whatsapp_invalid_window_days': { 'type': %w[integer null] }
+          },
+          'additionalProperties': true
         }
       },
     'required': [],

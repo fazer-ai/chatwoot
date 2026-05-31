@@ -57,7 +57,10 @@ class Api::V1::AccountsController < Api::BaseController
   def update
     @account.assign_attributes(account_params.slice(:name, :locale, :domain, :support_email))
     @account.custom_attributes.merge!(custom_attributes_params)
-    @account.settings.merge!(settings_params)
+    # to_h deep-converts the permitted params (incl. the nested disparador_settings
+    # hash + its array) to a plain Hash so the jsonb settings column never stores an
+    # ActionController::Parameters object, which the settings JSON-schema would reject.
+    @account.settings.merge!(settings_params.to_h)
     @account.custom_attributes.delete('onboarding_step') if @account.custom_attributes['onboarding_step'] == 'account_details'
     @account.custom_attributes['onboarding_step'] = 'invite_team' if @account.custom_attributes['onboarding_step'] == 'account_update'
     @account.save!
@@ -119,7 +122,17 @@ class Api::V1::AccountsController < Api::BaseController
   end
 
   def permitted_settings_attributes
-    [:auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting, :audio_transcriptions, :auto_resolve_label]
+    [
+      :auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting, :audio_transcriptions, :auto_resolve_label,
+      # Per-account Disparador (Beta 0) rule bindings. Permitted explicitly (not as a
+      # bare `disparador_settings: {}`) so the kanban_opt_out_steps array survives strong
+      # params — a bare hash permit would silently drop the array value.
+      { disparador_settings: [
+        :opt_out_label, :opt_out_lgpd_key, :followup_locked_key, :window_closes_at_key,
+        :kanban_step_key, :whatsapp_invalid_at_key, :dedup_window_days, :whatsapp_invalid_window_days,
+        { kanban_opt_out_steps: [] }
+      ] }
+    ]
   end
 
   def check_signup_enabled

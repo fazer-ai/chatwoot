@@ -1,0 +1,254 @@
+{
+  "DISPARADOR_MGMT": {
+    "HEADER": "Disparador",
+    "HEADER_BTN_TXT": "Novo disparo",
+    "EMPTY_STATE": {
+      "TITLE": "Nenhum disparo ainda",
+      "SUBTITLE": "Crie um rascunho para pré-visualizar quais contatos de WhatsApp Cloud seriam considerados. Nada é enviado neste beta.",
+      "ACTION": "Criar seu primeiro disparo"
+    },
+    "LIST": {
+      "TABLE_HEADER": {
+        "NAME": "Nome",
+        "INBOX": "Caixa de entrada",
+        "STATUS": "Status",
+        "ACTION": "Ações"
+      },
+      "INBOX_COUNT": "{count} caixa | {count} caixas",
+      "DRY_RUN": "Dry-run",
+      "SHADOW_RUN": "Rodar shadow",
+      "VIEW_TARGETS": "Ver alvos",
+      "LOAD_ERROR": {
+        "TITLE": "Não foi possível carregar os disparos",
+        "SUBTITLE": "Algo deu errado ao buscar a lista. Verifique sua conexão e tente novamente.",
+        "RETRY": "Tentar novamente"
+      }
+    },
+    "STATUS": {
+      "DRAFT": "Rascunho",
+      "SCHEDULED": "Agendado",
+      "RUNNING": "Em execução",
+      "PAUSED": "Pausado",
+      "COMPLETED": "Concluído",
+      "FAILED": "Falhou",
+      "CANCELLED": "Cancelado"
+    },
+    "CREATE": {
+      "TITLE": "Novo disparo",
+      "DESC": "O Beta 0 suporta apenas caixas de WhatsApp Cloud. Defina a audiência por etapa e/ou etiqueta e depois pré-visualize com um dry-run.",
+      "FORM": {
+        "NAME": {
+          "LABEL": "Nome",
+          "PLACEHOLDER": "ex.: Reativação de junho",
+          "ERROR": "O nome é obrigatório"
+        },
+        "DESCRIPTION": {
+          "LABEL": "Descrição",
+          "PLACEHOLDER": "Nota interna opcional"
+        },
+        "INBOX": {
+          "LABEL": "Caixa de WhatsApp Cloud",
+          "PLACEHOLDER": "Selecione uma caixa",
+          "ERROR": "Selecione uma caixa de WhatsApp Cloud",
+          "EMPTY": "Nenhuma caixa de WhatsApp Cloud encontrada. Conecte uma para usar o Disparador."
+        },
+        "TEMPLATE": {
+          "LABEL": "Template",
+          "PLACEHOLDER": "Selecione um template",
+          "EMPTY": "Selecione uma caixa primeiro para carregar os templates",
+          "MANAGE_LINK": "Gerenciar templates",
+          "ERROR": "Selecione um template"
+        },
+        "CATEGORY": {
+          "LABEL": "Categoria do template",
+          "MARKETING": "Marketing",
+          "UTILITY": "Utilitário",
+          "AUTHENTICATION": "Autenticação"
+        },
+        "CONVERSATION_STATUS": {
+          "LABEL": "Status da conversa",
+          "OPEN": "Apenas conversas abertas",
+          "ALL": "Todas as conversas"
+        },
+        "KANBAN_STEPS": {
+          "LABEL": "Etapas do Kanban",
+          "PLACEHOLDER": "Digite uma etapa e pressione enter"
+        },
+        "LABELS": {
+          "LABEL": "Etiquetas",
+          "PLACEHOLDER": "Selecione etiquetas"
+        },
+        "AUDIENCE_HINT": "Adicione ao menos uma etapa ou etiqueta para definir a audiência.",
+        "SUBMIT": "Criar rascunho",
+        "CANCEL": "Cancelar"
+      },
+      "API": {
+        "SUCCESS_MESSAGE": "Rascunho de disparo criado",
+        "ERROR_MESSAGE": "Não foi possível criar o disparo, tente novamente",
+        "ERRORS": {
+          "UNSUPPORTED_INBOX_PROVIDER": "Apenas caixas de WhatsApp Cloud são suportadas neste beta. Escolha uma caixa Cloud.",
+          "INVALID_AUDIENCE_FILTER": "Adicione ao menos uma etapa ou etiqueta para definir a audiência.",
+          "INVALID_TEMPLATE": "Selecione um template antes de criar o disparo."
+        }
+      }
+    },
+    "DRY_RUN": {
+      "TITLE": "Pré-visualização do dry-run",
+      "DESC": "Pré-visualização somente leitura da audiência considerada para \"{name}\". Nenhuma mensagem é enviada.",
+      "RUNNING": "Rodando dry-run",
+      "SUMMARY": {
+        "TOTAL_ELIGIBLE": "Elegíveis",
+        "TOTAL_SKIPPED": "Ignorados",
+        "SKIP_BREAKDOWN": "Motivos de exclusão",
+        "COST": "Custo estimado",
+        "COST_UNKNOWN": "Preço desconhecido — não comparável",
+        "COST_SOURCE": "Fonte: {source}",
+        "NO_SKIPS": "Nenhum contato foi ignorado."
+      },
+      "SKIP_REASONS": {
+        "UNSUPPORTED_INBOX_PROVIDER": "Provedor de caixa não suportado",
+        "INBOX_NOT_APPROVED": "Template não aprovado nesta caixa",
+        "MISSING_PHONE": "Telefone ausente",
+        "INVALID_PHONE": "Telefone inválido",
+        "OPT_OUT_LGPD": "Opt-out (LGPD)",
+        "LABEL_AGENTE_OFF_PERMANENTE": "Etiqueta: agente off (permanente)",
+        "STAGE_OPT_OUT": "Etapa com opt-out",
+        "FOLLOWUP_LOCKED": "Follow-up bloqueado",
+        "INVALID_WINDOW_CLOSES_AT": "Janela de mensagem inválida",
+        "WINDOW_INCOMPATIBLE": "Janela de mensagem incompatível",
+        "TEMPLATE_SENT_LAST_7D": "Template já enviado nos últimos 7 dias",
+        "MARKETING_COOLDOWN_7D": "Cooldown de marketing (enviado nos últimos 7 dias)",
+        "WHATSAPP_INVALID_30D": "WhatsApp marcado como inválido nos últimos 30 dias"
+      },
+      "CLOSE": "Fechar",
+      "API": {
+        "ERROR_MESSAGE": "Não foi possível rodar o dry-run, tente novamente",
+        "ERRORS": {
+          "INVALID_DRY_RUN": "Este disparo ainda não pode ser dry-run. Garanta que ele tem template, caixa Cloud e filtro de audiência."
+        }
+      }
+    },
+    "SHADOW_RUN": {
+      "API": {
+        "SUCCESS_MESSAGE": "Shadow-run concluído: {created} alvo(s) persistido(s), {eligible} elegíveis, {skipped} ignorados. Nenhuma mensagem foi enviada.",
+        "ERROR_MESSAGE": "Não foi possível rodar o shadow-run, tente novamente",
+        "ERRORS": {
+          "INVALID_SHADOW_RUN": "Este disparo ainda não pode ser shadow-run. Garanta que ele tem template, caixa Cloud e filtro de audiência."
+        }
+      }
+    },
+    "SETTINGS": {
+      "HEADER": "Regras do Disparador",
+      "HEADER_BTN_TXT": "Regras",
+      "BACK": "Voltar aos disparos",
+      "DESC": "Estas associações dizem ao motor de audiência onde ler cada regra. Alterá-las muda quem um disparo atinge. Valores não definidos usam os padrões da plataforma mostrados abaixo.",
+      "OPT_OUT": {
+        "TITLE": "Opt-out",
+        "NOTE": "Como um contato sinaliza que não quer ser contatado.",
+        "LABEL": {
+          "LABEL": "Label de opt-out permanente",
+          "PLACEHOLDER": "ex.: agente-off-permanente",
+          "HINT": "Contatos com esta label são sempre excluídos. Comparação sem diferenciar maiúsculas."
+        },
+        "STEPS": {
+          "LABEL": "Etapas de kanban de opt-out",
+          "PLACEHOLDER": "Digite um valor de etapa e tecle enter",
+          "HINT": "Contatos em qualquer uma destas etapas do kanban são excluídos. Os valores são comparados como texto."
+        }
+      },
+      "KEYS": {
+        "TITLE": "Chaves de atributo personalizado",
+        "NOTE": "As chaves de atributo personalizado da conversa que o motor lê para aplicar cada regra. Use as mesmas chaves que suas automações gravam.",
+        "OPT_OUT_LGPD": {
+          "LABEL": "Chave de opt-out LGPD",
+          "PLACEHOLDER": "ex.: opt_out_lgpd",
+          "HINT": "Valor verdadeiro na conversa significa que o contato fez opt-out (LGPD)."
+        },
+        "FOLLOWUP_LOCKED": {
+          "LABEL": "Chave de follow-up travado",
+          "PLACEHOLDER": "ex.: followup_locked",
+          "HINT": "Valor verdadeiro significa que o follow-up está travado e o contato é ignorado."
+        },
+        "WINDOW_CLOSES_AT": {
+          "LABEL": "Chave de fechamento da janela",
+          "PLACEHOLDER": "ex.: window_closes_at",
+          "HINT": "Timestamp de quando a janela de mensagens fecha."
+        },
+        "KANBAN_STEP": {
+          "LABEL": "Chave da etapa do kanban",
+          "PLACEHOLDER": "ex.: kanban_step",
+          "HINT": "Guarda a etapa atual do kanban do contato, comparada com as etapas de opt-out acima."
+        },
+        "WHATSAPP_INVALID_AT": {
+          "LABEL": "Chave de WhatsApp inválido",
+          "PLACEHOLDER": "ex.: whatsapp_invalid_at",
+          "HINT": "Timestamp de quando o WhatsApp marcou o número como inválido pela última vez."
+        }
+      },
+      "WINDOWS": {
+        "TITLE": "Janelas",
+        "NOTE": "Janelas de tempo móveis, em dias, que excluem números contatados ou marcados recentemente.",
+        "DEDUP": {
+          "LABEL": "Janela de dedup (dias)",
+          "PLACEHOLDER": "7",
+          "HINT": "Ignora um contato que já recebeu o mesmo template dentro deste número de dias."
+        },
+        "WHATSAPP_INVALID": {
+          "LABEL": "Janela de WhatsApp inválido (dias)",
+          "PLACEHOLDER": "30",
+          "HINT": "Ignora um número marcado como inválido pelo WhatsApp dentro deste número de dias."
+        }
+      },
+      "VALIDATION": {
+        "REQUIRED": "Esta associação é obrigatória.",
+        "POSITIVE_INTEGER": "Informe um número inteiro de dias maior que zero.",
+        "STEPS_REQUIRED": "Adicione ao menos uma etapa de kanban de opt-out."
+      },
+      "SAVE": "Salvar regras",
+      "API": {
+        "SUCCESS_MESSAGE": "Regras do Disparador salvas",
+        "ERROR_MESSAGE": "Não foi possível salvar as regras, tente novamente"
+      }
+    },
+    "TARGETS": {
+      "TITLE": "Alvos do shadow",
+      "DESC": "A audiência persistida para \"{name}\". Somente leitura — nenhuma mensagem é enviada e nenhum telefone é armazenado.",
+      "LOADING": "Carregando alvos",
+      "EMPTY": {
+        "TITLE": "Nenhum alvo ainda",
+        "SUBTITLE": "Rode um shadow-run para persistir a audiência considerada e volte aqui para inspecioná-la.",
+        "END_TITLE": "Sem mais alvos",
+        "END_SUBTITLE": "Você chegou ao fim da lista. Volte para a página anterior."
+      },
+      "LOAD_ERROR": {
+        "TITLE": "Não foi possível carregar os alvos",
+        "SUBTITLE": "Algo deu errado ao buscar os alvos. Isso não significa que a audiência está vazia. Verifique sua conexão e tente novamente.",
+        "RETRY": "Tentar novamente"
+      },
+      "TABLE_HEADER": {
+        "CONVERSATION": "Conversa",
+        "CONTACT": "Contato",
+        "STATE": "Estado",
+        "SKIP_REASON": "Motivo de exclusão",
+        "PHONE_PRESENT": "Telefone presente"
+      },
+      "STATE": {
+        "PENDING": "Pendente",
+        "QUEUED": "Na fila",
+        "SKIPPED": "Ignorado",
+        "CANCELLED": "Cancelado"
+      },
+      "PHONE_PRESENT": {
+        "YES": "Sim",
+        "NO": "Não"
+      },
+      "PAGE": "Página {page}",
+      "PREV": "Anterior",
+      "NEXT": "Próxima",
+      "CLOSE": "Fechar",
+      "API": {
+        "ERROR_MESSAGE": "Não foi possível carregar os alvos, tente novamente"
+      }
+    }
+  }
+}

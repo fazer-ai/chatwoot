@@ -30,6 +30,7 @@ import csat from './modules/csat';
 import customRole from './modules/customRole';
 import customViews from './modules/customViews';
 import dashboardApps from './modules/dashboardApps';
+import disparador from './modules/disparador';
 import draftMessages from './modules/draftMessages';
 import globalConfig from 'shared/store/globalConfig';
 import groupMembers from './modules/groupMembers';
@@ -98,6 +99,7 @@ export default createStore({
     customRole,
     customViews,
     dashboardApps,
+    disparador,
     draftMessages,
     globalConfig,
     groupMembers,

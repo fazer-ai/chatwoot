@@ -704,6 +704,7 @@
       "WIDGET_BUILDER": "Widget Builder",
       "BOT_CONFIGURATION": "Bot Configuration",
       "ACCOUNT_HEALTH": "Account Health",
+      "WHATSAPP_TEMPLATES": "Templates",
       "CSAT": "CSAT",
       "VOICE": "Voice"
     },
@@ -781,6 +782,71 @@
         "REGISTER_ERROR": "Failed to register webhook. Please try again.",
         "CONFIGURED_SUCCESS": "Webhook configured successfully",
         "URL_MISMATCH": "Webhook URL mismatch"
+      }
+    },
+    "WHATSAPP_TEMPLATES": {
+      "TITLE": "Message templates",
+      "DESCRIPTION": "Browse the WhatsApp message templates available on this inbox and sync the latest versions from Meta.",
+      "LAST_SYNCED": "Last synced {time}",
+      "EMPTY": "No templates yet — sync from Meta to fetch your WhatsApp message templates.",
+      "SYNC": {
+        "BUTTON": "Sync from Meta",
+        "SUCCESS": "Template sync started. Templates will update shortly.",
+        "ERROR": "Failed to sync templates. Please try again."
+      },
+      "NEW_BUTTON": "New template",
+      "SUBMIT": {
+        "TITLE": "New template",
+        "DESCRIPTION": "Submit a new WhatsApp message template to Meta. Meta reviews every template before it can be used.",
+        "NAME": {
+          "LABEL": "Name",
+          "PLACEHOLDER": "order_update",
+          "HINT": "Lowercase letters, numbers and underscores only.",
+          "ERROR": "Use only lowercase letters, numbers and underscores."
+        },
+        "LANGUAGE": {
+          "LABEL": "Language",
+          "PLACEHOLDER": "pt_BR",
+          "ERROR": "Language is required."
+        },
+        "CATEGORY": {
+          "LABEL": "Category",
+          "MARKETING": "Marketing",
+          "UTILITY": "Utility"
+        },
+        "BODY": {
+          "LABEL": "Body",
+          "PLACEHOLDER": "Hi there, your order is on its way.",
+          "HINT": "Add variables with double curly braces and a number, like the first and second placeholders.",
+          "ERROR": "Body is required.",
+          "VARIABLES_ERROR": "Number the variables in order starting from one, with no gaps."
+        },
+        "FOOTER": {
+          "LABEL": "Footer (optional)",
+          "PLACEHOLDER": "Reply STOP to unsubscribe"
+        },
+        "SAMPLES": {
+          "LABEL": "Sample for variable {index}",
+          "PLACEHOLDER": "Example value",
+          "HINT": "Meta needs one example value per variable.",
+          "ERROR": "Provide a sample for every variable."
+        },
+        "BUTTON": "Submit to Meta",
+        "SUCCESS": "Template submitted to Meta — pending review.",
+        "SUCCESS_WITH_STATUS": "Template submitted to Meta — status: {status}.",
+        "ERROR": "Failed to submit the template. Please try again."
+      },
+      "TABLE": {
+        "NAME": "Name",
+        "STATUS": "Status",
+        "CATEGORY": "Category",
+        "LANGUAGE": "Language"
+      },
+      "STATUS": {
+        "APPROVED": "Approved",
+        "PENDING": "Pending",
+        "REJECTED": "Rejected",
+        "UNKNOWN": "Unknown"
       }
     },
     "SETTINGS": "Settings",

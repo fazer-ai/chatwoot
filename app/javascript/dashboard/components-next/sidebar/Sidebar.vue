@@ -44,6 +44,9 @@ const { t } = useI18n();
 const isACustomBrandedInstance = useMapGetter(
   'globalConfig/isACustomBrandedInstance'
 );
+const isDisparadorBeta0Visible = useMapGetter(
+  'globalConfig/isDisparadorBeta0Visible'
+);
 const isRTL = useMapGetter('accounts/isRTL');
 
 const { width: windowWidth } = useWindowSize();
@@ -542,6 +545,17 @@ const menuItems = computed(() => {
         },
       ],
     },
+    ...(isDisparadorBeta0Visible.value
+      ? [
+          {
+            name: 'Disparador',
+            label: t('SIDEBAR.DISPARADOR'),
+            icon: 'i-lucide-send-horizontal',
+            activeOn: ['disparador_wrapper', 'disparador_list'],
+            to: accountScopedRoute('disparador_list'),
+          },
+        ]
+      : []),
     {
       name: 'Portals',
       label: t('SIDEBAR.HELP_CENTER.TITLE'),

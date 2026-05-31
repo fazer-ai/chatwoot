@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_15_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_02_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -851,6 +851,74 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_15_000000) do
     t.index ["account_id"], name: "index_data_imports_on_account_id"
   end
 
+  create_table "disparo_audience_snapshots", force: :cascade do |t|
+    t.bigint "disparo_id", null: false
+    t.jsonb "filter_dsl", default: {}, null: false
+    t.integer "inbox_ids", default: [], null: false, array: true
+    t.integer "total_eligible", default: 0, null: false
+    t.jsonb "by_skip_reason", default: {}, null: false
+    t.jsonb "by_inbox", default: {}, null: false
+    t.integer "estimated_cost_cents"
+    t.datetime "expires_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["disparo_id"], name: "index_disparo_audience_snapshots_on_disparo_id"
+  end
+
+  create_table "disparo_events", force: :cascade do |t|
+    t.bigint "disparo_target_id", null: false
+    t.integer "event_type", null: false
+    t.jsonb "payload", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.index ["disparo_target_id"], name: "index_disparo_events_on_disparo_target_id"
+    t.index ["event_type"], name: "index_disparo_events_on_event_type"
+  end
+
+  create_table "disparo_inboxes", force: :cascade do |t|
+    t.bigint "disparo_id", null: false
+    t.integer "inbox_id", null: false
+    t.integer "provider", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["disparo_id", "inbox_id"], name: "index_disparo_inboxes_on_disparo_id_and_inbox_id", unique: true
+    t.index ["inbox_id"], name: "index_disparo_inboxes_on_inbox_id"
+  end
+
+  create_table "disparo_targets", force: :cascade do |t|
+    t.bigint "disparo_id", null: false
+    t.integer "conversation_id", null: false
+    t.integer "contact_id", null: false
+    t.integer "inbox_id"
+    t.integer "state", default: 0, null: false
+    t.string "primary_skip_reason"
+    t.string "skip_reasons", default: [], null: false, array: true
+    t.boolean "shadow_run", default: false, null: false
+    t.uuid "dispatch_id", default: -> { "gen_random_uuid()" }, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "phone_present", default: false, null: false
+    t.index ["disparo_id", "conversation_id", "contact_id"], name: "idx_on_disparo_id_conversation_id_contact_id_2b1fdc99ae", unique: true
+    t.index ["disparo_id", "state"], name: "index_disparo_targets_on_disparo_id_and_state"
+    t.index ["dispatch_id"], name: "index_disparo_targets_on_dispatch_id", unique: true
+  end
+
+  create_table "disparos", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.integer "status", default: 0, null: false
+    t.integer "mode", default: 0, null: false
+    t.jsonb "audience_filter", default: {}, null: false
+    t.integer "audience_filter_dsl_version", default: 1, null: false
+    t.integer "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "template_name"
+    t.integer "conversation_status", default: 0, null: false
+    t.integer "template_category", default: 1, null: false
+    t.index ["account_id", "status"], name: "index_disparos_on_account_id_and_status"
+  end
+
   create_table "email_templates", force: :cascade do |t|
     t.string "name", null: false
     t.text "body", null: false
@@ -1571,6 +1639,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_15_000000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "disparo_audience_snapshots", "disparos", on_delete: :cascade
+  add_foreign_key "disparo_events", "disparo_targets", on_delete: :cascade
+  add_foreign_key "disparo_inboxes", "disparos", on_delete: :cascade
+  add_foreign_key "disparo_inboxes", "inboxes", on_delete: :cascade
+  add_foreign_key "disparo_targets", "disparos", on_delete: :cascade
+  add_foreign_key "disparos", "accounts", on_delete: :cascade
+  add_foreign_key "disparos", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"

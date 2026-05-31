@@ -175,6 +175,25 @@ RSpec.describe 'Inboxes API', type: :request do
         end
       end
 
+      context 'when it is a WhatsApp Cloud inbox' do
+        let(:whatsapp_channel) do
+          create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+        end
+        let(:whatsapp_inbox) { create(:inbox, channel: whatsapp_channel, account: account) }
+
+        it 'returns message_templates_last_updated in inbox details' do
+          whatsapp_channel.mark_message_templates_updated
+
+          get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}",
+              headers: admin.create_new_auth_token,
+              as: :json
+
+          expect(response).to have_http_status(:success)
+          data = JSON.parse(response.body, symbolize_names: true)
+          expect(data[:message_templates_last_updated]).to be_present
+        end
+      end
+
       it 'fetch API inbox without hmac token when agent' do
         api_channel = create(:channel_api, account: account)
         api_inbox = create(:inbox, channel: api_channel, account: account)
@@ -1093,6 +1112,215 @@ RSpec.describe 'Inboxes API', type: :request do
           post "/api/v1/accounts/#{account.id}/inboxes/999999/sync_templates",
                headers: admin.create_new_auth_token,
                as: :json
+
+          expect(response).to have_http_status(:not_found)
+        end
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/inboxes/:id/submit_template' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:non_whatsapp_inbox) { create(:inbox, account: account) }
+    let(:api_key) { whatsapp_channel.provider_config['api_key'] }
+    let(:template_payload) do
+      {
+        name: 'evento_lembrete',
+        language: 'pt_BR',
+        category: 'UTILITY',
+        components: [
+          { type: 'BODY', text: 'Olá {{1}}, sua aula é amanhã.', example: { body_text: [['João']] } }
+        ]
+      }
+    end
+
+    # The Meta WRITE is gated behind WHATSAPP_TEMPLATE_SUBMIT_ENABLED (installation_config, default OFF).
+    # Call original first so the rest of the request cycle (auth/locale configs) keeps working, then
+    # opt the existing behavioral specs into the flag being ON.
+    def stub_template_submit_flag(value)
+      allow(GlobalConfigService).to receive(:load).and_call_original
+      allow(GlobalConfigService).to receive(:load).with('WHATSAPP_TEMPLATE_SUBMIT_ENABLED', false).and_return(value)
+    end
+
+    before { stub_template_submit_flag(true) }
+
+    context 'when the WHATSAPP_TEMPLATE_SUBMIT_ENABLED flag is off' do
+      before { stub_template_submit_flag(false) }
+
+      it 'returns not found for an administrator and never calls Meta' do
+        allow(HTTParty).to receive(:post)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+             params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(HTTParty).not_to have_received(:post)
+      end
+
+      it 'does not reach TemplateSubmitService' do
+        allow(Whatsapp::TemplateSubmitService).to receive(:new)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+             params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(Whatsapp::TemplateSubmitService).not_to have_received(:new)
+      end
+    end
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+             params: { template: template_payload }, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated agent' do
+      before { create(:inbox_member, user: agent, inbox: whatsapp_inbox) }
+
+      it 'returns unauthorized for agent even when assigned to the inbox' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+             params: { template: template_payload }, headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated administrator' do
+      let(:success_response) do
+        # rubocop:disable RSpec/VerifiedDoubles
+        double('response', success?: true, body: '{"id":"meta_123","status":"PENDING"}')
+        # rubocop:enable RSpec/VerifiedDoubles
+      end
+
+      before do
+        allow(success_response).to receive(:[]).with('id').and_return('meta_123')
+        allow(success_response).to receive(:[]).with('status').and_return('PENDING')
+      end
+
+      context 'with a valid payload on a WhatsApp Cloud inbox' do
+        before { allow(HTTParty).to receive(:post).and_return(success_response) }
+
+        it 'submits the template and returns the Meta result' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:created)
+          json_response = response.parsed_body
+          expect(json_response['template_id']).to eq('meta_123')
+          expect(json_response['status']).to eq('PENDING')
+        end
+
+        it 'forwards the components verbatim to Meta' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(HTTParty).to have_received(:post) do |_url, options|
+            parsed_body = JSON.parse(options[:body])
+            expect(parsed_body['components'].first['example']).to eq({ 'body_text' => [['João']] })
+          end
+        end
+
+        it 'never includes the api_key in the response body' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response.body).not_to include(api_key)
+        end
+      end
+
+      context 'with an invalid payload' do
+        it 'returns unprocessable entity and does not call Meta' do
+          allow(HTTParty).to receive(:post)
+          invalid_payload = template_payload.merge(category: 'AUTHENTICATION')
+
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+               params: { template: invalid_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to match(/category must be one of/)
+          expect(HTTParty).not_to have_received(:post)
+        end
+      end
+
+      context 'when Meta returns an error' do
+        let(:error_response) do
+          # rubocop:disable RSpec/VerifiedDoubles
+          double('response', success?: false, code: 400,
+                             body: '{"error":{"error_user_msg":"Template already exists"}}')
+          # rubocop:enable RSpec/VerifiedDoubles
+        end
+
+        before do
+          allow(HTTParty).to receive(:post).and_return(error_response)
+          allow(Rails.logger).to receive(:error)
+        end
+
+        it 'returns 422 with the Meta error and never leaks the api_key' do
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('Template already exists')
+          expect(response.body).not_to include(api_key)
+        end
+      end
+
+      context 'with a non-WhatsApp inbox' do
+        it 'returns unprocessable entity' do
+          allow(HTTParty).to receive(:post)
+          post "/api/v1/accounts/#{account.id}/inboxes/#{non_whatsapp_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('Template submission is only available for WhatsApp Cloud API channels')
+          expect(HTTParty).not_to have_received(:post)
+        end
+      end
+
+      context 'with a WhatsApp non-cloud inbox' do
+        let(:whatsapp_default_channel) do
+          create(:channel_whatsapp, account: account, provider: 'default', sync_templates: false, validate_provider_config: false)
+        end
+        let(:whatsapp_default_inbox) { create(:inbox, account: account, channel: whatsapp_default_channel) }
+
+        it 'returns unprocessable entity for non-cloud provider' do
+          allow(HTTParty).to receive(:post)
+          post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_default_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('Template submission is only available for WhatsApp Cloud API channels')
+          expect(HTTParty).not_to have_received(:post)
+        end
+      end
+
+      context 'with a cross-account inbox' do
+        let(:other_account) { create(:account) }
+        let(:other_channel) do
+          create(:channel_whatsapp, account: other_account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+        end
+        let(:other_inbox) { create(:inbox, account: other_account, channel: other_channel) }
+
+        it 'returns not found' do
+          allow(HTTParty).to receive(:post)
+          post "/api/v1/accounts/#{account.id}/inboxes/#{other_inbox.id}/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:not_found)
+          expect(HTTParty).not_to have_received(:post)
+        end
+      end
+
+      context 'with a non-existent inbox' do
+        it 'returns not found error' do
+          post "/api/v1/accounts/#{account.id}/inboxes/999999/submit_template",
+               params: { template: template_payload }, headers: admin.create_new_auth_token, as: :json
 
           expect(response).to have_http_status(:not_found)
         end

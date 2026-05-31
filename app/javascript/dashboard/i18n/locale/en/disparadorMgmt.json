@@ -1,0 +1,254 @@
+{
+  "DISPARADOR_MGMT": {
+    "HEADER": "Disparador",
+    "HEADER_BTN_TXT": "New disparo",
+    "EMPTY_STATE": {
+      "TITLE": "No disparos yet",
+      "SUBTITLE": "Create a draft to preview which WhatsApp Cloud contacts would be considered. Nothing is sent in this beta.",
+      "ACTION": "Create your first disparo"
+    },
+    "LIST": {
+      "TABLE_HEADER": {
+        "NAME": "Name",
+        "INBOX": "Inbox",
+        "STATUS": "Status",
+        "ACTION": "Actions"
+      },
+      "INBOX_COUNT": "{count} inbox | {count} inboxes",
+      "DRY_RUN": "Dry-run",
+      "SHADOW_RUN": "Run shadow",
+      "VIEW_TARGETS": "View targets",
+      "LOAD_ERROR": {
+        "TITLE": "Couldn't load disparos",
+        "SUBTITLE": "Something went wrong fetching the list. Check your connection and try again.",
+        "RETRY": "Retry"
+      }
+    },
+    "STATUS": {
+      "DRAFT": "Draft",
+      "SCHEDULED": "Scheduled",
+      "RUNNING": "Running",
+      "PAUSED": "Paused",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    },
+    "CREATE": {
+      "TITLE": "New disparo",
+      "DESC": "Beta 0 only supports WhatsApp Cloud inboxes. Define the audience by stage and/or label, then preview it with a dry-run.",
+      "FORM": {
+        "NAME": {
+          "LABEL": "Name",
+          "PLACEHOLDER": "e.g. June reactivation",
+          "ERROR": "Name is required"
+        },
+        "DESCRIPTION": {
+          "LABEL": "Description",
+          "PLACEHOLDER": "Optional internal note"
+        },
+        "INBOX": {
+          "LABEL": "WhatsApp Cloud inbox",
+          "PLACEHOLDER": "Select an inbox",
+          "ERROR": "Select a WhatsApp Cloud inbox",
+          "EMPTY": "No WhatsApp Cloud inbox found. Connect one to use Disparador."
+        },
+        "TEMPLATE": {
+          "LABEL": "Template",
+          "PLACEHOLDER": "Select a template",
+          "EMPTY": "Select an inbox first to load its templates",
+          "MANAGE_LINK": "Manage templates",
+          "ERROR": "Select a template"
+        },
+        "CATEGORY": {
+          "LABEL": "Template category",
+          "MARKETING": "Marketing",
+          "UTILITY": "Utility",
+          "AUTHENTICATION": "Authentication"
+        },
+        "CONVERSATION_STATUS": {
+          "LABEL": "Conversation status",
+          "OPEN": "Open conversations only",
+          "ALL": "All conversations"
+        },
+        "KANBAN_STEPS": {
+          "LABEL": "Kanban stages",
+          "PLACEHOLDER": "Type a stage and press enter"
+        },
+        "LABELS": {
+          "LABEL": "Labels",
+          "PLACEHOLDER": "Select labels"
+        },
+        "AUDIENCE_HINT": "Add at least one stage or label to define the audience.",
+        "SUBMIT": "Create draft",
+        "CANCEL": "Cancel"
+      },
+      "API": {
+        "SUCCESS_MESSAGE": "Disparo draft created",
+        "ERROR_MESSAGE": "Could not create the disparo, please try again",
+        "ERRORS": {
+          "UNSUPPORTED_INBOX_PROVIDER": "Only WhatsApp Cloud inboxes are supported in this beta. Pick a Cloud inbox.",
+          "INVALID_AUDIENCE_FILTER": "Add at least one stage or label to define the audience.",
+          "INVALID_TEMPLATE": "Select a template before creating the disparo."
+        }
+      }
+    },
+    "DRY_RUN": {
+      "TITLE": "Dry-run preview",
+      "DESC": "A read-only preview of the considered audience for \"{name}\". No messages are sent.",
+      "RUNNING": "Running dry-run",
+      "SUMMARY": {
+        "TOTAL_ELIGIBLE": "Eligible",
+        "TOTAL_SKIPPED": "Skipped",
+        "SKIP_BREAKDOWN": "Skip reasons",
+        "COST": "Estimated cost",
+        "COST_UNKNOWN": "Unknown price — not comparable",
+        "COST_SOURCE": "Source: {source}",
+        "NO_SKIPS": "No contacts were skipped."
+      },
+      "SKIP_REASONS": {
+        "UNSUPPORTED_INBOX_PROVIDER": "Unsupported inbox provider",
+        "INBOX_NOT_APPROVED": "Template not approved on this inbox",
+        "MISSING_PHONE": "Missing phone number",
+        "INVALID_PHONE": "Invalid phone number",
+        "OPT_OUT_LGPD": "Opted out (LGPD)",
+        "LABEL_AGENTE_OFF_PERMANENTE": "Label: agent off (permanent)",
+        "STAGE_OPT_OUT": "Stage opted out",
+        "FOLLOWUP_LOCKED": "Follow-up locked",
+        "INVALID_WINDOW_CLOSES_AT": "Invalid messaging window",
+        "WINDOW_INCOMPATIBLE": "Messaging window incompatible",
+        "TEMPLATE_SENT_LAST_7D": "Template already sent in last 7 days",
+        "MARKETING_COOLDOWN_7D": "Marketing cooldown (sent in last 7 days)",
+        "WHATSAPP_INVALID_30D": "WhatsApp flagged invalid in last 30 days"
+      },
+      "CLOSE": "Close",
+      "API": {
+        "ERROR_MESSAGE": "Could not run the dry-run, please try again",
+        "ERRORS": {
+          "INVALID_DRY_RUN": "This disparo can't be dry-run yet. Make sure it has a template, a Cloud inbox and an audience filter."
+        }
+      }
+    },
+    "SHADOW_RUN": {
+      "API": {
+        "SUCCESS_MESSAGE": "Shadow-run complete: {created} target(s) persisted, {eligible} eligible, {skipped} skipped. No messages were sent.",
+        "ERROR_MESSAGE": "Could not run the shadow-run, please try again",
+        "ERRORS": {
+          "INVALID_SHADOW_RUN": "This disparo can't be shadow-run yet. Make sure it has a template, a Cloud inbox and an audience filter."
+        }
+      }
+    },
+    "SETTINGS": {
+      "HEADER": "Disparador rules",
+      "HEADER_BTN_TXT": "Rules",
+      "BACK": "Back to disparos",
+      "DESC": "These bindings tell the audience engine where to read each rule. Changing them changes who a disparo targets. Unset values fall back to the platform defaults shown below.",
+      "OPT_OUT": {
+        "TITLE": "Opt-out",
+        "NOTE": "How a contact signals they don't want to be contacted.",
+        "LABEL": {
+          "LABEL": "Permanent opt-out label",
+          "PLACEHOLDER": "e.g. agente-off-permanente",
+          "HINT": "Contacts with this label are always excluded. Compared case-insensitively."
+        },
+        "STEPS": {
+          "LABEL": "Opt-out kanban stages",
+          "PLACEHOLDER": "Type a stage value and press enter",
+          "HINT": "Contacts in any of these kanban stages are excluded. Values are compared as text."
+        }
+      },
+      "KEYS": {
+        "TITLE": "Custom-attribute keys",
+        "NOTE": "The conversation custom-attribute keys the engine reads to apply each rule. Match the keys your automations write.",
+        "OPT_OUT_LGPD": {
+          "LABEL": "LGPD opt-out key",
+          "PLACEHOLDER": "e.g. opt_out_lgpd",
+          "HINT": "Truthy on a conversation means the contact opted out (LGPD)."
+        },
+        "FOLLOWUP_LOCKED": {
+          "LABEL": "Follow-up locked key",
+          "PLACEHOLDER": "e.g. followup_locked",
+          "HINT": "Truthy means follow-up is locked and the contact is skipped."
+        },
+        "WINDOW_CLOSES_AT": {
+          "LABEL": "Window closes-at key",
+          "PLACEHOLDER": "e.g. window_closes_at",
+          "HINT": "Timestamp of when the messaging window closes."
+        },
+        "KANBAN_STEP": {
+          "LABEL": "Kanban stage key",
+          "PLACEHOLDER": "e.g. kanban_step",
+          "HINT": "Holds the contact's current kanban stage, matched against the opt-out stages above."
+        },
+        "WHATSAPP_INVALID_AT": {
+          "LABEL": "WhatsApp invalid-at key",
+          "PLACEHOLDER": "e.g. whatsapp_invalid_at",
+          "HINT": "Timestamp of when WhatsApp last flagged the number as invalid."
+        }
+      },
+      "WINDOWS": {
+        "TITLE": "Windows",
+        "NOTE": "Rolling time windows, in days, that exclude recently-contacted or recently-flagged numbers.",
+        "DEDUP": {
+          "LABEL": "Dedup window (days)",
+          "PLACEHOLDER": "7",
+          "HINT": "Skip a contact that already received the same template within this many days."
+        },
+        "WHATSAPP_INVALID": {
+          "LABEL": "WhatsApp invalid window (days)",
+          "PLACEHOLDER": "30",
+          "HINT": "Skip a number flagged invalid by WhatsApp within this many days."
+        }
+      },
+      "VALIDATION": {
+        "REQUIRED": "This binding is required.",
+        "POSITIVE_INTEGER": "Enter a whole number of days greater than zero.",
+        "STEPS_REQUIRED": "Add at least one opt-out kanban stage."
+      },
+      "SAVE": "Save rules",
+      "API": {
+        "SUCCESS_MESSAGE": "Disparador rules saved",
+        "ERROR_MESSAGE": "Could not save the rules, please try again"
+      }
+    },
+    "TARGETS": {
+      "TITLE": "Shadow targets",
+      "DESC": "The persisted audience for \"{name}\". Read-only — no messages are sent and no phone numbers are stored.",
+      "LOADING": "Loading targets",
+      "EMPTY": {
+        "TITLE": "No targets yet",
+        "SUBTITLE": "Run a shadow-run to persist the considered audience, then come back to inspect it here.",
+        "END_TITLE": "No more targets",
+        "END_SUBTITLE": "You've reached the end of the list. Go back to the previous page."
+      },
+      "LOAD_ERROR": {
+        "TITLE": "Couldn't load targets",
+        "SUBTITLE": "Something went wrong fetching the targets. This doesn't mean the audience is empty. Check your connection and try again.",
+        "RETRY": "Retry"
+      },
+      "TABLE_HEADER": {
+        "CONVERSATION": "Conversation",
+        "CONTACT": "Contact",
+        "STATE": "State",
+        "SKIP_REASON": "Skip reason",
+        "PHONE_PRESENT": "Phone present"
+      },
+      "STATE": {
+        "PENDING": "Pending",
+        "QUEUED": "Queued",
+        "SKIPPED": "Skipped",
+        "CANCELLED": "Cancelled"
+      },
+      "PHONE_PRESENT": {
+        "YES": "Yes",
+        "NO": "No"
+      },
+      "PAGE": "Page {page}",
+      "PREV": "Previous",
+      "NEXT": "Next",
+      "CLOSE": "Close",
+      "API": {
+        "ERROR_MESSAGE": "Could not load the targets, please try again"
+      }
+    }
+  }
+}

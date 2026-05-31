@@ -25,6 +25,8 @@ class DashboardController < ActionController::Base
     DISABLE_USER_PROFILE_UPDATE
     DEPLOYMENT_ENV
     INSTALLATION_PRICING_PLAN
+    DISPARADOR_BETA0_VISIBLE
+    WHATSAPP_TEMPLATE_SUBMIT_ENABLED
   ].freeze
 
   before_action :set_application_pack

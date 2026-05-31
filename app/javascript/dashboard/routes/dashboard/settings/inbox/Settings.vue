@@ -26,6 +26,7 @@ import CustomerSatisfactionPage from './settingsPage/CustomerSatisfactionPage.vu
 import CollaboratorsPage from './settingsPage/CollaboratorsPage.vue';
 import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
+import WhatsappTemplates from './components/WhatsappTemplates.vue';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
@@ -74,6 +75,7 @@ export default {
     ColorPicker,
     SelectInput,
     AccountHealth,
+    WhatsappTemplates,
     Widget,
     AccessToken,
   },
@@ -246,6 +248,10 @@ export default {
           {
             key: 'whatsapp-health',
             name: this.$t('INBOX_MGMT.TABS.ACCOUNT_HEALTH'),
+          },
+          {
+            key: 'whatsapp-templates',
+            name: this.$t('INBOX_MGMT.TABS.WHATSAPP_TEMPLATES'),
           },
         ];
       }
@@ -1324,6 +1330,9 @@ export default {
             :is-registering-webhook="isRegisteringWebhook"
             @register-webhook="registerWebhook"
           />
+        </div>
+        <div v-if="selectedTabKey === 'whatsapp-templates'">
+          <WhatsappTemplates :inbox="inbox" />
         </div>
       </div>
     </section>

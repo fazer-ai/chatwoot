@@ -1,0 +1,11 @@
+json.id disparo.id
+json.account_id disparo.account_id
+json.name disparo.name
+json.description disparo.description
+json.status disparo.status
+json.mode disparo.mode
+json.template_name disparo.template_name
+json.audience_filter disparo.audience_filter
+json.inbox_ids disparo.disparo_inboxes.map(&:inbox_id)
+json.created_at disparo.created_at
+json.updated_at disparo.updated_at

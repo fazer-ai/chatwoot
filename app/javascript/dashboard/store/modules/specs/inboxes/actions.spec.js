@@ -234,26 +234,105 @@ describe('#actions', () => {
   });
 
   describe('#syncTemplates', () => {
-    it('sends correct API call when sync is successful', async () => {
+    it('toggles uiFlag, calls API and refetches inboxes on success', async () => {
+      const dispatch = vi.fn();
       axios.post.mockResolvedValue({
         data: { message: 'Template sync initiated successfully' },
       });
 
-      await actions.syncTemplates({ commit }, 123);
+      await actions.syncTemplates({ commit, dispatch }, 123);
 
       expect(axios.post).toHaveBeenCalledWith(
         '/api/v1/inboxes/123/sync_templates'
       );
+      expect(dispatch).toHaveBeenCalledWith('get');
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: true }],
+        [types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: false }],
+      ]);
     });
 
-    it('throws error when API call fails', async () => {
+    it('toggles uiFlag off and throws error when API call fails', async () => {
+      const dispatch = vi.fn();
       const errorMessage =
         'Template sync is only available for WhatsApp channels';
       axios.post.mockRejectedValue(new Error(errorMessage));
 
-      await expect(actions.syncTemplates({ commit }, 123)).rejects.toThrow(
-        errorMessage
+      await expect(
+        actions.syncTemplates({ commit, dispatch }, 123)
+      ).rejects.toThrow(errorMessage);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: true }],
+        [types.default.SET_INBOXES_UI_FLAG, { isSyncingTemplates: false }],
+      ]);
+    });
+  });
+
+  describe('#submitTemplate', () => {
+    const payload = {
+      name: 'order_update',
+      language: 'pt_BR',
+      category: 'UTILITY',
+      components: [{ type: 'BODY', text: 'Hello {{1}}' }],
+    };
+
+    it('toggles uiFlag, posts the template and triggers a sync on success', async () => {
+      const dispatch = vi.fn();
+      axios.post.mockResolvedValue({
+        data: { template_id: 'abc123', status: 'PENDING' },
+      });
+
+      const result = await actions.submitTemplate(
+        { commit, dispatch },
+        { inboxId: 123, payload }
       );
+
+      expect(axios.post).toHaveBeenCalledWith(
+        '/api/v1/inboxes/123/submit_template',
+        { template: payload }
+      );
+      expect(dispatch).toHaveBeenCalledWith('syncTemplates', 123);
+      expect(result).toEqual({ template_id: 'abc123', status: 'PENDING' });
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: true }],
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: false }],
+      ]);
+    });
+
+    it('resolves with the Meta write result even when the post-write refresh fails', async () => {
+      const dispatch = vi.fn().mockRejectedValue(new Error('sync down'));
+      axios.post.mockResolvedValue({
+        data: { template_id: 'abc123', status: 'PENDING' },
+      });
+
+      const result = await actions.submitTemplate(
+        { commit, dispatch },
+        { inboxId: 123, payload }
+      );
+
+      expect(dispatch).toHaveBeenCalledWith('syncTemplates', 123);
+      expect(result).toEqual({ template_id: 'abc123', status: 'PENDING' });
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: true }],
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: false }],
+      ]);
+    });
+
+    it('toggles uiFlag off and throws the Meta error message on 422', async () => {
+      const dispatch = vi.fn();
+      axios.post.mockRejectedValue({
+        response: { data: { error: 'Template name already exists' } },
+      });
+
+      await expect(
+        actions.submitTemplate({ commit, dispatch }, { inboxId: 123, payload })
+      ).rejects.toThrow('Template name already exists');
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: true }],
+        [types.default.SET_INBOXES_UI_FLAG, { isSubmittingTemplate: false }],
+      ]);
     });
   });
 

@@ -26,6 +26,8 @@ const {
   DEPLOYMENT_ENV: deploymentEnv,
   BAILEYS_WHATSAPP_GROUPS_ENABLED: baileysWhatsappGroupsEnabled,
   ACTIVE_PLATFORM_BANNERS: activePlatformBanners,
+  DISPARADOR_BETA0_VISIBLE: disparadorBeta0Visible,
+  WHATSAPP_TEMPLATE_SUBMIT_ENABLED: whatsappTemplateSubmitEnabled,
 } = window.globalConfig || {};
 
 const state = {
@@ -53,6 +55,8 @@ const state = {
   isEnterprise: parseBoolean(isEnterprise),
   baileysWhatsappGroupsEnabled: parseBoolean(baileysWhatsappGroupsEnabled),
   activePlatformBanners: activePlatformBanners || [],
+  disparadorBeta0Visible: parseBoolean(disparadorBeta0Visible),
+  whatsappTemplateSubmitEnabled: parseBoolean(whatsappTemplateSubmitEnabled),
 };
 
 export const getters = {
@@ -60,6 +64,9 @@ export const getters = {
   isOnChatwootCloud: $state => $state.deploymentEnv === 'cloud',
   isACustomBrandedInstance: $state => $state.installationName !== 'Chatwoot',
   isAChatwootInstance: $state => $state.installationName === 'Chatwoot',
+  isDisparadorBeta0Visible: $state => $state.disparadorBeta0Visible,
+  isWhatsappTemplateSubmitEnabled: $state =>
+    $state.whatsappTemplateSubmitEnabled,
 };
 
 export const actions = {};

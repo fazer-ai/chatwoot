@@ -8,6 +8,7 @@ import { routes as inboxRoutes } from './inbox/routes';
 import { frontendURL } from '../../helper/URLHelper';
 import helpcenterRoutes from './helpcenter/helpcenter.routes';
 import campaignsRoutes from './campaigns/campaigns.routes';
+import disparadorRoutes from './disparador/disparador.routes';
 import { routes as captainRoutes } from './captain/captain.routes';
 import { routes as kanbanRoutes } from './kanban/kanban.routes';
 import dashboardAppsRoutes from './dashboardApps/dashboardApps.routes';
@@ -34,6 +35,7 @@ export default {
         ...notificationRoutes,
         ...helpcenterRoutes.routes,
         ...campaignsRoutes.routes,
+        ...disparadorRoutes.routes,
         ...dashboardAppsRoutes.routes,
         ...internalChatRoutes.routes,
       ],

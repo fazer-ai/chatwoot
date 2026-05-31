@@ -72,6 +72,18 @@
   value: false
   description: 'Allow users to create new accounts from the dashboard'
   locked: false
+- name: DISPARADOR_BETA0_VISIBLE
+  display_title: 'Disparador Beta 0 (Cloud Shadow) API visible'
+  value: false
+  description: 'Expose the read-only/shadow Disparador Cloud Shadow Beta 0 API. When off the API returns 404. Keep false in production.'
+  locked: false
+  type: boolean
+- name: WHATSAPP_TEMPLATE_SUBMIT_ENABLED
+  display_title: 'WhatsApp Template Submit (Meta write) enabled'
+  value: false
+  description: 'Expose the WhatsApp template submission write to Meta (POST /message_templates). When off the submit endpoint returns 404 and the UI submit affordance is hidden. The read-only template sync stays active either way. Keep false in production.'
+  locked: false
+  type: boolean
 - name: HCAPTCHA_SITE_KEY
   value:
   locked: false
