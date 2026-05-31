@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_03_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_04_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -862,6 +862,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_03_000000) do
     t.datetime "expires_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "config_fingerprint"
     t.index ["disparo_id"], name: "index_disparo_audience_snapshots_on_disparo_id"
   end
 

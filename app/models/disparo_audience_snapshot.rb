@@ -5,6 +5,7 @@
 #  id                   :bigint           not null, primary key
 #  by_inbox             :jsonb            not null
 #  by_skip_reason       :jsonb            not null
+#  config_fingerprint   :string
 #  estimated_cost_cents :integer
 #  expires_at           :datetime
 #  filter_dsl           :jsonb            not null

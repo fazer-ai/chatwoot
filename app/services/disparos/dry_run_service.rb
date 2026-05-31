@@ -120,7 +120,10 @@ class Disparos::DryRunService
       by_skip_reason: agg[:by_skip_reason],
       by_inbox: agg[:by_inbox],
       estimated_cost_cents: estimated_cost_cents,
-      expires_at: @now + SNAPSHOT_TTL
+      expires_at: @now + SNAPSHOT_TTL,
+      # GAP B: pin the config this preview was computed under, so ShadowRun can
+      # refuse to persist if the disparo's config drifts before approval.
+      config_fingerprint: Disparos::ConfigFingerprint.for(disparo)
     )
   end
 end

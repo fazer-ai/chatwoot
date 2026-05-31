@@ -4,3 +4,5 @@ json.by_skip_reason @summary.by_skip_reason
 json.by_inbox @summary.by_inbox
 json.estimated_cost_cents @summary.estimated_cost_cents
 json.cost_source @summary.cost_source
+# GAP B: the FE needs the snapshot id to approve it back into shadow_run.
+json.snapshot_id @summary.snapshot&.id

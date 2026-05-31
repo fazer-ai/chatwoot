@@ -40,12 +40,18 @@ class Disparos::ShadowRunService
 
   Summary = Struct.new(:total_targets, :eligible, :skipped, :created, :updated, keyword_init: true)
 
-  def initialize(now: Time.current)
+  def initialize(now: Time.current, snapshot_id: nil)
     @now = now
+    @snapshot_id = snapshot_id
   end
 
   def perform(disparo)
     validate_runnable!(disparo, CustomExceptions::Disparos::InvalidShadowRun)
+    # GAP B: the shadow run may ONLY persist the set the operator approved in a
+    # dry-run preview. Validate the snapshot (exists, belongs to this disparo, not
+    # expired, config unchanged) BEFORE touching any target row, so a stale or
+    # drifted approval rolls the (empty) transaction back cleanly.
+    validate_snapshot!(disparo)
 
     # Run-level telemetry: ids + counts only (no phone/token/raw SHA) — §Observability / US20.
     ActiveSupport::Notifications.instrument('disparos.shadow_run_started', disparo_id: disparo.id)
@@ -54,6 +60,21 @@ class Disparos::ShadowRunService
     # engine; the engine never reads account.settings per-conversation.
     @rules_config = Disparos::RulesConfig.new(disparo.account)
 
+    summary = process_candidates(disparo)
+
+    ActiveSupport::Notifications.instrument(
+      'disparos.shadow_run_completed',
+      disparo_id: disparo.id, total_targets: summary[:total_targets], eligible: summary[:eligible], skipped: summary[:skipped]
+    )
+
+    Summary.new(**summary)
+  end
+
+  private
+
+  # Iterates the resolved audience, intra-run de-duping by grain, and upserts one
+  # target per (conversation, contact). Returns the running summary hash.
+  def process_candidates(disparo)
     candidates = Disparos::AudienceResolver.new(
       account: disparo.account, filter: filter_for(disparo),
       inbox_ids: disparo.disparo_inboxes.pluck(:inbox_id), conversation_status: disparo.conversation_status
@@ -68,15 +89,22 @@ class Disparos::ShadowRunService
       upsert_target(disparo, conversation, evaluate(disparo, conversation), summary)
     end
 
-    ActiveSupport::Notifications.instrument(
-      'disparos.shadow_run_completed',
-      disparo_id: disparo.id, total_targets: summary[:total_targets], eligible: summary[:eligible], skipped: summary[:skipped]
-    )
-
-    Summary.new(**summary)
+    summary
   end
 
-  private
+  # GAP B gate. Raises InvalidShadowRun unless the approved dry-run snapshot is
+  # present, belongs to THIS disparo, is not expired, and was computed under the
+  # disparo's CURRENT config (fingerprint match). The recalculated rows are still
+  # authoritative for persistence; the snapshot is the APPROVAL gate (TTL +
+  # fingerprint), not the row source — the snapshot stores only aggregates.
+  def validate_snapshot!(disparo)
+    raise CustomExceptions::Disparos::InvalidShadowRun if @snapshot_id.blank?
+
+    snapshot = disparo.disparo_audience_snapshots.find_by(id: @snapshot_id)
+    raise CustomExceptions::Disparos::InvalidShadowRun if snapshot.nil?
+    raise CustomExceptions::Disparos::InvalidShadowRun if snapshot.expires_at.nil? || snapshot.expires_at <= @now
+    raise CustomExceptions::Disparos::InvalidShadowRun if snapshot.config_fingerprint != Disparos::ConfigFingerprint.for(disparo)
+  end
 
   def evaluate(disparo, conversation)
     Disparos::EligibilityEngine.new(

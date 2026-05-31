@@ -205,25 +205,40 @@ class Disparos::EligibilityEngine
     recent_marker?(custom_attributes[key]) || recent_marker?(contact_custom_attributes[key])
   end
 
-  # MARKETING COOLDOWN: only for marketing templates. Any `bulk_template_*_sent_at`
-  # marker (ANY template name) on the conversation OR contact, parsing to within
-  # the configured dedup window, trips `marketing_cooldown_7d`.
+  # MARKETING COOLDOWN: only for marketing templates. A recent
+  # `bulk_template_<name>_sent_at` marker (on the conversation OR contact) trips
+  # `marketing_cooldown_7d` ONLY when its OWN template `<name>` resolves to a
+  # MARKETING-category approved template on this inbox's channel (delta §6: the
+  # cooldown is scoped to markers whose own category is MARKETING).
   #
-  # INTERIM OVER-BROAD APPROXIMATION (reconciliation-delta §6 — OPEN UNKNOWN):
-  # wf15 scopes this cooldown to markers whose OWN template category is MARKETING
-  # (via a CATALOG mapping template_name -> category). That catalog does NOT exist
-  # yet — delta §6 flags its SOURCE as an open unknown the team still owes a data
-  # decision on — so we approximate it as "any recent bulk marker regardless of the
-  # marker's category". This is intentionally broader than wf15: a recent UTILITY
-  # (non-marketing) marker ALSO trips marketing_cooldown_7d here. This is NOT the
-  # final behavior; it stays pinned by a characterization spec so the gap is visible
-  # and is corrected once the delta §6 template->category catalog lands. Do NOT
-  # mistake this for the reconciled rule.
+  # SAFE DIRECTION (do NOT over-block): a marker whose `<name>` is NOT found in
+  # the channel's message_templates — an UNKNOWN template — does NOT count. We
+  # cannot prove it was marketing, so we do not let it suppress a send. Likewise a
+  # known UTILITY/AUTHENTICATION marker does not count. Only a known-marketing
+  # marker trips the cooldown.
   def marketing_cooldown_hit?
     return false unless @template_category == MARKETING_CATEGORY
 
-    bulk_marker_values(custom_attributes).any? { |raw| recent_marker?(raw) } ||
-      bulk_marker_values(contact_custom_attributes).any? { |raw| recent_marker?(raw) }
+    recent_marketing_marker?(custom_attributes) || recent_marketing_marker?(contact_custom_attributes)
+  end
+
+  # True iff `attributes` carries a recent bulk marker whose own template maps to
+  # MARKETING. Unknown (nil-resolving) markers are skipped — the safe direction.
+  def recent_marketing_marker?(attributes)
+    attributes.any? do |key, value|
+      next false unless Disparos::BulkMarker.marker_key?(key)
+      next false unless recent_marker?(value)
+
+      marker_category(key) == MARKETING_CATEGORY
+    end
+  end
+
+  # The mapped enum category of the template that wrote a given bulk-marker key,
+  # resolved via the inbox's synced channel templates (shared resolver). nil when
+  # unknown / not approved / no category.
+  def marker_category(key)
+    name = Disparos::BulkMarker.template_name(key)
+    Disparos::TemplateCategory.for_channel(@conversation.inbox&.channel, name)
   end
 
   # WHATSAPP-INVALID 30d: contact-level. A `whatsapp_invalid_at` within 30 days
@@ -240,11 +255,6 @@ class Disparos::EligibilityEngine
     return false if parsed.nil?
 
     parsed > @now - window
-  end
-
-  # Every `bulk_template_<any>_sent_at` value in the given custom_attributes hash.
-  def bulk_marker_values(attributes)
-    attributes.filter_map { |key, value| value if Disparos::BulkMarker.marker_key?(key) }
   end
 
   def custom_attributes

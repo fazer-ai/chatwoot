@@ -199,6 +199,18 @@ describe Disparos::DryRunService do
         expect(snapshot.filter_dsl).to eq(filter)
         expect(snapshot.expires_at).to eq(now + 15.minutes)
       end
+
+      # GAP B: the snapshot pins the disparo's config fingerprint so ShadowRun can
+      # detect drift between the approved preview and the persist call.
+      it 'stores the disparo config_fingerprint on the snapshot' do
+        candidate(contact: create(:contact, account: account, phone_number: '+5511999998888'))
+
+        service.perform(disparo)
+
+        snapshot = DisparoAudienceSnapshot.last
+        expect(snapshot.config_fingerprint).to eq(Disparos::ConfigFingerprint.for(disparo))
+        expect(snapshot.config_fingerprint).to be_present
+      end
     end
 
     context 'with run-level observability (US20: ids + counts only, no PII)', :aggregate_failures do

@@ -28,4 +28,15 @@ module Disparos::BulkMarker
     key_str = key.to_s
     key_str.start_with?(PREFIX) && key_str.end_with?(SUFFIX)
   end
+
+  # The `<template_name>` embedded in a `bulk_template_<name>_sent_at` key, or
+  # nil when `key` is not a bulk-marker key. Used by the EligibilityEngine
+  # marketing cooldown to resolve a marker's own template category. A degenerate
+  # empty-name key returns '' (mirrors marker_key?), which the resolver then maps
+  # to nil (not found) — so it never trips the cooldown.
+  def template_name(key)
+    return nil unless marker_key?(key)
+
+    key.to_s[PREFIX.length...-SUFFIX.length]
+  end
 end

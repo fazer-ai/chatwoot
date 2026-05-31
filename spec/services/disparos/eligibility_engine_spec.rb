@@ -220,11 +220,28 @@ describe Disparos::EligibilityEngine do
       end
     end
 
-    context 'with the MARKETING cross-template cooldown (W2)' do
-      let(:other_marker) { { 'bulk_template_other_promo_sent_at' => (now - 1.day).iso8601 } }
+    # GAP E: the marketing cooldown is now scoped to markers whose OWN template
+    # resolves to a MARKETING-category approved template on the inbox's channel
+    # (via Disparos::TemplateCategory). A recent marker keyed to a KNOWN marketing
+    # template trips it; a UTILITY-template or UNKNOWN-template marker does NOT
+    # (the safe direction — do not over-block on a template we cannot prove was
+    # marketing). The cooldown inbox below approves both the disparo template
+    # (sample_shipping_confirmation, legacy SHIPPING_UPDATE -> utility) and the
+    # markers' templates so resolution is exercised end-to-end.
+    context 'with the MARKETING cross-template cooldown (W2 / GAP E category-scoped)' do
+      let(:cooldown_inbox) do
+        create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                  sync_templates: false, validate_provider_config: false,
+                                  message_templates: [
+                                    { 'name' => template_name, 'status' => 'approved', 'category' => 'SHIPPING_UPDATE' },
+                                    { 'name' => 'promo_blast', 'status' => 'approved', 'category' => 'MARKETING' },
+                                    { 'name' => 'utility_receipt', 'status' => 'approved', 'category' => 'UTILITY' }
+                                  ]).inbox
+      end
+      let(:marketing_marker) { { 'bulk_template_promo_blast_sent_at' => (now - 1.day).iso8601 } }
 
-      it 'skips marketing_cooldown_7d for a marketing template with a recent DIFFERENT-template marker' do
-        conversation = build_conversation(contact: contact, custom_attributes: other_marker)
+      it 'skips marketing_cooldown_7d for a marketing template with a recent KNOWN-MARKETING-template marker' do
+        conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: marketing_marker)
         res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :marketing).perform
 
         expect(res).not_to be_eligible
@@ -232,42 +249,42 @@ describe Disparos::EligibilityEngine do
         expect(res.primary_skip_reason).to eq('marketing_cooldown_7d')
       end
 
-      it 'is eligible for a utility template with the SAME recent cross-template marker (no cooldown)' do
-        conversation = build_conversation(contact: contact, custom_attributes: other_marker)
+      it 'is eligible for a utility template with the SAME recent marketing marker (cooldown is marketing-only)' do
+        conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: marketing_marker)
         res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :utility).perform
 
         expect(res).to be_eligible
         expect(res.skip_reasons).to be_empty
       end
 
-      it 'reads the cooldown marker from the contact mirror as well' do
+      it 'reads the marketing cooldown marker from the contact mirror as well' do
         cooldown_contact = create(:contact, account: account, phone_number: '+5511999991111',
-                                            custom_attributes: { 'bulk_template_other_promo_sent_at' => (now - 1.day).iso8601 })
-        conversation = build_conversation(contact: cooldown_contact)
+                                            custom_attributes: { 'bulk_template_promo_blast_sent_at' => (now - 1.day).iso8601 })
+        conversation = build_conversation(contact: cooldown_contact, inbox: cooldown_inbox)
         res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :marketing).perform
 
         expect(res.skip_reasons).to include('marketing_cooldown_7d')
       end
 
-      # CHARACTERIZATION (known interim limitation — reconciliation-delta §6):
-      # the engine scans EVERY bulk_template_*_sent_at marker regardless of the
-      # marker's own template category, because the delta §6 template->category
-      # catalog does not exist yet. So a recent NON-marketing (UTILITY) marker DOES
-      # currently trip marketing_cooldown_7d for a MARKETING disparo. This asserts
-      # CURRENT (over-broad) behavior, not the desired wf15-reconciled behavior, and
-      # pins the gap so it stays visible until the catalog lands. When the catalog
-      # is built, this example is expected to flip (a UTILITY marker must NOT trip
-      # the marketing cooldown) and should be updated alongside the engine.
-      it 'currently trips marketing_cooldown_7d from a recent UTILITY-category marker (delta §6 over-suppression)' do
-        # The marker was itself written by a UTILITY-category send (its name carries no
-        # category; the engine cannot tell), yet it still counts toward the MARKETING cooldown.
+      it 'does NOT trip marketing_cooldown_7d from a recent KNOWN-UTILITY-template marker (GAP E narrowed)' do
         utility_marker = { 'bulk_template_utility_receipt_sent_at' => (now - 1.day).iso8601 }
-        conversation = build_conversation(contact: contact, custom_attributes: utility_marker)
+        conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: utility_marker)
         res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :marketing).perform
 
-        expect(res).not_to be_eligible
-        expect(res.skip_reasons).to contain_exactly('marketing_cooldown_7d')
-        expect(res.primary_skip_reason).to eq('marketing_cooldown_7d')
+        expect(res).to be_eligible
+        expect(res.skip_reasons).not_to include('marketing_cooldown_7d')
+      end
+
+      # SAFE DIRECTION (documented in the engine): a marker whose template is NOT
+      # in the channel's message_templates is UNKNOWN — we cannot prove it was
+      # marketing, so it must NOT suppress a send.
+      it 'does NOT trip marketing_cooldown_7d from a recent UNKNOWN-template marker (safe direction)' do
+        unknown_marker = { 'bulk_template_other_promo_sent_at' => (now - 1.day).iso8601 }
+        conversation = build_conversation(contact: contact, inbox: cooldown_inbox, custom_attributes: unknown_marker)
+        res = described_class.new(conversation: conversation, template_name: template_name, now: now, template_category: :marketing).perform
+
+        expect(res).to be_eligible
+        expect(res.skip_reasons).not_to include('marketing_cooldown_7d')
       end
     end
 
@@ -322,6 +339,11 @@ describe Disparos::EligibilityEngine do
     end
 
     context 'with the reconciled precedence (W2)' do
+      # The default cloud_inbox approves sample_shipping_confirmation (legacy
+      # SHIPPING_UPDATE -> utility). The per-template marker trips
+      # template_sent_last_7d; the cross-template `other_promo` marker is an
+      # UNKNOWN template (not in the channel) so under GAP E it does NOT trip the
+      # marketing cooldown. marketing_cooldown_7d therefore drops out.
       it 'picks label_agente_off_permanente over opt_out_lgpd and collects every reason' do
         conversation = build_conversation(
           contact: contact,
@@ -336,7 +358,7 @@ describe Disparos::EligibilityEngine do
 
         expect(res.primary_skip_reason).to eq('label_agente_off_permanente')
         expect(res.skip_reasons).to contain_exactly(
-          'label_agente_off_permanente', 'opt_out_lgpd', 'template_sent_last_7d', 'marketing_cooldown_7d'
+          'label_agente_off_permanente', 'opt_out_lgpd', 'template_sent_last_7d'
         )
       end
     end

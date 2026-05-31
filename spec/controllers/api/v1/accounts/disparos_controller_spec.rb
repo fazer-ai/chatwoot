@@ -23,12 +23,16 @@ RSpec.describe 'Disparos API', type: :request do
                                 sync_templates: false, validate_provider_config: false).inbox
     end
 
+    # GAP A: the submitted template_category must equal the real category of the
+    # approved template in the selected inbox. The factory cloud inbox approves
+    # `sample_shipping_confirmation` (legacy SHIPPING_UPDATE -> utility) and the
+    # column defaults to utility, so the omitted-category happy path resolves.
     let(:valid_params) do
       {
         disparo: {
           name: 'Reativação',
           description: 'Shadow run',
-          template_name: 'welcome_back',
+          template_name: 'sample_shipping_confirmation',
           audience_filter: { kanban_steps: %w[3], label: %w[vip] },
           inbox_ids: [inbox.id]
         }
@@ -70,13 +74,21 @@ RSpec.describe 'Disparos API', type: :request do
           body = response.parsed_body
           expect(body['id']).to eq(Disparo.last.id)
           expect(body['status']).to eq('draft')
-          expect(body['template_name']).to eq('welcome_back')
+          expect(body['template_name']).to eq('sample_shipping_confirmation')
           expect(body['inbox_ids']).to eq([inbox.id])
         end
 
         it 'persists template_category from the create params so the marketing cooldown can fire' do
+          # GAP A: a `marketing` submission must match a MARKETING-category approved
+          # template in the selected inbox, so use an inbox that approves one.
+          marketing_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                      sync_templates: false, validate_provider_config: false,
+                                                      message_templates: [{ 'name' => 'promo_blast', 'status' => 'approved',
+                                                                            'category' => 'MARKETING' }]).inbox
           params = valid_params.deep_dup
+          params[:disparo][:template_name] = 'promo_blast'
           params[:disparo][:template_category] = 'marketing'
+          params[:disparo][:inbox_ids] = [marketing_inbox.id]
 
           post "/api/v1/accounts/#{account.id}/disparos",
                headers: admin.create_new_auth_token, params: params, as: :json
@@ -173,6 +185,95 @@ RSpec.describe 'Disparos API', type: :request do
 
           expect(response).to have_http_status(:unprocessable_entity)
           expect(response.parsed_body['error']).to eq('invalid_conversation_status')
+        end
+
+        # GAP A: the submitted template_category must equal the resolved category
+        # of the template in the selected inbox(es) — the backend defends even
+        # though the FE derives the category.
+        it 'creates the disparo when the submitted category matches the approved template category' do
+          # sample_shipping_confirmation is legacy SHIPPING_UPDATE -> utility.
+          params = valid_params.deep_dup
+          params[:disparo][:template_category] = 'utility'
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.to change(Disparo, :count).by(1)
+
+          expect(response).to have_http_status(:created)
+          expect(Disparo.last.template_category).to eq('utility')
+        end
+
+        it 'rejects with a 422 when the submitted category mismatches (utility submitted for a MARKETING template)' do
+          marketing_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                      sync_templates: false, validate_provider_config: false,
+                                                      message_templates: [{ 'name' => 'promo_blast', 'status' => 'approved',
+                                                                            'category' => 'MARKETING' }]).inbox
+          params = valid_params.deep_dup
+          params[:disparo][:template_name] = 'promo_blast'
+          params[:disparo][:template_category] = 'utility'
+          params[:disparo][:inbox_ids] = [marketing_inbox.id]
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.to not_change(Disparo, :count).and not_change(DisparoInbox, :count)
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('template_category_mismatch')
+        end
+
+        it 'rejects with a 422 when an omitted category (defaults utility) mismatches a MARKETING template' do
+          # A client cannot bypass the marketing cooldown by omitting the category:
+          # the EFFECTIVE value (utility) is validated against the real category.
+          marketing_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                      sync_templates: false, validate_provider_config: false,
+                                                      message_templates: [{ 'name' => 'promo_blast', 'status' => 'approved',
+                                                                            'category' => 'MARKETING' }]).inbox
+          params = valid_params.deep_dup
+          params[:disparo][:template_name] = 'promo_blast'
+          params[:disparo].delete(:template_category)
+          params[:disparo][:inbox_ids] = [marketing_inbox.id]
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.not_to change(Disparo, :count)
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('template_category_mismatch')
+        end
+
+        it 'rejects with a 422 when the template is not approved in the selected inbox' do
+          params = valid_params.deep_dup
+          params[:disparo][:template_name] = 'never_synced_template'
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.not_to change(Disparo, :count)
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('template_category_mismatch')
+        end
+
+        it 'rejects with a 422 when the category matches in one selected inbox but not the other (multi-inbox strict)' do
+          # inbox approves sample_shipping_confirmation -> utility; the second inbox
+          # does NOT carry it, so the submitted utility cannot resolve there.
+          second_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                   sync_templates: false, validate_provider_config: false,
+                                                   message_templates: []).inbox
+          params = valid_params.deep_dup
+          params[:disparo][:template_category] = 'utility'
+          params[:disparo][:inbox_ids] = [inbox.id, second_inbox.id]
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/disparos",
+                 headers: admin.create_new_auth_token, params: params, as: :json
+          end.not_to change(Disparo, :count)
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['error']).to eq('template_category_mismatch')
         end
 
         it 'ignores client-supplied status, account_id and created_by_id (mass-assignment guard)' do
@@ -376,6 +477,8 @@ RSpec.describe 'Disparos API', type: :request do
         body = response.parsed_body
         expect(body).to include('total_eligible', 'total_skipped', 'by_skip_reason', 'by_inbox', 'estimated_cost_cents')
         expect(body['total_eligible']).to eq(0)
+        # GAP B: the FE needs the snapshot id to approve it back into shadow_run.
+        expect(body['snapshot_id']).to eq(DisparoAudienceSnapshot.last.id)
       end
 
       it 'returns 422 with the error message when the dry-run is invalid' do
@@ -435,13 +538,24 @@ RSpec.describe 'Disparos API', type: :request do
                             custom_attributes: { 'kanban_step' => '3' }, label_list: ['vip'])
     end
 
+    # GAP B: shadow_run must reference the dry-run snapshot the operator approved.
+    # Run a real dry_run over HTTP and return its snapshot_id (now exposed in the
+    # dry_run response) so the happy paths approve the same config they previewed.
+    def approved_snapshot_id(target = disparo)
+      post "/api/v1/accounts/#{account.id}/disparos/#{target.id}/dry_run",
+           headers: admin.create_new_auth_token, as: :json
+      response.parsed_body['snapshot_id']
+    end
+
     context 'when the flag is on' do
       before { stub_beta0_flag(true) }
 
       it 'persists shadow targets without creating messages or conversations' do
+        snapshot_id = approved_snapshot_id
+
         expect do
           post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
-               headers: admin.create_new_auth_token, as: :json
+               headers: admin.create_new_auth_token, params: { snapshot_id: snapshot_id }, as: :json
         end.to not_change(Message, :count)
           .and not_change(Conversation, :count)
           .and change { DisparoTarget.where(disparo: disparo).count }.from(0).to(1)
@@ -454,23 +568,67 @@ RSpec.describe 'Disparos API', type: :request do
 
       it 'is idempotent over HTTP — a second call does not duplicate targets' do
         post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
-             headers: admin.create_new_auth_token, as: :json
+             headers: admin.create_new_auth_token, params: { snapshot_id: approved_snapshot_id }, as: :json
         expect(DisparoTarget.where(disparo: disparo).count).to eq(1)
 
         expect do
           post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
-               headers: admin.create_new_auth_token, as: :json
+               headers: admin.create_new_auth_token, params: { snapshot_id: approved_snapshot_id }, as: :json
         end.not_to(change { DisparoTarget.where(disparo: disparo).count })
 
         expect(response).to have_http_status(:success)
         expect(response.parsed_body).to include('created' => 0, 'updated' => 1)
       end
 
-      it 'returns 422 with the error message when the shadow-run is invalid' do
-        disparo.update!(template_name: nil)
+      # GAP B load-bearing #1: no snapshot_id at all -> 422, nothing persisted.
+      it 'returns 422 and persists nothing when no snapshot_id is provided' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
+               headers: admin.create_new_auth_token, as: :json
+        end.not_to change(DisparoTarget, :count)
 
-        post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
-             headers: admin.create_new_auth_token, as: :json
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq('invalid_shadow_run')
+      end
+
+      it 'returns 422 when the snapshot_id does not belong to this disparo' do
+        other_disparo = create(:disparo, account: account, template_name: 'sample_shipping_confirmation', audience_filter: filter)
+        create(:disparo_inbox, disparo: other_disparo, inbox: cloud_inbox)
+        foreign_snapshot_id = approved_snapshot_id(other_disparo)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
+               headers: admin.create_new_auth_token, params: { snapshot_id: foreign_snapshot_id }, as: :json
+        end.not_to change(DisparoTarget, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq('invalid_shadow_run')
+      end
+
+      # GAP B load-bearing #2: an EXPIRED snapshot -> 422, nothing persisted.
+      it 'returns 422 and persists nothing when the snapshot has expired' do
+        snapshot_id = approved_snapshot_id
+        DisparoAudienceSnapshot.find(snapshot_id).update!(expires_at: 1.hour.ago)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
+               headers: admin.create_new_auth_token, params: { snapshot_id: snapshot_id }, as: :json
+        end.not_to change(DisparoTarget, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq('invalid_shadow_run')
+      end
+
+      # GAP B load-bearing #3 (THE load-bearing test): config changed after the
+      # dry-run -> fingerprint mismatch -> 422, nothing persisted.
+      it 'returns 422 and persists nothing when the config changed after the dry-run' do
+        snapshot_id = approved_snapshot_id
+        disparo.update!(template_category: :marketing) # config drift vs the snapshot
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
+               headers: admin.create_new_auth_token, params: { snapshot_id: snapshot_id }, as: :json
+        end.not_to change(DisparoTarget, :count)
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['error']).to eq('invalid_shadow_run')
@@ -485,7 +643,7 @@ RSpec.describe 'Disparos API', type: :request do
         other_disparo = create(:disparo, account: create(:account))
 
         post "/api/v1/accounts/#{account.id}/disparos/#{other_disparo.id}/shadow_run",
-             headers: admin.create_new_auth_token, as: :json
+             headers: admin.create_new_auth_token, params: { snapshot_id: 'whatever' }, as: :json
 
         expect(response).to have_http_status(:not_found)
       end
@@ -497,7 +655,7 @@ RSpec.describe 'Disparos API', type: :request do
       it 'returns 404 and creates nothing' do
         expect do
           post "/api/v1/accounts/#{account.id}/disparos/#{disparo.id}/shadow_run",
-               headers: admin.create_new_auth_token, as: :json
+               headers: admin.create_new_auth_token, params: { snapshot_id: 'whatever' }, as: :json
         end.not_to change(DisparoTarget, :count)
 
         expect(response).to have_http_status(:not_found)

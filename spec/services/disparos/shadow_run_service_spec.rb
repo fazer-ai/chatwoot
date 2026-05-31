@@ -1,7 +1,20 @@
 require 'rails_helper'
 
 describe Disparos::ShadowRunService do
+  # GAP B: a shadow run must reference an approved, unexpired dry-run snapshot
+  # whose config fingerprint matches the disparo's CURRENT config. `run` captures
+  # a fresh valid snapshot for the disparo's current config and performs against
+  # it; the per-snapshot specs at the bottom exercise the gate directly. The
+  # not-runnable specs use `service` (no snapshot) because validate_runnable! runs
+  # before the snapshot gate.
   subject(:service) { described_class.new(now: now) }
+
+  # Build a valid snapshot for `d`'s CURRENT config (via DryRunService, which
+  # writes the correct fingerprint + TTL) and perform the shadow run with it.
+  def run(disparo_to_run = disparo)
+    snapshot = Disparos::DryRunService.new(now: now).perform(disparo_to_run).snapshot
+    described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo_to_run)
+  end
 
   let(:account) { create(:account) }
   let(:cloud_channel) do
@@ -56,7 +69,7 @@ describe Disparos::ShadowRunService do
         opted_out = create(:contact, account: account, phone_number: '+5511988887777')
         skipped_convo = candidate(contact: opted_out, custom_attributes: { 'opt_out_lgpd' => true })
 
-        summary = service.perform(disparo)
+        summary = run(disparo)
 
         expect(summary.total_targets).to eq(2)
         expect(summary.eligible).to eq(1)
@@ -81,7 +94,7 @@ describe Disparos::ShadowRunService do
         eligible_contact = create(:contact, account: account, phone_number: '+5511999998888')
         eligible_convo = candidate(contact: eligible_contact)
 
-        service.perform(disparo)
+        run(disparo)
 
         target = DisparoTarget.find_by(disparo: disparo, conversation_id: eligible_convo.id)
         expect(target.state).to eq('queued')
@@ -106,7 +119,7 @@ describe Disparos::ShadowRunService do
                                                  custom_attributes: { 'kanban_step' => '3' }, label_list: ['vip'],
                                                  contact: create(:contact, account: account, phone_number: '+5511999990002'))
 
-        summary = service.perform(disparo)
+        summary = run(disparo)
 
         expect(summary.total_targets).to eq(1)
         expect(DisparoTarget.find_by(disparo: disparo, conversation_id: selected_convo.id)).to be_present
@@ -121,7 +134,7 @@ describe Disparos::ShadowRunService do
         resolved_convo = candidate(contact: create(:contact, account: account, phone_number: '+5511999990002'))
         resolved_convo.update!(status: :resolved)
 
-        summary = service.perform(disparo) # disparo defaults conversation_status to open
+        summary = run(disparo) # disparo defaults conversation_status to open
 
         expect(summary.total_targets).to eq(1)
         expect(DisparoTarget.find_by(disparo: disparo, conversation_id: open_convo.id)).to be_present
@@ -134,7 +147,7 @@ describe Disparos::ShadowRunService do
         resolved_convo.update!(status: :resolved)
         disparo.update!(conversation_status: :all)
 
-        summary = service.perform(disparo)
+        summary = run(disparo)
 
         expect(summary.total_targets).to eq(2)
         expect(DisparoTarget.find_by(disparo: disparo, conversation_id: resolved_convo.id)).to be_present
@@ -147,7 +160,7 @@ describe Disparos::ShadowRunService do
         opted_out = create(:contact, account: account, phone_number: '+5511988887777')
         candidate(contact: opted_out, custom_attributes: { 'opt_out_lgpd' => true })
 
-        service.perform(disparo)
+        run(disparo)
 
         expect(DisparoTarget.where(disparo: disparo)).to all(have_attributes(shadow_run: true))
         expect(DisparoTarget.where(disparo: disparo, shadow_run: false)).to be_empty
@@ -160,7 +173,7 @@ describe Disparos::ShadowRunService do
         opted_out = create(:contact, account: account, phone_number: '+5511988887777')
         candidate(contact: opted_out, custom_attributes: { 'opt_out_lgpd' => true })
 
-        expect { service.perform(disparo) }
+        expect { run(disparo) }
           .to not_change(Message, :count)
           .and not_change(Conversation, :count)
           .and change(DisparoTarget, :count).by(2)
@@ -175,7 +188,7 @@ describe Disparos::ShadowRunService do
         contact = create(:contact, account: account, phone_number: '+5511999998888')
         conversation = candidate(contact: contact)
 
-        first = service.perform(disparo)
+        first = run(disparo)
         expect(first.created).to eq(1)
         target_id = DisparoTarget.find_by(disparo: disparo, conversation_id: conversation.id).id
         expect(DisparoTarget.find(target_id).state).to eq('queued')
@@ -184,7 +197,7 @@ describe Disparos::ShadowRunService do
         conversation.update!(custom_attributes: { 'kanban_step' => '3', 'opt_out_lgpd' => true })
 
         second = nil
-        expect { second = service.perform(disparo) }.not_to change(DisparoTarget, :count)
+        expect { second = run(disparo) }.not_to change(DisparoTarget, :count)
 
         expect(second.created).to eq(0)
         expect(second.updated).to eq(1)
@@ -208,15 +221,15 @@ describe Disparos::ShadowRunService do
       it 'does not append a new event when an unchanged candidate is re-evaluated' do
         candidate(contact: create(:contact, account: account, phone_number: '+5511999998888'))
 
-        service.perform(disparo)
-        expect { service.perform(disparo) }.not_to change(DisparoEvent, :count)
+        run(disparo)
+        expect { run(disparo) }.not_to change(DisparoEvent, :count)
       end
 
       it 'clears stale skip data and flips skipped -> queued in place when a candidate becomes eligible (AC46)', :aggregate_failures do
         contact = create(:contact, account: account, phone_number: '+5511999998888')
         conversation = candidate(contact: contact, custom_attributes: { 'opt_out_lgpd' => true })
 
-        first = service.perform(disparo)
+        first = run(disparo)
         expect(first.created).to eq(1)
         target_id = DisparoTarget.find_by(disparo: disparo, conversation_id: conversation.id).id
         skipped = DisparoTarget.find(target_id)
@@ -228,7 +241,7 @@ describe Disparos::ShadowRunService do
         conversation.update!(custom_attributes: { 'kanban_step' => '3' })
 
         second = nil
-        expect { second = service.perform(disparo) }.not_to change(DisparoTarget, :count)
+        expect { second = run(disparo) }.not_to change(DisparoTarget, :count)
 
         expect(second.created).to eq(0)
         expect(second.updated).to eq(1)
@@ -251,10 +264,13 @@ describe Disparos::ShadowRunService do
         opted_out = create(:contact, account: account, phone_number: '+5511988887777')
         candidate(contact: opted_out, custom_attributes: { 'opt_out_lgpd' => true })
 
+        # Snapshot OUTSIDE the subscribed block so dry_run's own notifications do
+        # not leak into the captured shadow_run stream.
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
         captured = []
         ActiveSupport::Notifications.subscribed(
           ->(name, _start, _finish, _id, payload) { captured << [name, payload] }, /\Adisparos\.shadow_run_/
-        ) { service.perform(disparo) }
+        ) { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
 
         names = captured.map(&:first)
         expect(names).to eq(%w[disparos.shadow_run_started disparos.shadow_run_completed])
@@ -280,10 +296,11 @@ describe Disparos::ShadowRunService do
         opted_out = create(:contact, account: account, phone_number: '+5511988887777')
         skipped_convo = candidate(contact: opted_out, custom_attributes: { 'opt_out_lgpd' => true })
 
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
         captured = []
         ActiveSupport::Notifications.subscribed(
           ->(name, _start, _finish, _id, payload) { captured << [name, payload] }, /\Adisparos\.target_/
-        ) { service.perform(disparo) }
+        ) { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
 
         names = captured.map(&:first)
         expect(names).to contain_exactly('disparos.target_queued_shadow', 'disparos.target_skipped')
@@ -317,7 +334,7 @@ describe Disparos::ShadowRunService do
         eligible_convo = candidate(contact: contact)
         skipped_convo = candidate(contact: contact, custom_attributes: { 'opt_out_lgpd' => true })
 
-        summary = service.perform(disparo)
+        summary = run(disparo)
 
         expect(summary.total_targets).to eq(2)
         expect(summary.eligible).to eq(1)
@@ -331,6 +348,82 @@ describe Disparos::ShadowRunService do
 
         skipped_target = DisparoTarget.find_by(disparo: disparo, conversation_id: skipped_convo.id)
         expect(skipped_target.primary_skip_reason).to eq('opt_out_lgpd')
+      end
+    end
+
+    # GAP B: the shadow run may only persist the set approved in a dry-run preview.
+    # These 4 exercise the snapshot gate directly at the service level: the run
+    # must raise InvalidShadowRun (and persist nothing) unless the snapshot is
+    # present, owned by this disparo, unexpired, and fingerprint-matched.
+    context 'with the approved-snapshot gate (GAP B)' do
+      before { candidate(contact: create(:contact, account: account, phone_number: '+5511999998888')) }
+
+      # (1) no valid snapshot_id -> raise, nothing persisted.
+      it 'raises InvalidShadowRun and persists nothing without a snapshot_id' do
+        expect { described_class.new(now: now).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+          .and not_change(DisparoTarget, :count)
+      end
+
+      it 'raises InvalidShadowRun when the snapshot belongs to a different disparo' do
+        other = create(:disparo, account: account, template_name: template_name, audience_filter: filter)
+        create(:disparo_inbox, disparo: other, inbox: cloud_inbox)
+        foreign = Disparos::DryRunService.new(now: now).perform(other).snapshot
+
+        expect { described_class.new(now: now, snapshot_id: foreign.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+          .and(not_change { DisparoTarget.where(disparo: disparo).count })
+      end
+
+      # (2) EXPIRED snapshot -> raise, nothing persisted.
+      it 'raises InvalidShadowRun and persists nothing when the snapshot is expired' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+        snapshot.update!(expires_at: now - 1.minute)
+
+        expect { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+          .and(not_change { DisparoTarget.where(disparo: disparo).count })
+      end
+
+      # (3) THE load-bearing test: config changed after the dry-run -> fingerprint
+      # mismatch -> raise, nothing persisted. Each config dimension drifts the hash.
+      it 'raises InvalidShadowRun and persists nothing when the config changed after the dry-run' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+        disparo.update!(template_category: :marketing)
+
+        expect { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+          .and(not_change { DisparoTarget.where(disparo: disparo).count })
+      end
+
+      it 'raises InvalidShadowRun when the audience filter changed after the dry-run' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+        disparo.update!(audience_filter: { 'kanban_steps' => %w[3], 'label' => %w[gold] })
+
+        expect { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+      end
+
+      it 'raises InvalidShadowRun when the selected inbox set changed after the dry-run' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+        second_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                 sync_templates: false, validate_provider_config: false).inbox
+        create(:disparo_inbox, disparo: disparo, inbox: second_inbox)
+
+        expect { described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to raise_error(CustomExceptions::Disparos::InvalidShadowRun)
+      end
+
+      # (4) valid flow: dry_run -> shadow_run with the fresh snapshot -> passes + persists.
+      it 'runs and persists targets with a fresh, matching, unexpired snapshot' do
+        snapshot = Disparos::DryRunService.new(now: now).perform(disparo).snapshot
+
+        summary = nil
+        expect { summary = described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+          .to change { DisparoTarget.where(disparo: disparo).count }.from(0).to(1)
+
+        expect(summary.total_targets).to eq(1)
+        expect(summary.eligible).to eq(1)
       end
     end
   end

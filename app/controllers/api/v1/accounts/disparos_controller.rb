@@ -34,6 +34,10 @@ class Api::V1::Accounts::DisparosController < Api::V1::Accounts::BaseController
     # precedes cloud_inbox? because `[].all?` is vacuously true and would mask this.
     return render_could_not_create_error('invalid_audience_filter') if inboxes.empty?
     return render_could_not_create_error('unsupported_inbox_provider') unless inboxes.all? { |inbox| cloud_inbox?(inbox) }
+    # GAP A: the submitted template_category must equal the REAL category of the
+    # approved template in EVERY selected inbox. Needs the resolved inboxes, so it
+    # runs after the cloud guard (not in invalid_attributes_reason, which has none).
+    return render_could_not_create_error('template_category_mismatch') unless template_category_matches?(inboxes)
 
     @disparo = build_disparo(inboxes)
     render :show, status: :created
@@ -56,8 +60,13 @@ class Api::V1::Accounts::DisparosController < Api::V1::Accounts::BaseController
   # pre-write validation failure rolls the (empty) transaction back cleanly.
   def shadow_run
     authorize @disparo
+    # GAP B: the shadow run must reference the dry-run snapshot the operator
+    # approved. A missing/blank snapshot_id is a 422 before any work; the service
+    # then validates the snapshot's ownership, TTL and config fingerprint.
+    return render_could_not_create_error('invalid_shadow_run') if params[:snapshot_id].blank?
+
     @summary = @disparo.with_lock do
-      Disparos::ShadowRunService.new(now: Time.current).perform(@disparo)
+      Disparos::ShadowRunService.new(now: Time.current, snapshot_id: params[:snapshot_id]).perform(@disparo)
     end
     render :shadow_run
   rescue CustomExceptions::Disparos::InvalidShadowRun => e
@@ -123,6 +132,23 @@ class Api::V1::Accounts::DisparosController < Api::V1::Accounts::BaseController
   def valid_conversation_status?
     status = params.dig(:disparo, :conversation_status)
     status.blank? || Disparo.conversation_statuses.key?(status)
+  end
+
+  # GAP A real-category guard: the EFFECTIVE submitted category (an omitted value
+  # defaults to the column default — utility, matching the persisted disparo) must
+  # equal the resolved category of `template_name` in EVERY selected inbox's
+  # channel. A nil resolution (template not found / not approved / no category) in
+  # ANY inbox is a mismatch, so a client can neither dispatch an unapproved
+  # template nor bypass the marketing cooldown by omitting the category. The
+  # enum-range guard already ran (valid_template_category?), so submitted is a
+  # known enum key or blank here.
+  def template_category_matches?(inboxes)
+    submitted = params.dig(:disparo, :template_category).presence || 'utility'
+    template_name = params.dig(:disparo, :template_name)
+
+    inboxes.all? do |inbox|
+      Disparos::TemplateCategory.for_channel(inbox.channel, template_name) == submitted
+    end
   end
 
   def build_disparo(inboxes)
