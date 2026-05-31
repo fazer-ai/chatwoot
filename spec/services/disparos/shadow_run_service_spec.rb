@@ -12,8 +12,14 @@ describe Disparos::ShadowRunService do
   # Build a valid snapshot for `d`'s CURRENT config (via DryRunService, which
   # writes the correct fingerprint + TTL) and perform the shadow run with it.
   def run(disparo_to_run = disparo)
-    snapshot = Disparos::DryRunService.new(now: now).perform(disparo_to_run).snapshot
-    described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo_to_run)
+    described_class.new(now: now, snapshot_id: valid_snapshot(disparo_to_run).id).perform(disparo_to_run)
+  end
+
+  # A fresh, fingerprint-matched, unexpired snapshot for the disparo's CURRENT
+  # config. Used when the run must be invoked manually (e.g. inside an explicit
+  # outer transaction) instead of via the `run` helper.
+  def valid_snapshot(disparo_to_run = disparo)
+    Disparos::DryRunService.new(now: now).perform(disparo_to_run).snapshot
   end
 
   let(:account) { create(:account) }
@@ -348,6 +354,230 @@ describe Disparos::ShadowRunService do
 
         skipped_target = DisparoTarget.find_by(disparo: disparo, conversation_id: skipped_convo.id)
         expect(skipped_target.primary_skip_reason).to eq('opt_out_lgpd')
+      end
+    end
+
+    # TOCTOU guard, COMMON path (ActiveRecord::RecordInvalid). AudienceResolver reads
+    # the candidate set at the top of the run; migration 20260603000000 wired
+    # disparo_targets to ON DELETE CASCADE FKs on conversation_id/contact_id. The
+    # service builds each target from the FK INTEGER (find_or_initialize_by) with NO
+    # cached association object, and DisparoTarget belongs_to :conversation/:contact
+    # are REQUIRED. So when a candidate's conversation is deleted concurrently between
+    # the audience read and the save, the required-presence validator RE-QUERIES the
+    # now-missing parent and save! raises ActiveRecord::RecordInvalid ("Conversation
+    # must exist") BEFORE any SQL write — this is the DOMINANT real-world error, not
+    # InvalidForeignKey (which is only the rarer validation-SELECT↔INSERT race, spec
+    # below). The rescue must catch RecordInvalid too, or the run 500s. The narrowed
+    # rescue drops ONLY the candidate whose own parent actually vanished.
+    #
+    # FAITHFUL: this runs perform INSIDE an outer transaction (mimicking the
+    # controller's `@disparo.with_lock`) and triggers a GENUINE RecordInvalid via a
+    # real concurrent delete + real save!, NOT a stubbed raise. The delete is fired
+    # from the `state_changed?` hook (the call immediately before the save) so it
+    # lands in the OUTER transaction and the real save! then fails validation.
+    context 'when THIS candidate vanishes mid-run inside the controller transaction (TOCTOU, RecordInvalid path)', :aggregate_failures do
+      it 'drops the vanished candidate, does not raise, and persists only the survivor' do
+        doomed = candidate(contact: create(:contact, account: account, phone_number: '+5511999990001'))
+        candidate(contact: create(:contact, account: account, phone_number: '+5511999990002'))
+        # Capture the approval snapshot BEFORE the stub is armed (DryRunService does not
+        # persist targets, so it never trips the state_changed? hook).
+        snapshot = valid_snapshot
+
+        # Real concurrent delete fired from the call immediately before save!. No save!
+        # stub: the REAL save! re-queries the missing parent and raises a GENUINE
+        # ActiveRecord::RecordInvalid. Branch on the receiver's conversation_id
+        # (AudienceResolver order is not guaranteed).
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(DisparoTarget).to receive(:state_changed?).and_wrap_original do |original|
+          Conversation.where(id: doomed.id).delete_all if original.receiver.conversation_id == doomed.id
+          original.call
+        end
+        # rubocop:enable RSpec/AnyInstance
+
+        summary = nil
+        # Mimic the controller's `@disparo.with_lock`: run the whole perform inside an
+        # OPEN transaction. Even the RecordInvalid path must not escape and 500 the run.
+        expect do
+          ActiveRecord::Base.transaction { summary = described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+        end.not_to raise_error
+
+        # Only the surviving target is counted and persisted; the dropped one leaves no
+        # row — proving the outer transaction stayed USABLE after the failure.
+        expect(summary.total_targets).to eq(1)
+        expect(summary.eligible).to eq(1)
+        expect(summary.skipped).to eq(0)
+        expect(summary.created).to eq(1)
+        survivor = DisparoTarget.where(disparo: disparo)
+        expect(survivor.count).to eq(1)
+        expect(survivor.first.conversation_id).not_to eq(doomed.id)
+        # The dropped candidate gets NO event; exactly one event for the survivor.
+        expect(DisparoEvent.count).to eq(1)
+      end
+    end
+
+    # TOCTOU guard, RARE INSERT-level race (ActiveRecord::InvalidForeignKey). If the
+    # parent vanishes in the nanosecond gap BETWEEN the presence-validation SELECT and
+    # the INSERT, validation passes but the DB FK fires — a real failing write that
+    # ABORTS the controller's surrounding `@disparo.with_lock` transaction. This is the
+    # exact case the SAVEPOINT (requires_new: true) protects: without it, the aborted
+    # outer transaction poisons the narrowed rescue's existence probes
+    # (PG::InFailedSqlTransaction) and the run still 500s.
+    #
+    # We reproduce the race DETERMINISTICALLY by priming the association cache so the
+    # presence validator passes WITHOUT re-querying, THEN deleting the row so the real
+    # INSERT FK-violates. This is the red-green spec for the savepoint: revert the
+    # savepoint (plain `target.save!`) and this fails with PG::InFailedSqlTransaction;
+    # restore it and it is green.
+    context 'when the parent vanishes between validation and INSERT (TOCTOU, InvalidForeignKey race)', :aggregate_failures do
+      it 'isolates the FK abort in a savepoint, does not raise, and persists only the survivor' do
+        doomed = candidate(contact: create(:contact, account: account, phone_number: '+5511999990001'))
+        doomed_convo = Conversation.find(doomed.id) # capture the live record to prime the cache
+        candidate(contact: create(:contact, account: account, phone_number: '+5511999990002'))
+        snapshot = valid_snapshot
+
+        # Prime the association cache (validation passes without re-query) then delete the
+        # row, OUTSIDE the savepoint, from the call immediately before save!. The REAL
+        # INSERT then fires a GENUINE ActiveRecord::InvalidForeignKey — a failing write
+        # that aborts the outer transaction unless the savepoint isolates it.
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(DisparoTarget).to receive(:state_changed?).and_wrap_original do |original|
+          receiver = original.receiver
+          if receiver.conversation_id == doomed.id
+            receiver.conversation = doomed_convo
+            receiver.contact = doomed_convo.contact
+            Conversation.where(id: doomed.id).delete_all
+          end
+          original.call
+        end
+        # rubocop:enable RSpec/AnyInstance
+
+        summary = nil
+        expect do
+          ActiveRecord::Base.transaction { summary = described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+        end.not_to raise_error
+
+        expect(summary.total_targets).to eq(1)
+        expect(summary.eligible).to eq(1)
+        expect(summary.created).to eq(1)
+        survivor = DisparoTarget.where(disparo: disparo)
+        expect(survivor.count).to eq(1)
+        expect(survivor.first.conversation_id).not_to eq(doomed.id)
+        expect(DisparoEvent.count).to eq(1)
+      end
+    end
+
+    # TOCTOU guard, EVENT-WRITE isolation — the regression Codex flagged. The
+    # per-candidate unit is TWO writes: the target UPSERT (save!) AND its transition
+    # event (append_event -> DisparoEvent.create!). append_event runs AFTER save! but is
+    # itself a DB WRITE; it MUST share the SAME savepoint as save!. If it lives OUTSIDE
+    # the savepoint (the pre-fix structure), its FK failure aborts the controller's
+    # surrounding `@disparo.with_lock` transaction and poisons every later query — the
+    # rescue's existence probes then raise PG::InFailedSqlTransaction and the run 500s.
+    #
+    # FAITHFUL DETERMINISTIC TRIGGER. disparo_events.disparo_target_id is an ON DELETE
+    # CASCADE FK to disparo_targets, which itself cascades from conversations
+    # (20260603000000). We first run the service so BOTH candidates have a PERSISTED
+    # target. Then the doomed candidate is flipped ineligible so the second run's
+    # `state_changed?` is true and append_event fires (queued -> skipped). On that second
+    # run, inside `state_changed?` (the call immediately BEFORE the savepoint opens) we:
+    #   (a) PRIME the doomed target's conversation/contact association cache, so save!'s
+    #       required-presence validator passes WITHOUT re-querying — otherwise save! would
+    #       re-query the missing parent and fail as RecordInvalid BEFORE reaching the event
+    #       write, masking the path under test; and
+    #   (b) DELETE the doomed conversation. The delete lands in the OUTER transaction
+    #       (state_changed? runs before the savepoint) so it is DURABLE across the
+    #       savepoint rollback — a delete issued INSIDE the savepoint would be undone by
+    #       its own rollback, hiding the race. The cascade removes the doomed target row.
+    # save! is then an UPDATE matching 0 rows (no FK re-check, succeeds), so the FAILURE
+    # POINT is append_event: the REAL DisparoEvent.create! fires a GENUINE
+    # ActiveRecord::InvalidForeignKey on the vanished disparo_target_id — not a stubbed
+    # raise. This isolates the EVENT write specifically: save! does NOT fail here, only
+    # append_event's placement is under test.
+    #
+    # RED-GREEN (verified): with append_event OUTSIDE the savepoint (pre-fix) the FK abort
+    # hits the OUTER transaction directly and the rescue's `Conversation.exists?` probe
+    # raises ActiveRecord::StatementInvalid (cause: PG::InFailedSqlTransaction) — perform
+    # 500s. With both writes in ONE savepoint it is green: the savepoint rolls the failed
+    # event back, the outer transaction stays usable, the probe sees the doomed
+    # conversation gone and DROPS the candidate, and only the survivor persists.
+    context 'when the event write fails after the target committed (TOCTOU, append_event isolation)', :aggregate_failures do
+      it 'isolates the event-write FK abort in the shared savepoint, does not raise, and persists only the survivor' do
+        doomed = candidate(contact: create(:contact, account: account, phone_number: '+5511999990001'))
+        doomed_convo = Conversation.find(doomed.id) # live record captured to prime the cache
+        candidate(contact: create(:contact, account: account, phone_number: '+5511999990002'))
+
+        # First run: BOTH candidates get a persisted target (doomed currently queued).
+        run(disparo)
+        expect(DisparoTarget.where(disparo: disparo).count).to eq(2)
+
+        # Flip the doomed candidate ineligible so the 2nd run's state_changed? is true and
+        # append_event fires (queued -> skipped transition).
+        Conversation.find(doomed.id).update!(custom_attributes: { 'kanban_step' => '3', 'opt_out_lgpd' => true })
+        snapshot = valid_snapshot
+
+        # On the 2nd run, from state_changed? (OUTSIDE the savepoint): prime the cache so
+        # save! validates as an UPDATE, then DURABLY delete the doomed conversation. The
+        # cascade removes the doomed target row; save! (UPDATE, 0 rows) succeeds, and
+        # append_event's DisparoEvent.create! fires a GENUINE InvalidForeignKey on the
+        # now-missing disparo_target_id.
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(DisparoTarget).to receive(:state_changed?).and_wrap_original do |original|
+          receiver = original.receiver
+          if receiver.conversation_id == doomed.id
+            receiver.conversation = doomed_convo
+            receiver.contact = doomed_convo.contact
+            Conversation.where(id: doomed.id).delete_all
+          end
+          original.call
+        end
+        # rubocop:enable RSpec/AnyInstance
+
+        summary = nil
+        # Mimic the controller's `@disparo.with_lock`: the whole run inside an OPEN
+        # transaction. The event-write FK abort must not escape and 500 the run.
+        expect do
+          ActiveRecord::Base.transaction { summary = described_class.new(now: now, snapshot_id: snapshot.id).perform(disparo) }
+        end.not_to raise_error
+
+        # Summary reflects ONLY the survivor (the doomed candidate was dropped: no tally).
+        expect(summary.total_targets).to eq(1)
+        expect(summary.eligible).to eq(1)
+        expect(summary.skipped).to eq(0)
+        # The doomed target row is ROLLED BACK / cascade-gone -> absent; the outer txn
+        # stayed usable so the survivor's row remains.
+        survivor = DisparoTarget.where(disparo: disparo)
+        expect(survivor.count).to eq(1)
+        expect(survivor.first.conversation_id).not_to eq(doomed.id)
+        expect(DisparoTarget.find_by(disparo: disparo, conversation_id: doomed.id)).to be_nil
+        # No half-written event for the doomed target: the failed event rolled back with
+        # its savepoint, and the cascade removed the doomed candidate's first-run event
+        # alongside its target. Net: exactly the survivor's single (first-run) event.
+        expect(DisparoEvent.where(disparo_target_id: survivor.first.id).count).to eq(1)
+        expect(DisparoEvent.count).to eq(1)
+      end
+    end
+
+    # The negative that pins Codex's P2: a FK violation while the candidate's OWN
+    # conversation AND contact still exist is NOT the candidate-vanished TOCTOU — it
+    # is run-wide invalid state (e.g. the disparo deleted mid-run, hitting the
+    # disparo_id FK). The narrowed rescue MUST re-raise it instead of masking the run
+    # as a successful/partial completion. With the broad rescue this swallows; with
+    # the narrowed guard perform re-raises — a genuine red-green guard.
+    context 'when an FK violation fires while both parents still exist (run-wide invalid state)', :aggregate_failures do
+      it 're-raises InvalidForeignKey instead of masking the run as complete' do
+        candidate(contact: create(:contact, account: account, phone_number: '+5511999990001'))
+
+        # Raise the FK violation WITHOUT deleting the conversation/contact: both of the
+        # candidate's parents still exist, so the rescue's existence check holds and the
+        # violation re-raises (it was not this candidate vanishing).
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(DisparoTarget).to receive(:save!)
+          .and_raise(ActiveRecord::InvalidForeignKey, 'run-wide FK violation (e.g. disparo deleted mid-run)')
+        # rubocop:enable RSpec/AnyInstance
+
+        expect { run(disparo) }.to raise_error(ActiveRecord::InvalidForeignKey)
+        # Nothing was masked into a successful/partial summary; the run aborted.
+        expect(DisparoTarget.where(disparo: disparo).count).to eq(0)
       end
     end
 

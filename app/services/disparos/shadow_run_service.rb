@@ -123,12 +123,59 @@ class Disparos::ShadowRunService
     target.assign_attributes(shadow_run: true, inbox_id: conversation.inbox_id, phone_present: conversation.contact&.phone_number.present?)
 
     state_changed = target.state_changed? # MUST be captured BEFORE save! — dirty tracking resets on save.
-    target.save!
-    append_event(target, result) if was_new || state_changed
-    # Per-target telemetry: fires for EVERY processed candidate (run telemetry, not the
-    # change-only transition log). ids + skip-reason enums only (no PII) — §Observability / US20.
-    instrument_target(disparo, target, result)
 
+    # TOCTOU guard. AudienceResolver read this conversation/contact at the top of
+    # the run, but migration 20260603000000 wired disparo_targets.conversation_id /
+    # contact_id to ON DELETE CASCADE FKs. If THIS candidate's conversation or
+    # contact is deleted concurrently between that read and these WRITES, they fail.
+    # A single vanished candidate must NOT 500 the whole run.
+    #
+    # Both per-candidate WRITES — the target UPSERT and its transition event — are
+    # isolated in ONE savepoint. The controller runs the whole shadow_run inside
+    # `@disparo.with_lock` (a transaction); `requires_new: true` emits a real
+    # SAVEPOINT when nested there (a plain transaction when the service is called
+    # directly). A vanished candidate rolls back ONLY this savepoint — BOTH writes
+    # together, so there is never a half-written target without its event — while the
+    # OUTER transaction stays usable and the run continues with the survivors.
+    #
+    # TWO distinct failures, both handled below:
+    #   1. COMMON path -> ActiveRecord::RecordInvalid. DisparoTarget belongs_to
+    #      :conversation/:contact (required), and the target is built from the FK
+    #      INTEGER (find_or_initialize_by) with no cached association object. The
+    #      required-presence validator therefore RE-QUERIES the parent at save!; a
+    #      concurrently-deleted parent fails validation BEFORE any SQL write.
+    #   2. RARE path -> ActiveRecord::InvalidForeignKey. If the parent vanishes in the
+    #      nanosecond race between that validation SELECT and the INSERT (target save!
+    #      OR the event insert), the DB FK fires a failing write instead. Without the
+    #      savepoint that write would ABORT the controller's surrounding `with_lock`
+    #      transaction and poison every later query (the existence probes below would
+    #      raise PG::InFailedSqlTransaction).
+    begin
+      ActiveRecord::Base.transaction(requires_new: true) do
+        target.save!
+        append_event(target, result) if was_new || state_changed
+      end
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::InvalidForeignKey => e
+      # The savepoint already rolled back -> the outer transaction is healthy and
+      # these probes are safe. The rescue is narrowed by RE-CHECKING the candidate's
+      # OWN parents: if BOTH the conversation and the contact still exist, the failure
+      # came from elsewhere (a genuine validation error, or the disparo itself deleted
+      # mid-run -> disparo_targets.disparo_id, run-wide invalid state) and we re-raise
+      # so it surfaces. Otherwise we drop ONLY this vanished candidate (no tally, no
+      # event, no telemetry) and continue with the survivors. We probe existence
+      # instead of string-matching the PG constraint name because constraint names are
+      # an implementation detail (rename/recreate breaks the match) whereas "did this
+      # candidate's parent vanish?" is the exact condition the cascade FK encodes.
+      raise e if Conversation.exists?(conversation.id) && Contact.exists?(conversation.contact_id)
+
+      return
+    end
+
+    # Telemetry (ActiveSupport::Notifications, NOT a DB write) + the in-memory tally
+    # run ONLY when the savepointed unit committed. Per-target telemetry fires for
+    # EVERY processed candidate (run telemetry, not the change-only transition log):
+    # ids + skip-reason enums only (no PII) — §Observability / US20.
+    instrument_target(disparo, target, result)
     tally(summary, result, was_new)
   end
 
