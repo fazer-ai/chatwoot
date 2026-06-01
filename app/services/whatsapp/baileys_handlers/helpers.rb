@@ -91,7 +91,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       parts = [tpl[:hydratedTitleText], tpl[:hydratedContentText], tpl[:hydratedFooterText]].select(&:present?)
       buttons = (tpl[:hydratedButtons] || []).map do |b|
         b.dig(:quickReplyButton, :displayText) || b.dig(:urlButton, :displayText) || b.dig(:callButton, :displayText)
-      end.compact
+      end.select(&:present?)
       parts << buttons.map { |t| "[#{t}]" }.join(" ") if buttons.any?
       parts.join("\n\n").presence
     when 'reaction'
