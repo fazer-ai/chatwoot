@@ -817,4 +817,53 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         .not_to raise_error
     end
   end
+
+  describe 'template message handling' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+
+    context 'when receiving a hydrated template message' do
+      it 'stores the title, content, footer and button labels as text' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+
+        raw_message = {
+          key: { id: 'msg_template_123', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid",
+                 fromMe: false, addressingMode: 'pn' },
+          pushName: 'Acme',
+          messageTimestamp: timestamp,
+          message: {
+            templateMessage: {
+              hydratedTemplate: {
+                hydratedTitleText: '',
+                hydratedContentText: "Hello, Acme!\n\nYour invoice is ready.",
+                hydratedFooterText: 'Reply STOP to opt out.',
+                hydratedButtons: [
+                  { quickReplyButton: { displayText: 'Pay now', id: 'pay' }, index: 0 },
+                  { urlButton: { displayText: 'Open portal', url: 'https://example.com' }, index: 1 }
+                ]
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(conversation.messages, :count).by(1)
+
+        message = conversation.messages.last
+        expect(message.message_type).to eq('incoming')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.content).to eq(
+          "Hello, Acme!\n\nYour invoice is ready.\n\nReply STOP to opt out.\n\n[Pay now] [Open portal]"
+        )
+      end
+    end
+  end
 end
