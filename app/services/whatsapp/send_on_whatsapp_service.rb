@@ -8,11 +8,16 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   end
 
   def perform_reply
-    should_send_template_message = template_params.present? || !message.conversation.can_reply?
-    if should_send_template_message
-      send_template_message
-    elsif channel.provider == 'baileys'
+    # Baileys uses the Web/multi-device protocol — there is no 24h customer
+    # service window and no template gating. Routing through the template
+    # path used to result in a no-op (Baileys' send_template returns nil),
+    # leaving the message forever in "sent" with no source_id. Always use
+    # the session path so the warm-up + retry from the Baileys send flow
+    # gets a chance to recover cold conversations.
+    if channel.provider == 'baileys'
       send_baileys_session_message
+    elsif template_params.present? || !message.conversation.can_reply?
+      send_template_message
     else
       send_session_message
     end
