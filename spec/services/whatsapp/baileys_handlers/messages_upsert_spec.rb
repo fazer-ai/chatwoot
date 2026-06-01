@@ -865,5 +865,85 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         )
       end
     end
+    context 'when receiving a legacy hydratedFourRowTemplate' do
+      it 'falls back to hydratedFourRowTemplate and extracts the call button label' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+
+        raw_message = {
+          key: { id: 'msg_template_legacy', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid",
+                 fromMe: false, addressingMode: 'pn' },
+          pushName: 'Acme',
+          messageTimestamp: timestamp,
+          message: {
+            templateMessage: {
+              hydratedFourRowTemplate: {
+                hydratedContentText: 'Your appointment is confirmed.',
+                hydratedFooterText: 'See you soon.',
+                hydratedButtons: [
+                  { callButton: { displayText: 'Call us', phoneNumber: '+5511999999999' }, index: 0 }
+                ]
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(conversation.messages, :count).by(1)
+
+        message = conversation.messages.last
+        expect(message.message_type).to eq('incoming')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.content).to eq(
+          "Your appointment is confirmed.\n\nSee you soon.\n\n[Call us]"
+        )
+      end
+    end
+
+    context 'when a template button has a blank display text' do
+      it 'skips the blank label instead of rendering empty brackets' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+
+        raw_message = {
+          key: { id: 'msg_template_blank_btn', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid",
+                 fromMe: false, addressingMode: 'pn' },
+          pushName: 'Acme',
+          messageTimestamp: timestamp,
+          message: {
+            templateMessage: {
+              hydratedTemplate: {
+                hydratedContentText: 'Body only.',
+                hydratedButtons: [
+                  { quickReplyButton: { displayText: '', id: 'noop' }, index: 0 },
+                  { urlButton: { displayText: 'Open portal', url: 'https://example.com' }, index: 1 }
+                ]
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(conversation.messages, :count).by(1)
+
+        message = conversation.messages.last
+        expect(message.content).to eq("Body only.\n\n[Open portal]")
+      end
+    end
+
   end
 end
