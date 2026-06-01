@@ -64,6 +64,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     elsif msg.key?(:contactMessage)
       match_phone_number = msg.dig(:contactMessage, :vcard)&.match(/waid=(\d+)/)
       match_phone_number ? 'contact' : 'unsupported'
+    elsif msg.key?(:templateMessage)
+      'template'
     elsif msg.key?(:protocolMessage)
       'protocol'
     elsif msg.key?(:messageContextInfo) && msg.keys.count == 1
@@ -88,6 +90,15 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'file'
       msg.dig(:documentMessage, :caption).presence ||
         msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :caption)
+    when 'template'
+      tpl = msg.dig(:templateMessage, :hydratedTemplate) ||
+            msg.dig(:templateMessage, :hydratedFourRowTemplate) || {}
+      parts = [tpl[:hydratedTitleText], tpl[:hydratedContentText], tpl[:hydratedFooterText]].select(&:present?)
+      buttons = (tpl[:hydratedButtons] || []).map do |b|
+        b.dig(:quickReplyButton, :displayText) || b.dig(:urlButton, :displayText) || b.dig(:callButton, :displayText)
+      end.compact
+      parts << buttons.map { |t| "[#{t}]" }.join(" ") if buttons.any?
+      parts.join("\n\n").presence
     when 'reaction'
       msg.dig(:reactionMessage, :text)
     when 'contact'
