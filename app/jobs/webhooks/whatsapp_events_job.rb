@@ -7,9 +7,21 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
   # `awaitResponse: true`; this `retry_on` covers the async path, where the
   # webhook lands straight on Sidekiq without going through the controller
   # rescue.
+  #
+  # When the four retries are exhausted, the source_id will not show up:
+  # this is almost always an outgoing echo whose `messages.upsert` event
+  # was lost (agent sent from the WhatsApp app directly, baileys-api blip),
+  # so the status update has no record to attach to. We swallow it with an
+  # info log instead of letting it pile up in DeadSet — the real "Chatwoot
+  # sent and lost source_id" cases are surfaced by the `Não confirmadas 24h`
+  # column on the inbox status report, not by these dead jobs.
   retry_on Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError,
            wait: 10.seconds,
-           attempts: 4
+           attempts: 4 do |_job, error|
+    Rails.logger.info(
+      "[whatsapp] discarding messages.update for unknown source_id after retries: #{error.message}"
+    )
+  end
 
   def perform(params = {})
     channel = find_channel(params)
