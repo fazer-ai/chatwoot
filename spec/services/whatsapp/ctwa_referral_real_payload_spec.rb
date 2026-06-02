@@ -13,10 +13,6 @@ describe 'WhatsApp Click-to-WhatsApp referral (real payload shapes)' do # ruboco
     JSON.parse(Rails.root.join('spec/fixtures/files/whatsapp', name).read).with_indifferent_access
   end
 
-  after do
-    Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
-  end
-
   describe 'Baileys externalAdReply (numeric mediaType)' do
     let(:webhook_verify_token) { 'valid_token' }
     let!(:channel) do
@@ -26,6 +22,12 @@ describe 'WhatsApp Click-to-WhatsApp referral (real payload shapes)' do # ruboco
 
     before do
       stub_request(:get, /profile-picture-url/).to_return(status: 200, body: { data: { profilePictureUrl: nil } }.to_json)
+    end
+
+    # Scope the dedupe cleanup to this inbox so it can't wipe keys other specs
+    # are using against the same Redis DB.
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{channel.inbox.id}_*") { |key| Redis::Alfred.delete(key) }
     end
 
     it 'normalizes the real ad payload into referral (message) and entry_point (conversation)' do
@@ -49,6 +51,10 @@ describe 'WhatsApp Click-to-WhatsApp referral (real payload shapes)' do # ruboco
 
   describe 'Cloud referral object' do
     let!(:channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
+
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{channel.inbox.id}_*") { |key| Redis::Alfred.delete(key) }
+    end
 
     it 'normalizes the real referral object into the message and conversation' do
       params = load_fixture('cloud_ctwa_referral.json')
