@@ -24,7 +24,10 @@ namespace :whatsapp do
     cloud_payload = payload[:object] == 'whatsapp_business_account'
     abort 'Baileys replays require a phone_number argument or payload[:phone_number]' if !cloud_payload && phone.blank?
 
-    channel = Channel::Whatsapp.find_by(phone_number: phone) if phone.present?
+    # Only resolve a channel for non-cloud (Baileys) replays: cloud payloads route
+    # from embedded metadata, so an optional/stale phone must not pull in a channel
+    # here (which could misprint the destination or inject a Baileys token).
+    channel = Channel::Whatsapp.find_by(phone_number: phone) if phone.present? && !cloud_payload
 
     # A non-cloud payload (a phone was given) that resolves to no channel is a
     # dead end — abort instead of no-opping inside the events job. Cloud replays
