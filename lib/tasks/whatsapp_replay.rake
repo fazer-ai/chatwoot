@@ -30,6 +30,10 @@ namespace :whatsapp do
     # also a dead end — abort instead of no-opping inside the events job.
     abort "No WhatsApp channel found for phone #{phone.inspect}" if phone.present? && channel.nil?
 
+    # A non-cloud payload must run through the Baileys parser; if the phone maps to
+    # a Cloud/Z-API channel the events job would misroute it, so fail fast.
+    abort "Baileys replays must target a Baileys channel, got #{channel.provider.inspect}" if !cloud_payload && channel.provider != 'baileys'
+
     # Baileys verifies webhookVerifyToken inside the service, so inject the
     # channel's token (captured payloads usually omit/filter it).
     if channel&.provider == 'baileys' && payload[:webhookVerifyToken].blank?
