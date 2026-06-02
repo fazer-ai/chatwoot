@@ -46,6 +46,29 @@ RSpec.describe Webhooks::WhatsappEventsJob do
 
       expect(handler).to be_present
     end
+
+    it 'logs and discards instead of dying in DeadSet when retries exhaust' do
+      # After 4 attempts the source_id will never appear: most of these
+      # are outgoing echoes whose `messages.upsert` was lost upstream.
+      # Verify the retry_on block swallows the exception instead of
+      # letting it surface as an unhandled error.
+      allow(Rails.logger).to receive(:info)
+
+      error_class = Whatsapp::BaileysHandlers::MessagesUpdate::MessageNotFoundError
+      error = error_class.new('source_id not found')
+
+      handler = described_class.rescue_handlers.find { |klass, _| klass == error_class.to_s }
+      internal_block = handler.last
+
+      job_instance = described_class.new
+      # `executions_for` keys by the stringified Array of exception classes
+      # and pre-increments before comparing. Seed it at 3 so the next call
+      # bumps to 4, equalling `attempts`, and routes into the discard branch.
+      job_instance.exception_executions = { [error_class].to_s => 3 }
+
+      expect { job_instance.instance_exec(error, &internal_block) }.not_to raise_error
+      expect(Rails.logger).to have_received(:info).with(/discarding messages.update for unknown source_id/)
+    end
   end
 
   context 'when whatsapp_cloud provider' do
