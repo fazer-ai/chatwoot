@@ -14,6 +14,8 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
       @message = nil
       @contact_inbox = nil
       @contact = nil
+      @referral = nil
+      @entry_point = nil
       @raw_message = message
 
       next handle_message if incoming?

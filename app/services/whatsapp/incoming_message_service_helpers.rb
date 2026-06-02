@@ -1,15 +1,21 @@
-module Whatsapp::IncomingMessageServiceHelpers
+module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleLength
   def download_attachment_file(attachment_payload)
     Down.download(inbox.channel.media_url(attachment_payload[:id]), headers: inbox.channel.api_headers)
   end
 
   def conversation_params
-    {
+    params = {
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       contact_id: @contact.id,
       contact_inbox_id: @contact_inbox.id
     }
+    # First-touch attribution persisted only when the conversation is created from
+    # the originating message: the rich ad/post referral (externalAdReply) and/or
+    # the WhatsApp entry point (e.g. click_to_chat_link from a profile/bio link).
+    attribution = { referral: @referral, entry_point: @entry_point }.compact
+    params[:additional_attributes] = attribution if attribution.present?
+    params
   end
 
   def processed_params
@@ -31,7 +37,73 @@ module Whatsapp::IncomingMessageServiceHelpers
       message.dig(:interactive, :button_reply, :title) ||
       message.dig(:interactive, :list_reply, :title) ||
       message.dig(:name, :formatted_name) ||
-      message.dig(:reaction, :emoji)
+      message.dig(:reaction, :emoji) ||
+      referral_fallback_content(message)
+  end
+
+  # Ad-click webhooks can arrive with no textual body (e.g. request_welcome), so
+  # fall back to the ad headline/body to keep the message renderable.
+  def referral_fallback_content(message)
+    ref = message[:referral]
+    return if ref.blank?
+
+    ref[:headline].presence || ref[:body].presence
+  end
+
+  # Normalizes the WhatsApp Cloud API `referral` object (sent on the first
+  # message after a Click-to-WhatsApp ad click) to a provider-agnostic hash.
+  def normalize_cloud_referral(message)
+    ref = message[:referral]
+    return if ref.blank?
+
+    {
+      source_type: ref[:source_type],
+      source_id: ref[:source_id],
+      source_url: ref[:source_url],
+      ctwa_clid: ref[:ctwa_clid],
+      title: ref[:headline],
+      body: ref[:body],
+      media_type: ref[:media_type]&.to_s&.downcase,
+      thumbnail_url: ref[:image_url] || ref[:thumbnail_url] || ref[:video_url]
+    }.compact.presence
+  end
+
+  # Normalizes the Baileys `contextInfo.externalAdReply` to the same shape as
+  # `normalize_cloud_referral` so the frontend reads a single referral payload.
+  def normalize_baileys_referral(context_info)
+    ad = context_info&.dig(:externalAdReply)
+    return if ad.blank?
+
+    {
+      source_type: ad[:sourceType],
+      source_id: ad[:sourceId],
+      source_url: ad[:sourceUrl],
+      ctwa_clid: ad[:ctwaClid],
+      title: ad[:title],
+      body: ad[:body],
+      media_type: baileys_media_type(ad[:mediaType]),
+      thumbnail_url: ad[:thumbnailUrl]
+    }.compact.presence
+  end
+
+  # Baileys serializes the externalAdReply MediaType proto enum as a number
+  # (0=none, 1=image, 2=video), but some layers emit the string name instead.
+  # Handle both so the frontend always gets a lowercase string.
+  def baileys_media_type(value)
+    return if value.nil?
+    return { 0 => 'none', 1 => 'image', 2 => 'video' }[value] if value.is_a?(Integer)
+
+    value.to_s.downcase.presence
+  end
+
+  # Lightweight WhatsApp entry-point attribution from Baileys `contextInfo`.
+  # Present on first-contact messages even without an ad (e.g. a profile/bio
+  # click-to-chat link reports `click_to_chat_link`). Does NOT render the ad card.
+  def normalize_baileys_entry_point(context_info)
+    source = context_info&.dig(:entryPointConversionSource)
+    return if source.blank?
+
+    { source: source, app: context_info[:entryPointConversionApp].presence }.compact.presence
   end
 
   def file_content_type(file_type)

@@ -97,6 +97,9 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
       content_attributes[:is_unsupported] = true
     end
 
+    referral = normalize_baileys_referral(message_context_info)
+    content_attributes[:referral] = referral if referral.present?
+
     content_attributes
   end
 

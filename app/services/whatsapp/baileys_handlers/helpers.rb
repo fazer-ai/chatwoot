@@ -41,7 +41,11 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
 
   def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength,Metrics/AbcSize
     msg = unwrap_ephemeral_message(@raw_message[:message])
-    if msg.key?(:conversation) || msg.dig(:extendedTextMessage, :text).present?
+    # A Click-to-WhatsApp ad-click can arrive as an extendedTextMessage carrying
+    # only the ad context (no text). Classify it as text so it renders with the
+    # ad headline/body as fallback content instead of being dropped/unsupported.
+    if msg.key?(:conversation) || msg.dig(:extendedTextMessage, :text).present? ||
+       msg.dig(:extendedTextMessage, :contextInfo, :externalAdReply).present?
       'text'
     elsif msg.key?(:imageMessage)
       'image'
@@ -69,12 +73,13 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     end
   end
 
-  def message_content # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength
+  def message_content # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength,Metrics/AbcSize
     msg = unwrap_ephemeral_message(@raw_message[:message])
     case message_type
     when 'text'
       text = msg[:conversation] || msg.dig(:extendedTextMessage, :text)
       context_info = msg.dig(:extendedTextMessage, :contextInfo)
+      text = baileys_referral_fallback_content(context_info) if text.blank?
       convert_incoming_mentions(text, context_info)
     when 'image'
       msg.dig(:imageMessage, :caption)
@@ -114,6 +119,29 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
                   end
 
     msg.dig(message_key, :contextInfo, :stanzaId) if message_key
+  end
+
+  # Returns the `contextInfo` for the current message type, where the
+  # Click-to-WhatsApp ad metadata (`externalAdReply`) lives.
+  def message_context_info # rubocop:disable Metrics/CyclomaticComplexity
+    msg = unwrap_ephemeral_message(@raw_message[:message])
+    case message_type
+    when 'text' then msg.dig(:extendedTextMessage, :contextInfo)
+    when 'image' then msg.dig(:imageMessage, :contextInfo)
+    when 'video' then msg.dig(:videoMessage, :contextInfo)
+    when 'audio' then msg.dig(:audioMessage, :contextInfo)
+    when 'sticker' then msg.dig(:stickerMessage, :contextInfo)
+    when 'file'
+      msg.dig(:documentMessage, :contextInfo).presence ||
+        msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :contextInfo)
+    end
+  end
+
+  def baileys_referral_fallback_content(context_info)
+    ad = context_info&.dig(:externalAdReply)
+    return if ad.blank?
+
+    ad[:title].presence || ad[:body].presence
   end
 
   def file_content_type

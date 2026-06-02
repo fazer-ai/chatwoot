@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import MessageMeta from '../MessageMeta.vue';
+import ReferralCard from './ReferralCard.vue';
 
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
@@ -21,8 +22,12 @@ const {
   inReplyTo,
   shouldGroupWithNext,
   additionalAttributes,
+  contentAttributes,
 } = useMessageContext();
 const { t } = useI18n();
+
+// Click-to-WhatsApp ad metadata attached to the first message after an ad click.
+const referral = computed(() => contentAttributes.value?.referral);
 
 const varaintBaseMap = {
   [MESSAGE_VARIANTS.AGENT]: 'bg-n-solid-blue text-n-slate-12',
@@ -122,6 +127,7 @@ const replyToPreview = computed(() => {
       },
     ]"
   >
+    <ReferralCard v-if="referral" :referral="referral" />
     <div
       v-if="inReplyTo"
       class="p-2 -mx-1 mb-2 rounded-lg cursor-pointer bg-n-alpha-black1"

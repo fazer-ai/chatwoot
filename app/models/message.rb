@@ -115,11 +115,12 @@ class Message < ApplicationRecord
   # [:is_reaction] : Used to denote if the message is a reaction and differentiate it from a simple reply message
   # [:is_edited, :previous_content] : Used to indicated edited message and previous content (before edit)
   # [:zapi_args] : Used to pass additional arguments specific to Z-API WhatsApp provider
+  # [:referral] : Click-to-WhatsApp ad metadata (source ad, headline, ctwa_clid, ...) attached to the first message after an ad click
 
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data,
-                                         :is_reaction, :is_edited, :previous_content, :zapi_args], coder: JSON
+                                         :is_reaction, :is_edited, :previous_content, :zapi_args, :referral], coder: JSON
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 

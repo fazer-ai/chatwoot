@@ -33,12 +33,21 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
       # set_conversation so a blank webhook can't open/create a stray thread.
       next mark_existing_reaction_as_removed(sender: @contact) if reaction_removal?
 
+      set_first_touch_attribution
       set_conversation
       handle_create_message
       dispatch_incoming_typing_off
     end
   ensure
     clear_message_source_id_from_redis if @lock_acquired
+  end
+
+  # First-touch attribution: set before set_conversation so conversation_params
+  # can persist it on the conversation created from this originating message.
+  def set_first_touch_attribution
+    context_info = message_context_info
+    @referral = normalize_baileys_referral(context_info)
+    @entry_point = normalize_baileys_entry_point(context_info)
   end
 
   def dispatch_incoming_typing_off

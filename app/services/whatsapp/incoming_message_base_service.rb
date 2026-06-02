@@ -52,6 +52,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
       # just to no-op. The match is sender-agnostic on purpose; the precise
       # filter happens inside `mark_existing_reaction_as_removed`.
       process_in_reply_to(messages_data.first)
+      @referral = normalize_cloud_referral(messages_data.first)
       next if reaction_removal? && !existing_reaction_row?
 
       set_contact
@@ -78,6 +79,11 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def skip_message?
+    # Don't drop a Click-to-WhatsApp ad-click webhook even when its type would
+    # otherwise be unprocessable (e.g. request_welcome): the ad referral is the
+    # whole point of the message and must be persisted.
+    return false if normalize_cloud_referral(messages_data.first).present?
+
     unprocessable_message_type?(message_type)
   end
 
@@ -277,7 +283,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def attach_files
-    return if %w[text button interactive location contacts reaction].include?(message_type)
+    return if %w[text button interactive location contacts reaction request_welcome unsupported].include?(message_type)
 
     attachment_payload = messages_data.first[message_type.to_sym]
     @message.content ||= attachment_payload[:caption]
@@ -329,6 +335,8 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
     content_attrs[:external_created_at] = message[:timestamp].to_i
     content_attrs[:is_reaction] = true if message_type == 'reaction'
+    referral = normalize_cloud_referral(message)
+    content_attrs[:referral] = referral if referral.present?
     content_attrs
   end
 

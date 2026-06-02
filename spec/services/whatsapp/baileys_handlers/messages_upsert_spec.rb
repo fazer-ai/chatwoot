@@ -845,4 +845,95 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         .not_to raise_error
     end
   end
+
+  describe 'click-to-WhatsApp ad referral and entry-point handling' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+    let(:external_ad_reply) do
+      {
+        title: 'Promo de Inverno',
+        body: '50% OFF em tudo',
+        mediaType: 'IMAGE',
+        thumbnailUrl: 'https://example.com/ad-thumb.jpg',
+        sourceType: 'ad',
+        sourceId: '120210000000000',
+        sourceUrl: 'https://fb.me/abc123',
+        ctwaClid: 'ARAaCtwaClid123'
+      }
+    end
+
+    def ad_params(message)
+      raw_message = {
+        key: { id: 'ad_msg_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false, addressingMode: 'pn' },
+        pushName: 'Lead Anúncio',
+        messageTimestamp: timestamp,
+        message: message
+      }
+      { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert', data: { type: 'notify', messages: [raw_message] } }
+    end
+
+    context 'when a text message carries an externalAdReply' do
+      it 'persists the referral on the message and the conversation' do
+        params = ad_params(extendedTextMessage: { text: 'Oi, vi o anúncio', contextInfo: { externalAdReply: external_ad_reply } })
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('Oi, vi o anúncio')
+        expect(message.content_attributes['referral']).to include(
+          'source_type' => 'ad', 'source_id' => '120210000000000', 'source_url' => 'https://fb.me/abc123',
+          'ctwa_clid' => 'ARAaCtwaClid123', 'title' => 'Promo de Inverno', 'body' => '50% OFF em tudo',
+          'media_type' => 'image', 'thumbnail_url' => 'https://example.com/ad-thumb.jpg'
+        )
+        expect(message.conversation.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+      end
+    end
+
+    context 'when an ad-click message has no text body' do
+      it 'still creates a renderable message using the ad headline as content' do
+        params = ad_params(extendedTextMessage: { contextInfo: { externalAdReply: external_ad_reply } })
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be_falsey
+        expect(message.content).to eq('Promo de Inverno')
+        expect(message.content_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+      end
+    end
+
+    context 'when externalAdReply mediaType is the numeric proto enum' do
+      it 'maps the enum number to the string media type' do
+        ad = external_ad_reply.merge(mediaType: 2)
+        params = ad_params(extendedTextMessage: { text: 'oi', contextInfo: { externalAdReply: ad } })
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+        expect(inbox.messages.last.content_attributes.dig('referral', 'media_type')).to eq('video')
+      end
+    end
+
+    context 'when the message comes from a click-to-chat link (no ad)' do
+      it 'records the entry point on the conversation without a referral or card' do
+        params = ad_params(extendedTextMessage: {
+                             text: 'oi',
+                             contextInfo: { entryPointConversionSource: 'click_to_chat_link', entryPointConversionApp: '' }
+                           })
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('oi')
+        expect(message.content_attributes['referral']).to be_nil
+        expect(message.conversation.additional_attributes['referral']).to be_nil
+        expect(message.conversation.additional_attributes['entry_point']).to eq('source' => 'click_to_chat_link')
+      end
+    end
+  end
 end

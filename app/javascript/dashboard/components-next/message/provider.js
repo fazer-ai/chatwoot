@@ -66,6 +66,15 @@ const MessageControl = Symbol('MessageControl');
  * @property {EmailContent} [email] - Email content and metadata
  * @property {string|null} [ccEmail] - CC email addresses
  * @property {string|null} [bccEmail] - BCC email addresses
+ * @property {Object} [referral] - Click-to-WhatsApp ad metadata on the first message after an ad click (keys camelized by MessageList)
+ * @property {string} [referral.sourceType] - Ad source type (e.g. 'ad', 'post')
+ * @property {string} [referral.sourceId] - Source ad identifier
+ * @property {string} [referral.sourceUrl] - URL of the ad/post
+ * @property {string} [referral.ctwaClid] - Click-to-WhatsApp click ID
+ * @property {string} [referral.title] - Ad headline/title
+ * @property {string} [referral.body] - Ad body text
+ * @property {string} [referral.mediaType] - Ad media type ('image'|'video'|'none')
+ * @property {string} [referral.thumbnailUrl] - Ad thumbnail URL
  */
 
 /**
