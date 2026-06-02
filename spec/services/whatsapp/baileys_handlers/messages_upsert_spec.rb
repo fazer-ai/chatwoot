@@ -848,7 +848,6 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
 
   describe 'click-to-WhatsApp ad referral and entry-point handling' do
     let(:phone) { '5511912345678' }
-    let(:lid) { '12345678' }
     let(:external_ad_reply) do
       {
         title: 'Promo de Inverno',
@@ -860,6 +859,13 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         sourceUrl: 'https://fb.me/abc123',
         ctwaClid: 'ARAaCtwaClid123'
       }
+    end
+    let(:lid) { '12345678' }
+
+    # Scope the dedupe cleanup to this inbox so it can't wipe keys other specs
+    # are using against the same Redis DB.
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{inbox.id}_*") { |key| Redis::Alfred.delete(key) }
     end
 
     # Each example needs a distinct id so the MESSAGE_SOURCE_KEY dedupe doesn't
