@@ -48,6 +48,7 @@ const adUrl = computed(() => {
     <img
       v-if="showImage"
       :src="referral.thumbnailUrl"
+      :alt="referral.title || ''"
       class="object-cover w-full rounded max-h-44 skip-context-menu"
       @error="hasImageError = true"
     />

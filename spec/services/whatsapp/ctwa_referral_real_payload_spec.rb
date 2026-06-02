@@ -13,6 +13,10 @@ describe 'WhatsApp Click-to-WhatsApp referral (real payload shapes)' do # ruboco
     JSON.parse(Rails.root.join('spec/fixtures/files/whatsapp', name).read).with_indifferent_access
   end
 
+  after do
+    Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
+  end
+
   describe 'Baileys externalAdReply (numeric mediaType)' do
     let(:webhook_verify_token) { 'valid_token' }
     let!(:channel) do
