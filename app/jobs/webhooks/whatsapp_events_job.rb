@@ -92,11 +92,12 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
 
   private
 
-  # Debug aid: set WHATSAPP_WEBHOOK_DEBUG=true to log the raw inbound webhook
-  # payload (Baileys or Cloud) so you can capture a real Click-to-WhatsApp ad
-  # referral / externalAdReply and replay it later. Off by default since it
-  # logs full message content.
+  # Debug aid for non-production only: set WHATSAPP_WEBHOOK_DEBUG=true to log the
+  # raw inbound webhook payload (Baileys or Cloud) so you can capture a real
+  # Click-to-WhatsApp ad referral / externalAdReply and replay it later. Logs
+  # full message content, so it never runs in production and is off by default.
   def dump_raw_payload(params)
+    return if Rails.env.production?
     return unless ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_WEBHOOK_DEBUG', false))
 
     Rails.logger.info("[WhatsappWebhookDebug] #{params.to_json}")

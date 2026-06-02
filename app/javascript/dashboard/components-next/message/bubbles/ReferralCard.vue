@@ -18,16 +18,28 @@ const hasImageError = ref(false);
 const showImage = computed(
   () => Boolean(props.referral.thumbnailUrl) && !hasImageError.value
 );
+
+// Only treat the ad source as a link when it's a well-formed http(s) URL, so a
+// malicious referral can't smuggle an unsafe scheme (e.g. javascript:) into href.
+const adUrl = computed(() => {
+  const url = props.referral.sourceUrl;
+  if (!url) return null;
+  try {
+    return ['http:', 'https:'].includes(new URL(url).protocol) ? url : null;
+  } catch {
+    return null;
+  }
+});
 </script>
 
 <template>
   <component
-    :is="referral.sourceUrl ? 'a' : 'div'"
-    :href="referral.sourceUrl || undefined"
-    :target="referral.sourceUrl ? '_blank' : undefined"
+    :is="adUrl ? 'a' : 'div'"
+    :href="adUrl || undefined"
+    :target="adUrl ? '_blank' : undefined"
     rel="noopener noreferrer"
     class="flex flex-col gap-2 p-2 -mx-1 mb-2 overflow-hidden no-underline rounded-lg bg-n-alpha-black1"
-    :class="referral.sourceUrl ? 'cursor-pointer hover:bg-n-alpha-black2' : ''"
+    :class="adUrl ? 'cursor-pointer hover:bg-n-alpha-black2' : ''"
   >
     <div class="flex items-center gap-1 text-xs text-n-slate-11">
       <Icon icon="i-lucide-megaphone" class="size-3" />
@@ -48,7 +60,7 @@ const showImage = computed(
       </p>
     </div>
     <div
-      v-if="referral.sourceUrl"
+      v-if="adUrl"
       class="flex items-center gap-1 text-xs font-medium text-n-slate-12"
     >
       <Icon icon="i-lucide-external-link" class="size-3 shrink-0" />

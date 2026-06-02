@@ -20,6 +20,10 @@ namespace :whatsapp do
 
     channel = Channel::Whatsapp.find_by(phone_number: phone) if phone.present?
 
+    # Fail fast on a Baileys-style payload (a phone was given) that resolves to no
+    # channel, instead of silently no-opping inside the events job.
+    abort "No WhatsApp channel found for phone #{phone.inspect}" if phone.present? && channel.nil?
+
     # Baileys verifies webhookVerifyToken inside the service, so inject the
     # channel's token (captured payloads usually omit/filter it).
     if channel&.provider == 'baileys' && payload[:webhookVerifyToken].blank?
