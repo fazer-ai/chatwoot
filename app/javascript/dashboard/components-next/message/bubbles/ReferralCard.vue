@@ -7,6 +7,14 @@ const props = defineProps({
   referral: {
     type: Object,
     required: true,
+    // Webhook-derived payload — guard the string fields the template renders so a
+    // malformed referral warns in dev instead of silently rendering a broken card.
+    validator: value =>
+      value != null &&
+      typeof value === 'object' &&
+      ['title', 'body', 'sourceUrl', 'thumbnailUrl'].every(
+        key => value[key] == null || typeof value[key] === 'string'
+      ),
   },
 });
 

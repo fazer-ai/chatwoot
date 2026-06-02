@@ -18,10 +18,16 @@ namespace :whatsapp do
     phone = args[:phone_number].presence || payload[:phone_number]
     payload[:phone_number] = phone if phone.present?
 
+    # Cloud payloads embed the channel in their metadata; Baileys payloads resolve
+    # the channel from the phone. Fail fast on a Baileys replay with no phone
+    # available instead of silently no-opping inside the events job.
+    cloud_payload = payload[:object] == 'whatsapp_business_account'
+    abort 'Baileys replays require a phone_number argument or payload[:phone_number]' if !cloud_payload && phone.blank?
+
     channel = Channel::Whatsapp.find_by(phone_number: phone) if phone.present?
 
-    # Fail fast on a Baileys-style payload (a phone was given) that resolves to no
-    # channel, instead of silently no-opping inside the events job.
+    # A Baileys-style payload (a phone was given) that resolves to no channel is
+    # also a dead end — abort instead of no-opping inside the events job.
     abort "No WhatsApp channel found for phone #{phone.inspect}" if phone.present? && channel.nil?
 
     # Baileys verifies webhookVerifyToken inside the service, so inject the

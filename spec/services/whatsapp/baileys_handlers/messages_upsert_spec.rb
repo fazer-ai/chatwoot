@@ -862,9 +862,11 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       }
     end
 
-    def ad_params(message)
+    # Each example needs a distinct id so the MESSAGE_SOURCE_KEY dedupe doesn't
+    # short-circuit later examples based on execution order.
+    def ad_params(message, id:)
       raw_message = {
-        key: { id: 'ad_msg_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false, addressingMode: 'pn' },
+        key: { id: id, remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false, addressingMode: 'pn' },
         pushName: 'Lead Anúncio',
         messageTimestamp: timestamp,
         message: message
@@ -874,7 +876,10 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
 
     context 'when a text message carries an externalAdReply' do
       it 'persists the referral on the message and the conversation' do
-        params = ad_params(extendedTextMessage: { text: 'Oi, vi o anúncio', contextInfo: { externalAdReply: external_ad_reply } })
+        params = ad_params(
+          { extendedTextMessage: { text: 'Oi, vi o anúncio', contextInfo: { externalAdReply: external_ad_reply } } },
+          id: 'ad_msg_text_1'
+        )
 
         expect do
           Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
@@ -893,7 +898,10 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
 
     context 'when an ad-click message has no text body' do
       it 'still creates a renderable message using the ad headline as content' do
-        params = ad_params(extendedTextMessage: { contextInfo: { externalAdReply: external_ad_reply } })
+        params = ad_params(
+          { extendedTextMessage: { contextInfo: { externalAdReply: external_ad_reply } } },
+          id: 'ad_msg_headline_fallback_1'
+        )
 
         expect do
           Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
@@ -909,7 +917,10 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     context 'when externalAdReply mediaType is the numeric proto enum' do
       it 'maps the enum number to the string media type' do
         ad = external_ad_reply.merge(mediaType: 2)
-        params = ad_params(extendedTextMessage: { text: 'oi', contextInfo: { externalAdReply: ad } })
+        params = ad_params(
+          { extendedTextMessage: { text: 'oi', contextInfo: { externalAdReply: ad } } },
+          id: 'ad_msg_numeric_media_1'
+        )
 
         Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
 
@@ -919,10 +930,13 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
 
     context 'when the message comes from a click-to-chat link (no ad)' do
       it 'records the entry point on the conversation without a referral or card' do
-        params = ad_params(extendedTextMessage: {
-                             text: 'oi',
-                             contextInfo: { entryPointConversionSource: 'click_to_chat_link', entryPointConversionApp: '' }
-                           })
+        params = ad_params(
+          { extendedTextMessage: {
+            text: 'oi',
+            contextInfo: { entryPointConversionSource: 'click_to_chat_link', entryPointConversionApp: '' }
+          } },
+          id: 'ad_msg_entry_point_1'
+        )
 
         expect do
           Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
