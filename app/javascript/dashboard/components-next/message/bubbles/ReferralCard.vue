@@ -22,22 +22,27 @@ const { t } = useI18n();
 
 // content_attributes keys are deep-camelized by MessageList (useCamelCase),
 // so the referral payload arrives as sourceUrl/thumbnailUrl/etc.
-const hasImageError = ref(false);
-const showImage = computed(
-  () => Boolean(props.referral.thumbnailUrl) && !hasImageError.value
-);
 
-// Only treat the ad source as a link when it's a well-formed http(s) URL, so a
-// malicious referral can't smuggle an unsafe scheme (e.g. javascript:) into href.
-const adUrl = computed(() => {
-  const url = props.referral.sourceUrl;
+// Both the ad link (href) and the thumbnail (img src) come from the webhook, so
+// only accept well-formed http(s) URLs: this keeps an unsafe scheme (e.g.
+// javascript:) out of the link and stops an arbitrary URL from triggering a
+// request from the agent's browser through the image.
+const toHttpUrl = url => {
   if (!url) return null;
   try {
     return ['http:', 'https:'].includes(new URL(url).protocol) ? url : null;
   } catch {
     return null;
   }
-});
+};
+
+const adUrl = computed(() => toHttpUrl(props.referral.sourceUrl));
+const imageUrl = computed(() => toHttpUrl(props.referral.thumbnailUrl));
+
+const hasImageError = ref(false);
+const showImage = computed(
+  () => Boolean(imageUrl.value) && !hasImageError.value
+);
 </script>
 
 <template>
@@ -55,7 +60,7 @@ const adUrl = computed(() => {
     </div>
     <img
       v-if="showImage"
-      :src="referral.thumbnailUrl"
+      :src="imageUrl || undefined"
       :alt="referral.title || ''"
       class="object-cover w-full rounded max-h-44 skip-context-menu"
       @error="hasImageError = true"

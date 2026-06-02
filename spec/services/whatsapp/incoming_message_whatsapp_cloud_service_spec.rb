@@ -380,8 +380,11 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
   end
 
   describe '#perform with a click-to-WhatsApp ad referral' do
+    # The service clears its own dedupe key in an ensure; this is a safety net for
+    # any path that bails before the lock, scoped to this inbox so it can't wipe
+    # keys other specs are using against the same Redis DB.
     after do
-      Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{whatsapp_channel.inbox.id}_*") { |key| Redis::Alfred.delete(key) }
     end
 
     let!(:whatsapp_channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
@@ -434,6 +437,21 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         expect(created.content).to eq('Promo de Inverno')
         expect(created.content_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
         expect(created.conversation.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+      end
+    end
+
+    context 'when a referral arrives on an existing conversation' do
+      it 'backfills the first-touch attribution without overwriting it' do
+        plain = { from: '2423423243', id: 'wamid.plain1', timestamp: '1664799904', type: 'text', text: { body: 'oi' } }
+        described_class.new(inbox: whatsapp_channel.inbox, params: referral_params(plain)).perform
+        conversation = whatsapp_channel.inbox.messages.last.conversation
+        expect(conversation.additional_attributes['referral']).to be_nil
+
+        ad = { from: '2423423243', id: 'wamid.ad2', timestamp: '1664799999', type: 'text',
+               text: { body: 'agora vi o anúncio' }, referral: referral }
+        described_class.new(inbox: whatsapp_channel.inbox, params: referral_params(ad)).perform
+
+        expect(conversation.reload.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
       end
     end
   end

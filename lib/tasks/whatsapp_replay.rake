@@ -12,7 +12,7 @@ namespace :whatsapp do
   # channel from the embedded metadata, so the arg is optional there.
   desc 'Replay a captured WhatsApp webhook payload (Baileys/Cloud) through the parser'
   task :replay_webhook, %i[path phone_number] => :environment do |_task, args|
-    raise 'usage: rake "whatsapp:replay_webhook[path/to/payload.json,+55...]"' if args[:path].blank?
+    abort 'usage: rake "whatsapp:replay_webhook[path/to/payload.json,+55...]"' if args[:path].blank?
 
     payload = JSON.parse(File.read(args[:path])).with_indifferent_access
     phone = args[:phone_number].presence || payload[:phone_number]
@@ -26,9 +26,10 @@ namespace :whatsapp do
 
     channel = Channel::Whatsapp.find_by(phone_number: phone) if phone.present?
 
-    # A Baileys-style payload (a phone was given) that resolves to no channel is
-    # also a dead end — abort instead of no-opping inside the events job.
-    abort "No WhatsApp channel found for phone #{phone.inspect}" if phone.present? && channel.nil?
+    # A non-cloud payload (a phone was given) that resolves to no channel is a
+    # dead end — abort instead of no-opping inside the events job. Cloud replays
+    # resolve the channel from embedded metadata, so a stale phone must not fail them.
+    abort "No WhatsApp channel found for phone #{phone.inspect}" if phone.present? && channel.nil? && !cloud_payload
 
     # A non-cloud payload must run through the Baileys parser; if the phone maps to
     # a Cloud/Z-API channel the events job would misroute it, so fail fast.

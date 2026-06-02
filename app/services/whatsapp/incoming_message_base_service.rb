@@ -262,10 +262,11 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   # only the keys still missing so a genuine first touch is never overwritten.
   def backfill_first_touch_attribution
     attribution = { 'referral' => @referral, 'entry_point' => @entry_point }.compact
-    missing = attribution.reject { |key, _| @conversation.additional_attributes.key?(key) }
+    existing_attributes = @conversation.additional_attributes || {}
+    missing = attribution.reject { |key, _| existing_attributes.key?(key) }
     return if missing.blank?
 
-    @conversation.update!(additional_attributes: @conversation.additional_attributes.merge(missing))
+    @conversation.update!(additional_attributes: existing_attributes.merge(missing))
   end
 
   def conversation_for_reaction
