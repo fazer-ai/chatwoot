@@ -4,21 +4,9 @@
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.8
   notes:
     en: |-
-      ### ⚡ Improvements
-
-      - **Cleaner internal processing queues.** Old events from messages sent through the agent's phone (outside Chatwoot) no longer pile up as failures in internal monitoring, making real send issues easier to spot.
-
-      ### 🐛 Fixes
-
-      - **AI message delivery after long gaps in the conversation.** Messages sent by the AI agent after several hours of inactivity (for example, when handing the conversation off to a human agent) could show as "sent" in the panel without ever reaching the patient. These messages now get delivered as expected.
+      Bug fixes and internal improvements.
     pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Filas internas de processamento mais limpas.** Eventos antigos de mensagens enviadas pelo celular do agente (fora do Chatwoot) deixaram de se acumular como falhas no monitoramento interno, facilitando enxergar problemas reais de envio.
-
-      ### 🐛 Correções
-
-      - **Entrega de mensagens da IA após gap longo na conversa.** Mensagens enviadas pelo agente de IA depois de várias horas sem interação (por exemplo, no momento da transferência para um atendente humano) podiam ficar exibindo "enviada" no painel sem nunca chegar ao paciente. Agora essas mensagens são entregues normalmente.
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.24.7
   published_at: '2026-05-30T15:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.7
