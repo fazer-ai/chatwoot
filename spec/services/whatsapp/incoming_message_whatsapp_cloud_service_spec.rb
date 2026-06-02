@@ -441,7 +441,7 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
     end
 
     context 'when a referral arrives on an existing conversation' do
-      it 'backfills the first-touch attribution without overwriting it' do
+      it 'backfills missing attribution and preserves the first touch thereafter' do
         plain = { from: '2423423243', id: 'wamid.plain1', timestamp: '1664799904', type: 'text', text: { body: 'oi' } }
         described_class.new(inbox: whatsapp_channel.inbox, params: referral_params(plain)).perform
         conversation = whatsapp_channel.inbox.messages.last.conversation
@@ -452,6 +452,13 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         described_class.new(inbox: whatsapp_channel.inbox, params: referral_params(ad)).perform
 
         expect(conversation.reload.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+
+        later_referral = referral.merge(ctwa_clid: 'DIFFERENT_CLID', source_id: '999999999999999')
+        later_ad = { from: '2423423243', id: 'wamid.ad3', timestamp: '1664800000', type: 'text',
+                     text: { body: 'outro anúncio' }, referral: later_referral }
+        described_class.new(inbox: whatsapp_channel.inbox, params: referral_params(later_ad)).perform
+
+        expect(conversation.reload.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123', 'source_id' => '120210000000000')
       end
     end
   end
