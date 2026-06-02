@@ -949,5 +949,37 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
         expect(message.conversation.additional_attributes['entry_point']).to eq('source' => 'click_to_chat_link')
       end
     end
+
+    context 'when a later message reuses the conversation' do
+      it 'preserves the original ad attribution (first touch wins)' do
+        first = ad_params(
+          { extendedTextMessage: { text: 'Oi, vi o anúncio', contextInfo: { externalAdReply: external_ad_reply } } },
+          id: 'ad_msg_first_touch_1'
+        )
+        follow_up = ad_params({ extendedTextMessage: { text: 'seguindo a conversa' } }, id: 'ad_msg_first_touch_2')
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: first).perform
+        conversation = inbox.messages.last.conversation
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: follow_up).perform
+
+        expect(conversation.reload.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+      end
+
+      it 'backfills attribution when the reused conversation had none' do
+        plain = ad_params({ extendedTextMessage: { text: 'oi, tudo bem?' } }, id: 'ad_msg_backfill_1')
+        ad = ad_params(
+          { extendedTextMessage: { text: 'agora vi o anúncio', contextInfo: { externalAdReply: external_ad_reply } } },
+          id: 'ad_msg_backfill_2'
+        )
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: plain).perform
+        conversation = inbox.messages.last.conversation
+        expect(conversation.additional_attributes['referral']).to be_nil
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: ad).perform
+
+        expect(conversation.reload.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+      end
+    end
   end
 end

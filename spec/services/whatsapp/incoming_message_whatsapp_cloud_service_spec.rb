@@ -433,6 +433,7 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         created = whatsapp_channel.inbox.messages.last
         expect(created.content).to eq('Promo de Inverno')
         expect(created.content_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
+        expect(created.conversation.additional_attributes['referral']).to include('ctwa_clid' => 'ARAaCtwaClid123')
       end
     end
   end

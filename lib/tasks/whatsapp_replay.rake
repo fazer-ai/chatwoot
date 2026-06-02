@@ -37,7 +37,8 @@ namespace :whatsapp do
     end
 
     Rails.logger.info("[whatsapp:replay_webhook] replaying #{args[:path]} (phone=#{phone.inspect})")
-    puts "Replaying #{args[:path]}#{" -> #{channel.name} (#{channel.provider})" if channel}"
+    destination = " -> #{channel.name} (#{channel.provider})" if channel
+    puts "Replaying #{args[:path]}#{destination}"
     Webhooks::WhatsappEventsJob.perform_now(payload)
     puts 'Done. Check the conversation / last message in the inbox.'
   end

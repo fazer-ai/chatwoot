@@ -252,9 +252,20 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     # Mirrors the inbox-scoped lookup used by the reaction-removal flow; falls back
     # to the normal logic when the target isn't stored locally.
     @conversation = conversation_for_reaction || conversation_by_inbox_config
-    return if @conversation
+    return backfill_first_touch_attribution if @conversation
 
     @conversation = ::Conversation.create!(conversation_params)
+  end
+
+  # When the inbound message reuses an existing thread (active/reopened), the
+  # attribution conversation_params would have set on create never lands. Backfill
+  # only the keys still missing so a genuine first touch is never overwritten.
+  def backfill_first_touch_attribution
+    attribution = { 'referral' => @referral, 'entry_point' => @entry_point }.compact
+    missing = attribution.reject { |key, _| @conversation.additional_attributes.key?(key) }
+    return if missing.blank?
+
+    @conversation.update!(additional_attributes: @conversation.additional_attributes.merge(missing))
   end
 
   def conversation_for_reaction
