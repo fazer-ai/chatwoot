@@ -514,6 +514,42 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('msg_after_warmup')
       end
 
+      describe 'always uses the session path (never templates)' do
+        # Baileys has no 24h customer-service window and no template API.
+        # Routing handover / re-engagement messages through send_template
+        # used to drop them on the floor (Baileys' send_template returns nil).
+        # These cases confirm the session path is taken even when can_reply?
+        # is false or template_params are present.
+        it 'sends via session when template_params are present' do
+          conversation.contact.update!(phone_number: '+123456789')
+          message = create(:message,
+                           message_type: :outgoing, content: 'test', conversation: conversation,
+                           additional_attributes: { template_params: { name: 'whatever' } })
+
+          expect(whatsapp_channel).to receive(:send_message).with('123456789', message).and_return('msg_sent')
+          expect(whatsapp_channel).not_to receive(:send_template)
+
+          described_class.new(message: message).perform
+
+          expect(message.reload.source_id).to eq('msg_sent')
+        end
+
+        it 'sends via session when the conversation can_reply? is false (e.g. handover after 24h gap)' do
+          conversation.contact.update!(phone_number: '+123456789')
+          message = create(:message, message_type: :outgoing, content: 'handover', conversation: conversation)
+          allow(message.conversation).to receive(:can_reply?).and_return(false)
+
+          expect(whatsapp_channel).to receive(:send_message).with('123456789', message).and_return('msg_sent')
+          expect(whatsapp_channel).not_to receive(:send_template)
+
+          service = described_class.new(message: message)
+          allow(service).to receive(:message).and_return(message)
+          service.perform
+
+          expect(message.reload.source_id).to eq('msg_sent')
+        end
+      end
+
       describe 'duplicate send on Net::ReadTimeout retry' do
         let(:send_message_url) do
           "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"
