@@ -111,6 +111,15 @@ describe Whatsapp::Baileys::RichMessageParser do
       expect(text_for(msg)).to eq('Pick')
     end
 
+    it 'degrades to the body when buttonParamsJson is a non-string (TypeError)' do
+      msg = { interactiveMessage: {
+        body: { text: 'Pick' },
+        nativeFlowMessage: { buttons: [{ name: 'cta_url', buttonParamsJson: { display_text: 'Buy' } }] }
+      } }
+
+      expect(parse(msg)).to eq(type: 'interactive', body: 'Pick')
+    end
+
     # Real WABA shape: an InteractiveMessage nested under templateMessage.
     it 'parses an interactive template (templateMessage.interactiveMessageTemplate)' do
       msg = { templateMessage: { interactiveMessageTemplate: {

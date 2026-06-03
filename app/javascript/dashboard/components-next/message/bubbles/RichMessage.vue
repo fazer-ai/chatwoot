@@ -75,7 +75,7 @@ const buttons = computed(() =>
           :key="`${button.text}-${index}`"
           :href="button.href || undefined"
           :target="button.isLink ? '_blank' : undefined"
-          rel="noopener noreferrer"
+          :rel="button.isLink ? 'noopener noreferrer' : undefined"
           class="flex items-center justify-center gap-1 px-3 py-1.5 text-sm font-medium text-center no-underline rounded-lg bg-n-alpha-black1"
           :class="
             button.href

@@ -195,7 +195,7 @@ class Whatsapp::Baileys::RichMessageParser
     return {} if str.blank?
 
     JSON.parse(str)
-  rescue JSON::ParserError
+  rescue JSON::ParserError, TypeError
     {}
   end
 end
