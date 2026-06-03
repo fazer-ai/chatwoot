@@ -64,12 +64,12 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     elsif msg.key?(:contactMessage)
       match_phone_number = msg.dig(:contactMessage, :vcard)&.match(/waid=(\d+)/)
       match_phone_number ? 'contact' : 'unsupported'
-    elsif msg.key?(:templateMessage)
-      'template'
     elsif msg.key?(:protocolMessage)
       'protocol'
     elsif msg.key?(:messageContextInfo) && msg.keys.count == 1
       'context'
+    elsif Whatsapp::Baileys::RichMessageParser.rich?(msg)
+      'rich'
     else
       'unsupported'
     end
@@ -90,15 +90,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'file'
       msg.dig(:documentMessage, :caption).presence ||
         msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :caption)
-    when 'template'
-      tpl = msg.dig(:templateMessage, :hydratedTemplate) ||
-            msg.dig(:templateMessage, :hydratedFourRowTemplate) || {}
-      parts = [tpl[:hydratedTitleText], tpl[:hydratedContentText], tpl[:hydratedFooterText]].select(&:present?)
-      buttons = (tpl[:hydratedButtons] || []).map do |b|
-        b.dig(:quickReplyButton, :displayText) || b.dig(:urlButton, :displayText) || b.dig(:callButton, :displayText)
-      end.compact
-      parts << buttons.map { |t| "[#{t}]" }.join(" ") if buttons.any?
-      parts.join("\n\n").presence
+    when 'rich'
+      Whatsapp::Baileys::RichMessageParser.to_text(Whatsapp::Baileys::RichMessageParser.new(msg).parse)
     when 'reaction'
       msg.dig(:reactionMessage, :text)
     when 'contact'
@@ -145,6 +138,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'file'
       msg.dig(:documentMessage, :contextInfo).presence ||
         msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :contextInfo)
+    when 'rich' then Whatsapp::Baileys::RichMessageParser.new(msg).context_info
     end
   end
 

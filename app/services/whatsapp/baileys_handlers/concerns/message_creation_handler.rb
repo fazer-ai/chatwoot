@@ -97,10 +97,22 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
       content_attributes[:is_unsupported] = true
     end
 
+    add_rich_content_attributes(content_attributes, msg) if type == 'rich'
+
     referral = normalize_baileys_referral(message_context_info)
     content_attributes[:referral] = referral if referral.present?
 
     content_attributes
+  end
+
+  # Persists the structured card payload; an unparseable rich shape falls back to
+  # unsupported (the previous empty-bubble behavior) and is logged to capture real shapes.
+  def add_rich_content_attributes(content_attributes, msg)
+    rich = Whatsapp::Baileys::RichMessageParser.new(msg).parse
+    return content_attributes[:rich] = rich if rich.present?
+
+    content_attributes[:is_unsupported] = true
+    Rails.logger.info("[Baileys] rich message fell back to unsupported: keys=#{msg.keys}")
   end
 
   def attach_media_to_message

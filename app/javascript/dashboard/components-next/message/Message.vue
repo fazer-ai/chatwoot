@@ -34,6 +34,7 @@ import EmbedBubble from './bubbles/Embed.vue';
 import InstagramStoryBubble from './bubbles/InstagramStory.vue';
 import EmailBubble from './bubbles/Email/Index.vue';
 import UnsupportedBubble from './bubbles/Unsupported.vue';
+import RichMessageBubble from './bubbles/RichMessage.vue';
 import ContactBubble from './bubbles/Contact.vue';
 import DyteBubble from './bubbles/Dyte.vue';
 import LocationBubble from './bubbles/Location.vue';
@@ -371,6 +372,10 @@ const componentToRender = computed(() => {
     }
     // Attachment content is the name of the contact
     if (fileType === ATTACHMENT_TYPES.CONTACT) return ContactBubble;
+  }
+
+  if (props.contentAttributes?.rich) {
+    return RichMessageBubble;
   }
 
   return TextBubble;

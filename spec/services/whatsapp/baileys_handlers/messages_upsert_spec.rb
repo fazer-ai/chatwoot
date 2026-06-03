@@ -988,4 +988,94 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
   end
+
+  describe 'rich message handling' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{inbox.id}_*") { |key| Redis::Alfred.delete(key) }
+    end
+
+    def rich_params(message, id:)
+      raw_message = {
+        key: { id: id, remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false, addressingMode: 'pn' },
+        pushName: 'Acme Payments',
+        messageTimestamp: timestamp,
+        message: message
+      }
+      { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert', data: { type: 'notify', messages: [raw_message] } }
+    end
+
+    context 'when receiving a hydrated template message' do
+      it 'stores the text content and the structured rich payload, not unsupported' do
+        params = rich_params(
+          { templateMessage: { hydratedTemplate: {
+            hydratedContentText: 'Your invoice is ready.', hydratedFooterText: 'Reply STOP to opt out.',
+            hydratedButtons: [{ urlButton: { displayText: 'Pay now', url: 'https://acme.io/pay' } }]
+          } }, messageContextInfo: { deviceListMetadataVersion: 2 } },
+          id: 'rich_tpl_1'
+        )
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be_falsey
+        expect(message.content).to eq("Your invoice is ready.\n\nReply STOP to opt out.\n\n▸ Pay now: https://acme.io/pay")
+        expect(message.content_attributes['rich']).to include(
+          'type' => 'template', 'body' => 'Your invoice is ready.', 'footer' => 'Reply STOP to opt out.',
+          'buttons' => [{ 'text' => 'Pay now', 'url' => 'https://acme.io/pay' }]
+        )
+      end
+    end
+
+    context 'when a template carries an externalAdReply (CTWA)' do
+      it 'captures the referral with the numeric proto media type mapped' do
+        params = rich_params(
+          { templateMessage: { hydratedTemplate: { hydratedContentText: 'Promo' },
+                               contextInfo: { externalAdReply: { title: 'Ad', mediaType: 2, ctwaClid: 'CLID1' } } } },
+          id: 'rich_tpl_ad_1'
+        )
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+        message = inbox.messages.last
+        expect(message.content_attributes['rich']).to include('type' => 'template', 'body' => 'Promo')
+        expect(message.content_attributes['referral']).to include('ctwa_clid' => 'CLID1', 'media_type' => 'video')
+      end
+    end
+
+    context 'when receiving an interactive nativeFlow message' do
+      it 'parses the cta_url button from the snake_case params json' do
+        params = rich_params(
+          { interactiveMessage: { body: { text: 'Pick one' },
+                                  nativeFlowMessage: { buttons: [
+                                    { name: 'cta_url', buttonParamsJson: '{"display_text":"Buy","url":"https://b.io"}' }
+                                  ] } } },
+          id: 'rich_interactive_1'
+        )
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be_falsey
+        expect(message.content).to eq("Pick one\n\n▸ Buy: https://b.io")
+        expect(message.content_attributes.dig('rich', 'buttons')).to eq([{ 'text' => 'Buy', 'url' => 'https://b.io' }])
+      end
+    end
+
+    context 'when the rich message has no renderable content' do
+      it 'marks the message as unsupported' do
+        params = rich_params({ interactiveMessage: {} }, id: 'rich_empty_1')
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be(true)
+        expect(message.content).to be_nil
+      end
+    end
+  end
 end
