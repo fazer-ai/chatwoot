@@ -64,6 +64,10 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     elsif msg.key?(:contactMessage)
       match_phone_number = msg.dig(:contactMessage, :vcard)&.match(/waid=(\d+)/)
       match_phone_number ? 'contact' : 'unsupported'
+    elsif msg.key?(:contactsArrayMessage)
+      'contact'
+    elsif msg.key?(:locationMessage) || msg.key?(:liveLocationMessage)
+      'location'
     elsif msg.key?(:protocolMessage)
       'protocol'
     elsif msg.key?(:messageContextInfo) && msg.keys.count == 1
@@ -75,7 +79,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     end
   end
 
-  def message_content # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength,Metrics/AbcSize
+  def message_content # rubocop:disable Metrics/CyclomaticComplexity
     msg = unwrap_ephemeral_message(@raw_message[:message])
     case message_type
     when 'text'
@@ -94,17 +98,33 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       Whatsapp::Baileys::RichMessageParser.to_text(Whatsapp::Baileys::RichMessageParser.new(msg).parse)
     when 'reaction'
       msg.dig(:reactionMessage, :text)
-    when 'contact'
-      # FIXME: Missing specs
-      display_name = msg.dig(:contactMessage, :displayName)
-      vcard = msg.dig(:contactMessage, :vcard)
-      match_phone_number = vcard&.match(/waid=(\d+)/)
-
-      return display_name unless match_phone_number
-      return match_phone_number[1] if display_name&.start_with?('+')
-
-      "#{display_name} - #{match_phone_number[1]}" if match_phone_number
     end
+  end
+
+  # The shared contacts of the current message: the entries of a
+  # contactsArrayMessage, or the single contactMessage wrapped in an array.
+  def baileys_contacts
+    msg = unwrap_ephemeral_message(@raw_message[:message])
+    msg.dig(:contactsArrayMessage, :contacts).presence || [msg[:contactMessage]].compact
+  end
+
+  # Extracts { phone, name } from a Baileys contact hash. The vcard TEL line is
+  # `...;waid=<digits>:<formatted phone>`, so prefer the formatted phone and fall
+  # back to the waid digits.
+  def baileys_contact_fields(contact)
+    vcard = contact&.dig(:vcard).to_s
+    phone = vcard[/waid=\d+:\s*([^\r\n]+)/, 1]&.strip
+    phone = vcard[/waid=(\d+)/, 1] if phone.blank?
+    { phone: phone, name: contact&.dig(:displayName) }
+  end
+
+  # Short "Name - phone" line used as the message content (chat-list preview).
+  def baileys_contact_line(contact)
+    fields = baileys_contact_fields(contact)
+    return fields[:name] if fields[:phone].blank?
+    return fields[:phone] if fields[:name].blank? || fields[:name].start_with?('+')
+
+    "#{fields[:name]} - #{fields[:phone]}"
   end
 
   def reply_to_message_id # rubocop:disable Metrics/CyclomaticComplexity
@@ -149,15 +169,23 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     ad[:title].presence || ad[:body].presence
   end
 
+  # Media nested in a rich header (e.g. a PDF/image in a template header), or nil.
+  def rich_media_header
+    return unless message_type == 'rich'
+
+    Whatsapp::Baileys::RichMessageParser.new(unwrap_ephemeral_message(@raw_message[:message])).media_header
+  end
+
   def file_content_type
     return :image if message_type.in?(%w[image sticker])
     return :video if message_type.in?(%w[video video_note])
     return :audio if message_type == 'audio'
+    return rich_media_header[:kind].to_sym if rich_media_header
 
     :file
   end
 
-  def message_mimetype
+  def message_mimetype # rubocop:disable Metrics/CyclomaticComplexity
     msg = unwrap_ephemeral_message(@raw_message[:message])
     case message_type
     when 'image'
@@ -171,6 +199,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'file'
       msg.dig(:documentMessage, :mimetype).presence ||
         msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :mimetype)
+    when 'rich'
+      rich_media_header&.dig(:node, :mimetype)
     end
   end
 

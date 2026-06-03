@@ -2,10 +2,11 @@
 import { computed } from 'vue';
 import BaseBubble from './Base.vue';
 import Icon from 'next/icon/Icon.vue';
+import AttachmentChips from '../chips/AttachmentChips.vue';
 import MessageFormatter from 'shared/helpers/MessageFormatter.js';
 import { useMessageContext } from '../provider.js';
 
-const { contentAttributes } = useMessageContext();
+const { contentAttributes, attachments } = useMessageContext();
 
 // content_attributes keys are deep-camelized by MessageList (useCamelCase), so the
 // rich payload arrives as { type, title, body, footer, buttons: [{ text, url, phone }] }.
@@ -53,6 +54,11 @@ const buttons = computed(() =>
 <template>
   <BaseBubble class="px-4 py-3 text-sm" data-bubble-name="rich">
     <div class="flex flex-col gap-2">
+      <AttachmentChips
+        v-if="attachments?.length"
+        :attachments="attachments"
+        class="gap-2"
+      />
       <p v-if="rich.title" class="mb-0 font-medium">{{ rich.title }}</p>
       <div
         v-if="formattedBody"

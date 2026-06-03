@@ -13,13 +13,18 @@ class Whatsapp::Baileys::RichMessageParser
   RICH_KEYS = %i[
     interactiveMessage templateMessage buttonsMessage listMessage
     buttonsResponseMessage listResponseMessage templateButtonReplyMessage interactiveResponseMessage
+    pollCreationMessage pollCreationMessageV2 pollCreationMessageV3
   ].freeze
 
   # Tried in order; mirrors Baileys' extractMessageContent. First non-nil wins.
   PARSERS = %i[
     parse_interactive parse_template parse_buttons parse_list
     parse_buttons_response parse_list_response parse_template_reply parse_interactive_response
+    parse_poll
   ].freeze
+
+  # Media that can sit in a rich header, mapped to Chatwoot attachment kinds.
+  MEDIA_HEADER_KINDS = { imageMessage: 'image', videoMessage: 'video', documentMessage: 'file' }.freeze
 
   class << self
     def rich?(msg)
@@ -62,11 +67,33 @@ class Whatsapp::Baileys::RichMessageParser
       @msg.dig(:interactiveResponseMessage, :contextInfo)
   end
 
+  # Media nested in a rich header (template/interactive/buttons), e.g. an invoice
+  # PDF in a template header. Returns { kind: 'image'|'video'|'file', node: } or nil.
+  def media_header
+    source = template_header || interactive_payload&.dig(:header) || @msg[:buttonsMessage]
+    return if source.blank?
+
+    MEDIA_HEADER_KINDS.each do |key, kind|
+      node = source[key]
+      return { kind: kind, node: node } if node.present?
+    end
+    nil
+  end
+
   private
 
+  def template_header
+    @msg.dig(:templateMessage, :hydratedFourRowTemplate) || @msg.dig(:templateMessage, :hydratedTemplate)
+  end
+
+  # WABA "interactive" templates arrive as an InteractiveMessage nested under
+  # templateMessage.interactiveMessageTemplate instead of at the top level.
+  def interactive_payload
+    @msg[:interactiveMessage] || @msg.dig(:templateMessage, :interactiveMessageTemplate)
+  end
+
   def parse_template
-    tpl = @msg.dig(:templateMessage, :hydratedFourRowTemplate) ||
-          @msg.dig(:templateMessage, :hydratedTemplate)
+    tpl = template_header
     return if tpl.blank?
 
     buttons = Array(tpl[:hydratedButtons]).filter_map { |button| template_button(button) }
@@ -84,24 +111,25 @@ class Whatsapp::Baileys::RichMessageParser
     end
   end
 
-  # UNVERIFIED: no real interactiveMessage payload captured yet.
   def parse_interactive
-    interactive = @msg[:interactiveMessage]
+    interactive = interactive_payload
     return if interactive.blank?
 
-    buttons = Array(interactive.dig(:nativeFlowMessage, :buttons)).filter_map { |button| native_flow_button(button) }
+    buttons = Array(interactive.dig(:nativeFlowMessage, :buttons)).flat_map { |button| native_flow_buttons(button) }
     build('interactive', title: interactive.dig(:header, :title), body: interactive.dig(:body, :text),
                          footer: interactive.dig(:footer, :text), buttons: buttons)
   end
 
-  # buttonParamsJson is a snake_case JSON string; parse defensively.
-  def native_flow_button(button)
+  # buttonParamsJson is a snake_case JSON string; parse defensively. Returns an
+  # array because single_select expands into one entry per row.
+  def native_flow_buttons(button) # rubocop:disable Metrics/CyclomaticComplexity
     params = parse_json(button[:buttonParamsJson])
     case button[:name]
-    when 'cta_url' then { text: params['display_text'], url: params['url'] }
-    when 'cta_call' then { text: params['display_text'], phone: params['phone_number'] }
-    when 'single_select' then { text: params['title'] }
-    else { text: params['display_text'] || params['title'] } # quick_reply, cta_copy, ...
+    when 'cta_url' then [{ text: params['display_text'], url: params['url'] }]
+    when 'cta_call' then [{ text: params['display_text'], phone: params['phone_number'] }]
+    when 'open_webview' then [{ text: params['title'] || params['display_text'], url: params.dig('link', 'url') }]
+    when 'single_select' then Array(params['sections']).flat_map { |s| Array(s['rows']) }.map { |r| { text: r['title'] } }
+    else [{ text: params['display_text'] || params['title'] || params['flow_cta'] }] # quick_reply, cta_copy, flow, ...
     end
   end
 
@@ -144,6 +172,14 @@ class Whatsapp::Baileys::RichMessageParser
 
   def parse_interactive_response
     build('interactive_response', body: @msg.dig(:interactiveResponseMessage, :body, :text))
+  end
+
+  def parse_poll
+    poll = @msg[:pollCreationMessage] || @msg[:pollCreationMessageV2] || @msg[:pollCreationMessageV3]
+    return if poll.blank?
+
+    options = Array(poll[:options]).filter_map { |option| { text: option[:optionName] } if option[:optionName].present? }
+    build('poll', title: poll[:name], buttons: options)
   end
 
   # Returns the normalized hash only when there is something renderable, else nil
