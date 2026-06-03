@@ -198,6 +198,11 @@ describe Whatsapp::Baileys::RichMessageParser do
       expect(described_class.new({ templateMessage: { contextInfo: ctx } }).context_info).to eq(ctx)
       expect(described_class.new({ interactiveMessage: { contextInfo: ctx } }).context_info).to eq(ctx)
     end
+
+    it 'reads the contextInfo nested in an interactiveMessageTemplate (real WABA shape)' do
+      ctx = { externalAdReply: { title: 'Ad' }, stanzaId: 'QUOTED_1' }
+      expect(described_class.new({ templateMessage: { interactiveMessageTemplate: { contextInfo: ctx } } }).context_info).to eq(ctx)
+    end
   end
 
   describe '#media_header' do

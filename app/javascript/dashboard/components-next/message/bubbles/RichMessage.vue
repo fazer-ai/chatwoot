@@ -27,28 +27,31 @@ const toHttpUrl = url => {
   }
 };
 
-const buttons = computed(() =>
-  (rich.value.buttons ?? []).map(button => {
-    const url = toHttpUrl(button.url);
-    if (url) {
-      return {
-        text: button.text,
-        href: url,
-        isLink: true,
-        icon: 'i-lucide-external-link',
-      };
-    }
-    if (button.phone) {
-      return {
-        text: button.text,
-        href: `tel:${button.phone}`,
-        isLink: false,
-        icon: 'i-lucide-phone',
-      };
-    }
-    return { text: button.text, href: null, isLink: false, icon: null };
-  })
-);
+const buttons = computed(() => {
+  const list = Array.isArray(rich.value.buttons) ? rich.value.buttons : [];
+  return list
+    .filter(button => button && typeof button === 'object')
+    .map(button => {
+      const url = toHttpUrl(button.url);
+      if (url) {
+        return {
+          text: button.text,
+          href: url,
+          isLink: true,
+          icon: 'i-lucide-external-link',
+        };
+      }
+      if (typeof button.phone === 'string' && button.phone) {
+        return {
+          text: button.text,
+          href: `tel:${button.phone}`,
+          isLink: false,
+          icon: 'i-lucide-phone',
+        };
+      }
+      return { text: button.text, href: null, isLink: false, icon: null };
+    });
+});
 </script>
 
 <template>

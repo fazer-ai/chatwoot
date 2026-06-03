@@ -1047,6 +1047,27 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
 
+    context 'when the rich message quotes another message' do
+      it 'anchors the reply to the quoted message' do
+        contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
+        contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+        original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_RICH_1')
+
+        params = rich_params(
+          { templateMessage: { hydratedTemplate: { hydratedContentText: 'Re: your order' },
+                               contextInfo: { stanzaId: 'QUOTED_RICH_1' } } },
+          id: 'rich_reply_1'
+        )
+
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+        reply = conversation.messages.last
+        expect(reply.in_reply_to).to eq(original.id)
+        expect(reply.in_reply_to_external_id).to eq('QUOTED_RICH_1')
+      end
+    end
+
     context 'when receiving an interactive nativeFlow message' do
       it 'parses the cta_url button from the snake_case params json' do
         params = rich_params(
@@ -1175,6 +1196,24 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       attachment = inbox.messages.last.attachments.first
       expect(attachment.fallback_title).to eq('Padaria, Rua X, 1')
       expect(attachment.external_url).to eq('https://maps.example/p')
+    end
+
+    it 'anchors the reply when the location quotes another message' do
+      contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
+      contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
+      conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+      original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_LOC_1')
+
+      params = loc_params(
+        { locationMessage: { degreesLatitude: -23.5, degreesLongitude: -46.6, contextInfo: { stanzaId: 'QUOTED_LOC_1' } } },
+        id: 'loc_reply_1'
+      )
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+      reply = conversation.messages.last
+      expect(reply.in_reply_to).to eq(original.id)
+      expect(reply.in_reply_to_external_id).to eq('QUOTED_LOC_1')
     end
   end
 

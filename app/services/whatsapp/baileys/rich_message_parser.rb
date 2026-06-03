@@ -61,7 +61,7 @@ class Whatsapp::Baileys::RichMessageParser
   # contextInfo of the current rich subtype, where externalAdReply (CTWA) lives.
   def context_info
     @msg.dig(:templateMessage, :contextInfo) ||
-      @msg.dig(:interactiveMessage, :contextInfo) ||
+      interactive_payload&.dig(:contextInfo) ||
       @msg.dig(:buttonsMessage, :contextInfo) ||
       @msg.dig(:listMessage, :contextInfo) ||
       @msg.dig(:interactiveResponseMessage, :contextInfo)

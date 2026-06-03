@@ -127,22 +127,11 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     "#{fields[:name]} - #{fields[:phone]}"
   end
 
-  def reply_to_message_id # rubocop:disable Metrics/CyclomaticComplexity
-    msg = unwrap_ephemeral_message(@raw_message[:message])
-    message_key = case message_type
-                  when 'text' then :extendedTextMessage
-                  when 'image' then :imageMessage
-                  when 'sticker' then :stickerMessage
-                  when 'audio' then :audioMessage
-                  when 'video' then :videoMessage
-                  when 'contact' then :contactMessage
-                  when 'file'
-                    context_info = msg.dig(:documentMessage, :contextInfo).presence ||
-                                   msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :contextInfo)
-                    return context_info&.dig(:stanzaId)
-                  end
-
-    msg.dig(message_key, :contextInfo, :stanzaId) if message_key
+  # The provider id of the quoted message (stanzaId), read from the same per-type
+  # contextInfo used for ad attribution, so every supported type (incl. rich,
+  # location and contact) resolves replies through a single lookup.
+  def reply_to_message_id
+    message_context_info&.dig(:stanzaId)
   end
 
   # Returns the `contextInfo` for the current message type, where the
@@ -158,6 +147,10 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     when 'file'
       msg.dig(:documentMessage, :contextInfo).presence ||
         msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :contextInfo)
+    when 'contact'
+      msg.dig(:contactMessage, :contextInfo) || msg.dig(:contactsArrayMessage, :contextInfo)
+    when 'location'
+      msg.dig(:locationMessage, :contextInfo) || msg.dig(:liveLocationMessage, :contextInfo)
     when 'rich' then Whatsapp::Baileys::RichMessageParser.new(msg).context_info
     end
   end
