@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.24.9
+  published_at: '2026-06-04T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.9
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Patient replies no longer create a duplicate contact.** When you created a patient through the pencil button with their phone number missing the "9" and the patient later replied on WhatsApp, AurisChat would open a brand new contact and conversation for the same person. Now the reply lands in the conversation you already had open.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Resposta do paciente não vira mais um contato duplicado.** Antes, quando você cadastrava o paciente pelo lápis com o telefone sem o "9" e ele respondia depois pelo WhatsApp, aparecia um contato novo e uma conversa nova pra mesma pessoa. Agora a resposta cai na conversa que já estava aberta.
 - tag: v4.13.0-auris.1.24.8
   published_at: '2026-06-01T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.8
@@ -273,37 +285,3 @@
       Internal improvements to the unofficial WhatsApp connection (Baileys).
     pt_BR: |-
       Melhorias internas na conexão WhatsApp não oficial (Baileys).
-- tag: v4.13.0-auris.1.20
-  published_at: '2026-05-16T18:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.20
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **AI vs manual breakdown in the Funnel Conversion chart.** Each stage now shows two stacked colored layers — green for AI-handled conversations, blue for manual ones — and hovering a stage reveals the percentage split for that stage.
-      - **Loss reasons donut.** A new chart next to the funnel breaks down lost conversations by reason, with a color-coded legend.
-      - **Inbox and label filters in the funnel reports.** Two new dropdowns let you scope every number and chart in the funnel to a specific inbox or to conversations carrying a specific label.
-
-      ### ⚡ Improvements
-
-      - **Conversion KPIs reframed around attendance.** Four new rates replace the previous "Top / Completed / Win rate" set: Scheduling rate, Confirmation rate, Attendance rate (formerly win rate), and No-show rate — all expressed as a percent of total leads.
-      - **Stage rename.** "Ganho" is now displayed as "Comparecimento (ganho)" across the conversion chart, matching the clinical attendance vocabulary.
-
-      ### 🐛 Fixes
-
-      - **Funnel stages populate correctly in production.** Earlier installations could end up with an empty Funnel Stages list when a migration silently failed; the canonical 9 stages are now automatically backfilled.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Divisão IA vs manual no Funil de Conversão.** Cada fase agora aparece em duas camadas empilhadas — verde para conversas atendidas pela IA, azul para atendidas manualmente — e ao passar o mouse sobre uma fase você vê a divisão percentual daquela fase.
-      - **Distribuição de motivos de perda.** Novo gráfico ao lado do funil mostra a quebra das conversas perdidas por motivo, com legenda colorida.
-      - **Filtros de caixa de entrada e etiquetas nos relatórios do funil.** Dois novos selects permitem escopar todos os números e gráficos do funil para uma caixa específica ou para conversas com uma etiqueta específica.
-
-      ### ⚡ Melhorias
-
-      - **KPIs da Conversão reformulados para foco em comparecimento.** Quatro novas taxas substituem o conjunto anterior "Topo / Concluídas / Taxa de ganho": Taxa de agendamento, Taxa de confirmação, Taxa de comparecimento (ganho) e Taxa de no-show — todas expressas como % do total de leads.
-      - **Renomeação de etapa.** "Ganho" agora aparece como "Comparecimento (ganho)" no gráfico de conversão, alinhando-se ao vocabulário de comparecimento clínico.
-
-      ### 🐛 Correções
-
-      - **Fases do funil agora populam corretamente em produção.** Instalações anteriores podiam acabar com a lista de Fases vazia por causa de uma migração que falhava silenciosamente; as 9 fases padrão agora são preenchidas automaticamente.
