@@ -47,6 +47,14 @@ const shouldShowEditedIndicator = computed(() => {
   return isEdited.value && shouldGroupWithNext.value;
 });
 
+const deletedByContact = computed(() => {
+  return contentAttributes.value?.deletedByContact === true;
+});
+
+const shouldShowDeletedByContactIndicator = computed(() => {
+  return deletedByContact.value && shouldGroupWithNext.value;
+});
+
 // Scheduled message indicator
 const isScheduledMessage = computed(
   () => !!additionalAttributes.value?.scheduledMessageId
@@ -164,6 +172,17 @@ const iconColorClass = computed(() => {
       class="inline-flex items-center ml-1 align-middle"
     >
       <Icon icon="i-lucide-pencil" class="size-3" />
+    </span>
+    <span
+      v-if="shouldShowDeletedByContactIndicator"
+      v-tooltip.top="{
+        content: t('CONVERSATION.MESSAGE_DELETED_BY_CONTACT'),
+        delay: { show: 300, hide: 0 },
+      }"
+      :class="iconColorClass"
+      class="inline-flex items-center ml-1 align-middle"
+    >
+      <Icon icon="i-lucide-trash-2" class="size-3" />
     </span>
   </span>
 </template>

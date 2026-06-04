@@ -379,6 +379,158 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
     end
   end
 
+  # WhatsApp Cloud (including coexistence / embedded signup, which the factory
+  # configures by default via provider_config['source'] = 'embedded_signup')
+  # delivers an in-place edit as a `type: "edit"` message under the `messages`
+  # field. Editing flows through the shared base service, so the same coverage
+  # applies to both regular cloud and coexistence inboxes.
+  describe '#perform with an edited message' do
+    after do
+      Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
+    end
+
+    let!(:whatsapp_channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
+    let(:text_edit_params) { edit_params({ context: { id: 'M0' }, type: 'text', text: { body: 'Edited content' } }) }
+
+    def edit_params(edited_message)
+      message = { from: '2423423243', id: 'wamid.EDIT_EVENT_ID', timestamp: '1664799999', type: 'edit',
+                  edit: { original_message_id: 'wamid.ORIGINAL_MESSAGE_ID', message: edited_message } }
+      value = { contacts: [{ profile: { name: 'Sojan Jose' }, wa_id: '2423423243' }], messages: [message] }
+      {
+        phone_number: whatsapp_channel.phone_number,
+        object: 'whatsapp_business_account',
+        entry: [{ changes: [{ field: 'messages', value: value }] }]
+      }.with_indifferent_access
+    end
+
+    def create_original_message(content:, content_attributes: {})
+      contact = create(:contact, phone_number: '+2423423243', account: whatsapp_channel.account)
+      contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '2423423243')
+      conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+      create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID',
+                       content: content, content_attributes: content_attributes)
+    end
+
+    context 'when the original message exists' do
+      it 'updates the content in place and records the previous content' do
+        original = create_original_message(content: 'Original content')
+
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: text_edit_params).perform
+        end.not_to(change { whatsapp_channel.inbox.messages.count })
+
+        original.reload
+        expect(original.content).to eq('Edited content')
+        expect(original.content_attributes['is_edited']).to be true
+        expect(original.content_attributes['previous_content']).to eq('Original content')
+      end
+
+      it 'preserves the earliest previous_content across repeated edits' do
+        original = create_original_message(content: 'First edit', content_attributes: { is_edited: true, previous_content: 'Original content' })
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: text_edit_params).perform
+
+        original.reload
+        expect(original.content).to eq('Edited content')
+        expect(original.content_attributes['previous_content']).to eq('Original content')
+      end
+
+      it 'updates a media caption edit' do
+        original = create_original_message(content: 'Old caption')
+        params = edit_params({ type: 'image', image: { id: 'media-id', mime_type: 'image/jpeg', caption: 'New caption' } })
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+
+        original.reload
+        expect(original.content).to eq('New caption')
+        expect(original.content_attributes['is_edited']).to be true
+        expect(original.content_attributes['previous_content']).to eq('Old caption')
+      end
+    end
+
+    context 'when the original message does not exist' do
+      it 'does not create a new message or contact' do
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: text_edit_params).perform
+        end.to not_change(whatsapp_channel.inbox.messages, :count).and not_change(Contact, :count)
+
+        expect(whatsapp_channel.inbox.messages).to be_empty
+      end
+    end
+
+    context 'when the edit carries no usable content' do
+      it 'leaves the original message untouched' do
+        original = create_original_message(content: 'Original content')
+        params = edit_params({ type: 'text', text: {} })
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+
+        original.reload
+        expect(original.content).to eq('Original content')
+        expect(original.content_attributes['is_edited']).to be_nil
+      end
+    end
+  end
+
+  # The contact deleting their own message arrives as `type: "revoke"` under the
+  # `messages` field. We keep the content visible and only flag deleted_by_contact.
+  describe '#perform with a revoked (deleted) message' do
+    after do
+      Redis::Alfred.scan_each(match: 'MESSAGE_SOURCE_KEY::*') { |key| Redis::Alfred.delete(key) }
+    end
+
+    let!(:whatsapp_channel) { create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
+    let(:revoke_params) do
+      {
+        phone_number: whatsapp_channel.phone_number,
+        object: 'whatsapp_business_account',
+        entry: [{
+          changes: [{
+            field: 'messages',
+            value: {
+              contacts: [{ profile: { name: 'Sojan Jose' }, wa_id: '2423423243' }],
+              messages: [{
+                from: '2423423243', id: 'wamid.REVOKE_EVENT_ID', timestamp: '1664799999',
+                type: 'revoke', revoke: { original_message_id: 'wamid.ORIGINAL_MESSAGE_ID' }
+              }]
+            }
+          }]
+        }]
+      }.with_indifferent_access
+    end
+
+    def create_original_message(content:)
+      contact = create(:contact, phone_number: '+2423423243', account: whatsapp_channel.account)
+      contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '2423423243')
+      conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+      create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: content)
+    end
+
+    context 'when the original message exists' do
+      it 'flags it as deleted by the contact while keeping the content' do
+        original = create_original_message(content: 'secret message')
+
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: revoke_params).perform
+        end.not_to(change { whatsapp_channel.inbox.messages.count })
+
+        original.reload
+        expect(original.content).to eq('secret message')
+        expect(original.content_attributes['deleted_by_contact']).to be true
+      end
+    end
+
+    context 'when the original message does not exist' do
+      it 'does not create a new message or contact' do
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: revoke_params).perform
+        end.to not_change(whatsapp_channel.inbox.messages, :count).and not_change(Contact, :count)
+
+        expect(whatsapp_channel.inbox.messages).to be_empty
+      end
+    end
+  end
+
   describe '#perform with a click-to-WhatsApp ad referral' do
     # The service clears its own dedupe key in an ensure; this is a safety net for
     # any path that bails before the lock, scoped to this inbox so it can't wipe

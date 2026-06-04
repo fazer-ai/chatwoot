@@ -11,6 +11,10 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
     if processed_params.try(:[], :statuses).present?
       process_statuses
+    elsif edited_message?
+      process_edited_message
+    elsif revoked_message?
+      process_revoked_message
     elsif messages_data.present?
       process_messages
     end
@@ -113,6 +117,45 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
       message.external_error = "#{error[:code]}: #{error[:title]}"
     end
     message.save!
+  end
+
+  # WhatsApp Cloud delivers an in-place edit as a `type: "edit"` entry under the
+  # `messages` field: the new content is nested in `edit.message` and the edited
+  # message is referenced by `edit.original_message_id`. We update the stored
+  # message in place to mirror the Baileys edit flow (is_edited + previous_content),
+  # which the frontend already renders. Coexistence (embedded signup) inbound edits
+  # arrive through this same `messages` path, so no echo-specific handling is needed.
+  def edited_message?
+    messages_data.present? && message_type == 'edit'
+  end
+
+  def revoked_message?
+    messages_data.present? && message_type == 'revoke'
+  end
+
+  def process_edited_message
+    edit = messages_data.first[:edit]
+    return if edit.blank?
+    return unless find_message_by_source_id(edit[:original_message_id])
+
+    content = edited_message_content(edit[:message])
+    return if content.blank?
+
+    # Keep the earliest known content as previous_content across repeated edits.
+    previous_content = @message.is_edited ? @message.previous_content : @message.content
+    @message.update!(content: content, is_edited: true, previous_content: previous_content)
+  end
+
+  # WhatsApp Cloud delivers a sender-initiated delete as a `type: "revoke"` entry
+  # under the `messages` field, referencing the deleted message via
+  # `revoke.original_message_id`. We keep the original content and only flag the
+  # message as deleted by the contact (the frontend marks it but still shows the text).
+  def process_revoked_message
+    revoke = messages_data.first[:revoke]
+    return if revoke.blank?
+    return unless find_message_by_source_id(revoke[:original_message_id])
+
+    @message.update!(deleted_by_contact: true)
   end
 
   def create_messages

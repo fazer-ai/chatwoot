@@ -41,6 +41,18 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
       referral_fallback_content(message)
   end
 
+  # Edited messages nest the new content under `edit.message`, which carries its own
+  # type. Reuse message_content for text/interactive bodies and fall back to the
+  # media caption for image/video/document edits.
+  def edited_message_content(edited)
+    return if edited.blank?
+
+    message_content(edited) ||
+      edited.dig(:image, :caption) ||
+      edited.dig(:video, :caption) ||
+      edited.dig(:document, :caption)
+  end
+
   # Ad-click webhooks can arrive with no textual body (e.g. request_welcome), so
   # fall back to the ad headline/body to keep the message renderable.
   def referral_fallback_content(message)

@@ -29,6 +29,12 @@ const { t } = useI18n();
 // Click-to-WhatsApp ad metadata attached to the first message after an ad click.
 const referral = computed(() => contentAttributes.value?.referral);
 
+// The contact deleted/revoked this message on WhatsApp. We keep the content
+// readable but mute the bubble and add a dashed border to signal the deletion.
+const deletedByContact = computed(
+  () => contentAttributes.value?.deletedByContact === true
+);
+
 const varaintBaseMap = {
   [MESSAGE_VARIANTS.AGENT]: 'bg-n-solid-blue text-n-slate-12',
   [MESSAGE_VARIANTS.PRIVATE]:
@@ -82,6 +88,10 @@ const messageClass = computed(() => {
 
   if (scheduledMessageClass.value) {
     classToApply.push(scheduledMessageClass.value);
+  }
+
+  if (deletedByContact.value) {
+    classToApply.push('border-2 border-dashed border-n-slate-7 opacity-75');
   }
 
   return classToApply;

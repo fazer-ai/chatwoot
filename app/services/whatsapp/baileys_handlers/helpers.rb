@@ -263,6 +263,17 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     message_type.in?(%w[protocol context edited])
   end
 
+  # A protocolMessage of type REVOKE is the contact deleting a message for everyone.
+  # Baileys delivers it as a messages.upsert entry whose protocolMessage.key.id
+  # points at the original message.
+  def protocol_revoke?
+    unwrap_ephemeral_message(@raw_message[:message] || {}).dig(:protocolMessage, :type) == 'REVOKE'
+  end
+
+  def protocol_revoke_target_id
+    unwrap_ephemeral_message(@raw_message[:message] || {}).dig(:protocolMessage, :key, :id)
+  end
+
   def reaction_removal?
     message_type == 'reaction' && message_content.blank?
   end

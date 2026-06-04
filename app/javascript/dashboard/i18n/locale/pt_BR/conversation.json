@@ -277,6 +277,7 @@
     "FILE_SIZE_LIMIT": "O arquivo excede os {MAXIMUM_SUPPORTED_FILE_UPLOAD_SIZE} MB do limite para anexos",
     "FILE_TYPE_NOT_SUPPORTED": "O tipo de arquivo {fileName} não é suportado nesta conversa",
     "MESSAGE_ERROR": "Não foi possível enviar esta mensagem, por favor, tente novamente mais tarde",
+    "MESSAGE_DELETED_BY_CONTACT": "Apagada pelo contato",
     "SENT_BY": "Enviado por:",
     "BOT": "Robôs",
     "WHATSAPP": "WhatsApp",

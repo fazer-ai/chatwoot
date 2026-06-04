@@ -276,6 +276,37 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is a revoke (contact deleted for everyone)' do
+        let(:original_message) do
+          contact = create(:contact, account: inbox.account, phone_number: '+5511912345678')
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5511912345678')
+          conversation = create(:conversation, contact: contact, inbox: inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'original_msg_id', content: 'secret message')
+        end
+
+        it 'flags the original message as deleted by the contact and keeps the content' do
+          original_message
+          raw_message[:message] = { protocolMessage: { key: { id: 'original_msg_id' }, type: 'REVOKE' } }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to(change { inbox.messages.count })
+
+          original_message.reload
+          expect(original_message.content).to eq('secret message')
+          expect(original_message.content_attributes['deleted_by_contact']).to be(true)
+        end
+
+        it 'does nothing when the revoked message is unknown' do
+          raw_message[:message] = { protocolMessage: { key: { id: 'unknown_id' }, type: 'REVOKE' } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
+        end
+      end
+
       context 'when message is not from a user' do
         it 'does not create a conversation' do
           raw_message[:key][:remoteJid] = 'status@broadcast'
