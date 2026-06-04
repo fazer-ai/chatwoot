@@ -45,6 +45,11 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
 
   # The contact deleted a message for everyone. Keep the stored content and only
   # flag it as deleted by the contact so the UI can mark it while staying readable.
+  # NOTE: If the revoke webhook somehow arrives before the original message is
+  # processed, find_message_by_source_id returns nil and the revoke becomes a
+  # no-op; the original is later created without the flag. WhatsApp delivers
+  # webhooks in order so this is rare and accepted; persisting pending revokes
+  # would require updating this flagging logic.
   def handle_revoke
     return unless find_message_by_source_id(protocol_revoke_target_id)
 
