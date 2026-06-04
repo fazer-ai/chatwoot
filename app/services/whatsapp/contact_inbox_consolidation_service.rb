@@ -38,7 +38,20 @@ class Whatsapp::ContactInboxConsolidationService
   private
 
   def find_phone_contact_inbox
-    @inbox.contact_inboxes.find_by(source_id: @phone)
+    @inbox.contact_inboxes.find_by(source_id: @phone) ||
+      (alternative_brazilian_phone && @inbox.contact_inboxes.find_by(source_id: alternative_brazilian_phone))
+  end
+
+  # Inbound Brazilian phones are normalized to the 13-digit form (with the
+  # "9" after the area code). Existing contacts created via the pencil
+  # flow / imported / migrated from another provider may still carry the
+  # 12-digit legacy form. This helper returns the 12d alternative so we
+  # can fall back to it when the 13d lookup doesn't find anything.
+  # Returns nil when the current phone isn't a Brazilian 13d number.
+  def alternative_brazilian_phone
+    return nil unless @phone.to_s.match?(/\A55\d{2}9\d{8}\z/)
+
+    "#{@phone[0, 4]}#{@phone[5..]}"
   end
 
   def find_lid_contact_inbox
@@ -101,6 +114,7 @@ class Whatsapp::ContactInboxConsolidationService
   # This handles the case where contact_inbox has a different source_id (e.g., old format)
   def update_existing_contact_inbox_by_phone
     existing_contact = @inbox.account.contacts.find_by(phone_number: "+#{@phone}")
+    existing_contact ||= @inbox.account.contacts.find_by(phone_number: "+#{alternative_brazilian_phone}") if alternative_brazilian_phone
     return unless existing_contact
 
     existing_contact_inbox = existing_contact.contact_inboxes.find_by(inbox_id: @inbox.id)
@@ -160,15 +174,16 @@ class Whatsapp::ContactInboxConsolidationService
     end
   end
 
-  # Resolve identifier conflict by transferring the identifier to the phone-based contact.
+  # Sets the LID identifier on the target contact so the downstream
+  # ContactInboxWithContactBuilder's identifier lookup finds it (and a
+  # duplicate is not created). If another contact in the account already
+  # holds this identifier, that conflict is cleared first.
   def transfer_identifier_to(target_contact)
     return if target_contact.identifier == @identifier
 
-    conflicting = @inbox.account.contacts.find_by(identifier: @identifier)
-    return unless conflicting && conflicting.id != target_contact.id
-
     ActiveRecord::Base.transaction do
-      conflicting.update!(identifier: nil)
+      conflicting = @inbox.account.contacts.find_by(identifier: @identifier)
+      conflicting.update!(identifier: nil) if conflicting && conflicting.id != target_contact.id
       target_contact.update!(identifier: @identifier)
     end
   end
