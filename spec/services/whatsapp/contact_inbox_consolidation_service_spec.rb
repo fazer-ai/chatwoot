@@ -80,11 +80,16 @@ describe Whatsapp::ContactInboxConsolidationService do
       end
 
       context 'when no identifier conflict exists' do
-        it 'does not change contacts' do
+        it 'assigns the LID identifier to the existing phone contact' do
+          # The downstream builder finds existing contacts by identifier
+          # first, then by phone. Setting the identifier here ensures the
+          # builder reuses this contact instead of creating a duplicate —
+          # important for cases where the contact's phone format may not
+          # match the inbound's normalized form (e.g., legacy 12d BR).
           service = described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier)
           service.perform
 
-          expect(phone_contact.reload.identifier).to be_nil
+          expect(phone_contact.reload.identifier).to eq(identifier)
         end
       end
     end
@@ -269,6 +274,47 @@ describe Whatsapp::ContactInboxConsolidationService do
           expect(old_contact_inbox.reload.source_id).to eq(lid)
           expect(contact.reload.identifier).to eq(identifier)
           expect(conflicting_contact.reload.identifier).to be_nil
+        end
+      end
+    end
+
+    # Real-world scenario: an operator creates a contact via the pencil flow
+    # with the legacy 12-digit Brazilian phone (e.g., +553198010696, no "9"
+    # after the area code). Later, when the recipient replies via WhatsApp,
+    # the inbound message arrives normalized to 13 digits (+5531998010696)
+    # plus a LID. Without the 12d fallback, neither the phone nor the LID
+    # would match the existing contact, and a duplicate would be created.
+    context 'when an existing contact has the pre-2012 Brazilian phone (12 digits)' do
+      let(:phone_13d) { '5531998010696' }
+      let(:phone_12d) { '553198010696' }
+      let(:lid) { '210256349122728' }
+      let(:identifier) { "#{lid}@lid" }
+
+      context 'when matched via contact_inbox source_id' do
+        let!(:old_contact) { create(:contact, account: inbox.account, name: 'Leticia', phone_number: "+#{phone_12d}") }
+        let!(:old_contact_inbox) { create(:contact_inbox, inbox: inbox, contact: old_contact, source_id: phone_12d) }
+
+        it 'finds the 12d contact_inbox and migrates it to the new LID' do
+          service = described_class.new(inbox: inbox, phone: phone_13d, lid: lid, identifier: identifier)
+          service.perform
+
+          expect(old_contact_inbox.reload.source_id).to eq(lid)
+          expect(old_contact.reload.identifier).to eq(identifier)
+          expect(old_contact.reload.phone_number).to eq("+#{phone_13d}")
+          expect(inbox.contact_inboxes.count).to eq(1)
+        end
+      end
+
+      context 'when matched via the contact phone_number (no contact_inbox in this inbox yet)' do
+        let!(:old_contact) { create(:contact, account: inbox.account, name: 'Leticia', phone_number: "+#{phone_12d}") }
+
+        it 'adopts/resolves the 12d-phone contact and avoids creating a duplicate' do
+          service = described_class.new(inbox: inbox, phone: phone_13d, lid: lid, identifier: identifier)
+          service.perform
+
+          expect(old_contact.reload.identifier).to eq(identifier)
+          # No new contact was created — duplicates are exactly what this guard prevents.
+          expect(inbox.account.contacts.count).to eq(1)
         end
       end
     end
