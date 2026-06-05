@@ -176,6 +176,46 @@ describe ContactInboxBuilder do
           ).perform
         end.to raise_error(ActionController::ParameterMissing, 'param is missing or the value is empty: contact phone number')
       end
+
+      describe 'Baileys canonical phone resolution' do
+        let(:baileys_inbox) do
+          create(:channel_whatsapp, account: account, provider: 'baileys',
+                                    sync_templates: false, validate_provider_config: false).inbox
+        end
+
+        it 'rewrites the contact phone and source_id to whatever the resolver returns' do
+          contact.update!(phone_number: '+5531998010696')
+          resolver = instance_double(Whatsapp::CanonicalPhoneResolverService, resolve: '553198010696')
+          allow(Whatsapp::CanonicalPhoneResolverService).to receive(:new).and_return(resolver)
+
+          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox).perform
+
+          expect(contact.reload.phone_number).to eq('+553198010696')
+          expect(contact_inbox.source_id).to eq('553198010696')
+        end
+
+        it 'leaves the contact alone when the resolver returns the same phone' do
+          contact.update!(phone_number: '+5531998010696')
+          resolver = instance_double(Whatsapp::CanonicalPhoneResolverService, resolve: '5531998010696')
+          allow(Whatsapp::CanonicalPhoneResolverService).to receive(:new).and_return(resolver)
+
+          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox).perform
+
+          expect(contact.reload.phone_number).to eq('+5531998010696')
+          expect(contact_inbox.source_id).to eq('5531998010696')
+        end
+
+        it 'skips the resolver for non-Baileys WhatsApp channels' do
+          cloud_inbox = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                  sync_templates: false, validate_provider_config: false).inbox
+          contact.update!(phone_number: '+5531998010696')
+          expect(Whatsapp::CanonicalPhoneResolverService).not_to receive(:new)
+
+          described_class.new(contact: contact, inbox: cloud_inbox).perform
+
+          expect(contact.reload.phone_number).to eq('+5531998010696')
+        end
+      end
     end
 
     describe 'sms inbox' do
