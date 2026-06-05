@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.24.10
+  published_at: '2026-06-05T01:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.10
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Patient phone automatically matched to WhatsApp.** When you create a patient through the pencil button and type the phone without the "9", AurisChat checks WhatsApp and adjusts to the right format — the first message goes through and no duplicate contact appears later.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Telefone do paciente acertado automaticamente.** Quando você cadastra um paciente pelo lápis com o telefone sem o "9", o AurisChat confere com o WhatsApp e ajusta para o formato certo — a primeira mensagem já chega e não aparece contato duplicado depois.
 - tag: v4.13.0-auris.1.24.9
   published_at: '2026-06-04T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.9
@@ -272,14 +284,6 @@
 - tag: v4.13.0-auris.1.21.1
   published_at: '2026-05-19T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.1
-  notes:
-    en: |-
-      Internal improvements to the unofficial WhatsApp connection (Baileys).
-    pt_BR: |-
-      Melhorias internas na conexão WhatsApp não oficial (Baileys).
-- tag: v4.13.0-auris.1.21
-  published_at: '2026-05-17T14:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21
   notes:
     en: |-
       Internal improvements to the unofficial WhatsApp connection (Baileys).
