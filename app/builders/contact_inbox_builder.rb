@@ -43,8 +43,28 @@ class ContactInboxBuilder
   def wa_source_id
     raise ActionController::ParameterMissing, 'contact phone number' unless @contact.phone_number
 
+    # For Baileys channels, ask the provider whether the number is
+    # registered under the 13d form or the legacy 12d Brazilian form,
+    # and persist whichever the WhatsApp servers actually use. This
+    # prevents the duplicate-contact problem when the operator types
+    # the format the patient's account is NOT registered with.
+    resolve_canonical_phone_for_baileys
+
     # whatsapp doesn't want the + in e164 format
     @contact.phone_number.delete('+').to_s
+  end
+
+  def resolve_canonical_phone_for_baileys
+    return unless @inbox.channel.is_a?(Channel::Whatsapp) && @inbox.channel.provider == 'baileys'
+
+    canonical = Whatsapp::CanonicalPhoneResolverService.new(
+      channel: @inbox.channel,
+      phone: @contact.phone_number
+    ).resolve
+
+    return if canonical.blank? || canonical == @contact.phone_number.delete('+')
+
+    @contact.update!(phone_number: "+#{canonical}")
   end
 
   def twilio_source_id
