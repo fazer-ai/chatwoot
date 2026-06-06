@@ -1,6 +1,7 @@
 <script setup>
 import { defineModel, computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useElementBounding, useWindowSize } from '@vueuse/core';
 import { picoSearch } from '@scmmishra/pico-search';
 import Icon from 'next/icon/Icon.vue';
 import Button from 'next/button/Button.vue';
@@ -59,6 +60,24 @@ const selected = defineModel({
   required: true,
 });
 
+const triggerRef = ref(null);
+const dropdownRef = ref(null);
+
+const { top } = useElementBounding(triggerRef);
+const { height } = useWindowSize();
+const { height: dropdownHeight } = useElementBounding(dropdownRef);
+
+// Open the menu upward when there isn't enough room below the trigger, so it
+// never overflows past the viewport bottom (e.g. action selects low in a tall modal).
+const dropdownPosition = computed(() => {
+  // Matches the default `dropdownMaxHeight` prop (`max-h-80` = 320px); used as a
+  // fallback before the menu has been measured. 20px keeps a small gap below.
+  const DROPDOWN_MAX_HEIGHT = 320;
+  const menuHeight = (dropdownHeight.value || DROPDOWN_MAX_HEIGHT) + 20;
+  const spaceBelow = height.value - top.value;
+  return spaceBelow < menuHeight ? 'bottom-0' : 'top-0';
+});
+
 const searchTerm = ref('');
 const searchResults = computed(() => {
   if (!options) return [];
@@ -101,6 +120,7 @@ const toggleSelected = option => {
     <template #trigger="{ toggle }">
       <Button
         v-if="selectedItem"
+        ref="triggerRef"
         sm
         slate
         faded
@@ -111,6 +131,7 @@ const toggleSelected = option => {
       />
       <Button
         v-else
+        ref="triggerRef"
         sm
         slate
         faded
@@ -126,7 +147,12 @@ const toggleSelected = option => {
         }}</span>
       </Button>
     </template>
-    <DropdownBody class="top-0 min-w-56 z-50" strong>
+    <DropdownBody
+      ref="dropdownRef"
+      class="min-w-56 z-50"
+      :class="dropdownPosition"
+      strong
+    >
       <div v-if="!disableSearch" class="relative">
         <Icon class="absolute size-4 left-2 top-2" icon="i-lucide-search" />
         <input
