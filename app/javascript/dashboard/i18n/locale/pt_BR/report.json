@@ -703,5 +703,34 @@
       "MANUAL": "Atendido manualmente"
     },
     "TOOLTIP_STAT": "{label}: {pct} ({count})"
+  },
+  "IA_HUMAN_DISTRIBUTION_REPORT": {
+    "HEADER": "IA → Humano",
+    "DESCRIPTION": "Auditoria das atribuições feitas pela IA Auris (últimos 7 dias).",
+    "ALL_INBOXES": "Todas as caixas",
+    "ERROR_LOAD": "Falha ao carregar dados: {error}",
+    "KPI": {
+      "TOTAL": "Total",
+      "VIA_TEAM": "✅ via time",
+      "DIRECT": "🟦 direta",
+      "FAILED": "⚠️ sem atribuir",
+      "FAILED_NO_ONLINE": "🔴 ninguém ativo"
+    },
+    "COLUMNS": {
+      "DATETIME": "Data / Hora",
+      "CONVERSATION": "Conversa",
+      "INBOX": "Inbox",
+      "TEAM": "Time",
+      "AGENT": "Agente atribuído",
+      "ONLINE_TEAM_MEMBERS": "On no momento",
+      "STATUS": "Status"
+    },
+    "EMPTY_STATE": "Nenhuma atribuição encontrada para os filtros atuais.",
+    "LOADING": "Carregando…",
+    "ROW_COUNT": "{count} linha(s)",
+    "DASH": "—",
+    "HASH_ID": "#{id}",
+    "MORE_DOTS": "…",
+    "ONLINE_LIST_HEADER": "{count} agentes online no momento"
   }
 }

@@ -553,6 +553,7 @@ Rails.application.routes.draw do
               get :grouped_conversation_metrics
             end
           end
+          resources :ia_human_distribution_reports, only: [:index]
         end
       end
     end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_25_140000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_09_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1369,6 +1369,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_25_140000) do
     t.index ["user_id"], name: "index_notifications_on_user_id"
   end
 
+  create_table "online_snapshots", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.index ["account_id", "snapshot_at"], name: "index_online_snapshots_on_account_id_and_snapshot_at"
+    t.index ["account_id"], name: "index_online_snapshots_on_account_id"
+    t.index ["user_id", "snapshot_at"], name: "index_online_snapshots_on_user_id_and_snapshot_at"
+    t.index ["user_id"], name: "index_online_snapshots_on_user_id"
+  end
+
   create_table "platform_app_permissibles", force: :cascade do |t|
     t.bigint "platform_app_id", null: false
     t.string "permissible_type", null: false
@@ -1691,6 +1701,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_25_140000) do
   add_foreign_key "internal_chat_polls", "internal_chat_messages"
   add_foreign_key "internal_chat_reactions", "internal_chat_messages"
   add_foreign_key "internal_chat_reactions", "users", on_delete: :cascade
+  add_foreign_key "online_snapshots", "accounts", on_delete: :cascade
+  add_foreign_key "online_snapshots", "users", on_delete: :cascade
   add_foreign_key "recurring_scheduled_messages", "accounts"
   add_foreign_key "recurring_scheduled_messages", "conversations"
   add_foreign_key "recurring_scheduled_messages", "inboxes"

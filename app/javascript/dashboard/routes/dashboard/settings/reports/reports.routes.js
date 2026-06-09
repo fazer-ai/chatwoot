@@ -22,6 +22,7 @@ import CsatResponses from './CsatResponses.vue';
 import BotReports from './BotReports.vue';
 import LiveReports from './LiveReports.vue';
 import SLAReports from './SLAReports.vue';
+import IaHumanDistributionReport from './IaHumanDistributionReport.vue';
 
 const meta = {
   featureFlag: FEATURE_FLAGS.REPORTS,
@@ -166,6 +167,12 @@ export default {
           name: 'bot_reports',
           meta,
           component: BotReports,
+        },
+        {
+          path: 'ia_human_distribution',
+          name: 'ia_human_distribution_report',
+          meta,
+          component: IaHumanDistributionReport,
         },
       ],
     },
