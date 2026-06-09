@@ -998,6 +998,25 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(contact.phone_number).to eq('+5511912345678')
         end
 
+        it 'reuses a contact saved with the Brazilian ninth digit when the reply arrives without it' do
+          # Regression: the agent saved the number with the ninth digit and outbound
+          # normalization was skipped; the reply delivers the canonical number without
+          # it and must not spawn a duplicate contact in a new conversation.
+          raw_message[:key][:remoteJidAlt] = '551112345678@s.whatsapp.net'
+          contact = create(:contact, account: inbox.account, phone_number: '+5511912345678', identifier: nil)
+          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678')
+          conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to change(Contact, :count)
+
+          expect(contact_inbox.reload.source_id).to eq('12345678')
+          expect(contact.reload.identifier).to eq('12345678@lid')
+          expect(contact.phone_number).to eq('+551112345678')
+          expect(conversation.reload.messages.last.content).to eq('Hello from Baileys')
+        end
+
         it 'does not update contact_inbox if source_id is already LID' do
           contact = create(:contact, account: inbox.account, phone_number: '+5511912345678', identifier: '12345678@lid')
           contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
