@@ -116,7 +116,10 @@
         "PLACEHOLDER": "Short description about this team."
       },
       "AUTO_ASSIGN": {
-        "LABEL": "Allow auto assign for this team."
+        "LABEL": "Allow auto assign for this team.",
+        "INFO_TITLE": "How automatic assignment works",
+        "INFO_BODY_ENABLED": "When enabled, Auris automatically assigns each new conversation to an available team member following the configured distribution rule. Only agents who belong to that inbox and are online are considered. If nobody is online at the moment, the conversation stays unassigned.",
+        "INFO_BODY_DISABLED": "When disabled, Auris does not auto-assign the conversation. It will stay in the Unassigned list so an agent can pick it up manually."
       },
       "SUBMIT_CREATE": "Create team"
     }
