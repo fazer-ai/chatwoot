@@ -1,4 +1,18 @@
 ---
+- tag: v4.13.0-auris.1.25
+  published_at: '2026-06-10T01:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.25
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **New "AI → Human" report.** A new report under **Reports** where the manager can see, line by line, every conversation Auris AI handed off in the last 7 days — which team, which agent, who was online at the time, and whether it actually reached someone or got stuck.
+      - **Managers can manage their teams.** If you have the manager role, you can now go into **Settings → Teams**, add or remove agents from a team and turn automatic assignment on or off — no need to ask the administrator anymore.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Novo relatório "IA → Humano".** Um relatório novo dentro de **Relatórios** onde o gestor consegue ver, linha por linha, cada conversa que a Auris distribuiu nos últimos 7 dias — qual time, qual agente, quem estava online no momento e se a conversa de fato foi pra alguém ou ficou parada.
+      - **Gerentes podem cuidar dos times.** Quem tem o papel de gerente agora consegue entrar em **Configurações → Times**, entrar e sair agentes do time e ligar ou desligar a atribuição automática — sem precisar chamar o administrador.
 - tag: v4.13.0-auris.1.24.10
   published_at: '2026-06-05T01:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.10
@@ -276,14 +290,6 @@
 - tag: v4.13.0-auris.1.21.2
   published_at: '2026-05-20T01:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.2
-  notes:
-    en: |-
-      Internal improvements to the unofficial WhatsApp connection (Baileys).
-    pt_BR: |-
-      Melhorias internas na conexão WhatsApp não oficial (Baileys).
-- tag: v4.13.0-auris.1.21.1
-  published_at: '2026-05-19T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.1
   notes:
     en: |-
       Internal improvements to the unofficial WhatsApp connection (Baileys).
