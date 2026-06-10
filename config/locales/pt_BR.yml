@@ -135,6 +135,7 @@ pt_BR:
       channel:
         provider_connection:
           wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.
+          reconnect_loop_detected: Não foi possível restabelecer a conexão após várias tentativas. Tente reconectar a caixa de entrada.
     custom_filters:
       number_of_records: Limite atingido. O número máximo de filtros personalizados permitidos para um usuário por conta é de 1000.
       invalid_attribute: Chave de atributo inválido - [%{key}]. A chave deve ser uma das [%{allowed_keys}] ou um atributo personalizado definido na conta.

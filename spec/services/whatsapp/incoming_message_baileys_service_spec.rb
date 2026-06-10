@@ -162,6 +162,75 @@ describe Whatsapp::IncomingMessageBaileysService do
 
         expect(inbox.channel.provider_connection['error']).to be_nil
       end
+
+      context 'with lease epochs (multi-instance baileys-api)' do
+        it 'persists the epoch alongside the connection state' do
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 7 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection).to include('connection' => 'open', 'epoch' => 7)
+        end
+
+        it 'discards events carrying an epoch older than the last seen' do
+          # A late retry from a previous owner (e.g. "reconnecting") must not
+          # overwrite the current owner's "open".
+          inbox.channel.update_provider_connection!(connection: 'open', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'reconnecting', epoch: 6 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+          expect(inbox.channel.provider_connection['epoch']).to eq(7)
+        end
+
+        it 'accepts events with the same epoch as the last seen' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 7 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+        end
+
+        it 'accepts events without an epoch (older baileys-api versions)' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'open' }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+        end
+
+        it 'accepts any epoch when none has been seen yet' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting')
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 3 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection).to include('connection' => 'open', 'epoch' => 3)
+        end
+      end
     end
 
     context 'when processing messages.upsert event' do
