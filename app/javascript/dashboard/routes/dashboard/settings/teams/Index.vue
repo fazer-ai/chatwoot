@@ -15,7 +15,8 @@ import Button from 'dashboard/components-next/button/Button.vue';
 const store = useStore();
 const { t } = useI18n();
 const getters = useStoreGetters();
-const { isAdmin } = useAdmin();
+const { isAdmin, isManager } = useAdmin();
+const canEditTeams = computed(() => isAdmin.value || isManager.value);
 
 const loading = ref({});
 const searchQuery = ref('');
@@ -147,7 +148,7 @@ const confirmPlaceHolderText = computed(() =>
               }"
             >
               <Button
-                v-if="isAdmin"
+                v-if="canEditTeams"
                 v-tooltip.top="$t('TEAMS_SETTINGS.LIST.EDIT_TEAM')"
                 icon="i-woot-settings"
                 slate

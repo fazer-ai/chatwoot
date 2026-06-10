@@ -4,7 +4,7 @@ class TeamPolicy < ApplicationPolicy
   end
 
   def update?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 
   def show?

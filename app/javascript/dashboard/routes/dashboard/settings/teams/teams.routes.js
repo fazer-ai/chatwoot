@@ -30,7 +30,7 @@ export default {
           component: TeamsIndex,
           meta: {
             featureFlag: FEATURE_FLAGS.TEAM_MANAGEMENT,
-            permissions: ['administrator'],
+            permissions: ['administrator', 'manager'],
           },
         },
       ],
@@ -89,7 +89,7 @@ export default {
               component: EditTeam,
               meta: {
                 featureFlag: FEATURE_FLAGS.TEAM_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
             },
             {
@@ -98,7 +98,7 @@ export default {
               component: EditAgents,
               meta: {
                 featureFlag: FEATURE_FLAGS.TEAM_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
             },
             {
@@ -106,7 +106,7 @@ export default {
               name: 'settings_teams_edit_finish',
               meta: {
                 featureFlag: FEATURE_FLAGS.TEAM_MANAGEMENT,
-                permissions: ['administrator'],
+                permissions: ['administrator', 'manager'],
               },
               component: FinishSetup,
             },
