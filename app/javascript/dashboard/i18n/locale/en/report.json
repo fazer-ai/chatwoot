@@ -703,5 +703,34 @@
       "MANUAL": "Handled manually"
     },
     "TOOLTIP_STAT": "{label}: {pct} ({count})"
+  },
+  "IA_HUMAN_DISTRIBUTION_REPORT": {
+    "HEADER": "AI → Human",
+    "DESCRIPTION": "Audit of assignments made by Auris AI (last 7 days).",
+    "ALL_INBOXES": "All inboxes",
+    "ERROR_LOAD": "Failed to load data: {error}",
+    "KPI": {
+      "TOTAL": "Total",
+      "VIA_TEAM": "✅ via team",
+      "DIRECT": "🟦 direct",
+      "FAILED": "⚠️ not assigned",
+      "FAILED_NO_ONLINE": "🔴 nobody online"
+    },
+    "COLUMNS": {
+      "DATETIME": "Date / Time",
+      "CONVERSATION": "Conversation",
+      "INBOX": "Inbox",
+      "TEAM": "Team",
+      "AGENT": "Assigned agent",
+      "ONLINE_TEAM_MEMBERS": "On at the time",
+      "STATUS": "Status"
+    },
+    "EMPTY_STATE": "No assignments found for the current filters.",
+    "LOADING": "Loading…",
+    "ROW_COUNT": "{count} row(s)",
+    "DASH": "—",
+    "HASH_ID": "#{id}",
+    "MORE_DOTS": "…",
+    "ONLINE_LIST_HEADER": "{count} agents online at the time"
   }
 }

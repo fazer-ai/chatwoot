@@ -481,6 +481,11 @@ const menuItems = computed(() => {
           label: t('SIDEBAR.REPORTS_SLA'),
           to: accountScopedRoute('sla_reports'),
         },
+        {
+          name: 'Reports IA Human Distribution',
+          label: t('SIDEBAR.REPORTS_IA_HUMAN_DISTRIBUTION'),
+          to: accountScopedRoute('ia_human_distribution_report'),
+        },
       ],
     },
     {

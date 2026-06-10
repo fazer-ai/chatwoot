@@ -390,6 +390,7 @@
     "ONGOING": "Em andamento",
     "ONE_OFF": "Única",
     "REPORTS_SLA": "SLA",
+    "REPORTS_IA_HUMAN_DISTRIBUTION": "IA → Humano",
     "REPORTS_BOT": "Robôs",
     "REPORTS_AGENT": "Agentes",
     "REPORTS_LABEL": "Etiquetas",

@@ -390,6 +390,7 @@
     "ONGOING": "Ongoing",
     "ONE_OFF": "One off",
     "REPORTS_SLA": "SLA",
+    "REPORTS_IA_HUMAN_DISTRIBUTION": "AI → Human",
     "REPORTS_BOT": "Bot",
     "REPORTS_AGENT": "Agents",
     "REPORTS_LABEL": "Labels",
