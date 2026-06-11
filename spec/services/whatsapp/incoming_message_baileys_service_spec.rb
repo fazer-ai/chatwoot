@@ -230,6 +230,13 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(inbox.channel.provider_connection).to include('connection' => 'open', 'epoch' => 3)
         end
+
+        it 'acquires a row lock so the epoch check and update are atomic' do
+          params = base_params.merge({ data: { connection: 'open', epoch: 7 } })
+          expect(inbox.channel).to receive(:with_lock).and_call_original
+
+          described_class.new(inbox: inbox, params: params).perform
+        end
       end
     end
 

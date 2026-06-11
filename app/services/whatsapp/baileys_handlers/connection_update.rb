@@ -6,16 +6,17 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   def process_connection_update
     data = processed_params[:data]
 
-    if stale_connection_event?(data)
-      Rails.logger.warn(
-        "Baileys stale connection.update discarded: epoch #{data[:epoch]} < #{inbox.channel.provider_connection['epoch']}"
-      )
-      return
+    inbox.channel.with_lock do
+      if stale_connection_event?(data)
+        Rails.logger.warn(
+          "Baileys stale connection.update discarded: epoch #{data[:epoch]} < #{inbox.channel.provider_connection['epoch']}"
+        )
+        next
+      end
+
+      inbox.channel.update_provider_connection!(provider_connection_payload(data))
+      Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
     end
-
-    inbox.channel.update_provider_connection!(provider_connection_payload(data))
-
-    Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
   end
 
   # NOTE: `connection` values
