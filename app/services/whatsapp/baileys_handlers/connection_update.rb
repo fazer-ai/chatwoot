@@ -28,7 +28,7 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
     {
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
       qr_data_url: data[:qrDataUrl] || nil,
-      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}") : nil,
+      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
       epoch: data[:epoch]
     }.compact
   end
