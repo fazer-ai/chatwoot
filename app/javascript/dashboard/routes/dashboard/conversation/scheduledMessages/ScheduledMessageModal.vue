@@ -94,6 +94,7 @@ const holdOnReply = ref(false);
 const originalContent = ref('');
 const originalScheduledAt = ref(null);
 const originalHasAttachment = ref(false);
+const originalHoldOnReply = ref(false);
 
 // NOTE: Local ref to control modal visibility, prevents auto-close when unsaved changes exist
 const localShowModal = ref(false);
@@ -115,6 +116,7 @@ const resetForm = () => {
   originalContent.value = '';
   originalScheduledAt.value = null;
   originalHasAttachment.value = false;
+  originalHoldOnReply.value = false;
 };
 
 const setFormFromMessage = scheduledMessage => {
@@ -144,6 +146,7 @@ const setFormFromMessage = scheduledMessage => {
     ? new Date(scheduledDateTime.value)
     : null;
   originalHasAttachment.value = !!existingAttachment.value;
+  originalHoldOnReply.value = holdOnReply.value;
 };
 
 const { onFileUpload } = useFileUpload({
@@ -264,8 +267,11 @@ const hasUnsavedChanges = computed(() => {
   const attachmentChanged =
     hasNewAttachment.value ||
     (originalHasAttachment.value && !hasExistingAttachment.value);
+  const holdOnReplyChanged = holdOnReply.value !== originalHoldOnReply.value;
 
-  return contentChanged || dateChanged || attachmentChanged;
+  return (
+    contentChanged || dateChanged || attachmentChanged || holdOnReplyChanged
+  );
 });
 
 const showModal = computed({

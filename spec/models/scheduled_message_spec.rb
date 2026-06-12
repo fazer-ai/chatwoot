@@ -147,7 +147,7 @@ RSpec.describe ScheduledMessage, type: :model do
         scheduled_message.update!(status: :sent)
 
         expect { scheduled_message.update!(content: 'Updated content') }.to raise_error(ActiveRecord::RecordInvalid) do |error|
-          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft or pending')
+          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft, pending, or held')
         end
       end
 
@@ -156,7 +156,7 @@ RSpec.describe ScheduledMessage, type: :model do
         scheduled_message.update!(status: :failed)
 
         expect { scheduled_message.update!(content: 'Updated content') }.to raise_error(ActiveRecord::RecordInvalid) do |error|
-          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft or pending')
+          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft, pending, or held')
         end
       end
 

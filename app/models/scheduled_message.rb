@@ -122,7 +122,7 @@ class ScheduledMessage < ApplicationRecord
 
     return if status_was.in?(%w[draft pending held])
 
-    errors.add(:base, 'Scheduled message can only be modified while draft or pending')
+    errors.add(:base, 'Scheduled message can only be modified while draft, pending, or held')
   end
 
   def only_status_changed?
