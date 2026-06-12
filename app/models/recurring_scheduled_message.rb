@@ -5,6 +5,7 @@
 #  id               :bigint           not null, primary key
 #  author_type      :string           not null
 #  content          :text
+#  hold_on_reply    :boolean          default(FALSE), not null
 #  occurrences_sent :integer          default(0), not null
 #  recurrence_rule  :jsonb            not null
 #  status           :integer          default("draft"), not null

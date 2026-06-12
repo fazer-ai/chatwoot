@@ -69,4 +69,75 @@ RSpec.describe ScheduledMessageHandler do
       message.update!(content: 'Updated content')
     end
   end
+
+  describe '#hold_pending_scheduled_messages' do
+    let(:pending_with_flag) do
+      create(:scheduled_message,
+             account: account, inbox: inbox, conversation: conversation,
+             author: author, hold_on_reply: true,
+             scheduled_at: 1.hour.from_now, status: :pending)
+    end
+
+    let(:pending_without_flag) do
+      create(:scheduled_message,
+             account: account, inbox: inbox, conversation: conversation,
+             author: author, hold_on_reply: false,
+             scheduled_at: 1.hour.from_now, status: :pending)
+    end
+
+    it 'holds pending scheduled messages with hold_on_reply when customer sends a message' do
+      pending_with_flag
+
+      create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+      expect(pending_with_flag.reload.status).to eq('held')
+    end
+
+    it 'does not hold pending messages without hold_on_reply flag' do
+      pending_without_flag
+
+      create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+      expect(pending_without_flag.reload.status).to eq('pending')
+    end
+
+    it 'does not hold messages when customer sends a reaction' do
+      pending_with_flag
+
+      create(:message, account: account, inbox: inbox, conversation: conversation,
+                       message_type: :incoming,
+                       content_attributes: { 'is_reaction' => true })
+
+      expect(pending_with_flag.reload.status).to eq('pending')
+    end
+
+    it 'does not hold messages when an outgoing message is sent by the agent' do
+      pending_with_flag
+
+      create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :outgoing)
+
+      expect(pending_with_flag.reload.status).to eq('pending')
+    end
+
+    it 'does not hold messages on private notes' do
+      pending_with_flag
+
+      create(:message, account: account, inbox: inbox, conversation: conversation,
+                       message_type: :incoming, private: true)
+
+      expect(pending_with_flag.reload.status).to eq('pending')
+    end
+
+    it 'dispatches SCHEDULED_MESSAGE_UPDATED event for each held message' do
+      pending_with_flag
+
+      allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+
+      expect(Rails.configuration.dispatcher).to receive(:dispatch)
+        .with(Events::Types::SCHEDULED_MESSAGE_UPDATED, anything, scheduled_message: pending_with_flag)
+        .at_least(:once)
+
+      create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+    end
+  end
 end

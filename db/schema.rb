@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_25_093000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_12_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1338,6 +1338,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_25_093000) do
     t.bigint "author_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "hold_on_reply", default: false, null: false
     t.index ["account_id", "status"], name: "idx_recurring_sched_msgs_on_account_status"
     t.index ["account_id"], name: "index_recurring_scheduled_messages_on_account_id"
     t.index ["author_type", "author_id"], name: "index_recurring_scheduled_messages_on_author"
@@ -1408,6 +1409,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_25_093000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "recurring_scheduled_message_id"
+    t.boolean "hold_on_reply", default: false, null: false
     t.index ["account_id", "status"], name: "index_scheduled_messages_on_account_id_and_status"
     t.index ["account_id"], name: "index_scheduled_messages_on_account_id"
     t.index ["author_type", "author_id", "status"], name: "idx_on_author_type_author_id_status_6997d67ef6"
