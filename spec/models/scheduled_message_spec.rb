@@ -136,7 +136,7 @@ RSpec.describe ScheduledMessage, type: :model do
 
       it 'allows editing held messages' do
         scheduled_message = create_scheduled_message
-        scheduled_message.update_column(:status, 4) # rubocop:disable Rails/SkipsModelValidations
+        scheduled_message.update_column(:status, described_class.statuses[:held]) # rubocop:disable Rails/SkipsModelValidations
 
         expect { scheduled_message.update!(content: 'Revised content') }.not_to raise_error
         expect(scheduled_message.reload.content).to eq('Revised content')
@@ -270,7 +270,7 @@ RSpec.describe ScheduledMessage, type: :model do
       failed_message.update!(status: :failed)
 
       held_message = create_scheduled_message(scheduled_at: 1.minute.from_now)
-      held_message.update_column(:status, 4) # rubocop:disable Rails/SkipsModelValidations
+      held_message.update_column(:status, described_class.statuses[:held]) # rubocop:disable Rails/SkipsModelValidations
 
       # NOTE: Travel to a time where due_same_minute and overdue are due but not_due_yet is not
       travel_to(5.minutes.from_now)

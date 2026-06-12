@@ -154,6 +154,7 @@ const openEditRecurringModal = recurringMessage => {
     scheduled_at: pendingChild?.scheduled_at || null,
     recurrence_rule: recurringMessage.recurrence_rule,
     recurring_scheduled_message_id: recurringMessage.id,
+    hold_on_reply: recurringMessage.hold_on_reply ?? false,
     template_params: recurringMessage.template_params,
     attachment: recurringMessage.attachment,
     author: recurringMessage.author,

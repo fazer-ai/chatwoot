@@ -92,6 +92,7 @@ class RecurringScheduledMessage < ApplicationRecord
       status: status, template_params: template_params,
       recurrence_rule: recurrence_rule, recurrence_description: recurrence_description,
       occurrences_sent: occurrences_sent, author_id: author_id, author_type: author_type,
+      hold_on_reply: hold_on_reply,
       created_at: created_at.to_i, updated_at: updated_at.to_i
     }
   end
