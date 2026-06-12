@@ -44,8 +44,8 @@ module ScheduledMessageHandler
   def hold_pending_scheduled_messages
     conversation.scheduled_messages.pending.where(hold_on_reply: true).find_each do |sm|
       sm.update!(status: :held)
-      dispatch_scheduled_message_update(sm)
       advance_recurring_series(sm) if sm.recurring_scheduled_message_id.present?
+      dispatch_scheduled_message_update(sm)
     end
   end
 

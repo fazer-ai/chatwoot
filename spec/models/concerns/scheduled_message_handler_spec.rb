@@ -139,5 +139,42 @@ RSpec.describe ScheduledMessageHandler do
 
       create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
     end
+
+    context 'when the held message belongs to a recurring series' do
+      let(:recurring) do
+        create(:recurring_scheduled_message,
+               account: account, inbox: inbox, conversation: conversation,
+               author: author, hold_on_reply: true, status: :active)
+      end
+
+      let(:recurring_occurrence) do
+        create(:scheduled_message,
+               account: account, inbox: inbox, conversation: conversation,
+               author: author, hold_on_reply: true, status: :pending,
+               scheduled_at: 1.hour.from_now,
+               recurring_scheduled_message: recurring)
+      end
+
+      it 'holds the occurrence and detaches it from the series' do
+        recurring_occurrence
+
+        create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+        expect(recurring_occurrence.reload.status).to eq('held')
+        expect(recurring_occurrence.reload.recurring_scheduled_message_id).to be_nil
+      end
+
+      it 'creates a new pending occurrence linked to the series' do
+        recurring_occurrence
+
+        expect do
+          create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+        end.to change(ScheduledMessage, :count).by(1)
+
+        new_occurrence = recurring.scheduled_messages.pending.first
+        expect(new_occurrence).to be_present
+        expect(new_occurrence.id).not_to eq(recurring_occurrence.id)
+      end
+    end
   end
 end
