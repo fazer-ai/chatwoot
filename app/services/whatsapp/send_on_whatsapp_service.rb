@@ -83,12 +83,16 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
     if message_id.present?
       message.update!(source_id: message_id)
-    else
+    elsif message.reload.external_error.blank?
       # Baileys' Signal session can fail to re-establish silently for cold
       # conversations (e.g., gap > 24h since the last message), in which case
-      # sendMessage returns no id. Leaving the message in the default "sent"
-      # status hides this from the operator; surfacing it as failed makes the
-      # red marker show up so they can retry.
+      # sendMessage returns no id and no error. Leaving the message in the
+      # default "sent" status hides this from the operator; surfacing it as
+      # failed makes the red marker show up so they can retry.
+      #
+      # Only kick in when no provider-specific error message has been saved
+      # yet — Cloud / Z-API / 360Dialog already write a detailed error via
+      # `handle_error` and we'd be overwriting it with a generic message.
       message.update!(status: :failed, external_error: 'Provider did not return a message id')
     end
   end
