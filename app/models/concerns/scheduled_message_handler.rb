@@ -59,7 +59,7 @@ module ScheduledMessageHandler
       skip_increment: true
     ).perform
 
-    # Desvincular da série para que o agente possa reagendar/reenviar sem avançar a série de novo
+    # Detach from the series so the agent can reschedule/resend without advancing it again
     scheduled_message.update_column(:recurring_scheduled_message_id, nil) # rubocop:disable Rails/SkipsModelValidations
   end
 
