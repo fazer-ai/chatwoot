@@ -28,10 +28,13 @@ RSpec.describe Webhooks::WhatsappEventsJob do
     allow(process_service).to receive(:perform)
   end
 
-  it 'enqueues the job' do
+  it 'enqueues the job on the high queue' do
+    # WhatsApp webhooks carry interactive flows (QR pairing handshake,
+    # incoming customer messages) — they must not sit behind background
+    # work on :low when the queue is backed up.
     expect { job.perform_later(params) }.to have_enqueued_job(described_class)
       .with(params)
-      .on_queue('low')
+      .on_queue('high')
   end
 
   describe 'race condition handling on the async path' do

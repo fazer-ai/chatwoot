@@ -1,5 +1,10 @@
 class Webhooks::WhatsappEventsJob < ApplicationJob
-  queue_as :low
+  # Bumped from :low to :high so that interactive WhatsApp flows survive a
+  # backed-up Sidekiq: a QR pairing waits on a `connection: open` webhook,
+  # an operator waits on an incoming customer message, and both used to
+  # queue behind whatever was sitting in the higher-priority queues. Pairs
+  # the inbound flow with SendReplyJob, which already lives on :high.
+  queue_as :high
 
   # Race condition: `messages.update` can arrive before `SendReplyJob` has
   # persisted the `source_id` of the outgoing message. The controller's
