@@ -1,4 +1,26 @@
 ---
+- tag: v4.13.0-auris.1.26
+  published_at: '2026-06-15T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.26
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **WhatsApp moves faster when the system is busy.** Pairing a device with the QR code, and the arrival of patient messages, no longer have to wait in line behind background work — they come through right away even at busy moments.
+
+      ### 🐛 Fixes
+
+      - **Cleaner error message when WhatsApp is down.** When the red flag appears on a message it now shows the actual reason WhatsApp gave (out of service, expired token, etc.) instead of a generic technical message — so you know what to do without having to ask someone.
+      - **Template list refreshes by itself again.** If management adds a new template in WhatsApp, you don't need to click "Sync templates" anymore — within a couple of hours the new template just appears in your dropdown automatically.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **WhatsApp anda mais rápido quando o sistema está cheio.** Pareamento do aparelho pelo QR code e a chegada das mensagens dos pacientes não precisam mais esperar uma fila de tarefas de fundo — vêm direto, mesmo em momentos de muito movimento.
+
+      ### 🐛 Correções
+
+      - **Mensagem de erro mais clara quando o WhatsApp falha.** Quando aparece a bandeira vermelha em uma mensagem, agora ela mostra a causa real que o WhatsApp deu (fora do ar, token vencido, etc.) em vez de um aviso genérico técnico — você sabe o que fazer sem precisar perguntar pra alguém.
+      - **Lista de modelos volta a se atualizar sozinha.** Se a gestão criar um modelo novo no WhatsApp, você não precisa mais clicar em "Sincronizar Modelos" — em algumas horas o modelo novo já aparece na sua lista automaticamente.
 - tag: v4.13.0-auris.1.25
   published_at: '2026-06-10T01:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.25
@@ -287,11 +309,3 @@
       ### 🐛 Correções
 
       - **Resolução automática não dispara mais em duplicidade.** Conversas que atingem o tempo de inatividade são fechadas apenas uma vez, sem eventos repetidos no histórico.
-- tag: v4.13.0-auris.1.21.2
-  published_at: '2026-05-20T01:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.21.2
-  notes:
-    en: |-
-      Internal improvements to the unofficial WhatsApp connection (Baileys).
-    pt_BR: |-
-      Melhorias internas na conexão WhatsApp não oficial (Baileys).
