@@ -41,5 +41,39 @@ RSpec.describe Channels::Whatsapp::TemplatesSyncSchedulerJob do
         have_been_enqueued.with(non_synced).on_queue('low')
       )
     end
+
+    # Regression guard: Baileys / Z-API have no template registry; their
+    # `sync_templates` is a no-op that never stamps the timestamp. Before
+    # this filter, those channels (which create as `last_updated = NULL`)
+    # monopolized the 25-channel batch every 5 minutes, starving the
+    # Cloud / 360Dialog channels that actually need refreshing — leaving
+    # some Cloud inboxes with templates months out of date.
+    it 'does not enqueue templates_sync_job for baileys channels' do
+      baileys_channel = create(:channel_whatsapp, provider: 'baileys', sync_templates: false,
+                                                  validate_provider_config: false, message_templates_last_updated: nil)
+      described_class.perform_now
+      expect(Channels::Whatsapp::TemplatesSyncJob).not_to(have_been_enqueued.with(baileys_channel))
+    end
+
+    it 'does not enqueue templates_sync_job for zapi channels' do
+      zapi_channel = create(:channel_whatsapp, provider: 'zapi', sync_templates: false,
+                                               validate_provider_config: false, message_templates_last_updated: nil)
+      described_class.perform_now
+      expect(Channels::Whatsapp::TemplatesSyncJob).not_to(have_been_enqueued.with(zapi_channel))
+    end
+
+    it 'still enqueues cloud channels when baileys / zapi are also present' do
+      stub_request(:post, 'https://waba.360dialog.io/v1/configs/webhook')
+      create(:channel_whatsapp, provider: 'baileys', sync_templates: false,
+                                validate_provider_config: false, message_templates_last_updated: nil)
+      create(:channel_whatsapp, provider: 'zapi', sync_templates: false,
+                                validate_provider_config: false, message_templates_last_updated: nil)
+      cloud_channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false,
+                                                validate_provider_config: false, message_templates_last_updated: 4.hours.ago)
+
+      described_class.perform_now
+
+      expect(Channels::Whatsapp::TemplatesSyncJob).to(have_been_enqueued.with(cloud_channel))
+    end
   end
 end
