@@ -466,6 +466,29 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to be_nil
       end
 
+      it 'preserves a provider-specific external_error already saved by the channel' do
+        # When the underlying provider (Cloud / Z-API / 360Dialog) saved a
+        # detailed error via handle_error (e.g., Meta returning "Service
+        # unavailable" during an outage), the generic fallback must not
+        # overwrite it — the operator needs the real cause.
+        conversation.contact.update!(phone_number: '+123456789')
+        message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
+
+        allow(whatsapp_channel).to receive(:send_message) do
+          message.update!(status: :failed, external_error: '(#131056) Service unavailable')
+          nil
+        end
+        allow(whatsapp_channel).to receive(:on_whatsapp)
+        allow(whatsapp_channel).to receive(:presence_subscribe)
+        service = described_class.new(message: message)
+        allow(service).to receive(:sleep)
+
+        service.perform
+
+        expect(message.reload.status).to eq('failed')
+        expect(message.reload.external_error).to eq('(#131056) Service unavailable')
+      end
+
       it 'warms the Signal session and retries when the first attempt returns no id' do
         conversation.contact.update!(phone_number: '+123456789')
         message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation)
