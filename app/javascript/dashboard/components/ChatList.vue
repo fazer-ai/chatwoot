@@ -166,6 +166,9 @@ const activeFolder = computed(() => {
   return undefined;
 });
 
+const getContact = useMapGetter('contacts/getContact');
+const folderContactId = useMapGetter('customViews/getActiveFolderContactId');
+
 const activeFolderName = computed(() => {
   return activeFolder.value?.name;
 });
@@ -502,6 +505,7 @@ function setParamsForEditFolderModal() {
     inboxes: inboxesList.value,
     labels: labels.value,
     campaigns: campaigns.value,
+    contacts: [getContact.value(folderContactId.value)],
     languages: languages,
     countries: countries,
     priority: [

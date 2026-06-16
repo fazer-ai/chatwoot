@@ -171,7 +171,11 @@ RSpec.describe 'Api::V1::Accounts::Portals', type: :request do
               { 'articles_count' => 0, 'categories_count' => 0, 'code' => 'en', 'draft' => false },
               { 'articles_count' => 0, 'categories_count' => 0, 'code' => 'es', 'draft' => true }
             ],
-            'show_author' => true
+            'show_author' => true,
+            'default_locale' => 'en',
+            'layout' => 'classic',
+            'social_profiles' => {},
+            'locale_translations' => {}
           }
         )
       end

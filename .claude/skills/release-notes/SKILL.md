@@ -46,6 +46,29 @@ Downstream forks (e.g. `fazer-ai/chatwoot-pro`) that mirror a CE release must de
 <!-- user-notes:pt-BR:end -->
 ```
 
+## Upstream sync releases (CE)
+
+When a CE release contains a merge with official Chatwoot (`chore/merge-upstream-X.Y.Z`), do **not** enumerate upstream features in the user-notes blocks. Only declare the sync with a blockquote at the top of each block, linking to the official upstream release notes (list every upstream version covered by the merge):
+
+```markdown
+<!-- user-notes:en:start -->
+> This release includes the merge with official Chatwoot 4.14.1 and 4.14.2. See the official release notes for the full list of upstream changes: https://github.com/chatwoot/chatwoot/releases/tag/v4.14.1 and https://github.com/chatwoot/chatwoot/releases/tag/v4.14.2
+...
+<!-- user-notes:en:end -->
+
+<!-- user-notes:pt-BR:start -->
+> Esta release inclui o merge com o Chatwoot oficial 4.14.1 e 4.14.2. Para a lista completa de mudanças do upstream, consulte as notas oficiais: https://github.com/chatwoot/chatwoot/releases/tag/v4.14.1 e https://github.com/chatwoot/chatwoot/releases/tag/v4.14.2
+...
+<!-- user-notes:pt-BR:end -->
+```
+
+After the blockquote, list only:
+
+- fork-specific changes shipped in the same release, and
+- specific items the team explicitly asks to call out (e.g. an upstream fix that resolves a problem our users actually hit).
+
+If nothing qualifies, the blockquote alone is a valid block body. See `v4.14.0-fazer-ai.74` for reference.
+
 ## Audience and tone
 
 Write for an **end user, not a developer**. Readers do not read code, do not know what a PR is, and do not care about refactors.

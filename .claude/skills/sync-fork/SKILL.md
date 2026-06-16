@@ -98,6 +98,7 @@ The cop flags more than just `save`. Full list it tries to add `!` to: `save`, `
 - **Never blindly accept the bang rewrite (or run `rubocop -A`) without evaluating each offense individually.** The cop doesn't check the receiver's class — it matches by method name alone. Non-ActiveRecord receivers (POROs, service objects with their own `save`/`update`/`destroy` method, third-party libraries like Stripe, Kredis, OpenStruct wrappers, CSV/IO objects with `update`, filesystem objects with `destroy`) will raise `NoMethodError` at runtime. Caught by CI if there's a spec, silently broken in prod if not.
 - For each SaveBang offense, read the surrounding code: what class is the receiver? If it's an ActiveRecord model, the autocorrect is safe. If it's anything else, either add the receiver to `.rubocop.yml`'s `Rails/SaveBang.AllowedReceivers` list (currently Stripe::Subscription, Stripe::Customer, Stripe::Invoice) or add a targeted `rubocop:disable Rails/SaveBang` comment.
 - Safe workflow: run `bundle exec rubocop <files>` (without `-A`) first to see the offenses listed, evaluate each individually, then apply `-A` only once you've confirmed every receiver is an ActiveRecord object. Always review the diff before committing.
+- **Specs trap (4.14.2 merge):** receiver class is not enough — check INTENT. Upstream specs often call non-bang `update(...)` on purpose to assert validation failures right after (`expect(portal).not_to be_valid`). `rubocop -A` rewrites them to `update!` and the test now raises instead of failing validation. For those, keep `update` with an inline `# rubocop:disable Rails/SaveBang` (existing fork pattern in `spec/models/portal_spec.rb`).
 
 ### Signature architecture (PR #79)
 
@@ -121,6 +122,24 @@ Decision: **CO (combination)**. Keep the fork's `acquire_message_processing_lock
 Adjacent file that may need follow-up: `app/services/whatsapp/incoming_message_service_helpers.rb` typically auto-merges to our version. That's correct. If upstream's `Whatsapp::MessageDedupLock` class becomes orphaned after a merge, `git rm` it (and its spec).
 
 **Known regression hiding here:** `acquire_message_processing_lock` in our fork checks `@processed_params.try(:[], :messages).blank?`, which skips `:message_echoes` payloads. Echoes from WhatsApp Cloud native-app sends were being silently dropped. Fixed in the 4.13.0 merge by changing to `messages_data.blank?` and picking `:to` vs `:from` for the contact phone based on `outgoing_echo`. Keep that fix on future merges.
+
+**`unprocessable_message_type?` (4.14.2):** the list is now `%w[ephemeral request_welcome]`. `reaction` stays OUT (fork processes reactions, incl. `reaction_removal?`); `unsupported` stays OUT (upstream's `create_unsupported_message` persists a placeholder instead of dropping). If a future merge re-adds either to the list, that's upstream churn — keep them out.
+
+### Voice notes meta keys: `is_voice_message` (canonical) vs `is_recorded_audio` (legacy)
+
+The fork's dashboard voice-note pipeline was upstreamed by us as #14606 with the meta key renamed to `is_voice_message`. Decision made in the 4.14.2 merge: **converge the dashboard flow to upstream's key, keep the backend reading BOTH keys** — `is_recorded_audio` is still written by Baileys/Zapi PTT handlers, by the `transcode_audio` API pipeline, and exists on all historical messages.
+
+- Frontend (`ReplyBox.vue`, `message.js`): only `isVoiceMessage`/`is_voice_message`. The fork's `removeRecordedAudio` re-record race fix (#91) and computed `hasRecordedAudio` are preserved on top of upstream's flow — keep them on future merges.
+- Backend readers accept both: `Whatsapp::Providers::WhatsappCloudService#voice_message?` and `WhatsappBaileysService#voice_note_attachment?`. Baileys sets `content[:ptt] = true` only when voice (`compact` semantics — don't emit `ptt: false`, a spec pins this).
+- `Messages::MessageBuilder` keeps the fork-only params (`is_recorded_audio`, `transcode_audio`, `attachments_metadata`) for external API consumers, plus upstream's `is_voice_message`/`tag_voice_message`. Do NOT assign `attachment.meta = nil` — upstream specs expect the jsonb default `{}` to survive (assign only when `metadata.present?`).
+
+### Opus normalization lives in the model, not the provider service (PR #223)
+
+Fork architecture: `Attachment#normalize_opus_blob_content_type!` (lazy, called from `download_url`, uses `update_column`) + `config/initializers/active_storage_opus_fix.rb` (normalizes at identification time). Upstream still carries a service-level `normalize_opus_content_type` in `whatsapp_cloud_service.rb` whose `blob.update` **fails silently on validation** — that's why #223 moved to `update_column`. On every merge: **delete the service-level method + its call** if upstream re-introduces it (it did in 4.14.2).
+
+### Portal custom HTML injection (custom_head_html / custom_body_html)
+
+Upstream 4.14.x extracted the public portal layout into shared partials `app/views/layouts/_portal_head.html.erb` and `_portal_scripts.html.erb`, used by both `portal.html.erb` and the new `portal.html+documentation.erb` variant. The fork's `custom_head_html`/`custom_body_html` injection lives at the END of those partials (guarded by `!@is_plain_layout_enabled`). If upstream rewrites the layouts again, re-attach the injection to whatever shared partial both variants render. Also: `show_author` must stay in `Portal::CONFIG_JSON_KEYS`, and the fork's `merged_portal_params` controller helper is GONE — upstream's model-level `normalize_config` (merges `persisted_config`) replaced it.
 
 ### db/schema.rb
 

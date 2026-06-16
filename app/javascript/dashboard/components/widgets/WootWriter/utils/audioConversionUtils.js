@@ -137,13 +137,24 @@ export const convertToMp3 = async (audioBlob, bitrate = 128) => {
 
 export const convertAudio = async (inputBlob, outputFormat, bitrate = 128) => {
   let audio;
-  if (outputFormat === 'audio/ogg') {
-    // Chrome produces WebM even when OGG is requested; remux to proper OGG/Opus
-    audio = await remuxWebmToOgg(inputBlob);
-  } else if (outputFormat === 'audio/wav') {
+  if (outputFormat === 'audio/wav') {
     audio = await convertToWav(inputBlob);
   } else if (outputFormat === 'audio/mp3') {
     audio = await convertToMp3(inputBlob, bitrate);
+  } else if (outputFormat === 'audio/ogg') {
+    const inputType = inputBlob.type.split(';')[0].trim();
+    if (inputType === 'audio/webm' || inputType === 'video/webm') {
+      audio = await remuxWebmToOgg(inputBlob);
+    } else if (inputType === 'audio/ogg') {
+      audio = inputBlob;
+    } else {
+      // Browsers that record neither WebM nor OGG (e.g. Safari records
+      // audio/mp4) cannot produce OGG/Opus. Fall back to MP3 so the recording
+      // still sends as a regular audio message instead of failing. The caller
+      // keys the voice-note flag off the returned blob type, so an MP3 result
+      // is never mislabeled as an OGG/Opus voice note.
+      audio = await convertToMp3(inputBlob, bitrate);
+    }
   } else {
     throw new Error('Unsupported output format');
   }

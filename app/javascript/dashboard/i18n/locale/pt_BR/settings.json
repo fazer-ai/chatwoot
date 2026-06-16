@@ -304,6 +304,10 @@
       "INSTAGRAM_STORY_UNAVAILABLE": "Este story não está mais disponível.",
       "INSTAGRAM_STORY_REPLY": "Respondido ao seu story:"
     },
+    "REFERRAL_CARD": {
+      "AD_LABEL": "Veio de um anúncio",
+      "VIEW_AD": "Ver anúncio"
+    },
     "LOCATION_BUBBLE": {
       "SEE_ON_MAP": "Ver Localização"
     },

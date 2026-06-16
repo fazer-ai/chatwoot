@@ -94,6 +94,14 @@ class Inboxes extends CacheEnabledApiClient {
       provider_config: providerConfig,
     });
   }
+
+  enableWhatsappCalling(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/enable_whatsapp_calling`);
+  }
+
+  disableWhatsappCalling(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/disable_whatsapp_calling`);
+  }
 }
 
 export default new Inboxes();

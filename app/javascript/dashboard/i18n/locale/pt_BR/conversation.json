@@ -68,6 +68,7 @@
     "UNSUPPORTED_MESSAGE_FACEBOOK": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo Facebook Messenger.",
     "UNSUPPORTED_MESSAGE_INSTAGRAM": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo do Instagram.",
     "UNSUPPORTED_MESSAGE_TIKTOK": "Esta mensagem não é compatível. Você pode visualizá-la no aplicativo do TikTok.",
+    "UNSUPPORTED_MESSAGE_WHATSAPP": "Esta mensagem não é suportada. Você pode visualizar esta mensagem no aplicativo do WhatsApp.",
     "SUCCESS_DELETE_MESSAGE": "Mensagem excluída com sucesso",
     "FAIL_DELETE_MESSSAGE": "Não foi possível excluir a mensagem! Tente novamente",
     "NO_RESPONSE": "Sem resposta",
@@ -85,13 +86,22 @@
       "OUTGOING_CALL": "Chamada realizada",
       "CALL_IN_PROGRESS": "Chamada em andamento",
       "NO_ANSWER": "Sem resposta",
+      "NO_ANSWER_OUTBOUND_LABEL": "Sem resposta",
+      "NO_ANSWER_OUTBOUND_SUBTEXT": "O contato não atendeu",
       "MISSED_CALL": "Chamada perdida",
+      "MISSED_CALL_INBOUND_SUBTEXT": "Nenhum atendente atendeu",
+      "MISSED_CALL_DECLINED_BY": "Recusado por {agentName}",
       "CALL_ENDED": "Chamada encerrada",
+      "HANDLED_BY": "Atendido por {agentName}",
       "NOT_ANSWERED_YET": "Ainda não respondido",
+      "CALLING": "Chamando…",
       "THEY_ANSWERED": "Eles responderam",
       "YOU_ANSWERED": "Você respondeu",
       "AGENT_ANSWERED": "{agentName} respondeu",
-      "JOIN_CALL": "Entrar na chamada"
+      "JOIN_CALL": "Entrar na chamada",
+      "CALL_BACK": "Retornar chamada",
+      "TRANSCRIPT_SHOW_MORE": "Ver mais",
+      "TRANSCRIPT_SHOW_LESS": "Mostrar menos"
     },
     "HEADER": {
       "RESOLVE_ACTION": "Resolver",
@@ -106,6 +116,12 @@
       "SNOOZED_UNTIL_TOMORROW": "Adiado até amanhã",
       "SNOOZED_UNTIL_NEXT_WEEK": "Adiada até a próxima semana",
       "SNOOZED_UNTIL_NEXT_REPLY": "Adiado até a próxima resposta",
+      "WHATSAPP_CALL": "Iniciar chamada no WhatsApp",
+      "WHATSAPP_CALL_FAILED": "Não foi possível iniciar a chamada no WhatsApp.",
+      "VOICE_CALL": "Iniciar chamada",
+      "VOICE_CALL_FAILED": "Não foi possível iniciar a chamada.",
+      "WHATSAPP_CALL_PERMISSION_REQUESTED": "Solicitação de permissão de chamada enviada ao contato. Tente novamente após a aceitação.",
+      "WHATSAPP_CALL_PERMISSION_PENDING": "Uma solicitação de permissão de chamada já foi enviada recentemente. Tente novamente após o contato aceitar.",
       "SLA_STATUS": {
         "FRT": "FRT {status}",
         "NRT": "NRT {status}",
@@ -277,6 +293,7 @@
     "FILE_SIZE_LIMIT": "O arquivo excede os {MAXIMUM_SUPPORTED_FILE_UPLOAD_SIZE} MB do limite para anexos",
     "FILE_TYPE_NOT_SUPPORTED": "O tipo de arquivo {fileName} não é suportado nesta conversa",
     "MESSAGE_ERROR": "Não foi possível enviar esta mensagem, por favor, tente novamente mais tarde",
+    "MESSAGE_DELETED_BY_CONTACT": "Apagada pelo contato",
     "SENT_BY": "Enviado por:",
     "BOT": "Robôs",
     "WHATSAPP": "WhatsApp",
@@ -342,8 +359,13 @@
       "NOT_ANSWERED_YET": "Ainda não respondido",
       "HANDLED_IN_ANOTHER_TAB": "Sendo atendida em outra aba",
       "REJECT_CALL": "Recusar",
+      "DISMISS_CALL": "Recusar",
       "JOIN_CALL": "Entrar na chamada",
-      "END_CALL": "Encerrar chamada"
+      "END_CALL": "Encerrar chamada",
+      "MUTE": "Silenciar microfone",
+      "UNMUTE": "Desilenciar microfone",
+      "VIEW_CHAT_HISTORY": "Ver histórico da conversa",
+      "GO_TO_CONVERSATION": "Ir para a conversa"
     },
     "INBOX": {
       "WHATSAPP_PROVIDER_CONNECTION": {

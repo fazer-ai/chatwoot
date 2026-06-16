@@ -276,6 +276,37 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'when message is a revoke (contact deleted for everyone)' do
+        let(:original_message) do
+          contact = create(:contact, account: inbox.account, phone_number: '+5511912345678')
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5511912345678')
+          conversation = create(:conversation, contact: contact, inbox: inbox, contact_inbox: contact_inbox)
+          create(:message, conversation: conversation, source_id: 'original_msg_id', content: 'secret message')
+        end
+
+        it 'flags the original message as deleted by the contact and keeps the content' do
+          original_message
+          raw_message[:message] = { protocolMessage: { key: { id: 'original_msg_id' }, type: 'REVOKE' } }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to(change { inbox.messages.count })
+
+          original_message.reload
+          expect(original_message.content).to eq('secret message')
+          expect(original_message.content_attributes['deleted_by_contact']).to be(true)
+        end
+
+        it 'does nothing when the revoked message is unknown' do
+          raw_message[:message] = { protocolMessage: { key: { id: 'unknown_id' }, type: 'REVOKE' } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages).to be_empty
+          expect(inbox.contact_inboxes).to be_empty
+        end
+      end
+
       context 'when message is not from a user' do
         it 'does not create a conversation' do
           raw_message[:key][:remoteJid] = 'status@broadcast'
@@ -552,6 +583,26 @@ describe Whatsapp::IncomingMessageBaileysService do
           reaction = message.conversation.messages.last
           expect(reaction.is_reaction).to be(true)
           expect(reaction.in_reply_to).to eq(message.id)
+          expect(reaction.in_reply_to_external_id).to eq(message.source_id)
+        end
+
+        it 'anchors the reaction to the target message conversation when it is resolved instead of opening a new one' do
+          message.conversation.update!(status: :resolved)
+          raw_message[:key][:id] = 'reaction_123'
+          raw_message[:message] = {
+            reactionMessage: {
+              key: { remoteJid: '12345678@lid', fromMe: true, id: 'msg_123' },
+              text: '👍'
+            }
+          }
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to change(Conversation, :count)
+
+          reaction = message.conversation.reload.messages.last
+          expect(reaction.is_reaction).to be(true)
+          expect(reaction.conversation_id).to eq(message.conversation.id)
           expect(reaction.in_reply_to_external_id).to eq(message.source_id)
         end
 
@@ -945,6 +996,25 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(contact_inbox.source_id).to eq('12345678')
           expect(contact.reload.identifier).to eq('12345678@lid')
           expect(contact.phone_number).to eq('+5511912345678')
+        end
+
+        it 'reuses a contact saved with the Brazilian ninth digit when the reply arrives without it' do
+          # Regression: the agent saved the number with the ninth digit and outbound
+          # normalization was skipped; the reply delivers the canonical number without
+          # it and must not spawn a duplicate contact in a new conversation.
+          raw_message[:key][:remoteJidAlt] = '551112345678@s.whatsapp.net'
+          contact = create(:contact, account: inbox.account, phone_number: '+5511912345678', identifier: nil)
+          contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678')
+          conversation = create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.not_to change(Contact, :count)
+
+          expect(contact_inbox.reload.source_id).to eq('12345678')
+          expect(contact.reload.identifier).to eq('12345678@lid')
+          expect(contact.phone_number).to eq('+551112345678')
+          expect(conversation.reload.messages.last.content).to eq('Hello from Baileys')
         end
 
         it 'does not update contact_inbox if source_id is already LID' do

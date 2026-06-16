@@ -171,7 +171,7 @@ describe Messages::MessageBuilder do
 
         message = message_builder
 
-        expect(message.attachments.first.meta).to be_nil
+        expect(message.attachments.first.meta).to eq({})
       end
 
       it 'merges is_recorded_audio with attachments_metadata' do
@@ -242,6 +242,35 @@ describe Messages::MessageBuilder do
           message = message_builder
           expect(message.attachments.first.file_type).to eq 'image'
         end
+      end
+    end
+
+    context 'when is_voice_message is true' do
+      let(:params) do
+        ActionController::Parameters.new({
+                                           content: 'test',
+                                           attachments: [Rack::Test::UploadedFile.new('spec/assets/sample.ogg', 'audio/ogg')],
+                                           is_voice_message: true
+                                         })
+      end
+
+      it 'sets is_voice_message in attachment meta' do
+        message = message_builder
+        expect(message.attachments.first.meta).to include('is_voice_message' => true)
+      end
+    end
+
+    context 'when is_voice_message is not provided' do
+      let(:params) do
+        ActionController::Parameters.new({
+                                           content: 'test',
+                                           attachments: [Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png')]
+                                         })
+      end
+
+      it 'does not set is_voice_message in attachment meta' do
+        message = message_builder
+        expect(message.attachments.first.meta).not_to include('is_voice_message')
       end
     end
 

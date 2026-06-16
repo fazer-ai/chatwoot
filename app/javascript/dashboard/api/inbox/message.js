@@ -8,11 +8,11 @@ export const buildCreatePayload = ({
   contentAttributes,
   echoId,
   files,
-  isRecordedAudio,
   ccEmails = '',
   bccEmails = '',
   toEmails = '',
   templateParams,
+  isVoiceMessage = false,
 }) => {
   let payload;
   if (files && files.length !== 0) {
@@ -23,13 +23,6 @@ export const buildCreatePayload = ({
     files.forEach(file => {
       payload.append('attachments[]', file);
     });
-    if (isRecordedAudio === true) {
-      payload.append('is_recorded_audio', true);
-    } else if (Array.isArray(isRecordedAudio)) {
-      isRecordedAudio.forEach(filename => {
-        payload.append('is_recorded_audio[]', filename);
-      });
-    }
     payload.append('private', isPrivate);
     payload.append('echo_id', echoId);
     payload.append('cc_emails', ccEmails);
@@ -40,6 +33,9 @@ export const buildCreatePayload = ({
     }
     if (contentAttributes) {
       payload.append('content_attributes', JSON.stringify(contentAttributes));
+    }
+    if (isVoiceMessage) {
+      payload.append('is_voice_message', true);
     }
   } else {
     payload = {
@@ -68,11 +64,11 @@ class MessageApi extends ApiClient {
     contentAttributes,
     echo_id: echoId,
     files,
-    isRecordedAudio,
     ccEmails = '',
     bccEmails = '',
     toEmails = '',
     templateParams,
+    isVoiceMessage = false,
   }) {
     return axios({
       method: 'post',
@@ -83,11 +79,11 @@ class MessageApi extends ApiClient {
         contentAttributes,
         echoId,
         files,
-        isRecordedAudio,
         ccEmails,
         bccEmails,
         toEmails,
         templateParams,
+        isVoiceMessage,
       }),
     });
   }

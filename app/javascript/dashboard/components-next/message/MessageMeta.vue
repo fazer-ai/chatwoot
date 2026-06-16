@@ -225,6 +225,10 @@ const isEdited = computed(() => {
 const previousContent = computed(() => {
   return contentAttributes.value?.previousContent || '';
 });
+
+const deletedByContact = computed(() => {
+  return contentAttributes.value?.deletedByContact === true;
+});
 </script>
 
 <template>
@@ -251,6 +255,16 @@ const previousContent = computed(() => {
       class="inline-flex items-center gap-0.5"
     >
       <Icon icon="i-lucide-pencil" class="size-3" />
+    </span>
+    <span
+      v-if="deletedByContact"
+      v-tooltip.top="{
+        content: t('CONVERSATION.MESSAGE_DELETED_BY_CONTACT'),
+        delay: { show: 300, hide: 0 },
+      }"
+      class="inline-flex items-center gap-0.5"
+    >
+      <Icon icon="i-lucide-trash-2" class="size-3" />
     </span>
     <Icon v-if="isPrivate" icon="i-lucide-lock-keyhole" class="size-3" />
     <MessageStatus v-if="showStatusIndicator" :status="statusToShow" />

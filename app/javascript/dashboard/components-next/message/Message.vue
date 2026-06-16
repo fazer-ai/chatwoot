@@ -31,9 +31,11 @@ import FileBubble from './bubbles/File.vue';
 import AudioBubble from './bubbles/Audio.vue';
 import VideoBubble from './bubbles/Video.vue';
 import EmbedBubble from './bubbles/Embed.vue';
+import FallbackBubble from './bubbles/Fallback.vue';
 import InstagramStoryBubble from './bubbles/InstagramStory.vue';
 import EmailBubble from './bubbles/Email/Index.vue';
 import UnsupportedBubble from './bubbles/Unsupported.vue';
+import RichMessageBubble from './bubbles/RichMessage.vue';
 import ContactBubble from './bubbles/Contact.vue';
 import DyteBubble from './bubbles/Dyte.vue';
 import LocationBubble from './bubbles/Location.vue';
@@ -360,6 +362,8 @@ const componentToRender = computed(() => {
   if (Array.isArray(props.attachments) && props.attachments.length === 1) {
     const fileType = props.attachments[0].fileType;
 
+    if (fileType === ATTACHMENT_TYPES.FALLBACK) return FallbackBubble;
+
     if (!props.content) {
       if (fileType === ATTACHMENT_TYPES.IMAGE) return ImageBubble;
       if (fileType === ATTACHMENT_TYPES.FILE) return FileBubble;
@@ -371,6 +375,10 @@ const componentToRender = computed(() => {
     }
     // Attachment content is the name of the contact
     if (fileType === ATTACHMENT_TYPES.CONTACT) return ContactBubble;
+  }
+
+  if (props.contentAttributes?.rich) {
+    return RichMessageBubble;
   }
 
   return TextBubble;
@@ -402,6 +410,7 @@ const payloadForContextMenu = computed(() => {
 const contextMenuEnabledOptions = computed(() => {
   const hasText = !!props.content;
   const hasAttachments = !!(props.attachments && props.attachments.length > 0);
+  const hasRichContent = !!props.contentAttributes?.rich;
 
   const isOutgoing = props.messageType === MESSAGE_TYPES.OUTGOING;
   const isFailedOrProcessing =
@@ -411,7 +420,7 @@ const contextMenuEnabledOptions = computed(() => {
   return {
     copy: hasText,
     delete:
-      (hasText || hasAttachments) &&
+      (hasText || hasAttachments || hasRichContent) &&
       !isFailedOrProcessing &&
       !isMessageDeleted.value,
     cannedResponse: isOutgoing && hasText && !isMessageDeleted.value,
@@ -498,6 +507,7 @@ const shouldRenderMessage = computed(() => {
     props.contentType === CONTENT_TYPES.INTEGRATIONS;
   const isFailedMessage = props.status === MESSAGE_STATUS.FAILED;
   const hasExternalError = !!props.contentAttributes?.externalError;
+  const hasRichContent = !!props.contentAttributes?.rich;
 
   return (
     hasAttachments ||
@@ -506,7 +516,8 @@ const shouldRenderMessage = computed(() => {
     isUnsupported ||
     isAnIntegrationMessage ||
     isFailedMessage ||
-    hasExternalError
+    hasExternalError ||
+    hasRichContent
   );
 });
 
@@ -740,11 +751,10 @@ provideMessageContext({
           {{ sender?.name }}
         </span>
         <div
-          class="flex"
+          class="flex min-w-0"
           :class="{
             'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
             'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
-            'min-w-0': variant === MESSAGE_VARIANTS.EMAIL,
           }"
         >
           <div class="relative">

@@ -318,7 +318,6 @@ const resetToDefault = () => {
       :placeholder="$t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE.PLACEHOLDER')"
       channel-type="Context::MessageSignature"
       :enable-suggestions="false"
-      show-image-resize-toolbar
     />
     <div
       class="flex flex-col gap-3 p-4 bg-n-slate-1 dark:bg-n-slate-2 rounded-lg border border-n-slate-4 dark:border-n-slate-8"

@@ -37,6 +37,13 @@ export const getValuesName = (values, list, idKey, nameKey) => {
   };
 };
 
+const getValuesForContact = (values, contacts) => ({
+  id: values[0],
+  name:
+    contacts?.find(contact => contact.id === values[0])?.name ||
+    `Contact #${values[0]}`,
+});
+
 export const getValuesForStatus = values => {
   return values.map(value => ({ id: value, name: value }));
 };
@@ -89,6 +96,7 @@ export const getValuesForFilter = (filter, params) => {
     labels,
     priority,
     group_type: groupType = [],
+    contacts,
   } = params;
   switch (attribute_key) {
     case 'status':
@@ -99,6 +107,8 @@ export const getValuesForFilter = (filter, params) => {
       return getValuesName(values, inboxes, 'id', 'name');
     case 'team_id':
       return getValuesName(values, teams, 'id', 'name');
+    case 'contact_id':
+      return getValuesForContact(values, contacts);
     case 'campaign_id':
       return getValuesName(values, campaigns, 'id', 'title');
     case 'labels':

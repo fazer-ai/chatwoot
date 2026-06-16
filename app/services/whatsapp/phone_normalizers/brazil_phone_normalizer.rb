@@ -18,6 +18,20 @@ class Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer < Whatsapp::PhoneNormali
     normalized_number
   end
 
+  # A Brazilian mobile number may be registered on WhatsApp with or without the
+  # ninth digit, so both forms are variants of the same line.
+  def variants(waid)
+    return [waid] unless handles_country?(waid)
+
+    ddd = waid[COUNTRY_CODE_LENGTH, DDD_LENGTH]
+    number = waid[(COUNTRY_CODE_LENGTH + DDD_LENGTH)..]
+
+    candidates = [waid]
+    candidates << "55#{ddd}9#{number}" if number.length == 8
+    candidates << "55#{ddd}#{number[1..]}" if number.length == 9 && number.start_with?('9')
+    candidates
+  end
+
   private
 
   def country_code_pattern

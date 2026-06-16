@@ -5,7 +5,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
 
   attr_reader :message
 
-  def initialize(user, conversation, params) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def initialize(user, conversation, params) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     @params = params
     @private = params[:private] || false
     @conversation = conversation
@@ -14,6 +14,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @message_type = params[:message_type] || 'outgoing'
     @attachments = params[:attachments]
     @is_recorded_audio = params[:is_recorded_audio]
+    @is_voice_message = ActiveModel::Type::Boolean.new.cast(params[:is_voice_message])
     @transcode_audio = params[:transcode_audio]
     @attachments_metadata = normalize_attachments_metadata(params[:attachments_metadata])
     @automation_rule = content_attributes&.dig(:automation_rule_id)
@@ -60,16 +61,26 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
         account_id: @message.account_id,
         file: uploaded_attachment
       )
-      attachment.meta = process_metadata(uploaded_attachment)
-      attachment.file_type = if uploaded_attachment.is_a?(String)
-                               file_type_by_signed_id(
-                                 uploaded_attachment
-                               )
-                             else
-                               file_type(uploaded_attachment&.content_type)
-                             end
+      metadata = process_metadata(uploaded_attachment)
+      attachment.meta = metadata if metadata.present?
+      attachment.file_type = attachment_file_type(uploaded_attachment)
+      tag_voice_message(attachment)
       transcode_attachment(attachment, file_like_source(uploaded_attachment)) if should_transcode?(attachment)
     end
+  end
+
+  def attachment_file_type(uploaded_attachment)
+    if uploaded_attachment.is_a?(String)
+      file_type_by_signed_id(uploaded_attachment)
+    else
+      file_type(uploaded_attachment&.content_type)
+    end
+  end
+
+  def tag_voice_message(attachment)
+    return unless @is_voice_message && attachment.file_type == 'audio'
+
+    attachment.meta = (attachment.meta || {}).merge('is_voice_message' => true)
   end
 
   def process_metadata(attachment)

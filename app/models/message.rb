@@ -115,11 +115,15 @@ class Message < ApplicationRecord
   # [:is_reaction] : Used to denote if the message is a reaction and differentiate it from a simple reply message
   # [:is_edited, :previous_content] : Used to indicated edited message and previous content (before edit)
   # [:zapi_args] : Used to pass additional arguments specific to Z-API WhatsApp provider
+  # [:referral] : Click-to-WhatsApp ad metadata (source ad, headline, ctwa_clid, ...) attached to the first message after an ad click
+  # [:rich] : Structured WhatsApp "rich" message (template/interactive/buttons/list) with title/body/footer/buttons rendered as a card
+  # [:deleted_by_contact] : The contact deleted/revoked the message on WhatsApp; we keep the content visible and only flag it
 
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data,
-                                         :is_reaction, :is_edited, :previous_content, :zapi_args], coder: JSON
+                                         :is_reaction, :is_edited, :previous_content, :zapi_args, :referral, :rich,
+                                         :deleted_by_contact], coder: JSON
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 
@@ -384,6 +388,13 @@ class Message < ApplicationRecord
   end
 
   def set_waiting_since_on_incoming_message
+    # Reactions are annotations, not a new turn awaiting a reply; treating an
+    # incoming reaction as one would push an already-attended conversation back
+    # into the unattended queue (and leave it stuck there, since removals don't
+    # create a Message that could clear it). Mirrors the reaction guard on the
+    # outgoing side (`human_response?`).
+    return if reaction?
+
     # Set waiting_since when customer sends a message (if currently blank)
     conversation.update!(waiting_since: created_at) if incoming? && conversation.waiting_since.blank?
   end

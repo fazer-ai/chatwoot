@@ -109,6 +109,43 @@ describe Whatsapp::Providers::WhatsappCloudService do
         expect(service.send_message('+123456789', message)).to eq 'message_id'
       end
 
+      it 'calls message endpoints for audio voice message with voice flag' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_voice_message' => true })
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'voice.ogg', content_type: 'audio/ogg')
+
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(
+            body: hash_including({
+                                   messaging_product: 'whatsapp',
+                                   to: '+123456789',
+                                   type: 'audio',
+                                   audio: WebMock::API.hash_including({ link: anything, voice: true })
+                                 })
+          )
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+      end
+
+      it 'calls message endpoints for regular audio attachment without voice flag' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'audio.ogg', content_type: 'audio/ogg')
+
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(
+            body: hash_including({
+                                   messaging_product: 'whatsapp',
+                                   to: '+123456789',
+                                   type: 'audio'
+                                 })
+          )
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+        result = service.send_message('+123456789', message)
+        expect(result).to eq 'message_id'
+        expect(WebMock).not_to(have_requested(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with { |req| JSON.parse(req.body).dig('audio', 'voice') })
+      end
+
       it 'does not send voice flag for recorded audio in non-ogg format' do
         attachment = message.attachments.new(account_id: message.account_id, file_type: :audio, meta: { 'is_recorded_audio' => true })
         attachment.file.attach(io: Rails.root.join('spec/assets/sample.mp3').open, filename: 'sample.mp3', content_type: 'audio/mpeg')

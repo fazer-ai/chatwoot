@@ -11,6 +11,12 @@ class Whatsapp::PhoneNormalizers::BasePhoneNormalizer
     raise NotImplementedError, 'Subclasses must implement #normalize'
   end
 
+  # All forms the number may appear as on WhatsApp (including itself).
+  # Country normalizers override this when numbers have known variants.
+  def variants(waid)
+    [waid]
+  end
+
   private
 
   def country_code_pattern

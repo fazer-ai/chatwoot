@@ -65,7 +65,8 @@
             "INTERNAL_CHAT_MESSAGE_CREATED": "Internal chat message created",
             "INTERNAL_CHAT_MESSAGE_UPDATED": "Internal chat message updated",
             "INTERNAL_CHAT_MESSAGE_DELETED": "Internal chat message deleted",
-            "INTERNAL_CHAT_CHANNEL_UPDATED": "Internal chat channel updated"
+            "INTERNAL_CHAT_CHANNEL_UPDATED": "Internal chat channel updated",
+            "INBOX_UPDATED": "Inbox updated"
           }
         },
         "NAME": {

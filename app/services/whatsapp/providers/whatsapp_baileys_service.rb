@@ -571,7 +571,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       content[:image] = buffer
     when 'audio'
       content[:audio] = buffer
-      content[:ptt] = attachment.meta&.dig('is_recorded_audio')
+      content[:ptt] = true if voice_note_attachment?(attachment)
     when 'file'
       content[:document] = buffer
       content[:mimetype] = attachment.file.content_type
@@ -582,6 +582,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
 
     content.compact
+  end
+
+  # `is_recorded_audio` is the legacy fazer.ai meta key (transcode pipeline and old messages).
+  def voice_note_attachment?(attachment)
+    meta = attachment.meta || {}
+    meta['is_voice_message'].present? || meta['is_recorded_audio'].present?
   end
 
   def send_message_request

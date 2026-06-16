@@ -6,6 +6,7 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   retry_on LockAcquisitionError, wait: 2.seconds, attempts: 20
 
   def perform(params = {})
+    dump_raw_payload(params)
     channel = find_channel_from_whatsapp_business_payload(params)
 
     if channel_is_inactive?(channel)
@@ -91,22 +92,65 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
 
   private
 
+  # Debug aid for non-production only: set WHATSAPP_WEBHOOK_DEBUG=true to log the
+  # raw inbound webhook payload (Baileys or Cloud) so you can capture a real
+  # Click-to-WhatsApp ad referral / externalAdReply and replay it later. Logs
+  # full message content, so it never runs in production and is off by default.
+  def dump_raw_payload(params)
+    return if Rails.env.production?
+    return unless ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_WEBHOOK_DEBUG', false))
+
+    Rails.logger.info("[WhatsappWebhookDebug] #{params.to_json}")
+  end
+
   # Echo payloads reverse the fields — `from` is the business number and `to` is the contact.
   # Returns nil for status-only webhooks so they bypass the lock.
   def contact_sender_id(params)
     value = params.dig(:entry, 0, :changes, 0, :value) || params
-    message = (value[:messages] || value[:message_echoes])&.first
+    return contact_sender_id_from_message_echoes(value[:message_echoes]) if value[:message_echoes].present?
+
+    contact_sender_id_from_messages(value[:messages], value[:contacts])
+  end
+
+  # Echo payloads are outbound messages from the WhatsApp Business app, so `to`
+  # points to the contact. Prefer parent BSUID when present so payloads that have
+  # both regular+parent BSUIDs serialize with parent-BSUID-only payloads.
+  def contact_sender_id_from_message_echoes(message_echoes)
+    message = message_echoes&.first
     return if message.blank?
 
-    message[:to] || message[:from]
+    [message[:to_parent_user_id], message[:to_user_id], message[:to]].compact_blank.first
+  end
+
+  # Regular inbound payloads are sent by the contact, so `from` points to the
+  # contact. Prefer parent BSUID when present so payloads that have both
+  # regular+parent BSUIDs serialize with parent-BSUID-only payloads.
+  def contact_sender_id_from_messages(messages, contacts)
+    message = messages&.first
+    return if message.blank?
+
+    contact = contacts&.first || {}
+
+    [
+      message[:from_parent_user_id],
+      contact[:parent_user_id],
+      message[:from_user_id],
+      contact[:user_id],
+      message[:from]
+    ].compact_blank.first
   end
 
   def channel_is_inactive?(channel)
     return true if channel.blank?
-    return true if channel.reauthorization_required?
+    # Only skip for embedded signup when reauth is required; manual flow uses API keys and should still receive webhooks
+    return true if channel.reauthorization_required? && embedded_signup_channel?(channel)
     return true unless channel.account.active?
 
     false
+  end
+
+  def embedded_signup_channel?(channel)
+    (channel.provider_config || {}).to_h['source'] == 'embedded_signup'
   end
 
   def find_channel_by_url_param(params)
