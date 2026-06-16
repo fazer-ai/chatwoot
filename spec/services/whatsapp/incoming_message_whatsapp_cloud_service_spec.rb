@@ -377,6 +377,59 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         end
       end
     end
+
+    # Regression coverage for out-of-order status acks. Meta retries each
+    # status (sent / delivered / read) independently and async deliveries
+    # can land an older status after a newer one already arrived — without
+    # this guard the checkmark would rewind in the UI.
+    describe 'status update ordering' do
+      let(:conversation_for_status) do
+        create(:conversation, account: whatsapp_channel.account, inbox: whatsapp_channel.inbox)
+      end
+      let!(:tracked_message) do
+        create(:message, account: whatsapp_channel.account, inbox: whatsapp_channel.inbox,
+                         conversation: conversation_for_status, source_id: 'wamid.PHBgNTUx', status: :read)
+      end
+
+      def status_payload(new_status, errors: nil)
+        status_entry = { id: tracked_message.source_id, status: new_status, timestamp: '1664799904',
+                         recipient_id: '2423423243' }
+        status_entry[:errors] = errors if errors
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{ changes: [{ value: { statuses: [status_entry] } }] }]
+        }.with_indifferent_access
+      end
+
+      it 'ignores a delivered ack that arrives after read' do
+        described_class.new(inbox: whatsapp_channel.inbox, params: status_payload('delivered')).perform
+        expect(tracked_message.reload.status).to eq('read')
+      end
+
+      it 'ignores a sent ack that arrives after delivered' do
+        tracked_message.update!(status: :delivered)
+        described_class.new(inbox: whatsapp_channel.inbox, params: status_payload('sent')).perform
+        expect(tracked_message.reload.status).to eq('delivered')
+      end
+
+      it 'still advances forward: sent → delivered → read' do
+        tracked_message.update!(status: :sent)
+        described_class.new(inbox: whatsapp_channel.inbox, params: status_payload('delivered')).perform
+        expect(tracked_message.reload.status).to eq('delivered')
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: status_payload('read')).perform
+        expect(tracked_message.reload.status).to eq('read')
+      end
+
+      it 'always applies a failed status even when one had already been read' do
+        described_class.new(inbox: whatsapp_channel.inbox,
+                            params: status_payload('failed', errors: [{ code: 131_026, title: 'Re-engagement message' }])).perform
+
+        expect(tracked_message.reload.status).to eq('failed')
+        expect(tracked_message.reload.external_error).to eq('131026: Re-engagement message')
+      end
+    end
   end
 
   # Métodos auxiliares para reduzir o tamanho do exemplo

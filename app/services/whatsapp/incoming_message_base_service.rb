@@ -4,6 +4,13 @@
 class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   include ::Whatsapp::IncomingMessageServiceHelpers
 
+  # Forward-only ranking of the three "progress" statuses Meta delivers
+  # for a message. `failed` is terminal and intentionally NOT in this
+  # list — any status (including `failed`) can move forward when the
+  # current state has no rank, but a smaller-or-equal rank cannot
+  # overwrite a larger one.
+  STATUS_PROGRESS_RANK = { 'sent' => 0, 'delivered' => 1, 'read' => 2 }.freeze
+
   pattr_initialize [:inbox!, :params!, :outgoing_echo]
 
   def perform
@@ -101,12 +108,31 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   end
 
   def update_message_with_status(message, status)
-    message.status = status[:status]
-    if status[:status] == 'failed' && status[:errors].present?
+    new_status = status[:status]
+    return if regressive_status_update?(message.status, new_status)
+
+    message.status = new_status
+    if new_status == 'failed' && status[:errors].present?
       error = status[:errors]&.first
       message.external_error = "#{error[:code]}: #{error[:title]}"
     end
     message.save!
+  end
+
+  # Meta retries each status (sent / delivered / read) independently, so
+  # async deliveries can land an older status after a newer one already
+  # arrived — e.g. `delivered` arriving after `read` was already saved.
+  # Without this guard the checkmark rewinds in the UI, which is more
+  # confusing than a missed update. `failed` is always allowed through
+  # because it carries the external_error payload we need on the message.
+  def regressive_status_update?(current_status, new_status)
+    return false if new_status == 'failed'
+
+    current_rank = STATUS_PROGRESS_RANK[current_status]
+    new_rank = STATUS_PROGRESS_RANK[new_status]
+    return false if current_rank.nil? || new_rank.nil?
+
+    new_rank <= current_rank
   end
 
   def create_messages
