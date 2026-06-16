@@ -66,18 +66,45 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
     end
 
     context 'when the payload is an inbound WhatsApp Cloud message' do
-      it 'routes "messages" field to :whatsapp_messages' do
+      it 'routes "messages" field carrying a messages array to :whatsapp_messages' do
         post '/webhooks/whatsapp/123221321',
-             params: { object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'messages', value: {} }] }] }
+             params: {
+               object: 'whatsapp_business_account',
+               entry: [{ changes: [{ field: 'messages', value: { messages: [{ id: 'wamid.x' }] } }] }]
+             }
 
         expect(queues_seen).to eq([:whatsapp_messages])
       end
 
-      it 'routes "smb_message_echoes" field to :whatsapp_messages' do
+      it 'routes "smb_message_echoes" field carrying a message_echoes array to :whatsapp_messages' do
         post '/webhooks/whatsapp/123221321',
-             params: { object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'smb_message_echoes', value: {} }] }] }
+             params: {
+               object: 'whatsapp_business_account',
+               entry: [{ changes: [{ field: 'smb_message_echoes', value: { message_echoes: [{ id: 'wamid.x' }] } }] }]
+             }
 
         expect(queues_seen).to eq([:whatsapp_messages])
+      end
+    end
+
+    # The Cloud API uses `field: messages` as the envelope for both real
+    # inbound messages and status acks (sent / delivered / read). Routing
+    # both to :whatsapp_messages drowned real messages behind cosmetic
+    # checkmark updates during peak traffic.
+    context 'when the payload is a WhatsApp Cloud status ack (sent/delivered/read)' do
+      it 'routes "messages" field carrying only a statuses array to :whatsapp_statuses' do
+        post '/webhooks/whatsapp/123221321',
+             params: {
+               object: 'whatsapp_business_account',
+               entry: [{
+                 changes: [{
+                   field: 'messages',
+                   value: { statuses: [{ id: 'wamid.x', status: 'delivered' }] }
+                 }]
+               }]
+             }
+
+        expect(queues_seen).to eq([:whatsapp_statuses])
       end
     end
 
