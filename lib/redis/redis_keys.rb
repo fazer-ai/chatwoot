@@ -55,4 +55,10 @@ module Redis::RedisKeys
 
   ## Account Email Rate Limiting
   ACCOUNT_OUTBOUND_EMAIL_COUNT_KEY = 'OUTBOUND_EMAIL_COUNT::%<account_id>d::%<date>s'.freeze
+
+  ## Baileys avatar fetch throttle — caps profile-picture lookups to one
+  ## per contact per day. Without this every inbound message enqueues a
+  ## job that hits baileys-api, which dominates the :low queue when a
+  ## contact sends a burst.
+  BAILEYS_AVATAR_ATTEMPT = 'BAILEYS::AVATAR_ATTEMPT::%<contact_id>d'.freeze
 end
