@@ -103,3 +103,7 @@ CLAUDE.local.md
 .pnpm-store/*
 local/
 Procfile.worktree
+
+# graphify knowledge-graph output (regenerable via /graphify)
+graphify-out/
+ARCHIVE_old_*.tgz
