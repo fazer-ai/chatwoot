@@ -199,6 +199,14 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     phone = contact ? target_contact.phone_number&.delete('+') : extract_from_jid(type: 'pn')
     return if phone.blank?
 
+    # Throttle: one fetch attempt per contact per day. Without this every
+    # inbound message from a contact without a public avatar enqueues a
+    # new job — a contact sending 20 messages produced 20 identical jobs
+    # all hitting baileys-api, which dominated the :low queue and slowed
+    # everything else on it (templates sync, retries, etc).
+    attempt_key = format(Redis::RedisKeys::BAILEYS_AVATAR_ATTEMPT, contact_id: target_contact.id)
+    return unless Redis::Alfred.set(attempt_key, 1, nx: true, ex: 24.hours)
+
     Channels::Whatsapp::BaileysUpdateContactAvatarJob.perform_later(target_contact, inbox, phone)
   end
 

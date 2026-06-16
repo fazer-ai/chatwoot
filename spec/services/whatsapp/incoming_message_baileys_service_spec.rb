@@ -216,6 +216,32 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect(Channels::Whatsapp::BaileysUpdateContactAvatarJob).not_to have_been_enqueued
         end
+
+        # Regression guard: avatar fetch used to fan out one job per inbound
+        # message — a contact sending 20 messages caused 20 baileys-api calls.
+        # The throttle caps the enqueue at one per contact per 24h.
+        it 'only enqueues the avatar update job once per contact within the throttle window' do
+          described_class.new(inbox: inbox, params: params).perform
+          raw_message[:key][:id] = 'msg_124'
+          described_class.new(inbox: inbox, params: params).perform
+          raw_message[:key][:id] = 'msg_125'
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Channels::Whatsapp::BaileysUpdateContactAvatarJob).to have_been_enqueued.once
+        end
+
+        it 'enqueues again after the throttle window expires' do
+          described_class.new(inbox: inbox, params: params).perform
+
+          contact = inbox.conversations.last.contact
+          throttle_key = format(Redis::RedisKeys::BAILEYS_AVATAR_ATTEMPT, contact_id: contact.id)
+          Redis::Alfred.delete(throttle_key)
+
+          raw_message[:key][:id] = 'msg_124'
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Channels::Whatsapp::BaileysUpdateContactAvatarJob).to have_been_enqueued.twice
+        end
       end
 
       context 'when message type is unsupported' do
