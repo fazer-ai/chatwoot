@@ -51,11 +51,26 @@ No remaining blocker — production deploy is the same clean image swap as stagi
 
 ## Backup (mandatory — this is your real rollback)
 
+> ⚠️ **Pick the right container.** This host runs multiple Postgres instances, and the
+> *staging* container holds an **empty leftover `chatwoot_production`**. Backing that up would
+> produce a useless dump. The live production DB is `postgres-f8kkkgcsko4sogs88k8c80ok`
+> (verify by data freshness, below). Also: `$SERVICE_USER_POSTGRES` is **not** set in the host
+> shell — evaluate the user *inside* the container (`$POSTGRES_USER`).
+
 ```bash
-PG=$(docker ps --format '{{.Names}}' | grep -i postgres | head -1)
-docker exec "$PG" pg_dump -U "$SERVICE_USER_POSTGRES" -Fc chatwoot_production \
+# 1. Confirm which container holds the LIVE chatwoot_production (recent data, non-zero count):
+for c in $(docker ps --format '{{.Names}}' | grep -i postgres); do
+  echo "=== $c ==="
+  docker exec "$c" sh -c 'psql -U "$POSTGRES_USER" -d chatwoot_production -tAc \
+    "select now()-max(created_at) as age, count(*) as convos from conversations"' 2>/dev/null
+done
+# (the one with recent age + non-zero convos is live; the empty one is the staging leftover)
+
+# 2. Dump it (user/db evaluated inside the container):
+PG=postgres-f8kkkgcsko4sogs88k8c80ok        # <-- the confirmed-live container
+docker exec "$PG" sh -c 'pg_dump -U "$POSTGRES_USER" -Fc chatwoot_production' \
   > ~/chatwoot_production_pre-v4.14.2_$(date +%Y%m%d_%H%M).dump
-ls -lh ~/chatwoot_production_pre-v4.14.2_*.dump   # confirm non-zero size
+ls -lh ~/chatwoot_production_pre-v4.14.2_*.dump   # confirm a real size (MBs), not 0
 ```
 
 (See also `deployment/MANUAL_BACKUP_PRODUCTION.md`.)
@@ -74,12 +89,14 @@ All validated on staging, but production data is larger/older — watch these in
   tables.
 - **Concurrent indexes** — a few `algorithm: :concurrently` indexes (won't block, but add time).
 
-Optional pre-check for the FK migration:
+Pre-check for the FK migration — run directly against the **live production** DB (avoids
+picking the wrong Rails/Postgres container):
 
 ```bash
-RAILS=$(docker ps --format '{{.Names}}' | grep -i rails | head -1)
-docker exec "$RAILS" bundle exec rails runner \
-  "puts Conversation.where.not(contact_id: Contact.select(:id)).count"   # expect 0
+docker exec postgres-f8kkkgcsko4sogs88k8c80ok sh -c \
+  'psql -U "$POSTGRES_USER" -d chatwoot_production -tAc \
+   "select count(*) from conversations c where not exists (select 1 from contacts ct where ct.id = c.contact_id)"'
+# expect 0; if > 0, those orphaned conversations must be cleaned before the FK migration
 ```
 
 ## Upgrade Steps
@@ -129,10 +146,11 @@ Because of the destructive migrations, **reverting the image alone is NOT enough
 
 1. In Coolify, set both services back to `ghcr.io/lucouto/chatwoot.fazer.ai:v4.10.0-fazer-ai.16-ee`
    (restore the previous compose; the Azure mount is abandoned and need not be re-added).
-2. Restore the DB from the pre-upgrade dump:
+2. Restore the DB from the pre-upgrade dump (target the live production container; user
+   evaluated inside it):
    ```bash
-   PG=$(docker ps --format '{{.Names}}' | grep -i postgres | head -1)
-   docker exec -i "$PG" pg_restore -U "$SERVICE_USER_POSTGRES" -d chatwoot_production --clean --if-exists \
+   PG=postgres-f8kkkgcsko4sogs88k8c80ok
+   docker exec -i "$PG" sh -c 'pg_restore -U "$POSTGRES_USER" -d chatwoot_production --clean --if-exists' \
      < ~/chatwoot_production_pre-v4.14.2_YYYYMMDD_HHMM.dump
    ```
 3. Redeploy and verify version is back to `4.10.0-fazer-ai.16`.
