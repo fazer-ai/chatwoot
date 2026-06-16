@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.27.1
+  published_at: '2026-06-16T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Connecting an Instagram inbox works again.** The "Failed to exchange token" error that appeared when adding a new Instagram inbox is fixed.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Conexão de inbox do Instagram voltou a funcionar.** O erro "Failed to exchange token" que aparecia ao adicionar uma inbox nova de Instagram foi corrigido.
 - tag: v4.13.0-auris.1.27
   published_at: '2026-06-16T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27
@@ -283,15 +295,3 @@
 
       - **Painel do Simulador volta a abrir em produção.** O painel flutuante do Simulador de WhatsApp estava abrindo vazio em produção por um conflito de cabeçalho na tela embedada; agora carrega normalmente.
       - **Nome da fase do funil sem espaços sobrando.** A fase "Comparecimento (ganho)" e o KPI equivalente no relatório de Conversão não têm mais espaços extras dentro dos parênteses.
-- tag: v4.13.0-auris.1.22.1
-  published_at: '2026-05-23T14:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Simulator inbox shows the correct label.** On test accounts, the **Simulator** inbox was listed with a raw technical key instead of a readable name; it now shows up as "Simulator" in the inbox list.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Caixa de entrada do Simulador com o rótulo certo.** Em contas de teste, a inbox **Simulador** estava sendo listada com um texto técnico ilegível; agora aparece como "Simulador" na lista de caixas de entrada.
