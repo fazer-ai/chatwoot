@@ -35,17 +35,21 @@ RSpec.describe InstagramConcern do
     let(:mock_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
 
     before do
-      allow(HTTParty).to receive(:get).and_return(mock_response)
+      allow(HTTParty).to receive(:post).and_return(mock_response)
       allow(mock_response).to receive(:inspect).and_return(response_body)
     end
 
-    it 'exchanges short lived token for long lived token' do
+    # Regression: Meta started rejecting GET on this endpoint with
+    # `IGApiException code 100: "Unsupported request - method type: get"`
+    # after the Basic Display API was sunset. The Business Login flow
+    # requires POST for the long-lived token exchange.
+    it 'exchanges short lived token for long lived token via POST' do
       result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
 
-      expect(HTTParty).to have_received(:get).with(
+      expect(HTTParty).to have_received(:post).with(
         'https://graph.instagram.com/access_token',
         {
-          query: {
+          body: {
             grant_type: 'ig_exchange_token',
             client_secret: client_secret,
             access_token: short_lived_token,
