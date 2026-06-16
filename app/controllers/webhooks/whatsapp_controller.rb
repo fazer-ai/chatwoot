@@ -28,12 +28,15 @@ class Webhooks::WhatsappController < ActionController::API
   end
 
   # Webhook payloads share a single job, but their priority depends on what
-  # kind of event arrived. Status / presence / account updates would otherwise
-  # share `:low` with the actual patient messages and starve them during a
-  # spike — splitting by queue prevents that without dropping any event.
+  # kind of event arrived. Splitting by queue prevents one class of event
+  # from starving another during a spike — patient messages get the top
+  # WhatsApp queue, status acks land in a dedicated mid-priority queue so
+  # they keep flowing without elbowing messages out of the way, and the
+  # rest (presence, account updates) stays on `:low`.
   def target_queue
     return :whatsapp_history if params[:importMode]
     return :whatsapp_messages if live_message_payload?
+    return :whatsapp_statuses if status_only_payload?
 
     :low
   end
@@ -43,6 +46,8 @@ class Webhooks::WhatsappController < ActionController::API
   # - Baileys              -> top-level `event` field equals 'messages.upsert'
   # - WhatsApp Cloud (Meta) -> envelope object 'whatsapp_business_account'
   #                            with field 'messages' or 'smb_message_echoes'
+  #                            AND a 'messages' / 'message_echoes' array in
+  #                            the change value (NOT just statuses)
   # - Z-API                -> top-level `type` equals 'ReceivedCallback'
   def live_message_payload?
     baileys_message_payload? || cloud_message_payload? || zapi_message_payload?
@@ -56,11 +61,33 @@ class Webhooks::WhatsappController < ActionController::API
     return false unless params[:object].to_s == 'whatsapp_business_account'
 
     field = params.dig(:entry, 0, :changes, 0, :field).to_s
-    %w[messages smb_message_echoes].include?(field)
+    return false unless %w[messages smb_message_echoes].include?(field)
+
+    # `field == 'messages'` covers BOTH real inbound messages and status
+    # acks (sent / delivered / read). The discriminator is whether `value`
+    # carries a `messages` array — without this check, every status ack
+    # piled into :whatsapp_messages during peak hours and starved the
+    # actual patient messages behind 1000s of cosmetic checkmark updates.
+    value = params.dig(:entry, 0, :changes, 0, :value) || {}
+    value[:messages].present? || value[:message_echoes].present?
   end
 
   def zapi_message_payload?
     params[:type].to_s == 'ReceivedCallback'
+  end
+
+  # WhatsApp Cloud status acks (sent / delivered / read). They share the
+  # `field: messages` envelope with real messages, but their value carries
+  # `statuses` instead of `messages`. Routed to their own queue so they
+  # don't starve real messages but also don't sit at the bottom of `:low`.
+  def status_only_payload?
+    return false unless params[:object].to_s == 'whatsapp_business_account'
+
+    field = params.dig(:entry, 0, :changes, 0, :field).to_s
+    return false unless field == 'messages'
+
+    value = params.dig(:entry, 0, :changes, 0, :value) || {}
+    value[:statuses].present?
   end
 
   def perform_sync
