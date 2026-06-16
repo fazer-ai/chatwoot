@@ -1,4 +1,24 @@
 ---
+- tag: v4.13.0-auris.1.27
+  published_at: '2026-06-16T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **WhatsApp keeps up better when things are busy.** Patient messages arrive faster even when there's a lot of delivery and read confirmations coming in at the same time — they no longer have to wait in line behind those.
+
+      ### 🐛 Fixes
+
+      - **The checkmark color of a sent message doesn't rewind anymore.** Before, the message marker could turn blue (the patient read) and briefly go back to gray, making it look like the patient hadn't seen it yet. Now once it shows the patient read, it stays that way.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **O WhatsApp acompanha melhor o ritmo quando está cheio.** As mensagens dos pacientes chegam mais rápido mesmo quando vêm muitas confirmações de entrega e leitura ao mesmo tempo — elas não precisam mais esperar atrás dessas confirmações.
+
+      ### 🐛 Correções
+
+      - **O check de mensagem enviada não volta atrás.** Antes, o marcador podia ficar azul (paciente leu) e voltar pra cinza por um instante, dando a impressão de que ele ainda não tinha visto. Agora, depois que aparece como lido, fica desse jeito.
 - tag: v4.13.0-auris.1.26
   published_at: '2026-06-15T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.26
@@ -275,37 +295,3 @@
       ### 🐛 Correções
 
       - **Caixa de entrada do Simulador com o rótulo certo.** Em contas de teste, a inbox **Simulador** estava sendo listada com um texto técnico ilegível; agora aparece como "Simulador" na lista de caixas de entrada.
-- tag: v4.13.0-auris.1.22
-  published_at: '2026-05-22T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **WhatsApp simulator for test accounts.** Chat with your own account as if you were a customer — full WhatsApp look, attachments, reactions, and a floating window you can open whenever you need it.
-      - **Account environment (test or production).** Mark each account as test or production from Super Admin. Test accounts get a banner inside the app and a clear label on the sidebar so nobody confuses them with real ones.
-      - **Quick search on the account switcher.** Type part of an account name in the sidebar to find and switch accounts without scrolling the list.
-
-      ### ⚡ Improvements
-
-      - **Inbox status report now covers every WhatsApp provider.** See Baileys, Z-API, and WhatsApp Cloud side by side from Super Admin, each with its current connection state.
-      - **Report dates and durations in your language.** Report charts and stats now follow the account language — dates and time units appear in the right format for pt-BR or en.
-
-      ### 🐛 Fixes
-
-      - **Auto-resolve no longer fires twice.** Conversations that reach the idle timeout are closed once, without duplicate events in the history.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Simulador de WhatsApp para contas de teste.** Converse com a própria conta como se fosse um cliente — visual de WhatsApp, anexos, reações e janela flutuante que você abre a qualquer momento.
-      - **Ambiente da conta (teste ou produção).** Defina se uma conta é de teste ou produção pelo Super Admin. Contas de teste ganham aviso dentro do app e identificação clara na lateral, evitando confusão com contas reais.
-      - **Busca rápida no seletor de contas.** Digite parte do nome da conta direto na barra lateral para encontrar e trocar de conta sem rolar a lista.
-
-      ### ⚡ Melhorias
-
-      - **Relatório de status de caixas de entrada agora cobre todos os provedores de WhatsApp.** Veja Baileys, Z-API e WhatsApp Cloud lado a lado no Super Admin, cada um com o seu status de conexão.
-      - **Datas e durações dos relatórios no idioma da conta.** Gráficos e métricas passam a respeitar o idioma — datas e unidades de tempo aparecem no formato certo para pt-BR ou en.
-
-      ### 🐛 Correções
-
-      - **Resolução automática não dispara mais em duplicidade.** Conversas que atingem o tempo de inatividade são fechadas apenas uma vez, sem eventos repetidos no histórico.
