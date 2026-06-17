@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.29.1
+  published_at: '2026-06-17T23:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29.1
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.29
   published_at: '2026-06-17T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29
@@ -281,15 +289,3 @@
       ### 🐛 Correções
 
       - **Regras de automação com "Status da IA = IA Desativada" são salvas corretamente.** Salvar uma regra com a condição **IA Desativada** estava perdendo o valor silenciosamente — ao reabrir, o dropdown vinha vazio e o gatilho não disparava. Agora a condição persiste e a regra dispara como esperado.
-- tag: v4.13.0-auris.1.23.1
-  published_at: '2026-05-24T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Enable/Disable AI actions in Automation Rules can be saved again.** Adding **Enable AI** or **Disable AI** as an automation action was showing an "Action parameters are required" error and blocking the form. The actions now save without asking for parameters.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Ações Ativar/Desativar IA voltam a salvar nas Regras de Automação.** Selecionar **Ativar IA** ou **Desativar IA** como ação estava exibindo o erro "Os parâmetros de ação são necessários" e bloqueando o salvamento. Agora as ações são aceitas sem exigir parâmetro.
