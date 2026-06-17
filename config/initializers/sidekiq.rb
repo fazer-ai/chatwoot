@@ -3,14 +3,23 @@ require Rails.root.join('lib/redis/config')
 schedule_file = 'config/schedule.yml'
 
 # Customise the Sidekiq Web UI mounted at `/monitoring/sidekiq` (see
-# `config/routes.rb`). The middleware adds a "Prioridade" column to the
-# /queues page by injecting a `<script>` tag that pulls
-# `public/sidekiq-priority-column.js`. Wired here (and not via
-# `Sidekiq::Web.custom_javascript=`) because Sidekiq 7.3 removed that
-# setter.
+# `config/routes.rb`).
+#
+# - `PriorityColumnInjector`: injects a `<script>` tag that adds a
+#   "Prioridade" column to the /queues page, served from
+#   `public/sidekiq-priority-column.js`. Wired at the Rack layer because
+#   Sidekiq 7.3 removed `Sidekiq::Web.custom_javascript=`.
+# - `AurisKpisInjector`: injects an extra summary row on the dashboard
+#   with daily and last-hour Processed / Failed / Success-rate KPIs,
+#   sourced from counters maintained by `AurisMetricsRecorder` (server
+#   middleware below).
 require 'sidekiq/web'
 require Rails.root.join('lib/sidekiq/priority_column_injector')
+require Rails.root.join('lib/sidekiq/auris_kpis_injector')
 Sidekiq::Web.use Sidekiq::PriorityColumnInjector
+Sidekiq::Web.use Sidekiq::AurisKpisInjector
+
+require Rails.root.join('lib/sidekiq/auris_metrics_recorder')
 
 Sidekiq.configure_client do |config|
   config.redis = Redis::Config.app
@@ -27,6 +36,10 @@ end
 
 Sidekiq.configure_server do |config|
   config.redis = Redis::Config.app
+
+  config.server_middleware do |chain|
+    chain.add Sidekiq::AurisMetricsRecorder
+  end
 
   if ActiveModel::Type::Boolean.new.cast(ENV.fetch('ENABLE_SIDEKIQ_DEQUEUE_LOGGER', false))
     config.server_middleware do |chain|
