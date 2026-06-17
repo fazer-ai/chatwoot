@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.29.2
+  published_at: '2026-06-17T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29.2
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.29.1
   published_at: '2026-06-17T23:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29.1
@@ -277,15 +285,3 @@
       ### 🐛 Correções
 
       - **Mensagens de atividade das automações no idioma da conta.** Os eventos gerados por regras de automação (atribuição, time, etiquetas, mudança de status da IA) apareciam sempre em inglês, mesmo em contas configuradas em português. Agora respeitam o idioma da conta.
-- tag: v4.13.0-auris.1.23.2
-  published_at: '2026-05-24T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.2
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Automation rules with "AI status = AI Disabled" stay saved.** Saving a rule with the new "AI Disabled" condition was silently losing the value on save — reopening the rule showed an empty dropdown and the trigger never fired. The condition now persists and the rule triggers correctly.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Regras de automação com "Status da IA = IA Desativada" são salvas corretamente.** Salvar uma regra com a condição **IA Desativada** estava perdendo o valor silenciosamente — ao reabrir, o dropdown vinha vazio e o gatilho não disparava. Agora a condição persiste e a regra dispara como esperado.
