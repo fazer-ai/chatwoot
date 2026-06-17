@@ -1,4 +1,18 @@
 ---
+- tag: v4.13.0-auris.1.29
+  published_at: '2026-06-17T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Improvements in message processing.** Behind-the-scenes adjustments made message delivery more responsive, especially early in the day.
+      - **Internal reports adjustments.** Internal monitoring indicators got refined to better reflect what's happening in AurisChat in real time.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Melhorias no processamento das mensagens.** Pequenos ajustes nos bastidores deixaram o envio das mensagens mais ágil, principalmente logo no início do dia.
+      - **Ajustes em relatórios internos.** Indicadores de monitoramento interno foram refinados para refletir melhor o que está acontecendo no AurisChat em tempo real.
 - tag: v4.13.0-auris.1.28
   published_at: '2026-06-17T03:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.28
@@ -279,17 +293,3 @@
       ### 🐛 Correções
 
       - **Ações Ativar/Desativar IA voltam a salvar nas Regras de Automação.** Selecionar **Ativar IA** ou **Desativar IA** como ação estava exibindo o erro "Os parâmetros de ação são necessários" e bloqueando o salvamento. Agora as ações são aceitas sem exigir parâmetro.
-- tag: v4.13.0-auris.1.23
-  published_at: '2026-05-24T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Toggle AI on or off in bulk from the conversation list.** Pick multiple conversations, open the new toolbar button, and choose to enable (green) or disable (red) the AI on all of them at once.
-      - **AI status in Automation Rules.** You can now use the AI status as a condition ("equals AI Enabled / AI Disabled") and as an action ("Enable AI" / "Disable AI") in any rule — available across every event (conversation created, updated, opened, resolved, and message created).
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Ativar ou desativar a IA em massa direto da lista de conversas.** Selecione várias conversas, abra o novo botão no toolbar de seleção e escolha entre ativar (verde) ou desativar (vermelho) a IA em todas de uma vez.
-      - **Status da IA nas Regras de Automação.** Agora dá pra usar o status da IA como condição ("Igual a IA Ativada / IA Desativada") e como ação ("Ativar IA" / "Desativar IA") em qualquer regra — disponível em todos os eventos (conversa criada, atualizada, aberta, resolvida e mensagem criada).
