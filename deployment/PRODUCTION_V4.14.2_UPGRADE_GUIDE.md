@@ -75,6 +75,31 @@ ls -lh ~/chatwoot_production_pre-v4.14.2_*.dump   # confirm a real size (MBs), n
 
 (See also `deployment/MANUAL_BACKUP_PRODUCTION.md`.)
 
+## 🔐 SMTP / email (required — set before deploy)
+
+`docker-compose.production-v4.14.2.yaml` **parameterizes SMTP via env vars**, whereas the
+old `PRODUCTION_COMPOSE_V4.10.0.yaml` had the credentials **hardcoded**. If you paste the new
+compose without setting these on the production Coolify service, the app still boots but
+**email breaks** (and an empty `MAIL_SENDER` can raise on send).
+
+Set these as environment variables / secrets on the **production** Coolify service:
+
+| Var | Value |
+|---|---|
+| `SMTP_USERNAME` | `chatwoot@cheminneuf.church` |
+| `SMTP_PASSWORD` | the Gmail app password — **use a freshly rotated one** |
+| `MAIL_SENDER` | `chatwoot@cheminneuf.church` |
+
+These have safe built-in defaults and only need overriding if different:
+`SMTP_ADDRESS` (`smtp.gmail.com`), `SMTP_PORT` (`587`), `SMTP_AUTHENTICATION` (`login`),
+`SMTP_ENABLE_STARTTLS_AUTO` (`true`).
+
+> ⚠️ **Rotate the password.** The old Gmail app password was hardcoded in
+> `PRODUCTION_COMPOSE_V4.10.0.yaml` (committed to git history), so it must be considered
+> compromised. Generate a new Gmail app password, set it as `SMTP_PASSWORD`, and revoke the old one.
+
+Verify after deploy via the Step 4 "Email sends" check.
+
 ## Migration risk notes (54 migrations)
 
 All validated on staging, but production data is larger/older — watch these in particular:
