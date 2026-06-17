@@ -124,6 +124,45 @@ docker exec postgres-f8kkkgcsko4sogs88k8c80ok sh -c \
 # expect 0; if > 0, those orphaned conversations must be cleaned before the FK migration
 ```
 
+## ⚠️ Known cross-version migration failure — apply this fix
+
+On the 4.10→4.14 **big-bang** migrate, `db:chatwoot_prepare` (the `post_start` hook) **fails**
+on the first data migration with:
+
+```
+== 20260112092041 RemoveCountryCodeFromConversationFilters: migrating
+StandardError: Undeclared attribute type for enum 'visibility' in CustomFilter.
+```
+
+**Cause (not data corruption):** the early migration loads the **4.14 `CustomFilter` model**,
+which declares `enum :visibility`. That column is only added by a *much later* migration
+(`20260510160215`). Running all migrations at once with the final code → the enum has no
+backing column yet. (Staging never hit this because it migrated *incrementally*, with older
+code, when `20260112092041` ran.)
+
+**Fix (run inside the running rails container, then resume):** pre-create the `visibility`
+column + index exactly as `20260510160215` would, mark that migration applied, then continue.
+Idempotent — safe to re-run.
+
+```bash
+docker exec rails-f8kkkgcsko4sogs88k8c80ok bundle exec rails runner "
+c = ActiveRecord::Base.connection
+c.execute(%q{ALTER TABLE custom_filters ADD COLUMN IF NOT EXISTS visibility integer NOT NULL DEFAULT 0})
+c.execute(%q{CREATE INDEX IF NOT EXISTS index_custom_filters_on_account_type_visibility_user ON custom_filters (account_id, filter_type, visibility, user_id)})
+c.execute(%q{INSERT INTO schema_migrations (version) VALUES ('20260510160215') ON CONFLICT DO NOTHING})
+puts 'visibility column + index added; 20260510160215 marked applied'
+"
+docker exec rails-f8kkkgcsko4sogs88k8c80ok bundle exec rails db:migrate 2>&1 | tail -60
+```
+
+The remaining 50+ migrations (incl. `EnforceContactFkOnConversations`) then complete with no
+further conflicts. **After they finish, redeploy/restart rails + sidekiq** so they load the
+complete schema (they booted against the partial one during the failed hook).
+
+> If a *different* "undeclared enum / missing column / uninitialized constant" appears, the
+> big-bang has more ordering conflicts — prefer rolling back and migrating **incrementally**
+> through intermediate fazer-ai versions instead of patching each one.
+
 ## Upgrade Steps
 
 ### 1. Update compose in Coolify
