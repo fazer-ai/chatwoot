@@ -76,10 +76,13 @@ remove_old_notification_job:
   class: 'Notification::RemoveOldNotificationJob'
   queue: purgable
 
-# executed every 12 hours
-# to remove orphan conversations without contact
+# executed daily at 0700 UTC (0400 America/Sao_Paulo)
+# to remove orphan conversations without contact — moved out of the
+# previous 09h/21h local schedule because the 9 AM run coincided with
+# the start of the business day and starved the message-processing
+# queues while it churned through the weekend's accumulated orphans.
 remove_orphan_conversations_job:
-  cron: '0 */12 * * *'
+  cron: '0 7 * * *'
   class: 'Internal::RemoveOrphanConversationsJob'
   queue: housekeeping
 
