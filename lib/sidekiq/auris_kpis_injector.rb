@@ -10,7 +10,11 @@
 # Each window exposes Proc., Falhas and a "KPI" success-rate metric
 # computed as `100% - (failed / processed)`.
 class Sidekiq::AurisKpisInjector
-  ANCHOR = '</ul>'.freeze
+  # Matches Sidekiq's `_summary.erb` block as a whole. Anchoring on the
+  # `</ul>` alone would inject after the FIRST `</ul>` (which is the
+  # navbar), and the row would be rendered outside the CSS scope that
+  # styles the summary numbers as stacked count+desc cards.
+  SUMMARY_BLOCK = %r{<ul class="list-unstyled summary row">.*?</ul>}m
 
   def initialize(app)
     @app = app
@@ -18,11 +22,13 @@ class Sidekiq::AurisKpisInjector
 
   def call(env)
     status, headers, body = @app.call(env)
-    return [status, headers, body] unless inject?(env, headers)
+    return [status, headers, body] unless inject?(headers)
 
     html = collect(body)
+    return [status, headers, [html]] unless SUMMARY_BLOCK.match?(html)
+
     extra = render_row
-    html = html.sub(ANCHOR, "#{ANCHOR}\n#{extra}")
+    html = html.sub(SUMMARY_BLOCK) { |match| "#{match}\n#{extra}" }
 
     new_headers = headers.dup
     new_headers['Content-Length'] = html.bytesize.to_s if new_headers.key?('Content-Length') || new_headers.key?('content-length')
@@ -32,13 +38,10 @@ class Sidekiq::AurisKpisInjector
 
   private
 
-  # Sidekiq's dashboard lives at the root of the mount point. The path
-  # depends on where Sidekiq Web is mounted, so we match on the suffix
-  # the dashboard ends with (`/` or empty) rather than a fixed path.
-  def inject?(env, headers)
-    path = env['PATH_INFO'].to_s
-    return false unless path.end_with?('/sidekiq', '/sidekiq/')
-
+  # The summary is rendered by `layout.erb`, so every Sidekiq Web HTML
+  # page carries the bar. No PATH_INFO filter — we just skip non-HTML
+  # responses (poll JSON endpoints).
+  def inject?(headers)
     content_type = headers['Content-Type'] || headers['content-type']
     content_type&.include?('text/html')
   end
@@ -52,26 +55,26 @@ class Sidekiq::AurisKpisInjector
   def render_row
     m = fetch_metrics
     items = [
-      ['processed', m[:today_processed],                                              'Proc. hoje'],
-      ['failed',    m[:today_failed],                                                 'Falhas hoje'],
-      ['processed', success_rate(m[:today_processed], m[:today_failed]),              'KPI hoje'],
-      ['processed', m[:hour_processed],                                               'Proc. últ. hora'],
-      ['failed',    m[:hour_failed],                                                  'Falhas últ. hora'],
-      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),                'KPI últ. hora']
+      ['processed', m[:today_processed],                                'Proc. hoje',       true],
+      ['failed',    m[:today_failed],                                   'Falhas hoje',      true],
+      ['processed', success_rate(m[:today_processed], m[:today_failed]), 'KPI hoje',        false],
+      ['processed', m[:hour_processed],                                 'Proc. últ. hora',  true],
+      ['failed',    m[:hour_failed],                                    'Falhas últ. hora', true],
+      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),  'KPI últ. hora',   false]
     ]
-    lis = items.map { |klass, value, label| li_for(klass, value, label) }.join("\n")
-    <<~HTML
-      <ul class="list-unstyled summary row" style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
-        #{lis}
-      </ul>
-    HTML
+    lis = items.map { |klass, value, label, nwp| li_for(klass, value, label, nwp) }.join("\n")
+    %(<ul class="list-unstyled summary row">\n#{lis}\n</ul>)
   end
 
-  def li_for(klass, value, label)
+  # `data-nwp` triggers Sidekiq Web's `updateNumbers()` JS, which does
+  # `parseFloat(textContent)` and rewrites the cell — stripping any
+  # non-numeric suffix like our `%`. So KPI cells render WITHOUT it.
+  def li_for(klass, value, label, nwp)
     value_str = value.is_a?(Numeric) ? number_with_delimiter(value) : value
+    count_attrs = nwp ? ' data-nwp' : ''
     <<~LI
-      <li class="#{klass} col-sm-2">
-        <span class="count" data-nwp>#{value_str}</span>
+      <li class="#{klass} col-sm-1">
+        <span class="count"#{count_attrs}>#{value_str}</span>
         <span class="desc">#{label}</span>
       </li>
     LI
@@ -111,12 +114,13 @@ class Sidekiq::AurisKpisInjector
 
   # Success-rate formula requested by the operator:
   # `100% - (failed / processed)`. Treats zero processed as 100%
-  # (no jobs ran → no failures to count).
+  # (no jobs ran → no failures to count). Rounded to integer percent
+  # to keep the value short enough for the narrow col-sm-1 column.
   def success_rate(processed, failed)
-    return '100,00%' if processed.zero?
+    return '100%' if processed.zero?
 
     pct = 100.0 - (failed.to_f / processed * 100)
-    "#{format('%.2f', pct).tr('.', ',')}%"
+    "#{pct.round}%"
   end
 
   def number_with_delimiter(number)
