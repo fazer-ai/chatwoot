@@ -20,6 +20,7 @@
     'mailers',
     'action_mailbox_routing',
     'whatsapp_messages',
+    'whatsapp_statuses',
     'low',
     'whatsapp_history',
     'scheduled_jobs',
