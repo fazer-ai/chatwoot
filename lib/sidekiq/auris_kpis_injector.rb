@@ -10,7 +10,11 @@
 # Each window exposes Proc., Falhas and a "KPI" success-rate metric
 # computed as `100% - (failed / processed)`.
 class Sidekiq::AurisKpisInjector
-  ANCHOR = '</ul>'.freeze
+  # Matches Sidekiq's `_summary.erb` block as a whole. Anchoring on the
+  # `</ul>` alone would inject after the FIRST `</ul>` (which is the
+  # navbar), and the row would be rendered outside the CSS scope that
+  # styles the summary numbers as stacked count+desc cards.
+  SUMMARY_BLOCK = %r{<ul class="list-unstyled summary row">.*?</ul>}m
 
   def initialize(app)
     @app = app
@@ -18,11 +22,13 @@ class Sidekiq::AurisKpisInjector
 
   def call(env)
     status, headers, body = @app.call(env)
-    return [status, headers, body] unless inject?(env, headers)
+    return [status, headers, body] unless inject?(headers)
 
     html = collect(body)
+    return [status, headers, [html]] unless SUMMARY_BLOCK.match?(html)
+
     extra = render_row
-    html = html.sub(ANCHOR, "#{ANCHOR}\n#{extra}")
+    html = html.sub(SUMMARY_BLOCK) { |match| "#{match}\n#{extra}" }
 
     new_headers = headers.dup
     new_headers['Content-Length'] = html.bytesize.to_s if new_headers.key?('Content-Length') || new_headers.key?('content-length')
@@ -32,14 +38,10 @@ class Sidekiq::AurisKpisInjector
 
   private
 
-  # Sidekiq's dashboard is the ROOT of the mount point. Rack strips the
-  # mount prefix into SCRIPT_NAME and leaves PATH_INFO as `''` or `/`,
-  # regardless of where the engine was mounted — `/monitoring/sidekiq`
-  # in this project, but the middleware shouldn't assume that path.
-  def inject?(env, headers)
-    path = env['PATH_INFO'].to_s
-    return false unless path.empty? || path == '/'
-
+  # The summary is rendered by `layout.erb`, so every Sidekiq Web HTML
+  # page carries the bar. No PATH_INFO filter — we just skip non-HTML
+  # responses (poll JSON endpoints).
+  def inject?(headers)
     content_type = headers['Content-Type'] || headers['content-type']
     content_type&.include?('text/html')
   end
@@ -53,25 +55,21 @@ class Sidekiq::AurisKpisInjector
   def render_row
     m = fetch_metrics
     items = [
-      ['processed', m[:today_processed],                                              'Proc. hoje'],
-      ['failed',    m[:today_failed],                                                 'Falhas hoje'],
-      ['processed', success_rate(m[:today_processed], m[:today_failed]),              'KPI hoje'],
-      ['processed', m[:hour_processed],                                               'Proc. últ. hora'],
-      ['failed',    m[:hour_failed],                                                  'Falhas últ. hora'],
-      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),                'KPI últ. hora']
+      ['processed', m[:today_processed],                                'Proc. hoje'],
+      ['failed',    m[:today_failed],                                   'Falhas hoje'],
+      ['processed', success_rate(m[:today_processed], m[:today_failed]), 'KPI hoje'],
+      ['processed', m[:hour_processed],                                 'Proc. últ. hora'],
+      ['failed',    m[:hour_failed],                                    'Falhas últ. hora'],
+      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),  'KPI últ. hora']
     ]
     lis = items.map { |klass, value, label| li_for(klass, value, label) }.join("\n")
-    <<~HTML
-      <ul class="list-unstyled summary row" style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
-        #{lis}
-      </ul>
-    HTML
+    %(<ul class="list-unstyled summary row">\n#{lis}\n</ul>)
   end
 
   def li_for(klass, value, label)
     value_str = value.is_a?(Numeric) ? number_with_delimiter(value) : value
     <<~LI
-      <li class="#{klass} col-sm-2">
+      <li class="#{klass} col-sm-1">
         <span class="count" data-nwp>#{value_str}</span>
         <span class="desc">#{label}</span>
       </li>

@@ -1,7 +1,25 @@
 require 'rails_helper'
 
 RSpec.describe Sidekiq::AurisKpisInjector do
-  let(:html_body) { '<html><body><ul class="summary"><li>x</li></ul></body></html>' }
+  # Matches the structure Sidekiq's `_summary.erb` actually renders —
+  # also includes a navbar `<ul>` BEFORE the summary so the spec proves
+  # we don't accidentally insert after the first `</ul>` we find.
+  let(:html_body) do
+    <<~HTML
+      <html>
+        <body>
+          <nav><ul class="nav navbar-nav"><li>tab</li></ul></nav>
+          <div class="summary_bar">
+            <ul class="list-unstyled summary row">
+              <li class="processed col-sm-1"><span class="count" data-nwp>10</span><span class="desc">Processed</span></li>
+              <li class="dead col-sm-1"><a href="/morgue"><span class="count" data-nwp>1</span><span class="desc">Dead</span></a></li>
+            </ul>
+          </div>
+          <main>page body</main>
+        </body>
+      </html>
+    HTML
+  end
   let(:html_headers) { { 'Content-Type' => 'text/html' } }
   let(:app) { ->(_env) { [200, html_headers, [html_body]] } }
   let(:middleware) { described_class.new(app) }
@@ -12,21 +30,21 @@ RSpec.describe Sidekiq::AurisKpisInjector do
     end
   end
 
-  # Inside Sidekiq Web's Rack stack, PATH_INFO is relative to the
-  # engine mount, so the dashboard arrives as `''` or `/`.
-  def request(path: '/')
-    middleware.call('PATH_INFO' => path)
-  end
+  it 'injects the Auris KPI row right after Sidekiq summary block' do
+    _status, _headers, body = middleware.call({})
 
-  it 'injects the Auris KPI row on the dashboard root' do
-    _status, _headers, body = request
+    html = body.first
+    expect(html).to include('Proc. hoje')
+    expect(html).to include('Falhas hoje')
+    expect(html).to include('KPI hoje')
+    expect(html).to include('Proc. últ. hora')
+    expect(html).to include('Falhas últ. hora')
+    expect(html).to include('KPI últ. hora')
 
-    expect(body.first).to include('Proc. hoje')
-    expect(body.first).to include('Falhas hoje')
-    expect(body.first).to include('KPI hoje')
-    expect(body.first).to include('Proc. últ. hora')
-    expect(body.first).to include('Falhas últ. hora')
-    expect(body.first).to include('KPI últ. hora')
+    # Make sure we inserted AFTER the summary, not after the navbar.
+    summary_end = html.index('</ul>', html.index('list-unstyled summary'))
+    auris_start = html.index('Proc. hoje')
+    expect(auris_start).to be > summary_end
   end
 
   it 'reads day and minute counters from Redis to populate the row' do
@@ -38,37 +56,31 @@ RSpec.describe Sidekiq::AurisKpisInjector do
       c.set(Sidekiq::AurisMetricsRecorder.minute_key(Sidekiq::AurisMetricsRecorder::TYPE_FAILED, now.to_i / 60), 5)
     end
 
-    _status, _headers, body = request
+    _status, _headers, body = middleware.call({})
 
-    # 1500 with thousand-separator
     expect(body.first).to include('1.500')
     # KPI hoje = 100 - (30/1500*100) = 98,00%
     expect(body.first).to include('98,00%')
   end
 
   it 'reports 100% success when no jobs ran' do
-    _status, _headers, body = request
+    _status, _headers, body = middleware.call({})
 
     expect(body.first).to include('100,00%')
   end
 
-  it 'leaves other Sidekiq paths untouched' do
-    _status, _headers, body = request(path: '/queues')
+  it 'leaves HTML without the summary block untouched (e.g. login screen)' do
+    app = ->(_env) { [200, html_headers, ['<html><body>Login</body></html>']] }
 
-    expect(body.first).to eq(html_body)
-    expect(body.first).not_to include('Proc. hoje')
+    _status, _headers, body = described_class.new(app).call({})
+
+    expect(body.first).to eq('<html><body>Login</body></html>')
   end
 
-  it 'also injects when PATH_INFO is empty (Rack normalises mount root that way too)' do
-    _status, _headers, body = request(path: '')
-
-    expect(body.first).to include('Proc. hoje')
-  end
-
-  it 'leaves non-HTML responses untouched' do
+  it 'leaves non-HTML responses untouched (poll JSON endpoints)' do
     json_app = ->(_env) { [200, { 'Content-Type' => 'application/json' }, ['{}']] }
 
-    _status, _headers, body = described_class.new(json_app).call('PATH_INFO' => '/')
+    _status, _headers, body = described_class.new(json_app).call({})
 
     expect(body.first).to eq('{}')
   end
