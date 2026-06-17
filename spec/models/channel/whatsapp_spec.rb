@@ -586,6 +586,15 @@ RSpec.describe Channel::Whatsapp do
 
       channel.update_reachout_time_lock!({ is_active: true })
     end
+
+    it 'returns without raising or broadcasting when passed nil (404/fetch error)' do
+      expect(channel.provider_connection).to be_present # realize the record before arming the dispatch guard
+
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).not_to receive(:dispatch)
+
+      expect { channel.update_reachout_time_lock!(nil) }.not_to raise_error
+    end
   end
 
   describe '#update_new_chat_cap!' do
@@ -629,6 +638,15 @@ RSpec.describe Channel::Whatsapp do
       expect(sync_dispatcher).not_to receive(:dispatch)
 
       channel.update_new_chat_cap!(cap)
+    end
+
+    it 'returns without raising or broadcasting when passed nil (404/fetch error)' do
+      expect(channel.provider_connection).to be_present # realize the record before arming the dispatch guard
+
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).not_to receive(:dispatch)
+
+      expect { channel.update_new_chat_cap!(nil) }.not_to raise_error
     end
   end
 

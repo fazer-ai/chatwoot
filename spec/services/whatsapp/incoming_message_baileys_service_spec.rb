@@ -250,6 +250,21 @@ describe Whatsapp::IncomingMessageBaileysService do
         end
       end
 
+      context 'with new-chat cap (quota)' do
+        it 'preserves an existing cap when a connection-only update arrives' do
+          inbox.channel.update_provider_connection!(
+            connection: 'open',
+            new_chat_cap: { capping_status: 'CAPPED', total_quota: 100, used_quota: 100 }
+          )
+          params = base_params.merge(data: { connection: 'connecting' })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('connecting')
+          expect(inbox.channel.provider_connection['new_chat_cap']).to include('capping_status' => 'CAPPED')
+        end
+      end
+
       context 'with lease epochs (multi-instance baileys-api)' do
         it 'persists the epoch alongside the connection state' do
           params = base_params.merge(

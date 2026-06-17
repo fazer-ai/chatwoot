@@ -154,6 +154,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # broadcast. The with_lock reloads under SELECT FOR UPDATE so a concurrent connection.update
   # can't be lost by merging onto a stale snapshot. Callers pass nil (404/fetch error) to skip.
   def update_reachout_time_lock!(reachout_time_lock)
+    return if reachout_time_lock.nil?
+
     with_lock do
       update_provider_connection!(provider_connection.merge('reachout_time_lock' => reachout_time_lock.deep_stringify_keys))
     end
@@ -163,6 +165,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # only the UI-relevant keys (dropping the volatile server_sent_timestamp) so the poll doesn't
   # re-broadcast every cycle when nothing meaningful changed.
   def update_new_chat_cap!(new_chat_cap)
+    return if new_chat_cap.nil?
+
     normalized = new_chat_cap.to_h.deep_stringify_keys.slice(*NEW_CHAT_CAP_KEYS)
     with_lock do
       update_provider_connection!(provider_connection.merge('new_chat_cap' => normalized))

@@ -763,6 +763,13 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
       expect(service.fetch_new_chat_cap).to be_nil
     end
+
+    it 'returns nil on a server error (read-only, never marks the connection closed)' do
+      stub_request(:get, url).to_return(status: 500, body: 'Internal Server Error')
+      allow(Rails.logger).to receive(:error)
+
+      expect(service.fetch_new_chat_cap).to be_nil
+    end
   end
 
   describe '#read_messages' do
