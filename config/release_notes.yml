@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.28
+  published_at: '2026-06-17T03:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.28
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Replies that kept failing for certain patients now work.** Some patient conversations were stuck with "Failed to send" on every attempt, even though the patient could still write to the clinic. AurisChat now fixes the patient's data automatically the moment they send the next message, so you can keep the conversation going normally.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Respostas que ficavam falhando pra alguns pacientes voltaram a funcionar.** Algumas conversas ficavam travadas com "Falha ao enviar" toda vez que você tentava responder, mesmo o paciente conseguindo escrever pra clínica. O AurisChat agora corrige os dados do paciente automaticamente assim que ele mandar a próxima mensagem, e você consegue continuar a conversa normalmente.
 - tag: v4.13.0-auris.1.27.1
   published_at: '2026-06-16T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27.1
@@ -281,17 +293,3 @@
 
       - **Ativar ou desativar a IA em massa direto da lista de conversas.** Selecione várias conversas, abra o novo botão no toolbar de seleção e escolha entre ativar (verde) ou desativar (vermelho) a IA em todas de uma vez.
       - **Status da IA nas Regras de Automação.** Agora dá pra usar o status da IA como condição ("Igual a IA Ativada / IA Desativada") e como ação ("Ativar IA" / "Desativar IA") em qualquer regra — disponível em todos os eventos (conversa criada, atualizada, aberta, resolvida e mensagem criada).
-- tag: v4.13.0-auris.1.22.2
-  published_at: '2026-05-23T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.22.2
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Simulator panel loads again in production.** The floating WhatsApp simulator panel was opening empty on production due to a header conflict on the embedded view; it now mounts correctly.
-      - **Funnel stage label tidied up.** The "Comparecimento (ganho)" stage and the matching KPI in the Conversion report no longer carry extra spaces inside the parentheses.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Painel do Simulador volta a abrir em produção.** O painel flutuante do Simulador de WhatsApp estava abrindo vazio em produção por um conflito de cabeçalho na tela embedada; agora carrega normalmente.
-      - **Nome da fase do funil sem espaços sobrando.** A fase "Comparecimento (ganho)" e o KPI equivalente no relatório de Conversão não têm mais espaços extras dentro dos parênteses.
