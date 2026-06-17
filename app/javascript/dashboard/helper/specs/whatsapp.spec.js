@@ -43,6 +43,11 @@ describe('#isReachoutRestricted', () => {
     };
     expect(isReachoutRestricted(lock, 'open', now)).toBe(false);
   });
+
+  it('keeps the restriction visible when the deadline is malformed (fail safe)', () => {
+    const lock = { is_active: true, time_enforcement_ends: 'not-a-date' };
+    expect(isReachoutRestricted(lock, 'open', now)).toBe(true);
+  });
 });
 
 describe('#reachoutRestrictionDeadline', () => {
@@ -56,6 +61,12 @@ describe('#reachoutRestrictionDeadline', () => {
       time_enforcement_ends: '2026-06-19T21:52:39.000Z',
     });
     expect(formatted).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+  });
+
+  it('returns an empty string when the deadline is malformed', () => {
+    expect(reachoutRestrictionDeadline({ time_enforcement_ends: 'nope' })).toBe(
+      ''
+    );
   });
 });
 

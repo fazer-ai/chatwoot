@@ -376,7 +376,7 @@
       },
       "WHATSAPP_REACHOUT_RESTRICTION": {
         "RESTRICTED": "O WhatsApp restringiu temporariamente o início de novas conversas a partir deste número.",
-        "RESTRICTED_UNTIL": "O WhatsApp restringiu temporariamente o envio de mensagens a partir deste número até {time}."
+        "RESTRICTED_UNTIL": "O WhatsApp restringiu temporariamente o início de novas conversas a partir deste número até {time}."
       },
       "WHATSAPP_NEW_CHAT_CAP": {
         "WARNING": "Este número está se aproximando do limite do WhatsApp para iniciar novas conversas neste ciclo.",

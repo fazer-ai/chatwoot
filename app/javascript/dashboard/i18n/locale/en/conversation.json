@@ -377,7 +377,7 @@
       },
       "WHATSAPP_REACHOUT_RESTRICTION": {
         "RESTRICTED": "WhatsApp has temporarily restricted starting new conversations from this number.",
-        "RESTRICTED_UNTIL": "WhatsApp has temporarily restricted outbound messaging from this number until {time}."
+        "RESTRICTED_UNTIL": "WhatsApp has temporarily restricted starting new conversations from this number until {time}."
       },
       "WHATSAPP_NEW_CHAT_CAP": {
         "WARNING": "This number is approaching its WhatsApp limit for starting new conversations this cycle.",

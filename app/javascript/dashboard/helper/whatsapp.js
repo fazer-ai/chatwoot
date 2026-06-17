@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 /**
  * Whether a baileys inbox should surface the WhatsApp reach-out restriction banner.
@@ -16,7 +16,11 @@ export const isReachoutRestricted = (lock, connection, now = Date.now()) => {
   if (!lock?.is_active) return false;
   if (connection !== 'open') return false;
   if (!lock.time_enforcement_ends) return true;
-  return new Date(lock.time_enforcement_ends).getTime() > now;
+  // A malformed deadline must not silently hide an active restriction: keep it
+  // visible (fail safe) rather than letting NaN > now resolve to false.
+  const deadline = new Date(lock.time_enforcement_ends);
+  if (!isValid(deadline)) return true;
+  return deadline.getTime() > now;
 };
 
 /**
@@ -29,7 +33,10 @@ export const isReachoutRestricted = (lock, connection, now = Date.now()) => {
  */
 export const reachoutRestrictionDeadline = lock => {
   if (!lock?.time_enforcement_ends) return '';
-  return format(new Date(lock.time_enforcement_ends), 'dd/MM/yyyy HH:mm');
+  // format() throws RangeError on an Invalid Date; fall back to '' so the banner
+  // renders the generic (deadline-less) copy instead of crashing.
+  const deadline = new Date(lock.time_enforcement_ends);
+  return isValid(deadline) ? format(deadline, 'dd/MM/yyyy HH:mm') : '';
 };
 
 // capping_status values that warrant a banner (NONE / absent => no banner).
