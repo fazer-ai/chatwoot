@@ -31,6 +31,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # default at the moment is 360dialog lets change later.
   PROVIDERS = %w[default whatsapp_cloud baileys zapi].freeze
   REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi].freeze
+  # UI-relevant subset of the baileys new-chat message cap payload that we persist in
+  # provider_connection. server_sent_timestamp is intentionally dropped (it changes on every
+  # snapshot, so keeping it would make the 5-min poll re-broadcast every cycle for no reason).
+  NEW_CHAT_CAP_KEYS = %w[capping_status ote_status mv_status total_quota used_quota cycle_start_timestamp cycle_end_timestamp].freeze
   before_validation :ensure_webhook_verify_token
 
   validates :provider, inclusion: { in: PROVIDERS }
@@ -144,8 +148,31 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     broadcast_provider_connection_updated
   end
 
+  # Proactive (REST poll) / push update of just the reach-out lock. Unlike the connection.update
+  # path this carries no lease epoch, so it merges into the existing provider_connection without
+  # touching connection/epoch/qr/error and reuses update_provider_connection!'s no-op guard and
+  # broadcast. The with_lock reloads under SELECT FOR UPDATE so a concurrent connection.update
+  # can't be lost by merging onto a stale snapshot. Callers pass nil (404/fetch error) to skip.
+  def update_reachout_time_lock!(reachout_time_lock)
+    with_lock do
+      update_provider_connection!(provider_connection.merge('reachout_time_lock' => reachout_time_lock.deep_stringify_keys))
+    end
+  end
+
+  # Same contract as update_reachout_time_lock! for the new-chat message cap (quota). We persist
+  # only the UI-relevant keys (dropping the volatile server_sent_timestamp) so the poll doesn't
+  # re-broadcast every cycle when nothing meaningful changed.
+  def update_new_chat_cap!(new_chat_cap)
+    normalized = new_chat_cap.to_h.deep_stringify_keys.slice(*NEW_CHAT_CAP_KEYS)
+    with_lock do
+      update_provider_connection!(provider_connection.merge('new_chat_cap' => normalized))
+    end
+  end
+
   def provider_connection_data
     data = { connection: provider_connection['connection'] }
+    data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
+    data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
     if Current.account_user&.administrator?
       data[:qr_data_url] = provider_connection['qr_data_url']
       data[:error] = provider_connection['error']

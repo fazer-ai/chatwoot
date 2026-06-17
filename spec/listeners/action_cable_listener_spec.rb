@@ -303,6 +303,54 @@ describe ActionCableListener do
 
       listener.inbox_provider_connection_updated(event)
     end
+
+    context 'when a reach-out time-lock is present' do
+      let(:provider_connection) do
+        { 'connection' => 'connecting', 'reachout_time_lock' => { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' } }
+      end
+
+      it 'includes the lock in the agent broadcast (agents see the banner)' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          {
+            inbox_id: inbox.id,
+            provider_connection: {
+              connection: 'connecting',
+              reachout_time_lock: { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' }
+            },
+            account_id: account.id
+          }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
+    end
+
+    context 'when a new-chat cap is present' do
+      let(:provider_connection) do
+        { 'connection' => 'open', 'new_chat_cap' => { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 } }
+      end
+
+      it 'includes the cap in the agent broadcast' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          {
+            inbox_id: inbox.id,
+            provider_connection: {
+              connection: 'open',
+              new_chat_cap: { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 }
+            },
+            account_id: account.id
+          }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
+    end
   end
 
   describe '#conversation_unread_count_changed' do

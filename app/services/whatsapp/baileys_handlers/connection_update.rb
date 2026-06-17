@@ -29,7 +29,25 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
       qr_data_url: data[:qrDataUrl] || nil,
       error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
+      reachout_time_lock: reachout_time_lock_payload(data),
       epoch: data[:epoch]
+    }.compact
+  end
+
+  # Reach-out time-lock is NOT echoed on every connection.update (the provider debounces it
+  # ~60s and may push it standalone, without a `connection` value). So, unlike qr_data_url, a
+  # connection-only event must PRESERVE the existing lock rather than reset it. When the
+  # provider DOES send reachoutTimeLock (including isActive:false to lift the restriction), we
+  # persist it verbatim — isActive:false is a real "cleared" state the UI relies on to drop the
+  # banner. Returns nil only when nothing was ever set, so the outer .compact omits the key.
+  def reachout_time_lock_payload(data)
+    raw = data[:reachoutTimeLock]
+    return inbox.channel.provider_connection['reachout_time_lock'] if raw.blank?
+
+    {
+      is_active: raw[:isActive] || false,
+      time_enforcement_ends: raw[:timeEnforcementEnds],
+      enforcement_type: raw[:enforcementType]
     }.compact
   end
 

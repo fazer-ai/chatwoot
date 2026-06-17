@@ -374,6 +374,16 @@
         "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp is not connected. Click this button to try to reconnect, or please contact your administrator to link your device again.",
         "LINK_DEVICE": "Link device",
         "RECONNECT_FAILED": "Failed to reconnect. Please contact your administrator to link your device again."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "WhatsApp has temporarily restricted starting new conversations from this number.",
+        "RESTRICTED_UNTIL": "WhatsApp has temporarily restricted outbound messaging from this number until {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "This number is approaching its WhatsApp limit for starting new conversations this cycle.",
+        "WARNING_WITH_QUOTA": "This number has started {used} of {total} new conversations allowed by WhatsApp this cycle.",
+        "CAPPED": "This number has reached its WhatsApp limit for starting new conversations this cycle.",
+        "CAPPED_WITH_QUOTA": "This number has reached its WhatsApp limit ({used} of {total}) for starting new conversations this cycle."
       }
     }
   },

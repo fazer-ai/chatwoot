@@ -551,6 +551,87 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe '#update_reachout_time_lock!' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                provider_connection: { 'connection' => 'open', 'epoch' => 7 })
+    end
+
+    it 'merges the lock without touching connection or epoch' do
+      channel.update_reachout_time_lock!({ is_active: true, time_enforcement_ends: '2026-06-19T21:52:39.000Z' })
+
+      expect(channel.reload.provider_connection).to eq(
+        'connection' => 'open',
+        'epoch' => 7,
+        'reachout_time_lock' => { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' }
+      )
+    end
+
+    it 'broadcasts the updated provider_connection' do
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).to receive(:dispatch).with(
+        Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED,
+        anything,
+        hash_including(inbox: channel.inbox)
+      )
+
+      channel.update_reachout_time_lock!({ is_active: true })
+    end
+
+    it 'is a no-op when the lock is unchanged' do
+      channel.update_reachout_time_lock!({ is_active: true })
+
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).not_to receive(:dispatch)
+
+      channel.update_reachout_time_lock!({ is_active: true })
+    end
+  end
+
+  describe '#update_new_chat_cap!' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                provider_connection: { 'connection' => 'open', 'epoch' => 7 })
+    end
+
+    it 'persists only the UI-relevant keys, dropping server_sent_timestamp' do
+      channel.update_new_chat_cap!({
+                                     capping_status: 'CAPPED',
+                                     ote_status: 'ELIGIBLE',
+                                     mv_status: 'NOT_ELIGIBLE',
+                                     total_quota: 100,
+                                     used_quota: 100,
+                                     cycle_start_timestamp: '1781640000',
+                                     cycle_end_timestamp: '1781699999',
+                                     server_sent_timestamp: '1781645846'
+                                   })
+
+      expect(channel.reload.provider_connection).to eq(
+        'connection' => 'open',
+        'epoch' => 7,
+        'new_chat_cap' => {
+          'capping_status' => 'CAPPED',
+          'ote_status' => 'ELIGIBLE',
+          'mv_status' => 'NOT_ELIGIBLE',
+          'total_quota' => 100,
+          'used_quota' => 100,
+          'cycle_start_timestamp' => '1781640000',
+          'cycle_end_timestamp' => '1781699999'
+        }
+      )
+    end
+
+    it 'is a no-op when the cap is unchanged' do
+      cap = { capping_status: 'FIRST_WARNING', total_quota: 100, used_quota: 50 }
+      channel.update_new_chat_cap!(cap)
+
+      sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
+      expect(sync_dispatcher).not_to receive(:dispatch)
+
+      channel.update_new_chat_cap!(cap)
+    end
+  end
+
   describe '#provider_connection_data' do
     let(:channel) do
       create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
@@ -594,6 +675,50 @@ RSpec.describe Channel::Whatsapp do
         data = channel.provider_connection_data
 
         expect(data).to eq({ connection: 'open' })
+      end
+    end
+
+    context 'when a reach-out time-lock is present' do
+      let(:channel) do
+        create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                  provider_connection: {
+                                    'connection' => 'open',
+                                    'reachout_time_lock' => { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' }
+                                  })
+      end
+
+      it 'exposes the lock to non-administrators (agents see the banner too)' do
+        account_user = create(:account_user, account: channel.account, role: :agent)
+        allow(Current).to receive(:account_user).and_return(account_user)
+
+        data = channel.provider_connection_data
+
+        expect(data).to eq({
+                             connection: 'open',
+                             reachout_time_lock: { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' }
+                           })
+      end
+    end
+
+    context 'when a new-chat cap is present' do
+      let(:channel) do
+        create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                  provider_connection: {
+                                    'connection' => 'open',
+                                    'new_chat_cap' => { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 }
+                                  })
+      end
+
+      it 'exposes the cap to non-administrators' do
+        account_user = create(:account_user, account: channel.account, role: :agent)
+        allow(Current).to receive(:account_user).and_return(account_user)
+
+        data = channel.provider_connection_data
+
+        expect(data).to eq({
+                             connection: 'open',
+                             new_chat_cap: { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 }
+                           })
       end
     end
   end

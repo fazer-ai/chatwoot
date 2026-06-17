@@ -52,7 +52,15 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     admin_tokens = account.administrators.pluck(:pubsub_token)
     agent_tokens = account.agents.pluck(:pubsub_token)
 
-    connection = { connection: provider_connection['connection'] }
+    # reach-out lock and new-chat cap are not credential-sensitive (unlike qr_data_url), so they
+    # ride the base hash shared by both agent and admin broadcasts. Without this, a connection.update
+    # push would broadcast a provider_connection without them and the frontend mutation (wholesale
+    # replace) would drop the restriction/cap banners. .presence + .compact keeps absent keys out.
+    connection = {
+      connection: provider_connection['connection'],
+      reachout_time_lock: provider_connection['reachout_time_lock'].presence,
+      new_chat_cap: provider_connection['new_chat_cap'].presence
+    }.compact
     broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
     broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
                 inbox_id: inbox.id,

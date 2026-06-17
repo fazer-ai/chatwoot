@@ -41,6 +41,13 @@ import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import WhatsappLinkDeviceModal from '../../../routes/dashboard/settings/inbox/components/WhatsappLinkDeviceModal.vue';
 import { isInboxAdminInGroup } from 'dashboard/helper/phoneHelper';
+import {
+  isReachoutRestricted,
+  reachoutRestrictionDeadline,
+  isMessageCapped,
+  isMessageCapReached,
+  messageCapQuota,
+} from 'dashboard/helper/whatsapp';
 
 export default {
   components: {
@@ -346,6 +353,55 @@ export default {
     },
     inboxProviderConnection() {
       return this.currentInbox.provider_connection?.connection;
+    },
+    inboxReachoutLock() {
+      return this.currentInbox.provider_connection?.reachout_time_lock;
+    },
+    showReachoutRestriction() {
+      return isReachoutRestricted(
+        this.inboxReachoutLock,
+        this.inboxProviderConnection
+      );
+    },
+    reachoutRestrictionMessage() {
+      const deadline = reachoutRestrictionDeadline(this.inboxReachoutLock);
+      return deadline
+        ? this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_REACHOUT_RESTRICTION.RESTRICTED_UNTIL',
+            { time: deadline }
+          )
+        : this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_REACHOUT_RESTRICTION.RESTRICTED'
+          );
+    },
+    inboxNewChatCap() {
+      return this.currentInbox.provider_connection?.new_chat_cap;
+    },
+    showMessageCap() {
+      return isMessageCapped(
+        this.inboxNewChatCap,
+        this.inboxProviderConnection
+      );
+    },
+    messageCapBannerScheme() {
+      return isMessageCapReached(this.inboxNewChatCap) ? 'alert' : 'warning';
+    },
+    messageCapMessage() {
+      const quota = messageCapQuota(this.inboxNewChatCap);
+      if (isMessageCapReached(this.inboxNewChatCap)) {
+        return quota
+          ? this.$t(
+              'CONVERSATION.INBOX.WHATSAPP_NEW_CHAT_CAP.CAPPED_WITH_QUOTA',
+              quota
+            )
+          : this.$t('CONVERSATION.INBOX.WHATSAPP_NEW_CHAT_CAP.CAPPED');
+      }
+      return quota
+        ? this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_NEW_CHAT_CAP.WARNING_WITH_QUOTA',
+            quota
+          )
+        : this.$t('CONVERSATION.INBOX.WHATSAPP_NEW_CHAT_CAP.WARNING');
     },
   },
 
@@ -811,6 +867,18 @@ export default {
           @primary-action="
             isAdmin ? onOpenLinkDeviceModal() : onSetupProviderConnection()
           "
+        />
+        <Banner
+          v-if="showReachoutRestriction"
+          color-scheme="alert"
+          class="mt-2 mx-2 rounded-lg overflow-hidden"
+          :banner-message="reachoutRestrictionMessage"
+        />
+        <Banner
+          v-if="showMessageCap"
+          :color-scheme="messageCapBannerScheme"
+          class="mt-2 mx-2 rounded-lg overflow-hidden"
+          :banner-message="messageCapMessage"
         />
       </template>
       <Banner

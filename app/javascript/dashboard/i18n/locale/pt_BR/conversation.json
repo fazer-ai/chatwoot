@@ -373,6 +373,16 @@
         "NOT_CONNECTED_CONTACT_ADMIN": "O WhatsApp não está conectado. Clique no botão ao lado para tentar reconectar, ou contate o seu administrador para conectar o dispositivo novamente.",
         "LINK_DEVICE": "Conectar dispositivo",
         "RECONNECT_FAILED": "Falha ao reconectar. Por favor, contate o seu administrador para conectar o dispositivo novamente."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "O WhatsApp restringiu temporariamente o início de novas conversas a partir deste número.",
+        "RESTRICTED_UNTIL": "O WhatsApp restringiu temporariamente o envio de mensagens a partir deste número até {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "Este número está se aproximando do limite do WhatsApp para iniciar novas conversas neste ciclo.",
+        "WARNING_WITH_QUOTA": "Este número já iniciou {used} de {total} novas conversas permitidas pelo WhatsApp neste ciclo.",
+        "CAPPED": "Este número atingiu o limite do WhatsApp para iniciar novas conversas neste ciclo.",
+        "CAPPED_WITH_QUOTA": "Este número atingiu o limite do WhatsApp ({used} de {total}) para iniciar novas conversas neste ciclo."
       }
     }
   },
