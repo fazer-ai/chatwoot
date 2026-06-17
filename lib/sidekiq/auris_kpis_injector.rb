@@ -55,22 +55,26 @@ class Sidekiq::AurisKpisInjector
   def render_row
     m = fetch_metrics
     items = [
-      ['processed', m[:today_processed],                                'Proc. hoje'],
-      ['failed',    m[:today_failed],                                   'Falhas hoje'],
-      ['processed', success_rate(m[:today_processed], m[:today_failed]), 'KPI hoje'],
-      ['processed', m[:hour_processed],                                 'Proc. últ. hora'],
-      ['failed',    m[:hour_failed],                                    'Falhas últ. hora'],
-      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),  'KPI últ. hora']
+      ['processed', m[:today_processed],                                'Proc. hoje',       true],
+      ['failed',    m[:today_failed],                                   'Falhas hoje',      true],
+      ['processed', success_rate(m[:today_processed], m[:today_failed]), 'KPI hoje',        false],
+      ['processed', m[:hour_processed],                                 'Proc. últ. hora',  true],
+      ['failed',    m[:hour_failed],                                    'Falhas últ. hora', true],
+      ['processed', success_rate(m[:hour_processed], m[:hour_failed]),  'KPI últ. hora',   false]
     ]
-    lis = items.map { |klass, value, label| li_for(klass, value, label) }.join("\n")
+    lis = items.map { |klass, value, label, nwp| li_for(klass, value, label, nwp) }.join("\n")
     %(<ul class="list-unstyled summary row">\n#{lis}\n</ul>)
   end
 
-  def li_for(klass, value, label)
+  # `data-nwp` triggers Sidekiq Web's `updateNumbers()` JS, which does
+  # `parseFloat(textContent)` and rewrites the cell — stripping any
+  # non-numeric suffix like our `%`. So KPI cells render WITHOUT it.
+  def li_for(klass, value, label, nwp)
     value_str = value.is_a?(Numeric) ? number_with_delimiter(value) : value
+    count_attrs = nwp ? ' data-nwp' : ''
     <<~LI
       <li class="#{klass} col-sm-1">
-        <span class="count" data-nwp>#{value_str}</span>
+        <span class="count"#{count_attrs}>#{value_str}</span>
         <span class="desc">#{label}</span>
       </li>
     LI
