@@ -32,12 +32,13 @@ class Sidekiq::AurisKpisInjector
 
   private
 
-  # Sidekiq's dashboard lives at the root of the mount point. The path
-  # depends on where Sidekiq Web is mounted, so we match on the suffix
-  # the dashboard ends with (`/` or empty) rather than a fixed path.
+  # Sidekiq's dashboard is the ROOT of the mount point. Rack strips the
+  # mount prefix into SCRIPT_NAME and leaves PATH_INFO as `''` or `/`,
+  # regardless of where the engine was mounted — `/monitoring/sidekiq`
+  # in this project, but the middleware shouldn't assume that path.
   def inject?(env, headers)
     path = env['PATH_INFO'].to_s
-    return false unless path.end_with?('/sidekiq', '/sidekiq/')
+    return false unless path.empty? || path == '/'
 
     content_type = headers['Content-Type'] || headers['content-type']
     content_type&.include?('text/html')

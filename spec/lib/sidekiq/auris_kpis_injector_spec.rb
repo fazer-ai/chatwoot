@@ -12,7 +12,9 @@ RSpec.describe Sidekiq::AurisKpisInjector do
     end
   end
 
-  def request(path: '/monitoring/sidekiq/')
+  # Inside Sidekiq Web's Rack stack, PATH_INFO is relative to the
+  # engine mount, so the dashboard arrives as `''` or `/`.
+  def request(path: '/')
     middleware.call('PATH_INFO' => path)
   end
 
@@ -51,16 +53,22 @@ RSpec.describe Sidekiq::AurisKpisInjector do
   end
 
   it 'leaves other Sidekiq paths untouched' do
-    _status, _headers, body = request(path: '/monitoring/sidekiq/queues')
+    _status, _headers, body = request(path: '/queues')
 
     expect(body.first).to eq(html_body)
     expect(body.first).not_to include('Proc. hoje')
   end
 
+  it 'also injects when PATH_INFO is empty (Rack normalises mount root that way too)' do
+    _status, _headers, body = request(path: '')
+
+    expect(body.first).to include('Proc. hoje')
+  end
+
   it 'leaves non-HTML responses untouched' do
     json_app = ->(_env) { [200, { 'Content-Type' => 'application/json' }, ['{}']] }
 
-    _status, _headers, body = described_class.new(json_app).call('PATH_INFO' => '/monitoring/sidekiq/')
+    _status, _headers, body = described_class.new(json_app).call('PATH_INFO' => '/')
 
     expect(body.first).to eq('{}')
   end
