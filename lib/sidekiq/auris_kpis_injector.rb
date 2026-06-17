@@ -110,12 +110,13 @@ class Sidekiq::AurisKpisInjector
 
   # Success-rate formula requested by the operator:
   # `100% - (failed / processed)`. Treats zero processed as 100%
-  # (no jobs ran → no failures to count).
+  # (no jobs ran → no failures to count). Rounded to integer percent
+  # to keep the value short enough for the narrow col-sm-1 column.
   def success_rate(processed, failed)
-    return '100,00%' if processed.zero?
+    return '100%' if processed.zero?
 
     pct = 100.0 - (failed.to_f / processed * 100)
-    "#{format('%.2f', pct).tr('.', ',')}%"
+    "#{pct.round}%"
   end
 
   def number_with_delimiter(number)

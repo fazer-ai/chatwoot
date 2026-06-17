@@ -59,14 +59,14 @@ RSpec.describe Sidekiq::AurisKpisInjector do
     _status, _headers, body = middleware.call({})
 
     expect(body.first).to include('1.500')
-    # KPI hoje = 100 - (30/1500*100) = 98,00%
-    expect(body.first).to include('98,00%')
+    # KPI hoje = 100 - (30/1500*100) = 98.0 → '98%'
+    expect(body.first).to include('98%')
   end
 
   it 'reports 100% success when no jobs ran' do
     _status, _headers, body = middleware.call({})
 
-    expect(body.first).to include('100,00%')
+    expect(body.first).to include('100%')
   end
 
   it 'leaves HTML without the summary block untouched (e.g. login screen)' do
