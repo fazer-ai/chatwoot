@@ -243,6 +243,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
+    reconcile_cloud_contact_inbox_to_canonical(canonical_waid: phone_number)
   end
 
   def set_contact_from_message
@@ -260,9 +261,55 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
+    reconcile_cloud_contact_inbox_to_canonical(canonical_waid: contact_params[:wa_id])
+
     # Update existing contact name if ProfileName is available and current name is just phone number
     update_contact_with_profile_name(contact_params)
   end
+
+  # Consolidates duplicate contact_inboxes for the same contact in the
+  # same Cloud inbox under the canonical wa_id Meta just told us about.
+  #
+  # The bug this guards against: external integrations (pencil create,
+  # n8n flows, CRM imports) can construct a contact_inbox with a source
+  # id that Meta won't accept on outbound. When the patient later sends
+  # a message, the webhook creates a SECOND ci with the canonical wa_id
+  # — but the existing conversation stays anchored to the first ci, so
+  # every outbound try fails with 131026 (`Message undeliverable`).
+  #
+  # Strategy: pick the survivor (prefer the one whose source_id already
+  # matches the canonical; otherwise update the most ancient ci to it),
+  # move conversations from the other ci(s) onto the survivor, then
+  # delete the duplicates. End state: 1 ci per contact per inbox, with
+  # source_id == canonical wa_id.
+  #
+  # Scoped to whatsapp_cloud because that's where Meta is the source of
+  # truth on the wa_id. Baileys handles this differently
+  # (CanonicalPhoneResolverService at create time).
+  # rubocop:disable Metrics/AbcSize
+  def reconcile_cloud_contact_inbox_to_canonical(canonical_waid:)
+    return unless inbox.channel.is_a?(Channel::Whatsapp) && inbox.channel.provider == 'whatsapp_cloud'
+    return if canonical_waid.blank?
+
+    duplicates = inbox.contact_inboxes.where(contact_id: @contact.id)
+    return if duplicates.count <= 1
+
+    survivor = inbox.contact_inboxes.find_by(contact_id: @contact.id, source_id: canonical_waid) ||
+               duplicates.order(:created_at).first
+    survivor.update!(source_id: canonical_waid) if survivor.source_id != canonical_waid
+
+    duplicates.where.not(id: survivor.id).find_each do |dup|
+      Rails.logger.info(
+        '[whatsapp_cloud] consolidating duplicate contact_inbox: ' \
+        "merging ci.id=#{dup.id} (#{dup.source_id.inspect}) into ci.id=#{survivor.id} (#{survivor.source_id.inspect})"
+      )
+      dup.conversations.update_all(contact_inbox_id: survivor.id) # rubocop:disable Rails/SkipsModelValidations
+      dup.destroy!
+    end
+
+    @contact_inbox = survivor
+  end
+  # rubocop:enable Metrics/AbcSize
 
   def set_conversation
     # if lock to single conversation is disabled, we will create a new conversation if previous conversation is resolved

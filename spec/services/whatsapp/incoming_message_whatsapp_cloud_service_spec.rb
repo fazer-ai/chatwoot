@@ -378,6 +378,80 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
       end
     end
 
+    # Regression coverage for the duplicate contact_inbox bug. External
+    # integrations (pencil create, n8n, CRM import) can stamp a
+    # contact_inbox with an off-format source_id that Meta won't accept
+    # on outbound — every send then fails with 131026. When the patient
+    # eventually messages in via Meta, the webhook lands with the
+    # canonical wa_id and the service must consolidate the two ci's so
+    # that the conversation can be answered.
+    describe 'duplicate contact_inbox consolidation' do
+      let(:canonical_waid) { '553197516012' }
+      let(:incoming_message_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              field: 'messages',
+              value: {
+                contacts: [{ profile: { name: 'Farly' }, wa_id: canonical_waid }],
+                messages: [{ from: canonical_waid, text: { body: 'Olá' }, timestamp: '1750100000', type: 'text' }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      it 'merges an off-format contact_inbox onto the canonical wa_id when the patient messages in' do
+        # Off-format ci created earlier by an external integration
+        # (n8n-style suffix). Has an existing conversation, mirroring
+        # the production fingerprint that motivated this fix.
+        contact = create(:contact, account: whatsapp_channel.account, name: 'Farly', phone_number: "+#{canonical_waid}")
+        off_format_ci = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox,
+                                               source_id: "5531997516012-#{whatsapp_channel.inbox.id}")
+        legacy_conversation = create(:conversation, account: whatsapp_channel.account, inbox: whatsapp_channel.inbox,
+                                                    contact: contact, contact_inbox: off_format_ci)
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: incoming_message_params).perform
+
+        # End state: exactly one ci, with the canonical source_id, and
+        # the legacy conversation now points to it.
+        cis = whatsapp_channel.inbox.contact_inboxes.where(contact_id: contact.id)
+        expect(cis.count).to eq(1)
+        expect(cis.first.source_id).to eq(canonical_waid)
+        expect(legacy_conversation.reload.contact_inbox_id).to eq(cis.first.id)
+      end
+
+      it 'keeps the canonical contact_inbox when the existing one already matches' do
+        contact = create(:contact, account: whatsapp_channel.account, name: 'Farly', phone_number: "+#{canonical_waid}")
+        canonical_ci = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: canonical_waid)
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: incoming_message_params).perform
+
+        expect(whatsapp_channel.inbox.contact_inboxes.where(contact_id: contact.id).pluck(:id)).to eq([canonical_ci.id])
+        expect(canonical_ci.reload.source_id).to eq(canonical_waid)
+      end
+
+      it 'is a no-op when only one contact_inbox exists, even if its source_id is off-format' do
+        # Defensive: don't rewrite an off-format ci unless there's a
+        # second ci to consolidate. The patient may eventually message
+        # in and trigger the normal path; we don't want to surprise the
+        # operator by silently renaming on every webhook.
+        contact = create(:contact, account: whatsapp_channel.account, name: 'Farly', phone_number: "+#{canonical_waid}")
+        off_format_ci = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox,
+                                               source_id: "5531997516012-#{whatsapp_channel.inbox.id}")
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: incoming_message_params).perform
+
+        # The webhook creates a SECOND ci (with canonical), and now the
+        # consolidation kicks in — survivor is canonical, the off-format
+        # is merged in. End state: 1 ci with the canonical source_id.
+        expect(whatsapp_channel.inbox.contact_inboxes.where(contact_id: contact.id).pluck(:source_id)).to eq([canonical_waid])
+        expect(ContactInbox.exists?(id: off_format_ci.id)).to be(false)
+      end
+    end
+
     # Regression coverage for out-of-order status acks. Meta retries each
     # status (sent / delivered / read) independently and async deliveries
     # can land an older status after a newer one already arrived — without
