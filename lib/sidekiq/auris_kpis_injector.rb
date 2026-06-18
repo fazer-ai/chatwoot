@@ -66,15 +66,21 @@ class Sidekiq::AurisKpisInjector
     %(<ul class="list-unstyled summary row">\n#{lis}\n</ul>)
   end
 
-  # `data-nwp` triggers Sidekiq Web's `updateNumbers()` JS, which does
-  # `parseFloat(textContent)` and rewrites the cell — stripping any
-  # non-numeric suffix like our `%`. So KPI cells render WITHOUT it.
+  # Sidekiq Web's `updateNumbers()` JS does `parseFloat(textContent)`
+  # and re-runs `toLocaleString` to format the number with the browser
+  # locale. Two consequences:
+  #   - KPI cells must NOT carry `data-nwp`: their textContent ends in
+  #     `%`, parseFloat would strip it.
+  #   - Numeric cells must NOT be pre-formatted with `.` as thousands
+  #     separator. In JS, `.` is the decimal separator, so a server
+  #     value like `"166.000"` would parseFloat to `166`, collapsing
+  #     the cell to just the thousands portion. Output the raw integer
+  #     and let the browser locale add the separators.
   def li_for(klass, value, label, nwp)
-    value_str = value.is_a?(Numeric) ? number_with_delimiter(value) : value
     count_attrs = nwp ? ' data-nwp' : ''
     <<~LI
       <li class="#{klass} col-sm-1">
-        <span class="count"#{count_attrs}>#{value_str}</span>
+        <span class="count"#{count_attrs}>#{value}</span>
         <span class="desc">#{label}</span>
       </li>
     LI
@@ -121,9 +127,5 @@ class Sidekiq::AurisKpisInjector
 
     pct = 100.0 - (failed.to_f / processed * 100)
     "#{pct.round}%"
-  end
-
-  def number_with_delimiter(number)
-    number.to_i.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1.').reverse
   end
 end
