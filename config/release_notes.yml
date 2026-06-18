@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.30.2
+  published_at: '2026-06-18T13:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.2
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.30.1
   published_at: '2026-06-18T13:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.1
@@ -261,15 +269,3 @@
       ### ⚡ Melhorias
 
       - **Mensagens recebidas do WhatsApp com mais prioridade no processamento.** Ajustamos como os webhooks de WhatsApp são tratados internamente para que mensagens reais dos clientes sejam atendidas antes de eventos secundários (indicador de digitação, recibos de leitura, notificações de template/qualidade), reduzindo atrasos em picos de tráfego.
-- tag: v4.13.0-auris.1.24.1
-  published_at: '2026-05-26T16:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.1
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Group chip and readable inbox list on the Health Score drill-down.** Each metric card in the expanded view of the Health Score report now shows a colored chip identifying its group (Outcomes / Operational / Engagement), and the Inbox uptime metric lists the phone numbers and connection state instead of the raw "[object Object]" placeholder.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Etiqueta de grupo e lista de inboxes legível no drill-down do Health Score.** Cada card de métrica na visão expandida do relatório Health Score agora mostra uma etiqueta colorida indicando o grupo (Outcomes / Operational / Engagement), e a métrica de uptime das inboxes lista os números de telefone com o status de conexão em vez do "[object Object]" anterior.
