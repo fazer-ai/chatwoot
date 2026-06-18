@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.31
+  published_at: '2026-06-18T20:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.30.2
   published_at: '2026-06-18T13:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.2
@@ -257,15 +265,3 @@
       ### 🐛 Correções
 
       - **Contatos duplicados de WhatsApp por causa do "9º dígito" resolvido.** Quando o mesmo número brasileiro chegava em formatos diferentes (12 dígitos sem o "9" e 13 dígitos com o "9"), o Chatwoot criava dois contatos separados. Os formatos agora são unificados na entrada da mensagem, e os duplicados existentes se consolidam automaticamente na próxima interação do paciente.
-- tag: v4.13.0-auris.1.24.2
-  published_at: '2026-05-26T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.2
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Incoming WhatsApp messages processed with higher priority.** We tuned how WhatsApp webhooks are handled internally so real customer messages are picked up ahead of secondary events (typing indicators, delivery receipts, template/quality notifications), reducing delays during traffic spikes.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Mensagens recebidas do WhatsApp com mais prioridade no processamento.** Ajustamos como os webhooks de WhatsApp são tratados internamente para que mensagens reais dos clientes sejam atendidas antes de eventos secundários (indicador de digitação, recibos de leitura, notificações de template/qualidade), reduzindo atrasos em picos de tráfego.
