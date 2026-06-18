@@ -33,12 +33,25 @@ class Webhooks::WhatsappController < ActionController::API
   # WhatsApp queue, status acks land in a dedicated mid-priority queue so
   # they keep flowing without elbowing messages out of the way, and the
   # rest (presence, account updates) stays on `:low`.
+  #
+  # Interactive Baileys events (QR pairing) jump straight to `:high`. They
+  # are rare per session, sit at the same priority as `SendReplyJob`, and
+  # — critically — they are NOT allowed to wait behind `presence.update`
+  # backlog on `:low`. A backed-up `:low` was making QR pairings time out.
   def target_queue
     return :whatsapp_history if params[:importMode]
+    return :high if interactive_baileys_event?
     return :whatsapp_messages if live_message_payload?
     return :whatsapp_statuses if status_only_payload?
 
     :low
+  end
+
+  # `connection.update` carries the QR data URL and the connection state
+  # transitions (`connecting` → `open` / `close`). `creds.update` fires
+  # once after the contact scans the QR, persisting credentials.
+  def interactive_baileys_event?
+    %w[connection.update creds.update].include?(params[:event].to_s)
   end
 
   # Detects whether the webhook is an actual inbound (or echo) WhatsApp

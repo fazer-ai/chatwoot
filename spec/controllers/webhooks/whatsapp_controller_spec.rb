@@ -65,6 +65,23 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
     end
 
+    # `connection.update` carries the QR pairing data and the connection
+    # state transitions. They are rare per session but operators wait on
+    # them interactively — they must not sit behind a backed-up `:low`.
+    context 'when the payload is an interactive Baileys event (QR pairing)' do
+      it 'routes connection.update to :high' do
+        post '/webhooks/whatsapp/123221321', params: { event: 'connection.update', data: { connection: 'connecting' } }
+
+        expect(queues_seen).to eq([:high])
+      end
+
+      it 'routes creds.update to :high' do
+        post '/webhooks/whatsapp/123221321', params: { event: 'creds.update', data: {} }
+
+        expect(queues_seen).to eq([:high])
+      end
+    end
+
     context 'when the payload is an inbound WhatsApp Cloud message' do
       it 'routes "messages" field carrying a messages array to :whatsapp_messages' do
         post '/webhooks/whatsapp/123221321',
