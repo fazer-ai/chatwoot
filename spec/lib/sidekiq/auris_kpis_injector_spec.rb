@@ -58,7 +58,11 @@ RSpec.describe Sidekiq::AurisKpisInjector do
 
     _status, _headers, body = middleware.call({})
 
-    expect(body.first).to include('1.500')
+    # Numeric cells are emitted as raw integers — Sidekiq Web's
+    # `updateNumbers()` JS re-runs `toLocaleString` to add browser-locale
+    # separators. Pre-formatting with `.` in Ruby would collide with JS
+    # decimal parsing and truncate the displayed value to the thousands.
+    expect(body.first).to include('>1500</span>')
     # KPI hoje = 100 - (30/1500*100) = 98.0 → '98%'
     expect(body.first).to include('98%')
   end
