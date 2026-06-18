@@ -22,6 +22,93 @@ describe Messages::MessageBuilder do
     end
   end
 
+  describe '#perform with WhatsApp template_params and blank content' do
+    let(:channel) do
+      create(:channel_whatsapp,
+             account: account,
+             validate_provider_config: false,
+             sync_templates: false,
+             message_templates: [
+               {
+                 'name' => 'auris_fup_geral',
+                 'language' => 'pt_BR',
+                 'status' => 'approved',
+                 'components' => [
+                   { 'type' => 'BODY', 'text' => 'Está aí? {{mensagem}}' }
+                 ]
+               }
+             ])
+    end
+    let(:inbox) { channel.inbox }
+    let(:template_payload) do
+      {
+        name: 'auris_fup_geral',
+        language: 'pt_BR',
+        processed_params: { body: { mensagem: 'precisa de ajuda?' } }
+      }
+    end
+
+    context 'when content is blank' do
+      let(:params) do
+        ActionController::Parameters.new(message_type: 'outgoing', template_params: template_payload)
+      end
+
+      it 'renders the template body into message.content' do
+        message = described_class.new(user, conversation, params).perform
+        expect(message.content).to eq('Está aí? precisa de ajuda?')
+      end
+    end
+
+    context 'when content is an empty string' do
+      let(:params) do
+        ActionController::Parameters.new(message_type: 'outgoing', content: '', template_params: template_payload)
+      end
+
+      it 'still renders the template body' do
+        message = described_class.new(user, conversation, params).perform
+        expect(message.content).to eq('Está aí? precisa de ajuda?')
+      end
+    end
+
+    context 'when content is filled by the caller' do
+      let(:params) do
+        ActionController::Parameters.new(message_type: 'outgoing', content: 'manual content', template_params: template_payload)
+      end
+
+      it 'keeps the caller-provided content untouched' do
+        message = described_class.new(user, conversation, params).perform
+        expect(message.content).to eq('manual content')
+      end
+    end
+
+    context 'when template is not in the channel catalog' do
+      let(:template_payload) do
+        { name: 'missing_template', language: 'pt_BR', processed_params: { body: { mensagem: 'x' } } }
+      end
+      let(:params) do
+        ActionController::Parameters.new(message_type: 'outgoing', template_params: template_payload)
+      end
+
+      it 'falls back to a placeholder so the bubble is not blank (does not raise)' do
+        message = described_class.new(user, conversation, params).perform
+        expect(message.content).to eq('Mensagem a ser enviada')
+      end
+    end
+
+    context 'when inbox is not WhatsApp' do
+      let(:inbox) { create(:inbox, account: account) }
+      let(:params) do
+        ActionController::Parameters.new(message_type: 'outgoing', template_params: template_payload)
+      end
+
+      it 'does not attempt to render the template body' do
+        expect(Whatsapp::TemplateBodyRenderer).not_to receive(:new)
+        message = described_class.new(user, conversation, params).perform
+        expect(message.content).to be_nil
+      end
+    end
+  end
+
   describe '#content_attributes' do
     context 'when content_attributes is a JSON string' do
       let(:params) do

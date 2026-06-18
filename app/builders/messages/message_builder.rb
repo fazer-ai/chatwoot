@@ -221,7 +221,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       account_id: @conversation.account_id,
       inbox_id: @conversation.inbox_id,
       message_type: message_type,
-      content: @params[:content],
+      content: @params[:content].presence || whatsapp_template_body,
       private: @private,
       sender: sender,
       content_type: @params[:content_type],
@@ -233,6 +233,34 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       source_id: @params[:source_id]
     }.merge(external_created_at).merge(automation_rule_id).merge(campaign_id)
       .deep_merge(template_params).merge(zapi_args).deep_merge(scheduled_message_metadata)
+  end
+
+  # When an n8n / external integration posts to a WhatsApp inbox with a
+  # `template_params` payload but leaves `content` empty, the message is
+  # delivered to the contact but shows up as a blank bubble in the panel.
+  # Reuse the same renderer the OneoffCampaign already uses to interpolate
+  # the template body with `processed_params[:body]` and store the result
+  # as the message content so it renders normally for agents.
+  #
+  # When the renderer cannot interpolate (template not synced locally, body
+  # malformed, etc.) we keep the bubble from being blank by returning a
+  # short placeholder — `Whatsapp::SendOnWhatsappService` then marks the
+  # message as failed with a specific "Template X não sincronizado" error.
+  BLANK_TEMPLATE_PLACEHOLDER = 'Mensagem a ser enviada'.freeze
+
+  def whatsapp_template_body
+    return nil unless @conversation.inbox&.channel.is_a?(Channel::Whatsapp)
+    return nil if @params[:template_params].blank?
+
+    rendered = Whatsapp::TemplateBodyRenderer.new(
+      channel: @conversation.inbox.channel,
+      template_params: JSON.parse(@params[:template_params].to_json)
+    ).call
+
+    rendered.presence || BLANK_TEMPLATE_PLACEHOLDER
+  rescue StandardError => e
+    Rails.logger.warn("[MessageBuilder] failed to render WhatsApp template body for content: #{e.message}")
+    BLANK_TEMPLATE_PLACEHOLDER
   end
 
   def email_inbox?

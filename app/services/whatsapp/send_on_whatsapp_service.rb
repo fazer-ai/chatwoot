@@ -25,25 +25,46 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
   def send_template_message
     processor = Whatsapp::TemplateProcessorService.new(
-      channel: channel,
-      template_params: template_params,
-      message: message
+      channel: channel, template_params: template_params, message: message
     )
 
     name, namespace, lang_code, processed_parameters = processor.call
 
-    if name.blank?
-      message.update!(status: :failed, external_error: 'Template not found or invalid template name')
-      return
-    end
+    return fail_template_send('Template not found or invalid template name') if name.blank?
+    return fail_template_send("Template #{name} não sincronizado") unless template_synced?
 
     message_id = channel.send_template(recipient_id, {
-                                         name: name,
-                                         namespace: namespace,
-                                         lang_code: lang_code,
-                                         parameters: processed_parameters
+                                         name: name, namespace: namespace,
+                                         lang_code: lang_code, parameters: processed_parameters
                                        }, message)
     message.update!(source_id: message_id) if message_id.present?
+  end
+
+  def fail_template_send(error)
+    message.update!(status: :failed, external_error: error)
+  end
+
+  # Pre-flight check: confirm the template named in the payload exists in
+  # the channel's synced catalog with status `approved` before we call
+  # `send_template`. Without this, Meta returns a generic 132000 and the
+  # operator only sees "Template not found or invalid template name" with
+  # no hint of WHICH template misfired.
+  #
+  # If the channel has no templates synced at all (`message_templates`
+  # blank), defer the check to Meta — empty catalog can happen on freshly
+  # connected inboxes before the first sync runs, and blocking those
+  # would surface as a false-positive failure.
+  def template_synced?
+    return false if template_params.blank?
+    return true if channel.message_templates.blank?
+
+    channel.message_templates.any? { |t| template_match?(t) }
+  end
+
+  def template_match?(template)
+    template['name'] == template_params['name'] &&
+      template['language']&.downcase == template_params['language']&.downcase &&
+      template['status']&.downcase == 'approved'
   end
 
   def send_baileys_session_message
