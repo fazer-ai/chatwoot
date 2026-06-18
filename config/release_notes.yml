@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.1
+  published_at: '2026-06-18T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Connecting a new Instagram inbox works again.** Meta flipped the accepted HTTP method on the Instagram token exchange endpoint, breaking the "Failed to exchange token" dialog when adding an Instagram inbox. Fixed.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Conexão de uma nova caixa de entrada do Instagram voltou a funcionar.** O Meta mudou o método HTTP aceito no endpoint de troca de token do Instagram, quebrando o passo final com a mensagem "Failed to exchange token". Corrigido.
 - tag: v4.13.0-auris.1.31
   published_at: '2026-06-18T20:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31
@@ -243,25 +255,3 @@
       ### 🐛 Correções
 
       - **Confirmação de entrega das mensagens do WhatsApp mais consistente.** Em alguns cenários, mensagens enviadas pelo agente ficavam exibindo apenas o status "enviada" sem evoluir para "entregue" no painel, mesmo tendo chegado ao paciente. O processamento dessas atualizações foi reforçado para que o status correto sempre apareça.
-- tag: v4.13.0-auris.1.24.3
-  published_at: '2026-05-27T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.3
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Inline help on Health Score terms.** The Super Admin report now shows (?) icons next to each group (Outcomes / Operational / Engagement) and each metric, explaining what they measure and why they matter for churn risk.
-      - **Health Score report no longer lists suspended accounts.** Ops now sees only active accounts in the report — suspended ones drop off the list until reactivated.
-
-      ### 🐛 Fixes
-
-      - **Duplicate WhatsApp contacts from the Brazilian "9th-digit" issue resolved.** When the same Brazilian number arrived in different formats (12 digits without the "9" and 13 digits with the "9"), Chatwoot used to create two separate contacts. The formats are now unified at the inbound message boundary, and existing duplicates consolidate automatically on the patient's next interaction.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Ajuda inline nos termos do Health Score.** No relatório do Super Admin, agora aparecem ícones (?) ao lado dos grupos (Outcomes / Operational / Engagement) e de cada métrica, explicando o que cada um mede e por que importa para o risco de churn.
-      - **Relatório de Health Score sem o ruído de contas suspensas.** O Ops passa a ver apenas as contas ativas — contas suspensas somem da lista até serem reativadas.
-
-      ### 🐛 Correções
-
-      - **Contatos duplicados de WhatsApp por causa do "9º dígito" resolvido.** Quando o mesmo número brasileiro chegava em formatos diferentes (12 dígitos sem o "9" e 13 dígitos com o "9"), o Chatwoot criava dois contatos separados. Os formatos agora são unificados na entrada da mensagem, e os duplicados existentes se consolidam automaticamente na próxima interação do paciente.
