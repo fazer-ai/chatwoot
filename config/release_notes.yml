@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.30.1
+  published_at: '2026-06-18T13:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.1
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.30
   published_at: '2026-06-18T00:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30
@@ -265,25 +273,3 @@
       ### ⚡ Melhorias
 
       - **Etiqueta de grupo e lista de inboxes legível no drill-down do Health Score.** Cada card de métrica na visão expandida do relatório Health Score agora mostra uma etiqueta colorida indicando o grupo (Outcomes / Operational / Engagement), e a métrica de uptime das inboxes lista os números de telefone com o status de conexão em vez do "[object Object]" anterior.
-- tag: v4.13.0-auris.1.24
-  published_at: '2026-05-25T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Per-account Health Score report.** New **Reports → Health Score** entry in super admin with a 0-100 score per account and per group (Outcomes, Operational, Engagement). Colors flag churn risk at a glance (red / yellow / green) and clicking any row expands the 5 underlying metrics with raw values and the reason behind each missing metric. Snapshots are computed daily.
-      - **Search accounts by ID in the sidebar switcher.** Beyond the name, the "Switch account" dropdown now also matches the account ID — handy when you already know the ID by heart.
-
-      ### ⚡ Improvements
-
-      - **Chat and campaign timestamps in the account language.** Message timestamps in the chat (including system activity messages) and dates on campaign cards now follow the account's configured language — Portuguese accounts see pt-BR copy, English accounts stay in English.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Relatório de Health Score por conta.** Novo item **Relatórios → Health Score** no super admin com nota de 0 a 100 por conta e por grupo (Outcomes, Operational, Engagement). As cores sinalizam o risco de churn rapidamente (vermelho / amarelo / verde) e clicando em qualquer linha expande as 5 métricas que compõem a nota com valores brutos e a razão de cada métrica indisponível. Snapshots calculados diariamente.
-      - **Buscar conta pelo ID no seletor da barra lateral.** Além do nome, o dropdown "Alterar conta" agora também casa pelo ID da conta — útil quando você já sabe o ID de cor.
-
-      ### ⚡ Melhorias
-
-      - **Datas do chat e das campanhas no idioma da conta.** O timestamp das mensagens no chat (incluindo as mensagens de atividade do sistema) e a data dos cards de campanha agora respeitam o idioma configurado da conta — em contas pt-BR aparecem em português, em contas em inglês continuam em inglês.
