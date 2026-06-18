@@ -1,4 +1,18 @@
 ---
+- tag: v4.13.0-auris.1.30
+  published_at: '2026-06-18T00:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Automated WhatsApp template messages now show their full text in the conversation.** Messages that integrations send using an approved template render with the proper text in the panel instead of an empty bubble.
+      - **When a template is out of sync, the conversation tells you which one.** If a message can't go out because its template is no longer synced, the red error marker on the bubble now names the template so it's clear what needs to be reconnected.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Mensagens automáticas com template do WhatsApp aparecem com o texto completo na conversa.** Mensagens que integrações mandam usando um template aprovado agora aparecem no painel com o texto certo, em vez de uma bolha vazia.
+      - **Quando um template está desatualizado, a conversa avisa qual é.** Se uma mensagem não sai porque o template dela não está mais sincronizado, o marcador vermelho de erro na bolha agora mostra o nome do template, facilitando saber o que precisa ser reconectado.
 - tag: v4.13.0-auris.1.29.2
   published_at: '2026-06-17T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29.2
@@ -273,15 +287,3 @@
       ### ⚡ Melhorias
 
       - **Datas do chat e das campanhas no idioma da conta.** O timestamp das mensagens no chat (incluindo as mensagens de atividade do sistema) e a data dos cards de campanha agora respeitam o idioma configurado da conta — em contas pt-BR aparecem em português, em contas em inglês continuam em inglês.
-- tag: v4.13.0-auris.1.23.3
-  published_at: '2026-05-25T01:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.23.3
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Automation activity messages now match the account language.** Activity entries triggered by automation rules (assignment, team, label, AI status changes) were always rendered in English, even on Portuguese accounts. They now follow the account's configured language.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Mensagens de atividade das automações no idioma da conta.** Os eventos gerados por regras de automação (atribuição, time, etiquetas, mudança de status da IA) apareciam sempre em inglês, mesmo em contas configuradas em português. Agora respeitam o idioma da conta.
