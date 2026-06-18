@@ -89,9 +89,9 @@ describe Messages::MessageBuilder do
         ActionController::Parameters.new(message_type: 'outgoing', template_params: template_payload)
       end
 
-      it 'falls back to nil content (does not raise)' do
+      it 'falls back to a placeholder so the bubble is not blank (does not raise)' do
         message = described_class.new(user, conversation, params).perform
-        expect(message.content).to be_nil
+        expect(message.content).to eq('Mensagem a ser enviada')
       end
     end
 

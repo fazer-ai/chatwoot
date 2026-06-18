@@ -97,6 +97,28 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.external_error).to eq('Template not found or invalid template name')
       end
 
+      it 'marks message as failed with the template name when the template is not synced' do
+        whatsapp_channel.update!(message_templates: [
+                                   { 'name' => 'other_template', 'language' => 'pt_BR', 'status' => 'approved',
+                                     'components' => [{ 'type' => 'BODY', 'text' => 'x' }] }
+                                 ])
+        not_synced_params = {
+          name: 'auris_fup_geral',
+          language: 'pt_BR',
+          processed_params: { 'body' => { 'mensagem' => 'oi' } }
+        }
+        message = create(:message,
+                         additional_attributes: { template_params: not_synced_params },
+                         conversation: conversation,
+                         message_type: :outgoing,
+                         account: conversation.account)
+
+        described_class.new(message: message).perform
+
+        expect(message.reload.status).to eq('failed')
+        expect(message.reload.external_error).to eq('Template auris_fup_geral não sincronizado')
+      end
+
       it 'calls channel.send_template when after 24 hour limit' do
         message = create(:message, message_type: :outgoing, content: 'Your package has been shipped. It will be delivered in 3 business days.',
                                    conversation: conversation, additional_attributes: { template_params: template_params },

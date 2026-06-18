@@ -241,17 +241,26 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   # Reuse the same renderer the OneoffCampaign already uses to interpolate
   # the template body with `processed_params[:body]` and store the result
   # as the message content so it renders normally for agents.
+  #
+  # When the renderer cannot interpolate (template not synced locally, body
+  # malformed, etc.) we keep the bubble from being blank by returning a
+  # short placeholder — `Whatsapp::SendOnWhatsappService` then marks the
+  # message as failed with a specific "Template X não sincronizado" error.
+  BLANK_TEMPLATE_PLACEHOLDER = 'Mensagem a ser enviada'.freeze
+
   def whatsapp_template_body
     return nil unless @conversation.inbox&.channel.is_a?(Channel::Whatsapp)
     return nil if @params[:template_params].blank?
 
-    Whatsapp::TemplateBodyRenderer.new(
+    rendered = Whatsapp::TemplateBodyRenderer.new(
       channel: @conversation.inbox.channel,
       template_params: JSON.parse(@params[:template_params].to_json)
     ).call
+
+    rendered.presence || BLANK_TEMPLATE_PLACEHOLDER
   rescue StandardError => e
     Rails.logger.warn("[MessageBuilder] failed to render WhatsApp template body for content: #{e.message}")
-    nil
+    BLANK_TEMPLATE_PLACEHOLDER
   end
 
   def email_inbox?
