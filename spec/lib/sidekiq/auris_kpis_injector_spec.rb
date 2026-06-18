@@ -63,14 +63,27 @@ RSpec.describe Sidekiq::AurisKpisInjector do
     # separators. Pre-formatting with `.` in Ruby would collide with JS
     # decimal parsing and truncate the displayed value to the thousands.
     expect(body.first).to include('>1500</span>')
-    # KPI hoje = 100 - (30/1500*100) = 98.0 → '98%'
-    expect(body.first).to include('98%')
+    # KPI hoje = 100 - (30/1500*100) = 98.00 → '98,00%' (BR decimal comma)
+    expect(body.first).to include('98,00%')
   end
 
-  it 'reports 100% success when no jobs ran' do
+  it 'reports 100,00% success when no jobs ran' do
     _status, _headers, body = middleware.call({})
 
-    expect(body.first).to include('100%')
+    expect(body.first).to include('100,00%')
+  end
+
+  it 'shows two decimal places so high-volume KPIs do not round to 100,00%' do
+    now = Time.now.utc
+    Sidekiq.redis do |c|
+      c.set(Sidekiq::AurisMetricsRecorder.day_key(Sidekiq::AurisMetricsRecorder::TYPE_PROCESSED, now.strftime('%Y%m%d')), 166_000)
+      c.set(Sidekiq::AurisMetricsRecorder.day_key(Sidekiq::AurisMetricsRecorder::TYPE_FAILED, now.strftime('%Y%m%d')), 73)
+    end
+
+    _status, _headers, body = middleware.call({})
+
+    # 100 - (73/166000 * 100) = 99.956... → '99,96%'
+    expect(body.first).to include('99,96%')
   end
 
   it 'leaves HTML without the summary block untouched (e.g. login screen)' do
