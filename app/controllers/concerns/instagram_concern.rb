@@ -34,11 +34,17 @@ module InstagramConcern
       client_id: client_id
     }
 
-    # Meta started rejecting GET on this endpoint (`IGApiException code 100:
-    # "Unsupported request - method type: get"`) after the Instagram Basic
-    # Display API was sunset. The Instagram Business Login flow requires POST
-    # for the long-lived token exchange.
-    make_api_request(endpoint, params, 'Failed to exchange token', method: :post)
+    # Meta has flipped the accepted HTTP method on this endpoint twice
+    # in two days:
+    #   - up to mid-Jun/2026: GET worked (then started rejecting with
+    #     `IGApiException code 100: "Unsupported request - method type: get"`)
+    #   - 16-Jun-2026: we switched to POST (v1.27.1)
+    #   - 18-Jun-2026: Meta reverted; POST now returns the symmetric
+    #     `"Unsupported request - method type: post"`.
+    # Back to GET. If Meta flips again, the `IGApiException code 100`
+    # message will literally say which method is "unsupported" — read the
+    # log line emitted by `make_api_request` and flip accordingly.
+    make_api_request(endpoint, params, 'Failed to exchange token', method: :get)
   end
 
   def fetch_instagram_user_details(access_token)
