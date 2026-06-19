@@ -61,15 +61,8 @@ module InstagramConcern
     make_api_request(endpoint, params, 'Failed to exchange token', method: :get)
   end
 
-  # Aligned with the Graph API version the Meta App is configured for
-  # (v24.0). Older pins on this endpoint returned the cryptic
-  # `"Unsupported request - method type: get"` because the token format
-  # produced by the modern Business Login flow no longer matches what
-  # those older versions accept on `/me`.
-  INSTAGRAM_GRAPH_VERSION = 'v24.0'.freeze
-
   def fetch_instagram_user_details(access_token)
-    endpoint = "https://graph.instagram.com/#{INSTAGRAM_GRAPH_VERSION}/me"
+    endpoint = "https://graph.instagram.com/#{Channel::Instagram.api_version}/me"
     params = {
       fields: 'id,username,user_id,name,profile_picture_url,account_type',
       access_token: access_token
@@ -80,7 +73,7 @@ module InstagramConcern
       "token_length=#{access_token.to_s.length}"
     )
 
-    result = make_api_request(endpoint, params, 'Failed to fetch Instagram user details')
+    result = attempt_user_details_with_fallback(endpoint, params)
 
     Rails.logger.info(
       "[instagram] /me response keys=#{result.keys.inspect} " \
@@ -88,6 +81,19 @@ module InstagramConcern
     )
 
     result
+  end
+
+  # Same flip-resilience pattern as `attempt_token_exchange_with_fallback`:
+  # Meta keeps returning the cryptic "method type: <get|post>" on Instagram
+  # endpoints. Try POST first (matches what works on the token exchange),
+  # fall back to GET if Meta rejects POST with that specific error.
+  def attempt_user_details_with_fallback(endpoint, params)
+    make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :post)
+  rescue RuntimeError => e
+    raise unless /method type:\s*post/i.match?(e.message)
+
+    Rails.logger.warn('[instagram] /me POST rejected by Meta, retrying with GET')
+    make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :get)
   end
 
   def make_api_request(endpoint, params, error_prefix, method: :get)

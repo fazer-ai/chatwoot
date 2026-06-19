@@ -12,6 +12,7 @@ RSpec.describe InstagramConcern do
   before do
     allow(GlobalConfigService).to receive(:load).with('INSTAGRAM_APP_ID', nil).and_return(client_id)
     allow(GlobalConfigService).to receive(:load).with('INSTAGRAM_APP_SECRET', nil).and_return(client_secret)
+    allow(GlobalConfigService).to receive(:load).with('INSTAGRAM_API_VERSION', 'v24.0').and_return('v24.0')
     allow(Rails.logger).to receive(:error)
   end
 
@@ -131,34 +132,66 @@ RSpec.describe InstagramConcern do
     let(:mock_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
 
     before do
+      allow(HTTParty).to receive(:post).and_return(mock_response)
       allow(HTTParty).to receive(:get).and_return(mock_response)
       allow(mock_response).to receive(:inspect).and_return(response_body)
     end
 
-    it 'fetches Instagram user details' do
+    it 'fetches Instagram user details via POST (matches what the token exchange now needs)' do
       result = dummy_instance.send(:fetch_instagram_user_details, access_token)
 
-      expect(HTTParty).to have_received(:get).with(
+      expect(HTTParty).to have_received(:post).with(
         'https://graph.instagram.com/v24.0/me',
         {
-          query: {
+          body: {
             fields: 'id,username,user_id,name,profile_picture_url,account_type',
             access_token: access_token
           },
           headers: { 'Accept' => 'application/json' }
         }
       )
-
+      expect(HTTParty).not_to have_received(:get)
       expect(result).to eq(user_details)
     end
 
-    context 'when the request fails' do
+    context 'when Meta rejects POST with the "method type: post" error' do
+      let(:post_error_body) do
+        { 'error' => { 'message' => 'Unsupported request - method type: post', 'type' => 'IGApiException', 'code' => 100 } }.to_json
+      end
+      let(:post_response) { instance_double(HTTParty::Response, body: post_error_body, success?: false, code: 400) }
+      let(:get_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
+
+      before do
+        allow(HTTParty).to receive(:post).and_return(post_response)
+        allow(HTTParty).to receive(:get).and_return(get_response)
+      end
+
+      it 'transparently retries with GET' do
+        result = dummy_instance.send(:fetch_instagram_user_details, access_token)
+
+        expect(HTTParty).to have_received(:post).once
+        expect(HTTParty).to have_received(:get).with(
+          'https://graph.instagram.com/v24.0/me',
+          {
+            query: {
+              fields: 'id,username,user_id,name,profile_picture_url,account_type',
+              access_token: access_token
+            },
+            headers: { 'Accept' => 'application/json' }
+          }
+        )
+        expect(result).to eq(user_details)
+      end
+    end
+
+    context 'when the request fails with an unrelated error' do
       let(:mock_response) { instance_double(HTTParty::Response, body: 'Error', success?: false, code: 400) }
 
-      it 'raises an error' do
+      it 'raises without falling back to GET' do
         expect do
           dummy_instance.send(:fetch_instagram_user_details, access_token)
         end.to raise_error(RuntimeError, 'Failed to fetch Instagram user details: Error')
+        expect(HTTParty).not_to have_received(:get)
       end
     end
 
