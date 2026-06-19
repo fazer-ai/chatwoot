@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.6
+  published_at: '2026-06-19T19:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.6
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Instagram integration hardened end-to-end.** All Instagram API calls (connect a new inbox, send and receive messages, periodic token refresh, webhook registration) now share the same API version and automatically retry with the alternate HTTP method when Meta swings between GET and POST. Silent failures on webhook subscribe/unsubscribe are now logged so the operator notices when something breaks.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Integração com Instagram reforçada de ponta a ponta.** Todas as chamadas para a API do Instagram (conectar nova caixa, enviar e receber mensagens, renovação periódica de token, registro de webhooks) agora compartilham a mesma versão de API e automaticamente reentregam com o método HTTP alternativo quando o Meta alterna entre GET e POST. Falhas silenciosas no subscribe/unsubscribe de webhook agora aparecem nos logs para o operador perceber.
 - tag: v4.13.0-auris.1.31.5
   published_at: '2026-06-19T15:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.5
@@ -227,11 +239,3 @@
       ### 🐛 Correções
 
       - **Resposta do paciente não vira mais um contato duplicado.** Antes, quando você cadastrava o paciente pelo lápis com o telefone sem o "9" e ele respondia depois pelo WhatsApp, aparecia um contato novo e uma conversa nova pra mesma pessoa. Agora a resposta cai na conversa que já estava aberta.
-- tag: v4.13.0-auris.1.24.8
-  published_at: '2026-06-01T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.8
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
