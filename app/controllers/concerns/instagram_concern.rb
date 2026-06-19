@@ -75,7 +75,19 @@ module InstagramConcern
       access_token: access_token
     }
 
-    make_api_request(endpoint, params, 'Failed to fetch Instagram user details')
+    Rails.logger.info(
+      "[instagram] /me request: endpoint=#{endpoint} token_present=#{access_token.present?} " \
+      "token_length=#{access_token.to_s.length}"
+    )
+
+    result = make_api_request(endpoint, params, 'Failed to fetch Instagram user details')
+
+    Rails.logger.info(
+      "[instagram] /me response keys=#{result.keys.inspect} " \
+      "user_id_present=#{result['user_id'].present?} username_present=#{result['username'].present?}"
+    )
+
+    result
   end
 
   def make_api_request(endpoint, params, error_prefix, method: :get)
