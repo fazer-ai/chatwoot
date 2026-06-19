@@ -10,11 +10,23 @@ class Instagram::MessageText < Instagram::BaseMessageText
     fields = 'name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user,is_verified_user'
     url = "#{base_uri}/#{ig_scope_id}?fields=#{fields}&access_token=#{@inbox.channel.access_token}"
 
-    response = HTTParty.get(url)
+    response = fetch_with_method_fallback(url)
 
     return process_successful_response(response) if response.success?
 
     handle_error_response(response, ig_scope_id) || {}
+  end
+
+  # Same flip-resilience pattern as InstagramConcern. Meta has been
+  # swinging the HTTP method on Instagram read endpoints. If GET is
+  # rejected with the cryptic 'method type: get', retry with POST so
+  # contact resolution does not break for inbound messages.
+  def fetch_with_method_fallback(url)
+    response = HTTParty.get(url)
+    return response unless response.body.to_s.match?(/method type:\s*get/i)
+
+    Rails.logger.warn('[instagram] /me-style GET rejected by Meta, retrying with POST')
+    HTTParty.post(url)
   end
 
   private
@@ -76,7 +88,7 @@ class Instagram::MessageText < Instagram::BaseMessageText
   end
 
   def base_uri
-    "https://graph.instagram.com/#{GlobalConfigService.load('INSTAGRAM_API_VERSION', 'v22.0')}"
+    "https://graph.instagram.com/#{Channel::Instagram.api_version}"
   end
 
   def create_message

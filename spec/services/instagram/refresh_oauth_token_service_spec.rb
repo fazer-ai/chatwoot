@@ -18,18 +18,14 @@ RSpec.describe Instagram::RefreshOauthTokenService do
   let(:service) { described_class.new(channel: instagram_channel) }
 
   before do
+    # POST is the primary method since we added flip-resilience; GET stays
+    # stubbed too so the fallback path is covered when POST is not used.
+    stub_request(:post, 'https://graph.instagram.com/refresh_access_token')
+      .with(body: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
+      .to_return(status: 200, body: refresh_response.to_json, headers: { 'Content-Type' => 'application/json' })
+
     stub_request(:get, 'https://graph.instagram.com/refresh_access_token')
-      .with(
-        query: {
-          'access_token' => fixed_token,
-          'grant_type' => 'ig_refresh_token'
-        },
-        headers: {
-          'Accept' => 'application/json',
-          'Accept-Encoding' => 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
-          'User-Agent' => 'Ruby'
-        }
-      )
+      .with(query: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
       .to_return(status: 200, body: refresh_response.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 

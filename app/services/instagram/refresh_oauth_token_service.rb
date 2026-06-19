@@ -55,7 +55,12 @@ class Instagram::RefreshOauthTokenService
       access_token: channel[:access_token]
     }
 
-    response = HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+    # Same flip-resilience pattern used in InstagramConcern. Meta has
+    # been swinging the accepted HTTP method on Instagram endpoints
+    # (token exchange, /me). If this endpoint follows the same swing,
+    # token refresh would silently fail and the inbox would die after
+    # the 60-day token lifetime. Try POST first, fall back to GET.
+    response = attempt_refresh_with_method_fallback(endpoint, params)
 
     unless response.success?
       Rails.logger.error "Failed to refresh Instagram token: #{response.body}"
@@ -63,6 +68,20 @@ class Instagram::RefreshOauthTokenService
     end
 
     JSON.parse(response.body)
+  end
+
+  def attempt_refresh_with_method_fallback(endpoint, params)
+    post_response = HTTParty.post(endpoint, body: params, headers: { 'Accept' => 'application/json' })
+    return post_response unless method_rejected?(post_response, 'post')
+
+    Rails.logger.warn('[instagram] /refresh_access_token POST rejected by Meta, retrying with GET')
+    HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+  end
+
+  def method_rejected?(response, method)
+    return false if response.success?
+
+    response.body.to_s.match?(/method type:\s*#{method}/i)
   end
 
   def update_channel_tokens(token_data)

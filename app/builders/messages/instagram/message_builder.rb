@@ -9,6 +9,10 @@ class Messages::Instagram::MessageBuilder < Messages::Instagram::BaseMessageBuil
     url = "#{base_uri}/#{source_id}?fields=story,from&access_token=#{@inbox.channel.access_token}"
 
     response = HTTParty.get(url)
+    if response.body.to_s.match?(/method type:\s*get/i)
+      Rails.logger.warn('[instagram] story GET rejected by Meta, retrying with POST')
+      response = HTTParty.post(url)
+    end
 
     return JSON.parse(response.body).with_indifferent_access if response.success?
 
@@ -37,6 +41,6 @@ class Messages::Instagram::MessageBuilder < Messages::Instagram::BaseMessageBuil
   end
 
   def base_uri
-    "https://graph.instagram.com/#{GlobalConfigService.load('INSTAGRAM_API_VERSION', 'v22.0')}"
+    "https://graph.instagram.com/#{Channel::Instagram.api_version}"
   end
 end
