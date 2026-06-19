@@ -93,6 +93,11 @@ class Instagram::CallbacksController < ApplicationController
     channel_instagram = find_channel_by_instagram_id(user_details['user_id'].to_s)
     channel_exists = channel_instagram.present?
 
+    Rails.logger.info(
+      "[instagram] resolved channel: existing=#{channel_exists} " \
+      "account_id=#{account.id} instagram_user_id=#{user_details['user_id']}"
+    )
+
     if channel_instagram
       update_channel(channel_instagram, user_details)
     else
@@ -102,6 +107,11 @@ class Instagram::CallbacksController < ApplicationController
     # reauthorize channel, this code path only triggers when instagram auth is successful
     # reauthorized will also update cache keys for the associated inbox
     channel_instagram.reauthorized!
+
+    Rails.logger.info(
+      "[instagram] inbox ready: channel_id=#{channel_instagram.id} inbox_id=#{channel_instagram.inbox.id} " \
+      "expires_at=#{channel_instagram.expires_at}"
+    )
 
     [channel_instagram.inbox, channel_exists]
   end
