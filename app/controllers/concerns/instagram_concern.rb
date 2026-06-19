@@ -34,6 +34,16 @@ module InstagramConcern
       client_id: client_id
     }
 
+    # Diagnostic logging — captures the shape of the short-lived token
+    # so we can tell when Meta's "method type: X" rejection is actually
+    # a malformed-token issue dressed up as a method rejection. NEVER
+    # logs the token value, just its length and first 4 chars.
+    Rails.logger.info(
+      "[instagram] long-lived exchange: token_present=#{short_lived_token.present?} " \
+      "token_length=#{short_lived_token.to_s.length} " \
+      "token_prefix=#{short_lived_token.to_s[0, 4]}"
+    )
+
     # Meta keeps flipping the accepted HTTP method on this endpoint.
     # Symptom: `IGApiException code 100: "Unsupported request - method
     # type: <get|post>"`. Try one method, and if Meta rejects with that

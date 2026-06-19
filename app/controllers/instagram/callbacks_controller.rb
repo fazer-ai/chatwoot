@@ -25,6 +25,7 @@ class Instagram::CallbacksController < ApplicationController
       grant_type: 'authorization_code'
     )
 
+    log_short_lived_response(@response)
     @long_lived_token_response = exchange_for_long_lived_token(@response.token)
     inbox, already_exists = find_or_create_inbox
 
@@ -159,5 +160,17 @@ class Instagram::CallbacksController < ApplicationController
 
   def provider_name
     'instagram'
+  end
+
+  # Diagnostic: capture the shape of what Instagram returned for the
+  # short-lived token exchange. Helps tell apart Meta-side rejections
+  # from us-passing-something-weird-along to the long-lived exchange.
+  def log_short_lived_response(response)
+    Rails.logger.info(
+      "[instagram] short-lived response: token_class=#{response.class.name} " \
+      "token_present=#{response.token.present?} " \
+      "token_length=#{response.token.to_s.length} " \
+      "params_keys=#{response.params.keys.inspect}"
+    )
   end
 end
