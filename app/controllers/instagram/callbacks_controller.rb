@@ -26,7 +26,7 @@ class Instagram::CallbacksController < ApplicationController
     )
 
     log_short_lived_response(@response)
-    @long_lived_token_response = exchange_for_long_lived_token(@response.token)
+    @long_lived_token_response = resolve_long_lived_token(@response)
     inbox, already_exists = find_or_create_inbox
 
     if already_exists
@@ -170,7 +170,30 @@ class Instagram::CallbacksController < ApplicationController
       "[instagram] short-lived response: token_class=#{response.class.name} " \
       "token_present=#{response.token.present?} " \
       "token_length=#{response.token.to_s.length} " \
+      "expires_in=#{response.expires_in.inspect} " \
       "params_keys=#{response.params.keys.inspect}"
     )
+  end
+
+  # In the Instagram Business Login flow on Graph API v23+ Meta returns
+  # a long-lived (60-day) token directly from the code exchange — the
+  # `expires_in` is either missing (no exchange needed) or already >> 1h.
+  # In that case calling `ig_exchange_token` produces a confusing
+  # "method type: <get|post>" error because there's nothing to exchange.
+  # Only fall back to the legacy exchange when Meta explicitly tagged
+  # the token as short-lived (expires_in <= 1h).
+  SHORT_LIVED_THRESHOLD_SECONDS = 1.hour.to_i
+
+  def resolve_long_lived_token(response)
+    if response.expires_in.is_a?(Integer) && response.expires_in <= SHORT_LIVED_THRESHOLD_SECONDS
+      Rails.logger.info('[instagram] short-lived token detected, exchanging for long-lived')
+      exchange_for_long_lived_token(response.token)
+    else
+      Rails.logger.info('[instagram] token already long-lived (or expires_in missing), skipping legacy exchange')
+      {
+        'access_token' => response.token,
+        'expires_in' => response.expires_in || 60.days.to_i
+      }
+    end
   end
 end
