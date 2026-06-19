@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.4
+  published_at: '2026-06-19T04:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.4
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Connecting a new Instagram inbox works again.** The OAuth callback was failing during the long-lived token exchange because Meta's Instagram Business Login now returns a long-lived token directly, with no exchange step needed. AurisChat skips the legacy exchange in that case and the inbox finishes connecting cleanly.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Conexão de nova caixa de entrada do Instagram voltou a funcionar.** O callback do OAuth falhava na troca para o token de longa duração porque o Instagram Business Login do Meta passou a entregar o token já longo direto, sem precisar de troca. O AurisChat agora pula essa etapa quando ela não é necessária e a caixa de entrada conecta normalmente.
 - tag: v4.13.0-auris.1.31.3
   published_at: '2026-06-19T03:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.3
@@ -239,15 +251,3 @@
       ### 🐛 Correções
 
       - **Mensagens WhatsApp não entregues agora aparecem como erro.** Antes, alguns envios falhavam silenciosamente e ficavam exibindo "enviada" no painel mesmo sem chegar ao paciente. Agora, quando o provedor não confirma o recebimento da mensagem, ela aparece como falha com o indicador vermelho — assim você sabe que precisa reenviar.
-- tag: v4.13.0-auris.1.24.6
-  published_at: '2026-05-29T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.6
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **WhatsApp message delivery to contacts with older accounts.** In some cases, messages sent by the agent were marked as sent but didn't reach the recipient when the contact's WhatsApp account had been registered years ago. The routing was adjusted so these messages get delivered again.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Entrega de mensagens WhatsApp para contatos com conta antiga.** Em alguns cenários, mensagens enviadas pelo agente eram marcadas como enviadas mas não chegavam ao destinatário quando a conta de WhatsApp dele tinha sido registrada há vários anos. O roteamento foi ajustado e essas mensagens voltam a ser entregues normalmente.
