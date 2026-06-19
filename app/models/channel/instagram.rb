@@ -55,24 +55,65 @@ class Channel::Instagram < ApplicationRecord
                                                           }).perform
   end
 
+  SUBSCRIBED_FIELDS = %w[messages message_reactions messaging_seen].freeze
+
+  # Meta has been rejecting POST /subscribed_apps on graph.instagram.com
+  # with the cryptic 'method type: post' error (same pattern as /me).
+  # Try a sequence of request shapes — comma-separated string in body,
+  # then comma-separated string in query, then graph.facebook.com. First
+  # one that returns 2xx wins; logs detail what failed so an operator
+  # can read the trail.
   def subscribe
     # ref https://developers.facebook.com/docs/instagram-platform/webhooks#enable-subscriptions
-    response = HTTParty.post(
-      "https://graph.instagram.com/#{self.class.api_version}/#{instagram_id}/subscribed_apps",
-      query: {
-        subscribed_fields: %w[messages message_reactions messaging_seen],
-        access_token: access_token
-      }
-    )
-    # Webhook subscription is silent in the old code (rescue + true). If
-    # Meta rejects with the same 'method type' / version-mismatch error
-    # we've been chasing, the inbox would silently lose all incoming
-    # messages. Surface failures as warnings so an operator can see them.
-    Rails.logger.warn("[instagram] subscribe failed for channel=#{id}: status=#{response.code} body=#{response.body}") unless response.success?
-    response.success?
+    %i[subscribe_via_body subscribe_via_query subscribe_via_facebook_graph].each do |strategy|
+      response = send(strategy)
+      if response.success?
+        Rails.logger.info("[instagram] subscribe ok for channel=#{id} via=#{strategy}")
+        return true
+      end
+      log_subscribe_attempt(strategy, response)
+    end
+
+    Rails.logger.warn("[instagram] all subscribe strategies failed for channel=#{id}")
+    false
   rescue StandardError => e
     Rails.logger.warn("[instagram] subscribe exception for channel=#{id}: #{e.class.name}: #{e.message}")
     false
+  end
+
+  def log_subscribe_attempt(strategy, response)
+    Rails.logger.warn(
+      "[instagram] subscribe #{strategy} failed for channel=#{id}: " \
+      "status=#{response.code} body=#{response.body.to_s[0, 200]}"
+    )
+    true
+  end
+
+  # Comma-separated string in the request body — Meta's documented shape
+  # for state-changing POSTs on subscribed_apps.
+  def subscribe_via_body
+    HTTParty.post(
+      "https://graph.instagram.com/#{self.class.api_version}/#{instagram_id}/subscribed_apps",
+      body: { subscribed_fields: SUBSCRIBED_FIELDS.join(','), access_token: access_token }
+    )
+  end
+
+  # Original shape — comma-separated in the query string. Some Meta API
+  # paths only accept this variant.
+  def subscribe_via_query
+    HTTParty.post(
+      "https://graph.instagram.com/#{self.class.api_version}/#{instagram_id}/subscribed_apps",
+      query: { subscribed_fields: SUBSCRIBED_FIELDS.join(','), access_token: access_token }
+    )
+  end
+
+  # Last resort: Facebook Graph endpoint. IGAA tokens sometimes route
+  # through `graph.facebook.com` for the cross-app subscription surface.
+  def subscribe_via_facebook_graph
+    HTTParty.post(
+      "https://graph.facebook.com/#{self.class.api_version}/#{instagram_id}/subscribed_apps",
+      body: { subscribed_fields: SUBSCRIBED_FIELDS.join(','), access_token: access_token }
+    )
   end
 
   def unsubscribe
@@ -91,5 +132,13 @@ class Channel::Instagram < ApplicationRecord
 
   def access_token
     Instagram::RefreshOauthTokenService.new(channel: self).access_token
+  end
+
+  # Public re-entry point. Useful in a Rails console when an existing
+  # channel needs to be re-subscribed (e.g., the original subscribe was
+  # silenced by Meta and an operator wants to retry without recreating
+  # the inbox). Returns the same boolean as `subscribe`.
+  def try_subscribe!
+    subscribe
   end
 end

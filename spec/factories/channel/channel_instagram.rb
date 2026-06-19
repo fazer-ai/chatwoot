@@ -8,17 +8,11 @@ FactoryBot.define do
 
     before :create do |channel|
       version = Channel::Instagram.api_version
+      # Match the first subscribe strategy (body, comma-separated string)
+      # without pinning to exact body — covers any subscribe variant.
       WebMock::API.stub_request(:post, "https://graph.instagram.com/#{version}/#{channel.instagram_id}/subscribed_apps")
-                  .with(query: {
-                          access_token: channel.access_token,
-                          subscribed_fields: %w[messages message_reactions messaging_seen]
-                        })
                   .to_return(status: 200, body: '', headers: {})
-
       WebMock::API.stub_request(:delete, "https://graph.instagram.com/#{version}/#{channel.instagram_id}/subscribed_apps")
-                  .with(query: {
-                          access_token: channel.access_token
-                        })
                   .to_return(status: 200, body: '', headers: {})
     end
 
