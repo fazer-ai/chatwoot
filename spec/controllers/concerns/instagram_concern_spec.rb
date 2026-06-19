@@ -35,21 +35,21 @@ RSpec.describe InstagramConcern do
     let(:mock_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
 
     before do
+      allow(HTTParty).to receive(:post).and_return(mock_response)
       allow(HTTParty).to receive(:get).and_return(mock_response)
       allow(mock_response).to receive(:inspect).and_return(response_body)
     end
 
-    # Regression: Meta flipped the accepted method on this endpoint twice
-    # in two days. We're back to GET because `IGApiException code 100:
-    # "Unsupported request - method type: post"` started appearing right
-    # after we shipped the POST switch.
-    it 'exchanges short lived token for long lived token via GET' do
+    # Default: try POST first. Meta has been flipping the accepted method
+    # on this endpoint daily, so the code falls back to GET if Meta tells
+    # us POST is unsupported (see fallback context below).
+    it 'exchanges short lived token for long lived token via POST' do
       result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
 
-      expect(HTTParty).to have_received(:get).with(
+      expect(HTTParty).to have_received(:post).with(
         'https://graph.instagram.com/access_token',
         {
-          query: {
+          body: {
             grant_type: 'ig_exchange_token',
             client_secret: client_secret,
             access_token: short_lived_token,
@@ -58,17 +58,50 @@ RSpec.describe InstagramConcern do
           headers: { 'Accept' => 'application/json' }
         }
       )
-
+      expect(HTTParty).not_to have_received(:get)
       expect(result).to eq({ 'access_token' => long_lived_token, 'expires_in' => 5_184_000 })
     end
 
-    context 'when the request fails' do
-      let(:mock_response) { instance_double(HTTParty::Response, body: 'Error', success?: false, code: 400) }
+    context 'when Meta rejects POST with the "method type: post" error' do
+      let(:post_error_body) do
+        { 'error' => { 'message' => 'Unsupported request - method type: post', 'type' => 'IGApiException', 'code' => 100 } }.to_json
+      end
+      let(:post_response) { instance_double(HTTParty::Response, body: post_error_body, success?: false, code: 400) }
+      let(:get_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
 
-      it 'raises an error' do
+      before do
+        allow(HTTParty).to receive(:post).and_return(post_response)
+        allow(HTTParty).to receive(:get).and_return(get_response)
+      end
+
+      it 'transparently retries with GET' do
+        result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
+
+        expect(HTTParty).to have_received(:post).once
+        expect(HTTParty).to have_received(:get).with(
+          'https://graph.instagram.com/access_token',
+          {
+            query: {
+              grant_type: 'ig_exchange_token',
+              client_secret: client_secret,
+              access_token: short_lived_token,
+              client_id: client_id
+            },
+            headers: { 'Accept' => 'application/json' }
+          }
+        )
+        expect(result).to eq({ 'access_token' => long_lived_token, 'expires_in' => 5_184_000 })
+      end
+    end
+
+    context 'when POST fails with an unrelated error' do
+      let(:mock_response) { instance_double(HTTParty::Response, body: 'Bad gateway', success?: false, code: 502) }
+
+      it 'raises without falling back to GET' do
         expect do
           dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
-        end.to raise_error(RuntimeError, 'Failed to exchange token: Error')
+        end.to raise_error(RuntimeError, 'Failed to exchange token: Bad gateway')
+        expect(HTTParty).not_to have_received(:get)
       end
     end
 
