@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.2
+  published_at: '2026-06-18T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.2
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Connecting a new Instagram inbox keeps working even when Meta swings.** Meta has been flipping which HTTP method it accepts on the Instagram token exchange daily. The integration now retries automatically with the other method when that happens, so adding an inbox is no longer interrupted by Meta's flip-flopping.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Conexão de nova caixa de entrada do Instagram resiste às oscilações do Meta.** O Meta tem alternado diariamente qual método HTTP aceita na troca de token do Instagram. A integração agora tenta automaticamente com o outro método quando isso acontece, então adicionar uma caixa de entrada não é mais interrompido pelas oscilações do Meta.
 - tag: v4.13.0-auris.1.31.1
   published_at: '2026-06-18T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.1
@@ -243,15 +255,3 @@
       ### 🐛 Correções
 
       - **Cobertura adicional na confirmação de entrega do WhatsApp.** Reforço no processamento das atualizações de status "entregue" e "lida", para que o status correto sempre apareça no painel mesmo em cenários que escaparam da rodada anterior de correções.
-- tag: v4.13.0-auris.1.24.4
-  published_at: '2026-05-28T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.4
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **More reliable delivery confirmation on WhatsApp messages.** In some cases, messages sent by the agent would stay in "sent" status without progressing to "delivered" in the panel, even after reaching the customer. The handling of these status updates was hardened so the correct status always shows up.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Confirmação de entrega das mensagens do WhatsApp mais consistente.** Em alguns cenários, mensagens enviadas pelo agente ficavam exibindo apenas o status "enviada" sem evoluir para "entregue" no painel, mesmo tendo chegado ao paciente. O processamento dessas atualizações foi reforçado para que o status correto sempre apareça.
