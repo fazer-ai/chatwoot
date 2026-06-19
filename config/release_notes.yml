@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.7
+  published_at: '2026-06-19T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.7
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Adding a new Instagram inbox finally finishes.** Meta has been rejecting the `/me` endpoint with both POST and GET on Instagram Business Login tokens, blocking the OAuth callback even after the previous round of fixes. AurisChat now skips `/me` entirely — the Instagram user ID already comes in the OAuth response — so the inbox connects with a placeholder name when needed. You can rename the inbox from settings afterwards.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Adicionar uma nova caixa de entrada do Instagram finalmente conclui.** O Meta passou a rejeitar o endpoint `/me` com POST e GET para tokens do Instagram Business Login, bloqueando o callback do OAuth mesmo depois das correções anteriores. O AurisChat agora pula o `/me` por completo — o ID do usuário Instagram já vem na resposta do OAuth — então a caixa conecta com um nome padrão quando necessário. Você pode renomear a caixa em configurações depois.
 - tag: v4.13.0-auris.1.31.6
   published_at: '2026-06-19T19:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.6
@@ -227,15 +239,3 @@
       ### ⚡ Melhorias
 
       - **Telefone do paciente acertado automaticamente.** Quando você cadastra um paciente pelo lápis com o telefone sem o "9", o AurisChat confere com o WhatsApp e ajusta para o formato certo — a primeira mensagem já chega e não aparece contato duplicado depois.
-- tag: v4.13.0-auris.1.24.9
-  published_at: '2026-06-04T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.9
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Patient replies no longer create a duplicate contact.** When you created a patient through the pencil button with their phone number missing the "9" and the patient later replied on WhatsApp, AurisChat would open a brand new contact and conversation for the same person. Now the reply lands in the conversation you already had open.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Resposta do paciente não vira mais um contato duplicado.** Antes, quando você cadastrava o paciente pelo lápis com o telefone sem o "9" e ele respondia depois pelo WhatsApp, aparecia um contato novo e uma conversa nova pra mesma pessoa. Agora a resposta cai na conversa que já estava aberta.
