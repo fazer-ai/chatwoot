@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.31.3
+  published_at: '2026-06-19T03:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.3
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.31.2
   published_at: '2026-06-18T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.2
@@ -243,15 +251,3 @@
       ### 🐛 Correções
 
       - **Entrega de mensagens WhatsApp para contatos com conta antiga.** Em alguns cenários, mensagens enviadas pelo agente eram marcadas como enviadas mas não chegavam ao destinatário quando a conta de WhatsApp dele tinha sido registrada há vários anos. O roteamento foi ajustado e essas mensagens voltam a ser entregues normalmente.
-- tag: v4.13.0-auris.1.24.5
-  published_at: '2026-05-29T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.5
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Additional coverage on WhatsApp delivery confirmation.** Extra robustness around how delivery and read status updates are processed, so the correct status always shows up in the panel even in scenarios that escaped the previous round of fixes.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Cobertura adicional na confirmação de entrega do WhatsApp.** Reforço no processamento das atualizações de status "entregue" e "lida", para que o status correto sempre apareça no painel mesmo em cenários que escaparam da rodada anterior de correções.
