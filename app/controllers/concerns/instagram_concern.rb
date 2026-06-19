@@ -61,13 +61,12 @@ module InstagramConcern
     make_api_request(endpoint, params, 'Failed to exchange token', method: :get)
   end
 
-  # Pinned to v23.0 — the version where Instagram Business Login was
-  # promoted to return long-lived tokens directly on code exchange.
-  # v22.0 here started returning the same cryptic
-  # `"Unsupported request - method type: get"` from Meta after Business
-  # Login became the only flow, mirroring what we just fixed on the
-  # token-exchange endpoint.
-  INSTAGRAM_GRAPH_VERSION = 'v23.0'.freeze
+  # Aligned with the Graph API version the Meta App is configured for
+  # (v24.0). Older pins on this endpoint returned the cryptic
+  # `"Unsupported request - method type: get"` because the token format
+  # produced by the modern Business Login flow no longer matches what
+  # those older versions accept on `/me`.
+  INSTAGRAM_GRAPH_VERSION = 'v24.0'.freeze
 
   def fetch_instagram_user_details(access_token)
     endpoint = "https://graph.instagram.com/#{INSTAGRAM_GRAPH_VERSION}/me"
