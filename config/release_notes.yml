@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.5
+  published_at: '2026-06-19T15:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.5
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Connecting a new Instagram inbox finishes successfully.** Follow-up to the previous fix: the user-details step of the OAuth callback was pinned to an older Meta API version and started returning the same cryptic error. Pinned to the version the Meta App is configured for, and the inbox now finishes connecting.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Conexão de uma nova caixa de entrada do Instagram finaliza com sucesso.** Sequência da correção anterior: o passo de buscar os dados do usuário no callback do OAuth estava preso em uma versão antiga da API do Meta e passou a retornar o mesmo erro confuso. Atualizamos para a versão que o app no Meta está configurado e a caixa de entrada termina de conectar normalmente.
 - tag: v4.13.0-auris.1.31.4
   published_at: '2026-06-19T04:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.4
@@ -223,31 +235,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.24.7
-  published_at: '2026-05-30T15:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.7
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Unconfirmed-message rate in the Inbox status report (Super Admin).** The inbox status page got a new column showing the share of outgoing messages in the last 24 hours that didn't get a confirmation from the WhatsApp provider, with a green/yellow/red chip so it's easy to spot which inboxes are having delivery trouble.
-
-      ### ⚡ Improvements
-
-      - **More reliable WhatsApp delivery on cold conversations.** When a message doesn't reach the patient because the WhatsApp session had been quiet for hours or days, the system now detects it, refreshes the connection automatically and retries — most of these cases get delivered without the operator having to resend.
-
-      ### 🐛 Fixes
-
-      - **Undelivered WhatsApp messages now show as failed.** Previously some sends would fail silently and stay marked as "sent" in the panel even though they never reached the patient. Now, when the provider doesn't confirm receipt of the message, it shows as failed with the red indicator — so you know to resend.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Indicador de mensagens não confirmadas no relatório de Inboxes (Super Admin).** A página de status de inboxes ganhou uma coluna nova mostrando a porcentagem de mensagens enviadas nas últimas 24h que ficaram sem confirmação do provedor de WhatsApp, com chip verde/amarelo/vermelho pra identificar de cara quais caixas estão com problema de entrega.
-
-      ### ⚡ Melhorias
-
-      - **Mensagens WhatsApp mais confiáveis em conversas frias.** Quando uma mensagem não chega ao paciente porque a conversa estava parada há horas ou dias, o sistema agora detecta, refresca a conexão automaticamente e tenta de novo — a maioria desses casos passa a ser entregue sem o operador precisar reenviar.
-
-      ### 🐛 Correções
-
-      - **Mensagens WhatsApp não entregues agora aparecem como erro.** Antes, alguns envios falhavam silenciosamente e ficavam exibindo "enviada" no painel mesmo sem chegar ao paciente. Agora, quando o provedor não confirma o recebimento da mensagem, ela aparece como falha com o indicador vermelho — assim você sabe que precisa reenviar.
