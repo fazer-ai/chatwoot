@@ -89,13 +89,33 @@ class Instagram::CallbacksController < ApplicationController
   end
 
   def find_or_create_inbox
-    user_details = fetch_instagram_user_details(@long_lived_token_response['access_token'])
-    channel_instagram = find_channel_by_instagram_id(user_details['user_id'].to_s)
-    channel_exists = channel_instagram.present?
+    # `user_id` already comes back from Meta on the OAuth short-lived
+    # response (`@response.params['user_id']`). We don't need /me to
+    # create the channel — `/me` has been rejecting both POST and GET
+    # for IGAA tokens regardless of fallback. Use the OAuth user_id
+    # directly and best-effort the display name via the user-id-keyed
+    # endpoint, falling back to a placeholder if Meta blocks that too.
+    user_id = @response.params['user_id'].to_s
+    raise 'Instagram OAuth response missing user_id' if user_id.blank?
+
+    user_details = build_user_details(user_id)
+    channel_instagram, channel_existed = persist_channel(user_id, user_details)
 
     Rails.logger.info(
-      "[instagram] resolved channel: existing=#{channel_exists} " \
-      "account_id=#{account.id} instagram_user_id=#{user_details['user_id']}"
+      "[instagram] inbox ready: channel_id=#{channel_instagram.id} inbox_id=#{channel_instagram.inbox.id} " \
+      "expires_at=#{channel_instagram.expires_at}"
+    )
+
+    [channel_instagram.inbox, channel_existed]
+  end
+
+  def persist_channel(user_id, user_details)
+    channel_instagram = find_channel_by_instagram_id(user_id)
+    channel_existed = channel_instagram.present?
+
+    Rails.logger.info(
+      "[instagram] resolved channel: existing=#{channel_existed} " \
+      "account_id=#{account.id} instagram_user_id=#{user_id}"
     )
 
     if channel_instagram
@@ -104,16 +124,37 @@ class Instagram::CallbacksController < ApplicationController
       channel_instagram = create_channel_with_inbox(user_details)
     end
 
-    # reauthorize channel, this code path only triggers when instagram auth is successful
-    # reauthorized will also update cache keys for the associated inbox
+    # reauthorize channel; only triggers on successful auth and refreshes
+    # the cache keys for the associated inbox.
     channel_instagram.reauthorized!
+    [channel_instagram, channel_existed]
+  end
 
-    Rails.logger.info(
-      "[instagram] inbox ready: channel_id=#{channel_instagram.id} inbox_id=#{channel_instagram.inbox.id} " \
-      "expires_at=#{channel_instagram.expires_at}"
-    )
+  # Best-effort name fetch — tries the user-id-keyed endpoint (NOT /me)
+  # because that's the one that's been working when /me wasn't. If even
+  # that fails we still ship the inbox with a placeholder name; the
+  # operator can rename it from settings.
+  def build_user_details(user_id)
+    username = fetch_username_safely(user_id)
+    {
+      'user_id' => user_id,
+      'username' => username.presence || "Instagram (#{user_id})"
+    }
+  end
 
-    [channel_instagram.inbox, channel_exists]
+  def fetch_username_safely(user_id)
+    endpoint = "https://graph.instagram.com/#{Channel::Instagram.api_version}/#{user_id}"
+    params = { fields: 'username', access_token: @long_lived_token_response['access_token'] }
+
+    response = HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+    return nil unless response.success?
+
+    parsed = JSON.parse(response.body)
+    Rails.logger.info("[instagram] /{user_id} fetch ok username=#{parsed['username']}")
+    parsed['username']
+  rescue StandardError => e
+    Rails.logger.warn("[instagram] /{user_id} fetch failed for user_id=#{user_id}: #{e.message}")
+    nil
   end
 
   def find_channel_by_instagram_id(instagram_id)
