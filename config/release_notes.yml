@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.8
+  published_at: '2026-06-19T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.8
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Incoming Instagram DMs reach AurisChat.** Meta was rejecting the call AurisChat makes when a new inbox is created to subscribe it to incoming-message webhooks, so direct messages never reached the panel. The integration now tries multiple request shapes until one works and exposes a manual re-subscribe entry point for inboxes that were created during the outage.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Mensagens recebidas no Direct do Instagram chegam ao AurisChat.** O Meta estava rejeitando a chamada que o AurisChat faz quando uma caixa nova é criada para registrar o recebimento de mensagens, então as mensagens do direct não chegavam no painel. A integração agora tenta vários formatos de requisição até um passar e expõe um ponto de reinscrição manual para caixas que foram criadas durante a janela do problema.
 - tag: v4.13.0-auris.1.31.7
   published_at: '2026-06-19T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.7
@@ -227,15 +239,3 @@
 
       - **Novo relatório "IA → Humano".** Um relatório novo dentro de **Relatórios** onde o gestor consegue ver, linha por linha, cada conversa que a Auris distribuiu nos últimos 7 dias — qual time, qual agente, quem estava online no momento e se a conversa de fato foi pra alguém ou ficou parada.
       - **Gerentes podem cuidar dos times.** Quem tem o papel de gerente agora consegue entrar em **Configurações → Times**, entrar e sair agentes do time e ligar ou desligar a atribuição automática — sem precisar chamar o administrador.
-- tag: v4.13.0-auris.1.24.10
-  published_at: '2026-06-05T01:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.24.10
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Patient phone automatically matched to WhatsApp.** When you create a patient through the pencil button and type the phone without the "9", AurisChat checks WhatsApp and adjusts to the right format — the first message goes through and no duplicate contact appears later.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Telefone do paciente acertado automaticamente.** Quando você cadastra um paciente pelo lápis com o telefone sem o "9", o AurisChat confere com o WhatsApp e ajusta para o formato certo — a primeira mensagem já chega e não aparece contato duplicado depois.
