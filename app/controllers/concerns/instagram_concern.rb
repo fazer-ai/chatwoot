@@ -34,16 +34,20 @@ module InstagramConcern
       client_id: client_id
     }
 
-    # Meta has flipped the accepted HTTP method on this endpoint twice
-    # in two days:
-    #   - up to mid-Jun/2026: GET worked (then started rejecting with
-    #     `IGApiException code 100: "Unsupported request - method type: get"`)
-    #   - 16-Jun-2026: we switched to POST (v1.27.1)
-    #   - 18-Jun-2026: Meta reverted; POST now returns the symmetric
-    #     `"Unsupported request - method type: post"`.
-    # Back to GET. If Meta flips again, the `IGApiException code 100`
-    # message will literally say which method is "unsupported" — read the
-    # log line emitted by `make_api_request` and flip accordingly.
+    # Meta keeps flipping the accepted HTTP method on this endpoint.
+    # Symptom: `IGApiException code 100: "Unsupported request - method
+    # type: <get|post>"`. Try one method, and if Meta rejects with that
+    # specific error, automatically retry with the other. Avoids having
+    # to redeploy every time Meta swings.
+    attempt_token_exchange_with_fallback(endpoint, params)
+  end
+
+  def attempt_token_exchange_with_fallback(endpoint, params)
+    make_api_request(endpoint, params, 'Failed to exchange token', method: :post)
+  rescue RuntimeError => e
+    raise unless /method type:\s*post/i.match?(e.message)
+
+    Rails.logger.warn('[instagram] POST rejected by Meta, retrying with GET')
     make_api_request(endpoint, params, 'Failed to exchange token', method: :get)
   end
 
