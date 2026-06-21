@@ -333,6 +333,15 @@ Rails.application.routes.draw do
           end
           resource :notification_settings, only: [:show, :update]
 
+          resources :operations_notifications, only: [:index] do
+            collection do
+              get :pending
+            end
+            member do
+              post :acknowledge
+            end
+          end
+
           resources :teams do
             resources :team_members, only: [:index, :create] do
               collection do
@@ -731,6 +740,7 @@ Rails.application.routes.draw do
       resources :platform_apps, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resources :funnel_stages, only: [:index, :new, :create, :show, :edit, :update, :destroy]
       resources :loss_reasons, only: [:index, :new, :create, :show, :edit, :update, :destroy]
+      resources :operations_notifications, only: [:index, :new, :create, :show, :destroy]
       resource :instance_status, only: [:show]
       namespace :reports do
         resource :inbox_status, only: [:show], controller: :inbox_status do
