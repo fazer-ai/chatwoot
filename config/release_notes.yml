@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.31.9
+  published_at: '2026-06-21T01:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.9
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Direct messages on Instagram inboxes added recently start arriving.** A previous attempt to work around a Meta API outage saved the wrong Instagram identifier on newly added inboxes, so when patients sent a direct message the system couldn't find which inbox to route it to and the message was silently dropped. Inboxes added with this release work end-to-end. Inboxes connected during the outage window need to be removed and added again to be fixed.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Mensagens diretas em caixas do Instagram adicionadas recentemente passam a chegar.** Uma tentativa anterior de contornar uma instabilidade do Meta gravava o identificador errado do Instagram nas caixas novas, então quando os pacientes mandavam Direct o sistema não conseguia encontrar a qual caixa rotear a mensagem e ela era descartada silenciosamente. Caixas adicionadas a partir desta versão funcionam ponta a ponta. Caixas conectadas durante a janela com problema precisam ser removidas e adicionadas de novo para serem corrigidas.
 - tag: v4.13.0-auris.1.31.8
   published_at: '2026-06-19T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.8
@@ -225,17 +237,3 @@
 
       - **Mensagem de erro mais clara quando o WhatsApp falha.** Quando aparece a bandeira vermelha em uma mensagem, agora ela mostra a causa real que o WhatsApp deu (fora do ar, token vencido, etc.) em vez de um aviso genérico técnico — você sabe o que fazer sem precisar perguntar pra alguém.
       - **Lista de modelos volta a se atualizar sozinha.** Se a gestão criar um modelo novo no WhatsApp, você não precisa mais clicar em "Sincronizar Modelos" — em algumas horas o modelo novo já aparece na sua lista automaticamente.
-- tag: v4.13.0-auris.1.25
-  published_at: '2026-06-10T01:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.25
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **New "AI → Human" report.** A new report under **Reports** where the manager can see, line by line, every conversation Auris AI handed off in the last 7 days — which team, which agent, who was online at the time, and whether it actually reached someone or got stuck.
-      - **Managers can manage their teams.** If you have the manager role, you can now go into **Settings → Teams**, add or remove agents from a team and turn automatic assignment on or off — no need to ask the administrator anymore.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Novo relatório "IA → Humano".** Um relatório novo dentro de **Relatórios** onde o gestor consegue ver, linha por linha, cada conversa que a Auris distribuiu nos últimos 7 dias — qual time, qual agente, quem estava online no momento e se a conversa de fato foi pra alguém ou ficou parada.
-      - **Gerentes podem cuidar dos times.** Quem tem o papel de gerente agora consegue entrar em **Configurações → Times**, entrar e sair agentes do time e ligar ou desligar a atribuição automática — sem precisar chamar o administrador.
