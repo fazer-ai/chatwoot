@@ -83,17 +83,20 @@ module InstagramConcern
     result
   end
 
-  # Same flip-resilience pattern as `attempt_token_exchange_with_fallback`:
-  # Meta keeps returning the cryptic "method type: <get|post>" on Instagram
-  # endpoints. Try POST first (matches what works on the token exchange),
-  # fall back to GET if Meta rejects POST with that specific error.
+  # `/me` only accepts GET — that's the canonical, documented Meta API.
+  # An earlier observation that "both methods fail" came from sending
+  # POST first; when POST returns the cryptic 'method type' error, we
+  # fell back to GET — but the response we logged was sometimes for the
+  # POST attempt anyway (chained state). Try GET first now. POST stays
+  # as a last-resort fallback in case Meta swings again — it has cost
+  # zero when GET works.
   def attempt_user_details_with_fallback(endpoint, params)
-    make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :post)
-  rescue RuntimeError => e
-    raise unless /method type:\s*post/i.match?(e.message)
-
-    Rails.logger.warn('[instagram] /me POST rejected by Meta, retrying with GET')
     make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :get)
+  rescue RuntimeError => e
+    raise unless /method type:\s*get/i.match?(e.message)
+
+    Rails.logger.warn('[instagram] /me GET rejected by Meta, retrying with POST')
+    make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :post)
   end
 
   def make_api_request(endpoint, params, error_prefix, method: :get)
