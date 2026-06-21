@@ -40,6 +40,7 @@ import integrations from './modules/integrations';
 import labels from './modules/labels';
 import macros from './modules/macros';
 import notifications from './modules/notifications';
+import operationsNotifications from './modules/operationsNotifications';
 import portals from './modules/helpCenterPortals';
 import reports from './modules/reports';
 import recurringScheduledMessages from './modules/recurringScheduledMessages';
@@ -109,6 +110,7 @@ export default createStore({
     labels,
     macros,
     notifications,
+    operationsNotifications,
     portals,
     reports,
     recurringScheduledMessages,

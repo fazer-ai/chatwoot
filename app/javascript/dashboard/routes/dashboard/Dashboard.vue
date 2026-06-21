@@ -24,6 +24,7 @@ import CopilotLauncher from 'dashboard/components-next/copilot/CopilotLauncher.v
 import CopilotContainer from 'dashboard/components/copilot/CopilotContainer.vue';
 
 import MobileSidebarLauncher from 'dashboard/components-next/sidebar/MobileSidebarLauncher.vue';
+import OperationsNotificationModal from 'dashboard/components-next/operations-notifications/OperationsNotificationModal.vue';
 import ReleaseAnnouncementModal from 'dashboard/components-next/release/ReleaseAnnouncementModal.vue';
 import SimulatorModal from 'dashboard/components-next/simulator/SimulatorModal.vue';
 
@@ -40,6 +41,7 @@ export default {
     CopilotContainer,
     FloatingCallWidget,
     MobileSidebarLauncher,
+    OperationsNotificationModal,
     ReleaseAnnouncementModal,
     SimulatorModal,
   },
@@ -178,6 +180,14 @@ export default {
         @close="closeKeyShortcutModal"
         @clickaway="closeKeyShortcutModal"
       />
+      <!--
+        Operations Notifications must be acknowledged BEFORE the Release
+        Notes modal becomes visible. The dialog component used by both is
+        modal-blocking, but Vue mounts these as siblings, so we control
+        ordering by mounting ops first and ensuring its watcher fires
+        before the release modal's watcher.
+      -->
+      <OperationsNotificationModal />
       <ReleaseAnnouncementModal />
       <SimulatorModal />
     </main>

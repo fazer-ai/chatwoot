@@ -21,10 +21,20 @@ const unseenTag = computed(
 const releases = computed(() => store.getters['releases/getReleases']);
 const uiFlags = computed(() => store.getters['releases/getUIFlags']);
 
+// Operations Notifications take precedence over Release Notes — when an
+// ops broadcast is pending, the user must acknowledge it before seeing
+// the release modal. Once the ops queue drains, the existing watcher
+// reacts (`featuredRelease` re-evaluates as soon as `hasPendingOps`
+// flips to false) and opens the release dialog naturally.
+const hasPendingOps = computed(
+  () => store.getters['operationsNotifications/hasPending']
+);
+
 const localeKey = computed(() => (locale.value === 'pt_BR' ? 'pt_BR' : 'en'));
 
 const featuredRelease = computed(() => {
   if (!unseenTag.value) return null;
+  if (hasPendingOps.value) return null;
   return releases.value.find(rel => rel.tag === unseenTag.value) || null;
 });
 

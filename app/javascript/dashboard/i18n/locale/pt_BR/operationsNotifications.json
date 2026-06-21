@@ -1,0 +1,14 @@
+{
+  "OPERATIONS_NOTIFICATIONS": {
+    "PAGE_TITLE": "Central de Notificação",
+    "PAGE_DESCRIPTION": "Avisos e comunicados da equipe de operações do AurisChat. Os 10 mais recentes ficam aqui.",
+    "EMPTY_STATE": "Nenhum aviso da equipe de operações ainda.",
+    "EMERGENCY_BADGE": "⚠️ Aviso de emergência",
+    "EMERGENCY_ICON": "⚠️",
+    "ACK_ICON": "✓",
+    "ACKNOWLEDGE": "Entendi",
+    "CLOSE": "Fechar",
+    "ACKED_AT": "{icon} Confirmado em {date}",
+    "MORE_PENDING": "{count} aviso(s) ainda aguardando confirmação."
+  }
+}
