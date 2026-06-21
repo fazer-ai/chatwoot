@@ -38,6 +38,23 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
               })
   end
 
+  # Super-admin created a notification with trigger=immediate. Push only
+  # an `id` to keep payloads tiny — the frontend handler dispatches
+  # `operationsNotifications/fetchPending` which re-runs the visibility
+  # SQL and updates the store with the full record (including
+  # acknowledgement state).
+  def operations_notification_created(event)
+    operations_notification = event.data[:operations_notification]
+    tokens = operations_notification.target_users.pluck(:pubsub_token).compact_blank
+    return if tokens.blank?
+
+    ::ActionCableBroadcastJob.perform_later(
+      tokens.uniq,
+      OPERATIONS_NOTIFICATION_CREATED,
+      { operations_notification_id: operations_notification.id }
+    )
+  end
+
   def message_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation

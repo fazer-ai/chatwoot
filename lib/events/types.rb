@@ -72,6 +72,9 @@ module Events::Types
   NOTIFICATION_DELETED = 'notification.deleted'
   NOTIFICATION_UPDATED = 'notification.updated'
 
+  # operations notification events (super-admin broadcasts to users)
+  OPERATIONS_NOTIFICATION_CREATED = 'operations_notification.created'
+
   # agent events
   AGENT_ADDED = 'agent.added'
   AGENT_REMOVED = 'agent.removed'
