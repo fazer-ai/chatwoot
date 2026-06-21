@@ -93,6 +93,13 @@ const menuItems = computed(() => {
     {
       show: true,
       showOnCustomBrandedInstance: true,
+      label: t('SIDEBAR_ITEMS.OPERATIONS_NOTIFICATIONS'),
+      icon: 'i-lucide-bell',
+      link: { name: 'operations_notifications_index' },
+    },
+    {
+      show: true,
+      showOnCustomBrandedInstance: true,
       label: t('SIDEBAR_ITEMS.RELEASE_NOTES'),
       icon: 'i-lucide-scroll-text',
       link: { name: 'release_notes_index' },

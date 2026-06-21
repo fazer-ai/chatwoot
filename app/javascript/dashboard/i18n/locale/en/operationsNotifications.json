@@ -1,0 +1,14 @@
+{
+  "OPERATIONS_NOTIFICATIONS": {
+    "PAGE_TITLE": "Notification Center",
+    "PAGE_DESCRIPTION": "Announcements and alerts from the AurisChat operations team. The 10 most recent are kept here.",
+    "EMPTY_STATE": "No notifications from operations yet.",
+    "EMERGENCY_BADGE": "⚠️ Emergency notice",
+    "EMERGENCY_ICON": "⚠️",
+    "ACK_ICON": "✓",
+    "ACKNOWLEDGE": "I understand",
+    "CLOSE": "Close",
+    "ACKED_AT": "{icon} Acknowledged at {date}",
+    "MORE_PENDING": "{count} more pending after this one."
+  }
+}
