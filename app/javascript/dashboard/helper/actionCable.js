@@ -33,6 +33,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'notification.created': this.onNotificationCreated,
       'notification.deleted': this.onNotificationDeleted,
       'notification.updated': this.onNotificationUpdated,
+      'operations_notification.created': this.onOperationsNotificationCreated,
       'conversation.read': this.onConversationRead,
       'conversation.updated': this.onConversationUpdated,
       'account.cache_invalidated': this.onCacheInvalidate,
@@ -260,6 +261,15 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onNotificationUpdated = data => {
     this.app.$store.dispatch('notifications/updateNotification', data);
+  };
+
+  // Super-admin published a notification with trigger=immediate. The
+  // payload only carries the id — we re-fetch /pending so the store
+  // also gets the proper visibility-filtered shape (with acknowledgement
+  // state) and the modal opens within a second instead of waiting for
+  // the 30s polling tick.
+  onOperationsNotificationCreated = () => {
+    this.app.$store.dispatch('operationsNotifications/fetchPending');
   };
 
   onCopilotMessageCreated = data => {

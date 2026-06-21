@@ -41,6 +41,12 @@ class OperationsNotification < ApplicationRecord
   validate :account_required_when_scoped_to_account
   validate :audience_value_required_when_targeted
 
+  # Push to ActionCable only when the operator marked the notification as
+  # `immediate`. `on_login` ones rely on the frontend's onMounted
+  # fetchPending — pushing them would force them onto users already
+  # active, which contradicts the "wait until next login" intent.
+  after_create_commit :broadcast_if_immediate
+
   scope :active, -> { where(deleted_at: nil) }
   scope :published, lambda {
     where.not(published_at: nil)
@@ -81,7 +87,35 @@ class OperationsNotification < ApplicationRecord
     update!(deleted_at: Time.current)
   end
 
+  # Returns the set of users that should see this notification, used by the
+  # ActionCableListener to enumerate pubsub_tokens for an immediate push.
+  # NOT used by the read path — that one re-checks per request via
+  # `.visible_for` which is a single SQL query.
+  def target_users
+    base = User.joins(:account_users)
+    base = base.where(account_users: { account_id: account_id }) if scope_account?
+
+    case audience_type
+    when 'role'
+      base.where(account_users: { role: AccountUser.roles[audience_value] })
+    when 'specific_user'
+      base.where(id: audience_value.to_i)
+    else
+      base
+    end.distinct
+  end
+
   private
+
+  def broadcast_if_immediate
+    return unless trigger_immediate?
+
+    Rails.configuration.dispatcher.dispatch(
+      OPERATIONS_NOTIFICATION_CREATED,
+      Time.zone.now,
+      operations_notification: self
+    )
+  end
 
   def account_required_when_scoped_to_account
     return unless scope_account?

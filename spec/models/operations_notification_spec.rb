@@ -102,6 +102,58 @@ RSpec.describe OperationsNotification do
     end
   end
 
+  describe 'after_create broadcast' do
+    let(:other_account) { create(:account) }
+    let(:other_account_agent) { create(:user, account: other_account, role: :agent) }
+
+    before { allow(ActionCableBroadcastJob).to receive(:perform_later) }
+
+    it 'pushes to all matching users when trigger=immediate' do
+      [user, admin, other_account_agent]
+      create_notification(scope_type: :all_accounts, audience_type: :all_users, trigger_kind: :immediate)
+
+      expect(ActionCableBroadcastJob).to have_received(:perform_later) do |tokens, event, payload|
+        expect(tokens).to include(user.pubsub_token, admin.pubsub_token, other_account_agent.pubsub_token)
+        expect(event).to eq('operations_notification.created')
+        expect(payload[:operations_notification_id]).to be_present
+      end
+    end
+
+    it 'does not broadcast on on_login trigger' do
+      create_notification(scope_type: :all_accounts, audience_type: :all_users, trigger_kind: :on_login)
+      expect(ActionCableBroadcastJob).not_to have_received(:perform_later)
+    end
+
+    it 'restricts targets to the scoped account' do
+      [user, other_account_agent]
+      create_notification(scope_type: :account, account: account, audience_type: :all_users, trigger_kind: :immediate)
+
+      expect(ActionCableBroadcastJob).to have_received(:perform_later) do |tokens, _e, _p|
+        expect(tokens).to include(user.pubsub_token)
+        expect(tokens).not_to include(other_account_agent.pubsub_token)
+      end
+    end
+
+    it 'restricts targets by role' do
+      [user, admin]
+      create_notification(scope_type: :all_accounts, audience_type: :role, audience_value: 'administrator', trigger_kind: :immediate)
+
+      expect(ActionCableBroadcastJob).to have_received(:perform_later) do |tokens, _e, _p|
+        expect(tokens).to include(admin.pubsub_token)
+        expect(tokens).not_to include(user.pubsub_token)
+      end
+    end
+
+    it 'restricts targets to a single user' do
+      [user, admin]
+      create_notification(scope_type: :all_accounts, audience_type: :specific_user, audience_value: user.id.to_s, trigger_kind: :immediate)
+
+      expect(ActionCableBroadcastJob).to have_received(:perform_later) do |tokens, _e, _p|
+        expect(tokens).to eq([user.pubsub_token])
+      end
+    end
+  end
+
   def create_notification(**opts)
     OperationsNotification.create!({
       title: 'Aviso',
