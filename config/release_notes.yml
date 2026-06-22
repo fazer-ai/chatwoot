@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.32
+  published_at: '2026-06-22T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Auris Notification Center.** The Auris team can now send you announcements (maintenance, news) directly inside the panel. When there's something to read, a window pops up and stays until you click "I understand". You can revisit the 10 most recent notices any time from the new "Notification Center" menu.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Central de Notificação Auris.** A equipe Auris agora consegue te enviar avisos (manutenções, novidades) direto pelo painel. Quando tiver algo, uma janela aparece e fica na tela até você apertar "Entendi". Você pode rever os 10 mais recentes a qualquer hora no novo menu "Central de Notificação".
 - tag: v4.13.0-auris.1.31.9
   published_at: '2026-06-21T01:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.9
@@ -215,25 +227,3 @@
       ### 🐛 Correções
 
       - **O check de mensagem enviada não volta atrás.** Antes, o marcador podia ficar azul (paciente leu) e voltar pra cinza por um instante, dando a impressão de que ele ainda não tinha visto. Agora, depois que aparece como lido, fica desse jeito.
-- tag: v4.13.0-auris.1.26
-  published_at: '2026-06-15T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.26
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **WhatsApp moves faster when the system is busy.** Pairing a device with the QR code, and the arrival of patient messages, no longer have to wait in line behind background work — they come through right away even at busy moments.
-
-      ### 🐛 Fixes
-
-      - **Cleaner error message when WhatsApp is down.** When the red flag appears on a message it now shows the actual reason WhatsApp gave (out of service, expired token, etc.) instead of a generic technical message — so you know what to do without having to ask someone.
-      - **Template list refreshes by itself again.** If management adds a new template in WhatsApp, you don't need to click "Sync templates" anymore — within a couple of hours the new template just appears in your dropdown automatically.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **WhatsApp anda mais rápido quando o sistema está cheio.** Pareamento do aparelho pelo QR code e a chegada das mensagens dos pacientes não precisam mais esperar uma fila de tarefas de fundo — vêm direto, mesmo em momentos de muito movimento.
-
-      ### 🐛 Correções
-
-      - **Mensagem de erro mais clara quando o WhatsApp falha.** Quando aparece a bandeira vermelha em uma mensagem, agora ela mostra a causa real que o WhatsApp deu (fora do ar, token vencido, etc.) em vez de um aviso genérico técnico — você sabe o que fazer sem precisar perguntar pra alguém.
-      - **Lista de modelos volta a se atualizar sozinha.** Se a gestão criar um modelo novo no WhatsApp, você não precisa mais clicar em "Sincronizar Modelos" — em algumas horas o modelo novo já aparece na sua lista automaticamente.
