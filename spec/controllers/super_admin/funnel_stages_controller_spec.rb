@@ -19,6 +19,17 @@ RSpec.describe 'Super Admin funnel-stages dashboard', type: :request do
         expect(response).to have_http_status(:success)
         expect(response.body).to include(funnel_stage.name)
       end
+
+      # The super-admin sidebar got a collapse toggle (rail mode) matching
+      # the dashboard sidebar UX. The markup + inline controller ship with
+      # every Administrate page render.
+      it 'ships the sidebar collapse toggle on every super-admin page' do
+        sign_in(super_admin, scope: :super_admin)
+        get '/super_admin/funnel_stages'
+        expect(response.body).to include('id="super-admin-sidebar"')
+        expect(response.body).to include('id="super-admin-sidebar-toggle"')
+        expect(response.body).to include('superAdminSidebarCollapsed')
+      end
     end
   end
 

@@ -21,11 +21,13 @@ as defined by the routes in the `admin/` namespace
   }
 %>
 
-<div class="border-slate-100 border-r w-56 flex-shrink-0 justify-between h-full flex flex-col" role="navigation">
+<div id="super-admin-sidebar"
+     class="super-admin-sidebar border-slate-100 border-r flex-shrink-0 justify-between h-full flex flex-col"
+     role="navigation">
   <div>
-    <div class="flex mx-4 mb-4 border-slate-100 border-b py-6">
-      <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10'), super_admin_root_url %>
-      <div class="flex flex-col ml-3">
+    <div class="flex items-center mx-4 mb-4 border-slate-100 border-b py-6">
+      <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10 super-admin-sidebar__logo'), super_admin_root_url %>
+      <div class="flex flex-col ml-3 super-admin-sidebar__label">
         <div class="text-sm">Chatwoot</div>
         <div class="text-sm"><%= Chatwoot.config[:version] %></div>
         <div class="text-xs text-slate-700 mt-0.5">Super Admin Console</div>
@@ -56,6 +58,65 @@ as defined by the routes in the `admin/` namespace
         <%= render partial: "nav_item", locals: { icon: 'icon-lock-line', url: super_admin_profile_mfa_url, label: 'Two-factor auth' } %>
       <% end %>
       <%= render partial: "nav_item", locals: { icon: 'icon-logout-circle-r-line', url: super_admin_logout_url, label: 'Logout' } %>
+
+      <li class="px-4 mb-1 mt-2 border-t border-slate-100 pt-2">
+        <button type="button"
+                id="super-admin-sidebar-toggle"
+                class="-ml-1 flex items-center px-2 py-1.5 w-full text-slate-800 hover:text-woot-500 hover:bg-slate-25 rounded-lg cursor-pointer"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar">
+          <svg width="16" height="16" class="super-admin-sidebar__toggle-icon" viewBox="0 0 20 20" fill="currentColor">
+            <%# Chevron points left when expanded (click to collapse), right when collapsed. %>
+            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span class="ml-2 text-sm super-admin-sidebar__label super-admin-sidebar__toggle-label">Collapse sidebar</span>
+        </button>
+      </li>
     </ul>
   </div>
 </div>
+
+<style>
+  .super-admin-sidebar { width: 14rem; transition: width 0.18s ease; }
+  .super-admin-sidebar.is-collapsed { width: 3.5rem; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__label { display: none; }
+  /* Collapse open <details> submenus when the sidebar is collapsed: the
+     chevron + submenu items would otherwise overflow the narrow rail. */
+  .super-admin-sidebar.is-collapsed details > summary > svg.ml-auto { display: none; }
+  .super-admin-sidebar.is-collapsed details[open] > ul { display: none; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__toggle-icon { transform: rotate(180deg); }
+  /* Hide the right-border between logo and the (now hidden) version text. */
+  .super-admin-sidebar.is-collapsed > div > div:first-child { justify-content: center; padding-left: 0; padding-right: 0; margin-left: 0.25rem; margin-right: 0.25rem; }
+  /* Center the nav-item icons when collapsed, since labels are gone. */
+  .super-admin-sidebar.is-collapsed li > a,
+  .super-admin-sidebar.is-collapsed li > details > summary,
+  .super-admin-sidebar.is-collapsed li > button { justify-content: center; }
+</style>
+
+<script>
+  (function () {
+    var STORAGE_KEY = 'superAdminSidebarCollapsed';
+    var sidebar = document.getElementById('super-admin-sidebar');
+    var toggle = document.getElementById('super-admin-sidebar-toggle');
+    if (!sidebar || !toggle) return;
+
+    function applyState(isCollapsed) {
+      sidebar.classList.toggle('is-collapsed', isCollapsed);
+      var label = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('title', label);
+    }
+
+    // Persist between requests so the operator's choice survives a full
+    // page reload — Administrate is a multi-page app, not an SPA.
+    try {
+      applyState(localStorage.getItem(STORAGE_KEY) === '1');
+    } catch (e) { /* private mode etc. */ }
+
+    toggle.addEventListener('click', function () {
+      var next = !sidebar.classList.contains('is-collapsed');
+      applyState(next);
+      try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0'); } catch (e) {}
+    });
+  }());
+</script>
