@@ -83,7 +83,7 @@ RSpec.describe 'IA Human Distribution Reports API', type: :request do
             params: { from: range_from, to: range_to },
             headers: admin.create_new_auth_token
 
-        stuck = response.parsed_body['rows'].find { |r| r['conversation_id'] == conversation_stuck.id }
+        stuck = response.parsed_body['rows'].find { |r| r['conversation_id'] == conversation_stuck.display_id }
         expect(stuck['status_tag']).to eq('failed_no_online')
       end
 
@@ -94,9 +94,28 @@ RSpec.describe 'IA Human Distribution Reports API', type: :request do
             params: { from: range_from, to: range_to },
             headers: admin.create_new_auth_token
 
-        stuck = response.parsed_body['rows'].find { |r| r['conversation_id'] == conversation_stuck.id }
+        stuck = response.parsed_body['rows'].find { |r| r['conversation_id'] == conversation_stuck.display_id }
         expect(stuck['status_tag']).to eq('failed_with_online')
         expect(stuck['online_team_members']).to include('id' => agent_user.id, 'name' => agent_user.name)
+      end
+
+      # Regression: the report used to emit `messages.conversation_id`
+      # (the global FK) which produced broken `/conversations/<id>` links
+      # in the dashboard. The dashboard URL uses the per-account
+      # sequential `display_id` (Conversation#display_id).
+      it 'returns the conversation display_id, not the global conversations.id, on every row' do
+        get "/api/v2/accounts/#{account.id}/ia_human_distribution_reports",
+            params: { from: range_from, to: range_to },
+            headers: admin.create_new_auth_token
+
+        rows = response.parsed_body['rows']
+        # All test conversations have display_id < 100 (per-account sequence
+        # starts at 1) and global ids that are typically much larger; the
+        # invariant the report has to hold is that conversation_id matches
+        # the conversation's display_id.
+        expected = Conversation.where(account_id: account.id).pluck(:display_id).sort
+        actual = rows.map { |r| r['conversation_id'] }.sort
+        expect(actual).to eq(expected)
       end
 
       it 'filters by inbox_id' do

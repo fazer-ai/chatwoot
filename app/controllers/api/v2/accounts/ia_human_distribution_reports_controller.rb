@@ -48,7 +48,12 @@ class Api::V2::Accounts::IaHumanDistributionReportsController < Api::V1::Account
   end
 
   def ia_activity_messages(range, inbox_id)
-    scope = Message.reorder('').where(account_id: Current.account.id, message_type: :activity)
+    # Eager-load the conversation so we can render its `display_id` (the
+    # per-account sequential id used in the dashboard URL, e.g. /28557)
+    # instead of the global `messages.conversation_id` FK (which points
+    # at `conversations.id`, e.g. 165581).
+    scope = Message.reorder('').includes(:conversation)
+                   .where(account_id: Current.account.id, message_type: :activity)
                    .where(created_at: range)
                    .where('content LIKE ?', '%por IA | Auris%')
     scope = scope.where(inbox_id: inbox_id) if inbox_id
@@ -78,7 +83,10 @@ class Api::V2::Accounts::IaHumanDistributionReportsController < Api::V1::Account
       timestamp: in_brt.iso8601,
       date_label: in_brt.strftime('%d/%m/%Y'),
       time_label: in_brt.strftime('%H:%M:%S'),
-      conversation_id: msg.conversation_id,
+      # Render the per-account sequential id (display_id), not the
+      # global FK, so the dashboard link matches what the operator sees
+      # in the conversation URL bar.
+      conversation_id: msg.conversation&.display_id,
       inbox_id: msg.inbox_id,
       inbox_name: ctx[:inbox_cache][msg.inbox_id] ||= ctx[:account].inboxes.find_by(id: msg.inbox_id)&.name,
       team_id: team_id,

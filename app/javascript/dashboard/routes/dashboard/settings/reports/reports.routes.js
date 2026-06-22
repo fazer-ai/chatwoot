@@ -171,7 +171,10 @@ export default {
         {
           path: 'ia_human_distribution',
           name: 'ia_human_distribution_report',
-          meta,
+          // Wide audit table — opt this route out of the default 5xl
+          // wrapper so it uses whatever width the collapsed/expanded
+          // sidebar leaves available.
+          meta: { ...meta, fullWidth: true },
           component: IaHumanDistributionReport,
         },
       ],
