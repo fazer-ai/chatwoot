@@ -1,0 +1,403 @@
+<%#
+# Custom Operations Notifications Form
+#
+# Overrides Administrate's auto-generated form so we can:
+#   * hide the accounts picker when scope_type is "all_accounts";
+#   * render multi-select comboboxes (search + chips) for the accounts
+#     and specific-users pickers;
+#   * scope the users picker to whichever accounts are selected,
+#     because audience "specific users" only makes sense with at least
+#     one account.
+#
+# Standard fields go through the same `field-unit` wrapper Administrate
+# uses elsewhere so they pick up the default super-admin CSS. The dynamic
+# show/hide and the combobox UI are driven by a tiny vanilla controller
+# defined inline at the bottom of this file. We deliberately avoid adding
+# a JS dependency for what is a single super-admin form.
+%>
+
+<% resource = page.resource %>
+<% account_options = Account.order(:name).pluck(:id, :name).map { |id, name| { id: id, label: name } } %>
+<%
+  # Pre-load every (account_id, user) pair so the JS controller can
+  # filter users client-side as the operator changes the accounts
+  # selection. For super-admin scale this is negligible compared with
+  # the page render itself.
+  user_options = AccountUser
+                 .includes(:user)
+                 .order('users.name')
+                 .map do |au|
+    user = au.user
+    next unless user
+
+    {
+      id: user.id,
+      account_id: au.account_id,
+      label: user.available_name.presence || user.email
+    }
+  end.compact.uniq { |opt| [opt[:account_id], opt[:id]] }
+%>
+
+<%= form_for([namespace, resource], html: { class: 'form', id: 'operations-notification-form' }) do |f| %>
+  <% if resource.errors.any? %>
+    <div id="error_explanation">
+      <h2>
+        <%= t(
+          'administrate.form.errors',
+          pluralized_errors: pluralize(resource.errors.count, t('administrate.form.error')),
+          resource_name: display_resource_name(page.resource_name, singular: true)
+        ) %>
+      </h2>
+      <ul>
+        <% resource.errors.full_messages.each do |message| %>
+          <li class="flash-error"><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field-unit field-unit--string field-unit--required">
+    <div class="field-unit__label"><%= f.label :title %></div>
+    <div class="field-unit__field"><%= f.text_field :title, required: true %></div>
+  </div>
+
+  <div class="field-unit field-unit--text field-unit--required">
+    <div class="field-unit__label"><%= f.label :body %></div>
+    <div class="field-unit__field"><%= f.text_area :body, required: true, rows: 6 %></div>
+  </div>
+
+  <div class="field-unit field-unit--select field-unit--required">
+    <div class="field-unit__label"><%= f.label :severity %></div>
+    <div class="field-unit__field">
+      <%= f.select :severity, OperationsNotificationDashboard::SEVERITY_OPTIONS %>
+    </div>
+  </div>
+
+  <%
+    initial_scope = resource.scope_type.presence || 'all_accounts'
+    initial_audience = resource.audience_type.presence || 'all_users'
+    accounts_initial_display = initial_scope == 'accounts' ? 'flex' : 'none'
+    users_initial_display = (initial_scope == 'accounts' && initial_audience == 'specific_users') ? 'flex' : 'none'
+  %>
+
+  <div class="field-unit field-unit--select field-unit--required">
+    <div class="field-unit__label"><%= f.label :scope_type %></div>
+    <div class="field-unit__field">
+      <%= f.select :scope_type,
+                   OperationsNotificationDashboard::SCOPE_OPTIONS,
+                   {},
+                   data: { 'ops-form-target': 'scopeType' },
+                   onchange: "(function(s){var f=document.querySelector('[data-ops-form-target=accountsField]');if(f)f.style.display=(s.value==='accounts'?'flex':'none');var u=document.querySelector('[data-ops-form-target=audienceUsersField]');if(u){var a=document.querySelector('[data-ops-form-target=audienceType]');var v=a?a.value:'all_users';u.style.display=(s.value==='accounts'&&v==='specific_users'?'flex':'none');}window.opsFormApplyScope&&window.opsFormApplyScope();})(this);" %>
+    </div>
+  </div>
+
+  <div class="field-unit field-unit--ops-combobox field-unit--optional"
+       data-ops-form-target="accountsField"
+       style="display: <%= accounts_initial_display %>;">
+    <div class="field-unit__label"><label for="ops-combobox-accounts">Accounts</label></div>
+    <div class="field-unit__field">
+      <div class="ops-combobox"
+           id="ops-combobox-accounts"
+           data-ops-form-target="accountsCombobox"
+           data-options="<%= account_options.to_json %>"
+           data-selected="<%= (resource.account_ids || []).to_json %>"
+           data-name="<%= f.object_name %>[account_ids][]"
+           data-placeholder="Type to filter accounts…"></div>
+    </div>
+  </div>
+
+  <div class="field-unit field-unit--select field-unit--required">
+    <div class="field-unit__label"><%= f.label :audience_type %></div>
+    <div class="field-unit__field">
+      <%= f.select :audience_type,
+                   OperationsNotificationDashboard::AUDIENCE_OPTIONS,
+                   {},
+                   data: { 'ops-form-target': 'audienceType' },
+                   onchange: "(function(a){var s=document.querySelector('[data-ops-form-target=scopeType]');var sv=s?s.value:'all_accounts';var u=document.querySelector('[data-ops-form-target=audienceUsersField]');if(u)u.style.display=(a.value==='specific_users'&&sv==='accounts'?'flex':'none');})(this);" %>
+    </div>
+  </div>
+
+  <div class="field-unit field-unit--ops-combobox field-unit--optional"
+       data-ops-form-target="audienceUsersField"
+       style="display: <%= users_initial_display %>;">
+    <div class="field-unit__label"><label for="ops-combobox-users">Specific users</label></div>
+    <div class="field-unit__field">
+      <div class="ops-combobox"
+           id="ops-combobox-users"
+           data-ops-form-target="audienceUsersCombobox"
+           data-options="<%= user_options.to_json %>"
+           data-selected="<%= (resource.audience_user_ids || []).to_json %>"
+           data-name="<%= f.object_name %>[audience_user_ids][]"
+           data-placeholder="Type to filter users…"
+           data-scoped-by="accounts"></div>
+    </div>
+  </div>
+
+  <div class="field-unit field-unit--select field-unit--required">
+    <div class="field-unit__label"><%= f.label :trigger_kind %></div>
+    <div class="field-unit__field">
+      <%= f.select :trigger_kind, OperationsNotificationDashboard::TRIGGER_OPTIONS %>
+    </div>
+  </div>
+
+  <div class="field-unit field-unit--date-time field-unit--optional">
+    <div class="field-unit__label"><%= f.label :expires_at %></div>
+    <div class="field-unit__field">
+      <%= f.datetime_local_field :expires_at, value: resource.expires_at&.strftime('%Y-%m-%dT%H:%M') %>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit %>
+  </div>
+<% end %>
+
+<style>
+  /* The combobox lives inside a standard `field-unit__field`, so size
+     and align it like the other inputs Administrate renders. */
+  .field-unit--ops-combobox[hidden] { display: none !important; }
+  .field-unit--ops-combobox .field-unit__field { overflow: visible; }
+  .ops-combobox { position: relative; width: 100%; }
+  .ops-combobox__chips {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    padding: 6px 36px 6px 8px; min-height: 38px;
+    border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;
+    width: 100%; box-sizing: border-box; cursor: text;
+  }
+  .ops-combobox__chips:hover { border-color: #94a3b8; }
+  .ops-combobox__chips:focus-within {
+    border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .ops-combobox__chevron {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: #94a3b8; font-size: 12px;
+  }
+  .ops-combobox__chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px; background: #dbeafe; color: #1e3a8a;
+    border-radius: 999px; font-size: 13px;
+  }
+  .ops-combobox__chip button {
+    border: 0; background: transparent; cursor: pointer;
+    color: #1e3a8a; font-size: 15px; line-height: 1; padding: 0;
+  }
+  .ops-combobox__input {
+    border: 0; outline: none; flex: 1 1 140px; min-width: 140px;
+    font-size: 14px; padding: 4px 0; background: transparent;
+  }
+  .ops-combobox__dropdown {
+    position: absolute; z-index: 9999; left: 0; right: 0; top: calc(100% + 4px);
+    background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
+    max-height: 240px; overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    display: none;
+  }
+  .ops-combobox__dropdown.is-open { display: block; }
+  .ops-combobox__option {
+    padding: 8px 12px; cursor: pointer; font-size: 14px; color: #0f172a;
+  }
+  .ops-combobox__option:hover,
+  .ops-combobox__option.is-active { background: #f1f5f9; }
+  .ops-combobox__option.is-selected::after {
+    content: '✓'; color: #1d4ed8; float: right;
+  }
+  .ops-combobox__empty {
+    padding: 8px 12px; color: #94a3b8; font-size: 13px; font-style: italic;
+  }
+  .field-unit--ops-combobox .field-unit__field { overflow: visible; }
+</style>
+
+<script>
+  (function () {
+    function init() {
+      const form = document.getElementById('operations-notification-form');
+      if (!form) return;
+
+      const target = (name) => form.querySelector('[data-ops-form-target="' + name + '"]');
+      const scopeTypeEl = target('scopeType');
+      const audienceTypeEl = target('audienceType');
+      const accountsField = target('accountsField');
+      const audienceUsersField = target('audienceUsersField');
+      const accountsBox = target('accountsCombobox');
+      const audienceUsersBox = target('audienceUsersCombobox');
+
+      function mountCombobox(host, onChange) {
+        const allOptions = JSON.parse(host.dataset.options || '[]');
+        const selected = new Set((JSON.parse(host.dataset.selected || '[]') || []).map(Number));
+        const fieldName = host.dataset.name;
+        const placeholder = host.dataset.placeholder || '';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'ops-combobox__chips';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = placeholder;
+        input.className = 'ops-combobox__input';
+        input.autocomplete = 'off';
+
+        const chevron = document.createElement('span');
+        chevron.className = 'ops-combobox__chevron';
+        chevron.textContent = '▾';
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'ops-combobox__dropdown';
+
+        host.appendChild(wrap);
+        host.appendChild(chevron);
+        host.appendChild(dropdown);
+        wrap.appendChild(input);
+
+        let scopeFilter = null;
+
+        function isSelected(id) { return selected.has(Number(id)); }
+
+        function syncHiddenInputs() {
+          host.querySelectorAll('input[type="hidden"][data-ops-hidden]').forEach((el) => el.remove());
+          const ids = Array.from(selected);
+          if (ids.length === 0) {
+            const blank = document.createElement('input');
+            blank.type = 'hidden';
+            blank.name = fieldName;
+            blank.value = '';
+            blank.dataset.opsHidden = 'true';
+            host.appendChild(blank);
+            return;
+          }
+          ids.forEach((id) => {
+            const el = document.createElement('input');
+            el.type = 'hidden';
+            el.name = fieldName;
+            el.value = String(id);
+            el.dataset.opsHidden = 'true';
+            host.appendChild(el);
+          });
+        }
+
+        function chipFor(opt) {
+          const chip = document.createElement('span');
+          chip.className = 'ops-combobox__chip';
+          chip.textContent = opt.label;
+          const close = document.createElement('button');
+          close.type = 'button';
+          close.textContent = '×';
+          close.addEventListener('click', () => {
+            selected.delete(Number(opt.id));
+            renderChips();
+            renderDropdown();
+            syncHiddenInputs();
+            if (onChange) onChange(Array.from(selected));
+          });
+          chip.appendChild(close);
+          return chip;
+        }
+
+        function renderChips() {
+          wrap.querySelectorAll('.ops-combobox__chip').forEach((el) => el.remove());
+          Array.from(selected).forEach((id) => {
+            const opt = allOptions.find((o) => Number(o.id) === Number(id));
+            if (opt) wrap.insertBefore(chipFor(opt), input);
+          });
+        }
+
+        function renderDropdown() {
+          dropdown.innerHTML = '';
+          const q = input.value.trim().toLowerCase();
+          const filtered = allOptions.filter((opt) => {
+            if (scopeFilter && !scopeFilter(opt)) return false;
+            return !q || opt.label.toLowerCase().includes(q);
+          });
+          if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'ops-combobox__empty';
+            empty.textContent = q ? 'No matches' : 'No options available';
+            dropdown.appendChild(empty);
+            return;
+          }
+          filtered.slice(0, 100).forEach((opt) => {
+            const row = document.createElement('div');
+            row.className = 'ops-combobox__option' + (isSelected(opt.id) ? ' is-selected' : '');
+            row.textContent = opt.label;
+            row.addEventListener('mousedown', (e) => {
+              e.preventDefault();
+              if (isSelected(opt.id)) {
+                selected.delete(Number(opt.id));
+              } else {
+                selected.add(Number(opt.id));
+              }
+              input.value = '';
+              renderChips();
+              renderDropdown();
+              syncHiddenInputs();
+              if (onChange) onChange(Array.from(selected));
+            });
+            dropdown.appendChild(row);
+          });
+        }
+
+        // Open the dropdown on focus OR on click of the chips wrap.
+        wrap.addEventListener('click', () => { input.focus(); });
+        input.addEventListener('focus', () => { dropdown.classList.add('is-open'); renderDropdown(); });
+        input.addEventListener('blur', () => { setTimeout(() => dropdown.classList.remove('is-open'), 150); });
+        input.addEventListener('input', renderDropdown);
+
+        renderChips();
+        syncHiddenInputs();
+
+        return {
+          getSelected: () => Array.from(selected),
+          focus: () => { input.focus(); },
+          setScopeFilter: (fn) => { scopeFilter = fn; renderDropdown(); },
+          prune: (validIdsSet) => {
+            let changed = false;
+            Array.from(selected).forEach((id) => {
+              if (!validIdsSet.has(Number(id))) {
+                selected.delete(Number(id));
+                changed = true;
+              }
+            });
+            if (changed) {
+              renderChips();
+              syncHiddenInputs();
+            }
+          }
+        };
+      }
+
+      const accountsCombo = accountsBox ? mountCombobox(accountsBox, applyScopeToUsers) : null;
+      const usersCombo = audienceUsersBox ? mountCombobox(audienceUsersBox, null) : null;
+
+      function applyScopeToUsers() {
+        if (!usersCombo || !accountsCombo) return;
+        const selectedAccountIds = new Set(accountsCombo.getSelected().map(Number));
+        if (selectedAccountIds.size === 0) {
+          usersCombo.setScopeFilter(() => false);
+          usersCombo.prune(new Set());
+          return;
+        }
+        usersCombo.setScopeFilter((opt) => selectedAccountIds.has(Number(opt.account_id)));
+        const allUserOptions = JSON.parse(audienceUsersBox.dataset.options || '[]');
+        const validIds = new Set(
+          allUserOptions
+            .filter((opt) => selectedAccountIds.has(Number(opt.account_id)))
+            .map((opt) => Number(opt.id))
+        );
+        usersCombo.prune(validIds);
+      }
+
+      // Show/hide is handled by inline `onchange` on the selects (in the
+      // ERB) so the visibility never depends on this script running.
+      // This block only deals with the cross-field side effect: when the
+      // accounts selection changes, re-scope the users dropdown. We
+      // expose it globally so the scope_type onchange can fire it too.
+      window.opsFormApplyScope = applyScopeToUsers;
+      applyScopeToUsers();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  }());
+</script>

@@ -5,6 +5,7 @@
     "EMPTY_STATE": "No notifications from operations yet.",
     "EMERGENCY_BADGE": "⚠️ Emergency notice",
     "EMERGENCY_ICON": "⚠️",
+    "INFO_BADGE": "Notice",
     "ACK_ICON": "✓",
     "ACKNOWLEDGE": "I understand",
     "CLOSE": "Close",

@@ -89,7 +89,6 @@ onBeforeUnmount(() => {
     position="center"
     :show-cancel-button="false"
     :show-confirm-button="false"
-    :title="currentNotification?.title || ''"
   >
     <div v-if="currentNotification" class="flex flex-col gap-4">
       <div
@@ -98,6 +97,15 @@ onBeforeUnmount(() => {
       >
         {{ t('OPERATIONS_NOTIFICATIONS.EMERGENCY_BADGE') }}
       </div>
+      <div
+        v-else
+        class="px-3 py-2 text-sm font-medium border rounded-md bg-n-blue-3 border-n-blue-7 text-n-blue-11"
+      >
+        {{ t('OPERATIONS_NOTIFICATIONS.INFO_BADGE') }}
+      </div>
+      <h3 class="text-base font-semibold text-n-slate-12">
+        {{ currentNotification.title }}
+      </h3>
       <p class="text-sm whitespace-pre-wrap text-n-slate-12">
         {{ currentNotification.body }}
       </p>

@@ -37,6 +37,25 @@ en:
         average_ticket: 'Average ticket'
         funnel_enabled: 'Funnel menu enabled'
         ai_status_uses_attribute: 'AI status from attribute (off = legacy agente-off label)'
+    # Administrate uses `model.model_name.human(count: …)` to render both
+    # the super-admin sidebar label (plural / `other`) and the "New …"
+    # button label (singular / `one`). Choose forms that read naturally in
+    # each context: menu = "Notification Center", button = "New notification".
+    models:
+      operations_notification:
+        one: 'notification'
+        other: 'Notification Center'
+  # `helpers.label.<resource>.<attribute>` is what Administrate reads to
+  # render the column header on the index table and the row label on the
+  # show page. Without these, it falls back to the auto-humanized
+  # attribute name ("Operations Notification Acks").
+  helpers:
+    label:
+      operations_notification:
+        operations_notification_acks: 'Notification acks'
+        accounts_summary: 'Accounts'
+        audience_users_summary: 'Specific users'
+        created_by_display: 'Created by'
   internal_chat:
     default_category_name: 'Channels'
     default_channel_name: 'General'

@@ -126,7 +126,6 @@ onMounted(() => {
       position="center"
       :show-cancel-button="false"
       :show-confirm-button="false"
-      :title="selectedNotification?.title || ''"
     >
       <div v-if="selectedNotification" class="flex flex-col gap-3">
         <div
@@ -135,11 +134,20 @@ onMounted(() => {
         >
           {{ t('OPERATIONS_NOTIFICATIONS.EMERGENCY_BADGE') }}
         </div>
-        <p class="text-xs text-n-slate-10">
-          {{ formatDate(selectedNotification.published_at) }}
-        </p>
+        <div
+          v-else
+          class="px-3 py-2 text-sm font-medium border rounded-md bg-n-blue-3 border-n-blue-7 text-n-blue-11"
+        >
+          {{ t('OPERATIONS_NOTIFICATIONS.INFO_BADGE') }}
+        </div>
+        <h3 class="text-base font-semibold text-n-slate-12">
+          {{ selectedNotification.title }}
+        </h3>
         <p class="text-sm whitespace-pre-wrap text-n-slate-12">
           {{ selectedNotification.body }}
+        </p>
+        <p class="text-xs text-n-slate-10">
+          {{ formatDate(selectedNotification.published_at) }}
         </p>
       </div>
       <template #footer>
