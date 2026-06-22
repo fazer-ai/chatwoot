@@ -15,6 +15,11 @@ RSpec.describe 'Instagram Authorization API', type: :request do
     context 'when it is an authenticated user' do
       let(:agent) { create(:user, account: account, role: :agent) }
       let(:administrator) { create(:user, account: account, role: :administrator) }
+      let(:manager) do
+        user = create(:user, account: account)
+        AccountUser.find_by!(account: account, user: user).update!(role: :manager)
+        user
+      end
 
       it 'returns unauthorized for agent' do
         post "/api/v1/accounts/#{account.id}/instagram/authorization",
@@ -22,6 +27,19 @@ RSpec.describe 'Instagram Authorization API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unauthorized)
+      end
+
+      # Managers own inbox setup the same way administrators do (see
+      # `InboxPolicy`), so they must be able to kick off the OAuth
+      # reconnect — otherwise the red "click to reconnect" banner they
+      # see on the inbox settings page just 401s on click.
+      it 'allows managers to start the OAuth dance' do
+        post "/api/v1/accounts/#{account.id}/instagram/authorization",
+             headers: manager.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['success']).to be true
       end
 
       it 'creates a new authorization and returns the redirect url' do
