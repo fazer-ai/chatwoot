@@ -24,6 +24,22 @@ pt_BR:
         average_ticket: 'Ticket médio'
         funnel_enabled: 'Menu Funil ativo'
         ai_status_uses_attribute: 'Status da IA por atributo (desligado = etiqueta agente-off legada)'
+    # Administrate uses `model.model_name.human(count: …)` to render both
+    # the super-admin sidebar label (plural / `other`) and the "New …"
+    # button label (singular / `one`). Choose forms that read naturally
+    # in each context: menu = "Central de Notificações", button = "Nova notificação".
+    models:
+      operations_notification:
+        one: 'notificação'
+        other: 'Central de Notificações'
+  # Administrate column/row labels on the super-admin index/show pages.
+  helpers:
+    label:
+      operations_notification:
+        operations_notification_acks: 'Confirmações'
+        accounts_summary: 'Contas'
+        audience_users_summary: 'Usuários específicos'
+        created_by_display: 'Criado por'
   internal_chat:
     default_category_name: 'Canais'
     default_channel_name: 'Geral'

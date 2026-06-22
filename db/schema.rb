@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_21_120000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1397,9 +1397,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_120000) do
     t.text "body", null: false
     t.integer "severity", default: 0, null: false
     t.integer "scope_type", default: 0, null: false
-    t.bigint "account_id"
     t.integer "audience_type", default: 0, null: false
-    t.string "audience_value"
     t.integer "trigger_kind", default: 0, null: false
     t.datetime "published_at"
     t.datetime "expires_at"
@@ -1407,7 +1405,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_120000) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["account_id"], name: "index_operations_notifications_on_account_id"
+    t.bigint "account_ids", default: [], null: false, array: true
+    t.bigint "audience_user_ids", default: [], null: false, array: true
+    t.index ["account_ids"], name: "index_operations_notifications_on_account_ids", using: :gin
+    t.index ["audience_user_ids"], name: "index_operations_notifications_on_audience_user_ids", using: :gin
     t.index ["created_by_id"], name: "index_operations_notifications_on_created_by_id"
     t.index ["deleted_at"], name: "index_operations_notifications_on_deleted_at"
     t.index ["expires_at"], name: "index_operations_notifications_on_expires_at"

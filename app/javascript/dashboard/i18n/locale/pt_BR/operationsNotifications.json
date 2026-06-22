@@ -1,10 +1,11 @@
 {
   "OPERATIONS_NOTIFICATIONS": {
     "PAGE_TITLE": "Central de Notificação",
-    "PAGE_DESCRIPTION": "Avisos e comunicados da equipe de operações do AurisChat. Os 10 mais recentes ficam aqui.",
-    "EMPTY_STATE": "Nenhum aviso da equipe de operações ainda.",
+    "PAGE_DESCRIPTION": "Avisos e comunicados da equipe Auris. Os 10 mais recentes ficam aqui.",
+    "EMPTY_STATE": "Nenhum aviso da equipe Auris ainda.",
     "EMERGENCY_BADGE": "⚠️ Aviso de emergência",
     "EMERGENCY_ICON": "⚠️",
+    "INFO_BADGE": "Aviso",
     "ACK_ICON": "✓",
     "ACKNOWLEDGE": "Entendi",
     "CLOSE": "Fechar",

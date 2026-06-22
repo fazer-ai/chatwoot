@@ -1,0 +1,69 @@
+<%#
+# Acks report page
+#
+# Renders one row per `OperationsNotificationAck` so the super-admin can
+# audit who saw the notification, from which account, when, and from
+# which IP. There is no pagination yet — the table is bounded by the
+# number of users in scope of the notification, which is small for the
+# super-admin use-case.
+%>
+
+<% content_for(:title) do %>
+  Notification Acks — <%= @notification.title %>
+<% end %>
+
+<header class="main-content__header">
+  <h1 class="main-content__page-title">
+    <%= content_for(:title) %>
+  </h1>
+  <div>
+    <%= link_to 'Back to notification',
+                super_admin_operations_notification_path(@notification),
+                class: 'button button--clear' %>
+  </div>
+</header>
+
+<section class="main-content__body main-content__body--flush">
+  <div class="main-content__page-summary">
+    <strong><%= pluralize(@acks.size, 'acknowledgement') %></strong> recorded so far.
+  </div>
+
+  <% if @acks.empty? %>
+    <p style="padding: 1rem; color: #64748b;">No one has acknowledged this notification yet.</p>
+  <% else %>
+    <table class="main-content__page-table" style="width: 100%;">
+      <thead>
+        <tr>
+          <th scope="col">User</th>
+          <th scope="col">Account</th>
+          <th scope="col">Acknowledged at</th>
+          <th scope="col">IP</th>
+          <th scope="col">User agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @acks.each do |ack| %>
+          <tr>
+            <td>
+              <%= ack.user&.available_name.presence || ack.user&.email || "User ##{ack.user_id}" %>
+            </td>
+            <td>
+              <%= ack.account&.name || "Account ##{ack.account_id}" %>
+            </td>
+            <td>
+              <%# Render in America/Sao_Paulo so the operator reads the audit in local time. %>
+              <%= ack.acknowledged_at.in_time_zone('America/Sao_Paulo').strftime('%Y-%m-%d %H:%M:%S %Z') %>
+            </td>
+            <td>
+              <%= ack.ip.presence || '—' %>
+            </td>
+            <td style="max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                title="<%= ack.user_agent %>">
+              <%= ack.user_agent.presence || '—' %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
