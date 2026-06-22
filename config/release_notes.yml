@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.32.1
+  published_at: '2026-06-22T23:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32.1
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.32
   published_at: '2026-06-22T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32
@@ -207,23 +215,3 @@
       ### 🐛 Correções
 
       - **Conexão de inbox do Instagram voltou a funcionar.** O erro "Failed to exchange token" que aparecia ao adicionar uma inbox nova de Instagram foi corrigido.
-- tag: v4.13.0-auris.1.27
-  published_at: '2026-06-16T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **WhatsApp keeps up better when things are busy.** Patient messages arrive faster even when there's a lot of delivery and read confirmations coming in at the same time — they no longer have to wait in line behind those.
-
-      ### 🐛 Fixes
-
-      - **The checkmark color of a sent message doesn't rewind anymore.** Before, the message marker could turn blue (the patient read) and briefly go back to gray, making it look like the patient hadn't seen it yet. Now once it shows the patient read, it stays that way.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **O WhatsApp acompanha melhor o ritmo quando está cheio.** As mensagens dos pacientes chegam mais rápido mesmo quando vêm muitas confirmações de entrega e leitura ao mesmo tempo — elas não precisam mais esperar atrás dessas confirmações.
-
-      ### 🐛 Correções
-
-      - **O check de mensagem enviada não volta atrás.** Antes, o marcador podia ficar azul (paciente leu) e voltar pra cinza por um instante, dando a impressão de que ele ainda não tinha visto. Agora, depois que aparece como lido, fica desse jeito.
