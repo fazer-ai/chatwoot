@@ -17,7 +17,16 @@ class Api::V1::Accounts::OauthAuthorizationController < Api::V1::Accounts::BaseC
 
   private
 
+  # Allow `manager` in addition to `administrator`. Reconnecting a
+  # channel (Instagram, Google, TikTok, Notion) is the same kind of
+  # operation as creating an inbox, which the rest of `InboxPolicy`
+  # already exposes to managers (`create?`, `update?`, `destroy?`,
+  # `disconnect_channel_provider?`). Without this, a clinic manager
+  # sees the red "click to reconnect" banner but gets a 401 the moment
+  # they click — broken UX for a role that already owns inbox setup.
   def check_authorization
-    raise Pundit::NotAuthorizedError unless Current.account_user.administrator?
+    return if Current.account_user.administrator? || Current.account_user.manager?
+
+    raise Pundit::NotAuthorizedError
   end
 end
