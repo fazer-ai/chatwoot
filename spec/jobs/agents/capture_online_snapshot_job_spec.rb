@@ -18,11 +18,15 @@ RSpec.describe Agents::CaptureOnlineSnapshotJob do
       )
     end
 
-    it 'inserts only users currently online' do
-      expect { job.perform }.to change(OnlineSnapshot.where(account: account), :count).by(1)
+    # "Online no momento" in the IA → Humano audit treats `busy` as
+    # active: those agents are logged in (heartbeat present), just
+    # self-flagged as unavailable. The auto-assigner can still target
+    # them, so they belong in the snapshot.
+    it 'inserts users that are online or busy, but skips offline' do
+      expect { job.perform }.to change(OnlineSnapshot.where(account: account), :count).by(2)
 
       ids = OnlineSnapshot.where(account: account).pluck(:user_id)
-      expect(ids).to contain_exactly(online_user.id)
+      expect(ids).to contain_exactly(online_user.id, busy_user.id)
     end
 
     it 'stamps all snapshots in the same run with the same timestamp' do
