@@ -25,25 +25,35 @@ as defined by the routes in the `admin/` namespace
      class="super-admin-sidebar border-slate-100 border-r flex-shrink-0 justify-between h-full flex flex-col"
      role="navigation">
   <div>
-    <div class="flex items-center mx-4 mb-4 border-slate-100 border-b py-6 super-admin-sidebar__header">
-      <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10 super-admin-sidebar__logo'), super_admin_root_url %>
-      <div class="flex flex-col ml-3 flex-1 min-w-0 super-admin-sidebar__label">
-        <div class="text-sm">Chatwoot</div>
-        <div class="text-sm"><%= Chatwoot.config[:version] %></div>
-        <div class="text-xs text-slate-700 mt-0.5">Super Admin Console</div>
+    <div class="super-admin-sidebar__header mx-4 mb-4 border-slate-100 border-b py-6">
+      <%# EXPANDED header: small logo · brand block · close-button (right). %>
+      <div class="super-admin-sidebar__header-expanded flex items-center gap-2 min-w-0">
+        <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10 flex-shrink-0'), super_admin_root_url %>
+        <div class="flex flex-col ml-1 flex-1 min-w-0">
+          <div class="text-sm">Chatwoot</div>
+          <div class="text-sm"><%= Chatwoot.config[:version] %></div>
+          <div class="text-xs text-slate-700 mt-0.5">Super Admin Console</div>
+        </div>
+        <button type="button"
+                class="super-admin-sidebar__toggle-close grid flex-shrink-0 place-content-center w-6 h-6 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Collapse sidebar"
+                title="Recolher barra lateral">
+          <svg width="16" height="16"><use xlink:href="#icon-panel-left-close" /></svg>
+        </button>
       </div>
-      <button type="button"
-              id="super-admin-sidebar-toggle"
-              class="super-admin-sidebar__toggle ml-2 grid place-content-center size-7 rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex-shrink-0"
-              aria-label="Collapse sidebar"
-              title="Collapse sidebar">
-        <svg width="18" height="18" class="super-admin-sidebar__toggle-icon-close">
-          <use xlink:href="#icon-panel-left-close" />
-        </svg>
-        <svg width="18" height="18" class="super-admin-sidebar__toggle-icon-open hidden">
-          <use xlink:href="#icon-panel-left-open" />
-        </svg>
-      </button>
+
+      <%# COLLAPSED header: logo as a button on top, expand-button stacked below it. %>
+      <div class="super-admin-sidebar__header-collapsed flex flex-col items-center gap-2">
+        <%= link_to super_admin_root_url, title: 'Chatwoot Super Admin', class: 'grid flex-shrink-0 place-content-center p-1.5 rounded-lg hover:bg-slate-50' do %>
+          <%= image_tag '/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'w-7 h-7' %>
+        <% end %>
+        <button type="button"
+                class="super-admin-sidebar__toggle-open flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                aria-label="Expand sidebar"
+                title="Expandir barra lateral">
+          <svg width="16" height="16"><use xlink:href="#icon-panel-left-open" /></svg>
+        </button>
+      </div>
     </div>
 
     <ul class="my-4">
@@ -77,36 +87,35 @@ as defined by the routes in the `admin/` namespace
 <style>
   .super-admin-sidebar { width: 14rem; transition: width 0.18s ease; }
   .super-admin-sidebar.is-collapsed { width: 3.5rem; }
+  .super-admin-sidebar .super-admin-sidebar__label { display: inline; }
   .super-admin-sidebar.is-collapsed .super-admin-sidebar__label { display: none; }
+
+  /* Swap header variant. Expanded shows the brand row + close button;
+     collapsed shows the logo-as-button stacked over the expand button. */
+  .super-admin-sidebar .super-admin-sidebar__header-collapsed { display: none; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header-expanded { display: none; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header-collapsed { display: flex; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header { padding-left: 0; padding-right: 0; margin-left: 0.25rem; margin-right: 0.25rem; }
+
   /* Collapse open <details> submenus when the sidebar is collapsed: the
      chevron + submenu items would otherwise overflow the narrow rail. */
   .super-admin-sidebar.is-collapsed details > summary > svg.ml-auto { display: none; }
   .super-admin-sidebar.is-collapsed details[open] > ul { display: none; }
-  /* Swap the toggle icon (close <-> open) without re-rendering. */
-  .super-admin-sidebar.is-collapsed .super-admin-sidebar__toggle-icon-close { display: none; }
-  .super-admin-sidebar:not(.is-collapsed) .super-admin-sidebar__toggle-icon-open { display: none; }
-  /* In collapsed mode the header keeps just the toggle button; centre it. */
-  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header { justify-content: center; padding-left: 0; padding-right: 0; }
-  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header .super-admin-sidebar__logo { display: none; }
-  .super-admin-sidebar.is-collapsed .super-admin-sidebar__toggle { margin-left: 0; }
   /* Center the nav-item icons when collapsed, since labels are gone. */
   .super-admin-sidebar.is-collapsed li > a,
-  .super-admin-sidebar.is-collapsed li > details > summary,
-  .super-admin-sidebar.is-collapsed li > button { justify-content: center; }
+  .super-admin-sidebar.is-collapsed li > details > summary { justify-content: center; }
 </style>
 
 <script>
   (function () {
     var STORAGE_KEY = 'superAdminSidebarCollapsed';
     var sidebar = document.getElementById('super-admin-sidebar');
-    var toggle = document.getElementById('super-admin-sidebar-toggle');
-    if (!sidebar || !toggle) return;
+    if (!sidebar) return;
+    var closeBtn = sidebar.querySelector('.super-admin-sidebar__toggle-close');
+    var openBtn = sidebar.querySelector('.super-admin-sidebar__toggle-open');
 
     function applyState(isCollapsed) {
       sidebar.classList.toggle('is-collapsed', isCollapsed);
-      var label = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
-      toggle.setAttribute('aria-label', label);
-      toggle.setAttribute('title', label);
     }
 
     // Persist between requests so the operator's choice survives a full
@@ -115,10 +124,13 @@ as defined by the routes in the `admin/` namespace
       applyState(localStorage.getItem(STORAGE_KEY) === '1');
     } catch (e) { /* private mode etc. */ }
 
-    toggle.addEventListener('click', function () {
+    function toggle() {
       var next = !sidebar.classList.contains('is-collapsed');
       applyState(next);
       try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0'); } catch (e) {}
-    });
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', toggle);
+    if (openBtn) openBtn.addEventListener('click', toggle);
   }());
 </script>

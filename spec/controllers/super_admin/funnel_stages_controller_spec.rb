@@ -21,13 +21,19 @@ RSpec.describe 'Super Admin funnel-stages dashboard', type: :request do
       end
 
       # The super-admin sidebar got a collapse toggle (rail mode) matching
-      # the dashboard sidebar UX. The markup + inline controller ship with
-      # every Administrate page render.
-      it 'ships the sidebar collapse toggle on every super-admin page' do
+      # the dashboard sidebar UX: small close button in the header when
+      # expanded, larger outlined open button stacked under the logo when
+      # collapsed. State persisted in localStorage.
+      it 'ships both sidebar collapse toggles + the persistence script' do
         sign_in(super_admin, scope: :super_admin)
         get '/super_admin/funnel_stages'
         expect(response.body).to include('id="super-admin-sidebar"')
-        expect(response.body).to include('id="super-admin-sidebar-toggle"')
+        expect(response.body).to include('super-admin-sidebar__toggle-close')
+        expect(response.body).to include('super-admin-sidebar__toggle-open')
+        # Both use the Lucide panel-left icons so the look matches the
+        # dashboard sidebar exactly.
+        expect(response.body).to include('icon-panel-left-close')
+        expect(response.body).to include('icon-panel-left-open')
         expect(response.body).to include('superAdminSidebarCollapsed')
       end
     end
