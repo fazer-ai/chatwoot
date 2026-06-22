@@ -22,14 +22,38 @@ as defined by the routes in the `admin/` namespace
   }
 %>
 
-<div class="border-slate-100 border-r w-56 flex-shrink-0 justify-between h-full flex flex-col" role="navigation">
+<div id="super-admin-sidebar"
+     class="super-admin-sidebar border-slate-100 border-r flex-shrink-0 justify-between h-full flex flex-col"
+     role="navigation">
   <div>
-    <div class="flex mx-4 mb-4 border-slate-100 border-b py-6">
-      <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10'), super_admin_root_url %>
-      <div class="flex flex-col ml-3">
-        <div class="text-sm">Chatwoot</div>
-        <div class="text-sm"><%= Chatwoot.config[:version] %></div>
-        <div class="text-xs text-slate-700 mt-0.5">Super Admin Console</div>
+    <div class="super-admin-sidebar__header mx-4 mb-4 border-slate-100 border-b py-6">
+      <%# EXPANDED header: small logo · brand block · close-button (right). %>
+      <div class="super-admin-sidebar__header-expanded flex items-center gap-2 min-w-0">
+        <%= link_to image_tag('/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'h-10 flex-shrink-0'), super_admin_root_url %>
+        <div class="flex flex-col ml-1 flex-1 min-w-0">
+          <div class="text-sm">Chatwoot</div>
+          <div class="text-sm"><%= Chatwoot.config[:version] %></div>
+          <div class="text-xs text-slate-700 mt-0.5">Super Admin Console</div>
+        </div>
+        <button type="button"
+                class="super-admin-sidebar__toggle-close grid flex-shrink-0 place-content-center w-6 h-6 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Collapse sidebar"
+                title="Recolher barra lateral">
+          <svg width="16" height="16"><use xlink:href="#icon-panel-left-close" /></svg>
+        </button>
+      </div>
+
+      <%# COLLAPSED header: logo as a button on top, expand-button stacked below it. %>
+      <div class="super-admin-sidebar__header-collapsed flex flex-col items-center gap-2">
+        <%= link_to super_admin_root_url, title: 'Chatwoot Super Admin', class: 'grid flex-shrink-0 place-content-center p-1.5 rounded-lg hover:bg-slate-50' do %>
+          <%= image_tag '/brand-assets/logo_thumbnail.svg', alt: 'Chatwoot Admin Dashboard', class: 'w-7 h-7' %>
+        <% end %>
+        <button type="button"
+                class="super-admin-sidebar__toggle-open flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                aria-label="Expand sidebar"
+                title="Expandir barra lateral">
+          <svg width="16" height="16"><use xlink:href="#icon-panel-left-open" /></svg>
+        </button>
       </div>
     </div>
 
@@ -60,3 +84,90 @@ as defined by the routes in the `admin/` namespace
     </ul>
   </div>
 </div>
+
+<style>
+  .super-admin-sidebar { width: 14rem; transition: width 0.18s ease; }
+  .super-admin-sidebar.is-collapsed { width: 3.5rem; }
+  .super-admin-sidebar .super-admin-sidebar__label { display: inline; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__label { display: none; }
+
+  /* Swap header variant. Expanded shows the brand row + close button;
+     collapsed shows the logo-as-button stacked over the expand button. */
+  .super-admin-sidebar .super-admin-sidebar__header-collapsed { display: none; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header-expanded { display: none; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header-collapsed { display: flex; }
+  .super-admin-sidebar.is-collapsed .super-admin-sidebar__header { padding-left: 0; padding-right: 0; margin-left: 0.25rem; margin-right: 0.25rem; }
+
+  /* Administrate's `_buttons.scss` blasts every <button> with the brand
+     blue + white text + bold + padding. Neutralise that for the two
+     toggle buttons so the close/open icons render in the slate look the
+     dashboard sidebar uses. !important is needed because Administrate's
+     selector is `button` (specificity 1), but its declarations land in a
+     stylesheet loaded later than this one. */
+  .super-admin-sidebar__toggle-close,
+  .super-admin-sidebar__toggle-open {
+    background: transparent !important;
+    color: rgb(100 116 139) !important;
+    padding: 0 !important;
+    border-radius: 0.375rem !important;
+    font-weight: normal !important;
+    line-height: 0 !important;
+    box-shadow: none !important;
+    width: 1.5rem; height: 1.5rem;
+  }
+  .super-admin-sidebar__toggle-close:hover,
+  .super-admin-sidebar__toggle-open:hover {
+    background: rgb(241 245 249) !important;
+    color: rgb(15 23 42) !important;
+  }
+  .super-admin-sidebar__toggle-open {
+    width: 2.25rem !important; height: 2.25rem !important;
+    background: white !important;
+    border: 1px solid rgb(226 232 240) !important;
+    border-radius: 0.5rem !important;
+  }
+
+  /* Keep nav-item icons at their original 16×16 in both states — the
+     user explicitly asked that only the labels disappear, not the
+     icons. The size attributes on the <svg> already say 16×16, but pin
+     it here too in case anything else (e.g. a parent flex) would try to
+     shrink them. */
+  .super-admin-sidebar li svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  /* Collapse open <details> submenus when the sidebar is collapsed: the
+     chevron + submenu items would otherwise overflow the narrow rail. */
+  .super-admin-sidebar.is-collapsed details > summary > svg.ml-auto { display: none; }
+  .super-admin-sidebar.is-collapsed details[open] > ul { display: none; }
+  /* Center the nav-item icons when collapsed, since labels are gone. */
+  .super-admin-sidebar.is-collapsed li > a,
+  .super-admin-sidebar.is-collapsed li > details > summary { justify-content: center; }
+</style>
+
+<script>
+  (function () {
+    var STORAGE_KEY = 'superAdminSidebarCollapsed';
+    var sidebar = document.getElementById('super-admin-sidebar');
+    if (!sidebar) return;
+    var closeBtn = sidebar.querySelector('.super-admin-sidebar__toggle-close');
+    var openBtn = sidebar.querySelector('.super-admin-sidebar__toggle-open');
+
+    function applyState(isCollapsed) {
+      sidebar.classList.toggle('is-collapsed', isCollapsed);
+    }
+
+    // Persist between requests so the operator's choice survives a full
+    // page reload — Administrate is a multi-page app, not an SPA.
+    try {
+      applyState(localStorage.getItem(STORAGE_KEY) === '1');
+    } catch (e) { /* private mode etc. */ }
+
+    function toggle() {
+      var next = !sidebar.classList.contains('is-collapsed');
+      applyState(next);
+      try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0'); } catch (e) {}
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', toggle);
+    if (openBtn) openBtn.addEventListener('click', toggle);
+  }());
+</script>
