@@ -143,7 +143,13 @@
   <div class="field-unit field-unit--date-time field-unit--optional">
     <div class="field-unit__label"><%= f.label :expires_at %></div>
     <div class="field-unit__field">
-      <%= f.datetime_local_field :expires_at, value: resource.expires_at&.strftime('%Y-%m-%dT%H:%M') %>
+      <%# `<input type="datetime-local">` carries no timezone. Pre-fill in
+          São Paulo local time so editing shows the same value the
+          operator originally typed; the controller re-interprets the
+          submitted string in the same zone
+          (see SuperAdmin::OperationsNotificationsController#parse_expires_at). %>
+      <%= f.datetime_local_field :expires_at,
+                                 value: resource.expires_at&.in_time_zone(OperationsNotificationDashboard::LOCAL_TZ)&.strftime('%Y-%m-%dT%H:%M') %>
     </div>
   </div>
 

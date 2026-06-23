@@ -132,6 +132,22 @@ RSpec.describe 'Super Admin operations-notifications dashboard', type: :request 
       expect(notification.account_ids).to contain_exactly(account_one.id, account_two.id)
     end
 
+    # Regression: the form sends `expires_at` as a naive ISO string
+    # (`<input type="datetime-local">` has no timezone), and Rails was
+    # parsing it against `Time.zone` (UTC) — so an operator in São Paulo
+    # who typed 23:59 saw the value persisted as 23:59 UTC = 20:59 -03,
+    # three hours earlier than they meant.
+    it 'parses expires_at as America/Sao_Paulo local time, not UTC' do
+      sign_in(super_admin, scope: :super_admin)
+      params = base_params.deep_merge(
+        operations_notification: { expires_at: '2026-06-23T23:59' }
+      )
+      post '/super_admin/operations_notifications', params: params
+      notification = OperationsNotification.last
+      # 23:59 in São Paulo (UTC-03) is 02:59 the next day in UTC.
+      expect(notification.expires_at).to eq(Time.utc(2026, 6, 24, 2, 59))
+    end
+
     it 'persists specific_users audience with multiple audience_user_ids' do
       sign_in(super_admin, scope: :super_admin)
       target_user
