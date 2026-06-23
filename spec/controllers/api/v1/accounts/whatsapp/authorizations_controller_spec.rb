@@ -423,6 +423,49 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
         end
       end
 
+      context 'when converting a non-cloud WhatsApp channel' do
+        let(:baileys_channel) do
+          create(:channel_whatsapp, account: account, provider: 'baileys', phone_number: '+15551234567',
+                                    validate_provider_config: false, sync_templates: false)
+        end
+        let(:baileys_inbox) { baileys_channel.inbox }
+        let(:convert_params) do
+          {
+            code: 'auth_code_xyz',
+            business_id: 'business_xyz',
+            waba_id: 'waba_xyz',
+            phone_number_id: 'phone_xyz',
+            inbox_id: baileys_inbox.id
+          }
+        end
+
+        it 'allows the embedded signup flow to drive the conversion' do
+          embedded_signup_service = instance_double(Whatsapp::EmbeddedSignupService)
+          expect(Whatsapp::EmbeddedSignupService).to receive(:new).with(
+            account: account,
+            params: {
+              code: 'auth_code_xyz',
+              business_id: 'business_xyz',
+              waba_id: 'waba_xyz',
+              phone_number_id: 'phone_xyz'
+            },
+            inbox_id: baileys_inbox.id
+          ).and_return(embedded_signup_service)
+          allow(embedded_signup_service).to receive(:perform).and_return(baileys_channel)
+          allow(baileys_channel).to receive(:inbox).and_return(baileys_inbox)
+
+          post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
+               params: convert_params,
+               headers: administrator.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          json_response = response.parsed_body
+          expect(json_response['success']).to be true
+          expect(json_response['id']).to eq(baileys_inbox.id)
+        end
+      end
+
       context 'when channel is not WhatsApp' do
         let(:facebook_channel) do
           stub_request(:post, 'https://graph.facebook.com/v3.2/me/subscribed_apps')

@@ -50,7 +50,7 @@ const reauthorizeWhatsApp = async params => {
   isRequestingAuthorization.value = true;
 
   try {
-    const response = await whatsappChannel.reauthorizeWhatsApp({
+    const response = await whatsappChannel.postEmbeddedSignupAuthorization({
       inboxId: props.inbox.id,
       ...params,
     });
