@@ -150,40 +150,58 @@ describe Whatsapp::Providers::WhatsappBaileysService do
   end
 
   describe '#disconnect_channel_provider' do
-    context 'when response is successful' do
-      it 'disconnects the whatsapp connection' do
-        stub_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+    let(:disconnect_url) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}" }
+
+    context 'when the Baileys API responds successfully' do
+      it 'returns true' do
+        stub_request(:delete, disconnect_url)
           .with(headers: stub_headers(whatsapp_channel))
           .to_return(status: 200)
 
-        response = service.disconnect_channel_provider
-
-        expect(response).to be(true)
+        expect(service.disconnect_channel_provider).to be(true)
       end
     end
 
-    context 'when response is unsuccessful' do
-      it 'raises ProviderUnavailableError and logs the error' do
-        # Stub the failing request
-        stub_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+    # disconnect is best-effort: a missing session (404), a Baileys API error
+    # (5xx), or a transport failure shouldn't propagate. The caller (e.g.
+    # convert_provider!) just needs the cleanup attempt to be made, not to
+    # succeed.
+    context 'when the Baileys API responds with an error status' do
+      [404, 500].each do |status|
+        it "returns true, logs a warning, and does not raise for HTTP #{status}" do
+          stub_request(:delete, disconnect_url)
+            .with(headers: stub_headers(whatsapp_channel))
+            .to_return(status: status, body: 'baileys error')
+
+          allow(Rails.logger).to receive(:warn)
+
+          expect(service.disconnect_channel_provider).to be(true)
+          expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=#{status}/)
+        end
+      end
+    end
+
+    context 'when the request itself fails' do
+      it 'returns true, logs a warning, and does not raise' do
+        stub_request(:delete, disconnect_url)
           .with(headers: stub_headers(whatsapp_channel))
-          .to_return(
-            status: 400,
-            body: 'error message',
-            headers: {}
-          )
+          .to_raise(Net::OpenTimeout)
 
-        # Stub the reconnection attempt
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
-          .to_return(status: 200)
+        allow(Rails.logger).to receive(:warn)
 
-        allow(Rails.logger).to receive(:error)
+        expect(service.disconnect_channel_provider).to be(true)
+        expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider failed/)
+      end
 
-        expect do
-          service.disconnect_channel_provider
-        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+      it 'does not trigger the error recovery flow' do
+        stub_request(:delete, disconnect_url)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_raise(Net::OpenTimeout)
+        reconnect_request = stub_request(:post, disconnect_url)
 
-        expect(Rails.logger).to have_received(:error).with('error message')
+        service.disconnect_channel_provider
+
+        expect(reconnect_request).not_to have_been_requested
       end
     end
   end
