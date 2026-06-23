@@ -76,6 +76,21 @@ class SuperAdmin::OperationsNotificationsController < SuperAdmin::ApplicationCon
     ).tap do |permitted|
       permitted[:account_ids] = Array(permitted[:account_ids]).reject(&:blank?).map(&:to_i)
       permitted[:audience_user_ids] = Array(permitted[:audience_user_ids]).reject(&:blank?).map(&:to_i)
+      permitted[:expires_at] = parse_expires_at(permitted[:expires_at])
     end
+  end
+
+  # The form uses `<input type="datetime-local">`, which submits a naive
+  # ISO string like `"2026-06-23T23:59"` with no timezone. Rails would
+  # parse it against `Time.zone` (UTC by default in Chatwoot), so an
+  # operator in São Paulo typing `23:59` ends up persisted as
+  # `23:59 UTC` (= 20:59 -03) — three hours earlier than intended.
+  # Re-interpret the string explicitly in `America/Sao_Paulo`, which is
+  # the same zone the super-admin index/show already render in.
+  def parse_expires_at(raw)
+    return nil if raw.blank?
+    return raw unless raw.is_a?(String)
+
+    ActiveSupport::TimeZone[OperationsNotificationDashboard::LOCAL_TZ].parse(raw)
   end
 end
