@@ -54,7 +54,7 @@ class Whatsapp::EmbeddedSignupService
           account: @account,
           inbox_id: @inbox_id,
           phone_number_id: @phone_number_id,
-          business_id: @business_id
+          waba_id: @waba_id
         ).perform(access_token, phone_info)
       else
         convert_channel_to_cloud(channel, access_token)
@@ -71,7 +71,7 @@ class Whatsapp::EmbeddedSignupService
       new_provider_config: {
         'api_key' => access_token,
         'phone_number_id' => @phone_number_id,
-        'business_account_id' => @business_id,
+        'business_account_id' => @waba_id,
         'source' => 'embedded_signup'
       }
     )
