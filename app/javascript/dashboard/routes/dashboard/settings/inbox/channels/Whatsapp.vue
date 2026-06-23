@@ -39,10 +39,14 @@ const PROVIDER_TYPES = {
   ZAPI: 'zapi',
 };
 
-const hasWhatsappAppId = computed(() => {
+const hasEmbeddedSignupConfig = computed(() => {
+  const { whatsappAppId, whatsappConfigurationId } =
+    window.chatwootConfig ?? {};
   return (
-    window.chatwootConfig?.whatsappAppId &&
-    window.chatwootConfig.whatsappAppId !== 'none'
+    whatsappAppId &&
+    whatsappAppId !== 'none' &&
+    whatsappConfigurationId &&
+    whatsappConfigurationId !== 'none'
   );
 });
 
@@ -153,8 +157,7 @@ const selectProvider = providerValue => {
 const shouldShowCloudWhatsapp = provider => {
   return (
     provider === PROVIDER_TYPES.WHATSAPP_MANUAL ||
-    (provider === PROVIDER_TYPES.WHATSAPP &&
-      (!hasWhatsappAppId.value || isConvertMode.value))
+    (provider === PROVIDER_TYPES.WHATSAPP && !hasEmbeddedSignupConfig.value)
   );
 };
 
@@ -203,12 +206,11 @@ const handleManualLinkClick = () => {
         <!-- Show embedded signup if app ID is configured -->
         <div
           v-if="
-            !isConvertMode &&
-            hasWhatsappAppId &&
+            hasEmbeddedSignupConfig &&
             selectedProvider === PROVIDER_TYPES.WHATSAPP
           "
         >
-          <WhatsappEmbeddedSignup />
+          <WhatsappEmbeddedSignup :mode="mode" :inbox="inbox" />
 
           <!-- Manual setup fallback option -->
           <div class="pt-6 mt-6 border-t border-n-weak">

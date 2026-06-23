@@ -16,6 +16,20 @@ import {
   isValidBusinessData,
 } from './whatsapp/utils';
 
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: value => ['create', 'convert'].includes(value),
+  },
+  inbox: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isConvertMode = computed(() => props.mode === 'convert');
+
 const store = useStore();
 const router = useRouter();
 const { t } = useI18n();
@@ -69,6 +83,15 @@ const handleSignupSuccess = inboxData => {
   isProcessing.value = false;
   isAuthenticating.value = false;
 
+  if (isConvertMode.value) {
+    useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
+    router.replace({
+      name: 'settings_inbox_show',
+      params: { inboxId: props.inbox.id },
+    });
+    return;
+  }
+
   if (inboxData && inboxData.id) {
     useAlert(t('INBOX_MGMT.FINISH.MESSAGE'));
     router.replace({
@@ -88,6 +111,13 @@ const handleSignupSuccess = inboxData => {
 
 // Signup flow
 const completeSignupFlow = async businessDataParam => {
+  if (isConvertMode.value && !props.inbox?.id) {
+    handleSignupError({
+      error: t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'),
+    });
+    return;
+  }
+
   if (!authCodeReceived.value || !authCode.value) {
     handleSignupError({
       error: t('INBOX_MGMT.ADD.WHATSAPP.EMBEDDED_SIGNUP.AUTH_NOT_COMPLETED'),
@@ -108,10 +138,14 @@ const completeSignupFlow = async businessDataParam => {
       phone_number_id: businessDataParam?.phone_number_id || '',
     };
 
-    const responseData = await store.dispatch(
-      'inboxes/createWhatsAppEmbeddedSignup',
-      params
-    );
+    const action = isConvertMode.value
+      ? 'inboxes/convertWhatsAppEmbeddedSignup'
+      : 'inboxes/createWhatsAppEmbeddedSignup';
+    const dispatchParams = isConvertMode.value
+      ? { ...params, inboxId: props.inbox.id }
+      : params;
+
+    const responseData = await store.dispatch(action, dispatchParams);
 
     authCode.value = null;
     handleSignupSuccess(responseData);

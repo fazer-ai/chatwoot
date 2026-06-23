@@ -276,6 +276,19 @@ export const actions = {
       throw error;
     }
   },
+  convertWhatsAppEmbeddedSignup: async ({ commit, dispatch }, params) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: true });
+    try {
+      const response =
+        await WhatsappChannel.postEmbeddedSignupAuthorization(params);
+      await dispatch('get');
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return response.data;
+    } catch (error) {
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      throw error;
+    }
+  },
   ...channelActions,
   // TODO: Extract other create channel methods to separate files to reduce file size
   // - createChannel
