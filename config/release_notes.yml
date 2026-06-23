@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.33
+  published_at: '2026-06-23T13:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Instagram direct messages stop disappearing.** When several patient messages arrived for the same Instagram contact at the same time, some used to be silently dropped — the inbox felt offline until the next message came through. Messages now reach AurisChat reliably even at busy moments.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Mensagens do Direct do Instagram deixam de sumir.** Quando várias mensagens de pacientes chegavam ao mesmo tempo pro mesmo contato no Instagram, algumas eram descartadas em silêncio — a caixa parecia fora do ar até a próxima entrar. As mensagens agora chegam normalmente no AurisChat mesmo nos momentos de muito movimento.
 - tag: v4.13.0-auris.1.32.1
   published_at: '2026-06-22T23:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32.1
@@ -203,15 +215,3 @@
       ### 🐛 Correções
 
       - **Respostas que ficavam falhando pra alguns pacientes voltaram a funcionar.** Algumas conversas ficavam travadas com "Falha ao enviar" toda vez que você tentava responder, mesmo o paciente conseguindo escrever pra clínica. O AurisChat agora corrige os dados do paciente automaticamente assim que ele mandar a próxima mensagem, e você consegue continuar a conversa normalmente.
-- tag: v4.13.0-auris.1.27.1
-  published_at: '2026-06-16T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.27.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Connecting an Instagram inbox works again.** The "Failed to exchange token" error that appeared when adding a new Instagram inbox is fixed.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Conexão de inbox do Instagram voltou a funcionar.** O erro "Failed to exchange token" que aparecia ao adicionar uma inbox nova de Instagram foi corrigido.
