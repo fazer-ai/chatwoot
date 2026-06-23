@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.33.1
+  published_at: '2026-06-23T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33.1
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.33
   published_at: '2026-06-23T13:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33
@@ -203,15 +211,3 @@
 
       - **Melhorias no processamento das mensagens.** Pequenos ajustes nos bastidores deixaram o envio das mensagens mais ágil, principalmente logo no início do dia.
       - **Ajustes em relatórios internos.** Indicadores de monitoramento interno foram refinados para refletir melhor o que está acontecendo no AurisChat em tempo real.
-- tag: v4.13.0-auris.1.28
-  published_at: '2026-06-17T03:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.28
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Replies that kept failing for certain patients now work.** Some patient conversations were stuck with "Failed to send" on every attempt, even though the patient could still write to the clinic. AurisChat now fixes the patient's data automatically the moment they send the next message, so you can keep the conversation going normally.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Respostas que ficavam falhando pra alguns pacientes voltaram a funcionar.** Algumas conversas ficavam travadas com "Falha ao enviar" toda vez que você tentava responder, mesmo o paciente conseguindo escrever pra clínica. O AurisChat agora corrige os dados do paciente automaticamente assim que ele mandar a próxima mensagem, e você consegue continuar a conversa normalmente.
