@@ -28,6 +28,8 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(['leaving']);
+
 const isConvertMode = computed(() => props.mode === 'convert');
 
 const store = useStore();
@@ -82,6 +84,12 @@ const handleSignupCancellation = () => {
 const handleSignupSuccess = inboxData => {
   isProcessing.value = false;
   isAuthenticating.value = false;
+  // Tell the parent we are about to navigate away. The router.replace below
+  // is reactive against the route — without an explicit signal, the parent
+  // Whatsapp.vue would re-render against the new route's query params while
+  // still mounted, briefly flashing the provider picker between the toast
+  // and the unmount.
+  emit('leaving');
 
   if (isConvertMode.value) {
     useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n, I18nT } from 'vue-i18n';
 import Twilio from './Twilio.vue';
@@ -27,6 +27,16 @@ const isConvertMode = computed(() => props.mode === 'convert');
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+
+// Latched by the child once it triggers the post-success router.replace.
+// Suppresses rendering during the navigation tail so the parent doesn't
+// briefly re-render against the new route's query params (which would clear
+// `route.query.provider` and flash the provider picker between the success
+// toast and the unmount).
+const isLeaving = ref(false);
+const handleEmbeddedSignupLeaving = () => {
+  isLeaving.value = true;
+};
 
 const PROVIDER_TYPES = {
   WHATSAPP: 'whatsapp',
@@ -143,8 +153,12 @@ const isValidSelectedProvider = computed(() => {
   );
 });
 
-const showProviderSelection = computed(() => !isValidSelectedProvider.value);
-const showConfiguration = computed(() => isValidSelectedProvider.value);
+const showProviderSelection = computed(
+  () => !isLeaving.value && !isValidSelectedProvider.value
+);
+const showConfiguration = computed(
+  () => !isLeaving.value && isValidSelectedProvider.value
+);
 
 const selectProvider = providerValue => {
   router.push({
@@ -210,7 +224,11 @@ const handleManualLinkClick = () => {
             selectedProvider === PROVIDER_TYPES.WHATSAPP
           "
         >
-          <WhatsappEmbeddedSignup :mode="mode" :inbox="inbox" />
+          <WhatsappEmbeddedSignup
+            :mode="mode"
+            :inbox="inbox"
+            @leaving="handleEmbeddedSignupLeaving"
+          />
 
           <!-- Manual setup fallback option -->
           <div class="pt-6 mt-6 border-t border-n-weak">
