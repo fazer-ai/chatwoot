@@ -157,7 +157,7 @@
     "SCROLL_TO_BOTTOM": "Ir para o final",
     "NEW_MESSAGES": "Novas mensagens",
     "LOADING_MESSAGES": "Carregando mensagens...",
-    "MENTION_BADGE": "@",
+    "MENTION_BADGE": "{'@'}",
     "EMPTY_STATE": {
       "TITLE": "Bem-vindo ao Chat Interno",
       "SUBTITLE": "Escolha um canal ou conversa na barra lateral para começar."
