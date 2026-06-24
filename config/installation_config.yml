@@ -425,6 +425,11 @@
   description: 'Configure this if you want to use a different Instagram API version. Make sure its prefixed with `v`'
   value: 'v22.0'
   locked: true
+- name: INSTAGRAM_AUTHORIZATION_ERROR_THRESHOLD
+  display_title: 'Instagram authorization error threshold'
+  description: 'How many consecutive Meta auth errors (code 190) before showing the red "click to reconnect" banner. Higher = more tolerant of transient Meta API flakes. Default 10. Counter has a 1h TTL so isolated errors do not accumulate.'
+  value: '10'
+  locked: false
 # ------- End of Instagram Channel Related Config ------- #
 
 # ------- TikTok Channel Related Config ------- #

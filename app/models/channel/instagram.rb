@@ -22,7 +22,24 @@ class Channel::Instagram < ApplicationRecord
   # TODO: Remove guard once encryption keys become mandatory (target 3-4 releases out).
   encrypts :access_token if Chatwoot.encryption_configured?
 
-  AUTHORIZATION_ERROR_THRESHOLD = 1
+  # Fallback default. The runtime value used by `authorization_error!`
+  # is the configurable `.authorization_error_threshold` below — a
+  # super-admin can tune sensitivity per installation without redeploy
+  # via the `INSTAGRAM_AUTHORIZATION_ERROR_THRESHOLD` `InstallationConfig`.
+  #
+  # Was `1` historically: a single Meta auth error (code 190) flipped
+  # the inbox into "needs reauth", which on a busy inbox (700 msg/day
+  # in production) is hit by any transient Meta API hiccup. Bumped to
+  # `10` so isolated/sparse 190s don't force a manual reconnect.
+  AUTHORIZATION_ERROR_THRESHOLD = 10
+
+  # The error counter in Redis used to live forever — sparse transient
+  # 190s would slowly accumulate until they crossed the threshold, then
+  # the reauth banner would fire on a token that was actually still
+  # valid. A 1h TTL ages out the counter so only a burst of errors
+  # actually concentrated in time (a genuinely dead token) trips the
+  # banner.
+  ERROR_COUNT_TTL = 1.hour
 
   # Single source of truth for the Graph API version every Instagram call
   # in the app pins. Aligned with what the Meta App is configured for in
@@ -35,6 +52,22 @@ class Channel::Instagram < ApplicationRecord
 
   def self.api_version
     GlobalConfigService.load('INSTAGRAM_API_VERSION', GRAPH_API_VERSION)
+  end
+
+  # Runtime-configurable variant of `AUTHORIZATION_ERROR_THRESHOLD`.
+  # Super-admin exposes this on `/super_admin/app_config?config=instagram`.
+  def self.authorization_error_threshold
+    GlobalConfigService.load('INSTAGRAM_AUTHORIZATION_ERROR_THRESHOLD', AUTHORIZATION_ERROR_THRESHOLD).to_i
+  end
+
+  # Overrides `Reauthorizable#authorization_error!` so we can (a) consult
+  # the configurable threshold above instead of the class constant, and
+  # (b) put a TTL on the Redis counter so transient errors don't
+  # accumulate forever and force a manual reconnect.
+  def authorization_error!
+    ::Redis::Alfred.incr(authorization_error_count_key)
+    ::Redis::Alfred.expire(authorization_error_count_key, ERROR_COUNT_TTL.to_i)
+    prompt_reauthorization! if authorization_error_count >= self.class.authorization_error_threshold
   end
 
   validates :access_token, presence: true
