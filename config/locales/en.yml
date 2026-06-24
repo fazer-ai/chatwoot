@@ -282,6 +282,7 @@ en:
       deleted: This message was deleted
       whatsapp:
         list_button_label: 'Choose an item'
+        unsupported_message: 'This message is unavailable.'
       delivery_status:
         error_code: 'Error code: %{error_code}'
     activity:
