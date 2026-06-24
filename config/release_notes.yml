@@ -1,4 +1,20 @@
 ---
+- tag: v4.13.0-auris.1.34
+  published_at: '2026-06-24T00:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.34
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **The IA → Human report is now more reliable.** Every IA assignment is recorded the moment it happens, so the report no longer goes blank in busy periods. It also flags cases where the IA picked an agent that was already offline — making real issues easier to spot.
+
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **O relatório IA → Humano ficou mais confiável.** Cada atribuição feita pela IA é registrada na hora, então o relatório não fica mais com falhas em momentos de muito movimento. Também passa a sinalizar quando a IA atribuiu uma conversa para um agente que já estava offline — facilita identificar problemas reais.
+
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.33.1
   published_at: '2026-06-23T14:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33.1
@@ -197,17 +213,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.29
-  published_at: '2026-06-17T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Improvements in message processing.** Behind-the-scenes adjustments made message delivery more responsive, especially early in the day.
-      - **Internal reports adjustments.** Internal monitoring indicators got refined to better reflect what's happening in AurisChat in real time.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Melhorias no processamento das mensagens.** Pequenos ajustes nos bastidores deixaram o envio das mensagens mais ágil, principalmente logo no início do dia.
-      - **Ajustes em relatórios internos.** Indicadores de monitoramento interno foram refinados para refletir melhor o que está acontecendo no AurisChat em tempo real.
