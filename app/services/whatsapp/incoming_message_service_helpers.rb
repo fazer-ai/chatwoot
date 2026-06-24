@@ -44,8 +44,14 @@ module Whatsapp::IncomingMessageServiceHelpers
     :file
   end
 
+  # `unsupported` is intentionally NOT in this list — coexistence
+  # webhooks for `type: unsupported` (Meta error code 131060) need to
+  # flow through so we can persist a placeholder message (see
+  # `incoming_message_base_service.rb#unsupported_message?`). Upstream
+  # PR #14547 removed it on their side; Tech-Auris keeps `reaction` out
+  # too because we handle reaction removal separately below.
   def unprocessable_message_type?(message_type)
-    %w[ephemeral unsupported request_welcome].include?(message_type)
+    %w[ephemeral request_welcome].include?(message_type)
   end
 
   def reaction_removal?
