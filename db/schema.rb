@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_23_200001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -171,6 +171,21 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_agent_capacity_policies_on_account_id"
+  end
+
+  create_table "ai_assignment_attempts", force: :cascade do |t|
+    t.bigint "conversation_id", null: false
+    t.bigint "account_id", null: false
+    t.bigint "team_id", null: false
+    t.bigint "agent_assigned_id"
+    t.bigint "triggered_by_id", null: false
+    t.bigint "online_user_ids", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.index ["account_id", "created_at"], name: "index_ai_assignment_attempts_on_account_id_and_created_at"
+    t.index ["agent_assigned_id"], name: "index_ai_assignment_attempts_on_agent_assigned_id"
+    t.index ["conversation_id"], name: "index_ai_assignment_attempts_on_conversation_id"
+    t.index ["online_user_ids"], name: "index_ai_assignment_attempts_on_online_user_ids", using: :gin
+    t.index ["team_id"], name: "index_ai_assignment_attempts_on_team_id"
   end
 
   create_table "applied_slas", force: :cascade do |t|
@@ -1369,16 +1384,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
     t.index ["user_id"], name: "index_notifications_on_user_id"
   end
 
-  create_table "online_snapshots", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.bigint "user_id", null: false
-    t.datetime "snapshot_at", null: false
-    t.index ["account_id", "snapshot_at"], name: "index_online_snapshots_on_account_id_and_snapshot_at"
-    t.index ["account_id"], name: "index_online_snapshots_on_account_id"
-    t.index ["user_id", "snapshot_at"], name: "index_online_snapshots_on_user_id_and_snapshot_at"
-    t.index ["user_id"], name: "index_online_snapshots_on_user_id"
-  end
-
   create_table "operations_notification_acks", force: :cascade do |t|
     t.bigint "operations_notification_id", null: false
     t.bigint "user_id", null: false
@@ -1710,6 +1715,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
   add_foreign_key "account_health_scores", "accounts", on_delete: :cascade
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "ai_assignment_attempts", "conversations", on_delete: :cascade
   add_foreign_key "contacts", "languages"
   add_foreign_key "conversations", "funnel_stages", on_delete: :nullify
   add_foreign_key "funnel_stage_changes", "accounts", on_delete: :cascade
@@ -1737,8 +1743,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_21_180000) do
   add_foreign_key "internal_chat_polls", "internal_chat_messages"
   add_foreign_key "internal_chat_reactions", "internal_chat_messages"
   add_foreign_key "internal_chat_reactions", "users", on_delete: :cascade
-  add_foreign_key "online_snapshots", "accounts", on_delete: :cascade
-  add_foreign_key "online_snapshots", "users", on_delete: :cascade
   add_foreign_key "operations_notification_acks", "accounts"
   add_foreign_key "operations_notification_acks", "operations_notifications", on_delete: :cascade
   add_foreign_key "operations_notification_acks", "users"

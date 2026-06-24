@@ -712,7 +712,7 @@
     "KPI": {
       "TOTAL": "Total",
       "VIA_TEAM": "✅ via time",
-      "DIRECT": "🟦 direta",
+      "VIA_TEAM_OFFLINE": "🟧 via time (agente offline)",
       "FAILED": "⚠️ sem atribuir",
       "FAILED_NO_ONLINE": "🔴 ninguém ativo"
     },

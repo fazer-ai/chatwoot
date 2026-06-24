@@ -85,11 +85,3 @@ remove_orphan_conversations_job:
   cron: '0 7 * * *'
   class: 'Internal::RemoveOrphanConversationsJob'
   queue: housekeeping
-
-# every minute — snapshots which agents are 'online' per account.
-# feeds the "Distribuição da IA" super admin report so it can answer
-# "who was online when the IA tried to auto-assign this conversation?".
-agents_capture_online_snapshot_job:
-  cron: '* * * * *'
-  class: 'Agents::CaptureOnlineSnapshotJob'
-  queue: scheduled_jobs
