@@ -23,7 +23,7 @@ const rows = ref([]);
 const totals = ref({
   total: 0,
   assigned_via_team: 0,
-  direct: 0,
+  assigned_via_team_offline: 0,
   failed_with_online: 0,
   failed_no_online: 0,
 });
@@ -77,8 +77,8 @@ const statusPillClass = tag => {
   switch (tag) {
     case 'assigned_via_team':
       return 'bg-n-teal-3 text-n-teal-12';
-    case 'direct':
-      return 'bg-n-sky-3 text-n-sky-12';
+    case 'assigned_via_team_offline':
+      return 'bg-n-amber-3 text-n-amber-12';
     case 'failed_with_online':
       return 'bg-n-amber-3 text-n-amber-12';
     case 'failed_no_online':
@@ -92,8 +92,8 @@ const statusIcon = tag => {
   switch (tag) {
     case 'assigned_via_team':
       return '✅';
-    case 'direct':
-      return '🟦';
+    case 'assigned_via_team_offline':
+      return '🟧';
     case 'failed_with_online':
       return '⚠️';
     case 'failed_no_online':
@@ -192,12 +192,12 @@ const closeOnlineModal = () => {
       class="bg-n-solid-2 outline outline-1 outline-n-container rounded-xl shadow px-4 py-3"
     >
       <div class="text-xs text-n-slate-11">
-        {{ $t('IA_HUMAN_DISTRIBUTION_REPORT.KPI.DIRECT') }}
+        {{ $t('IA_HUMAN_DISTRIBUTION_REPORT.KPI.VIA_TEAM_OFFLINE') }}
       </div>
-      <div class="text-2xl font-medium text-n-sky-11 mt-1">
-        {{ totals.direct }}
+      <div class="text-2xl font-medium text-n-amber-11 mt-1">
+        {{ totals.assigned_via_team_offline }}
         <span class="text-xs text-n-slate-11 ml-1">{{
-          pct(totals.direct)
+          pct(totals.assigned_via_team_offline)
         }}</span>
       </div>
     </div>

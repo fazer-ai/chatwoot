@@ -5,6 +5,11 @@ class SyncDispatcher < BaseDispatcher
   end
 
   def listeners
-    [ActionCableListener.instance, AgentBotListener.instance]
+    [
+      ActionCableListener.instance,
+      AgentBotListener.instance,
+      # Sync (not async): we need `Current.user` to identify the IA.
+      AiAssignmentListener.instance
+    ]
   end
 end
