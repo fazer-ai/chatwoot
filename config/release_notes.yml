@@ -1,4 +1,16 @@
 ---
+- tag: v4.13.0-auris.1.35.1
+  published_at: '2026-06-25T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.35.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Instagram inboxes stay connected longer.** Some Instagram connections were dropping after a few hours and asking you to click "reconnect" even when nothing was wrong on Instagram's side. This no longer happens.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Caixas Instagram permanecem conectadas por mais tempo.** Algumas conexões do Instagram caíam após poucas horas e pediam pra você clicar em "reconectar" mesmo sem nada errado do lado do Instagram. Isso não acontece mais.
 - tag: v4.13.0-auris.1.35
   published_at: '2026-06-24T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.35
@@ -211,11 +223,3 @@
 
       - **Mensagens automáticas com template do WhatsApp aparecem com o texto completo na conversa.** Mensagens que integrações mandam usando um template aprovado agora aparecem no painel com o texto certo, em vez de uma bolha vazia.
       - **Quando um template está desatualizado, a conversa avisa qual é.** Se uma mensagem não sai porque o template dela não está mais sincronizado, o marcador vermelho de erro na bolha agora mostra o nome do template, facilitando saber o que precisa ser reconectado.
-- tag: v4.13.0-auris.1.29.2
-  published_at: '2026-06-17T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.29.2
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
