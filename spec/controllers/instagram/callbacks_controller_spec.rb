@@ -6,7 +6,7 @@ RSpec.describe Instagram::CallbacksController do
   let(:error_params) { { error: 'access_denied', error_description: 'User denied access', state: "#{account.id}|valid_token" } }
   let(:oauth_client) { instance_double(OAuth2::Client) }
   let(:auth_code_object) { instance_double(OAuth2::Strategy::AuthCode) }
-  let(:access_token) { instance_double(OAuth2::AccessToken, token: 'test_token') }
+  let(:access_token) { instance_double(OAuth2::AccessToken, token: 'test_token', expires_in: 3600, params: {}) }
   let(:long_lived_token_response) { { 'access_token' => 'long_lived_test_token', 'expires_in' => 5_184_000 } }
   let(:user_details) { { 'username' => 'test_user', 'user_id' => '12345' } }
   let(:exception_tracker) { instance_double(ChatwootExceptionTracker) }

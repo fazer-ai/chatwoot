@@ -35,30 +35,30 @@ module InstagramConcern
     }
 
     # Diagnostic logging — captures the shape of the short-lived token
-    # so we can tell when Meta's "method type: X" rejection is actually
-    # a malformed-token issue dressed up as a method rejection. NEVER
+    # so we can tell when Meta's method-swing rejection is actually a
+    # malformed-token issue dressed up as a method rejection. NEVER
     # logs the token value, just its length and first 4 chars.
-    Rails.logger.info(
+    Rails.logger.warn(
       "[instagram] long-lived exchange: token_present=#{short_lived_token.present?} " \
       "token_length=#{short_lived_token.to_s.length} " \
       "token_prefix=#{short_lived_token.to_s[0, 4]}"
     )
 
     # Meta keeps flipping the accepted HTTP method on this endpoint.
-    # Symptom: `IGApiException code 100: "Unsupported request - method
-    # type: <get|post>"`. Try one method, and if Meta rejects with that
-    # specific error, automatically retry with the other. Avoids having
-    # to redeploy every time Meta swings.
+    # As of v24.0 the production answer is GET; POST returns code 100 /
+    # subcode 33 with body "Unsupported post request. Object with ID
+    # 'access_token' does not exist...". So try GET first; fall back to
+    # POST if Meta swings again.
     attempt_token_exchange_with_fallback(endpoint, params)
   end
 
   def attempt_token_exchange_with_fallback(endpoint, params)
-    make_api_request(endpoint, params, 'Failed to exchange token', method: :post)
-  rescue RuntimeError => e
-    raise unless /method type:\s*post/i.match?(e.message)
-
-    Rails.logger.warn('[instagram] POST rejected by Meta, retrying with GET')
     make_api_request(endpoint, params, 'Failed to exchange token', method: :get)
+  rescue RuntimeError => e
+    raise unless meta_method_swing?(e.message, 'get')
+
+    Rails.logger.warn('[instagram] /access_token GET rejected by Meta, retrying with POST')
+    make_api_request(endpoint, params, 'Failed to exchange token', method: :post)
   end
 
   def fetch_instagram_user_details(access_token)
@@ -93,10 +93,30 @@ module InstagramConcern
   def attempt_user_details_with_fallback(endpoint, params)
     make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :get)
   rescue RuntimeError => e
-    raise unless /method type:\s*get/i.match?(e.message)
+    raise unless meta_method_swing?(e.message, 'get')
 
     Rails.logger.warn('[instagram] /me GET rejected by Meta, retrying with POST')
     make_api_request(endpoint, params, 'Failed to fetch Instagram user details', method: :post)
+  end
+
+  # Recognizes the two flavors of "this HTTP method is not the one we
+  # accept here" that Meta has used so far on Instagram Graph endpoints:
+  #
+  #   - "Unsupported request - method type: post"
+  #       (older format — what the regex used to match)
+  #
+  #   - "Unsupported post request. Object with ID 'access_token' does not
+  #      exist, cannot be loaded due to missing permissions, or does not
+  #      support this operation"
+  #       (current format on /access_token; same idea, different wording)
+  #
+  # When Meta swings the wording again, add the new variant here — the
+  # alternative is silent OAuth failure across every new inbox.
+  def meta_method_swing?(message, method)
+    return false if message.blank?
+
+    message.match?(/method type:\s*#{method}/i) ||
+      message.match?(/unsupported #{method} request/i)
   end
 
   def make_api_request(endpoint, params, error_prefix, method: :get)

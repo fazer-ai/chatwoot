@@ -41,16 +41,16 @@ RSpec.describe InstagramConcern do
       allow(mock_response).to receive(:inspect).and_return(response_body)
     end
 
-    # Default: try POST first. Meta has been flipping the accepted method
-    # on this endpoint daily, so the code falls back to GET if Meta tells
-    # us POST is unsupported (see fallback context below).
-    it 'exchanges short lived token for long lived token via POST' do
+    # Default: try GET first. Meta currently accepts GET on /access_token
+    # (POST returns the "Unsupported post request" error). The code falls
+    # back to POST if Meta swings again — see fallback contexts below.
+    it 'exchanges short lived token for long lived token via GET' do
       result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
 
-      expect(HTTParty).to have_received(:post).with(
+      expect(HTTParty).to have_received(:get).with(
         'https://graph.instagram.com/access_token',
         {
-          body: {
+          query: {
             grant_type: 'ig_exchange_token',
             client_secret: client_secret,
             access_token: short_lived_token,
@@ -59,30 +59,30 @@ RSpec.describe InstagramConcern do
           headers: { 'Accept' => 'application/json' }
         }
       )
-      expect(HTTParty).not_to have_received(:get)
+      expect(HTTParty).not_to have_received(:post)
       expect(result).to eq({ 'access_token' => long_lived_token, 'expires_in' => 5_184_000 })
     end
 
-    context 'when Meta rejects POST with the "method type: post" error' do
-      let(:post_error_body) do
-        { 'error' => { 'message' => 'Unsupported request - method type: post', 'type' => 'IGApiException', 'code' => 100 } }.to_json
+    context 'when Meta rejects GET with the legacy "method type: get" error' do
+      let(:get_error_body) do
+        { 'error' => { 'message' => 'Unsupported request - method type: get', 'type' => 'IGApiException', 'code' => 100 } }.to_json
       end
-      let(:post_response) { instance_double(HTTParty::Response, body: post_error_body, success?: false, code: 400) }
-      let(:get_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
+      let(:get_response) { instance_double(HTTParty::Response, body: get_error_body, success?: false, code: 400) }
+      let(:post_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
 
       before do
-        allow(HTTParty).to receive(:post).and_return(post_response)
         allow(HTTParty).to receive(:get).and_return(get_response)
+        allow(HTTParty).to receive(:post).and_return(post_response)
       end
 
-      it 'transparently retries with GET' do
+      it 'transparently retries with POST' do
         result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
 
-        expect(HTTParty).to have_received(:post).once
-        expect(HTTParty).to have_received(:get).with(
+        expect(HTTParty).to have_received(:get).once
+        expect(HTTParty).to have_received(:post).with(
           'https://graph.instagram.com/access_token',
           {
-            query: {
+            body: {
               grant_type: 'ig_exchange_token',
               client_secret: client_secret,
               access_token: short_lived_token,
@@ -95,14 +95,46 @@ RSpec.describe InstagramConcern do
       end
     end
 
-    context 'when POST fails with an unrelated error' do
+    # Same intent, but exercising the wording Meta uses today on
+    # /access_token. The old regex only knew the "method type:" variant
+    # and silently let OAuth break.
+    context 'when Meta rejects GET with the current "Unsupported get request" error' do
+      let(:get_error_body) do
+        {
+          'error' => {
+            'message' => "Unsupported get request. Object with ID 'access_token' does not exist, " \
+                         'cannot be loaded due to missing permissions, or does not support this operation',
+            'type' => 'IGApiException',
+            'code' => 100,
+            'error_subcode' => 33
+          }
+        }.to_json
+      end
+      let(:get_response) { instance_double(HTTParty::Response, body: get_error_body, success?: false, code: 400) }
+      let(:post_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
+
+      before do
+        allow(HTTParty).to receive(:get).and_return(get_response)
+        allow(HTTParty).to receive(:post).and_return(post_response)
+      end
+
+      it 'transparently retries with POST' do
+        result = dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
+
+        expect(HTTParty).to have_received(:get).once
+        expect(HTTParty).to have_received(:post).once
+        expect(result).to eq({ 'access_token' => long_lived_token, 'expires_in' => 5_184_000 })
+      end
+    end
+
+    context 'when GET fails with an unrelated error' do
       let(:mock_response) { instance_double(HTTParty::Response, body: 'Bad gateway', success?: false, code: 502) }
 
-      it 'raises without falling back to GET' do
+      it 'raises without falling back to POST' do
         expect do
           dummy_instance.send(:exchange_for_long_lived_token, short_lived_token)
         end.to raise_error(RuntimeError, 'Failed to exchange token: Bad gateway')
-        expect(HTTParty).not_to have_received(:get)
+        expect(HTTParty).not_to have_received(:post)
       end
     end
 
@@ -154,7 +186,7 @@ RSpec.describe InstagramConcern do
       expect(result).to eq(user_details)
     end
 
-    context 'when Meta rejects GET with the "method type: get" error' do
+    context 'when Meta rejects GET with the legacy "method type: get" error' do
       let(:get_error_body) do
         { 'error' => { 'message' => 'Unsupported request - method type: get', 'type' => 'IGApiException', 'code' => 100 } }.to_json
       end
@@ -180,6 +212,35 @@ RSpec.describe InstagramConcern do
             headers: { 'Accept' => 'application/json' }
           }
         )
+        expect(result).to eq(user_details)
+      end
+    end
+
+    context 'when Meta rejects GET with the current "Unsupported get request" error' do
+      let(:get_error_body) do
+        {
+          'error' => {
+            'message' => "Unsupported get request. Object with ID 'me' does not exist, " \
+                         'cannot be loaded due to missing permissions, or does not support this operation',
+            'type' => 'IGApiException',
+            'code' => 100,
+            'error_subcode' => 33
+          }
+        }.to_json
+      end
+      let(:get_response) { instance_double(HTTParty::Response, body: get_error_body, success?: false, code: 400) }
+      let(:post_response) { instance_double(HTTParty::Response, body: response_body, success?: true) }
+
+      before do
+        allow(HTTParty).to receive(:get).and_return(get_response)
+        allow(HTTParty).to receive(:post).and_return(post_response)
+      end
+
+      it 'transparently retries with POST' do
+        result = dummy_instance.send(:fetch_instagram_user_details, access_token)
+
+        expect(HTTParty).to have_received(:get).once
+        expect(HTTParty).to have_received(:post).once
         expect(result).to eq(user_details)
       end
     end
