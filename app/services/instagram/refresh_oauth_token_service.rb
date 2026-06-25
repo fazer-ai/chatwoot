@@ -59,7 +59,8 @@ class Instagram::RefreshOauthTokenService
     # been swinging the accepted HTTP method on Instagram endpoints
     # (token exchange, /me). If this endpoint follows the same swing,
     # token refresh would silently fail and the inbox would die after
-    # the 60-day token lifetime. Try POST first, fall back to GET.
+    # the 60-day token lifetime. Try GET first (matches what
+    # /access_token currently accepts), fall back to POST.
     response = attempt_refresh_with_method_fallback(endpoint, params)
 
     unless response.success?
@@ -71,17 +72,21 @@ class Instagram::RefreshOauthTokenService
   end
 
   def attempt_refresh_with_method_fallback(endpoint, params)
-    post_response = HTTParty.post(endpoint, body: params, headers: { 'Accept' => 'application/json' })
-    return post_response unless method_rejected?(post_response, 'post')
+    get_response = HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+    return get_response unless method_rejected?(get_response, 'get')
 
-    Rails.logger.warn('[instagram] /refresh_access_token POST rejected by Meta, retrying with GET')
-    HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+    Rails.logger.warn('[instagram] /refresh_access_token GET rejected by Meta, retrying with POST')
+    HTTParty.post(endpoint, body: params, headers: { 'Accept' => 'application/json' })
   end
 
+  # Mirrors `InstagramConcern#meta_method_swing?` — Meta has used two
+  # different wordings for "wrong HTTP method on this endpoint" and we
+  # want to recognize both so a silent swing doesn't break refresh.
   def method_rejected?(response, method)
     return false if response.success?
 
-    response.body.to_s.match?(/method type:\s*#{method}/i)
+    body = response.body.to_s
+    body.match?(/method type:\s*#{method}/i) || body.match?(/unsupported #{method} request/i)
   end
 
   def update_channel_tokens(token_data)

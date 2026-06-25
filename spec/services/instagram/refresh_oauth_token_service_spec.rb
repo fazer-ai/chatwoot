@@ -18,14 +18,15 @@ RSpec.describe Instagram::RefreshOauthTokenService do
   let(:service) { described_class.new(channel: instagram_channel) }
 
   before do
-    # POST is the primary method since we added flip-resilience; GET stays
-    # stubbed too so the fallback path is covered when POST is not used.
-    stub_request(:post, 'https://graph.instagram.com/refresh_access_token')
-      .with(body: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
-      .to_return(status: 200, body: refresh_response.to_json, headers: { 'Content-Type' => 'application/json' })
-
+    # GET is the primary method since Meta's current swing on
+    # /access_token (POST returns 'Unsupported post request'); we stub
+    # POST as well so the fallback path is covered when GET is rejected.
     stub_request(:get, 'https://graph.instagram.com/refresh_access_token')
       .with(query: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
+      .to_return(status: 200, body: refresh_response.to_json, headers: { 'Content-Type' => 'application/json' })
+
+    stub_request(:post, 'https://graph.instagram.com/refresh_access_token')
+      .with(body: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
       .to_return(status: 200, body: refresh_response.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
@@ -56,6 +57,28 @@ RSpec.describe Instagram::RefreshOauthTokenService do
         instagram_channel.reload
         expect(instagram_channel.access_token).to eq('new_refreshed_token')
         expect(instagram_channel.expires_at).to be_within(1.second).of(5_184_000.seconds.from_now)
+      end
+
+      context 'when Meta rejects GET with the current "Unsupported get request" error' do
+        before do
+          stub_request(:get, 'https://graph.instagram.com/refresh_access_token')
+            .with(query: { 'access_token' => fixed_token, 'grant_type' => 'ig_refresh_token' })
+            .to_return(
+              status: 400,
+              body: {
+                'error' => {
+                  'message' => "Unsupported get request. Object with ID 'refresh_access_token' does not exist, " \
+                               'cannot be loaded due to missing permissions, or does not support this operation',
+                  'type' => 'IGApiException', 'code' => 100, 'error_subcode' => 33
+                }
+              }.to_json,
+              headers: { 'Content-Type' => 'application/json' }
+            )
+        end
+
+        it 'transparently falls back to POST' do
+          expect(service.access_token).to eq('new_refreshed_token')
+        end
       end
     end
   end
