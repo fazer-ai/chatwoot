@@ -77,6 +77,8 @@ tags:
     description: Scheduled message management APIs
   - name: Profile
     description: User profile APIs
+  - name: Languages
+    description: Install-wide language catalog for contacts
   - name: Reports
     description: Analytics and reporting APIs
   - name: Teams
@@ -139,6 +141,7 @@ x-tagGroups:
       - Messages
       - Scheduled Messages
       - Profile
+      - Languages
       - Reports
       - Teams
       - Webhooks

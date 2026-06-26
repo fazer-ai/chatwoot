@@ -46,7 +46,19 @@ properties:
   blocked:
     type: boolean
     description: Whether the contact is blocked
+  language_id:
+    type:
+      - integer
+      - 'null'
+    description: ID of the language the contact prefers. `null` if no preference is set. See `GET /api/v1/languages`.
+    example: 3
+  language_code:
+    type:
+      - string
+      - 'null'
+    description: Denormalized language code (e.g. `pt-br`) derived from the contact's language. Read-only — set via `language_id`.
+    example: es-es
   type:
     type: string
     description: The type of entity
-    enum: ["contact"] 
+    enum: ["contact"]

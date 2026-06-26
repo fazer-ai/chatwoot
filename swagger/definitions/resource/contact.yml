@@ -32,6 +32,16 @@ properties:
         thumbnail:
           type: string
           description: The thumbnail of the contact
+        language_id:
+          type:
+            - integer
+            - 'null'
+          description: ID of the language the contact prefers. `null` if no preference is set.
+        language_code:
+          type:
+            - string
+            - 'null'
+          description: Denormalized language code (e.g. `pt-br`) derived from the contact's language. Read-only — set via `language_id`.
         custom_attributes:
           type: object
           description: The custom attributes of the contact

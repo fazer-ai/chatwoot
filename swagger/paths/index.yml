@@ -552,6 +552,10 @@
 /api/v1/profile:
   $ref: ./profile/index.yml
 
+# Languages
+/api/v1/languages:
+  $ref: ./application/languages/index.yml
+
 # Teams
 /api/v1/accounts/{account_id}/teams:
   parameters:

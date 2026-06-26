@@ -1,0 +1,18 @@
+type: object
+properties:
+  id:
+    type: integer
+    description: Database ID of the language. Pass this value as `language_id` when creating/updating a contact.
+    example: 3
+  code:
+    type: string
+    description: Language code (lowercase, hyphenated). Mirrors what shows up as `language_code` on a contact payload.
+    example: es-es
+  name:
+    type: string
+    description: Human-readable name of the language.
+    example: Español
+  position:
+    type: integer
+    description: Sort order applied by `GET /api/v1/languages` so the list always returns in the same order.
+    example: 2

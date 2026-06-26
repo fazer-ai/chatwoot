@@ -332,3 +332,8 @@ reporting_event_meta:
   $ref: ./resource/reporting_event_meta.yml
 reporting_events_list_response:
   $ref: ./resource/reporting_events_list_response.yml
+
+language:
+  $ref: ./resource/language.yml
+languages_list_response:
+  $ref: ./resource/languages_list_response.yml

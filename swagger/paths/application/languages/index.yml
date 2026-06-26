@@ -1,0 +1,24 @@
+get:
+  tags:
+    - Languages
+  operationId: languagesList
+  summary: List Languages
+  security:
+    - userApiKey: []
+  description: |
+    Returns the install-wide catalog of languages that can be assigned to a contact
+    via `language_id`. The list is static (managed by ops via direct DB inserts) and
+    is **not** account-scoped — every account on the install sees the same options.
+  responses:
+    '200':
+      description: Success
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/languages_list_response'
+    '401':
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/bad_request_error'

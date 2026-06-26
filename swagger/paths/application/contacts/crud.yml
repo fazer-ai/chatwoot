@@ -42,7 +42,45 @@ put:
   summary: Update Contact
   security:
     - userApiKey: []
-  description: Update a contact belonging to the account using ID
+  description: |
+    Update a contact belonging to the account using ID.
+    Accepts both `PUT` and `PATCH` — they are equivalent and both call the same controller action.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/contact_update_payload'
+  responses:
+    '204':
+      description: Success
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/contact_base'
+    '404':
+      description: Contact not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/bad_request_error'
+    '403':
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/bad_request_error'
+
+patch:
+  tags:
+    - Contacts
+  operationId: contactUpdatePatch
+  summary: Update Contact (PATCH alias)
+  security:
+    - userApiKey: []
+  description: |
+    Alias for the `PUT` form of contact update. Same body, same semantics — Rails routes both verbs
+    to the same controller action, and many client libraries default to `PATCH` for partial updates.
   requestBody:
     required: true
     content:

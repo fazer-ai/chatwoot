@@ -44,6 +44,8 @@ tags:
     description: Manage messages
   - name: Profile
     description: Manage user profile
+  - name: Languages
+    description: List the install-wide language catalog used to tag a contact's preferred language
   - name: Reports
     description: Generate reports
   - name: Teams
