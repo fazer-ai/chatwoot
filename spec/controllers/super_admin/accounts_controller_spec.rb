@@ -106,6 +106,45 @@ RSpec.describe 'Super Admin accounts API', type: :request do
     end
   end
 
+  describe 'PUT /super_admin/accounts/{account_id} (reporting_timezone)' do
+    before { sign_in(super_admin, scope: :super_admin) }
+
+    it 'persists the reporting_timezone selection from the form' do
+      expect(account.reporting_timezone).to be_nil
+
+      put "/super_admin/accounts/#{account.id}",
+          params: { account: { name: account.name, reporting_timezone: 'America/Mexico_City' } }
+
+      expect(response).to have_http_status(:redirect)
+      expect(account.reload.reporting_timezone).to eq('America/Mexico_City')
+    end
+
+    it 'clears the override when the blank option is submitted' do
+      account.update!(reporting_timezone: 'America/Mexico_City')
+
+      put "/super_admin/accounts/#{account.id}",
+          params: { account: { name: account.name, reporting_timezone: '' } }
+
+      expect(account.reload.reporting_timezone).to be_blank
+    end
+
+    it 'rejects an invalid timezone string' do
+      put "/super_admin/accounts/#{account.id}",
+          params: { account: { name: account.name, reporting_timezone: 'Mars/Olympus_Mons' } }
+
+      # Administrate re-renders the edit form with 422 on validation failure.
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(account.reload.reporting_timezone).to be_blank
+    end
+
+    it 'renders the timezone select on the edit form' do
+      get "/super_admin/accounts/#{account.id}/edit"
+
+      expect(response.body).to include('account[reporting_timezone]')
+      expect(response.body).to include('America/Mexico_City')
+    end
+  end
+
   describe 'DELETE /super_admin/accounts/{account_id}' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
