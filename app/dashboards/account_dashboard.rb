@@ -24,6 +24,14 @@ class AccountDashboard < Administrate::BaseDashboard
                                  {}
                                end
 
+  # Timezone collection for `reporting_timezone`. IANA name (e.g.
+  # "America/Mexico_City") is what `Account#validate_reporting_timezone`
+  # checks against and what the reporting layer feeds to
+  # `Time.use_zone`. Includes a blank option so super-admins can clear
+  # the override (account falls back to UTC for aggregations).
+  reporting_timezone_collection = [['(use server default — UTC)', '']] +
+                                  ActiveSupport::TimeZone.all.map { |tz| [tz.to_s, tz.tzinfo.name] }
+
   ATTRIBUTE_TYPES = {
     id: Field::Number.with_options(searchable: true),
     name: Field::String.with_options(searchable: true),
@@ -35,6 +43,7 @@ class AccountDashboard < Administrate::BaseDashboard
     status: Field::Select.with_options(collection: [%w[Active active], %w[Suspended suspended]]),
     environment: EnvironmentField.with_options(collection: [%w[Test test], %w[Production production]]),
     average_ticket: Field::Number.with_options(decimals: 2, step: 0.01),
+    reporting_timezone: Field::Select.with_options(collection: reporting_timezone_collection, include_blank: false),
     auris_settings: AurisAccountSettingsField,
     auris_menus: AurisAccountMenusField,
     funnel_enabled: Field::Boolean,
@@ -82,6 +91,7 @@ class AccountDashboard < Administrate::BaseDashboard
     status
     environment
     average_ticket
+    reporting_timezone
     auris_settings
     auris_menus
     conversations
@@ -105,6 +115,7 @@ class AccountDashboard < Administrate::BaseDashboard
     status
     environment
     average_ticket
+    reporting_timezone
     auris_settings
     auris_menus
   ] + enterprise_form_attributes).freeze
@@ -137,7 +148,11 @@ class AccountDashboard < Administrate::BaseDashboard
   # to prevent an error from being raised (wrong number of arguments)
   # Reference: https://github.com/thoughtbot/administrate/pull/2356/files#diff-4e220b661b88f9a19ac527c50d6f1577ef6ab7b0bed2bfdf048e22e6bfa74a05R204
   def permitted_attributes(action)
-    attrs = super + [limits: {}]
+    # `reporting_timezone` lives in `accounts.settings` (jsonb) via
+    # `store_accessor`, so it isn't in `column_names` and Administrate's
+    # default permitted-attributes derivation skips it. Add it
+    # explicitly so the FORM_ATTRIBUTES select round-trips on submit.
+    attrs = super + [:reporting_timezone, { limits: {} }]
 
     # Add manually_managed_features to permitted attributes only for Chatwoot Cloud
     attrs << { manually_managed_features: [] } if ChatwootApp.chatwoot_cloud?
