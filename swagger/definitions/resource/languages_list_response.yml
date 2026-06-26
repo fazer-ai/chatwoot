@@ -1,0 +1,7 @@
+type: object
+properties:
+  data:
+    type: array
+    description: Languages available for tagging on a contact, ordered by `position`.
+    items:
+      $ref: '#/components/schemas/language'

@@ -28,6 +28,11 @@ properties:
     type: string
     description: A unique identifier for the contact in external system
     example: '1234567890'
+  language_id:
+    type: integer
+    nullable: true
+    description: ID of the language the contact prefers. List the available languages via `GET /api/v1/languages`. Pass `null` to clear.
+    example: 3
   additional_attributes:
     type: object
     description: An object where you can store additional attributes for contact. example {"type":"customer", "age":30}

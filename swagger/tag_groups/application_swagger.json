@@ -1362,7 +1362,62 @@
             "userApiKey": []
           }
         ],
-        "description": "Update a contact belonging to the account using ID",
+        "description": "Update a contact belonging to the account using ID.\nAccepts both `PUT` and `PATCH` — they are equivalent and both call the same controller action.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/contact_update_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/contact_base"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Contacts"
+        ],
+        "operationId": "contactUpdatePatch",
+        "summary": "Update Contact (PATCH alias)",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Alias for the `PUT` form of contact update. Same body, same semantics — Rails routes both verbs\nto the same controller action, and many client libraries default to `PATCH` for partial updates.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6042,6 +6097,43 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/languages": {
+      "get": {
+        "tags": [
+          "Languages"
+        ],
+        "operationId": "languagesList",
+        "summary": "List Languages",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Returns the install-wide catalog of languages that can be assigned to a contact\nvia `language_id`. The list is static (managed by ops via direct DB inserts) and\nis **not** account-scoped — every account on the install sees the same options.\n",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/languages_list_response"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
           }
         }
       }
@@ -11817,6 +11909,20 @@
                   "type": "string",
                   "description": "The thumbnail of the contact"
                 },
+                "language_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "ID of the language the contact prefers. `null` if no preference is set."
+                },
+                "language_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Denormalized language code (e.g. `pt-br`) derived from the contact's language. Read-only — set via `language_id`."
+                },
                 "custom_attributes": {
                   "type": "object",
                   "description": "The custom attributes of the contact",
@@ -15743,6 +15849,12 @@
             "description": "A unique identifier for the contact in external system",
             "example": "1234567890"
           },
+          "language_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the language the contact prefers. List the available languages via `GET /api/v1/languages`.",
+            "example": 3
+          },
           "additional_attributes": {
             "type": "object",
             "description": "An object where you can store additional attributes for contact. example {\"type\":\"customer\", \"age\":30}",
@@ -15795,6 +15907,12 @@
             "type": "string",
             "description": "A unique identifier for the contact in external system",
             "example": "1234567890"
+          },
+          "language_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the language the contact prefers. List the available languages via `GET /api/v1/languages`. Pass `null` to clear.",
+            "example": 3
           },
           "additional_attributes": {
             "type": "object",
@@ -18030,6 +18148,22 @@
             "type": "boolean",
             "description": "Whether the contact is blocked"
           },
+          "language_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "ID of the language the contact prefers. `null` if no preference is set. See `GET /api/v1/languages`.",
+            "example": 3
+          },
+          "language_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Denormalized language code (e.g. `pt-br`) derived from the contact's language. Read-only — set via `language_id`.",
+            "example": "es-es"
+          },
           "type": {
             "type": "string",
             "description": "The type of entity",
@@ -18839,6 +18973,43 @@
             "description": "List of reporting events"
           }
         }
+      },
+      "language": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Database ID of the language. Pass this value as `language_id` when creating/updating a contact.",
+            "example": 3
+          },
+          "code": {
+            "type": "string",
+            "description": "Language code (lowercase, hyphenated). Mirrors what shows up as `language_code` on a contact payload.",
+            "example": "es-es"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name of the language.",
+            "example": "Español"
+          },
+          "position": {
+            "type": "integer",
+            "description": "Sort order applied by `GET /api/v1/languages` so the list always returns in the same order.",
+            "example": 2
+          }
+        }
+      },
+      "languages_list_response": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Languages available for tagging on a contact, ordered by `position`.",
+            "items": {
+              "$ref": "#/components/schemas/language"
+            }
+          }
+        }
       }
     },
     "parameters": {
@@ -19203,6 +19374,10 @@
       "description": "User profile APIs"
     },
     {
+      "name": "Languages",
+      "description": "Install-wide language catalog for contacts"
+    },
+    {
       "name": "Reports",
       "description": "Analytics and reporting APIs"
     },
@@ -19287,6 +19462,7 @@
         "Messages",
         "Scheduled Messages",
         "Profile",
+        "Languages",
         "Reports",
         "Teams",
         "Webhooks",
