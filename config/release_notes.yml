@@ -1,4 +1,12 @@
 ---
+- tag: v4.13.0-auris.1.36
+  published_at: '2026-06-27T17:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.36
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.13.0-auris.1.35.1
   published_at: '2026-06-25T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.35.1
@@ -209,17 +217,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.30
-  published_at: '2026-06-18T00:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30
-  notes:
-    en: |-
-      ### ⚡ Improvements
-
-      - **Automated WhatsApp template messages now show their full text in the conversation.** Messages that integrations send using an approved template render with the proper text in the panel instead of an empty bubble.
-      - **When a template is out of sync, the conversation tells you which one.** If a message can't go out because its template is no longer synced, the red error marker on the bubble now names the template so it's clear what needs to be reconnected.
-    pt_BR: |-
-      ### ⚡ Melhorias
-
-      - **Mensagens automáticas com template do WhatsApp aparecem com o texto completo na conversa.** Mensagens que integrações mandam usando um template aprovado agora aparecem no painel com o texto certo, em vez de uma bolha vazia.
-      - **Quando um template está desatualizado, a conversa avisa qual é.** Se uma mensagem não sai porque o template dela não está mais sincronizado, o marcador vermelho de erro na bolha agora mostra o nome do template, facilitando saber o que precisa ser reconectado.
