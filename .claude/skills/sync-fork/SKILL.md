@@ -60,6 +60,15 @@ git branch --show-current   # should be chatwoot-pro-main
 git remote -v               # should show `chatwoot-pro` remote pointing at fazer-ai/chatwoot-pro
 ```
 
+> **PR/CI base-repo gotcha.** This repo is a fork of `chatwoot/chatwoot`, so `gh` defaults the PR base (and `gh workflow run` target) to the **parent (upstream)** unless a default is pinned — the CE merge's `chore/merge-upstream-X.Y.Z` PR can silently land on `chatwoot/chatwoot`. Pin it before pushing/PRing:
+>
+> ```sh
+> gh repo set-default fazer-ai/chatwoot       # CE merge → PR/CI on the CE fork
+> gh repo set-default fazer-ai/chatwoot-pro   # Pro merge → PR/CI on the Pro repo
+> ```
+>
+> Or pass `--repo` explicitly on every `gh pr create` / `gh workflow run`.
+
 Terminology used in this skill:
 - **HEAD / current / ours** = the branch you're sitting on (the one receiving the merge).
 - **MERGE_HEAD / incoming / theirs** = the branch being merged in.
