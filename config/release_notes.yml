@@ -1,4 +1,18 @@
 ---
+- tag: v4.14.0-auris.1.37
+  published_at: '2026-07-01T21:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Copy the conversation number from the header.** A tiny button next to the contact name copies the conversation number so you can paste it wherever you need.
+      - **Redesigned bulk actions bar.** When you select multiple conversations, the action bar now floats above the list with a lighter look. Same actions as before.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Copiar o número da conversa direto do cabeçalho.** Um botão pequeno do lado do nome do contato copia o número da conversa pra você colar onde precisar.
+      - **Barra de ações em massa redesenhada.** Quando você seleciona várias conversas, a barra de ações agora flutua sobre a lista com um visual mais leve. Mesmas ações de antes.
 - tag: v4.13.0-auris.1.36
   published_at: '2026-06-27T17:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.36
@@ -204,14 +218,6 @@
 - tag: v4.13.0-auris.1.30.2
   published_at: '2026-06-18T13:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.2
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.30.1
-  published_at: '2026-06-18T13:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.1
   notes:
     en: |-
       Bug fixes and internal improvements.
