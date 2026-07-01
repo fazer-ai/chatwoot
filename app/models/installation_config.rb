@@ -15,6 +15,19 @@
 #  index_installation_configs_on_name_and_created_at  (name,created_at) UNIQUE
 #
 class InstallationConfig < ApplicationRecord
+  CAPTAIN_LLM_CONFIG_KEYS = %w[
+    CAPTAIN_OPEN_AI_API_KEY
+    CAPTAIN_OPEN_AI_ENDPOINT
+    CAPTAIN_OPEN_AI_MODEL
+  ].freeze
+
+  RESTART_REQUIRED_CONFIG_KEYS = (CAPTAIN_LLM_CONFIG_KEYS + %w[
+    LANGFUSE_BASE_URL
+    LANGFUSE_PUBLIC_KEY
+    LANGFUSE_SECRET_KEY
+    OTEL_PROVIDER
+  ]).freeze
+
   # The serialized_value column is jsonb but production data is mixed: older rows
   # were written as YAML strings by upstream's serialize :coder => YAML chain,
   # and some rows were written as native jsonb hashes. The stock YAML coder

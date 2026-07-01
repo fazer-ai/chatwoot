@@ -81,3 +81,5 @@ class MessageFinder
          .reorder('created_at asc')
   end
 end
+
+MessageFinder.prepend_mod_with('MessageFinder')

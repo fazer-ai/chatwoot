@@ -75,6 +75,8 @@ pt_BR:
       email_already_exists: 'Você já se cadastrou para uma conta com %{email}'
       invalid_params: 'Inválido, por favor, verifique os parâmetros de inscrição e tente novamente'
       failed: Registro falhou
+    voice:
+      call_already_accepted: '%{agent_name} já está atendendo a chamada.'
     assignment_policy:
       not_found: Política de atribuição não encontrada
     attachments:
@@ -129,6 +131,15 @@ pt_BR:
       reauthorization:
         generic: 'Falha ao reautenticar o WhatsApp. Por favor, tente novamente.'
         not_supported: 'Reautenticação não é suportado por este tipo de canal WhatsApp.'
+      calls:
+        not_enabled: 'As chamadas não estão habilitadas para esta caixa de entrada'
+        no_recording: 'Nenhum arquivo de gravação fornecido'
+        no_message: 'A chamada não possui mensagem associada'
+        sdp_offer_required: 'sdp_offer é obrigatório'
+        contact_phone_required: 'Número de telefone do contato é obrigatório'
+        permission_request_failed: 'Falha ao enviar solicitação de permissão de chamada'
+    openai:
+      invalid_api_key: 'OpenAI API key is invalid or revoked. Please check your key in your OpenAI dashboard.'
     inboxes:
       imap:
         socket_error: Por favor, verifique a conexão de rede, endereço IMAP e tente novamente.
@@ -261,6 +272,10 @@ pt_BR:
       deleted: Esta mensagem foi excluída
       whatsapp:
         list_button_label: 'Escolha um item'
+        call_permission_request_body: 'Gostaríamos de ligar para você em relação à sua conversa.'
+      voice_call:
+        twilio: 'Chamada de Voz'
+        whatsapp: 'Chamada do WhatsApp'
       delivery_status:
         error_code: 'Código de erro: %{error_code}'
     activity:
@@ -341,6 +356,9 @@ pt_BR:
         membership_request_created: '%{contact_name} deseja entrar no grupo'
         membership_request_revoked: '%{contact_name} não deseja mais fazer parte do grupo'
         icon_changed: '%{author_name} alterou a imagem do grupo'
+      whatsapp_call:
+        permission_requested: 'Solicitação de permissão de chamada enviada para %{contact_name}.'
+        permission_granted: '%{contact_name} aceitou a solicitação de permissão de chamada.'
       csat:
         not_sent_due_to_messaging_window: 'Pesquisa CSAT não foi enviada devido a restrições de envio de mensagens'
       auto_resolve:
@@ -414,6 +432,7 @@ pt_BR:
       name: 'Linear'
       short_description: 'Crie e vincule issues do Linear diretamente de conversas.'
       description: 'Crie issues em Linear diretamente da sua janela de conversa. Alternativamente, vincule as issues lineares existentes para um processo de rastreamento de problemas mais simples e eficiente.'
+      attachment_link_title: 'Conversa (#%{conversation_id}) com %{name}'
     notion:
       name: 'Notion'
       short_description: 'Integre banco de dados, documentos e páginas diretamente com o Capitão.'
@@ -442,6 +461,9 @@ pt_BR:
       limit_exceeded: 'Limite de documento excedido'
       pdf_format_error: 'Deve ser um arquivo PDF'
       pdf_size_error: 'Deve ser menor que 10 MB'
+      sync_not_supported_for_pdf: 'A sincronização não é suportada para documentos PDF'
+      sync_only_available_documents: 'A sincronização só está disponível para documentos processados'
+      sync_already_in_progress: 'Sincronização de documentos já está em andamento'
       pdf_upload_failed: 'Falha ao enviar PDF para OpenAI'
       pdf_upload_success: 'PDF enviado com sucesso com file_id: %{file_id}'
       pdf_processing_failed: 'Falha ao processar o documento PDF %{document_id}: %{error}'
@@ -551,6 +573,12 @@ pt_BR:
   agent_capacity_policy:
     inbox_already_assigned: 'A caixa de entrada já foi atribuída a esta política'
   portals:
+    articles:
+      captain_not_available: 'A tradução requer que o Capitão esteja ativado para esta conta'
+      locale_not_available: 'Localidade não disponível neste portal'
+      category_not_found: 'Categoria não encontrada neste portal'
+      no_articles_found: 'Nenhum artigo encontrado para processar'
+      invalid_status: 'Valor de status inválido'
     send_instructions:
       email_required: 'E-mail é obrigatório'
       invalid_email_format: 'Formato inválido de e-mail'
@@ -594,6 +622,7 @@ pt_BR:
       hello_there: Olá,
       click_here: "Clique <a href=\"%{url}\">aqui</a>"
       powered_by: Desenvolvido por
+      sent_by_prefix: Este e-mail foi enviado por
       you: Você
       attachment_click_to_view: "Anexo [<a href=\"%{url}\" target=\"_blank\">Clique aqui para visualizar</a>]"
       click_here_to_get_cracking: "Clique <a href=\"%{url}\">aqui</a> para acessar."
@@ -737,16 +766,52 @@ pt_BR:
         support_message: Se você tiver alguma dúvida ou precisar de ajuda, entre em contato com nossa equipe de suporte. Estamos aqui para ajudar.
     devise:
       confirmation_instructions:
-        invited_html: "%{inviter_name}, de %{account_name}, convidou você para experimentar o %{brand_name}."
-        login_message_html: "Você pode acessar sua conta %{brand_name} através do link abaixo:"
-        welcome_html: Bem-vindo ao %{brand_name}! Temos um conjunto de ferramentas poderosas prontas para você explorar. Antes disso, precisamos verificar rapidamente seu endereço de e-mail para confirmar que é realmente você.
-        activate_html: Clique no link abaixo para ativar sua conta.
-        confirm_account: Confirmar minha conta
-        login_account: Acessar minha conta
-        invited_sso_html: "%{inviter_name}, de %{account_name}, convidou você para acessar o %{brand_name} via Single Sign-On (SSO)."
-        sso_no_password_html: Sua organização utiliza SSO para autenticação segura. Você não precisará de uma senha para acessar sua conta.
-        sso_login_html: Agora você pode acessar sua conta fazendo login pelo portal SSO da sua organização.
-        sso_access_html: Você pode acessar sua conta fazendo login pelo portal SSO da sua organização.
+        secure_link: este link seguro
+        button_fallback_html: "Se o botão não funcionar, abra %{link}."
+        labels:
+          invited_by: Convidado por
+          workspace: Espaço de trabalho
+          sign_in_method: Método de acesso
+          sign_in_method_value: Single Sign-On (SSO)
+          new_email: Novo e-mail
+        welcome:
+          eyebrow: Boas-vindas
+          heading: Confirme seu e-mail para começar
+          intro_html: "Boas-vindas ao %{brand_name}. Só precisamos verificar seu endereço de e-mail antes que você possa começar a usar sua conta."
+          supporting_text: Leva só um instante.
+          action_text: Confirmar minha conta
+        email_update:
+          eyebrow: Atualização de e-mail
+          heading: Confirme seu novo endereço de e-mail
+          intro_html: "Recebemos um pedido para atualizar o endereço de e-mail da sua conta %{brand_name}."
+          supporting_text: Confirme o novo endereço abaixo para concluir a alteração.
+          action_text: Confirmar endereço de e-mail
+        account_ready:
+          eyebrow: Conta pronta
+          heading: Sua conta está pronta
+          intro_html: "Sua conta %{brand_name} já está ativa."
+          supporting_text: Use o botão abaixo para acessar e continuar de onde parou.
+          action_text: Abrir minha conta
+        invitation:
+          eyebrow: Convite para o espaço de trabalho
+          heading_with_account: "Você foi convidado para entrar em %{account_name}"
+          heading_default: "Você foi convidado para experimentar o %{brand_name}"
+          intro_with_account_html: "%{inviter_name} convidou você para entrar no espaço de trabalho %{account_name} no %{brand_name}."
+          intro_default_html: "%{inviter_name} convidou você para experimentar o %{brand_name}."
+          supporting_text: Crie sua conta para começar a colaborar com sua equipe.
+          action_text: Aceitar convite
+        sso_access_ready:
+          heading: Seu acesso está pronto
+          intro_html: "Seu acesso ao %{brand_name} já está configurado."
+          supporting_html: "Use o portal Single Sign-On (SSO) da sua organização para acessar o %{brand_name}."
+          info_title: "Acesse pelo SSO da sua organização"
+          info_text_html: "Você não precisará de uma senha separada para o %{brand_name}. Comece pelo portal de identidade da sua empresa."
+        sso_invitation:
+          intro_with_account_html: "%{inviter_name} convidou você para acessar o espaço de trabalho %{account_name} no %{brand_name}."
+          intro_default_html: "%{inviter_name} convidou você para acessar o %{brand_name}."
+          supporting_html: "Sua organização usa Single Sign-On (SSO), então você não precisará criar uma senha separada."
+          info_title: "Use o portal SSO da sua organização"
+          info_text_html: "Continue pelo portal de identidade da sua empresa para acessar o %{brand_name}."
       reset_password_instructions:
         greeting_html: Olá %{name}!
         body_html: Alguém solicitou um link para alterar sua senha. Você pode fazer isso através do link abaixo.
@@ -762,3 +827,9 @@ pt_BR:
         body_html: Sua conta foi bloqueada devido a um número excessivo de tentativas de login malsucedidas.
         action_prompt_html: "Clique no link abaixo para desbloquear sua conta:"
         unlock_account: Desbloquear minha conta
+  super_admin:
+    push_diagnostics:
+      user_not_found: 'Usuário não encontrado.'
+      no_subscriptions_to_test: 'Selecione pelo menos uma assinatura para teste.'
+      no_subscriptions_to_delete: 'Selecione pelo menos uma assinatura para excluir.'
+      subscriptions_deleted: "Excluída(s) %{count} inscrição(ões). O(s) dispositivo(s) do usuário será(ão) registrado(s) novamente na próxima inicialização do aplicativo."

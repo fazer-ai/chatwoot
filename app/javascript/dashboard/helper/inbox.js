@@ -15,6 +15,27 @@ export const INBOX_TYPES = {
   SIMULATOR: 'Channel::Simulator',
 };
 
+// Add providers here as they gain voice capability (e.g., WhatsApp Cloud, Twilio WhatsApp)
+export const VOICE_CALL_PROVIDERS = {
+  TWILIO: 'twilio',
+};
+
+export const getVoiceCallProvider = inbox => {
+  if (!inbox) return null;
+
+  // Callers pass either snake_case (raw API) or camelCase (after camelcaseKeys) shapes.
+  const channelType = inbox.channel_type || inbox.channelType;
+  const voiceEnabled = inbox.voice_enabled || inbox.voiceEnabled;
+
+  if (channelType === INBOX_TYPES.TWILIO && voiceEnabled) {
+    return VOICE_CALL_PROVIDERS.TWILIO;
+  }
+
+  return null;
+};
+
+export const isVoiceCallEnabled = inbox => getVoiceCallProvider(inbox) !== null;
+
 export const TWILIO_CHANNEL_MEDIUM = {
   WHATSAPP: 'whatsapp',
   SMS: 'sms',
@@ -31,7 +52,6 @@ const INBOX_ICON_MAP_FILL = {
   [INBOX_TYPES.LINE]: 'i-ri-line-fill',
   [INBOX_TYPES.INSTAGRAM]: 'i-ri-instagram-fill',
   [INBOX_TYPES.TIKTOK]: 'i-ri-tiktok-fill',
-  [INBOX_TYPES.VOICE]: 'i-ri-phone-fill',
 };
 
 const DEFAULT_ICON_FILL = 'i-ri-chat-1-fill';
@@ -46,7 +66,6 @@ const INBOX_ICON_MAP_LINE = {
   [INBOX_TYPES.TELEGRAM]: 'i-woot-telegram',
   [INBOX_TYPES.LINE]: 'i-woot-line',
   [INBOX_TYPES.INSTAGRAM]: 'i-woot-instagram',
-  [INBOX_TYPES.VOICE]: 'i-woot-voice',
   [INBOX_TYPES.TIKTOK]: 'i-woot-tiktok',
 };
 
@@ -59,7 +78,6 @@ export const getInboxSource = (type, phoneNumber, inbox) => {
 
     case INBOX_TYPES.TWILIO:
     case INBOX_TYPES.WHATSAPP:
-    case INBOX_TYPES.VOICE:
       return phoneNumber || '';
 
     case INBOX_TYPES.EMAIL:
@@ -97,9 +115,6 @@ export const getReadableInboxByType = (type, phoneNumber) => {
 
     case INBOX_TYPES.LINE:
       return 'line';
-
-    case INBOX_TYPES.VOICE:
-      return 'voice';
 
     default:
       return 'chat';
@@ -142,9 +157,6 @@ export const getInboxClassByType = (type, phoneNumber) => {
 
     case INBOX_TYPES.TIKTOK:
       return 'brand-tiktok';
-
-    case INBOX_TYPES.VOICE:
-      return 'phone';
 
     default:
       return 'chat';

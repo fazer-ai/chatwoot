@@ -54,6 +54,7 @@ import {
 } from '@chatwoot/prosemirror-schema/src/mentions/plugin';
 
 import {
+  collapseSelection,
   findNodeToInsertImage,
   getContentNode,
   insertAtCursor,
@@ -68,6 +69,7 @@ import {
 import {
   hasPressedEnterAndNotCmdOrShift,
   hasPressedCommandAndEnter,
+  isEscape,
 } from 'shared/helpers/KeyboardHelpers';
 import { createTypingIndicator } from '@chatwoot/utils';
 import { checkFileSizeLimit } from 'shared/helpers/FileHelper';
@@ -526,7 +528,9 @@ function setMenubarPosition({ selection } = {}) {
 
 function checkSelection(editorState) {
   showSelectionMenu.value = false;
-  const hasSelection = editorState.selection.from !== editorState.selection.to;
+  const { selection } = editorState;
+  // Skip NodeSelection (from Esc -> selectParentNode); only text ranges count.
+  const hasSelection = !selection.empty && !selection.node;
   if (hasSelection === isTextSelected.value) return;
 
   isTextSelected.value = hasSelection;
@@ -722,12 +726,17 @@ function handleLineBreakWhenCmdAndEnterToSendEnabled(event) {
 }
 
 function onKeydown(event) {
+  if (isEscape(event)) {
+    collapseSelection(editorView);
+    return true;
+  }
   if (isEnterToSendEnabled()) {
     handleLineBreakWhenEnterToSendEnabled(event);
   }
   if (isCmdPlusEnterToSendEnabled()) {
     handleLineBreakWhenCmdAndEnterToSendEnabled(event);
   }
+  return false;
 }
 
 function createEditorView() {
@@ -759,6 +768,9 @@ function createEditorView() {
       blur: () => {
         if (props.disabled) return;
         typingIndicator.stop();
+        // PM keeps its selection on blur — clear the menu flags manually.
+        isTextSelected.value = false;
+        editorRoot.value?.classList.remove('has-selection');
         emit('blur');
       },
       paste: (view, event) => {
@@ -804,6 +816,11 @@ watch(
   () => {
     reloadState(props.modelValue);
   }
+);
+
+watch(
+  computed(() => props.disabled),
+  () => editorView?.setProps({})
 );
 
 watch(

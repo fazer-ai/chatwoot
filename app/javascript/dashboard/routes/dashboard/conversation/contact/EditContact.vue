@@ -1,85 +1,84 @@
-<script>
-import { mapGetters } from 'vuex';
+<script setup>
+import { ref } from 'vue';
+import { useStore } from 'dashboard/composables/store';
+import { useMapGetter } from 'dashboard/composables/store';
+import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 import ContactForm from './ContactForm.vue';
+import Button from 'dashboard/components-next/button/Button.vue';
 
-export default {
-  components: {
-    ContactForm,
-  },
-  props: {
-    show: {
-      type: Boolean,
-      default: false,
-    },
-    contact: {
-      type: Object,
-      default: () => ({}),
-    },
-  },
-  emits: ['cancel', 'update:show'],
-  computed: {
-    ...mapGetters({
-      uiFlags: 'contacts/getUIFlags',
-    }),
-    localShow: {
-      get() {
-        return this.show;
-      },
-      set(value) {
-        this.$emit('update:show', value);
-      },
-    },
-  },
+const props = defineProps({
+  show: { type: Boolean, default: false },
+  contact: { type: Object, default: () => ({}) },
+});
 
-  methods: {
-    async onClose() {
-      const hasChanges = this.$refs.contactForm?.hasUnsavedChanges;
-      if (hasChanges) {
-        const shouldDiscard =
-          await this.$refs.confirmDiscardDialog.showConfirmation();
-        if (!shouldDiscard) {
-          return;
-        }
-      }
-      this.$emit('cancel');
-    },
-    onSuccess() {
-      this.$emit('cancel');
-    },
-    async onSubmit(contactItem) {
-      await this.$store.dispatch('contacts/update', contactItem);
-      await this.$store.dispatch(
-        'contacts/fetchContactableInbox',
-        this.contact.id
-      );
-    },
-  },
+const emit = defineEmits(['cancel']);
+
+const store = useStore();
+const uiFlags = useMapGetter('contacts/getUIFlags');
+
+const contactForm = ref(null);
+const confirmDiscardDialog = ref(null);
+
+const onCancel = async () => {
+  const hasChanges = contactForm.value?.hasUnsavedChanges;
+  if (hasChanges) {
+    const shouldDiscard = await confirmDiscardDialog.value?.showConfirmation();
+    if (!shouldDiscard) return;
+  }
+  emit('cancel');
 };
+
+const onSubmit = async contactItem => {
+  await store.dispatch('contacts/update', contactItem);
+  await store.dispatch('contacts/fetchContactableInbox', props.contact.id);
+};
+
+// Restore Escape-to-close behavior that was provided by woot-modal before
+// this drawer was reimplemented as a plain fixed panel.
+useKeyboardEvents({
+  Escape: {
+    action: () => {
+      if (props.show) onCancel();
+    },
+    allowOnFocusedInput: true,
+  },
+});
 </script>
 
 <template>
-  <woot-modal
-    v-model:show="localShow"
-    :on-close="onClose"
-    modal-type="right-aligned"
+  <transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="ltr:translate-x-full rtl:-translate-x-full opacity-0"
+    leave-active-class="transition duration-150 ease-in"
+    leave-to-class="ltr:translate-x-[30%] rtl:-translate-x-[30%] opacity-0"
   >
-    <div class="flex flex-col h-auto overflow-auto">
-      <woot-modal-header
-        :header-title="`${$t('EDIT_CONTACT.TITLE')} - ${
-          contact.name || contact.email
-        }`"
-        :header-content="$t('EDIT_CONTACT.DESC')"
-      />
+    <div
+      v-if="show"
+      class="fixed inset-y-0 ltr:right-0 rtl:left-0 z-50 flex flex-col w-[30rem] max-w-full h-full bg-n-surface-2 ltr:border-l rtl:border-r border-n-weak shadow-lg overflow-auto"
+    >
+      <div class="flex items-center justify-between px-8 pt-8 pb-2">
+        <div>
+          <h2 class="text-lg font-medium text-n-slate-12 mb-1">
+            {{
+              `${$t('EDIT_CONTACT.TITLE')} - ${contact.name || contact.email}`
+            }}
+          </h2>
+          <p class="text-sm text-n-slate-11 mb-0">
+            {{ $t('EDIT_CONTACT.DESC') }}
+          </p>
+        </div>
+        <Button icon="i-lucide-x" slate ghost sm @click="onCancel" />
+      </div>
       <ContactForm
         ref="contactForm"
         :contact="contact"
         :in-progress="uiFlags.isUpdating"
         :on-submit="onSubmit"
-        @success="onSuccess"
-        @cancel="onClose"
+        @success="$emit('cancel')"
+        @cancel="onCancel"
       />
     </div>
-  </woot-modal>
+  </transition>
   <woot-confirm-modal
     ref="confirmDiscardDialog"
     :title="$t('EDIT_CONTACT.CONFIRM_DISCARD.TITLE')"

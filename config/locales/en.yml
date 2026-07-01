@@ -94,6 +94,8 @@ en:
       email_already_exists: 'You have already signed up for an account with %{email}'
       invalid_params: 'Invalid, please check the signup paramters and try again'
       failed: Signup failed
+    voice:
+      call_already_accepted: '%{agent_name} is already handling the call.'
     assignment_policy:
       not_found: Assignment policy not found
     attachments:
@@ -150,6 +152,15 @@ en:
       reauthorization:
         generic: 'Failed to reauthorize WhatsApp. Please try again.'
         not_supported: 'Reauthorization is not supported for this type of WhatsApp channel.'
+      calls:
+        not_enabled: 'Calling is not enabled for this inbox'
+        no_recording: 'No recording file provided'
+        no_message: 'Call has no associated message'
+        sdp_offer_required: 'sdp_offer is required'
+        contact_phone_required: 'Contact phone number is required'
+        permission_request_failed: 'Failed to send call permission request'
+    openai:
+      invalid_api_key: 'OpenAI API key is invalid or revoked. Please check your key in your OpenAI dashboard.'
     inboxes:
       imap:
         socket_error: Please check the network connection, IMAP address and try again.
@@ -283,6 +294,10 @@ en:
       whatsapp:
         list_button_label: 'Choose an item'
         unsupported_message: 'This message is unavailable.'
+        call_permission_request_body: 'We would like to call you regarding your conversation.'
+      voice_call:
+        twilio: 'Voice Call'
+        whatsapp: 'WhatsApp Call'
       delivery_status:
         error_code: 'Error code: %{error_code}'
     activity:
@@ -363,6 +378,9 @@ en:
         membership_request_created: '%{contact_name} wants to join the group'
         membership_request_revoked: '%{contact_name} no longer wants to join the group'
         icon_changed: '%{author_name} changed the group image'
+      whatsapp_call:
+        permission_requested: 'Sent a call permission request to %{contact_name}.'
+        permission_granted: '%{contact_name} accepted the call permission request.'
       csat:
         not_sent_due_to_messaging_window: 'CSAT survey not sent due to outgoing message restrictions'
       auto_resolve:
@@ -436,6 +454,7 @@ en:
       name: 'Linear'
       short_description: 'Create and link Linear issues directly from conversations.'
       description: 'Create issues in Linear directly from your conversation window. Alternatively, link existing Linear issues for a more streamlined and efficient issue tracking process.'
+      attachment_link_title: 'Conversation (#%{conversation_id}) with %{name}'
     notion:
       name: 'Notion'
       short_description: 'Integrate databases, documents and pages directly with Captain.'
@@ -464,6 +483,9 @@ en:
       limit_exceeded: 'Document limit exceeded'
       pdf_format_error: 'must be a PDF file'
       pdf_size_error: 'must be less than 10MB'
+      sync_not_supported_for_pdf: 'Sync is not supported for PDF documents'
+      sync_only_available_documents: 'Sync is only available for processed documents'
+      sync_already_in_progress: 'Document sync is already in progress'
       pdf_upload_failed: 'Failed to upload PDF to OpenAI'
       pdf_upload_success: 'PDF uploaded successfully with file_id: %{file_id}'
       pdf_processing_failed: 'Failed to process PDF document %{document_id}: %{error}'
@@ -573,6 +595,12 @@ en:
   agent_capacity_policy:
     inbox_already_assigned: 'Inbox has already been assigned to this policy'
   portals:
+    articles:
+      captain_not_available: 'Translation requires Captain to be enabled for this account'
+      locale_not_available: 'Locale not available in this portal'
+      category_not_found: 'Category not found in this portal'
+      no_articles_found: 'No articles found to process'
+      invalid_status: 'Invalid status value'
     send_instructions:
       email_required: 'Email is required'
       invalid_email_format: 'Invalid email format'
@@ -616,6 +644,7 @@ en:
       hello_there: Hello there,
       click_here: "Click <a href=\"%{url}\">here</a>"
       powered_by: Powered by
+      sent_by_prefix: This email was sent by
       you: You
       attachment_click_to_view: "Attachment [<a href=\"%{url}\" target=\"_blank\">Click here to view</a>]"
       click_here_to_get_cracking: "Click <a href=\"%{url}\">here</a> to get cracking."
@@ -759,16 +788,52 @@ en:
         support_message: If you have any questions or need help, feel free to reach out to our support team. We're here to assist you.
     devise:
       confirmation_instructions:
-        invited_html: "%{inviter_name}, with %{account_name}, has invited you to try out %{brand_name}."
-        login_message_html: "You can login to your %{brand_name} account through the link below:"
-        welcome_html: Welcome to %{brand_name}! We have a suite of powerful tools ready for you to explore. Before that we quickly need to verify your email address to know it's really you.
-        activate_html: Please take a moment and click the link below and activate your account.
-        confirm_account: Confirm my account
-        login_account: Login to my account
-        invited_sso_html: "%{inviter_name}, with %{account_name}, has invited you to access %{brand_name} via Single Sign-On (SSO)."
-        sso_no_password_html: Your organization uses SSO for secure authentication. You will not need a password to access your account.
-        sso_login_html: You can now access your account by logging in through your organization's SSO portal.
-        sso_access_html: You can access your account by logging in through your organization's SSO portal.
+        secure_link: this secure link
+        button_fallback_html: "If the button does not work, open %{link}."
+        labels:
+          invited_by: Invited by
+          workspace: Workspace
+          sign_in_method: Sign-in method
+          sign_in_method_value: Single Sign-On (SSO)
+          new_email: New email
+        welcome:
+          eyebrow: Welcome
+          heading: Confirm your email to get started
+          intro_html: "Welcome to %{brand_name}. We just need to verify your email address before you can start using your account."
+          supporting_text: This only takes a moment.
+          action_text: Confirm my account
+        email_update:
+          eyebrow: Email update
+          heading: Confirm your new email address
+          intro_html: "We received a request to update the email address on your %{brand_name} account."
+          supporting_text: Confirm the new address below to finish the change.
+          action_text: Confirm email address
+        account_ready:
+          eyebrow: Account ready
+          heading: Your account is ready
+          intro_html: "Your %{brand_name} account is already active."
+          supporting_text: Use the button below to sign in and continue where you left off.
+          action_text: Open my account
+        invitation:
+          eyebrow: Workspace invitation
+          heading_with_account: "You're invited to join %{account_name}"
+          heading_default: "You're invited to try %{brand_name}"
+          intro_with_account_html: "%{inviter_name} invited you to join the %{account_name} workspace on %{brand_name}."
+          intro_default_html: "%{inviter_name} invited you to try %{brand_name}."
+          supporting_text: Create your account to start collaborating with your team.
+          action_text: Accept invitation
+        sso_access_ready:
+          heading: Your access is ready
+          intro_html: "Your %{brand_name} access is already set up."
+          supporting_html: "Use your organization's Single Sign-On (SSO) portal to access %{brand_name}."
+          info_title: "Sign in with your organization's SSO"
+          info_text_html: "You won't need a separate password for %{brand_name}. Start from your company identity provider portal."
+        sso_invitation:
+          intro_with_account_html: "%{inviter_name} invited you to access the %{account_name} workspace on %{brand_name}."
+          intro_default_html: "%{inviter_name} invited you to access %{brand_name}."
+          supporting_html: "Your organization uses Single Sign-On (SSO), so you won't need to create a separate password."
+          info_title: "Use your organization's SSO portal"
+          info_text_html: "Continue from your company identity provider portal to access %{brand_name}."
       reset_password_instructions:
         greeting_html: Hello %{name}!
         body_html: Someone has requested a link to change your password. You can do this through the link below.
@@ -784,3 +849,9 @@ en:
         body_html: Your account has been locked due to an excessive number of unsuccessful sign in attempts.
         action_prompt_html: "Click the link below to unlock your account:"
         unlock_account: Unlock my account
+  super_admin:
+    push_diagnostics:
+      user_not_found: 'User not found.'
+      no_subscriptions_to_test: 'Select at least one subscription to test.'
+      no_subscriptions_to_delete: 'Select at least one subscription to delete.'
+      subscriptions_deleted: "Deleted %{count} subscription(s). The user's device(s) will re-register on next app launch."
