@@ -1115,7 +1115,8 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response).to have_http_status(:success)
         response_body = response.parsed_body
-        expect(response_body['payload'].first['id']).to eq(conversation.messages.last.attachments.first.id)
+        attachment = conversation.messages.last.attachments.first
+        expect(response_body['payload'].first['id']).to eq(attachment.id)
         expect(response_body['payload'].first['file_type']).to eq('image')
         expect(response_body['payload'].first['sender']['id']).to eq(conversation.messages.last.sender.id)
       end

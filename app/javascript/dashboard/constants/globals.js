@@ -46,6 +46,7 @@ export default {
     'https://developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users#limitations',
   FAZER_AI_GUIDES_URL: 'https://app.auris.ia.br/#/guides',
   SMALL_SCREEN_BREAKPOINT: 768,
+  LARGE_SCREEN_BREAKPOINT: 1024,
   AVAILABILITY_STATUS_KEYS: ['online', 'busy', 'offline'],
   SNOOZE_OPTIONS: {
     UNTIL_NEXT_REPLY: 'until_next_reply',

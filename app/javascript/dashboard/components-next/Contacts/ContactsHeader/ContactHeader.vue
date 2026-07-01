@@ -33,7 +33,7 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <header class="sticky top-0 z-10 px-6">
+  <header class="sticky top-0 z-20 px-6">
     <div
       class="flex items-start sm:items-center justify-between w-full py-6 gap-2 mx-auto max-w-5xl"
     >
@@ -149,8 +149,8 @@ const emit = defineEmits([
           </div>
           <div class="w-px h-4 bg-n-strong" />
           <ComposeConversation>
-            <template #trigger="{ toggle }">
-              <Button :label="buttonLabel" size="sm" @click="toggle" />
+            <template #trigger>
+              <Button :label="buttonLabel" size="sm" />
             </template>
           </ComposeConversation>
         </div>

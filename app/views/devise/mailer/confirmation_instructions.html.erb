@@ -1,30 +1,67 @@
-<p><%= t('mailer.common.hi', name: @resource.name) %>,</p>
+<%
+  brand_name = global_config['BRAND_NAME'] || 'Chatwoot'
+  recipient_name = @resource.name.presence || @resource.email
+  account_user = @resource&.account_users&.first
+  inviter = account_user&.inviter
+  account_name = account_user&.account&.name
+  invited_user = inviter.present? && @resource.unconfirmed_email.blank?
 
-<% account_user = @resource&.account_users&.first %>
-<% brand_name = global_config['BRAND_NAME'] || 'Chatwoot' %>
+  i18n_scope = 'mailer.devise.confirmation_instructions'
+  eyebrow = t("#{i18n_scope}.welcome.eyebrow")
+  heading = t("#{i18n_scope}.welcome.heading")
+  intro_text = t("#{i18n_scope}.welcome.intro_html", brand_name: brand_name)
+  supporting_text = t("#{i18n_scope}.welcome.supporting_text")
+  action_text = t("#{i18n_scope}.welcome.action_text")
+  action_url = frontend_url('auth/confirmation', confirmation_token: @token)
+  info_title = nil
+  info_text = nil
+  detail_rows = []
 
-<% if account_user&.inviter.present? && @resource.unconfirmed_email.blank? %>
-  <p><%= t('mailer.devise.confirmation_instructions.invited_html', inviter_name: account_user.inviter.name, account_name: account_user.account.name, brand_name: brand_name) %></p>
-<% end %>
+  if @resource.unconfirmed_email.present?
+    eyebrow = t("#{i18n_scope}.email_update.eyebrow")
+    heading = t("#{i18n_scope}.email_update.heading")
+    intro_text = t("#{i18n_scope}.email_update.intro_html", brand_name: brand_name)
+    supporting_text = t("#{i18n_scope}.email_update.supporting_text")
+    action_text = t("#{i18n_scope}.email_update.action_text")
+    detail_rows << [t("#{i18n_scope}.labels.new_email"), @resource.unconfirmed_email]
+  elsif @resource.confirmed?
+    eyebrow = t("#{i18n_scope}.account_ready.eyebrow")
+    heading = t("#{i18n_scope}.account_ready.heading")
+    intro_text = t("#{i18n_scope}.account_ready.intro_html", brand_name: brand_name)
+    supporting_text = t("#{i18n_scope}.account_ready.supporting_text")
+    action_text = t("#{i18n_scope}.account_ready.action_text")
+    action_url = frontend_url('auth/sign_in')
+  elsif invited_user
+    eyebrow = t("#{i18n_scope}.invitation.eyebrow")
+    heading = if account_name.present?
+                t("#{i18n_scope}.invitation.heading_with_account", account_name: account_name)
+              else
+                t("#{i18n_scope}.invitation.heading_default", brand_name: brand_name)
+              end
+    intro_text = if account_name.present?
+                   t("#{i18n_scope}.invitation.intro_with_account_html",
+                     inviter_name: inviter.name, account_name: account_name, brand_name: brand_name)
+                 else
+                   t("#{i18n_scope}.invitation.intro_default_html",
+                     inviter_name: inviter.name, brand_name: brand_name)
+                 end
+    supporting_text = t("#{i18n_scope}.invitation.supporting_text")
+    action_text = t("#{i18n_scope}.invitation.action_text")
+    action_url = frontend_url('auth/password/edit', reset_password_token: @resource.send(:set_reset_password_token))
+    detail_rows = [[t("#{i18n_scope}.labels.invited_by"), inviter.name]]
+    detail_rows << [t("#{i18n_scope}.labels.workspace"), account_name] if account_name.present?
+  end
+%>
 
-<% if @resource.confirmed? %>
-  <p><%= t('mailer.devise.confirmation_instructions.login_message_html', brand_name: brand_name) %></p>
-<% else %>
-  <% if account_user&.inviter.blank? %>
-  <p>
-    <%= t('mailer.devise.confirmation_instructions.welcome_html', brand_name: brand_name) %>
-  </p>
-  <% end %>
-  <p><%= t('mailer.devise.confirmation_instructions.activate_html') %></p>
-<% end %>
-
-
-<% if @resource.unconfirmed_email.present? %>
-  <p><%= link_to t('mailer.devise.confirmation_instructions.confirm_account'), frontend_url('auth/confirmation', confirmation_token: @token) %></p>
-<% elsif @resource.confirmed? %>
-  <p><%= link_to t('mailer.devise.confirmation_instructions.login_account'), frontend_url('auth/sign_in') %></p>
-<% elsif account_user&.inviter.present? %>
-  <p><%= link_to t('mailer.devise.confirmation_instructions.confirm_account'), frontend_url('auth/password/edit', reset_password_token: @resource.send(:set_reset_password_token)) %></p>
-<% else %>
-  <p><%= link_to t('mailer.devise.confirmation_instructions.confirm_account'), frontend_url('auth/confirmation', confirmation_token: @token) %></p>
-<% end %>
+<%= render partial: 'devise/mailer/confirmation_body', locals: {
+  action_text: action_text,
+  action_url: action_url,
+  detail_rows: detail_rows,
+  eyebrow: eyebrow,
+  heading: heading,
+  info_text: info_text,
+  info_title: info_title,
+  intro_text: intro_text,
+  recipient_name: recipient_name,
+  supporting_text: supporting_text
+} %>

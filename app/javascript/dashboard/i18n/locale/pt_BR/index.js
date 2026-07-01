@@ -33,6 +33,7 @@ import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
 import mfa from './mfa.json';
+import onboarding from './onboarding.json';
 import operationsNotifications from './operationsNotifications.json';
 import releaseNotes from './releaseNotes.json';
 import report from './report.json';
@@ -84,6 +85,7 @@ export default {
   ...login,
   ...macros,
   ...mfa,
+  ...onboarding,
   ...operationsNotifications,
   ...releaseNotes,
   ...report,

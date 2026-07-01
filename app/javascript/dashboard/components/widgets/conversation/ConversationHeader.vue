@@ -14,6 +14,8 @@ import { conversationListPageURL } from 'dashboard/helper/URLHelper';
 import { snoozedReopenTime } from 'dashboard/helper/snoozeHelpers';
 import { useInbox } from 'dashboard/composables/useInbox';
 import { useI18n } from 'vue-i18n';
+import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import { useAlert } from 'dashboard/composables';
 
 const props = defineProps({
   chat: {
@@ -94,6 +96,15 @@ const hasMultipleInboxes = computed(
 const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
 
 const summary = computed(() => props.chat?.summary?.trim() || '');
+
+const copyConversationId = async () => {
+  try {
+    await copyTextToClipboard(String(props.chat.id));
+    useAlert(t('CONVERSATION.HEADER.COPY_ID_SUCCESS'));
+  } catch (error) {
+    // error
+  }
+};
 </script>
 
 <template>
@@ -141,6 +152,24 @@ const summary = computed(() => props.chat?.summary?.trim() || '');
             class="text-n-amber-10 my-0 mx-0 min-w-[14px] flex-shrink-0"
             icon="warning"
           />
+        </div>
+
+        <div
+          class="flex items-center gap-1 overflow-hidden text-xs conversation--header--actions text-n-slate-11 text-ellipsis whitespace-nowrap"
+        >
+          <button
+            type="button"
+            class="truncate text-label-small text-n-slate-11 hover:text-n-slate-12 !p-0 cucursor-pointer"
+            @click="copyConversationId"
+          >
+            {{ `#${chat.id}` }}
+          </button>
+          <span v-if="hasMultipleInboxes">•</span>
+          <InboxName v-if="hasMultipleInboxes" :inbox="inbox" class="!mx-0" />
+          <span v-if="isSnoozed">•</span>
+          <span v-if="isSnoozed" class="font-medium text-n-amber-10">
+            {{ snoozedDisplayText }}
+          </span>
         </div>
       </div>
     </div>
