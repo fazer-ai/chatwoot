@@ -145,7 +145,7 @@ onUnmounted(() => {
         class="flex items-center justify-between p-2 bg-n-button-color outline outline-1 -outline-offset-1 rounded-[10px] outline-n-weak shadow-[0_0_12px_0_rgba(27,40,59,0.08)]"
       >
         <div class="ltr:ml-0.5 rtl:mr-0.5 flex items-center gap-1">
-          <label class="cursor-pointer flex items-center gap-1.5 text-xs">
+          <label class="cursor-pointer flex items-center gap-1.5 text-[10px]">
             <Checkbox
               v-model="allSelected"
               :indeterminate="!allConversationsSelected"
@@ -162,7 +162,7 @@ onUnmounted(() => {
           <NextButton
             :label="$t('BULK_ACTION.CLEAR_SELECTION')"
             ghost
-            class="!text-n-blue-11 !px-1 !h-6"
+            class="!text-n-blue-11 !text-[10px] !px-1 !h-6 flex-shrink-0 [&>span]:!whitespace-nowrap [&>span]:!overflow-visible"
             xs
             @click="allSelected = false"
           />
