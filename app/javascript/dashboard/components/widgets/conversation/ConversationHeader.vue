@@ -131,14 +131,6 @@ const copyConversationId = async () => {
       <div
         class="flex flex-col items-start gap-0.5 min-w-0 ml-2 overflow-hidden rtl:ml-0 rtl:mr-2 flex-1"
       >
-        <div
-          class="flex items-center gap-2 overflow-hidden text-xs conversation--header--actions text-ellipsis whitespace-nowrap w-full"
-        >
-          <InboxName v-if="hasMultipleInboxes" :inbox="inbox" class="!mx-0" />
-          <span v-if="isSnoozed" class="font-medium text-n-amber-10">
-            {{ snoozedDisplayText }}
-          </span>
-        </div>
         <div class="flex flex-row items-center max-w-full gap-1 p-0 m-0">
           <span
             class="text-sm font-medium truncate leading-tight text-n-slate-12"
