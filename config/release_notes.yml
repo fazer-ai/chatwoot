@@ -1,4 +1,20 @@
 ---
+- tag: v4.14.0-auris.1.37.1
+  published_at: '2026-07-02T18:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Contact edit form pre-selects the contact's language.** The language combobox was showing "Selecione o idioma" even when the language had been set — now it loads the current value.
+      - **Inbox name appears once in the conversation header.** After the last release the inbox name was duplicated above the contact name; now it shows only once.
+      - **Bulk actions bar fits.** The floating action bar was cutting the "Limpar" button as "Lim..." and pushing the counter text against it. Fonts are smaller and "Limpar" now shows in full.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Formulário de contato mostra o idioma que está no cadastro.** O campo de idioma aparecia sempre como "Selecione o idioma" mesmo quando já havia um configurado — agora carrega o valor atual.
+      - **Nome da caixa aparece uma vez só no cabeçalho da conversa.** Depois da última versão o nome da caixa aparecia duplicado acima do nome do contato; agora aparece só uma vez.
+      - **Barra de ações em massa cabe na tela.** A barra flutuante estava cortando o botão "Limpar" (aparecia como "Lim...") e apertando o texto do contador do lado. Fontes menores e o "Limpar" agora aparece inteiro.
 - tag: v4.14.0-auris.1.37
   published_at: '2026-07-01T21:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37
@@ -210,14 +226,6 @@
 - tag: v4.13.0-auris.1.31
   published_at: '2026-06-18T20:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.30.2
-  published_at: '2026-06-18T13:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.30.2
   notes:
     en: |-
       Bug fixes and internal improvements.
