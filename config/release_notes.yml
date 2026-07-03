@@ -1,4 +1,12 @@
 ---
+- tag: v4.14.0-auris.1.37.2
+  published_at: '2026-07-02T19:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.2
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.14.0-auris.1.37.1
   published_at: '2026-07-02T18:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.1
@@ -223,11 +231,3 @@
       ### 🐛 Correções
 
       - **Conexão de uma nova caixa de entrada do Instagram voltou a funcionar.** O Meta mudou o método HTTP aceito no endpoint de troca de token do Instagram, quebrando o passo final com a mensagem "Failed to exchange token". Corrigido.
-- tag: v4.13.0-auris.1.31
-  published_at: '2026-06-18T20:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
