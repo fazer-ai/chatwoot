@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_12_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_03_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1603,9 +1603,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_12_000000) do
   add_foreign_key "internal_chat_channel_teams", "internal_chat_channels"
   add_foreign_key "internal_chat_channel_teams", "teams"
   add_foreign_key "internal_chat_channels", "internal_chat_categories", column: "category_id"
-  add_foreign_key "internal_chat_channels", "users", column: "created_by_id"
+  add_foreign_key "internal_chat_channels", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "internal_chat_drafts", "internal_chat_channels"
-  add_foreign_key "internal_chat_drafts", "users"
+  add_foreign_key "internal_chat_drafts", "users", on_delete: :cascade
   add_foreign_key "internal_chat_message_attachments", "internal_chat_messages"
   add_foreign_key "internal_chat_messages", "accounts", on_delete: :cascade
   add_foreign_key "internal_chat_messages", "internal_chat_channels"
