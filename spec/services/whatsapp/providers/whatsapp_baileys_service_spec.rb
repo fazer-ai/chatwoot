@@ -149,6 +149,55 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     end
   end
 
+  describe '#import_session' do
+    let(:import_url) do
+      "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/import-session"
+    end
+    let(:session) do
+      {
+        'noiseCandidates' => [{ 'private' => 'np0', 'public' => 'nb0' }],
+        'identityKey' => { 'private' => 'ip', 'public' => 'ib' },
+        'registrationId' => 42,
+        'advSecretKey' => 'adv',
+        'account' => { 'details' => 'd', 'accountSignatureKey' => 'ask', 'accountSignature' => 'as', 'deviceSignature' => 'ds' },
+        'id' => '551101234567:12@s.whatsapp.net'
+      }
+    end
+
+    context 'when response is successful' do
+      it 'posts the session to the import endpoint' do
+        request = stub_request(:post, import_url)
+                  .with(
+                    headers: stub_headers(whatsapp_channel),
+                    body: {
+                      session: session,
+                      candidateIndex: 2,
+                      clientName: 'chatwoot-test',
+                      webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
+                      webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+                      includeMedia: false,
+                      groupsEnabled: described_class.groups_enabled?
+                    }.to_json
+                  )
+                  .to_return(status: 202)
+
+        expect(service.import_session(session: session, candidate_index: 2)).to be(true)
+        expect(request).to have_been_requested
+      end
+    end
+
+    context 'when response is unsuccessful' do
+      it 'raises ProviderUnavailableError' do
+        stub_request(:post, import_url).to_return(status: 409, body: 'conflict')
+        allow(Rails.logger).to receive(:error)
+
+        expect do
+          service.import_session(session: session)
+        end.to raise_error(described_class::ProviderUnavailableError)
+      end
+    end
+  end
+
   describe '#disconnect_channel_provider' do
     let(:disconnect_url) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}" }
 

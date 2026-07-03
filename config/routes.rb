@@ -314,6 +314,7 @@ Rails.application.routes.draw do
             get :agent_bot, on: :member
             post :set_agent_bot, on: :member
             post :setup_channel_provider, on: :member
+            post :import_whatsapp_session, on: :member
             post :disconnect_channel_provider, on: :member
             post :convert_provider, on: :member
             delete :avatar, on: :member
