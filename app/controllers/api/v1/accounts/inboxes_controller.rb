@@ -99,8 +99,11 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
              status: :unprocessable_entity and return
     end
 
+    session = import_session_params[:session].to_h
+    render json: { error: 'Session payload is required' }, status: :unprocessable_entity and return if session.blank?
+
     channel.import_session(
-      session: import_session_params[:session].to_h,
+      session: session,
       candidate_index: import_session_params[:candidate_index].to_i
     )
     head :ok

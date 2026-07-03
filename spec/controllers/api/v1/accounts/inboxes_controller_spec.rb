@@ -1385,6 +1385,21 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
       end
 
+      it 'returns unprocessable entity when the session payload is missing' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+        allow(service_double).to receive(:import_session)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(service_double).not_to have_received(:import_session)
+      end
+
       it 'imports the session and returns ok' do
         service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
         allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
