@@ -59,6 +59,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # Hot-loads an already-linked WhatsApp Web session extracted by the browser
   # extension: the Baileys API seeds the credentials and resumes the socket
   # without a QR. `session` is opaque impersonation credentials — never log it.
+  # Not wrapped in `with_error_handling` (unlike setup_channel_provider): an
+  # import failure surfaces to the client via the connection.update webhook
+  # (provider_connection error), and recovery is a fresh QR setup, not a retry
+  # of the import.
   def import_session(session:, candidate_index: 0)
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/import-session",
@@ -71,7 +75,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         includeMedia: false,
         groupsEnabled: self.class.groups_enabled?
-      }.compact.to_json
+      }.compact.to_json,
+      timeout: 10
     )
 
     raise ProviderUnavailableError unless process_response(response)

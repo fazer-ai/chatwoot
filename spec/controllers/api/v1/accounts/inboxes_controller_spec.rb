@@ -1373,6 +1373,18 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
       end
 
+      it 'returns unprocessable entity for a whatsapp channel using a non-baileys provider' do
+        cloud_channel = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                  sync_templates: false, validate_provider_config: false)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{cloud_channel.inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
       it 'imports the session and returns ok' do
         service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
         allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
