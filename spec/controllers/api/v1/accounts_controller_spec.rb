@@ -198,6 +198,20 @@ RSpec.describe 'Accounts API', type: :request do
         expect(response.body).to include(account.support_email)
         expect(response.body).to include(account.locale)
       end
+
+      it 'exposes the Auris feature toggles (funnel_enabled, ai_status_uses_attribute, multi_language_ai)' do
+        account.update!(funnel_enabled: true, ai_status_uses_attribute: true, multi_language_ai: true)
+
+        get "/api/v1/accounts/#{account.id}",
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        body = response.parsed_body
+        expect(body['funnel_enabled']).to be(true)
+        expect(body['ai_status_uses_attribute']).to be(true)
+        expect(body['multi_language_ai']).to be(true)
+      end
     end
   end
 
