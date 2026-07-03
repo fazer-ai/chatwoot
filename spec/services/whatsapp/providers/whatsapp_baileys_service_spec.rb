@@ -193,7 +193,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
         expect do
           service.import_session(session: session)
-        end.to raise_error(described_class::ProviderUnavailableError)
+        end.to(raise_error { |error| expect(error.class.name).to eq(described_class::ProviderUnavailableError.name) })
       end
     end
   end

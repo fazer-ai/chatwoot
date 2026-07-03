@@ -185,6 +185,7 @@ watchEffect(() => {
             <button
               v-if="!showImportDetails"
               type="button"
+              :aria-expanded="showImportDetails"
               class="text-xs underline text-n-slate-11 hover:text-n-slate-12"
               @click="showImportDetails = true"
             >
