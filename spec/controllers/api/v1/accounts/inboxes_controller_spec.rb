@@ -1416,6 +1416,22 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(service_double).to have_received(:import_session).with(session: kind_of(Hash), candidate_index: 1)
       end
 
+      it 'returns service unavailable when the provider is unavailable' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+        allow(service_double).to receive(:import_session)
+          .and_raise(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:service_unavailable)
+      end
+
       it 'allows agents assigned to the inbox' do
         create(:inbox_member, user: agent, inbox: inbox)
         service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, import_session: true)
