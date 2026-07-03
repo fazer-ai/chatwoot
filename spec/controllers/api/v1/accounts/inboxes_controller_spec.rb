@@ -1339,6 +1339,125 @@ RSpec.describe 'Inboxes API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/import_whatsapp_session' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
+    let(:inbox) { channel.inbox }
+    let(:session_payload) do
+      {
+        noiseCandidates: [{ private: 'np0', public: 'nb0' }],
+        identityKey: { private: 'ip', public: 'ib' },
+        registrationId: 42,
+        advSecretKey: 'adv',
+        account: { details: 'd', accountSignatureKey: 'ask', accountSignature: 'as', deviceSignature: 'ds' },
+        id: '551101234567:12@s.whatsapp.net'
+      }
+    end
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when authenticated' do
+      it 'returns unprocessable entity for a non-baileys channel' do
+        other = create(:inbox, account: account)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{other.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'returns unprocessable entity for a whatsapp channel using a non-baileys provider' do
+        cloud_channel = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                                  sync_templates: false, validate_provider_config: false)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{cloud_channel.inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'returns unprocessable entity when the session payload is missing' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+        allow(service_double).to receive(:import_session)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(service_double).not_to have_received(:import_session)
+      end
+
+      it 'imports the session and returns ok' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+        allow(service_double).to receive(:import_session).and_return(true)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             params: { session: session_payload, candidate_index: 1 },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(service_double).to have_received(:import_session).with(session: kind_of(Hash), candidate_index: 1)
+      end
+
+      it 'returns service unavailable when the provider is unavailable' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+        allow(service_double).to receive(:import_session)
+          .and_raise(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:service_unavailable)
+      end
+
+      it 'allows agents assigned to the inbox' do
+        create(:inbox_member, user: agent, inbox: inbox)
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, import_session: true)
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
+          .with(whatsapp_channel: channel)
+          .and_return(service_double)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'returns unauthorized for agents not assigned to the inbox' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/import_whatsapp_session",
+             params: { session: session_payload },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/disconnect_channel_provider' do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }
