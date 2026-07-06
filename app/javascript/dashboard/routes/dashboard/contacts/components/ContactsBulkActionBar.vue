@@ -131,7 +131,7 @@ const handleUnassignLabels = labels => {
               sm
               faded
               slate
-              icon="i-lucide-tag"
+              icon="i-woot-tag-remove"
               :label="t('CONTACTS_BULK_ACTIONS.UNASSIGN_LABELS')"
               :disabled="!selectedCount || isLoading"
               :is-loading="isLoading"
