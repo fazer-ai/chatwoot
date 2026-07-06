@@ -467,7 +467,7 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect(contact.phone_number).to eq('+5511912345678')
           end
 
-          it 'creates a message on an existing conversation', skip: 'Follow-up to sync .75-.83: LID/phone normalization + on_whatsapp hook change the contact-inbox resolution so the message no longer lands on `existing_conversation` in this stubbed setup. Behavior is correct end-to-end; the test needs the new flow wired in.' do
+          it 'creates a message on an existing conversation', skip: 'Follow-up to sync .75-.83: LID/phone normalization + on_whatsapp hook change the contact-inbox resolution so the message no longer lands on `existing_conversation` in this stubbed setup. Behavior is correct end-to-end; the test needs the new flow wired in.' do # rubocop:disable Layout/LineLength
             contact = create(:contact, account: inbox.account, name: 'John Doe')
             contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
             existing_conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
@@ -1024,7 +1024,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(contact.phone_number).to eq('+5511912345678')
         end
 
-        it 'reuses a contact saved with the Brazilian ninth digit when the reply arrives without it', skip: 'Follow-up to sync .75-.83: upstream added this test alongside the generalized alternate_phone_variants path. Passes in isolation but fails in this describe when the stubbed on_whatsapp lookup interacts with our pre-existing LID handling. Behavior end-to-end is correct; test needs the new flow wired in.' do
+        it 'reuses a contact saved with the Brazilian ninth digit when the reply arrives without it', skip: 'Follow-up to sync .75-.83: upstream added this test alongside the generalized alternate_phone_variants path. Passes in isolation but fails in this describe when the stubbed on_whatsapp lookup interacts with our pre-existing LID handling. Behavior end-to-end is correct; test needs the new flow wired in.' do # rubocop:disable Layout/LineLength
           # Regression: the agent saved the number with the ninth digit and outbound
           # normalization was skipped; the reply delivers the canonical number without
           # it and must not spawn a duplicate contact in a new conversation.
