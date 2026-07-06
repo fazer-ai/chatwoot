@@ -11,6 +11,8 @@ import {
   CMD_BULK_ACTION_RESOLVE_CONVERSATION,
 } from 'dashboard/helper/commandbar/events';
 
+import { vOnClickOutside } from '@vueuse/components';
+
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import BulkAgentActions from './BulkAgentActions.vue';
 import BulkUpdateActions from './BulkUpdateActions.vue';
@@ -184,8 +186,14 @@ onUnmounted(() => {
             :conversation-count="conversations.length"
             @select="onAssignTeam"
           />
-          <!-- Auris: enable/disable AI handling for the selected conversations. -->
-          <div class="relative">
+          <!-- Auris: enable/disable AI handling for the selected conversations.
+               Click-outside lives on the wrapper (which also owns the trigger
+               button) so a click on the button doesn't count as "outside" and
+               ping-pong the popover open/close in the same event tick. -->
+          <div
+            v-on-click-outside="() => (showAiStatusActions = false)"
+            class="relative"
+          >
             <NextButton
               v-tooltip="$t('BULK_ACTION.AI_STATUS.TOOLTIP')"
               icon="i-lucide-bot"
