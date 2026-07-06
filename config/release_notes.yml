@@ -1,4 +1,30 @@
 ---
+- tag: v4.14.0-auris.1.38
+  published_at: '2026-07-06T17:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Ad referral tag on inbound messages.** When a patient replies via a WhatsApp ad, the conversation now shows which campaign brought them in.
+      - **Message edits from the patient show up.** If the patient edits a message on WhatsApp, the edit reflects on the timeline (previous version preserved). If they delete a message, the bubble is marked as deleted.
+      - **Reply and react on internal notes.** Same shortcuts you use on regular messages now work on team notes too.
+
+      ### ⚡ Improvements
+
+      - **Brazilian phone with/without "9" no longer creates duplicate contacts.** The system reuses the existing contact regardless of the format.
+      - **When a message fails to send, the reason now appears on the bubble.**
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Etiqueta de anúncio nas mensagens que chegam.** Quando o paciente responde por um anúncio do WhatsApp, a conversa agora mostra de qual campanha ele veio.
+      - **Edição de mensagem do paciente aparece.** Se o paciente edita uma mensagem no WhatsApp, a edição reflete na timeline (versão anterior preservada). Se ele apaga, a bolha fica marcada como apagada.
+      - **Responder e reagir em anotações internas.** Os mesmos atalhos que você usa em mensagens normais agora funcionam nas notas de equipe também.
+
+      ### ⚡ Melhorias
+
+      - **Número brasileiro com/sem "9" deixa de criar contato duplicado.** O sistema reusa o contato existente independente do formato.
+      - **Quando uma mensagem falha ao enviar, o motivo agora aparece na bolha.**
 - tag: v4.14.0-auris.1.37.2
   published_at: '2026-07-02T19:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.2
@@ -219,15 +245,3 @@
       ### 🐛 Correções
 
       - **Conexão de nova caixa de entrada do Instagram resiste às oscilações do Meta.** O Meta tem alternado diariamente qual método HTTP aceita na troca de token do Instagram. A integração agora tenta automaticamente com o outro método quando isso acontece, então adicionar uma caixa de entrada não é mais interrompido pelas oscilações do Meta.
-- tag: v4.13.0-auris.1.31.1
-  published_at: '2026-06-18T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Connecting a new Instagram inbox works again.** Meta flipped the accepted HTTP method on the Instagram token exchange endpoint, breaking the "Failed to exchange token" dialog when adding an Instagram inbox. Fixed.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Conexão de uma nova caixa de entrada do Instagram voltou a funcionar.** O Meta mudou o método HTTP aceito no endpoint de troca de token do Instagram, quebrando o passo final com a mensagem "Failed to exchange token". Corrigido.
