@@ -8,6 +8,7 @@ import BulkLabelActions from 'dashboard/components/widgets/conversation/conversa
 import LabelActions from 'dashboard/components/widgets/conversation/conversationBulkActions/LabelActions.vue';
 import Policy from 'dashboard/components/policy.vue';
 import { vOnClickOutside } from '@vueuse/components';
+import { useMapGetter } from 'dashboard/composables/store';
 
 const props = defineProps({
   visibleContactIds: {
@@ -37,6 +38,19 @@ const { t } = useI18n();
 const selectedCount = computed(() => props.selectedContactIds.length);
 const totalVisibleContacts = computed(() => props.visibleContactIds.length);
 const showUnassignLabelSelector = ref(false);
+
+const getContact = useMapGetter('contacts/getContact');
+
+// Union of labels applied across the current contact selection so the
+// unassign popover only offers labels operators can actually remove.
+const appliedLabelsForSelection = computed(() => {
+  const applied = new Set();
+  props.selectedContactIds.forEach(id => {
+    const contact = getContact.value(id);
+    (contact?.labels || []).forEach(label => applied.add(label));
+  });
+  return Array.from(applied);
+});
 
 const selectAllLabel = computed(() => {
   if (!totalVisibleContacts.value) {
@@ -131,7 +145,7 @@ const handleUnassignLabels = labels => {
               sm
               faded
               slate
-              icon="i-lucide-tag"
+              icon="i-woot-tag-remove"
               :label="t('CONTACTS_BULK_ACTIONS.UNASSIGN_LABELS')"
               :disabled="!selectedCount || isLoading"
               :is-loading="isLoading"
@@ -149,6 +163,7 @@ const handleUnassignLabels = labels => {
               <LabelActions
                 v-if="showUnassignLabelSelector"
                 mode="unassign"
+                :applied-labels="appliedLabelsForSelection"
                 class="[&>.triangle]:!hidden [&>div>button]:!hidden ltr:!right-0 rtl:!left-0 top-8 mt-0.5"
                 @unassign="handleUnassignLabels"
                 @close="closeUnassignLabelSelector"

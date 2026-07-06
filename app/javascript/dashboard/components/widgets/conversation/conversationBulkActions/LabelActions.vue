@@ -12,6 +12,14 @@ const props = defineProps({
     default: 'assign',
     validator: value => ['assign', 'unassign'].includes(value),
   },
+  // In `unassign` mode, restrict the picker to labels actually present on the
+  // current selection so operators can't try to remove a label that isn't
+  // there. Pass `null` (default) to keep the old "show every account label"
+  // behavior — used when the caller can't cheaply compute the union.
+  appliedLabels: {
+    type: Array,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['close', 'assign', 'unassign']);
@@ -24,6 +32,14 @@ const query = ref('');
 const selectedLabels = ref([]);
 
 const isUnassignMode = computed(() => props.mode === 'unassign');
+
+const visibleLabels = computed(() => {
+  if (!isUnassignMode.value || props.appliedLabels === null) {
+    return labels.value;
+  }
+  const applied = new Set(props.appliedLabels);
+  return labels.value.filter(label => applied.has(label.title));
+});
 const titleKey = computed(() =>
   isUnassignMode.value
     ? 'BULK_ACTION.LABELS.UNASSIGN_LABELS'
@@ -36,13 +52,13 @@ const submitKey = computed(() =>
 );
 
 const filteredLabels = computed(() => {
-  if (!query.value) return labels.value;
-  return labels.value.filter(label =>
+  if (!query.value) return visibleLabels.value;
+  return visibleLabels.value.filter(label =>
     label.title.toLowerCase().includes(query.value.toLowerCase())
   );
 });
 
-const hasLabels = computed(() => labels.value.length > 0);
+const hasLabels = computed(() => visibleLabels.value.length > 0);
 const hasFilteredLabels = computed(() => filteredLabels.value.length > 0);
 
 const isLabelSelected = label => {
