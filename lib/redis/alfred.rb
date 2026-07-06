@@ -80,6 +80,10 @@ module Redis::Alfred
       $alfred.with { |conn| conn.lrem(key, count, value) }
     end
 
+    def pipelined(&)
+      $alfred.with { |conn| conn.pipelined(&) }
+    end
+
     # hash operations
 
     # add a key value to redis hash

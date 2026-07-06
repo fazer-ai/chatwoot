@@ -37,7 +37,9 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 2. For every conflicted file: apply the **Per-file decision framework**, cross-referencing the **Recurring patterns** subsection for that file when one exists.
 3. Resolve and `git add` each file. Keep a running list of the KC/AI/CO/DEL decision per file (useful for the commit message and PR body).
 4. Run the **Validation flow** end-to-end (it is mandatory, not optional). Do not commit if any step fails.
-5. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
+6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
+7. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
 
@@ -128,12 +130,17 @@ Always conflicts because both sides have different migration versions. Resolutio
 
 1. Resolve the version-number conflict first so Ruby can parse the file (`ActiveRecord::Schema[7.1].define(version: ...)`). Pick the later timestamp.
 2. Resolve every other Ruby conflict file (`installation_config.rb`, any model conflicts) so Rails can boot.
-3. `bundle exec rails db:migrate` to apply pending migrations.
-4. `bundle exec rails db:schema:dump` to regenerate.
+3. **Prefer the git-merge schema over a dump.** Both HEAD and MERGE_HEAD commit their own migration's schema changes, so the 3-way merge of `db/schema.rb` ALREADY contains the correct, kanban-free result (fork tables from HEAD + the new upstream tables/columns from MERGE_HEAD). Just resolve the two conflict hunks (version + the new foreign-key/table blocks) by hand and you are done — **you usually do NOT need to dump at all.** If you already clobbered the file, recover the conflicted merge version from the index with `git checkout -m -- db/schema.rb` and re-resolve.
+4. Run `bundle exec rails db:migrate` only to apply the pending migrations to your **DB** (so specs run). ⚠️ **`db:migrate` auto-runs `db:schema:dump` at the end**, which silently overwrites `db/schema.rb` from your (probably polluted) local DB. So after migrating, restore the hand-resolved schema: `git checkout -m -- db/schema.rb` and re-resolve, OR `git show :2:db/schema.rb`/manual fix. Do not trust the post-migrate working-tree schema.
 
 **Traps to remember:**
 
-- **Local dev DB may have tables from other branches** (kanban, features in progress). After `db:schema:dump`, diff against `git show HEAD:db/schema.rb` and `git show MERGE_HEAD:db/schema.rb` to find extras. Manually delete stray `create_table` blocks + any foreign-key references + column references in shared tables (`conversations.kanban_task_id`, etc.).
+- **Local dev DB has tables from other branches** (kanban, Pro features) because dev DBs are shared across branches. `db:schema:dump` (including the implicit one inside `db:migrate`) will dump those stray tables into `db/schema.rb`. The fork CE `main` schema must be **kanban-free**. Validate with a hard check, EVERY merge:
+  ```bash
+  grep -ic kanban db/schema.rb        # MUST be 0 on the CE fork
+  diff <(git show HEAD:db/schema.rb) db/schema.rb | grep '^[<>]'   # should show ONLY this merge's upstream additions
+  ```
+  The ONLY valid baseline for that diff is `git show HEAD:db/schema.rb` / `git show MERGE_HEAD:db/schema.rb` — **never a local copy made after `db:migrate`** (it is already polluted, so the diff comes back empty and hides the strays — this is a real footgun that has shipped kanban refs into a CE merge). If strays are present, recover the clean merge schema via `git checkout -m -- db/schema.rb` (step 3) instead of hand-deleting 90+ lines.
 
 - **Custom SQL functions aren't dumpable.** `db:schema:dump` strips our `execute <<~SQL CREATE OR REPLACE FUNCTION f_unaccent(text)` block. Automated re-injection is wired via the `Rakefile` + `lib/tasks/internal_chat_search.rake` (`db:internal_chat:inject_schema_functions` runs as an `enhance` hook after `db:schema:dump`). If you see the block missing after a dump, the hook didn't run — check the Rakefile wiring and the task for a warning line like `Could not find insertion point ...`. The function itself is created by migration `20260410170003_add_unaccent_search_to_internal_chat.rb`.
 
@@ -230,6 +237,38 @@ NODE_OPTIONS="--max-old-space-size=4096" npx vitest run \
 ```
 
 Keep the output around until after push — if CI fails, being able to compare local vs CI run saves a round trip.
+
+## Mandatory subagent review
+
+After the validation flow passes and the merge is committed, **spawn a panel of read-only subagents to independently verify the merge** before merging the PR. This is a required gate. Run them in parallel (one message, multiple `Agent` calls), each with a distinct lens, each returning a structured PASS/FAIL verdict with evidence. Hard constraints to put in EVERY agent prompt:
+
+- READ-ONLY: do not modify any file.
+- **Do NOT run `rails db:migrate` or `rails db:schema:dump`** — both auto-dump `db/schema.rb` from the local dev DB and would re-introduce kanban/Pro strays.
+- Tell each agent that HEAD may be one or more docs/follow-up commits ahead of the merge commit, so it should locate the actual merge commit and use its real parents (`^1` = fork side, `^2` = upstream side) rather than assuming `HEAD` is the merge.
+
+Minimum panel (scale up for big merges):
+
+1. **Schema integrity** — `grep -ic kanban db/schema.rb` is 0; `diff <(git show <merge>^1:db/schema.rb) db/schema.rb` shows ONLY this version's intended upstream additions (no stray tables); version stamp correct; fork tables + `f_unaccent` present; parses; no markers.
+2. **Per-file resolution correctness** — for each conflicted file, confirm both sides' intent is preserved per the directive (default: prefer fork, pull upstream improvements), `ruby -c`/parse passes, and a repo-wide `git grep` finds zero leftover conflict markers.
+3. **High-risk-area deep-dive** — the trickiest CO of this merge (often the WhatsApp incoming service / referral architecture): no orphaned or duplicated methods, all callers consistent, specs assert the fork's shape. Let this agent run the one or two light specs for that area.
+4. **Auto-merge semantic-breakage sweep** — THE class of bug the per-file review misses, because the break is in a file that auto-merged cleanly. Upstream renames/moves/removes a symbol, file, or component on its side; a fork file that auto-merged still references the old name → green textual merge, broken build. Have this agent hunt for: imports that no longer resolve (Vue/JS `import ... from` and Ruby `require`/constant refs), components/helpers/i18n keys referenced but renamed upstream, and method calls whose definition moved. Grep the merge diff for files upstream renamed/deleted, then grep the fork tree for stale references to them.
+
+> Real example (4.15.0): upstream #14741 renamed `shared/components/emoji/EmojiInput.vue` → `EmojiPicker.vue` and swapped its `:on-click` prop for a `select` event. The fork's `EmojiReactionPicker.vue` auto-merged with the stale import + prop. Zero conflict markers, clean rubocop/eslint-on-changed-files, all backend specs green — but the Vite transform broke every frontend spec that transitively imported it. Neither manual review nor a per-resolved-file subagent caught it; **only the frontend CI job did.** This is exactly why lenses #4 and the CI gate are both mandatory.
+
+The subagent panel COMPLEMENTS but never REPLACES the CI gate below — agents reason over source, CI actually builds and runs everything. Treat any agent FAIL as blocking, and never merge on a green panel with a red CI.
+
+### Validate on upstream CI (GitHub Actions) before merging
+
+Local specs cover the resolved files, but the authoritative gate is the fork's own CI. After committing the merge and pushing the `chore/merge-upstream-X.Y.Z` branch, **trigger the CE spec workflow on the branch and wait for green before merging the PR** (the `Run Chatwoot CE spec` workflow, `run_foss_spec.yml`, only fires on tag pushes + `workflow_dispatch`, so a branch push alone does NOT run it):
+
+```bash
+git push -u origin chore/merge-upstream-X.Y.Z
+gh workflow run run_foss_spec.yml --ref chore/merge-upstream-X.Y.Z
+gh run list --workflow=run_foss_spec.yml --branch chore/merge-upstream-X.Y.Z --limit 1   # grab the run id
+gh run watch <run-id>                                                                    # or poll with `gh run view <run-id>`
+```
+
+For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered the same way against `chatwoot-pro-main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
 
 ## Pre-commit pitfalls
 

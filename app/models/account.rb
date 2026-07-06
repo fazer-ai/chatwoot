@@ -131,6 +131,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   after_create_commit :notify_creation
   after_create_commit :setup_internal_chat
   after_destroy :remove_account_sequences
+  after_update_commit :clear_unread_conversation_counts_cache, if: :saved_change_to_feature_conversation_unread_counts?
   after_commit :ensure_simulator_inbox!, on: %i[create update], if: :env_test?
 
   def agents
@@ -219,6 +220,13 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
     Redis::Alfred.exists?(enrichment_key) ? 'enrichment' : step
   end
 
+  # Ensure reset_cache_keys also drops the unread counts store so any account-level
+  # cache reset propagates to the memoized counters.
+  def reset_cache_keys
+    super
+    clear_unread_conversation_counts_cache
+  end
+
   private
 
   def notify_creation
@@ -245,6 +253,10 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
       update_column(:simulator_inbox_id, inbox.id)
       # rubocop:enable Rails/SkipsModelValidations
     end
+  end
+
+  def clear_unread_conversation_counts_cache
+    ::Conversations::UnreadCounts::Store.clear_all_account!(id)
   end
 
   trigger.after(:insert).for_each(:row) do

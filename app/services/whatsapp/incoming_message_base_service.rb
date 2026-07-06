@@ -223,7 +223,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   def create_contact_messages(message)
     message['contacts'].each do |contact|
       # Pass source_id from parent message since contact objects don't have :id
-      create_message(contact, source_id: message[:id])
+      create_message(contact, source_id: message[:id], content_attributes_source: message)
       attach_contact(contact)
       @message.save!
     end
@@ -372,7 +372,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     )
   end
 
-  def create_message(message, source_id: nil)
+  def create_message(message, source_id: nil, content_attributes_source: message)
     @message = @conversation.messages.build(
       content: message_content(message),
       account_id: @inbox.account_id,
@@ -382,11 +382,11 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
       status: outgoing_echo ? :delivered : :sent,
       sender: outgoing_echo ? nil : @contact,
       source_id: (source_id || message[:id]).to_s,
-      content_attributes: build_content_attributes(message)
+      content_attributes: message_content_attributes(content_attributes_source)
     )
   end
 
-  def build_content_attributes(message)
+  def message_content_attributes(message)
     content_attrs = outgoing_echo ? { external_echo: true } : {}
     content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
     content_attrs[:external_created_at] = message[:timestamp].to_i

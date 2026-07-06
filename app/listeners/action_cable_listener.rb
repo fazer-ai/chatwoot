@@ -55,6 +55,39 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     )
   end
 
+  def inbox_provider_connection_updated(event)
+    inbox = event.data[:inbox]
+    account = inbox.account
+    provider_connection = event.data[:provider_connection] || {}
+
+    # QR code / error are admin-only (mirrors Channel::Whatsapp#provider_connection_data):
+    # the QR grants full access to the WhatsApp account, so it must not reach agents.
+    # Agents and admins receive different payloads (admins also get qr_data_url/error,
+    # which grant full WhatsApp account access), so the two recipient lists are built
+    # separately. Querying each role directly also avoids `user_tokens` re-querying
+    # administrators. The roles are disjoint, so the lists never overlap.
+    admin_tokens = account.administrators.pluck(:pubsub_token)
+    agent_tokens = account.agents.pluck(:pubsub_token)
+
+    # reach-out lock and new-chat cap are not credential-sensitive (unlike qr_data_url), so they
+    # ride the base hash shared by both agent and admin broadcasts. Without this, a connection.update
+    # push would broadcast a provider_connection without them and the frontend mutation (wholesale
+    # replace) would drop the restriction/cap banners. .presence + .compact keeps absent keys out.
+    connection = {
+      connection: provider_connection['connection'],
+      reachout_time_lock: provider_connection['reachout_time_lock'].presence,
+      new_chat_cap: provider_connection['new_chat_cap'].presence
+    }.compact
+    broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
+    broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
+                inbox_id: inbox.id,
+                provider_connection: connection.merge(
+                  qr_data_url: provider_connection['qr_data_url'],
+                  error: provider_connection['error']
+                )
+              })
+  end
+
   def message_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
@@ -156,6 +189,15 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     metadata = event.data[:broadcast_metadata]
     payload = payload.merge(event_metadata: metadata) if metadata.present?
     broadcast(account, tokens, CONVERSATION_UPDATED, payload)
+  end
+
+  def conversation_unread_count_changed(event)
+    account, inbox_members, include_admins = ::Conversations::UnreadCounts::BroadcastScope.new(event).perform
+    return if account.blank? || !account.feature_enabled?('conversation_unread_counts')
+
+    tokens = include_admins ? user_tokens(account, inbox_members) : inbox_members.pluck(:pubsub_token)
+
+    broadcast(account, tokens, CONVERSATION_UNREAD_COUNT_CHANGED, {})
   end
 
   def conversation_typing_on(event)

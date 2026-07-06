@@ -88,6 +88,35 @@ describe Whatsapp::IncomingMessageBaileysService do
       )
     end
 
+    context 'when processing message-capping.update event' do
+      it 'persists the UI-relevant cap keys and drops server_sent_timestamp' do
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'message-capping.update',
+          data: {
+            capping_status: 'FIRST_WARNING',
+            ote_status: 'ELIGIBLE',
+            mv_status: 'NOT_ELIGIBLE',
+            total_quota: 100,
+            used_quota: 80,
+            cycle_end_timestamp: '1781699999',
+            server_sent_timestamp: '1781645846'
+          }
+        }
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.reload.provider_connection['new_chat_cap']).to eq(
+          'capping_status' => 'FIRST_WARNING',
+          'ote_status' => 'ELIGIBLE',
+          'mv_status' => 'NOT_ELIGIBLE',
+          'total_quota' => 100,
+          'used_quota' => 80,
+          'cycle_end_timestamp' => '1781699999'
+        )
+      end
+    end
+
     context 'when processing connection.update event' do
       let(:base_params) { { webhookVerifyToken: webhook_verify_token, event: 'connection.update' } }
 
@@ -161,6 +190,155 @@ describe Whatsapp::IncomingMessageBaileysService do
         described_class.new(inbox: inbox, params: params).perform
 
         expect(inbox.channel.provider_connection['error']).to be_nil
+      end
+
+      context 'with reach-out time-lock (error 463 / account restriction)' do
+        let(:reachout_data) do
+          { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' }
+        end
+
+        it 'persists the lock from a standalone reachoutTimeLock push and keeps the connection' do
+          inbox.channel.update_provider_connection!(connection: 'open')
+          params = base_params.merge(data: { reachoutTimeLock: reachout_data })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+          expect(inbox.channel.provider_connection['reachout_time_lock']).to eq(
+            'is_active' => true,
+            'time_enforcement_ends' => '2026-06-19T21:52:39.000Z',
+            'enforcement_type' => 'RESTRICT_ALL_COMPANIONS'
+          )
+        end
+
+        it 'preserves an existing lock when a connection-only update arrives' do
+          inbox.channel.update_provider_connection!(
+            connection: 'open',
+            reachout_time_lock: { is_active: true, time_enforcement_ends: '2026-06-19T21:52:39.000Z', enforcement_type: 'RESTRICT_ALL_COMPANIONS' }
+          )
+          params = base_params.merge(data: { connection: 'connecting' })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('connecting')
+          expect(inbox.channel.provider_connection['reachout_time_lock']).to include('is_active' => true)
+        end
+
+        it 'records the cleared state when isActive is false' do
+          params = base_params.merge(data: { reachoutTimeLock: { isActive: false, enforcementType: 'DEFAULT' } })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['reachout_time_lock']).to eq('is_active' => false, 'enforcement_type' => 'DEFAULT')
+        end
+
+        it 'persists only is_active when the deadline and type are absent' do
+          params = base_params.merge(data: { reachoutTimeLock: { isActive: true } })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['reachout_time_lock']).to eq('is_active' => true)
+        end
+
+        it 'discards a stale-epoch reachoutTimeLock push' do
+          inbox.channel.update_provider_connection!(connection: 'open', epoch: 7)
+          params = base_params.merge(data: { reachoutTimeLock: reachout_data, epoch: 6 })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['reachout_time_lock']).to be_nil
+        end
+      end
+
+      context 'with new-chat cap (quota)' do
+        it 'preserves an existing cap when a connection-only update arrives' do
+          inbox.channel.update_provider_connection!(
+            connection: 'open',
+            new_chat_cap: { capping_status: 'CAPPED', total_quota: 100, used_quota: 100 }
+          )
+          params = base_params.merge(data: { connection: 'connecting' })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('connecting')
+          expect(inbox.channel.provider_connection['new_chat_cap']).to include('capping_status' => 'CAPPED')
+        end
+      end
+
+      context 'with lease epochs (multi-instance baileys-api)' do
+        it 'persists the epoch alongside the connection state' do
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 7 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection).to include('connection' => 'open', 'epoch' => 7)
+        end
+
+        it 'discards events carrying an epoch older than the last seen' do
+          # A late retry from a previous owner (e.g. "reconnecting") must not
+          # overwrite the current owner's "open".
+          inbox.channel.update_provider_connection!(connection: 'open', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'reconnecting', epoch: 6 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+          expect(inbox.channel.provider_connection['epoch']).to eq(7)
+        end
+
+        it 'accepts events with the same epoch as the last seen' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 7 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+        end
+
+        it 'accepts events without an epoch (older baileys-api versions)' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting', epoch: 7)
+          params = base_params.merge(
+            {
+              data: { connection: 'open' }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection['connection']).to eq('open')
+        end
+
+        it 'accepts any epoch when none has been seen yet' do
+          inbox.channel.update_provider_connection!(connection: 'reconnecting')
+          params = base_params.merge(
+            {
+              data: { connection: 'open', epoch: 3 }
+            }
+          )
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.provider_connection).to include('connection' => 'open', 'epoch' => 3)
+        end
+
+        it 'acquires a row lock so the epoch check and update are atomic' do
+          params = base_params.merge({ data: { connection: 'open', epoch: 7 } })
+          expect(inbox.channel).to receive(:with_lock).and_call_original
+
+          described_class.new(inbox: inbox, params: params).perform
+        end
       end
     end
 

@@ -10,25 +10,80 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   #   - `open`: Open and ready to send/receive messages
   def process_connection_update
     data = processed_params[:data]
-    current = inbox.channel.provider_connection || {}
 
+    inbox.channel.with_lock do
+      if stale_connection_event?(data)
+        Rails.logger.warn(
+          "Baileys stale connection.update discarded: epoch #{data[:epoch]} < #{inbox.channel.provider_connection['epoch']}"
+        )
+        next
+      end
+
+      inbox.channel.update_provider_connection!(provider_connection_payload(data))
+      Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
+    end
+  end
+
+  # NOTE: `connection` values
+  #   - `close`: Never opened, or closed and no longer able to send/receive messages
+  #   - `connecting`: In the process of connecting, expecting QR code to be read
+  #   - `reconnecting`: Connection has been established, but not open (i.e. device is being linked for the first time, or Baileys server restart)
+  #   - `open`: Open and ready to send/receive messages
+  def provider_connection_payload(data)
+    current = inbox.channel.provider_connection || {}
     next_connection = data[:connection] || current['connection']
 
-    payload = {
+    {
       connection: next_connection,
       qr_data_url: resolve_qr_data_url(data, current, next_connection),
-      error: translate_baileys_error(data[:error])
+      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
+      reachout_time_lock: reachout_time_lock_payload(data),
+      # new_chat_cap never rides a connection.update (it arrives via message-capping.update / the
+      # poll). update_provider_connection! replaces provider_connection wholesale, so without
+      # carrying it forward here every connection.update would wipe the cap and flicker the banner
+      # off until the next cap push/poll. Preserve the existing value; .compact omits it when unset.
+      new_chat_cap: current['new_chat_cap'],
+      # `history_import` lives alongside `connection` in the same JSONB. Since
+      # `update_provider_connection!` REPLACES the column (not merge), we have
+      # to carry the snapshot forward or the history-import card disappears
+      # the next time Baileys re-emits a connection_update event (typing, QR
+      # rotation, reconnect).
+      history_import: current['history_import'].presence,
+      epoch: data[:epoch]
     }.compact
-    # `history_import` lives alongside `connection` in the same JSONB. Since
-    # `update_provider_connection!` REPLACES the column (not merge), we have
-    # to carry the snapshot forward or the history-import card disappears
-    # the next time Baileys re-emits a connection_update event (typing, QR
-    # rotation, reconnect).
-    payload[:history_import] = current['history_import'] if current['history_import'].present?
+  end
 
-    inbox.channel.update_provider_connection!(payload)
+  # Reach-out time-lock is NOT echoed on every connection.update (the provider debounces it
+  # ~60s and may push it standalone, without a `connection` value). So, unlike qr_data_url, a
+  # connection-only event must PRESERVE the existing lock rather than reset it. When the
+  # provider DOES send reachoutTimeLock (including isActive:false to lift the restriction), we
+  # persist it verbatim — isActive:false is a real "cleared" state the UI relies on to drop the
+  # banner. Returns nil only when nothing was ever set, so the outer .compact omits the key.
+  def reachout_time_lock_payload(data)
+    raw = data[:reachoutTimeLock]
+    return inbox.channel.provider_connection['reachout_time_lock'] if raw.blank?
 
-    Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
+    {
+      is_active: raw[:isActive] || false,
+      time_enforcement_ends: raw[:timeEnforcementEnds],
+      enforcement_type: raw[:enforcementType]
+    }.compact
+  end
+
+  # In a multi-instance baileys-api deployment, ownership of a phone number
+  # moves between instances (failover, rebalance, rolling deploys). Each
+  # connection.update carries the lease epoch of its sender; events from a
+  # previous owner can arrive late (webhook retries) and must not overwrite
+  # the current owner's state — last-writer-wins here would leave the inbox
+  # stuck on a stale "reconnecting" while the connection is actually open.
+  # Events without an epoch (older baileys-api versions) are always accepted.
+  def stale_connection_event?(data)
+    return false if data[:epoch].blank?
+
+    last_epoch = inbox.channel.provider_connection['epoch']
+    return false if last_epoch.blank?
+
+    data[:epoch].to_i < last_epoch.to_i
   end
 
   # Baileys emits multiple connection_update events per pairing session and only some carry
@@ -39,11 +94,5 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
     return current['qr_data_url'] if next_connection == 'connecting'
 
     nil
-  end
-
-  def translate_baileys_error(error_key)
-    return nil if error_key.blank?
-
-    I18n.t("errors.inboxes.channel.provider_connection.#{error_key}")
   end
 end
