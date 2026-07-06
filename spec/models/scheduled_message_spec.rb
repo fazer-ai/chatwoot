@@ -134,12 +134,20 @@ RSpec.describe ScheduledMessage, type: :model do
         expect(scheduled_message).to be_valid
       end
 
+      it 'allows editing held messages' do
+        scheduled_message = create_scheduled_message
+        scheduled_message.update_column(:status, described_class.statuses[:held]) # rubocop:disable Rails/SkipsModelValidations
+
+        expect { scheduled_message.update!(content: 'Revised content') }.not_to raise_error
+        expect(scheduled_message.reload.content).to eq('Revised content')
+      end
+
       it 'does not allow editing content of sent messages' do
         scheduled_message = create_scheduled_message
         scheduled_message.update!(status: :sent)
 
         expect { scheduled_message.update!(content: 'Updated content') }.to raise_error(ActiveRecord::RecordInvalid) do |error|
-          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft or pending')
+          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft, pending, or held')
         end
       end
 
@@ -148,7 +156,7 @@ RSpec.describe ScheduledMessage, type: :model do
         scheduled_message.update!(status: :failed)
 
         expect { scheduled_message.update!(content: 'Updated content') }.to raise_error(ActiveRecord::RecordInvalid) do |error|
-          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft or pending')
+          expect(error.record.errors[:base]).to include('Scheduled message can only be modified while draft, pending, or held')
         end
       end
 
@@ -260,6 +268,9 @@ RSpec.describe ScheduledMessage, type: :model do
         scheduled_at: 1.minute.from_now
       )
       failed_message.update!(status: :failed)
+
+      held_message = create_scheduled_message(scheduled_at: 1.minute.from_now)
+      held_message.update_column(:status, described_class.statuses[:held]) # rubocop:disable Rails/SkipsModelValidations
 
       # NOTE: Travel to a time where due_same_minute and overdue are due but not_due_yet is not
       travel_to(5.minutes.from_now)

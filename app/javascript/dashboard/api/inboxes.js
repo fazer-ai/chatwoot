@@ -83,6 +83,12 @@ class Inboxes extends CacheEnabledApiClient {
   toggleReconnection(inboxId) {
     return axios.post(`${this.url}/${inboxId}/toggle_reconnection`);
   }
+
+  setInboundCalls(inboxId, enabled) {
+    return axios.post(`${this.url}/${inboxId}/set_inbound_calls`, {
+      inbound_calls_enabled: enabled,
+    });
+  }
 }
 
 export default new Inboxes();

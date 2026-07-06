@@ -75,6 +75,9 @@ module Events::Types
   # operations notification events (super-admin broadcasts to users)
   OPERATIONS_NOTIFICATION_CREATED = 'operations_notification.created'
 
+  # inbox provider connection status updates (Baileys / WhatsApp Cloud reach-out lock, QR, etc.)
+  INBOX_PROVIDER_CONNECTION_UPDATED = 'inbox.provider_connection_updated'
+
   # agent events
   AGENT_ADDED = 'agent.added'
   AGENT_REMOVED = 'agent.removed'

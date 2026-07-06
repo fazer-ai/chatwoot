@@ -317,6 +317,7 @@
     "MEDIA": {
       "IMAGE_UNAVAILABLE": "Esta imagem não está mais disponível.",
       "AUDIO_UNAVAILABLE": "Este áudio não está mais disponível.",
+      "VIDEO_UNAVAILABLE": "Este vídeo não está mais disponível.",
       "LOADING_FAILED": "Falha no carregamento"
     }
   },

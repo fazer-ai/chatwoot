@@ -1,3 +1,4 @@
+# rubocop:disable RSpec/AnyInstance
 require 'rails_helper'
 
 RSpec.describe 'Webhooks::WhatsappController', type: :request do
@@ -375,3 +376,4 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
     end
   end
 end
+# rubocop:enable RSpec/AnyInstance

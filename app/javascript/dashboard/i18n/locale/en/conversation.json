@@ -358,6 +358,16 @@
         "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp is not connected. Click this button to try to reconnect, or please contact your administrator to link your device again.",
         "LINK_DEVICE": "Link device",
         "RECONNECT_FAILED": "Failed to reconnect. Please contact your administrator to link your device again."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "WhatsApp has temporarily restricted starting new conversations from this number.",
+        "RESTRICTED_UNTIL": "WhatsApp has temporarily restricted starting new conversations from this number until {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "This number is approaching its WhatsApp limit for starting new conversations this cycle.",
+        "WARNING_WITH_QUOTA": "This number has started {used} of {total} new conversations allowed by WhatsApp this cycle.",
+        "CAPPED": "This number has reached its WhatsApp limit for starting new conversations this cycle.",
+        "CAPPED_WITH_QUOTA": "This number has reached its WhatsApp limit ({used} of {total}) for starting new conversations this cycle."
       }
     }
   },
@@ -442,7 +452,8 @@
       "VIEW_ALL": "View all",
       "SHOW_LESS": "Show less",
       "MORE_COUNT": "+{count}",
-      "UNTITLED_FILE": "Untitled file"
+      "UNTITLED_FILE": "Untitled file",
+      "JUMP_TO_MESSAGE": "Jump to message"
     },
     "SHOPIFY": {
       "ORDER_ID": "Order #{id}",
@@ -472,8 +483,10 @@
       "DRAFT": "Draft",
       "PENDING": "Pending",
       "SENT": "Sent",
-      "FAILED": "Failed"
+      "FAILED": "Failed",
+      "HELD": "Held"
     },
+    "HELD_SECTION": "Held",
     "ITEM": {
       "SCHEDULED_FOR": "Scheduled for {time}",
       "NO_SCHEDULE": "No schedule",
@@ -486,7 +499,8 @@
       "COLLAPSE": "Collapse",
       "GO_TO_MESSAGE": "Go to message",
       "SEARCHING_MESSAGE": "Searching for message...",
-      "MESSAGE_NOT_FOUND": "The linked message was not found. It may have been deleted."
+      "MESSAGE_NOT_FOUND": "The linked message was not found. It may have been deleted.",
+      "HELD_REASON": "Held because the customer replied before this message was sent."
     },
     "MODAL": {
       "TITLE_NEW": "Schedule a message",
@@ -503,6 +517,8 @@
       "CANCEL": "Cancel",
       "SAVE_DRAFT": "Save as draft",
       "SCHEDULE": "Schedule",
+      "HOLD_ON_REPLY_LABEL": "Hold if customer replies first",
+      "HOLD_ON_REPLY_DESCRIPTION": "If the customer sends a message before this one is sent, the message will be held for review instead of being sent automatically.",
       "SHORTCUTS": {
         "TOMORROW_MORNING": "Tomorrow morning",
         "TOMORROW_AFTERNOON": "Tomorrow afternoon",

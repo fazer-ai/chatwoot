@@ -32,6 +32,10 @@ RSpec.describe 'Super Admin accounts API', type: :request do
       create(:team, account: account)
     end
 
+    after do
+      Conversations::UnreadCounts::Store.clear_all_account!(account.id)
+    end
+
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
         post "/super_admin/accounts/#{account.id}/reset_cache"

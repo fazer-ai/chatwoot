@@ -108,6 +108,7 @@ class User < ApplicationRecord
 
   has_many :scheduled_messages, as: :author, dependent: :nullify
   has_many :recurring_scheduled_messages, as: :author, dependent: :nullify
+  has_many :user_sessions, dependent: :destroy
 
   has_many :custom_filters, dependent: :destroy_async
   has_many :dashboard_apps, dependent: :nullify
@@ -126,6 +127,7 @@ class User < ApplicationRecord
 
   before_validation :set_password_and_uid, on: :create
   after_destroy :remove_macros
+  after_save :sync_user_sessions, if: :saved_change_to_tokens?
 
   scope :order_by_full_name, -> { order('lower(name) ASC') }
 
@@ -237,6 +239,11 @@ class User < ApplicationRecord
   end
 
   private
+
+  def sync_user_sessions
+    active_client_ids = (tokens || {}).keys
+    user_sessions.where.not(client_id: active_client_ids).destroy_all
+  end
 
   def remove_macros
     macros.personal.destroy_all

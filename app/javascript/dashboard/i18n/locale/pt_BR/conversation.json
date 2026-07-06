@@ -357,6 +357,16 @@
         "NOT_CONNECTED_CONTACT_ADMIN": "O WhatsApp não está conectado. Clique no botão ao lado para tentar reconectar, ou contate o seu administrador para conectar o dispositivo novamente.",
         "LINK_DEVICE": "Conectar dispositivo",
         "RECONNECT_FAILED": "Falha ao reconectar. Por favor, contate o seu administrador para conectar o dispositivo novamente."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "O WhatsApp restringiu temporariamente o início de novas conversas a partir deste número.",
+        "RESTRICTED_UNTIL": "O WhatsApp restringiu temporariamente o início de novas conversas a partir deste número até {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "Este número está se aproximando do limite do WhatsApp para iniciar novas conversas neste ciclo.",
+        "WARNING_WITH_QUOTA": "Este número já iniciou {used} de {total} novas conversas permitidas pelo WhatsApp neste ciclo.",
+        "CAPPED": "Este número atingiu o limite do WhatsApp para iniciar novas conversas neste ciclo.",
+        "CAPPED_WITH_QUOTA": "Este número atingiu o limite do WhatsApp ({used} de {total}) para iniciar novas conversas neste ciclo."
       }
     }
   },
@@ -471,8 +481,10 @@
       "DRAFT": "Rascunho",
       "PENDING": "Pendente",
       "SENT": "Enviada",
-      "FAILED": "Falhou"
+      "FAILED": "Falhou",
+      "HELD": "Retida"
     },
+    "HELD_SECTION": "Retidas",
     "ITEM": {
       "SCHEDULED_FOR": "Agendada para {time}",
       "NO_SCHEDULE": "Sem agendamento",
@@ -485,7 +497,8 @@
       "COLLAPSE": "Recolher",
       "GO_TO_MESSAGE": "Ir para a mensagem",
       "SEARCHING_MESSAGE": "Buscando mensagem...",
-      "MESSAGE_NOT_FOUND": "A mensagem vinculada não foi encontrada. Ela pode ter sido excluída."
+      "MESSAGE_NOT_FOUND": "A mensagem vinculada não foi encontrada. Ela pode ter sido excluída.",
+      "HELD_REASON": "Retida porque o cliente respondeu antes desta mensagem ser enviada."
     },
     "MODAL": {
       "TITLE_NEW": "Agendar mensagem",
@@ -502,6 +515,8 @@
       "CANCEL": "Cancelar",
       "SAVE_DRAFT": "Salvar como rascunho",
       "SCHEDULE": "Agendar",
+      "HOLD_ON_REPLY_LABEL": "Reter se o cliente responder primeiro",
+      "HOLD_ON_REPLY_DESCRIPTION": "Se o cliente enviar uma mensagem antes desta ser enviada, ela ficará retida para revisão em vez de ser enviada automaticamente.",
       "SHORTCUTS": {
         "TOMORROW_MORNING": "Amanhã de manhã",
         "TOMORROW_AFTERNOON": "Amanhã à tarde",
