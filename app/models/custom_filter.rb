@@ -26,7 +26,6 @@ class CustomFilter < ApplicationRecord
   enum :visibility, { personal: 0, global: 1 }, validate: true
 
   validate :validate_number_of_filters
-  after_commit :notify_unread_filter_counts_changed, on: [:create, :update, :destroy]
 
   def set_visibility(user, params)
     self.visibility = params[:visibility] if params.key?(:visibility)
@@ -44,13 +43,5 @@ class CustomFilter < ApplicationRecord
     return true if account.custom_filters.where(user_id: user_id).size < Limits::MAX_CUSTOM_FILTERS_PER_USER
 
     errors.add :account_id, I18n.t('errors.custom_filters.number_of_records')
-  end
-
-  private
-
-  def notify_unread_filter_counts_changed
-    return unless conversation?
-
-    ::Conversations::UnreadCounts::UserFilterNotifier.new(account: account, user: user).perform
   end
 end

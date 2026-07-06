@@ -39,7 +39,6 @@ class AccountUser < ApplicationRecord
   after_create_commit :notify_creation, :create_notification_setting, :add_to_public_internal_chat_channels
   after_destroy :notify_deletion, :remove_user_from_account
   after_save :update_presence_in_redis, if: :saved_change_to_availability?
-  after_commit :notify_unread_filter_counts_changed, on: [:update, :destroy], if: :unread_filter_access_changed?
 
   validates :user_id, uniqueness: { scope: :account_id }
 
@@ -90,14 +89,6 @@ class AccountUser < ApplicationRecord
         m.role = administrator? ? :admin : :member
       end
     end
-  end
-
-  def unread_filter_access_changed?
-    destroyed? || previous_changes.key?('role') || previous_changes.key?('custom_role_id')
-  end
-
-  def notify_unread_filter_counts_changed
-    ::Conversations::UnreadCounts::UserFilterNotifier.new(account: account, user: user).perform
   end
 end
 
