@@ -12,10 +12,16 @@ class Widget::RedirectToken
     def consume(token)
       return if token.blank?
 
-      raw = ::Redis::Alfred.get(key(token))
+      # Atomic get-and-delete so a token can never be consumed twice by concurrent
+      # requests. GETDEL is not namespaced by redis-namespace, so use MULTI/EXEC.
+      raw, = ::Redis::Alfred.with do |conn|
+        conn.multi do |transaction|
+          transaction.get(key(token))
+          transaction.del(key(token))
+        end
+      end
       return if raw.blank?
 
-      ::Redis::Alfred.delete(key(token))
       JSON.parse(raw)
     end
 

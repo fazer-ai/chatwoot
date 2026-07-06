@@ -4,6 +4,7 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   def create
     payload = ::Widget::RedirectToken.consume(permitted_params[:token])
     return render(json: { error: 'invalid_token' }, status: :not_found) if payload.blank?
+    return render(json: { error: 'invalid_token' }, status: :not_found) if payload['inbox_id'] != @web_widget.inbox.id
 
     identify_from_token(payload)
     resume_or_start_conversation(payload)
@@ -17,11 +18,13 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   private
 
   def identify_from_token(payload)
-    if @contact.identifier.present? && @contact.identifier != payload['identifier']
+    if payload['identifier'].present? && @contact.identifier.present? && @contact.identifier != payload['identifier']
       @contact_inbox, @widget_auth_token = build_contact_inbox_with_token(@web_widget)
       @contact = @contact_inbox.contact
     end
     @contact_inbox.update!(hmac_verified: true)
+    return if payload['identifier'].blank?
+
     @contact = ContactIdentifyAction.new(
       contact: @contact,
       params: { identifier: payload['identifier'] },

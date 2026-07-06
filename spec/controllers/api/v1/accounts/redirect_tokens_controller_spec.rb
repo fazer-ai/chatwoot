@@ -27,7 +27,8 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         expect(body['token']).to be_present
         expect(body['expires_in']).to eq(Widget::RedirectToken::DEFAULT_TTL)
         expect(body['website_url']).to eq(web_widget.website_url)
-        expect(Widget::RedirectToken.consume(body['token'])).to eq('identifier' => 'user-1', 'message' => 'Hi')
+        expect(Widget::RedirectToken.consume(body['token']))
+          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'message' => 'Hi')
       end
 
       it 'honours a custom ttl_seconds' do
@@ -39,6 +40,25 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         expect(response.parsed_body['expires_in']).to eq(60)
       end
 
+      it 'clamps a ttl_seconds above the default down to the default' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: agent.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', ttl_seconds: 10.years.to_i },
+             as: :json
+
+        expect(response.parsed_body['expires_in']).to eq(Widget::RedirectToken::DEFAULT_TTL)
+      end
+
+      it 'clamps a non-positive ttl_seconds up to a positive value' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: agent.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', ttl_seconds: -5 },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['expires_in']).to be >= 1
+      end
+
       it 'omits blank optional attributes from the stored payload' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
              headers: agent.create_new_auth_token,
@@ -46,7 +66,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
              as: :json
 
         token = response.parsed_body['token']
-        expect(Widget::RedirectToken.consume(token)).to eq('identifier' => 'user-1')
+        expect(Widget::RedirectToken.consume(token)).to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1')
       end
 
       it 'rejects a non web widget inbox' do
