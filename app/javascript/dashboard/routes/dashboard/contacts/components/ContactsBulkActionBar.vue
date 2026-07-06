@@ -151,6 +151,7 @@ const handleUnassignLabels = labels => {
                 mode="unassign"
                 class="[&>.triangle]:!hidden [&>div>button]:!hidden ltr:!right-0 rtl:!left-0 top-8 mt-0.5"
                 @unassign="handleUnassignLabels"
+                @close="closeUnassignLabelSelector"
               />
             </transition>
           </div>

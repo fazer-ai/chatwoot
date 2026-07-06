@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store';
-import { vOnClickOutside } from '@vueuse/components';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
@@ -65,8 +64,12 @@ const handleSubmit = () => {
 </script>
 
 <template>
+  <!-- Click-outside is handled by the parent wrapper (which also owns the
+       trigger button) so a click on the button doesn't trip an "outside"
+       detector attached here — otherwise the popover closes and the button
+       immediately re-opens it in the same event tick and the Apply click
+       never lands. -->
   <div
-    v-on-click-outside="onClose"
     class="absolute ltr:right-2 rtl:left-2 top-12 origin-top-right z-20 w-60 bg-n-alpha-3 backdrop-blur-[100px] border-n-weak rounded-lg border border-solid shadow-md"
     role="dialog"
     aria-labelledby="label-dialog-title"
