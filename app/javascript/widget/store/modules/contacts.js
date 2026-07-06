@@ -1,5 +1,6 @@
 import { sendMessage } from 'widget/helpers/utils';
 import ContactsAPI from '../../api/contacts';
+import RedirectAPI from '../../api/redirect';
 import { SET_USER_ERROR } from '../../constants/errorTypes';
 import { setHeader } from '../../helpers/axios';
 const state = {
@@ -85,6 +86,21 @@ export const actions = {
     } catch (error) {
       const data = parseErrorData(error);
       sendMessage({ event: 'error', errorType: SET_USER_ERROR, data });
+    }
+  },
+  resolveRedirect: async ({ dispatch }, token) => {
+    try {
+      const {
+        data: { widget_auth_token: widgetAuthToken },
+      } = await RedirectAPI.resolve(token);
+      updateWidgetAuthToken(widgetAuthToken);
+      dispatch('get');
+      dispatch('conversation/clearConversations', {}, { root: true });
+      dispatch('conversation/fetchOldConversations', {}, { root: true });
+      dispatch('conversationAttributes/getAttributes', {}, { root: true });
+      return true;
+    } catch (error) {
+      return false;
     }
   },
   setCustomAttributes: async (_, customAttributes = {}) => {

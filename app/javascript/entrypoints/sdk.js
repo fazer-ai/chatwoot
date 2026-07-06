@@ -1,5 +1,6 @@
 import Cookies from 'js-cookie';
 import { IFrameHelper } from '../sdk/IFrameHelper';
+import { parseRedirectParams } from '../sdk/redirectHelpers';
 import {
   getBubbleView,
   getDarkMode,
@@ -209,6 +210,17 @@ const runSDK = ({ baseUrl, websiteToken }) => {
       window.$chatwoot.resetTriggered = true;
     },
   };
+
+  const redirect = parseRedirectParams(window.location.hash);
+  if (redirect) {
+    window.$chatwoot.redirectToken = redirect.token;
+    window.$chatwoot.autoOpen = redirect.autoOpen;
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + window.location.search
+    );
+  }
 
   IFrameHelper.createFrame({
     baseUrl,
