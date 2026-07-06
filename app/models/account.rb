@@ -256,7 +256,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   end
 
   def clear_unread_conversation_counts_cache
-    ::Conversations::UnreadCounts::Store.clear_all_account!(id)
+    ::Conversations::UnreadCounts::Store.clear_account!(id)
   end
 
   trigger.after(:insert).for_each(:row) do
