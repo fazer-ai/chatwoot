@@ -1,4 +1,38 @@
 ---
+- tag: v4.15.1-auris.1.39
+  published_at: '2026-07-06T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Company on contacts.** The contact form has a new field to link the person to their company or health plan.
+      - **Filter conversations by contact + full search.** You can filter to a single patient's conversations. And there's a new search page that looks across conversations, contacts and messages at once.
+      - **Contact media tab.** A new side tab lists everything the patient has sent (photos, PDFs, audio).
+      - **Rearrange your sidebar.** Drag folders, teams, channels and labels into whatever order works for you, and hide the ones you don't use.
+      - **WhatsApp templates fill in the media for you.** When a template has example media, the field shows up already filled.
+
+      ### ⚡ Improvements
+
+      - **Unread message counts are back.** On totals, inboxes, labels and teams.
+      - **See and close open sessions.** From your profile, you can see which devices you're logged in on and disconnect any of them.
+      - **Mobile sessions show the right name.** Used to say "Unknown Device"; now shows "AurisChat Mobile".
+      - **Richer Help Center.** Categories with icon/emoji, resizable images in articles, move multiple articles between categories in one go.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Empresa nos contatos.** O cadastro de contato agora tem um campo pra vincular a empresa/convênio da pessoa.
+      - **Filtrar conversas por contato + busca completa.** Você pode filtrar as conversas de um paciente específico. E ganhou uma tela nova de busca que procura em conversas, contatos e mensagens ao mesmo tempo.
+      - **Aba de mídias do contato.** Uma aba lateral mostra tudo que o paciente já mandou (fotos, PDFs, áudios).
+      - **Reorganizar sua barra lateral.** Você pode arrastar folders, times, canais e etiquetas na ordem que quiser, e esconder o que não usa.
+      - **Templates de WhatsApp já vêm com a mídia preenchida.** Quando o template tem uma mídia de exemplo, o campo aparece pronto.
+
+      ### ⚡ Melhorias
+
+      - **Contadores de mensagens não lidas voltam.** Nos totais, caixas, etiquetas e times.
+      - **Ver e encerrar sessões abertas.** No seu perfil, você vê em quais dispositivos está logada e pode desconectar de qualquer um.
+      - **Sessões do celular aparecem com o nome certo.** Antes ficava "Dispositivo desconhecido"; agora mostra "AurisChat Mobile".
+      - **Central de ajuda mais rica.** Categorias com ícone/emoji, imagens redimensionáveis em artigos, mover vários artigos de categoria de uma vez.
 - tag: v4.14.0-auris.1.38.1
   published_at: '2026-07-06T18:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38.1
@@ -247,11 +281,3 @@
       ### 🐛 Correções
 
       - **Conexão de nova caixa de entrada do Instagram voltou a funcionar.** O callback do OAuth falhava na troca para o token de longa duração porque o Instagram Business Login do Meta passou a entregar o token já longo direto, sem precisar de troca. O AurisChat agora pula essa etapa quando ela não é necessária e a caixa de entrada conecta normalmente.
-- tag: v4.13.0-auris.1.31.3
-  published_at: '2026-06-19T03:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.3
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
