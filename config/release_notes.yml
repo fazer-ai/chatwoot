@@ -1,4 +1,26 @@
 ---
+- tag: v4.14.0-auris.1.38.1
+  published_at: '2026-07-06T18:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **The enable/disable AI button for bulk conversations works again.** Before, clicking it did nothing. Now the menu opens correctly and you can apply the change to all selected conversations.
+      - **Unassign labels from several conversations at once.** Select the conversations, use the new button, and pick which labels to remove.
+
+      ### ⚡ Improvements
+
+      - **Unassign label on Contacts is clearer.** The icon is now different from "Assign label" (so you don't confuse the two) and the list only shows labels actually present on the selected contacts.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **O botão para ligar/desligar a IA em várias conversas voltou a funcionar.** Antes você clicava e nada acontecia. Agora o menu aparece direitinho e você aplica para todas.
+      - **Desatribuir etiquetas em várias conversas de uma vez.** Selecione as conversas, use o novo botão e escolha quais etiquetas remover.
+
+      ### ⚡ Melhorias
+
+      - **Nos contatos, desatribuir rótulo ficou mais claro.** O ícone agora é diferente do "atribuir rótulo" (não confunde mais os dois botões) e a lista só mostra rótulos que realmente estão nos contatos selecionados.
 - tag: v4.14.0-auris.1.38
   published_at: '2026-07-06T17:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38
@@ -233,15 +255,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.31.2
-  published_at: '2026-06-18T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.2
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Connecting a new Instagram inbox keeps working even when Meta swings.** Meta has been flipping which HTTP method it accepts on the Instagram token exchange daily. The integration now retries automatically with the other method when that happens, so adding an inbox is no longer interrupted by Meta's flip-flopping.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Conexão de nova caixa de entrada do Instagram resiste às oscilações do Meta.** O Meta tem alternado diariamente qual método HTTP aceita na troca de token do Instagram. A integração agora tenta automaticamente com o outro método quando isso acontece, então adicionar uma caixa de entrada não é mais interrompido pelas oscilações do Meta.
