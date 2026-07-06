@@ -21,21 +21,17 @@ const handleSubmit = () => {
 </script>
 
 <template>
-  <!-- Click-outside is handled by the parent wrapper (which also owns the
-       trigger button) so a click on the button doesn't trip an "outside"
-       detector attached here — otherwise the popover closes and the button
-       immediately re-opens it in the same event tick and the Apply click
-       never lands. -->
+  <!-- Positioning is set by the parent invocation (absolute + bottom-full +
+       right-0) so the popover appears above the trigger button. Keep this
+       root position-agnostic — otherwise the internal `top-*` fights the
+       parent's `bottom-full` and the popover renders at zero height.
+       Click-outside is also handled by the parent wrapper (which owns both
+       button and popover) to avoid a self-toggling ping-pong on click. -->
   <div
-    class="absolute ltr:right-2 rtl:left-2 top-12 origin-top-right z-20 w-60 bg-n-alpha-3 backdrop-blur-[100px] border-n-weak rounded-lg border border-solid shadow-md"
+    class="w-60 bg-n-alpha-3 backdrop-blur-[100px] border-n-weak rounded-lg border border-solid shadow-md"
     role="dialog"
     aria-labelledby="ai-status-dialog-title"
   >
-    <div class="triangle">
-      <svg height="12" viewBox="0 0 24 12" width="24">
-        <path d="M20 12l-8-8-12 12" fill-rule="evenodd" stroke-width="1px" />
-      </svg>
-    </div>
     <div class="flex items-center justify-between p-2.5">
       <span id="ai-status-dialog-title" class="text-sm font-medium">
         {{ t('BULK_ACTION.AI_STATUS.TITLE') }}
@@ -106,13 +102,3 @@ const handleSubmit = () => {
     </div>
   </div>
 </template>
-
-<style scoped lang="scss">
-.triangle {
-  @apply block z-10 absolute text-left -top-3 ltr:right-[--triangle-position] rtl:left-[--triangle-position];
-
-  svg path {
-    @apply fill-n-alpha-3 backdrop-blur-[100px] stroke-n-weak;
-  }
-}
-</style>
