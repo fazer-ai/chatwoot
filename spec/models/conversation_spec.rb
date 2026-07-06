@@ -632,7 +632,10 @@ RSpec.describe Conversation do
         waiting_since: conversation.waiting_since.to_i,
         priority: nil,
         unread_count: 0,
-        group_type: 'individual'
+        group_type: 'individual',
+        # Auris additions to the conversation push payload.
+        ai_enabled: conversation.ai_enabled,
+        summary: conversation.summary
       }
     end
 
@@ -718,6 +721,25 @@ RSpec.describe Conversation do
       end
 
       expect { notification.reload }.to raise_error ActiveRecord::RecordNotFound
+    end
+
+    it 'dispatches conversation deleted event with unread count cache data' do
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+      conversation.destroy!
+
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+        'conversation.deleted',
+        kind_of(Time),
+        conversation_data: {
+          id: conversation.id,
+          account_id: conversation.account_id,
+          inbox_id: conversation.inbox_id,
+          assignee_id: conversation.assignee_id,
+          team_id: conversation.team_id,
+          cached_label_list: conversation.cached_label_list
+        }
+      )
     end
   end
 
