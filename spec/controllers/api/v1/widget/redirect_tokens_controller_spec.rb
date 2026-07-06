@@ -22,7 +22,7 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
     end
 
     context 'with a valid redirect token carrying a message' do
-      let(:redirect_token) { Widget::RedirectToken.create({ 'identifier' => 'user-42', 'message' => 'Hello' }) }
+      let(:redirect_token) { Widget::RedirectToken.generate({ 'identifier' => 'user-42', 'message' => 'Hello' }) }
 
       it 'identifies the contact, verifies the inbox and injects the message' do
         post '/api/v1/widget/redirect_token',
@@ -57,7 +57,7 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
       let(:contact) { create(:contact, account: account, identifier: 'someone-else') }
 
       it 'issues a fresh widget auth token for the redirected identity' do
-        redirect_token = Widget::RedirectToken.create({ 'identifier' => 'user-42' })
+        redirect_token = Widget::RedirectToken.generate({ 'identifier' => 'user-42' })
 
         post '/api/v1/widget/redirect_token',
              params: { website_token: web_widget.website_token, token: redirect_token },
