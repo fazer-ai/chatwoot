@@ -23,7 +23,13 @@ const connection = computed(() => providerConnection.value?.connection);
 const qrDataUrl = computed(() => providerConnection.value?.qr_data_url);
 const error = computed(() => providerConnection.value?.error);
 
+// Alternative onboarding when WhatsApp's extra device-linking verification blocks
+// the QR: install the browser extension and import an already-linked session.
+const extensionUrl =
+  'https://chromewebstore.google.com/detail/fazerai-whatsapp-connecto/nchdjpjplcnggifnemiiclgjplooible';
+
 const loading = ref(false);
+const showImportDetails = ref(false);
 
 const handleError = e => {
   useAlert(e.message);
@@ -161,6 +167,54 @@ watchEffect(() => {
               </router-link>
             </div>
           </template>
+
+          <!-- Fallback kept available in every non-open state, including while the
+               QR is shown: import an already-linked session via the extension. -->
+          <div
+            v-if="connection !== 'open'"
+            class="flex flex-col gap-1 items-center pt-4 mt-2 w-full border-t border-n-weak"
+          >
+            <p class="text-sm font-medium text-center text-n-slate-12">
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.IMPORT_SESSION_TITLE'
+                )
+              }}
+            </p>
+            <button
+              v-if="!showImportDetails"
+              type="button"
+              :aria-expanded="showImportDetails"
+              class="text-xs underline text-n-slate-11 hover:text-n-slate-12"
+              @click="showImportDetails = true"
+            >
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.IMPORT_SESSION_SHOW_MORE'
+                )
+              }}
+            </button>
+            <template v-else>
+              <p class="text-sm text-center text-n-slate-11">
+                {{
+                  $t(
+                    'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.IMPORT_SESSION_DESC'
+                  )
+                }}
+              </p>
+              <a :href="extensionUrl" target="_blank" rel="noopener noreferrer">
+                <Button
+                  link
+                  blue
+                  :label="
+                    $t(
+                      'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.IMPORT_SESSION_INSTALL'
+                    )
+                  "
+                />
+              </a>
+            </template>
+          </div>
         </div>
       </div>
     </div>

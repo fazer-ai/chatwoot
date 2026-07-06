@@ -30,7 +30,7 @@
 # Foreign Keys
 #
 #  fk_rails_...  (category_id => internal_chat_categories.id)
-#  fk_rails_...  (created_by_id => users.id)
+#  fk_rails_...  (created_by_id => users.id) ON DELETE => nullify
 #
 class InternalChat::Channel < ApplicationRecord
   self.table_name = 'internal_chat_channels'

@@ -5,7 +5,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :validate_limit, only: [:create]
   # we are already handling the authorization in fetch inbox
   # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in WhatsappHealthManagement concern
-  before_action :check_authorization, except: [:show, :health, :setup_channel_provider]
+  before_action :check_authorization, except: [:show, :health, :setup_channel_provider, :import_whatsapp_session]
   before_action :validate_whatsapp_cloud_channel, only: [:health]
   # rubocop:enable Rails/LexicallyScopedActionFilter
   include Api::V1::Accounts::Concerns::WhatsappHealthManagement
@@ -85,6 +85,30 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
     channel.setup_channel_provider
     head :ok
+  end
+
+  # Hot-loads a WhatsApp Web session extracted by the browser extension into a
+  # disconnected Baileys inbox. Authorized like setup_channel_provider (any agent
+  # assigned to the inbox, via fetch_inbox -> show?), since connecting a number
+  # to an assigned inbox is the same privilege as scanning a QR for it.
+  def import_whatsapp_session
+    channel = @inbox.channel
+
+    unless channel.is_a?(Channel::Whatsapp) && channel.provider == 'baileys'
+      render json: { error: 'Session import is only supported for Baileys WhatsApp channels' },
+             status: :unprocessable_entity and return
+    end
+
+    session = import_session_params[:session].to_h
+    render json: { error: 'Session payload is required' }, status: :unprocessable_entity and return if session.blank?
+
+    channel.import_session(
+      session: session,
+      candidate_index: import_session_params[:candidate_index].to_i
+    )
+    head :ok
+  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError
+    render json: { error: 'WhatsApp provider is currently unavailable. Please try again.' }, status: :service_unavailable
   end
 
   def disconnect_channel_provider
@@ -167,6 +191,23 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:id])
     authorize @inbox, :show?
+  end
+
+  # The session is opaque credentials forwarded verbatim to the Baileys API,
+  # which validates its schema. We still permit an explicit shape (rather than
+  # permit!) so nothing unexpected is forwarded. camelCase keys match the
+  # extractor's output.
+  def import_session_params
+    params.permit(
+      :candidate_index,
+      session: [
+        :registrationId, :advSecretKey, :id, :lid, :platform, :pushName, :routingInfo,
+        { noiseCandidates: %i[private public] },
+        { identityKey: %i[private public] },
+        { account: %i[details accountSignatureKey accountSignature deviceSignature] },
+        { signedPreKey: %i[keyId private public signature] }
+      ]
+    )
   end
 
   def fetch_agent_bot

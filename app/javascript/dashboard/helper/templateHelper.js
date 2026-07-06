@@ -49,7 +49,11 @@ export const buildTemplateParameters = (template, hasMediaHeaderValue) => {
 
   if (hasMediaHeaderValue) {
     if (!allVariables.header) allVariables.header = {};
-    allVariables.header.media_url = '';
+    // Pre-fill with the sample media URL that ships with the template
+    // (components[].example.header_handle[0]) so the agent doesn't have to
+    // paste it manually. The field stays editable in the parser.
+    allVariables.header.media_url =
+      headerComponent.example?.header_handle?.[0] || '';
     allVariables.header.media_type = headerComponent.format.toLowerCase();
 
     // For document templates, include media_name field for filename support

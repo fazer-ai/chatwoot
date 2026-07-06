@@ -96,6 +96,30 @@ describe('templateHelper', () => {
       const result = buildTemplateParameters(imageTemplate, true);
 
       expect(result.header).toEqual({
+        media_url: 'https://example.com/shoes.jpg',
+        media_type: 'image',
+      });
+    });
+
+    it('should pre-fill media_url from the template example header_handle', () => {
+      const imageTemplate = templates.find(
+        t => t.name === 'order_confirmation'
+      );
+      const result = buildTemplateParameters(imageTemplate, true);
+
+      expect(result.header.media_url).toBe('https://example.com/shoes.jpg');
+    });
+
+    it('should leave media_url empty when the template has no example handle', () => {
+      const imageTemplateWithoutExample = {
+        components: [
+          { type: 'HEADER', format: 'IMAGE' },
+          { type: 'BODY', text: 'Hi {{1}}' },
+        ],
+      };
+      const result = buildTemplateParameters(imageTemplateWithoutExample, true);
+
+      expect(result.header).toEqual({
         media_url: '',
         media_type: 'image',
       });

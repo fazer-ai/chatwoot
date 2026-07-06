@@ -324,6 +324,18 @@ RSpec.describe User do
 
       expect(scheduled_message.reload.author_id).to be_nil
     end
+
+    it 'nullifies created internal chat channels and destroys the user drafts' do
+      account = create(:account)
+      create(:account_user, user: user, account: account)
+      channel = create(:internal_chat_channel, account: account, created_by: user)
+      draft = create(:internal_chat_draft, account: account, user: user, channel: channel)
+
+      expect { user.destroy! }.not_to raise_error
+
+      expect(channel.reload.created_by_id).to be_nil
+      expect(InternalChat::Draft.exists?(draft.id)).to be(false)
+    end
   end
 
   describe 'sync_user_sessions callback' do

@@ -338,7 +338,11 @@
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Conectar dispositivo",
             "DISCONNECT": "Desconectar",
-            "CONNECTED": "Seu dispositivo foi conectado com sucesso. Agora você pode começar a enviar e receber mensagens."
+            "CONNECTED": "Seu dispositivo foi conectado com sucesso. Agora você pode começar a enviar e receber mensagens.",
+            "IMPORT_SESSION_TITLE": "O QR code não funciona?",
+            "IMPORT_SESSION_SHOW_MORE": "Ver mais",
+            "IMPORT_SESSION_DESC": "O WhatsApp passou a exigir chave de acesso ao vincular algumas contas, o que bloqueia o QR code. Instale a extensão de navegador para importar uma sessão em que você já está logado no WhatsApp Web.",
+            "IMPORT_SESSION_INSTALL": "Instalar a extensão"
           }
         },
         "SUBMIT_BUTTON": "Criar canal do WhatsApp",
