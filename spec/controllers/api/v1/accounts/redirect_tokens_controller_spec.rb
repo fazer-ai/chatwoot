@@ -2,6 +2,7 @@ require 'rails_helper'
 
 RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
   let(:account) { create(:account) }
+  let(:admin) { create(:user, account: account, role: :administrator) }
   let(:agent) { create(:user, account: account, role: :agent) }
   let(:web_widget) { create(:channel_widget, account: account) }
 
@@ -18,7 +19,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
     context 'when it is an authenticated user' do
       it 'mints a redirect token for a web widget inbox' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', message: 'Hi' },
              as: :json
 
@@ -33,7 +34,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
 
       it 'honours a custom ttl_seconds' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', ttl_seconds: 60 },
              as: :json
 
@@ -42,7 +43,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
 
       it 'clamps a ttl_seconds above the default down to the default' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', ttl_seconds: 10.years.to_i },
              as: :json
 
@@ -51,7 +52,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
 
       it 'clamps a non-positive ttl_seconds up to a positive value' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', ttl_seconds: -5 },
              as: :json
 
@@ -61,7 +62,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
 
       it 'omits blank optional attributes from the stored payload' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: web_widget.inbox.id, identifier: 'user-1' },
              as: :json
 
@@ -73,7 +74,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         email_inbox = create(:channel_email, account: account).inbox
 
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: email_inbox.id, identifier: 'user-1' },
              as: :json
 
@@ -85,11 +86,20 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         other_widget = create(:channel_widget)
 
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
-             headers: agent.create_new_auth_token,
+             headers: admin.create_new_auth_token,
              params: { inbox_id: other_widget.inbox.id, identifier: 'user-1' },
              as: :json
 
         expect(response).to have_http_status(:not_found)
+      end
+
+      it 'returns unauthorized for an agent not assigned to the inbox' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: agent.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1' },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
       end
     end
   end

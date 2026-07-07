@@ -17,6 +17,13 @@ RSpec.describe Widget::RedirectToken do
 
       expect(Redis::Alfred.ttl(key)).to be_within(5).of(120)
     end
+
+    it 'defaults to a 24 hour ttl' do
+      token = described_class.generate(payload)
+      key = "#{described_class::KEY_PREFIX}::#{token}"
+
+      expect(Redis::Alfred.ttl(key)).to be_within(5).of(24.hours.to_i)
+    end
   end
 
   describe '.consume' do

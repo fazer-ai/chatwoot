@@ -1,6 +1,7 @@
 class Api::V1::Accounts::RedirectTokensController < Api::V1::Accounts::BaseController
   def create
     inbox = Current.account.inboxes.find(permitted_params[:inbox_id])
+    authorize inbox, :show?
     return render(json: { error: 'not_a_web_widget' }, status: :unprocessable_entity) unless inbox.web_widget?
 
     payload = { inbox_id: inbox.id, identifier: permitted_params[:identifier], message: permitted_params[:message] }.compact
