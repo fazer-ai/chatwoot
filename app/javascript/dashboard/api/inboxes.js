@@ -15,6 +15,21 @@ class Inboxes extends CacheEnabledApiClient {
     return axios.get(`${this.url}/${inboxId}/campaigns`);
   }
 
+  // Keeps the locally cached inbox fresh on connection-status changes without bumping
+  // the cache key (so it never triggers a full refetch). Silent if IDB is unavailable.
+  async updateCachedProviderConnection(id, providerConnection) {
+    try {
+      await this.dataManager.initDb();
+      await this.dataManager.update({
+        modelName: this.cacheModelName,
+        id,
+        data: { provider_connection: providerConnection },
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
   deleteInboxAvatar(inboxId) {
     return axios.delete(`${this.url}/${inboxId}/avatar`);
   }
