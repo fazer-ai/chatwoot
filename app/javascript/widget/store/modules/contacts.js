@@ -1,7 +1,10 @@
 import { sendMessage } from 'widget/helpers/utils';
 import ContactsAPI from '../../api/contacts';
 import RedirectAPI from '../../api/redirect';
-import { SET_USER_ERROR } from '../../constants/errorTypes';
+import {
+  RESOLVE_REDIRECT_ERROR,
+  SET_USER_ERROR,
+} from '../../constants/errorTypes';
 import { setHeader } from '../../helpers/axios';
 const state = {
   currentUser: {},
@@ -100,6 +103,8 @@ export const actions = {
       dispatch('conversationAttributes/getAttributes', {}, { root: true });
       return true;
     } catch (error) {
+      const data = parseErrorData(error);
+      sendMessage({ event: 'error', errorType: RESOLVE_REDIRECT_ERROR, data });
       return false;
     }
   },

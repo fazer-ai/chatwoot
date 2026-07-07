@@ -1,6 +1,9 @@
 import Cookies from 'js-cookie';
 import { IFrameHelper } from '../sdk/IFrameHelper';
-import { parseRedirectParams } from '../sdk/redirectHelpers';
+import {
+  parseRedirectParams,
+  stripRedirectParams,
+} from '../sdk/redirectHelpers';
 import {
   getBubbleView,
   getDarkMode,
@@ -218,7 +221,9 @@ const runSDK = ({ baseUrl, websiteToken }) => {
     window.history.replaceState(
       null,
       '',
-      window.location.pathname + window.location.search
+      window.location.pathname +
+        window.location.search +
+        stripRedirectParams(window.location.hash)
     );
   }
 

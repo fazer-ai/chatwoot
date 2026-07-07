@@ -1,4 +1,4 @@
-import { parseRedirectParams } from '../redirectHelpers';
+import { parseRedirectParams, stripRedirectParams } from '../redirectHelpers';
 
 describe('#parseRedirectParams', () => {
   it('returns null when the fragment carries no redirect token', () => {
@@ -19,5 +19,22 @@ describe('#parseRedirectParams', () => {
       token: 'abc123',
       autoOpen: false,
     });
+  });
+});
+
+describe('#stripRedirectParams', () => {
+  it('returns an empty string when only redirect params are present', () => {
+    expect(stripRedirectParams('#cw_redirect=abc123&cw_open=1')).toBe('');
+  });
+
+  it('preserves other fragment params while removing the redirect ones', () => {
+    expect(
+      stripRedirectParams('#cw_redirect=abc123&cw_open=1&utm_source=x')
+    ).toBe('#utm_source=x');
+  });
+
+  it('handles an empty fragment', () => {
+    expect(stripRedirectParams('')).toBe('');
+    expect(stripRedirectParams('#')).toBe('');
   });
 });
