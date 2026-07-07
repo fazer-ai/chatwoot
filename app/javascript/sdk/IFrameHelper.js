@@ -183,6 +183,15 @@ export const IFrameHelper = {
         IFrameHelper.sendMessage('set-user', window.$chatwoot.user);
       }
 
+      if (window.$chatwoot.redirectToken) {
+        const { redirectToken, autoOpen } = window.$chatwoot;
+        window.$chatwoot.redirectToken = null;
+        IFrameHelper.sendMessage('resolve-redirect', { token: redirectToken });
+        if (autoOpen) {
+          window.$chatwoot.toggle('open');
+        }
+      }
+
       window.playAudioAlert = () => {};
 
       initOnEvents.forEach(e => {
