@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.39.5
+  published_at: '2026-07-07T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.5
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.39.4
   published_at: '2026-07-07T20:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.4
@@ -253,15 +261,3 @@
       ### 🐛 Correções
 
       - **Mensagens diretas em caixas do Instagram adicionadas recentemente passam a chegar.** Uma tentativa anterior de contornar uma instabilidade do Meta gravava o identificador errado do Instagram nas caixas novas, então quando os pacientes mandavam Direct o sistema não conseguia encontrar a qual caixa rotear a mensagem e ela era descartada silenciosamente. Caixas adicionadas a partir desta versão funcionam ponta a ponta. Caixas conectadas durante a janela com problema precisam ser removidas e adicionadas de novo para serem corrigidas.
-- tag: v4.13.0-auris.1.31.8
-  published_at: '2026-06-19T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.8
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Incoming Instagram DMs reach AurisChat.** Meta was rejecting the call AurisChat makes when a new inbox is created to subscribe it to incoming-message webhooks, so direct messages never reached the panel. The integration now tries multiple request shapes until one works and exposes a manual re-subscribe entry point for inboxes that were created during the outage.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Mensagens recebidas no Direct do Instagram chegam ao AurisChat.** O Meta estava rejeitando a chamada que o AurisChat faz quando uma caixa nova é criada para registrar o recebimento de mensagens, então as mensagens do direct não chegavam no painel. A integração agora tenta vários formatos de requisição até um passar e expõe um ponto de reinscrição manual para caixas que foram criadas durante a janela do problema.
