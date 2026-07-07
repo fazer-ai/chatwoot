@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.39.2
+  published_at: '2026-07-07T00:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.2
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.39.1
   published_at: '2026-07-06T23:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.1
@@ -265,15 +273,3 @@
       ### 🐛 Correções
 
       - **Integração com Instagram reforçada de ponta a ponta.** Todas as chamadas para a API do Instagram (conectar nova caixa, enviar e receber mensagens, renovação periódica de token, registro de webhooks) agora compartilham a mesma versão de API e automaticamente reentregam com o método HTTP alternativo quando o Meta alterna entre GET e POST. Falhas silenciosas no subscribe/unsubscribe de webhook agora aparecem nos logs para o operador perceber.
-- tag: v4.13.0-auris.1.31.5
-  published_at: '2026-06-19T15:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.5
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Connecting a new Instagram inbox finishes successfully.** Follow-up to the previous fix: the user-details step of the OAuth callback was pinned to an older Meta API version and started returning the same cryptic error. Pinned to the version the Meta App is configured for, and the inbox now finishes connecting.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Conexão de uma nova caixa de entrada do Instagram finaliza com sucesso.** Sequência da correção anterior: o passo de buscar os dados do usuário no callback do OAuth estava preso em uma versão antiga da API do Meta e passou a retornar o mesmo erro confuso. Atualizamos para a versão que o app no Meta está configurado e a caixa de entrada termina de conectar normalmente.
