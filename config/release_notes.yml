@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.39.4
+  published_at: '2026-07-07T20:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.4
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.39.3
   published_at: '2026-07-07T15:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.3
@@ -257,15 +265,3 @@
       ### 🐛 Correções
 
       - **Mensagens recebidas no Direct do Instagram chegam ao AurisChat.** O Meta estava rejeitando a chamada que o AurisChat faz quando uma caixa nova é criada para registrar o recebimento de mensagens, então as mensagens do direct não chegavam no painel. A integração agora tenta vários formatos de requisição até um passar e expõe um ponto de reinscrição manual para caixas que foram criadas durante a janela do problema.
-- tag: v4.13.0-auris.1.31.7
-  published_at: '2026-06-19T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.7
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Adding a new Instagram inbox finally finishes.** Meta has been rejecting the `/me` endpoint with both POST and GET on Instagram Business Login tokens, blocking the OAuth callback even after the previous round of fixes. AurisChat now skips `/me` entirely — the Instagram user ID already comes in the OAuth response — so the inbox connects with a placeholder name when needed. You can rename the inbox from settings afterwards.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Adicionar uma nova caixa de entrada do Instagram finalmente conclui.** O Meta passou a rejeitar o endpoint `/me` com POST e GET para tokens do Instagram Business Login, bloqueando o callback do OAuth mesmo depois das correções anteriores. O AurisChat agora pula o `/me` por completo — o ID do usuário Instagram já vem na resposta do OAuth — então a caixa conecta com um nome padrão quando necessário. Você pode renomear a caixa em configurações depois.
