@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.39.3
+  published_at: '2026-07-07T15:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.3
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.39.2
   published_at: '2026-07-07T00:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.2
@@ -261,15 +269,3 @@
       ### 🐛 Correções
 
       - **Adicionar uma nova caixa de entrada do Instagram finalmente conclui.** O Meta passou a rejeitar o endpoint `/me` com POST e GET para tokens do Instagram Business Login, bloqueando o callback do OAuth mesmo depois das correções anteriores. O AurisChat agora pula o `/me` por completo — o ID do usuário Instagram já vem na resposta do OAuth — então a caixa conecta com um nome padrão quando necessário. Você pode renomear a caixa em configurações depois.
-- tag: v4.13.0-auris.1.31.6
-  published_at: '2026-06-19T19:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.6
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Instagram integration hardened end-to-end.** All Instagram API calls (connect a new inbox, send and receive messages, periodic token refresh, webhook registration) now share the same API version and automatically retry with the alternate HTTP method when Meta swings between GET and POST. Silent failures on webhook subscribe/unsubscribe are now logged so the operator notices when something breaks.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Integração com Instagram reforçada de ponta a ponta.** Todas as chamadas para a API do Instagram (conectar nova caixa, enviar e receber mensagens, renovação periódica de token, registro de webhooks) agora compartilham a mesma versão de API e automaticamente reentregam com o método HTTP alternativo quando o Meta alterna entre GET e POST. Falhas silenciosas no subscribe/unsubscribe de webhook agora aparecem nos logs para o operador perceber.
