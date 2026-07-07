@@ -11,11 +11,19 @@ export const parseRedirectParams = hash => {
 };
 
 // Strip only the redirect-specific params from the fragment, preserving any
-// other hash state the host page may rely on.
+// other hash state the host page may rely on (including bare anchors like
+// `#pricing`, which URLSearchParams would otherwise rewrite to `pricing=`).
 export const stripRedirectParams = hash => {
-  const params = new URLSearchParams((hash || '').replace(/^#/, ''));
-  params.delete('cw_redirect');
-  params.delete('cw_open');
-  const remaining = params.toString();
+  const raw = (hash || '').replace(/^#/, '');
+  if (!raw) {
+    return '';
+  }
+  const remaining = raw
+    .split('&')
+    .filter(segment => {
+      const key = segment.split('=')[0];
+      return key !== 'cw_redirect' && key !== 'cw_open';
+    })
+    .join('&');
   return remaining ? `#${remaining}` : '';
 };

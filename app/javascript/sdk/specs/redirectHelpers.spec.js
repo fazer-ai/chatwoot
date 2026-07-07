@@ -33,6 +33,12 @@ describe('#stripRedirectParams', () => {
     ).toBe('#utm_source=x');
   });
 
+  it('preserves a bare anchor segment untouched', () => {
+    expect(stripRedirectParams('#pricing&cw_redirect=abc123&cw_open=1')).toBe(
+      '#pricing'
+    );
+  });
+
   it('handles an empty fragment', () => {
     expect(stripRedirectParams('')).toBe('');
     expect(stripRedirectParams('#')).toBe('');
