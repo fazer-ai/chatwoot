@@ -38,6 +38,8 @@ class ActionCableConnector extends BaseActionCableConnector {
       'conversation.updated': this.onConversationUpdated,
       'account.cache_invalidated': this.onCacheInvalidate,
       'account.enrichment_completed': this.onEnrichmentCompleted,
+      'inbox.provider_connection_updated':
+        this.onInboxProviderConnectionUpdated,
       'copilot.message.created': this.onCopilotMessageCreated,
       'scheduled_message.created': this.onScheduledMessageCreated,
       'scheduled_message.updated': this.onScheduledMessageUpdated,
@@ -279,6 +281,13 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onEnrichmentCompleted = () => {
     this.app.$store.dispatch('accounts/get', { silent: true });
+  };
+
+  onInboxProviderConnectionUpdated = data => {
+    this.app.$store.dispatch('inboxes/updateProviderConnection', {
+      id: data.inbox_id,
+      providerConnection: data.provider_connection,
+    });
   };
 
   onCacheInvalidate = data => {
