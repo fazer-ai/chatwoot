@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.39.1
+  published_at: '2026-07-06T23:30:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.1
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.39
   published_at: '2026-07-06T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39
@@ -269,15 +277,3 @@
       ### 🐛 Correções
 
       - **Conexão de uma nova caixa de entrada do Instagram finaliza com sucesso.** Sequência da correção anterior: o passo de buscar os dados do usuário no callback do OAuth estava preso em uma versão antiga da API do Meta e passou a retornar o mesmo erro confuso. Atualizamos para a versão que o app no Meta está configurado e a caixa de entrada termina de conectar normalmente.
-- tag: v4.13.0-auris.1.31.4
-  published_at: '2026-06-19T04:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.4
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Connecting a new Instagram inbox works again.** The OAuth callback was failing during the long-lived token exchange because Meta's Instagram Business Login now returns a long-lived token directly, with no exchange step needed. AurisChat skips the legacy exchange in that case and the inbox finishes connecting cleanly.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Conexão de nova caixa de entrada do Instagram voltou a funcionar.** O callback do OAuth falhava na troca para o token de longa duração porque o Instagram Business Login do Meta passou a entregar o token já longo direto, sem precisar de troca. O AurisChat agora pula essa etapa quando ela não é necessária e a caixa de entrada conecta normalmente.
