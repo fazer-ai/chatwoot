@@ -83,6 +83,22 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
+  # Downloads the conversation transcript as a PDF file. Grover renders each
+  # call in its own Chromium subprocess so concurrent downloads never share
+  # state; the service caps how many run at once to avoid OOM (see
+  # Conversations::TranscriptPdfService).
+  def transcript_pdf
+    service = Conversations::TranscriptPdfService.new(conversation: @conversation)
+    send_data service.perform,
+              filename: service.filename,
+              type: 'application/pdf',
+              disposition: 'attachment'
+  rescue Conversations::TranscriptPdfService::OverloadError
+    response.headers['Retry-After'] = Conversations::TranscriptPdfService::ACQUIRE_TIMEOUT.to_s
+    render json: { error: 'Too many transcript downloads in flight. Please try again in a few seconds.' },
+           status: :too_many_requests
+  end
+
   def toggle_status
     # FIXME: move this logic into a service object
     if pending_to_open_by_bot?

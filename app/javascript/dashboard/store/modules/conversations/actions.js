@@ -539,6 +539,24 @@ const actions = {
     await ConversationApi.sendEmailTranscript({ conversationId, email });
   },
 
+  // Auris: replaces the "send by email" flow when the operator uses the ⋮ menu.
+  // Fetches the transcript as a PDF blob and triggers a browser-side download.
+  // Each backend call spawns its own Chromium subprocess, so concurrent
+  // downloads never contaminate each other.
+  downloadConversationTranscriptPdf: async (_, conversationId) => {
+    const response =
+      await ConversationApi.downloadTranscriptPdf(conversationId);
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `transcricao_${conversationId}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+  },
+
   updateCustomAttributes: async (
     { commit },
     { conversationId, customAttributes }

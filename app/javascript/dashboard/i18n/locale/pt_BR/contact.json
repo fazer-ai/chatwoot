@@ -51,6 +51,9 @@
     "MUTED_SUCCESS": "Este contato foi bloqueado com sucesso. Você não será notificado por nenhuma conversação futura.",
     "UNMUTED_SUCCESS": "Este contato foi desbloqueado com sucesso.",
     "SEND_TRANSCRIPT": "Enviar Transcrição",
+    "DOWNLOAD_TRANSCRIPT": "Baixar transcrição (PDF)",
+    "DOWNLOAD_TRANSCRIPT_FAILED": "Não foi possível gerar o PDF da transcrição. Tente novamente.",
+    "DOWNLOAD_TRANSCRIPT_OVERLOADED": "Muitos downloads em andamento. Tente novamente em alguns segundos.",
     "EDIT_LABEL": "Alterar",
     "SIDEBAR_SECTIONS": {
       "CUSTOM_ATTRIBUTES": "Atributos Personalizados",

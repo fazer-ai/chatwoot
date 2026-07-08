@@ -171,6 +171,7 @@ Rails.application.routes.draw do
               post :mute
               post :unmute
               post :transcript
+              get :transcript_pdf
               post :toggle_status
               post :toggle_priority
               post :toggle_ai_status

@@ -44,15 +44,36 @@ const actionMenuItems = computed(() => {
     });
   }
 
+  // Auris: replace the upstream "send transcript by email" flow with a PDF
+  // download since our installs don't have SMTP configured — the email
+  // silently no-ops and users assume the feature is broken. The old flow's
+  // controller action + macro/automation hook stay in place for anyone who
+  // does have SMTP; we just don't expose the email UI from this menu.
   items.push({
-    icon: 'i-lucide-share',
-    label: t('CONTACT_PANEL.SEND_TRANSCRIPT'),
-    action: 'send_transcript',
-    value: 'send_transcript',
+    icon: 'i-lucide-download',
+    label: t('CONTACT_PANEL.DOWNLOAD_TRANSCRIPT'),
+    action: 'download_transcript',
+    value: 'download_transcript',
   });
 
   return items;
 });
+
+const downloadTranscript = async () => {
+  try {
+    await store.dispatch(
+      'downloadConversationTranscriptPdf',
+      currentChat.value.id
+    );
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status === 429) {
+      useAlert(t('CONTACT_PANEL.DOWNLOAD_TRANSCRIPT_OVERLOADED'));
+    } else {
+      useAlert(t('CONTACT_PANEL.DOWNLOAD_TRANSCRIPT_FAILED'));
+    }
+  }
+};
 
 const handleActionClick = ({ action }) => {
   toggleDropdown(false);
@@ -63,8 +84,8 @@ const handleActionClick = ({ action }) => {
   } else if (action === 'unmute') {
     store.dispatch('unmuteConversation', currentChat.value.id);
     useAlert(t('CONTACT_PANEL.UNMUTED_SUCCESS'));
-  } else if (action === 'send_transcript') {
-    toggleEmailModal();
+  } else if (action === 'download_transcript') {
+    downloadTranscript();
   }
 };
 

@@ -51,6 +51,9 @@
     "MUTED_SUCCESS": "This contact is blocked successfully. You will not be notified of any future conversations.",
     "UNMUTED_SUCCESS": "This contact is unblocked successfully.",
     "SEND_TRANSCRIPT": "Send Transcript",
+    "DOWNLOAD_TRANSCRIPT": "Download transcript (PDF)",
+    "DOWNLOAD_TRANSCRIPT_FAILED": "Could not generate the transcript PDF. Please try again.",
+    "DOWNLOAD_TRANSCRIPT_OVERLOADED": "Too many transcript downloads in flight. Please try again in a few seconds.",
     "EDIT_LABEL": "Edit",
     "SIDEBAR_SECTIONS": {
       "CUSTOM_ATTRIBUTES": "Custom Attributes",

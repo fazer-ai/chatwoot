@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Transcrição - Conversa ##<%= @conversation.display_id %></title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-size: 10px;
+        color: #1f2d3d;
+        margin: 0;
+        padding: 0;
+      }
+      .header {
+        border-bottom: 1px solid #e4e7eb;
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+      }
+      .header h1 {
+        font-size: 16px;
+        margin: 0 0 6px;
+        color: #1b283b;
+      }
+      .header .meta {
+        color: #6b7c94;
+        font-size: 9.5px;
+        line-height: 1.5;
+      }
+      .header .meta strong {
+        color: #1f2d3d;
+      }
+      .message {
+        page-break-inside: avoid;
+        margin-bottom: 12px;
+      }
+      .message .sender {
+        font-weight: 600;
+        font-size: 10.5px;
+        margin-bottom: 2px;
+      }
+      .message .email-meta {
+        font-size: 8.5px;
+        color: #6b7c94;
+        line-height: 1.4;
+        margin-bottom: 4px;
+      }
+      .message .content {
+        margin: 2px 0;
+        font-size: 10px;
+        line-height: 1.4;
+      }
+      .message .content p { margin: 0 0 4px; }
+      .message .content a { color: #1f6feb; text-decoration: none; }
+      .message .content img { max-width: 100%; height: auto; }
+      .message .attachments {
+        margin-top: 4px;
+        padding: 6px 8px;
+        background: #f7f9fb;
+        border: 1px solid #e4e7eb;
+        border-radius: 3px;
+      }
+      .message .attachments p { margin: 0 0 2px; font-weight: 600; font-size: 9.5px; }
+      .message .attachments a {
+        display: block;
+        color: #1f6feb;
+        text-decoration: none;
+        font-size: 9.5px;
+        margin: 1px 0;
+      }
+      .message .timestamp {
+        font-size: 8.5px;
+        color: #8492a6;
+        margin-top: 2px;
+      }
+      .footer {
+        margin-top: 24px;
+        padding-top: 12px;
+        border-top: 1px solid #e4e7eb;
+        color: #8492a6;
+        font-size: 9px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <%
+      # Priority for the display timezone: account setting (Super Admin →
+      # Accounts → reporting_timezone) → inbox timezone (Email inboxes carry
+      # one) → the fork's default Time.zone → UTC as a last resort. We resolve
+      # it once at render time and reuse for every timestamp on the page so the
+      # header, per-message timestamps, and footer all agree on the offset.
+      display_tz_name = [
+        @account&.reporting_timezone,
+        @inbox&.timezone,
+        Time.zone.name
+      ].compact_blank.find { |name| ActiveSupport::TimeZone[name].present? } || 'UTC'
+      display_tz = ActiveSupport::TimeZone[display_tz_name]
+
+      # Format timestamps to match how the conversation timeline renders them
+      # in the dashboard ("mai 13, 4:57 PM"). Ruby's strftime is locale-blind
+      # here (chatwoot's pt_BR.yml doesn't ship the standard rails-i18n
+      # date.abbr_month_names key), and calling I18n.l with %b just prints a
+      # "Translation missing" placeholder, so we build the abbreviation from a
+      # small inline table. Kept in Portuguese because the transcript is a
+      # customer-facing document for a pt-BR install; when we ever ship the
+      # transcript to en operators, the table can move to i18n.
+      pt_br_months = %w[jan fev mar abr mai jun jul ago set out nov dez].freeze
+      format_ts_short = ->(t) do
+        z = t.in_time_zone(display_tz)
+        "#{pt_br_months[z.month - 1]} #{z.day}, #{z.strftime('%-I:%M %p')}"
+      end
+      format_ts_full = ->(t) do
+        z = t.in_time_zone(display_tz)
+        "#{pt_br_months[z.month - 1]} #{z.day}, #{z.year}, #{z.strftime('%-I:%M %p')}"
+      end
+    %>
+    <div class="header">
+      <h1>Transcrição da conversa ##<%= @conversation.display_id %></h1>
+      <div class="meta">
+        <div><strong>Contato:</strong> <%= @contact&.name %></div>
+        <% if @agent %>
+          <div><strong>Agente:</strong> <%= @agent.name %></div>
+        <% end %>
+        <div><strong>Caixa:</strong> <%= @inbox&.name %></div>
+        <div><strong>Aberta em:</strong>
+          <%= format_ts_full.call(@conversation.created_at) %>
+        </div>
+      </div>
+    </div>
+
+    <% @messages.each do |message| %>
+      <div class="message">
+        <div class="sender">
+          <%= message.sender&.try(:available_name) || message.sender&.name || 'Sistema' %>
+        </div>
+
+        <% if @inbox&.inbox_type == 'Email' %>
+          <div class="email-meta">
+            <% if message.content_attributes.dig(:email, :from).present? %>
+              <div>De: <%= Array(message.content_attributes.dig(:email, :from)).join(', ') %></div>
+            <% elsif message.sender.respond_to?(:email) && message.sender.email.present? %>
+              <div>De: <%= message.sender.email %></div>
+            <% end %>
+            <% if message.content_attributes.dig(:email, :subject).present? %>
+              <div>Assunto: <%= message.content_attributes.dig(:email, :subject) %></div>
+            <% end %>
+            <% if message.content_attributes[:to_emails].present? %>
+              <div>Para: <%= Array(message.content_attributes[:to_emails]).join(', ') %></div>
+            <% end %>
+            <% if message.content_attributes[:cc_emails].present? %>
+              <div>CC: <%= Array(message.content_attributes[:cc_emails]).join(', ') %></div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if message.content.present? %>
+          <div class="content">
+            <%= ChatwootMarkdownRenderer.new(message.content).render_message %>
+          </div>
+        <% end %>
+
+        <% if message.attachments.present? %>
+          <div class="attachments">
+            <p>Anexos:</p>
+            <% message.attachments.each do |attachment| %>
+              <a href="<%= attachment.file_url %>"><%= attachment.file.filename %></a>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="timestamp">
+          <%= format_ts_short.call(message.created_at) %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="footer">
+      Gerado em <%= format_ts_full.call(Time.current) %> · AurisChat
+    </div>
+  </body>
+</html>
