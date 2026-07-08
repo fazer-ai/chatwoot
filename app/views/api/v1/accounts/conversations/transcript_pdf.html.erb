@@ -96,6 +96,24 @@
         Time.zone.name
       ].compact_blank.find { |name| ActiveSupport::TimeZone[name].present? } || 'UTC'
       display_tz = ActiveSupport::TimeZone[display_tz_name]
+
+      # Format timestamps to match how the conversation timeline renders them
+      # in the dashboard ("mai 13, 4:57 PM"). Ruby's strftime is locale-blind
+      # here (chatwoot's pt_BR.yml doesn't ship the standard rails-i18n
+      # date.abbr_month_names key), and calling I18n.l with %b just prints a
+      # "Translation missing" placeholder, so we build the abbreviation from a
+      # small inline table. Kept in Portuguese because the transcript is a
+      # customer-facing document for a pt-BR install; when we ever ship the
+      # transcript to en operators, the table can move to i18n.
+      pt_br_months = %w[jan fev mar abr mai jun jul ago set out nov dez].freeze
+      format_ts_short = ->(t) do
+        z = t.in_time_zone(display_tz)
+        "#{pt_br_months[z.month - 1]} #{z.day}, #{z.strftime('%-I:%M %p')}"
+      end
+      format_ts_full = ->(t) do
+        z = t.in_time_zone(display_tz)
+        "#{pt_br_months[z.month - 1]} #{z.day}, #{z.year}, #{z.strftime('%-I:%M %p')}"
+      end
     %>
     <div class="header">
       <h1>Transcrição da conversa ##<%= @conversation.display_id %></h1>
@@ -106,7 +124,7 @@
         <% end %>
         <div><strong>Caixa:</strong> <%= @inbox&.name %></div>
         <div><strong>Aberta em:</strong>
-          <%= @conversation.created_at.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %>
+          <%= format_ts_full.call(@conversation.created_at) %>
         </div>
       </div>
     </div>
@@ -152,13 +170,13 @@
         <% end %>
 
         <div class="timestamp">
-          <%= message.created_at.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %>
+          <%= format_ts_short.call(message.created_at) %>
         </div>
       </div>
     <% end %>
 
     <div class="footer">
-      Gerado em <%= Time.current.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %> · AurisChat
+      Gerado em <%= format_ts_full.call(Time.current) %> · AurisChat
     </div>
   </body>
 </html>
