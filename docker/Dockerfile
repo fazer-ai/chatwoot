@@ -132,7 +132,23 @@ RUN apk update && apk add --no-cache \
   git \
   vips \
   ffmpeg \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont \
+  font-noto-emoji \
   && gem install bundler -v "$BUNDLER_VERSION"
+
+# Point Grover (via Puppeteer) at the Alpine-packaged Chromium and skip the
+# built-in Chromium download that Puppeteer would attempt at install time —
+# saves ~150MB. Every conversation transcript PDF render (per user click) spawns
+# its own Node + Chromium subprocess against this binary, so concurrent
+# downloads stay isolated at the OS level. The soft cap on how many can run at
+# once lives in Conversations::TranscriptPdfService.
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

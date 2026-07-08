@@ -1131,6 +1131,54 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
+  describe 'GET /api/v1/accounts/{account.id}/conversations/:id/transcript_pdf' do
+    let(:conversation) { create(:conversation, account: account) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/transcript_pdf"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:service) { instance_double(Conversations::TranscriptPdfService) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: conversation.inbox)
+      end
+
+      it 'streams the PDF back with the expected filename and content type' do
+        allow(Conversations::TranscriptPdfService).to receive(:new).with(conversation: conversation).and_return(service)
+        allow(service).to receive(:perform).and_return('PDFBYTES')
+        allow(service).to receive(:filename).and_return("transcricao_#{conversation.display_id}.pdf")
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/transcript_pdf",
+            headers: agent.create_new_auth_token
+
+        expect(response).to have_http_status(:success)
+        expect(response.content_type).to include('application/pdf')
+        expect(response.headers['Content-Disposition']).to include("transcricao_#{conversation.display_id}.pdf")
+        expect(response.body).to eq('PDFBYTES')
+      end
+
+      # Guards the concurrency cap contract: the semaphore is process-wide and one
+      # user's overflow must not silently fall through as a broken download.
+      it 'returns 429 with a Retry-After header when the service reports overload' do
+        allow(Conversations::TranscriptPdfService).to receive(:new).with(conversation: conversation).and_return(service)
+        allow(service).to receive(:perform).and_raise(Conversations::TranscriptPdfService::OverloadError)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/transcript_pdf",
+            headers: agent.create_new_auth_token
+
+        expect(response).to have_http_status(:too_many_requests)
+        expect(response.headers['Retry-After']).to eq(Conversations::TranscriptPdfService::ACQUIRE_TIMEOUT.to_s)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/conversations/:id/custom_attributes' do
     let(:conversation) { create(:conversation, account: account) }
 

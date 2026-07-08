@@ -50,6 +50,12 @@ gem 'net-smtp', '~> 0.3.4'
 # Prevent CSV injection
 gem 'csv-safe'
 
+##-- PDF rendering (conversation transcript download) --##
+# Grover spawns a Node.js + Chromium subprocess per call, so concurrent
+# renders never share state. A Concurrent::Semaphore in the service caps
+# how many can spawn at once (see TranscriptPdfService).
+gem 'grover'
+
 ##-- for active storage --##
 gem 'aws-sdk-s3', require: false
 # original gem isn't maintained actively

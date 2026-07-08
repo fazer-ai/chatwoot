@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Transcrição - Conversa ##<%= @conversation.display_id %></title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-size: 12px;
+        color: #1f2d3d;
+        margin: 0;
+        padding: 0;
+      }
+      .header {
+        border-bottom: 1px solid #e4e7eb;
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+      }
+      .header h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+        color: #1b283b;
+      }
+      .header .meta {
+        color: #6b7c94;
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      .header .meta strong {
+        color: #1f2d3d;
+      }
+      .message {
+        page-break-inside: avoid;
+        margin-bottom: 20px;
+      }
+      .message .sender {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .message .email-meta {
+        font-size: 10px;
+        color: #6b7c94;
+        line-height: 1.5;
+        margin-bottom: 6px;
+      }
+      .message .content {
+        margin: 4px 0;
+        line-height: 1.5;
+      }
+      .message .content p { margin: 0 0 6px; }
+      .message .content a { color: #1f6feb; text-decoration: none; }
+      .message .content img { max-width: 100%; height: auto; }
+      .message .attachments {
+        margin-top: 6px;
+        padding: 8px;
+        background: #f7f9fb;
+        border: 1px solid #e4e7eb;
+        border-radius: 4px;
+      }
+      .message .attachments p { margin: 0 0 4px; font-weight: 600; font-size: 11px; }
+      .message .attachments a {
+        display: block;
+        color: #1f6feb;
+        text-decoration: none;
+        font-size: 11px;
+        margin: 2px 0;
+      }
+      .message .timestamp {
+        font-size: 10px;
+        color: #8492a6;
+        margin-top: 4px;
+      }
+      .footer {
+        margin-top: 32px;
+        padding-top: 16px;
+        border-top: 1px solid #e4e7eb;
+        color: #8492a6;
+        font-size: 10px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Transcrição da conversa ##<%= @conversation.display_id %></h1>
+      <div class="meta">
+        <div><strong>Contato:</strong> <%= @contact&.name %></div>
+        <% if @agent %>
+          <div><strong>Agente:</strong> <%= @agent.name %></div>
+        <% end %>
+        <div><strong>Caixa:</strong> <%= @inbox&.name %></div>
+        <div><strong>Aberta em:</strong>
+          <% opened_at = @inbox&.timezone.present? ? @conversation.created_at.in_time_zone(@inbox.timezone) : @conversation.created_at %>
+          <%= opened_at.strftime('%d/%m/%Y %H:%M %Z') %>
+        </div>
+      </div>
+    </div>
+
+    <% @messages.each do |message| %>
+      <div class="message">
+        <div class="sender">
+          <%= message.sender&.try(:available_name) || message.sender&.name || 'Sistema' %>
+        </div>
+
+        <% if @inbox&.inbox_type == 'Email' %>
+          <div class="email-meta">
+            <% if message.content_attributes.dig(:email, :from).present? %>
+              <div>De: <%= Array(message.content_attributes.dig(:email, :from)).join(', ') %></div>
+            <% elsif message.sender.respond_to?(:email) && message.sender.email.present? %>
+              <div>De: <%= message.sender.email %></div>
+            <% end %>
+            <% if message.content_attributes.dig(:email, :subject).present? %>
+              <div>Assunto: <%= message.content_attributes.dig(:email, :subject) %></div>
+            <% end %>
+            <% if message.content_attributes[:to_emails].present? %>
+              <div>Para: <%= Array(message.content_attributes[:to_emails]).join(', ') %></div>
+            <% end %>
+            <% if message.content_attributes[:cc_emails].present? %>
+              <div>CC: <%= Array(message.content_attributes[:cc_emails]).join(', ') %></div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if message.content.present? %>
+          <div class="content">
+            <%= ChatwootMarkdownRenderer.new(message.content).render_message %>
+          </div>
+        <% end %>
+
+        <% if message.attachments.present? %>
+          <div class="attachments">
+            <p>Anexos:</p>
+            <% message.attachments.each do |attachment| %>
+              <a href="<%= attachment.file_url %>"><%= attachment.file.filename %></a>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="timestamp">
+          <% ts = @inbox&.timezone.present? ? message.created_at.in_time_zone(@inbox.timezone) : message.created_at %>
+          <%= ts.strftime('%d/%m/%Y %H:%M %Z') %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="footer">
+      Gerado em <%= Time.current.in_time_zone(@inbox&.timezone.presence || Time.zone.name).strftime('%d/%m/%Y %H:%M %Z') %> · AurisChat
+    </div>
+  </body>
+</html>
