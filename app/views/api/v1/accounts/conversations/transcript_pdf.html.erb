@@ -7,81 +7,96 @@
       * { box-sizing: border-box; }
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        font-size: 12px;
+        font-size: 10px;
         color: #1f2d3d;
         margin: 0;
         padding: 0;
       }
       .header {
         border-bottom: 1px solid #e4e7eb;
-        padding-bottom: 16px;
-        margin-bottom: 24px;
+        padding-bottom: 12px;
+        margin-bottom: 16px;
       }
       .header h1 {
-        font-size: 20px;
-        margin: 0 0 8px;
+        font-size: 16px;
+        margin: 0 0 6px;
         color: #1b283b;
       }
       .header .meta {
         color: #6b7c94;
-        font-size: 11px;
-        line-height: 1.6;
+        font-size: 9.5px;
+        line-height: 1.5;
       }
       .header .meta strong {
         color: #1f2d3d;
       }
       .message {
         page-break-inside: avoid;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
       }
       .message .sender {
         font-weight: 600;
-        margin-bottom: 4px;
+        font-size: 10.5px;
+        margin-bottom: 2px;
       }
       .message .email-meta {
-        font-size: 10px;
+        font-size: 8.5px;
         color: #6b7c94;
-        line-height: 1.5;
-        margin-bottom: 6px;
+        line-height: 1.4;
+        margin-bottom: 4px;
       }
       .message .content {
-        margin: 4px 0;
-        line-height: 1.5;
+        margin: 2px 0;
+        font-size: 10px;
+        line-height: 1.4;
       }
-      .message .content p { margin: 0 0 6px; }
+      .message .content p { margin: 0 0 4px; }
       .message .content a { color: #1f6feb; text-decoration: none; }
       .message .content img { max-width: 100%; height: auto; }
       .message .attachments {
-        margin-top: 6px;
-        padding: 8px;
+        margin-top: 4px;
+        padding: 6px 8px;
         background: #f7f9fb;
         border: 1px solid #e4e7eb;
-        border-radius: 4px;
+        border-radius: 3px;
       }
-      .message .attachments p { margin: 0 0 4px; font-weight: 600; font-size: 11px; }
+      .message .attachments p { margin: 0 0 2px; font-weight: 600; font-size: 9.5px; }
       .message .attachments a {
         display: block;
         color: #1f6feb;
         text-decoration: none;
-        font-size: 11px;
-        margin: 2px 0;
+        font-size: 9.5px;
+        margin: 1px 0;
       }
       .message .timestamp {
-        font-size: 10px;
+        font-size: 8.5px;
         color: #8492a6;
-        margin-top: 4px;
+        margin-top: 2px;
       }
       .footer {
-        margin-top: 32px;
-        padding-top: 16px;
+        margin-top: 24px;
+        padding-top: 12px;
         border-top: 1px solid #e4e7eb;
         color: #8492a6;
-        font-size: 10px;
+        font-size: 9px;
         text-align: center;
       }
     </style>
   </head>
   <body>
+    <%
+      # Priority for the display timezone: account setting (Super Admin →
+      # Accounts → reporting_timezone) → inbox timezone (Email inboxes carry
+      # one) → the fork's default Time.zone → UTC as a last resort. We resolve
+      # it once at render time and reuse for every timestamp on the page so the
+      # header, per-message timestamps, and footer all agree on the offset.
+      display_tz_name = [
+        @account&.reporting_timezone,
+        @inbox&.timezone,
+        Time.zone.name
+      ].compact_blank.find { |name| ActiveSupport::TimeZone[name].present? } || 'UTC'
+      display_tz = ActiveSupport::TimeZone[display_tz_name]
+    %>
     <div class="header">
       <h1>Transcrição da conversa ##<%= @conversation.display_id %></h1>
       <div class="meta">
@@ -91,8 +106,7 @@
         <% end %>
         <div><strong>Caixa:</strong> <%= @inbox&.name %></div>
         <div><strong>Aberta em:</strong>
-          <% opened_at = @inbox&.timezone.present? ? @conversation.created_at.in_time_zone(@inbox.timezone) : @conversation.created_at %>
-          <%= opened_at.strftime('%d/%m/%Y %H:%M %Z') %>
+          <%= @conversation.created_at.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %>
         </div>
       </div>
     </div>
@@ -138,14 +152,13 @@
         <% end %>
 
         <div class="timestamp">
-          <% ts = @inbox&.timezone.present? ? message.created_at.in_time_zone(@inbox.timezone) : message.created_at %>
-          <%= ts.strftime('%d/%m/%Y %H:%M %Z') %>
+          <%= message.created_at.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %>
         </div>
       </div>
     <% end %>
 
     <div class="footer">
-      Gerado em <%= Time.current.in_time_zone(@inbox&.timezone.presence || Time.zone.name).strftime('%d/%m/%Y %H:%M %Z') %> · AurisChat
+      Gerado em <%= Time.current.in_time_zone(display_tz).strftime('%d/%m/%Y %H:%M %Z') %> · AurisChat
     </div>
   </body>
 </html>
