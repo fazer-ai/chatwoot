@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.40
+  published_at: '2026-07-08T03:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.40
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Download conversation transcript as PDF.** In the three-dot menu of a conversation, click "Download transcript (PDF)" and the file downloads to your computer. Save it, print it, or attach it elsewhere.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Baixar histórico da conversa em PDF.** Nos três pontinhos da conversa, clica em "Baixar transcrição (PDF)" e o arquivo cai no seu computador. Dá pra salvar, imprimir ou anexar em outro lugar.
 - tag: v4.15.1-auris.1.39.5
   published_at: '2026-07-07T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.5
@@ -249,15 +261,3 @@
       ### ✨ Novidades
 
       - **Central de Notificação Auris.** A equipe Auris agora consegue te enviar avisos (manutenções, novidades) direto pelo painel. Quando tiver algo, uma janela aparece e fica na tela até você apertar "Entendi". Você pode rever os 10 mais recentes a qualquer hora no novo menu "Central de Notificação".
-- tag: v4.13.0-auris.1.31.9
-  published_at: '2026-06-21T01:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.31.9
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Direct messages on Instagram inboxes added recently start arriving.** A previous attempt to work around a Meta API outage saved the wrong Instagram identifier on newly added inboxes, so when patients sent a direct message the system couldn't find which inbox to route it to and the message was silently dropped. Inboxes added with this release work end-to-end. Inboxes connected during the outage window need to be removed and added again to be fixed.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Mensagens diretas em caixas do Instagram adicionadas recentemente passam a chegar.** Uma tentativa anterior de contornar uma instabilidade do Meta gravava o identificador errado do Instagram nas caixas novas, então quando os pacientes mandavam Direct o sistema não conseguia encontrar a qual caixa rotear a mensagem e ela era descartada silenciosamente. Caixas adicionadas a partir desta versão funcionam ponta a ponta. Caixas conectadas durante a janela com problema precisam ser removidas e adicionadas de novo para serem corrigidas.
