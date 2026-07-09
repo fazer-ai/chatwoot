@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_03_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_09_000000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1649,6 +1649,34 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_03_000000) do
     t.index ["name", "account_id"], name: "index_teams_on_name_and_account_id", unique: true
   end
 
+  create_table "tickets", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "user_id"
+    t.string "context_type", null: false
+    t.bigint "context_id", null: false
+    t.bigint "conversation_id"
+    t.string "clickup_task_id"
+    t.string "clickup_task_url"
+    t.string "clickup_status_id"
+    t.string "clickup_status_name"
+    t.integer "sync_status", default: 0, null: false
+    t.integer "sync_attempts", default: 0, null: false
+    t.text "sync_error"
+    t.text "relatar_problema", null: false
+    t.text "comportamento_esperado"
+    t.text "resposta_para_cliente"
+    t.datetime "resposta_notified_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_tickets_on_account_id_and_created_at"
+    t.index ["account_id", "user_id", "created_at"], name: "index_tickets_on_account_id_and_user_id_and_created_at"
+    t.index ["account_id"], name: "index_tickets_on_account_id"
+    t.index ["clickup_task_id"], name: "index_tickets_on_clickup_task_id", unique: true, where: "(clickup_task_id IS NOT NULL)"
+    t.index ["context_type", "context_id"], name: "index_tickets_on_context_type_and_context_id"
+    t.index ["conversation_id"], name: "index_tickets_on_conversation_id"
+    t.index ["user_id"], name: "index_tickets_on_user_id"
+  end
+
   create_table "user_sessions", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "client_id", null: false
@@ -1782,6 +1810,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_03_000000) do
   add_foreign_key "scheduled_messages", "inboxes"
   add_foreign_key "scheduled_messages", "messages"
   add_foreign_key "scheduled_messages", "recurring_scheduled_messages"
+  add_foreign_key "tickets", "accounts", on_delete: :cascade
+  add_foreign_key "tickets", "conversations", on_delete: :cascade
+  add_foreign_key "tickets", "users", on_delete: :nullify
   add_foreign_key "user_sessions", "users"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").
