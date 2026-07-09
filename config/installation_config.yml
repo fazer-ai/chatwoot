@@ -547,3 +547,23 @@
   value: 'https://us.cloud.langfuse.com'
   locked: false
 ## ---- End of LLM Observability ---- ##
+
+## ---- ClickUp integration (Feedback tickets) ---- ##
+- name: CLICKUP_API_KEY
+  display_title: 'ClickUp API Key'
+  description: 'Personal token from ClickUp. When set, feedback tickets opened from the ⋮ menu on AI messages sync to the Feedback list configured for the Auris workspace. Leave blank to disable.'
+  value: ''
+  locked: false
+  type: secret
+- name: CLICKUP_WEBHOOK_ID
+  display_title: 'ClickUp Webhook ID'
+  description: 'Populated automatically the first time an API key is saved — the app registers a webhook with the ClickUp team so ticket status and “Resposta para o Cliente” changes flow back into AurisChat. Do not edit manually.'
+  value: ''
+  locked: false
+- name: CLICKUP_WEBHOOK_SECRET
+  display_title: 'ClickUp Webhook Secret'
+  description: 'Populated automatically when the webhook is registered. Used to verify inbound payloads. Do not edit manually.'
+  value: ''
+  locked: false
+  type: secret
+## ---- End of ClickUp integration ---- ##
