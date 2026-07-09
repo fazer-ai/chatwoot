@@ -27,6 +27,7 @@ import MobileSidebarLauncher from 'dashboard/components-next/sidebar/MobileSideb
 import OperationsNotificationModal from 'dashboard/components-next/operations-notifications/OperationsNotificationModal.vue';
 import ReleaseAnnouncementModal from 'dashboard/components-next/release/ReleaseAnnouncementModal.vue';
 import SimulatorModal from 'dashboard/components-next/simulator/SimulatorModal.vue';
+import FeedbackTicketDialog from 'dashboard/components-next/feedback/FeedbackTicketDialog.vue';
 
 import { useCallsStore } from 'dashboard/stores/calls';
 
@@ -44,6 +45,7 @@ export default {
     OperationsNotificationModal,
     ReleaseAnnouncementModal,
     SimulatorModal,
+    FeedbackTicketDialog,
   },
   setup() {
     const upgradePageRef = ref(null);
@@ -190,6 +192,7 @@ export default {
       <OperationsNotificationModal />
       <ReleaseAnnouncementModal />
       <SimulatorModal />
+      <FeedbackTicketDialog />
     </main>
   </div>
 </template>

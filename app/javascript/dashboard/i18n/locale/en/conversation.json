@@ -369,6 +369,27 @@
         "CAPPED": "This number has reached its WhatsApp limit for starting new conversations this cycle.",
         "CAPPED_WITH_QUOTA": "This number has reached its WhatsApp limit ({used} of {total}) for starting new conversations this cycle."
       }
+    },
+    "FEEDBACK_TICKET": {
+      "OPEN_BUTTON": "Report an issue with this message",
+      "TITLE": "Report an issue with the AI response",
+      "SUBTITLE": "Your report is sent to the operations team so they can investigate what went wrong.",
+      "RELATAR_PROBLEMA_LABEL": "What went wrong?",
+      "RELATAR_PROBLEMA_PLACEHOLDER": "Describe what the AI (or the operator) got wrong on this message.",
+      "COMPORTAMENTO_ESPERADO_LABEL": "What should have happened instead? (optional)",
+      "COMPORTAMENTO_ESPERADO_PLACEHOLDER": "Tell the ops team what the correct answer or behavior should have been.",
+      "ATTACHMENTS_LABEL": "Attachments (optional)",
+      "ATTACHMENTS_PICK": "Add attachments",
+      "ATTACHMENTS_HINT": "Up to 5 files, 5MB each.",
+      "ATTACHMENTS_REMOVE": "Remove attachment",
+      "CANCEL": "Cancel",
+      "SUBMIT": "Submit report",
+      "SUCCESS": "Report submitted. The ops team will investigate.",
+      "ERRORS": {
+        "TOO_MANY_ATTACHMENTS": "You can attach at most {max} files.",
+        "FILE_TOO_LARGE": "{name} is larger than 5MB.",
+        "GENERIC": "Could not submit the report. Please try again."
+      }
     }
   },
   "EMAIL_TRANSCRIPT": {

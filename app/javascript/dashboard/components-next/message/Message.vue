@@ -449,6 +449,30 @@ const canShowReactionToolbar = computed(() => {
   return true;
 });
 
+// Feedback button: only shows on messages sent by us or by the AI (outgoing
+// or bot variants) — the operator flags what OUR side said, not incoming
+// user messages. Reuses the reaction toolbar's hover reveal.
+const canShowFeedbackButton = computed(() => {
+  if (!isBubble.value) return false;
+  if (props.private) return false;
+  if (isMessageDeleted.value) return false;
+  if (props.contentAttributes?.isUnsupported) return false;
+  if (props.status === MESSAGE_STATUS.FAILED) return false;
+  if (props.status === MESSAGE_STATUS.PROGRESS) return false;
+  if (props.messageType === MESSAGE_TYPES.ACTIVITY) return false;
+  return (
+    variant.value === MESSAGE_VARIANTS.AGENT ||
+    variant.value === MESSAGE_VARIANTS.BOT
+  );
+});
+
+function handleOpenFeedback() {
+  emitter.emit(BUS_EVENTS.OPEN_FEEDBACK_TICKET, {
+    messageId: props.id,
+    conversationId: props.conversationId,
+  });
+}
+
 // Short cooldown after a click so a quick double-tap (or open-pick-reopen-pick
 // on the picker) doesn't fire two POSTs against the same emoji. Watching
 // reactions is not enough — the optimistic add mutates them synchronously, so
@@ -752,7 +776,7 @@ provideMessageContext({
           <div class="relative">
             <Component :is="componentToRender" />
             <div
-              v-if="canShowReactionToolbar"
+              v-if="canShowReactionToolbar || canShowFeedbackButton"
               class="absolute top-1/2 -translate-y-1/2 z-10 flex items-center gap-0.5 rounded-full border border-n-slate-6 bg-n-solid-2 shadow-sm p-0.5 transition-opacity [@media(hover:none)]:opacity-100"
               :class="[
                 reactionPickerOpen
@@ -764,6 +788,7 @@ provideMessageContext({
               ]"
             >
               <EmojiReactionPicker
+                v-if="canShowReactionToolbar"
                 :alignment="
                   orientation === ORIENTATION.RIGHT ? 'right' : 'left'
                 "
@@ -771,6 +796,16 @@ provideMessageContext({
                 @select="handleToggleReaction"
                 @update:open="value => (reactionPickerOpen = value)"
               />
+              <button
+                v-if="canShowFeedbackButton"
+                v-tooltip.top="t('CONVERSATION.FEEDBACK_TICKET.OPEN_BUTTON')"
+                type="button"
+                class="w-7 h-7 flex items-center justify-center rounded-full text-n-slate-11 hover:bg-n-slate-3 hover:text-n-slate-12 transition-colors"
+                :aria-label="t('CONVERSATION.FEEDBACK_TICKET.OPEN_BUTTON')"
+                @click="handleOpenFeedback"
+              >
+                <i class="i-lucide-flag size-4" />
+              </button>
             </div>
           </div>
         </div>

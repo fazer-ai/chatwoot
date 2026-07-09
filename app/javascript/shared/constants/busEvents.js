@@ -16,4 +16,5 @@ export const BUS_EVENTS = {
   INSERT_INTO_NORMAL_EDITOR: 'insertIntoNormalEditor',
   NAVIGATE_TO_GROUP: 'navigateToGroup',
   OPEN_SIMULATOR: 'openSimulator',
+  OPEN_FEEDBACK_TICKET: 'openFeedbackTicket',
 };
