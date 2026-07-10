@@ -52,6 +52,6 @@ class ContactPolicy < ApplicationPolicy
   end
 
   def destroy?
-    @account_user.administrator?
+    @account_user.administrator? || @account_user.manager?
   end
 end
