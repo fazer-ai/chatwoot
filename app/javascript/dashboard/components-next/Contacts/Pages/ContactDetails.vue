@@ -175,7 +175,7 @@ const handleAvatarDelete = async () => {
         @click="updateContact"
       />
     </div>
-    <Policy :permissions="['administrator']">
+    <Policy :permissions="['administrator', 'manager']">
       <div
         class="flex flex-col items-start w-full gap-4 pt-6 border-t border-n-strong"
       >
