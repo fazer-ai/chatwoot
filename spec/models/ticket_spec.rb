@@ -48,4 +48,25 @@ RSpec.describe Ticket do
       expect(described_class.for_user(agent).recent_first).to eq([newer, older])
     end
   end
+
+  describe '#push_event_data' do
+    let(:account) { create(:account) }
+    let(:agent) { create(:user, account: account, name: 'Fábio', email: 'f@auris.ia.br') }
+    let(:ticket) { create(:ticket, account: account, user: agent, relatar_problema: 'x') }
+
+    it 'exposes the fields the Meus Tickets list needs' do
+      payload = ticket.push_event_data
+
+      expect(payload[:id]).to eq(ticket.id)
+      expect(payload[:account_id]).to eq(account.id)
+      expect(payload[:relatar_problema]).to eq('x')
+      expect(payload[:sync_status]).to eq('pending_sync')
+      expect(payload[:user]).to include(id: agent.id, name: 'Fábio', email: 'f@auris.ia.br')
+    end
+
+    it 'returns user=nil when the owner has been removed' do
+      ticket.update!(user: nil)
+      expect(ticket.push_event_data[:user]).to be_nil
+    end
+  end
 end

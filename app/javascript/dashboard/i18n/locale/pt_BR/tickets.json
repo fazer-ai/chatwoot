@@ -1,0 +1,55 @@
+{
+  "SIDEBAR": {
+    "MY_TICKETS": "Meus Tickets"
+  },
+  "MEUS_TICKETS": {
+    "TITLE": "Meus Tickets",
+    "SUBTITLE": "Tickets de feedback que você abriu e o retorno do time de operações.",
+    "EMPTY": "Você ainda não abriu nenhum ticket de feedback.",
+    "FILTERS": {
+      "STATUS": "Status",
+      "ALL": "Todos"
+    },
+    "STATUS": {
+      "ABERTO": "Aberto",
+      "EM_ANALISE": "Em análise",
+      "RESOLVIDO": "Resolvido",
+      "RESTRICAO": "Restrição",
+      "ENCERRADO": "Encerrado",
+      "PENDING_SYNC": "Sincronizando…"
+    },
+    "COLUMNS": {
+      "OPENED_AT": "Abertura",
+      "PROBLEM": "Problema",
+      "STATUS": "Status",
+      "RESPONSE": "Resposta para o cliente",
+      "AGENT": "Agente"
+    },
+    "PAGINATION": {
+      "SUMMARY": "{from}–{to} de {total}",
+      "PREV": "Anterior",
+      "NEXT": "Próximo"
+    },
+    "DETAIL": {
+      "TITLE": "Detalhes do ticket",
+      "SUBTITLE": "Veja o retorno do time de operações e compartilhe mais contexto se precisar.",
+      "STATUS": "Status",
+      "AGENT": "Agente",
+      "PROBLEM": "O que aconteceu de errado",
+      "EXPECTED": "Comportamento esperado",
+      "RESPONSE": "Resposta para o cliente",
+      "PENDING_SYNC": "Este ticket ainda está sendo enviado ao time de operações. Pode levar alguns minutos.",
+      "SYNC_FAILED": "Não foi possível enviar este ticket ao time de operações. O suporte foi avisado.",
+      "GO_TO_MESSAGE": "Ver mensagem",
+      "OPEN_IN_CLICKUP": "Abrir no ClickUp",
+      "ADD_COMMENT_LABEL": "Adicionar mais informação",
+      "ADD_COMMENT_PLACEHOLDER": "Compartilhe mais contexto para o time de operações.",
+      "ADD_COMMENT_SUBMIT": "Enviar comentário",
+      "COMMENT_SUCCESS": "Comentário enviado ao time de operações.",
+      "COMMENT_ERROR": "Não foi possível enviar o comentário. Tente novamente."
+    },
+    "NOTIFICATIONS": {
+      "STATUS_CHANGED": "Há novidades em um dos seus tickets de feedback."
+    }
+  }
+}

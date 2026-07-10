@@ -67,4 +67,48 @@ class Ticket < ApplicationRecord
   scope :for_user, ->(u) { where(user_id: u.id) }
   scope :for_account, ->(a) { where(account_id: a.id) }
   scope :recent_first, -> { order(created_at: :desc) }
+
+  # Serialization used by the ActionCable broadcast when the webhook applies
+  # a status/response change. The frontend Vuex store consumes the same
+  # shape as the JBuilder index/show responses so the record swaps in place.
+  def push_event_data
+    core_fields.merge(clickup_fields).merge(
+      resposta_para_cliente: resposta_para_cliente,
+      resposta_notified_at: resposta_notified_at,
+      user: user_push_event_data,
+      created_at: created_at,
+      updated_at: updated_at
+    )
+  end
+
+  private
+
+  def core_fields
+    {
+      id: id,
+      account_id: account_id,
+      conversation_id: conversation_id,
+      conversation_display_id: conversation&.display_id,
+      message_id: context_type == 'Message' ? context_id : nil,
+      relatar_problema: relatar_problema,
+      comportamento_esperado: comportamento_esperado,
+      sync_status: sync_status,
+      sync_error: sync_error
+    }
+  end
+
+  def clickup_fields
+    {
+      clickup_task_id: clickup_task_id,
+      clickup_task_url: clickup_task_url,
+      clickup_status_id: clickup_status_id,
+      clickup_status_name: clickup_status_name
+    }
+  end
+
+  def user_push_event_data
+    return nil if user.blank?
+
+    { id: user.id, name: user.name, email: user.email }
+  end
 end
