@@ -144,3 +144,9 @@ shopify:
   enabled: true
   icon: 'icon-shopify'
   config_key: 'shopify'
+clickup:
+  name: 'ClickUp'
+  description: 'Configuration for the ClickUp Feedback Tickets integration'
+  enabled: true
+  icon: 'icon-list-check-2'
+  config_key: 'clickup'
