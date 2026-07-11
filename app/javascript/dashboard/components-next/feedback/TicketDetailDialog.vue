@@ -25,13 +25,13 @@ const dialogRef = ref(null);
 const comment = ref('');
 const EMPTY_CELL = '—';
 
-// Prefix the display id ("AF-42") on the dialog title so the operator can
-// mention it back to the ops team over chat / phone without having to
-// hunt for it in the row.
+// Prefix the ticket id on the dialog title so the operator can mention
+// it back to the ops team over chat / phone without having to hunt for
+// it in the row.
 const dialogTitle = computed(() => {
   const base = t('MEUS_TICKETS.DETAIL.TITLE');
   return ticket.value?.display_id
-    ? `${ticket.value.display_id} — ${base}`
+    ? `#${ticket.value.display_id} — ${base}`
     : base;
 });
 

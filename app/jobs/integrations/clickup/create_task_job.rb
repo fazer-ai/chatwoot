@@ -36,12 +36,12 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
     )
   end
 
-  # Prepend the local display id ("AF-42") as an OBS line so the ops team can
-  # cross-reference reports on ClickUp with what the operator sees on Meus
-  # Tickets. Kept in the description (natural OBS field) until product picks
-  # a custom field to promote it to.
+  # Prepend the local ticket id as a `TicketId = <n>` line so the ops team
+  # can cross-reference reports on ClickUp with what the operator sees on
+  # Meus Tickets. Kept in the description until product picks a dedicated
+  # custom field to promote it to.
   def build_task_description(ticket)
-    "OBS: #{ticket.display_id}\n\n#{ticket.relatar_problema}"
+    "TicketId = #{ticket.display_id}\n\n#{ticket.relatar_problema}"
   end
 
   def apply_clickup_response(ticket, response)

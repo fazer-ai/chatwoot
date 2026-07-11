@@ -68,15 +68,14 @@ class Ticket < ApplicationRecord
   scope :for_account, ->(a) { where(account_id: a.id) }
   scope :recent_first, -> { order(created_at: :desc) }
 
-  # Short, human-friendly display id ("AF-42") derived from the primary key.
-  # Used in Meus Tickets, in the ClickUp task description (OBS field for now,
-  # until ops decides on a custom field), and by operators referring to a
-  # specific report over chat / phone. Deliberately not stored — the pk is
-  # already unique account-wide and monotonic.
-  DISPLAY_ID_PREFIX = 'AF'.freeze
-
+  # Human-facing ticket reference — same value as the primary key, wrapped
+  # in a dedicated method so we can promote it to a distinct sequence or
+  # prefix format later without touching every serializer/UI. Used in Meus
+  # Tickets, on the ClickUp task description ("TicketId = <n>" until product
+  # picks a custom field), and by operators cross-referencing a ticket over
+  # chat / phone.
   def display_id
-    "#{DISPLAY_ID_PREFIX}-#{id}"
+    id
   end
 
   # Serialization used by the ActionCable broadcast when the webhook applies

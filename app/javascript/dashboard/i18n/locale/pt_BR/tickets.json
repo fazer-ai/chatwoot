@@ -16,7 +16,7 @@
       "PENDING_SYNC": "Sincronizando…"
     },
     "COLUMNS": {
-      "DISPLAY_ID": "Ticket",
+      "DISPLAY_ID": "ID",
       "OPENED_AT": "Abertura",
       "PROBLEM": "Problema",
       "STATUS": "Status",

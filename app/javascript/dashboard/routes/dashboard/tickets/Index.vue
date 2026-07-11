@@ -31,6 +31,11 @@ const isAdminOrManager = computed(() =>
   ['administrator', 'manager'].includes(currentRole.value)
 );
 
+// ClickUp task links expose internal ops references (task id, workspace),
+// so only administrators get that column — managers stay on the same "sees
+// every ticket" scope for the rest of the row.
+const isAdministrator = computed(() => currentRole.value === 'administrator');
+
 // ClickUp team id is fixed for the Auris workspace (see FieldMap::TEAM_ID
 // on the backend). We assemble the task URL client-side so the admin link
 // column stays populated even for older tickets whose sync response landed
@@ -57,6 +62,8 @@ const tableHeaders = computed(() => {
   ];
   if (isAdminOrManager.value) {
     headers.push(t('MEUS_TICKETS.COLUMNS.AGENT'));
+  }
+  if (isAdministrator.value) {
     headers.push(t('MEUS_TICKETS.COLUMNS.CLICKUP'));
   }
   return headers;
@@ -221,29 +228,27 @@ onUnmounted(clearUnread);
                 </p>
                 <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
               </BaseTableCell>
-              <template v-if="isAdminOrManager">
-                <BaseTableCell>
-                  <span class="text-body-main text-n-slate-11">
-                    {{ ticket.user?.name || EMPTY_CELL }}
-                  </span>
-                </BaseTableCell>
-                <BaseTableCell>
-                  <Button
-                    v-if="clickupTaskUrl(ticket)"
-                    v-tooltip.top="ticket.clickup_task_id"
-                    type="button"
-                    variant="faded"
-                    color="slate"
-                    size="xs"
-                    icon="i-lucide-external-link"
-                    :label="ticket.clickup_task_id"
-                    @click="
-                      event => openClickupTask(event, clickupTaskUrl(ticket))
-                    "
-                  />
-                  <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
-                </BaseTableCell>
-              </template>
+              <BaseTableCell v-if="isAdminOrManager">
+                <span class="text-body-main text-n-slate-11">
+                  {{ ticket.user?.name || EMPTY_CELL }}
+                </span>
+              </BaseTableCell>
+              <BaseTableCell v-if="isAdministrator">
+                <Button
+                  v-if="clickupTaskUrl(ticket)"
+                  v-tooltip.top="ticket.clickup_task_id"
+                  type="button"
+                  variant="faded"
+                  color="slate"
+                  size="xs"
+                  icon="i-lucide-external-link"
+                  :label="ticket.clickup_task_id"
+                  @click="
+                    event => openClickupTask(event, clickupTaskUrl(ticket))
+                  "
+                />
+                <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
+              </BaseTableCell>
             </template>
           </BaseTableRow>
         </template>
