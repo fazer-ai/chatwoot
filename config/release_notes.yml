@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.1
+  published_at: '2026-07-11T17:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.1
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Downloading the conversation transcript as a PDF now works.** Since the button was released, clicking "Download transcript (PDF)" ended with "Could not generate the transcript PDF. Try again." The file now downloads on the first click.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Baixar transcrição da conversa em PDF agora funciona.** Desde que o botão foi lançado, clicar em "Baixar transcrição (PDF)" terminava em "Não foi possível gerar o PDF da transcrição. Tente novamente." O arquivo agora baixa direto no primeiro clique.
 - tag: v4.15.1-auris.1.41
   published_at: '2026-07-10T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41
@@ -265,11 +277,3 @@
       ### 🐛 Correções
 
       - **Mensagens do Direct do Instagram deixam de sumir.** Quando várias mensagens de pacientes chegavam ao mesmo tempo pro mesmo contato no Instagram, algumas eram descartadas em silêncio — a caixa parecia fora do ar até a próxima entrar. As mensagens agora chegam normalmente no AurisChat mesmo nos momentos de muito movimento.
-- tag: v4.13.0-auris.1.32.1
-  published_at: '2026-06-22T23:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32.1
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
