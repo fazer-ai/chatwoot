@@ -68,6 +68,16 @@ class Ticket < ApplicationRecord
   scope :for_account, ->(a) { where(account_id: a.id) }
   scope :recent_first, -> { order(created_at: :desc) }
 
+  # Human-facing ticket reference — same value as the primary key, wrapped
+  # in a dedicated method so we can promote it to a distinct sequence or
+  # prefix format later without touching every serializer/UI. Used in Meus
+  # Tickets, on the ClickUp task description ("TicketId = <n>" until product
+  # picks a custom field), and by operators cross-referencing a ticket over
+  # chat / phone.
+  def display_id
+    id
+  end
+
   # Serialization used by the ActionCable broadcast when the webhook applies
   # a status/response change. The frontend Vuex store consumes the same
   # shape as the JBuilder index/show responses so the record swaps in place.
@@ -86,6 +96,7 @@ class Ticket < ApplicationRecord
   def core_fields
     {
       id: id,
+      display_id: display_id,
       account_id: account_id,
       conversation_id: conversation_id,
       conversation_display_id: conversation&.display_id,

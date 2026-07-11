@@ -1,7 +1,4 @@
 {
-  "SIDEBAR": {
-    "MY_TICKETS": "Meus Tickets"
-  },
   "MEUS_TICKETS": {
     "TITLE": "Meus Tickets",
     "SUBTITLE": "Tickets de feedback que você abriu e o retorno do time de operações.",
@@ -19,11 +16,13 @@
       "PENDING_SYNC": "Sincronizando…"
     },
     "COLUMNS": {
+      "DISPLAY_ID": "ID",
       "OPENED_AT": "Abertura",
       "PROBLEM": "Problema",
       "STATUS": "Status",
       "RESPONSE": "Resposta para o cliente",
-      "AGENT": "Agente"
+      "AGENT": "Agente",
+      "CLICKUP": "ClickUp"
     },
     "PAGINATION": {
       "SUMMARY": "{from}–{to} de {total}",

@@ -1,4 +1,5 @@
 json.id ticket.id
+json.display_id ticket.display_id
 json.account_id ticket.account_id
 json.conversation_id ticket.conversation_id
 json.conversation_display_id ticket.conversation&.display_id
