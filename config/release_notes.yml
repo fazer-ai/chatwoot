@@ -1,4 +1,24 @@
 ---
+- tag: v4.15.1-auris.1.41.2
+  published_at: '2026-07-11T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.2
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **My Tickets: track the feedback you sent and hear back from the team.** A new "My Tickets" item shows up in the sidebar with every feedback you opened. Each row shows the status; clicking one opens a panel with the team's response and a button to jump back to the message you flagged. When the team updates a ticket you see a notification right away.
+
+      ### ⚡ Improvements
+
+      - **Warmer wording on the feedback button.** The flag icon on messages now reads "Send feedback", and the modal focuses on helping your assistant get better instead of reporting a problem.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Meus Tickets: acompanhe seus feedbacks e o retorno do time.** Um novo item "Meus Tickets" aparece na barra lateral com a lista dos feedbacks que você abriu. Cada linha mostra o status; clicando abre um painel com o retorno do nosso time e um botão pra voltar direto pra mensagem que você comentou. Quando o time atualiza um ticket você recebe um aviso na hora.
+
+      ### ⚡ Melhorias
+
+      - **Textos mais leves ao dar feedback.** O botão de bandeirinha nas mensagens agora diz "Dar feedback" e o modal foca em ajudar a evoluir a sua secretária, não em reportar problema.
 - tag: v4.15.1-auris.1.41.1
   published_at: '2026-07-11T17:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.1
@@ -265,15 +285,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.33
-  published_at: '2026-06-23T13:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Instagram direct messages stop disappearing.** When several patient messages arrived for the same Instagram contact at the same time, some used to be silently dropped — the inbox felt offline until the next message came through. Messages now reach AurisChat reliably even at busy moments.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Mensagens do Direct do Instagram deixam de sumir.** Quando várias mensagens de pacientes chegavam ao mesmo tempo pro mesmo contato no Instagram, algumas eram descartadas em silêncio — a caixa parecia fora do ar até a próxima entrar. As mensagens agora chegam normalmente no AurisChat mesmo nos momentos de muito movimento.
