@@ -68,6 +68,17 @@ class Ticket < ApplicationRecord
   scope :for_account, ->(a) { where(account_id: a.id) }
   scope :recent_first, -> { order(created_at: :desc) }
 
+  # Short, human-friendly display id ("AF-42") derived from the primary key.
+  # Used in Meus Tickets, in the ClickUp task description (OBS field for now,
+  # until ops decides on a custom field), and by operators referring to a
+  # specific report over chat / phone. Deliberately not stored — the pk is
+  # already unique account-wide and monotonic.
+  DISPLAY_ID_PREFIX = 'AF'.freeze
+
+  def display_id
+    "#{DISPLAY_ID_PREFIX}-#{id}"
+  end
+
   # Serialization used by the ActionCable broadcast when the webhook applies
   # a status/response change. The frontend Vuex store consumes the same
   # shape as the JBuilder index/show responses so the record swaps in place.
@@ -86,6 +97,7 @@ class Ticket < ApplicationRecord
   def core_fields
     {
       id: id,
+      display_id: display_id,
       account_id: account_id,
       conversation_id: conversation_id,
       conversation_display_id: conversation&.display_id,

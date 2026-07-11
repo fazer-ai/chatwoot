@@ -25,6 +25,16 @@ const dialogRef = ref(null);
 const comment = ref('');
 const EMPTY_CELL = '—';
 
+// Prefix the display id ("AF-42") on the dialog title so the operator can
+// mention it back to the ops team over chat / phone without having to
+// hunt for it in the row.
+const dialogTitle = computed(() => {
+  const base = t('MEUS_TICKETS.DETAIL.TITLE');
+  return ticket.value?.display_id
+    ? `${ticket.value.display_id} — ${base}`
+    : base;
+});
+
 const isSyncPending = computed(
   () => ticket.value?.sync_status === 'pending_sync'
 );
@@ -84,7 +94,7 @@ defineExpose({ openWith });
     ref="dialogRef"
     type="edit"
     width="xl"
-    :title="t('MEUS_TICKETS.DETAIL.TITLE')"
+    :title="dialogTitle"
     :description="t('MEUS_TICKETS.DETAIL.SUBTITLE')"
     :show-cancel-button="false"
     :show-confirm-button="false"

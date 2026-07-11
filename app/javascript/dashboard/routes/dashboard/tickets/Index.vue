@@ -4,12 +4,20 @@ import { useI18n } from 'vue-i18n';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
+import {
+  BaseTable,
+  BaseTableRow,
+  BaseTableCell,
+} from 'dashboard/components-next/table';
+import PaginationFooter from 'dashboard/components-next/pagination/PaginationFooter.vue';
+import Button from 'dashboard/components-next/button/Button.vue';
 import TicketDetailDialog from 'dashboard/components-next/feedback/TicketDetailDialog.vue';
 
 // Meus Tickets. Renders every ticket the current user is allowed to see —
 // TicketPolicy::Scope on the backend already trims the payload to "own for
 // agent, everything for manager/admin", so this component doesn't need to
-// duplicate that check; it only decides whether to show the "Agente" column.
+// duplicate that check; it only decides whether to show the "Agente" column
+// and the (admin/manager-only) ClickUp link column.
 
 const { t } = useI18n();
 const store = useStore();
@@ -23,10 +31,36 @@ const isAdminOrManager = computed(() =>
   ['administrator', 'manager'].includes(currentRole.value)
 );
 
+// ClickUp team id is fixed for the Auris workspace (see FieldMap::TEAM_ID
+// on the backend). We assemble the task URL client-side so the admin link
+// column stays populated even for older tickets whose sync response landed
+// the task id but not the URL (a state PR1 briefly allowed).
+const CLICKUP_TEAM_ID = '90132001451';
+const clickupTaskUrl = ticket => {
+  if (ticket.clickup_task_url) return ticket.clickup_task_url;
+  if (!ticket.clickup_task_id) return null;
+  return `https://app.clickup.com/t/${CLICKUP_TEAM_ID}/${ticket.clickup_task_id}`;
+};
+
 const statusFilter = ref('');
 const currentPage = ref(1);
 const detailDialogRef = ref(null);
 const EMPTY_CELL = '—';
+
+const tableHeaders = computed(() => {
+  const headers = [
+    t('MEUS_TICKETS.COLUMNS.DISPLAY_ID'),
+    t('MEUS_TICKETS.COLUMNS.OPENED_AT'),
+    t('MEUS_TICKETS.COLUMNS.PROBLEM'),
+    t('MEUS_TICKETS.COLUMNS.STATUS'),
+    t('MEUS_TICKETS.COLUMNS.RESPONSE'),
+  ];
+  if (isAdminOrManager.value) {
+    headers.push(t('MEUS_TICKETS.COLUMNS.AGENT'));
+    headers.push(t('MEUS_TICKETS.COLUMNS.CLICKUP'));
+  }
+  return headers;
+});
 
 const fetch = async () => {
   await store.dispatch('tickets/fetchAll', {
@@ -44,21 +78,10 @@ watch(statusFilter, () => {
   fetch();
 });
 
-const nextPage = () => {
-  currentPage.value += 1;
+const onPageChange = page => {
+  currentPage.value = page;
   fetch();
 };
-
-const prevPage = () => {
-  if (currentPage.value <= 1) return;
-  currentPage.value -= 1;
-  fetch();
-};
-
-const hasNextPage = computed(() => {
-  const { totalCount, currentPage: page, perPage } = meta.value;
-  return page * perPage < totalCount;
-});
 
 const statusBadgeClass = statusName => {
   const slug = (statusName || '').toLowerCase();
@@ -81,6 +104,11 @@ const formatDate = timestamp => {
     hour: '2-digit',
     minute: '2-digit',
   });
+};
+
+const openClickupTask = (event, url) => {
+  event.stopPropagation();
+  if (url) window.open(url, '_blank');
 };
 
 onMounted(async () => {
@@ -141,54 +169,39 @@ onUnmounted(clearUnread);
       <div v-if="uiFlags.fetchingList" class="flex justify-center py-12">
         <Spinner class="text-n-brand" />
       </div>
-      <div
-        v-else-if="records.length === 0"
-        class="flex flex-col items-center justify-center py-16 text-center text-n-slate-11"
+      <BaseTable
+        v-else
+        :headers="tableHeaders"
+        :items="records"
+        :no-data-message="t('MEUS_TICKETS.EMPTY')"
       >
-        <i class="i-lucide-flag size-10 mb-3" />
-        <p class="text-sm">
-          {{ t('MEUS_TICKETS.EMPTY') }}
-        </p>
-      </div>
-      <div v-else class="rounded-xl border border-n-weak overflow-hidden">
-        <table class="w-full text-sm">
-          <thead
-            class="bg-n-solid-2 text-xs uppercase text-n-slate-11 tracking-wide"
+        <template #row="{ items }">
+          <BaseTableRow
+            v-for="ticket in items"
+            :key="ticket.id"
+            :item="ticket"
+            class="cursor-pointer hover:bg-n-solid-2 transition-colors"
+            @click="openTicket(ticket)"
           >
-            <tr>
-              <th class="px-4 py-3 text-left">
-                {{ t('MEUS_TICKETS.COLUMNS.OPENED_AT') }}
-              </th>
-              <th class="px-4 py-3 text-left">
-                {{ t('MEUS_TICKETS.COLUMNS.PROBLEM') }}
-              </th>
-              <th class="px-4 py-3 text-left">
-                {{ t('MEUS_TICKETS.COLUMNS.STATUS') }}
-              </th>
-              <th class="px-4 py-3 text-left">
-                {{ t('MEUS_TICKETS.COLUMNS.RESPONSE') }}
-              </th>
-              <th v-if="isAdminOrManager" class="px-4 py-3 text-left">
-                {{ t('MEUS_TICKETS.COLUMNS.AGENT') }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="ticket in records"
-              :key="ticket.id"
-              class="border-t border-n-weak hover:bg-n-solid-2 cursor-pointer transition-colors"
-              @click="openTicket(ticket)"
-            >
-              <td class="px-4 py-3 text-n-slate-11 whitespace-nowrap">
-                {{ formatDate(ticket.created_at) }}
-              </td>
-              <td class="px-4 py-3 text-n-slate-12 max-w-md">
-                <p class="line-clamp-2">
+            <template #default>
+              <BaseTableCell>
+                <span
+                  class="text-body-main font-medium text-n-slate-12 whitespace-nowrap"
+                >
+                  {{ ticket.display_id }}
+                </span>
+              </BaseTableCell>
+              <BaseTableCell>
+                <span class="text-body-main text-n-slate-11 whitespace-nowrap">
+                  {{ formatDate(ticket.created_at) }}
+                </span>
+              </BaseTableCell>
+              <BaseTableCell>
+                <p class="text-body-main text-n-slate-12 line-clamp-2 max-w-md">
                   {{ ticket.relatar_problema }}
                 </p>
-              </td>
-              <td class="px-4 py-3">
+              </BaseTableCell>
+              <BaseTableCell>
                 <span
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                   :class="statusBadgeClass(ticket.clickup_status_name)"
@@ -198,53 +211,52 @@ onUnmounted(clearUnread);
                     t('MEUS_TICKETS.STATUS.PENDING_SYNC')
                   }}
                 </span>
-              </td>
-              <td class="px-4 py-3 text-n-slate-11 max-w-md">
-                <p v-if="ticket.resposta_para_cliente" class="line-clamp-2">
+              </BaseTableCell>
+              <BaseTableCell>
+                <p
+                  v-if="ticket.resposta_para_cliente"
+                  class="text-body-main text-n-slate-11 line-clamp-2 max-w-md"
+                >
                   {{ ticket.resposta_para_cliente }}
                 </p>
                 <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
-              </td>
-              <td v-if="isAdminOrManager" class="px-4 py-3 text-n-slate-11">
-                {{ ticket.user?.name || EMPTY_CELL }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </BaseTableCell>
+              <template v-if="isAdminOrManager">
+                <BaseTableCell>
+                  <span class="text-body-main text-n-slate-11">
+                    {{ ticket.user?.name || EMPTY_CELL }}
+                  </span>
+                </BaseTableCell>
+                <BaseTableCell>
+                  <Button
+                    v-if="clickupTaskUrl(ticket)"
+                    v-tooltip.top="ticket.clickup_task_id"
+                    type="button"
+                    variant="faded"
+                    color="slate"
+                    size="xs"
+                    icon="i-lucide-external-link"
+                    :label="ticket.clickup_task_id"
+                    @click="
+                      event => openClickupTask(event, clickupTaskUrl(ticket))
+                    "
+                  />
+                  <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
+                </BaseTableCell>
+              </template>
+            </template>
+          </BaseTableRow>
+        </template>
+      </BaseTable>
 
-      <div
+      <PaginationFooter
         v-if="records.length > 0"
-        class="flex items-center justify-between mt-4 text-xs text-n-slate-11"
-      >
-        <span>
-          {{
-            t('MEUS_TICKETS.PAGINATION.SUMMARY', {
-              from: (meta.currentPage - 1) * meta.perPage + 1,
-              to: Math.min(meta.currentPage * meta.perPage, meta.totalCount),
-              total: meta.totalCount,
-            })
-          }}
-        </span>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="px-3 py-1 rounded-md border border-n-weak disabled:opacity-40 hover:bg-n-solid-2"
-            :disabled="currentPage <= 1"
-            @click="prevPage"
-          >
-            {{ t('MEUS_TICKETS.PAGINATION.PREV') }}
-          </button>
-          <button
-            type="button"
-            class="px-3 py-1 rounded-md border border-n-weak disabled:opacity-40 hover:bg-n-solid-2"
-            :disabled="!hasNextPage"
-            @click="nextPage"
-          >
-            {{ t('MEUS_TICKETS.PAGINATION.NEXT') }}
-          </button>
-        </div>
-      </div>
+        class="mt-4"
+        :current-page="meta.currentPage"
+        :total-items="meta.totalCount"
+        :items-per-page="meta.perPage"
+        @update:current-page="onPageChange"
+      />
     </div>
 
     <TicketDetailDialog ref="detailDialogRef" />

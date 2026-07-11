@@ -31,9 +31,17 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
     client.create_task(
       list_id: Integrations::Clickup::FieldMap::FEEDBACK_LIST_ID,
       name: build_task_name(ticket),
-      description: ticket.relatar_problema,
+      description: build_task_description(ticket),
       custom_fields: build_custom_fields(ticket)
     )
+  end
+
+  # Prepend the local display id ("AF-42") as an OBS line so the ops team can
+  # cross-reference reports on ClickUp with what the operator sees on Meus
+  # Tickets. Kept in the description (natural OBS field) until product picks
+  # a custom field to promote it to.
+  def build_task_description(ticket)
+    "OBS: #{ticket.display_id}\n\n#{ticket.relatar_problema}"
   end
 
   def apply_clickup_response(ticket, response)
