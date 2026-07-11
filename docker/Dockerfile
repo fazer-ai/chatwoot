@@ -84,9 +84,24 @@ COPY . /app
 RUN mkdir -p /app/log
 
 # generate production assets if production environment
+#
+# Grover (used by the conversation transcript-PDF download) shells out to
+# Node.js at runtime and needs `puppeteer-core` in node_modules. The full
+# dependency tree was only needed for `assets:precompile` above, so we blow
+# it away to keep the image small and then reinstall just puppeteer-core
+# — no bundled Chromium, we point at the system binary set via
+# PUPPETEER_EXECUTABLE_PATH. Without this reinstall the runtime crashes with
+# `Grover::DependencyError: Cannot find module 'puppeteer'` on the first
+# transcript download.
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
-  && rm -rf spec node_modules tmp/cache; \
+  && rm -rf spec node_modules tmp/cache \
+  # `--legacy-peer-deps` is required because the project's package.json still
+  # references dev-only tooling (histoire) whose peer range predates the vite
+  # 6 bump; without it npm refuses to resolve at all. We are installing a
+  # single package that doesn't touch either, so bypassing peer checks is safe.
+  && npm install --prefix /app --no-save --omit=dev --ignore-scripts --legacy-peer-deps \
+       puppeteer-core@"$(node -p 'require("./package.json").dependencies["puppeteer-core"]')"; \
   fi
 
 # Generate .git_sha file with current commit hash
