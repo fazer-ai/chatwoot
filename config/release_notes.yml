@@ -1,4 +1,28 @@
 ---
+- tag: v4.15.1-auris.1.41
+  published_at: '2026-07-10T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Report an issue on a response.** Hover any AI or agent message and a flag icon appears next to the reactions. Click it to describe what went wrong, suggest the correct answer, and attach screenshots. The team receives the report and follows up.
+
+      - **Managers can delete contacts.** Users with the "manager" role can now delete contacts directly — this used to be admin-only.
+
+      ### 🐛 Fixes
+
+      - **Renaming an inbox now works on the first try.** Editing an inbox name showed a confusing warning and only saved on the retry. It now saves on the first click.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Relatar problema em uma resposta.** Passe o mouse por cima de qualquer mensagem da IA ou do agente e aparece um ícone de bandeira ao lado das reações. Um clique abre uma janela para descrever o que aconteceu, sugerir a resposta correta e anexar prints. O time recebe o relato e volta com o retorno.
+
+      - **Gestor pode excluir contatos.** Usuários com papel de "gestor" agora conseguem apagar um contato direto — antes só administradores tinham.
+
+      ### 🐛 Correções
+
+      - **Renomear caixa de entrada agora funciona na primeira tentativa.** Editar o nome de uma caixa mostrava um aviso confuso e só salvava na segunda tentativa. Agora salva de primeira.
 - tag: v4.15.1-auris.1.40
   published_at: '2026-07-08T03:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.40
@@ -249,15 +273,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.32
-  published_at: '2026-06-22T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.32
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Auris Notification Center.** The Auris team can now send you announcements (maintenance, news) directly inside the panel. When there's something to read, a window pops up and stays until you click "I understand". You can revisit the 10 most recent notices any time from the new "Notification Center" menu.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Central de Notificação Auris.** A equipe Auris agora consegue te enviar avisos (manutenções, novidades) direto pelo painel. Quando tiver algo, uma janela aparece e fica na tela até você apertar "Entendi". Você pode rever os 10 mais recentes a qualquer hora no novo menu "Central de Notificação".
