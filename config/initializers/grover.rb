@@ -29,11 +29,15 @@ Grover.configure do |config|
     # Prevent HTML render from hanging forever if a remote asset (attachment link)
     # is slow — the transcript PDF is not worth a stuck Puma thread.
     timeout: 20_000,
+    # `--single-process` was originally included as a memory optimization but
+    # crashes modern Chromium the moment puppeteer opens the first target with
+    # `Protocol error (Target.setDiscoverTargets): Target closed`. Removing it
+    # is the puppeteer team's recommendation; `--disable-dev-shm-usage`
+    # already handles the container /dev/shm issue that motivated it.
     launch_args: [
       '--no-sandbox',
       '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--single-process'
+      '--disable-gpu'
     ],
     executable_path: puppeteer_executable_path
   }.compact
