@@ -96,7 +96,11 @@ RUN mkdir -p /app/log
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
   && rm -rf spec node_modules tmp/cache \
-  && npm install --prefix /app --no-save --omit=dev --ignore-scripts \
+  # `--legacy-peer-deps` is required because the project's package.json still
+  # references dev-only tooling (histoire) whose peer range predates the vite
+  # 6 bump; without it npm refuses to resolve at all. We are installing a
+  # single package that doesn't touch either, so bypassing peer checks is safe.
+  && npm install --prefix /app --no-save --omit=dev --ignore-scripts --legacy-peer-deps \
        puppeteer-core@"$(node -p 'require("./package.json").dependencies["puppeteer-core"]')"; \
   fi
 
