@@ -77,9 +77,17 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
     ticket.update!(sync_status: :sync_failed, sync_error: message)
   end
 
+  # Format: "<ticket id> - <problem excerpt>", excerpt capped at 50 chars so
+  # the ClickUp task list stays scannable. Longer bodies fall back to the
+  # first 47 chars + "…" via ActiveSupport's `truncate`; empty bodies
+  # collapse to just the id (validation should prevent that in practice).
+  TASK_NAME_EXCERPT_LIMIT = 50
+
   def build_task_name(ticket)
-    agent = ticket.user&.name.presence || 'Sistema'
-    "Feedback — Conversa ##{ticket.conversation&.display_id} — #{agent}"
+    excerpt = ticket.relatar_problema.to_s.strip.truncate(TASK_NAME_EXCERPT_LIMIT, separator: ' ')
+    return ticket.display_id.to_s if excerpt.blank?
+
+    "#{ticket.display_id} - #{excerpt}"
   end
 
   def build_custom_fields(ticket)

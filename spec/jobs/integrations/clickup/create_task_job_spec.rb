@@ -47,6 +47,32 @@ RSpec.describe Integrations::Clickup::CreateTaskJob do
       expect(ticket.sync_error).to be_nil
     end
 
+    # ClickUp task name is what shows up on the ops team's list view — the
+    # ticket id lets them cross-reference back to Meus Tickets, and the
+    # excerpt gives enough context to triage without opening the task.
+    it 'names the ClickUp task "<id> - <problem excerpt>"' do
+      captured = stub_capture_create_task
+      ticket.update!(relatar_problema: 'A IA poderia ter respondido em outro idioma')
+
+      described_class.new.perform(ticket.id)
+
+      expect(captured[:name]).to eq("#{ticket.id} - A IA poderia ter respondido em outro idioma")
+    end
+
+    it 'caps the problem excerpt in the task name at 50 chars so the ClickUp list stays scannable' do
+      captured = stub_capture_create_task
+      long_body = 'Este é um relato bem longo com muito detalhe explicando o que aconteceu de errado e todos os contornos'
+      ticket.update!(relatar_problema: long_body)
+
+      described_class.new.perform(ticket.id)
+
+      expect(captured[:name]).to start_with("#{ticket.id} - ")
+      # Truncate uses ' ' as separator so it clips on the nearest word — the
+      # tail is a Unicode ellipsis courtesy of ActiveSupport.
+      body_part = captured[:name].delete_prefix("#{ticket.id} - ")
+      expect(body_part.length).to be <= described_class::TASK_NAME_EXCERPT_LIMIT
+    end
+
     it 'sends the Auris custom fields the ops team relies on to route the ticket' do
       captured = stub_capture_create_task
 
