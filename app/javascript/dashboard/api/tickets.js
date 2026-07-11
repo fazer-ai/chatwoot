@@ -42,6 +42,19 @@ class Tickets extends ApiClient {
   addComment(id, { comment }) {
     return axios.post(`${this.url}/${id}/add_comment`, { comment });
   }
+
+  // GET /api/v1/accounts/:account_id/tickets?page=N&status=...
+  // Meus Tickets. Backend narrows the payload via TicketPolicy::Scope
+  // (agent → own, manager/admin → all).
+  fetchAll({ page = 1, status } = {}) {
+    const params = { page };
+    if (status) params.status = status;
+    return axios.get(this.url, { params });
+  }
+
+  fetch(id) {
+    return axios.get(`${this.url}/${id}`);
+  }
 }
 
 export default new Tickets();

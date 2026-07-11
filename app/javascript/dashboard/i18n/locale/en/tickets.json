@@ -1,0 +1,55 @@
+{
+  "SIDEBAR": {
+    "MY_TICKETS": "My Tickets"
+  },
+  "MEUS_TICKETS": {
+    "TITLE": "My Tickets",
+    "SUBTITLE": "Feedback tickets you have opened and their status from the operations team.",
+    "EMPTY": "You have not opened any feedback tickets yet.",
+    "FILTERS": {
+      "STATUS": "Status",
+      "ALL": "All"
+    },
+    "STATUS": {
+      "ABERTO": "Open",
+      "EM_ANALISE": "In review",
+      "RESOLVIDO": "Resolved",
+      "RESTRICAO": "Restriction",
+      "ENCERRADO": "Closed",
+      "PENDING_SYNC": "Syncing…"
+    },
+    "COLUMNS": {
+      "OPENED_AT": "Opened",
+      "PROBLEM": "Issue",
+      "STATUS": "Status",
+      "RESPONSE": "Response for the customer",
+      "AGENT": "Agent"
+    },
+    "PAGINATION": {
+      "SUMMARY": "{from}–{to} of {total}",
+      "PREV": "Previous",
+      "NEXT": "Next"
+    },
+    "DETAIL": {
+      "TITLE": "Ticket details",
+      "SUBTITLE": "Read what the operations team wrote and share more context if needed.",
+      "STATUS": "Status",
+      "AGENT": "Agent",
+      "PROBLEM": "What went wrong",
+      "EXPECTED": "Expected behavior",
+      "RESPONSE": "Response for the customer",
+      "PENDING_SYNC": "This ticket is still being sent to the operations team. It may take a few minutes.",
+      "SYNC_FAILED": "This ticket could not be sent to the operations team. The support team was notified.",
+      "GO_TO_MESSAGE": "Open message",
+      "OPEN_IN_CLICKUP": "Open in ClickUp",
+      "ADD_COMMENT_LABEL": "Add more information",
+      "ADD_COMMENT_PLACEHOLDER": "Share additional context for the operations team.",
+      "ADD_COMMENT_SUBMIT": "Add comment",
+      "COMMENT_SUCCESS": "Comment sent to the operations team.",
+      "COMMENT_ERROR": "Could not send the comment. Please try again."
+    },
+    "NOTIFICATIONS": {
+      "STATUS_CHANGED": "There is an update on one of your feedback tickets."
+    }
+  }
+}

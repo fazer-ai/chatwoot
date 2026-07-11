@@ -59,6 +59,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'internal_chat.reaction.created': this.onInternalChatReactionCreated,
       'internal_chat.reaction.deleted': this.onInternalChatReactionDeleted,
       'internal_chat.poll.voted': this.onInternalChatPollVoted,
+      'ticket.updated': this.onTicketUpdated,
     };
   }
 
@@ -149,6 +150,22 @@ class ActionCableConnector extends BaseActionCableConnector {
   onConversationUpdated = data => {
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
+  };
+
+  // ClickUp webhook applied a change to a Ticket. `notify` differentiates
+  // the loud transitions (Resolvido / Restrição / Encerrado + new resposta)
+  // from routine ones — on notify=true we fire a toast. Snackbar resolves
+  // the i18n key when action.usei18n is set (see SnackbarContainer.vue).
+  onTicketUpdated = data => {
+    const { ticket, notify } = data || {};
+    if (!ticket) return;
+    this.app.$store.dispatch('tickets/updateFromWebsocket', { ticket, notify });
+    if (notify) {
+      emitter.emit(BUS_EVENTS.SHOW_TOAST, {
+        message: 'MEUS_TICKETS.NOTIFICATIONS.STATUS_CHANGED',
+        action: { usei18n: true },
+      });
+    }
   };
 
   onScheduledMessageCreated = data => {

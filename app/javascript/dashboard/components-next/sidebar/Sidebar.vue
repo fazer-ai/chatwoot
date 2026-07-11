@@ -477,6 +477,16 @@ const menuItems = computed(() => {
         count: 'internalChat/getUnreadCount',
       },
     },
+    {
+      name: 'Tickets',
+      label: t('SIDEBAR.MY_TICKETS'),
+      icon: 'i-lucide-flag',
+      to: accountScopedRoute('tickets_index'),
+      activeOn: ['tickets_index'],
+      getterKeys: {
+        count: 'tickets/getUnreadCount',
+      },
+    },
     ...(isFunnelEnabled.value
       ? [
           {
