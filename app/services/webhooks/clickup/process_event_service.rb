@@ -1,19 +1,23 @@
 # Applies a ClickUp webhook event to the local Ticket.
 #
-# Two events are relevant:
-# - `taskStatusUpdated`: mirror ClickUp's status onto the Ticket. This is
-#   the source of truth for the badge the operator sees in Meus Tickets.
-# - `taskCustomFieldUpdated`: when the ops team fills the "Resposta para o
-#   Cliente" field, copy the new value onto the Ticket so it renders in
-#   the ticket detail modal.
+# ClickUp fires a single `taskUpdated` umbrella event for every kind of task
+# change (status, custom fields, priority, assignees, comments, etc.) with
+# the concrete diff on the `history_items` array. We route on that array:
 #
-# Other events (assignee, priority, comment) are ignored — Phase 1 only
-# surfaces status + response back to the operator.
+# - `field: 'status'`       → mirror ClickUp's status onto the Ticket
+#                             (source of truth for the badge on Meus
+#                             Tickets).
+# - `field: 'custom_field'` → when the ops team fills the "Resposta para o
+#                             Cliente" field, copy the new value onto the
+#                             Ticket so it renders in the detail modal.
 #
-# After a change lands the service also broadcasts `ticket.updated` on
+# Every other history-item field is dropped silently — Phase 1 only surfaces
+# status + response back to the operator.
+#
+# After a change lands the service broadcasts `ticket.updated` on
 # ActionCable so Meus Tickets refreshes live and, when the status
-# transitions into `FieldMap::NOTIFIABLE_STATUS_SLUGS` (resolvido / restrição
-# / encerrado), the frontend fires a toast + bumps the sidebar unread badge.
+# transitions into `FieldMap::NOTIFIABLE_STATUS_SLUGS` (encerrado), the
+# frontend fires a toast + bumps the sidebar unread badge.
 class Webhooks::Clickup::ProcessEventService
   TICKET_UPDATED_EVENT = 'ticket.updated'.freeze
 
@@ -28,25 +32,22 @@ class Webhooks::Clickup::ProcessEventService
     ticket = Ticket.find_by(clickup_task_id: task_id)
     return if ticket.nil?
 
-    case @payload[:event]
-    when 'taskStatusUpdated'
-      apply_status_update(ticket)
-    when 'taskCustomFieldUpdated'
-      apply_custom_field_update(ticket)
+    Array(@payload[:history_items]).each do |item|
+      case item[:field]
+      when 'status'
+        apply_status_update(ticket, item)
+      when 'custom_field'
+        apply_custom_field_update(ticket, item)
+      end
     end
   end
 
   private
 
-  # ClickUp payload shape (abbreviated):
-  #   { event: 'taskStatusUpdated', task_id: '...',
-  #     history_items: [{ field: 'status', after: { id, status, type }, ... }] }
-  def apply_status_update(ticket)
-    latest = Array(@payload[:history_items]).find { |h| h[:field] == 'status' }
-    return if latest.blank?
-
-    new_status_id = latest.dig(:after, :id)
-    raw_status_name = latest.dig(:after, :status)
+  # `after` for a status change: { id, status, type: 'open'|'custom'|'done'|... }
+  def apply_status_update(ticket, item)
+    new_status_id = item.dig(:after, :id)
+    raw_status_name = item.dig(:after, :status)
     return if new_status_id.blank?
     return if ticket.clickup_status_id == new_status_id
 
@@ -58,20 +59,17 @@ class Webhooks::Clickup::ProcessEventService
       clickup_status_id: new_status_id,
       clickup_status_name: mapped_name
     )
-    broadcast(ticket, notify: notifiable_transition?(mapped_name, latest.dig(:after, :type)))
+    broadcast(ticket, notify: notifiable_transition?(mapped_name, item.dig(:after, :type)))
   end
 
-  # `taskCustomFieldUpdated` fires for every custom field change; we only
-  # care about the "Resposta para o Cliente" field. Everything else is
-  # dropped silently so this handler stays O(1).
-  def apply_custom_field_update(ticket)
-    latest = Array(@payload[:history_items]).find { |h| h[:field] == 'custom_field' }
-    return if latest.blank?
-
-    field_id = latest.dig(:custom_field, :id)
+  # We only care about the "Resposta para o Cliente" custom field.
+  # Everything else (Ambiente, Canal, Chat ID, ...) is noise and would trash
+  # the ticket's local state if we mirrored it back.
+  def apply_custom_field_update(ticket, item)
+    field_id = item.dig(:custom_field, :id)
     return unless field_id == Integrations::Clickup::FieldMap::FIELDS[:resposta_para_cliente]
 
-    new_value = extract_text_value(latest[:after])
+    new_value = extract_text_value(item[:after])
     return if new_value.nil?
     return if ticket.resposta_para_cliente == new_value
 

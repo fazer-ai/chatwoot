@@ -62,10 +62,17 @@ module Integrations::Clickup::FieldMap
     mensagem: '9e476afd-7811-43bd-93c5-74e3cab283df'
   }.freeze
 
-  # ClickUp events we subscribe to. `taskStatusUpdated` drives the status
-  # column in Meus Tickets; `taskCustomFieldUpdated` flows the ops team's
-  # "Resposta para o Cliente" back into the ticket.
-  WEBHOOK_EVENTS = %w[taskStatusUpdated taskCustomFieldUpdated].freeze
+  # ClickUp events we subscribe to. `taskUpdated` is the umbrella event
+  # that fires for any change on a task — status, custom fields, priority,
+  # assignees, etc — and carries the concrete diff on the `history_items`
+  # array. We inspect that array server-side (see ProcessEventService) and
+  # only act on `field: 'status'` and the `field: 'custom_field'` entry
+  # for "Resposta para o Cliente".
+  #
+  # Note: `taskCustomFieldUpdated` is NOT a valid ClickUp event — the API
+  # rejects the subscription with `400 Invalid Events`. Custom field
+  # changes ride under `taskUpdated`.
+  WEBHOOK_EVENTS = %w[taskUpdated].freeze
 
   # ClickUp exposes ~7 statuses on the Feedback list; the operator only
   # needs 3 (Aberto / Em análise / Encerrado). Everything upstream gets
