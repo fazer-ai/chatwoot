@@ -1,4 +1,40 @@
 ---
+- tag: v4.15.1-auris.1.41.3
+  published_at: '2026-07-12T02:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.3
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **"Hide closed" checkbox on My Tickets.** Check the box and closed tickets disappear from the list, leaving only what still needs follow-up.
+
+      ### ⚡ Improvements
+
+      - **My Tickets looks cleaner.** New "ID" column, ordered by ID (newest first), and the table matches the style of other list pages. Ticket detail shows the status with the same colored badge as the list.
+      - **Simpler status.** The panel used to show 7 ops-team categories. Now you see only 3: Open, In review, Closed.
+      - **"Add more information" hides when it makes sense.** Field disappears on closed tickets — no more sending comments nobody will read.
+
+      ### 🐛 Fixes
+
+      - **Menu labels back to normal.** Sidebar was showing technical text ("SIDEBAR.CONVERSATIONS" etc.) instead of the translated names. Everything reads correctly now.
+      - **Ticket details open with the full content.** Clicking a ticket used to open an almost-empty modal. Now it opens with every field.
+      - **"In review" badge has its blue background.**
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Caixinha "Ocultar finalizadas" em Meus Tickets.** Marca a caixinha e os tickets encerrados somem da lista, deixando só o que ainda precisa acompanhamento.
+
+      ### ⚡ Melhorias
+
+      - **Meus Tickets ficou mais limpo.** Nova coluna "ID" no começo, ordenação por ID (do mais novo pro mais antigo) e a tabela ganhou o mesmo estilo do resto do painel. O detalhe do ticket também mostra o status com a mesma cor da lista.
+      - **Status simplificado.** Antes aparecia as 7 categorias que o time interno usa. Agora só 3: Aberto, Em análise e Encerrado.
+      - **"Adicionar mais informação" só quando faz sentido.** O campo some quando o ticket já foi encerrado — evita mandar comentário que ninguém vai olhar.
+
+      ### 🐛 Correções
+
+      - **Nomes do menu voltaram ao normal.** A barra lateral estava mostrando textos técnicos ("SIDEBAR.CONVERSATIONS" etc.). Tudo aparece certo agora.
+      - **Detalhes do ticket abrem completos.** Antes clicar num ticket abria uma janela quase vazia — só o cabeçalho. Agora aparece com todos os campos.
+      - **Badge "Em análise" com fundo azul.**
 - tag: v4.15.1-auris.1.41.2
   published_at: '2026-07-11T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.2
@@ -276,12 +312,4 @@
 
       - **O relatório IA → Humano ficou mais confiável.** Cada atribuição feita pela IA é registrada na hora, então o relatório não fica mais com falhas em momentos de muito movimento. Também passa a sinalizar quando a IA atribuiu uma conversa para um agente que já estava offline — facilita identificar problemas reais.
 
-      Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.33.1
-  published_at: '2026-06-23T14:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.33.1
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
       Correções de bugs e melhorias internas.
