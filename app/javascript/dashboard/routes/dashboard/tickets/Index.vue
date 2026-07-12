@@ -11,6 +11,7 @@ import {
 } from 'dashboard/components-next/table';
 import PaginationFooter from 'dashboard/components-next/pagination/PaginationFooter.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import Select from 'dashboard/components-next/select/Select.vue';
 import TicketDetailDialog from 'dashboard/components-next/feedback/TicketDetailDialog.vue';
 
 // Meus Tickets. Renders every ticket the current user is allowed to see —
@@ -51,6 +52,15 @@ const statusFilter = ref('');
 const currentPage = ref(1);
 const detailDialogRef = ref(null);
 const EMPTY_CELL = '—';
+
+const statusFilterOptions = computed(() => [
+  { value: '', label: t('MEUS_TICKETS.FILTERS.ALL') },
+  { value: 'aberto', label: t('MEUS_TICKETS.STATUS.ABERTO') },
+  { value: 'em análise', label: t('MEUS_TICKETS.STATUS.EM_ANALISE') },
+  { value: 'resolvido', label: t('MEUS_TICKETS.STATUS.RESOLVIDO') },
+  { value: 'restrição', label: t('MEUS_TICKETS.STATUS.RESTRICAO') },
+  { value: 'encerrado', label: t('MEUS_TICKETS.STATUS.ENCERRADO') },
+]);
 
 const tableHeaders = computed(() => {
   const headers = [
@@ -144,31 +154,11 @@ onUnmounted(clearUnread);
           {{ t('MEUS_TICKETS.SUBTITLE') }}
         </p>
       </div>
-      <div class="flex items-center gap-3">
-        <label class="text-xs text-n-slate-11">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-n-slate-11">
           {{ t('MEUS_TICKETS.FILTERS.STATUS') }}
-        </label>
-        <select
-          v-model="statusFilter"
-          class="text-sm rounded-lg border border-n-slate-6 bg-n-solid-2 px-3 py-1.5 text-n-slate-12 focus:outline-none focus:border-n-brand"
-        >
-          <option value="">{{ t('MEUS_TICKETS.FILTERS.ALL') }}</option>
-          <option value="aberto">
-            {{ t('MEUS_TICKETS.STATUS.ABERTO') }}
-          </option>
-          <option value="em análise">
-            {{ t('MEUS_TICKETS.STATUS.EM_ANALISE') }}
-          </option>
-          <option value="resolvido">
-            {{ t('MEUS_TICKETS.STATUS.RESOLVIDO') }}
-          </option>
-          <option value="restrição">
-            {{ t('MEUS_TICKETS.STATUS.RESTRICAO') }}
-          </option>
-          <option value="encerrado">
-            {{ t('MEUS_TICKETS.STATUS.ENCERRADO') }}
-          </option>
-        </select>
+        </span>
+        <Select v-model="statusFilter" :options="statusFilterOptions" />
       </div>
     </header>
 
