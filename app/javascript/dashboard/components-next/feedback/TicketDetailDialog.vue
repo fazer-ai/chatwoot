@@ -8,12 +8,10 @@ import { useAlert } from 'dashboard/composables';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
-// Ticket detail modal used by Meus Tickets. Shows the full ticket data
-// as a definition-list style form (ID / Abertura / Problema / Status /
-// Atualização Auris / Agente / Link mensagem), plus a compact
-// "Incluir mais contexto" section. Any comment submitted from that
-// section goes to ClickUp via AddCommentJob — the ops team gets it as
-// a comment on the same task the ticket is linked to.
+// Ticket detail modal used by Meus Tickets. Shows the readonly ticket
+// captured at open time (id, status, agent, problem, expected behavior,
+// resposta from ops) plus a compact "Incluir mais contexto" section
+// that posts a comment on the ClickUp task via AddCommentJob.
 
 const { t } = useI18n();
 const store = useStore();
@@ -44,6 +42,10 @@ const isSyncPending = computed(
 const isSyncFailed = computed(
   () => ticket.value?.sync_status === 'sync_failed'
 );
+// Only administrators see the ClickUp shortcut — it exposes ops-side
+// internals (task id, workspace URL) that don't belong in front of the
+// operator or the manager.
+const isAdministrator = computed(() => currentRole.value === 'administrator');
 // Agent → their own tickets (backend policy enforces this).
 // Manager, Administrator → any ticket in the account.
 // The `sync_synced` guard is on top: without a ClickUp task id the
@@ -56,32 +58,6 @@ const canComment = computed(() => {
     ticket.value?.sync_status === 'synced' &&
     !!ticket.value?.clickup_task_id
   );
-});
-
-const formatDate = timestamp => {
-  if (!timestamp) return EMPTY_CELL;
-  const date = new Date(timestamp);
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-// Deep link that reproduces what the operator would see in the browser
-// URL bar. Origin comes from window.location so it stays correct across
-// homolog / prod / worktrees without needing FRONTEND_URL wired to the
-// bundle.
-const messageLink = computed(() => {
-  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id) {
-    return null;
-  }
-  const account = accountId.value;
-  const conv = ticket.value.conversation_display_id;
-  const msg = ticket.value.message_id;
-  return `${window.location.origin}/app/accounts/${account}/conversations/${conv}?messageId=${msg}`;
 });
 
 const openWith = fresh => {
@@ -139,90 +115,66 @@ defineExpose({ openWith });
     @close="handleClose"
   >
     <div v-if="ticket" class="flex flex-col gap-5">
-      <!-- Definition-list style grid: label (col 1) / value (col 2) -->
-      <dl
-        class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm items-baseline"
-      >
-        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
-          {{ t('MEUS_TICKETS.DETAIL.ID') }}
-        </dt>
-        <dd class="text-n-slate-12 font-medium">
-          {{ ticket.display_id }}
-        </dd>
+      <!-- Header row: ID, Status, Agente in a compact 2-col grid.
+           Same visual style as the previous release; ID added inline. -->
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-xs uppercase text-n-slate-11 mb-1">
+            {{ t('MEUS_TICKETS.DETAIL.ID') }}
+          </p>
+          <p class="text-n-slate-12 font-medium">
+            {{ ticket.display_id }}
+          </p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-n-slate-11 mb-1">
+            {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
+          </p>
+          <p class="text-n-slate-12">
+            {{
+              ticket.clickup_status_name ||
+              t('MEUS_TICKETS.STATUS.PENDING_SYNC')
+            }}
+          </p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-n-slate-11 mb-1">
+            {{ t('MEUS_TICKETS.DETAIL.AGENT') }}
+          </p>
+          <p class="text-n-slate-12">
+            {{ ticket.user?.name || EMPTY_CELL }}
+          </p>
+        </div>
+      </div>
 
-        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
-          {{ t('MEUS_TICKETS.DETAIL.OPENED_AT') }}
-        </dt>
-        <dd class="text-n-slate-12">
-          {{ formatDate(ticket.created_at) }}
-        </dd>
-
-        <dt
-          class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
-        >
+      <div>
+        <p class="text-xs uppercase text-n-slate-11 mb-1">
           {{ t('MEUS_TICKETS.DETAIL.PROBLEM') }}
-        </dt>
-        <dd class="text-n-slate-12 whitespace-pre-wrap">
+        </p>
+        <p class="text-sm text-n-slate-12 whitespace-pre-wrap">
           {{ ticket.relatar_problema }}
-        </dd>
+        </p>
+      </div>
 
-        <template v-if="ticket.comportamento_esperado">
-          <dt
-            class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
-          >
-            {{ t('MEUS_TICKETS.DETAIL.EXPECTED') }}
-          </dt>
-          <dd class="text-n-slate-12 whitespace-pre-wrap">
-            {{ ticket.comportamento_esperado }}
-          </dd>
-        </template>
+      <div v-if="ticket.comportamento_esperado">
+        <p class="text-xs uppercase text-n-slate-11 mb-1">
+          {{ t('MEUS_TICKETS.DETAIL.EXPECTED') }}
+        </p>
+        <p class="text-sm text-n-slate-12 whitespace-pre-wrap">
+          {{ ticket.comportamento_esperado }}
+        </p>
+      </div>
 
-        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
-          {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
-        </dt>
-        <dd class="text-n-slate-12">
-          {{
-            ticket.clickup_status_name || t('MEUS_TICKETS.STATUS.PENDING_SYNC')
-          }}
-        </dd>
-
-        <dt
-          class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
-        >
+      <div v-if="ticket.resposta_para_cliente">
+        <p class="text-xs uppercase text-n-slate-11 mb-1">
           {{ t('MEUS_TICKETS.DETAIL.RESPONSE') }}
-        </dt>
-        <dd>
-          <div
-            v-if="ticket.resposta_para_cliente"
-            class="text-n-slate-12 whitespace-pre-wrap bg-n-teal-2 border border-n-teal-6 rounded-lg p-3"
-          >
-            {{ ticket.resposta_para_cliente }}
-          </div>
-          <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
-        </dd>
-
-        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
-          {{ t('MEUS_TICKETS.DETAIL.AGENT') }}
-        </dt>
-        <dd class="text-n-slate-12">
-          {{ ticket.user?.name || EMPTY_CELL }}
-        </dd>
-
-        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
-          {{ t('MEUS_TICKETS.DETAIL.MESSAGE_LINK') }}
-        </dt>
-        <dd>
-          <a
-            v-if="messageLink"
-            :href="messageLink"
-            class="text-n-brand hover:underline break-all text-sm"
-            @click.prevent="goToMessage"
-          >
-            {{ messageLink }}
-          </a>
-          <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
-        </dd>
-      </dl>
+        </p>
+        <div
+          class="text-sm text-n-slate-12 whitespace-pre-wrap bg-n-teal-2 border border-n-teal-6 rounded-lg p-3"
+        >
+          {{ ticket.resposta_para_cliente }}
+        </div>
+      </div>
 
       <div
         v-if="isSyncPending"
@@ -241,8 +193,19 @@ defineExpose({ openWith });
         </span>
       </div>
 
-      <div v-if="ticket.clickup_task_url" class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2">
         <Button
+          v-if="ticket.message_id && ticket.conversation_display_id"
+          type="button"
+          variant="faded"
+          color="slate"
+          size="sm"
+          icon="i-lucide-arrow-up-right"
+          :label="t('MEUS_TICKETS.DETAIL.GO_TO_MESSAGE')"
+          @click="goToMessage"
+        />
+        <Button
+          v-if="isAdministrator && ticket.clickup_task_url"
           type="button"
           variant="faded"
           color="slate"
