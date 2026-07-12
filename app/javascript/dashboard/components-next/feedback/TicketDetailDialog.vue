@@ -46,19 +46,36 @@ const isSyncFailed = computed(
 // internals (task id, workspace URL) that don't belong in front of the
 // operator or the manager.
 const isAdministrator = computed(() => currentRole.value === 'administrator');
+const isFinished = computed(
+  () => (ticket.value?.clickup_status_name || '').toLowerCase() === 'encerrado'
+);
+
 // Agent → their own tickets (backend policy enforces this).
 // Manager, Administrator → any ticket in the account.
 // The `sync_synced` guard is on top: without a ClickUp task id the
 // comment has nowhere to land, so the affordance stays hidden.
+// Also hidden on encerrado tickets — the conversation is closed from the
+// ops side and re-opening it via comment would confuse the workflow.
 const canComment = computed(() => {
   const role = currentRole.value;
   const roleAllowed = ['agent', 'manager', 'administrator'].includes(role);
   return (
     roleAllowed &&
     ticket.value?.sync_status === 'synced' &&
-    !!ticket.value?.clickup_task_id
+    !!ticket.value?.clickup_task_id &&
+    !isFinished.value
   );
 });
+
+// Same palette as the Meus Tickets grid — keeps the visual language of
+// status consistent between the list and the detail modal.
+const statusBadgeClass = statusName => {
+  const slug = (statusName || '').toLowerCase();
+  if (slug === 'encerrado') return 'bg-n-teal-3 text-n-teal-11';
+  if (['em análise', 'em analise'].includes(slug))
+    return 'bg-n-blue-3 text-n-blue-11';
+  return 'bg-n-slate-3 text-n-slate-11';
+};
 
 const openWith = fresh => {
   ticket.value = fresh;
@@ -130,12 +147,15 @@ defineExpose({ openWith });
           <p class="text-xs uppercase text-n-slate-11 mb-1">
             {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
           </p>
-          <p class="text-n-slate-12">
+          <span
+            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+            :class="statusBadgeClass(ticket.clickup_status_name)"
+          >
             {{
               ticket.clickup_status_name ||
               t('MEUS_TICKETS.STATUS.PENDING_SYNC')
             }}
-          </p>
+          </span>
         </div>
         <div>
           <p class="text-xs uppercase text-n-slate-11 mb-1">

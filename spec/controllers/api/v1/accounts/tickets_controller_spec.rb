@@ -48,6 +48,34 @@ RSpec.describe 'Tickets API', type: :request do
         ids = response.parsed_body['payload'].pluck('id')
         expect(ids).to eq([agent_ticket.id])
       end
+
+      # The "Ocultar finalizadas" checkbox on Meus Tickets flips this param.
+      # Encerrado tickets drop out — everything else (Aberto, Em análise, or
+      # unsynced) stays. Explicit status filter continues to override.
+      it 'hides encerrado tickets when hide_finished=true' do
+        agent_ticket.update!(clickup_status_name: 'aberto')
+        other_ticket.update!(clickup_status_name: 'encerrado')
+
+        get "/api/v1/accounts/#{account.id}/tickets",
+            params: { hide_finished: 'true' },
+            headers: manager.create_new_auth_token,
+            as: :json
+
+        ids = response.parsed_body['payload'].pluck('id')
+        expect(ids).to eq([agent_ticket.id])
+      end
+
+      it 'ignores hide_finished when the value is not truthy (e.g. blank param)' do
+        agent_ticket.update!(clickup_status_name: 'encerrado')
+
+        get "/api/v1/accounts/#{account.id}/tickets",
+            params: { hide_finished: 'false' },
+            headers: manager.create_new_auth_token,
+            as: :json
+
+        ids = response.parsed_body['payload'].pluck('id').sort
+        expect(ids).to eq([agent_ticket.id, other_ticket.id].sort)
+      end
     end
   end
 

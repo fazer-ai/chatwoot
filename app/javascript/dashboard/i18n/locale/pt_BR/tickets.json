@@ -5,7 +5,8 @@
     "EMPTY": "Você ainda não abriu nenhum ticket de feedback.",
     "FILTERS": {
       "STATUS": "Status",
-      "ALL": "Todos"
+      "ALL": "Todos",
+      "HIDE_FINISHED": "Ocultar finalizadas"
     },
     "STATUS": {
       "ABERTO": "Aberto",

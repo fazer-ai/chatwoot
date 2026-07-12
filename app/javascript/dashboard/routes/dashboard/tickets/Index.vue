@@ -49,6 +49,7 @@ const clickupTaskUrl = ticket => {
 };
 
 const statusFilter = ref('');
+const hideFinished = ref(false);
 const currentPage = ref(1);
 const detailDialogRef = ref(null);
 const EMPTY_CELL = '—';
@@ -85,6 +86,7 @@ const fetch = async () => {
   await store.dispatch('tickets/fetchAll', {
     page: currentPage.value,
     status: statusFilter.value || undefined,
+    hideFinished: hideFinished.value,
   });
 };
 
@@ -92,7 +94,7 @@ const openTicket = ticket => {
   detailDialogRef.value?.openWith(ticket);
 };
 
-watch(statusFilter, () => {
+watch([statusFilter, hideFinished], () => {
   currentPage.value = 1;
   fetch();
 });
@@ -153,11 +155,21 @@ onUnmounted(clearUnread);
           {{ t('MEUS_TICKETS.SUBTITLE') }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-n-slate-11">
-          {{ t('MEUS_TICKETS.FILTERS.STATUS') }}
-        </span>
-        <Select v-model="statusFilter" :options="statusFilterOptions" />
+      <div class="flex items-center gap-4">
+        <label class="inline-flex items-center gap-2 text-sm text-n-slate-12">
+          <input
+            v-model="hideFinished"
+            type="checkbox"
+            class="size-4 rounded border-n-weak"
+          />
+          {{ t('MEUS_TICKETS.FILTERS.HIDE_FINISHED') }}
+        </label>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-n-slate-11">
+            {{ t('MEUS_TICKETS.FILTERS.STATUS') }}
+          </span>
+          <Select v-model="statusFilter" :options="statusFilterOptions" />
+        </div>
       </div>
     </header>
 
