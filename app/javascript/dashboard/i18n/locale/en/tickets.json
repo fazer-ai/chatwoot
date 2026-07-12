@@ -1,7 +1,7 @@
 {
   "MEUS_TICKETS": {
     "TITLE": "My Tickets",
-    "SUBTITLE": "Feedback tickets you have opened and their status from the operations team.",
+    "SUBTITLE": "Track the updates on the tickets you have opened.",
     "EMPTY": "You have not opened any feedback tickets yet.",
     "FILTERS": {
       "STATUS": "Status",
@@ -18,7 +18,7 @@
       "OPENED_AT": "Opened",
       "PROBLEM": "Issue",
       "STATUS": "Status",
-      "RESPONSE": "Response for the customer",
+      "RESPONSE": "Auris update",
       "AGENT": "Agent",
       "CLICKUP": "ClickUp"
     },
@@ -29,21 +29,24 @@
     },
     "DETAIL": {
       "TITLE": "Ticket details",
-      "SUBTITLE": "Read what the operations team wrote and share more context if needed.",
+      "SUBTITLE": "See our team's update and add more context if needed.",
+      "ID": "ID",
+      "OPENED_AT": "Opened",
       "STATUS": "Status",
       "AGENT": "Agent",
-      "PROBLEM": "What went wrong",
+      "PROBLEM": "Issue",
       "EXPECTED": "Expected behavior",
-      "RESPONSE": "Response for the customer",
-      "PENDING_SYNC": "This ticket is still being sent to the operations team. It may take a few minutes.",
-      "SYNC_FAILED": "This ticket could not be sent to the operations team. The support team was notified.",
+      "RESPONSE": "Auris update",
+      "MESSAGE_LINK": "Message link",
+      "PENDING_SYNC": "This ticket is still being sent to our team. It may take a few minutes.",
+      "SYNC_FAILED": "This ticket could not be sent to our team. The support team was notified.",
       "GO_TO_MESSAGE": "Open message",
       "OPEN_IN_CLICKUP": "Open in ClickUp",
-      "ADD_COMMENT_LABEL": "Add more information",
-      "ADD_COMMENT_PLACEHOLDER": "Share additional context for the operations team.",
-      "ADD_COMMENT_SUBMIT": "Add comment",
-      "COMMENT_SUCCESS": "Comment sent to the operations team.",
-      "COMMENT_ERROR": "Could not send the comment. Please try again."
+      "ADD_COMMENT_LABEL": "Add more context",
+      "ADD_COMMENT_PLACEHOLDER": "Share additional context with our team.",
+      "ADD_COMMENT_SUBMIT": "Send",
+      "COMMENT_SUCCESS": "Context sent to our team.",
+      "COMMENT_ERROR": "Could not send the context. Please try again."
     },
     "NOTIFICATIONS": {
       "STATUS_CHANGED": "There is an update on one of your feedback tickets."

@@ -8,16 +8,19 @@ import { useAlert } from 'dashboard/composables';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
-// Ticket detail modal used by Meus Tickets. Shows the readonly ticket
-// captured at open time (problem, expected, status, ClickUp URL, response
-// from ops) plus a compact "add comment" input. Deep-links the operator
-// back to the exact message that triggered the ticket.
+// Ticket detail modal used by Meus Tickets. Shows the full ticket data
+// as a definition-list style form (ID / Abertura / Problema / Status /
+// Atualização Auris / Agente / Link mensagem), plus a compact
+// "Incluir mais contexto" section. Any comment submitted from that
+// section goes to ClickUp via AddCommentJob — the ops team gets it as
+// a comment on the same task the ticket is linked to.
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
 const accountId = useMapGetter('getCurrentAccountId');
+const currentRole = useMapGetter('getCurrentRole');
 const uiFlags = useMapGetter('tickets/getUIFlags');
 
 const ticket = ref(null);
@@ -41,10 +44,45 @@ const isSyncPending = computed(
 const isSyncFailed = computed(
   () => ticket.value?.sync_status === 'sync_failed'
 );
-const canComment = computed(
-  () =>
-    ticket.value?.sync_status === 'synced' && !!ticket.value?.clickup_task_id
-);
+// Agent → their own tickets (backend policy enforces this).
+// Manager, Administrator → any ticket in the account.
+// The `sync_synced` guard is on top: without a ClickUp task id the
+// comment has nowhere to land, so the affordance stays hidden.
+const canComment = computed(() => {
+  const role = currentRole.value;
+  const roleAllowed = ['agent', 'manager', 'administrator'].includes(role);
+  return (
+    roleAllowed &&
+    ticket.value?.sync_status === 'synced' &&
+    !!ticket.value?.clickup_task_id
+  );
+});
+
+const formatDate = timestamp => {
+  if (!timestamp) return EMPTY_CELL;
+  const date = new Date(timestamp);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+// Deep link that reproduces what the operator would see in the browser
+// URL bar. Origin comes from window.location so it stays correct across
+// homolog / prod / worktrees without needing FRONTEND_URL wired to the
+// bundle.
+const messageLink = computed(() => {
+  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id) {
+    return null;
+  }
+  const account = accountId.value;
+  const conv = ticket.value.conversation_display_id;
+  const msg = ticket.value.message_id;
+  return `${window.location.origin}/app/accounts/${account}/conversations/${conv}?messageId=${msg}`;
+});
 
 const openWith = fresh => {
   ticket.value = fresh;
@@ -58,16 +96,16 @@ const handleClose = () => {
 };
 
 const goToMessage = () => {
-  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id)
+  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id) {
     return;
-  const query = { messageId: String(ticket.value.message_id) };
+  }
   router.push({
     name: 'inbox_conversation',
     params: {
       accountId: accountId.value,
       conversation_id: ticket.value.conversation_display_id,
     },
-    query,
+    query: { messageId: String(ticket.value.message_id) },
   });
   dialogRef.value?.close();
 };
@@ -101,56 +139,90 @@ defineExpose({ openWith });
     @close="handleClose"
   >
     <div v-if="ticket" class="flex flex-col gap-5">
-      <div class="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <p class="text-xs uppercase text-n-slate-11 mb-1">
-            {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
-          </p>
-          <p class="text-n-slate-12">
-            {{
-              ticket.clickup_status_name ||
-              t('MEUS_TICKETS.STATUS.PENDING_SYNC')
-            }}
-          </p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-n-slate-11 mb-1">
-            {{ t('MEUS_TICKETS.DETAIL.AGENT') }}
-          </p>
-          <p class="text-n-slate-12">
-            {{ ticket.user?.name || EMPTY_CELL }}
-          </p>
-        </div>
-      </div>
+      <!-- Definition-list style grid: label (col 1) / value (col 2) -->
+      <dl
+        class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm items-baseline"
+      >
+        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
+          {{ t('MEUS_TICKETS.DETAIL.ID') }}
+        </dt>
+        <dd class="text-n-slate-12 font-medium">
+          {{ ticket.display_id }}
+        </dd>
 
-      <div>
-        <p class="text-xs uppercase text-n-slate-11 mb-1">
-          {{ t('MEUS_TICKETS.DETAIL.PROBLEM') }}
-        </p>
-        <p class="text-sm text-n-slate-12 whitespace-pre-wrap">
-          {{ ticket.relatar_problema }}
-        </p>
-      </div>
+        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
+          {{ t('MEUS_TICKETS.DETAIL.OPENED_AT') }}
+        </dt>
+        <dd class="text-n-slate-12">
+          {{ formatDate(ticket.created_at) }}
+        </dd>
 
-      <div v-if="ticket.comportamento_esperado">
-        <p class="text-xs uppercase text-n-slate-11 mb-1">
-          {{ t('MEUS_TICKETS.DETAIL.EXPECTED') }}
-        </p>
-        <p class="text-sm text-n-slate-12 whitespace-pre-wrap">
-          {{ ticket.comportamento_esperado }}
-        </p>
-      </div>
-
-      <div v-if="ticket.resposta_para_cliente">
-        <p class="text-xs uppercase text-n-slate-11 mb-1">
-          {{ t('MEUS_TICKETS.DETAIL.RESPONSE') }}
-        </p>
-        <div
-          class="text-sm text-n-slate-12 whitespace-pre-wrap bg-n-teal-2 border border-n-teal-6 rounded-lg p-3"
+        <dt
+          class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
         >
-          {{ ticket.resposta_para_cliente }}
-        </div>
-      </div>
+          {{ t('MEUS_TICKETS.DETAIL.PROBLEM') }}
+        </dt>
+        <dd class="text-n-slate-12 whitespace-pre-wrap">
+          {{ ticket.relatar_problema }}
+        </dd>
+
+        <template v-if="ticket.comportamento_esperado">
+          <dt
+            class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
+          >
+            {{ t('MEUS_TICKETS.DETAIL.EXPECTED') }}
+          </dt>
+          <dd class="text-n-slate-12 whitespace-pre-wrap">
+            {{ ticket.comportamento_esperado }}
+          </dd>
+        </template>
+
+        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
+          {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
+        </dt>
+        <dd class="text-n-slate-12">
+          {{
+            ticket.clickup_status_name || t('MEUS_TICKETS.STATUS.PENDING_SYNC')
+          }}
+        </dd>
+
+        <dt
+          class="text-xs uppercase text-n-slate-11 whitespace-nowrap self-start pt-0.5"
+        >
+          {{ t('MEUS_TICKETS.DETAIL.RESPONSE') }}
+        </dt>
+        <dd>
+          <div
+            v-if="ticket.resposta_para_cliente"
+            class="text-n-slate-12 whitespace-pre-wrap bg-n-teal-2 border border-n-teal-6 rounded-lg p-3"
+          >
+            {{ ticket.resposta_para_cliente }}
+          </div>
+          <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
+        </dd>
+
+        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
+          {{ t('MEUS_TICKETS.DETAIL.AGENT') }}
+        </dt>
+        <dd class="text-n-slate-12">
+          {{ ticket.user?.name || EMPTY_CELL }}
+        </dd>
+
+        <dt class="text-xs uppercase text-n-slate-11 whitespace-nowrap">
+          {{ t('MEUS_TICKETS.DETAIL.MESSAGE_LINK') }}
+        </dt>
+        <dd>
+          <a
+            v-if="messageLink"
+            :href="messageLink"
+            class="text-n-brand hover:underline break-all text-sm"
+            @click.prevent="goToMessage"
+          >
+            {{ messageLink }}
+          </a>
+          <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
+        </dd>
+      </dl>
 
       <div
         v-if="isSyncPending"
@@ -169,19 +241,8 @@ defineExpose({ openWith });
         </span>
       </div>
 
-      <div class="flex flex-wrap gap-2">
+      <div v-if="ticket.clickup_task_url" class="flex flex-wrap gap-2">
         <Button
-          v-if="ticket.message_id && ticket.conversation_display_id"
-          type="button"
-          variant="faded"
-          color="slate"
-          size="sm"
-          icon="i-lucide-arrow-up-right"
-          :label="t('MEUS_TICKETS.DETAIL.GO_TO_MESSAGE')"
-          @click="goToMessage"
-        />
-        <Button
-          v-if="ticket.clickup_task_url"
           type="button"
           variant="faded"
           color="slate"
