@@ -30,6 +30,45 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
     expect(ticket.clickup_status_name).to eq('em análise')
   end
 
+  # ClickUp exposes ~7 statuses but the operator only sees 3 in Meus Tickets.
+  # The service is the boundary that collapses the raw statuses down to the
+  # AurisChat canonical set (Aberto / Em análise / Encerrado).
+  describe 'ClickUp → AurisChat status mapping' do
+    {
+      'em andamento' => 'em análise',
+      'aguardando informação' => 'em análise',
+      'aguardando engenharia' => 'em análise',
+      'bloqueado' => 'em análise',
+      'descartado' => 'encerrado',
+      'resolvido' => 'encerrado',
+      'aberto' => 'aberto'
+    }.each do |raw_clickup, expected_auris|
+      it "stores '#{expected_auris}' when ClickUp sends '#{raw_clickup}'" do
+        described_class.new(
+          event: 'taskStatusUpdated',
+          task_id: 'CU_TASK_1',
+          history_items: [
+            { field: 'status', after: { id: "sc_#{raw_clickup.parameterize}", status: raw_clickup, type: 'custom' } }
+          ]
+        ).perform
+
+        expect(ticket.reload.clickup_status_name).to eq(expected_auris)
+      end
+    end
+
+    it 'lets unknown statuses through untouched so a newly-added ClickUp option is visible instead of silently dropped' do
+      described_class.new(
+        event: 'taskStatusUpdated',
+        task_id: 'CU_TASK_1',
+        history_items: [
+          { field: 'status', after: { id: 'sc_new', status: 'aguardando produto', type: 'custom' } }
+        ]
+      ).perform
+
+      expect(ticket.reload.clickup_status_name).to eq('aguardando produto')
+    end
+  end
+
   it 'is a no-op when the status id has not actually changed (dedup of retried webhooks)' do
     expect do
       described_class.new(
@@ -99,8 +138,9 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
       { tokens: tokens, event: event_name, payload: payload }
     end
 
-    # ClickUp status "Resolvido" is one of the notifiable ones — the operator
-    # should see a toast in Meus Tickets when this fires.
+    # ClickUp status "Resolvido" maps to AurisChat's "Encerrado", which is
+    # in the notifiable set — the operator should see a toast in Meus
+    # Tickets when this fires.
     it 'broadcasts ticket.updated with notify=true when transitioning into a notifiable status' do
       broadcast = enqueue_and_capture do
         { event: 'taskStatusUpdated',

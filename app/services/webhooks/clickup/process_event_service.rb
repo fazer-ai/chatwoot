@@ -46,15 +46,19 @@ class Webhooks::Clickup::ProcessEventService
     return if latest.blank?
 
     new_status_id = latest.dig(:after, :id)
-    new_status_name = latest.dig(:after, :status)
+    raw_status_name = latest.dig(:after, :status)
     return if new_status_id.blank?
     return if ticket.clickup_status_id == new_status_id
 
+    # Collapse ClickUp's ~7 statuses down to the AurisChat canonical set
+    # (Aberto / Em análise / Encerrado) before storing, so the frontend
+    # filter and badge logic only has to know about the 3 canonical names.
+    mapped_name = Integrations::Clickup::FieldMap.auris_status_for(raw_status_name)
     ticket.update!(
       clickup_status_id: new_status_id,
-      clickup_status_name: new_status_name
+      clickup_status_name: mapped_name
     )
-    broadcast(ticket, notify: notifiable_transition?(new_status_name, latest.dig(:after, :type)))
+    broadcast(ticket, notify: notifiable_transition?(mapped_name, latest.dig(:after, :type)))
   end
 
   # `taskCustomFieldUpdated` fires for every custom field change; we only

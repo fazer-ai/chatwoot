@@ -53,12 +53,14 @@ const currentPage = ref(1);
 const detailDialogRef = ref(null);
 const EMPTY_CELL = '—';
 
+// Only three canonical statuses reach the frontend — the backend
+// (Webhooks::Clickup::ProcessEventService) collapses ClickUp's ~7 raw
+// statuses down to these before writing `clickup_status_name` on the
+// ticket record.
 const statusFilterOptions = computed(() => [
   { value: '', label: t('MEUS_TICKETS.FILTERS.ALL') },
   { value: 'aberto', label: t('MEUS_TICKETS.STATUS.ABERTO') },
   { value: 'em análise', label: t('MEUS_TICKETS.STATUS.EM_ANALISE') },
-  { value: 'resolvido', label: t('MEUS_TICKETS.STATUS.RESOLVIDO') },
-  { value: 'restrição', label: t('MEUS_TICKETS.STATUS.RESTRICAO') },
   { value: 'encerrado', label: t('MEUS_TICKETS.STATUS.ENCERRADO') },
 ]);
 
@@ -102,10 +104,7 @@ const onPageChange = page => {
 
 const statusBadgeClass = statusName => {
   const slug = (statusName || '').toLowerCase();
-  if (['resolvido'].includes(slug)) return 'bg-n-teal-3 text-n-teal-11';
-  if (['restrição', 'restricao'].includes(slug))
-    return 'bg-n-amber-3 text-n-amber-11';
-  if (['encerrado'].includes(slug)) return 'bg-n-slate-3 text-n-slate-11';
+  if (slug === 'encerrado') return 'bg-n-teal-3 text-n-teal-11';
   if (['em análise', 'em analise'].includes(slug))
     return 'bg-n-sky-3 text-n-sky-11';
   return 'bg-n-slate-3 text-n-slate-11';

@@ -10,8 +10,6 @@
     "STATUS": {
       "ABERTO": "Open",
       "EM_ANALISE": "In review",
-      "RESOLVIDO": "Resolved",
-      "RESTRICAO": "Restriction",
       "ENCERRADO": "Closed",
       "PENDING_SYNC": "Syncing…"
     },
