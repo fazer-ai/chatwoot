@@ -17,12 +17,13 @@ module Integrations::Clickup::FieldMap
   # Custom field ids on the Feedback list. Keys mirror the ClickUp field
   # names so the debug output is human-readable.
   FIELDS = {
+    id: '35293256-6a38-4243-8bc3-5a072c226940',
     ambiente: '1a37d33d-8b7d-4361-b554-c21b848ea2dc',
     canal: 'a98f0069-f0ad-48c9-b5d8-231789e08ef3',
     chat_id: '01924c91-ab09-4b51-9781-43a7953c699e',
     comportamento_esperado: '9b7540cd-4861-4c88-8e14-3171614e5cc8',
     contexto: '84a863c5-50a1-4846-88fa-0befea67f9ae',
-    user_id: 'b9bf4453-847e-48da-9d2f-d90f88a923a4',
+    user_id: '852296e1-a134-4818-9c5f-be1883c94270',
     user_name: 'de5fdd9f-fe9f-4467-847c-b6051f01224f',
     account_id: '79c64ab5-1de8-4418-bdac-7017b905c8a6',
     aurischat_url: '34c5320c-8246-4502-9069-2143673f472b',
