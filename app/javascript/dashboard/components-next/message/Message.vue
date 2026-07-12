@@ -800,11 +800,11 @@ provideMessageContext({
                 v-if="canShowFeedbackButton"
                 v-tooltip.top="t('CONVERSATION.FEEDBACK_TICKET.OPEN_BUTTON')"
                 type="button"
-                class="w-7 h-7 flex items-center justify-center rounded-full text-n-slate-11 hover:bg-n-slate-3 hover:text-n-slate-12 transition-colors"
+                class="w-8 h-8 flex items-center justify-center rounded-full text-n-slate-11 hover:bg-n-slate-3 hover:text-n-slate-12 transition-colors"
                 :aria-label="t('CONVERSATION.FEEDBACK_TICKET.OPEN_BUTTON')"
                 @click="handleOpenFeedback"
               >
-                <i class="i-lucide-flag size-4" />
+                <i class="i-lucide-flag size-5" />
               </button>
             </div>
           </div>
