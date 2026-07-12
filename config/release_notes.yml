@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.41.5
+  published_at: '2026-07-12T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.5
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.41.4
   published_at: '2026-07-12T18:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.4
@@ -303,17 +311,3 @@
       ### 🐛 Correções
 
       - **Caixas Instagram permanecem conectadas por mais tempo.** Algumas conexões do Instagram caíam após poucas horas e pediam pra você clicar em "reconectar" mesmo sem nada errado do lado do Instagram. Isso não acontece mais.
-- tag: v4.13.0-auris.1.35
-  published_at: '2026-06-24T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.35
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **WhatsApp coexistence: patient messages stop disappearing.** When the same number runs in the WhatsApp app and AurisChat together, some patient messages were silently dropped. Now they always appear in the conversation — when the original content can't be re-rendered, a note shows up telling the agent to check the WhatsApp app.
-      - **Instagram inboxes stop disconnecting throughout the day.** The red "click to reconnect" banner used to appear on busy Instagram inboxes several times a day for harmless Meta hiccups. The system now waits for a real burst of errors before asking for a reconnect.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **WhatsApp coexistência: mensagens de paciente deixam de sumir.** Quando o mesmo número roda no aplicativo do WhatsApp e no AurisChat juntos, algumas mensagens de pacientes eram descartadas silenciosamente. Agora aparecem sempre na conversa — quando o conteúdo original não pode ser re-renderizado, surge um aviso pedindo pra ver a mensagem original no app do WhatsApp.
-      - **Caixas do Instagram param de desconectar durante o dia.** O banner vermelho de "clique para reconectar" aparecia várias vezes ao dia em caixas movimentadas por causa de instabilidades pontuais da Meta. O sistema agora espera uma rajada real de erros antes de pedir reconexão.
