@@ -44,21 +44,19 @@ class Webhooks::Clickup::ProcessEventService
 
   private
 
-  # `after` for a status change: { id, status, type: 'open'|'custom'|'done'|... }
+  # `after` for a status change: { status, type: 'open'|'custom'|'done'|..., color, orderindex }.
+  # ClickUp does NOT send a status id in the history_items payload — the
+  # status is identified by name only. We dedup on the AurisChat canonical
+  # mapped name so no-op broadcasts (e.g. "em andamento" → "aguardando
+  # engenharia", both mapped to "em análise") don't wake the frontend.
   def apply_status_update(ticket, item)
-    new_status_id = item.dig(:after, :id)
     raw_status_name = item.dig(:after, :status)
-    return if new_status_id.blank?
-    return if ticket.clickup_status_id == new_status_id
+    return if raw_status_name.blank?
 
-    # Collapse ClickUp's ~7 statuses down to the AurisChat canonical set
-    # (Aberto / Em análise / Encerrado) before storing, so the frontend
-    # filter and badge logic only has to know about the 3 canonical names.
     mapped_name = Integrations::Clickup::FieldMap.auris_status_for(raw_status_name)
-    ticket.update!(
-      clickup_status_id: new_status_id,
-      clickup_status_name: mapped_name
-    )
+    return if ticket.clickup_status_name == mapped_name
+
+    ticket.update!(clickup_status_name: mapped_name)
     broadcast(ticket, notify: notifiable_transition?(mapped_name, item.dig(:after, :type)))
   end
 
