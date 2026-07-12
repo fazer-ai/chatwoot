@@ -783,6 +783,16 @@ Rails.application.routes.draw do
         post :destroy_subscriptions, on: :collection
       end
 
+      # Namespace for one-off actions on the ClickUp integration surfaced
+      # under Super Admin → ClickUp. Currently only exposes the manual
+      # webhook (re-)registration trigger — the rest of the config is
+      # driven by the shared app_configs form.
+      namespace :integrations do
+        resource :clickup, only: [], controller: 'clickup' do
+          post :register_webhook
+        end
+      end
+
       # order of resources affect the order of sidebar navigation in super admin
       resources :accounts, only: [:index, :new, :create, :show, :edit, :update, :destroy] do
         post :seed, on: :member
