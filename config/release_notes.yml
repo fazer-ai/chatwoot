@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.6
+  published_at: '2026-07-12T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.6
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Ticket status now updates when the team changes it.** In My Tickets, the status badge was staying stuck on "Open" even after our team moved the ticket forward. Only the "Auris update" text was refreshing. Now both the badge and the text refresh live as soon as the team changes the status.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Status do ticket agora atualiza quando o time muda.** Em Meus Tickets, o status estava travado em "Aberto" mesmo depois do nosso time avançar o ticket. Só o texto de "Atualização Auris" chegava. Agora o status e o texto atualizam sozinhos assim que o time muda o andamento.
 - tag: v4.15.1-auris.1.41.5
   published_at: '2026-07-12T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.5
@@ -299,15 +311,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.13.0-auris.1.35.1
-  published_at: '2026-06-25T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.35.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Instagram inboxes stay connected longer.** Some Instagram connections were dropping after a few hours and asking you to click "reconnect" even when nothing was wrong on Instagram's side. This no longer happens.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Caixas Instagram permanecem conectadas por mais tempo.** Algumas conexões do Instagram caíam após poucas horas e pediam pra você clicar em "reconectar" mesmo sem nada errado do lado do Instagram. Isso não acontece mais.
