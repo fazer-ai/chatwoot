@@ -230,7 +230,7 @@ onUnmounted(() => emitter.off(BUS_EVENTS.OPEN_FEEDBACK_TICKET, handleOpen));
         <Button
           type="submit"
           variant="solid"
-          color="brand"
+          color="blue"
           size="sm"
           :is-loading="isSubmitting"
           :disabled="!canSubmit"
