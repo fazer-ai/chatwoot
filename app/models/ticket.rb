@@ -66,7 +66,10 @@ class Ticket < ApplicationRecord
 
   scope :for_user, ->(u) { where(user_id: u.id) }
   scope :for_account, ->(a) { where(account_id: a.id) }
-  scope :recent_first, -> { order(created_at: :desc) }
+  # Newest-first by id — since ids are monotonic per pk this matches
+  # created_at desc, but sorting on the pk lets the query hit the primary
+  # key index directly without a secondary sort on created_at.
+  scope :recent_first, -> { order(id: :desc) }
 
   # Human-facing ticket reference — same value as the primary key, wrapped
   # in a dedicated method so we can promote it to a distinct sequence or

@@ -11,6 +11,7 @@ import {
 } from 'dashboard/components-next/table';
 import PaginationFooter from 'dashboard/components-next/pagination/PaginationFooter.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import Select from 'dashboard/components-next/select/Select.vue';
 import TicketDetailDialog from 'dashboard/components-next/feedback/TicketDetailDialog.vue';
 
 // Meus Tickets. Renders every ticket the current user is allowed to see —
@@ -48,9 +49,21 @@ const clickupTaskUrl = ticket => {
 };
 
 const statusFilter = ref('');
+const hideFinished = ref(false);
 const currentPage = ref(1);
 const detailDialogRef = ref(null);
 const EMPTY_CELL = '—';
+
+// Only three canonical statuses reach the frontend — the backend
+// (Webhooks::Clickup::ProcessEventService) collapses ClickUp's ~7 raw
+// statuses down to these before writing `clickup_status_name` on the
+// ticket record.
+const statusFilterOptions = computed(() => [
+  { value: '', label: t('MEUS_TICKETS.FILTERS.ALL') },
+  { value: 'aberto', label: t('MEUS_TICKETS.STATUS.ABERTO') },
+  { value: 'em análise', label: t('MEUS_TICKETS.STATUS.EM_ANALISE') },
+  { value: 'encerrado', label: t('MEUS_TICKETS.STATUS.ENCERRADO') },
+]);
 
 const tableHeaders = computed(() => {
   const headers = [
@@ -73,6 +86,7 @@ const fetch = async () => {
   await store.dispatch('tickets/fetchAll', {
     page: currentPage.value,
     status: statusFilter.value || undefined,
+    hideFinished: hideFinished.value,
   });
 };
 
@@ -80,7 +94,7 @@ const openTicket = ticket => {
   detailDialogRef.value?.openWith(ticket);
 };
 
-watch(statusFilter, () => {
+watch([statusFilter, hideFinished], () => {
   currentPage.value = 1;
   fetch();
 });
@@ -92,12 +106,9 @@ const onPageChange = page => {
 
 const statusBadgeClass = statusName => {
   const slug = (statusName || '').toLowerCase();
-  if (['resolvido'].includes(slug)) return 'bg-n-teal-3 text-n-teal-11';
-  if (['restrição', 'restricao'].includes(slug))
-    return 'bg-n-amber-3 text-n-amber-11';
-  if (['encerrado'].includes(slug)) return 'bg-n-slate-3 text-n-slate-11';
+  if (slug === 'encerrado') return 'bg-n-teal-3 text-n-teal-11';
   if (['em análise', 'em analise'].includes(slug))
-    return 'bg-n-sky-3 text-n-sky-11';
+    return 'bg-n-blue-3 text-n-blue-11';
   return 'bg-n-slate-3 text-n-slate-11';
 };
 
@@ -144,31 +155,21 @@ onUnmounted(clearUnread);
           {{ t('MEUS_TICKETS.SUBTITLE') }}
         </p>
       </div>
-      <div class="flex items-center gap-3">
-        <label class="text-xs text-n-slate-11">
-          {{ t('MEUS_TICKETS.FILTERS.STATUS') }}
+      <div class="flex items-center gap-4">
+        <label class="inline-flex items-center gap-2 text-sm text-n-slate-12">
+          <input
+            v-model="hideFinished"
+            type="checkbox"
+            class="size-4 rounded border-n-weak"
+          />
+          {{ t('MEUS_TICKETS.FILTERS.HIDE_FINISHED') }}
         </label>
-        <select
-          v-model="statusFilter"
-          class="text-sm rounded-lg border border-n-slate-6 bg-n-solid-2 px-3 py-1.5 text-n-slate-12 focus:outline-none focus:border-n-brand"
-        >
-          <option value="">{{ t('MEUS_TICKETS.FILTERS.ALL') }}</option>
-          <option value="aberto">
-            {{ t('MEUS_TICKETS.STATUS.ABERTO') }}
-          </option>
-          <option value="em análise">
-            {{ t('MEUS_TICKETS.STATUS.EM_ANALISE') }}
-          </option>
-          <option value="resolvido">
-            {{ t('MEUS_TICKETS.STATUS.RESOLVIDO') }}
-          </option>
-          <option value="restrição">
-            {{ t('MEUS_TICKETS.STATUS.RESTRICAO') }}
-          </option>
-          <option value="encerrado">
-            {{ t('MEUS_TICKETS.STATUS.ENCERRADO') }}
-          </option>
-        </select>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-n-slate-11">
+            {{ t('MEUS_TICKETS.FILTERS.STATUS') }}
+          </span>
+          <Select v-model="statusFilter" :options="statusFilterOptions" />
+        </div>
       </div>
     </header>
 
@@ -210,7 +211,7 @@ onUnmounted(clearUnread);
               </BaseTableCell>
               <BaseTableCell>
                 <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
                   :class="statusBadgeClass(ticket.clickup_status_name)"
                 >
                   {{
@@ -229,7 +230,7 @@ onUnmounted(clearUnread);
                 <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
               </BaseTableCell>
               <BaseTableCell v-if="isAdminOrManager">
-                <span class="text-body-main text-n-slate-11">
+                <span class="text-body-main text-n-slate-11 whitespace-nowrap">
                   {{ ticket.user?.name || EMPTY_CELL }}
                 </span>
               </BaseTableCell>

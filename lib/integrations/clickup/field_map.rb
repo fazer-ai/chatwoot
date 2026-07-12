@@ -67,16 +67,35 @@ module Integrations::Clickup::FieldMap
   # "Resposta para o Cliente" back into the ticket.
   WEBHOOK_EVENTS = %w[taskStatusUpdated taskCustomFieldUpdated].freeze
 
-  # ClickUp status ids on the Feedback list that trigger a bell + toast
-  # notification for the ticket owner. Every other status change updates
-  # the ticket silently — Meus Tickets refreshes via ActionCable but no
-  # noisy popup fires. These slugs are the ClickUp `status.status` string
-  # (lowercased) so the mapping survives a rename of the display label.
-  NOTIFIABLE_STATUS_SLUGS = %w[resolvido restrição encerrado].freeze
+  # ClickUp exposes ~7 statuses on the Feedback list; the operator only
+  # needs 3 (Aberto / Em análise / Encerrado). Everything upstream gets
+  # collapsed here so `clickup_status_name` on the Ticket record is
+  # always one of the AurisChat canonical labels — that keeps Meus
+  # Tickets filter, badge colors, and notifications simple.
+  #
+  # Keys are the ClickUp `status.status` string lowercased; values are
+  # the AurisChat canonical name we store on the Ticket.
+  STATUS_MAPPING = {
+    'aberto' => 'aberto',
+    'em andamento' => 'em análise',
+    'aguardando informação' => 'em análise',
+    'aguardando engenharia' => 'em análise',
+    'bloqueado' => 'em análise',
+    'descartado' => 'encerrado',
+    'resolvido' => 'encerrado'
+  }.freeze
+
+  # AurisChat canonical set exposed on Meus Tickets.
+  AURIS_STATUSES = ['aberto', 'em análise', 'encerrado'].freeze
+
+  # AurisChat statuses that fire a bell + toast when the ticket transitions
+  # into them. Only the terminal state — routine "Em análise" transitions
+  # update the row silently.
+  NOTIFIABLE_STATUS_SLUGS = %w[encerrado].freeze
 
   # ClickUp `status.type` for a status the ticket is done under, used to
-  # detect "close" transitions when the status slug differs from the ones
-  # above (e.g. custom "Cancelado" status added later).
+  # detect "close" transitions when the incoming status slug is not in
+  # STATUS_MAPPING (e.g. ops adds a new dropdown option later).
   TERMINAL_STATUS_TYPES = %w[closed done].freeze
 
   # -- helpers --------------------------------------------------------
@@ -88,6 +107,15 @@ module Integrations::Clickup::FieldMap
   def self.ambiente_option_for(frontend_url)
     prod = frontend_url.to_s.start_with?('https://chat.auris.ia.br')
     prod ? AMBIENTE_OPTIONS[:producao] : AMBIENTE_OPTIONS[:homologacao]
+  end
+
+  # Collapse a raw ClickUp status name to the AurisChat canonical form.
+  # Unknown statuses pass through as-is (lowercased) so a newly-added
+  # ClickUp option shows up literally in Meus Tickets until we come back
+  # here to add its mapping — better than silently dropping.
+  def self.auris_status_for(clickup_status_name)
+    slug = clickup_status_name.to_s.strip.downcase
+    STATUS_MAPPING[slug] || slug
   end
 
   # Resolves the canal option id for a given inbox. WhatsApp inboxes fan

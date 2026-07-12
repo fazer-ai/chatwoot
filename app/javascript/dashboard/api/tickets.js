@@ -43,12 +43,14 @@ class Tickets extends ApiClient {
     return axios.post(`${this.url}/${id}/add_comment`, { comment });
   }
 
-  // GET /api/v1/accounts/:account_id/tickets?page=N&status=...
+  // GET /api/v1/accounts/:account_id/tickets?page=N&status=...&hide_finished=1
   // Meus Tickets. Backend narrows the payload via TicketPolicy::Scope
-  // (agent → own, manager/admin → all).
-  fetchAll({ page = 1, status } = {}) {
+  // (agent → own, manager/admin → all). `hideFinished` drives the
+  // "Ocultar finalizadas" checkbox — server drops encerrado tickets.
+  fetchAll({ page = 1, status, hideFinished = false } = {}) {
     const params = { page };
     if (status) params.status = status;
+    if (hideFinished) params.hide_finished = 'true';
     return axios.get(this.url, { params });
   }
 

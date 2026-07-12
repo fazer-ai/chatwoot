@@ -9,15 +9,16 @@ import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
 // Ticket detail modal used by Meus Tickets. Shows the readonly ticket
-// captured at open time (problem, expected, status, ClickUp URL, response
-// from ops) plus a compact "add comment" input. Deep-links the operator
-// back to the exact message that triggered the ticket.
+// captured at open time (id, status, agent, problem, expected behavior,
+// resposta from ops) plus a compact "Incluir mais contexto" section
+// that posts a comment on the ClickUp task via AddCommentJob.
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
 const accountId = useMapGetter('getCurrentAccountId');
+const currentRole = useMapGetter('getCurrentRole');
 const uiFlags = useMapGetter('tickets/getUIFlags');
 
 const ticket = ref(null);
@@ -41,10 +42,40 @@ const isSyncPending = computed(
 const isSyncFailed = computed(
   () => ticket.value?.sync_status === 'sync_failed'
 );
-const canComment = computed(
-  () =>
-    ticket.value?.sync_status === 'synced' && !!ticket.value?.clickup_task_id
+// Only administrators see the ClickUp shortcut — it exposes ops-side
+// internals (task id, workspace URL) that don't belong in front of the
+// operator or the manager.
+const isAdministrator = computed(() => currentRole.value === 'administrator');
+const isFinished = computed(
+  () => (ticket.value?.clickup_status_name || '').toLowerCase() === 'encerrado'
 );
+
+// Agent → their own tickets (backend policy enforces this).
+// Manager, Administrator → any ticket in the account.
+// The `sync_synced` guard is on top: without a ClickUp task id the
+// comment has nowhere to land, so the affordance stays hidden.
+// Also hidden on encerrado tickets — the conversation is closed from the
+// ops side and re-opening it via comment would confuse the workflow.
+const canComment = computed(() => {
+  const role = currentRole.value;
+  const roleAllowed = ['agent', 'manager', 'administrator'].includes(role);
+  return (
+    roleAllowed &&
+    ticket.value?.sync_status === 'synced' &&
+    !!ticket.value?.clickup_task_id &&
+    !isFinished.value
+  );
+});
+
+// Same palette as the Meus Tickets grid — keeps the visual language of
+// status consistent between the list and the detail modal.
+const statusBadgeClass = statusName => {
+  const slug = (statusName || '').toLowerCase();
+  if (slug === 'encerrado') return 'bg-n-teal-3 text-n-teal-11';
+  if (['em análise', 'em analise'].includes(slug))
+    return 'bg-n-blue-3 text-n-blue-11';
+  return 'bg-n-slate-3 text-n-slate-11';
+};
 
 const openWith = fresh => {
   ticket.value = fresh;
@@ -58,16 +89,16 @@ const handleClose = () => {
 };
 
 const goToMessage = () => {
-  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id)
+  if (!ticket.value?.conversation_display_id || !ticket.value?.message_id) {
     return;
-  const query = { messageId: String(ticket.value.message_id) };
+  }
   router.push({
     name: 'inbox_conversation',
     params: {
       accountId: accountId.value,
       conversation_id: ticket.value.conversation_display_id,
     },
-    query,
+    query: { messageId: String(ticket.value.message_id) },
   });
   dialogRef.value?.close();
 };
@@ -101,17 +132,22 @@ defineExpose({ openWith });
     @close="handleClose"
   >
     <div v-if="ticket" class="flex flex-col gap-5">
+      <!-- Header grid: Status, Agente. ID lives in the dialog title so we
+           don't duplicate it here. -->
       <div class="grid grid-cols-2 gap-4 text-sm">
         <div>
           <p class="text-xs uppercase text-n-slate-11 mb-1">
             {{ t('MEUS_TICKETS.DETAIL.STATUS') }}
           </p>
-          <p class="text-n-slate-12">
+          <span
+            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+            :class="statusBadgeClass(ticket.clickup_status_name)"
+          >
             {{
               ticket.clickup_status_name ||
               t('MEUS_TICKETS.STATUS.PENDING_SYNC')
             }}
-          </p>
+          </span>
         </div>
         <div>
           <p class="text-xs uppercase text-n-slate-11 mb-1">
@@ -181,7 +217,7 @@ defineExpose({ openWith });
           @click="goToMessage"
         />
         <Button
-          v-if="ticket.clickup_task_url"
+          v-if="isAdministrator && ticket.clickup_task_url"
           type="button"
           variant="faded"
           color="slate"
@@ -213,7 +249,7 @@ defineExpose({ openWith });
           <Button
             type="button"
             variant="solid"
-            color="brand"
+            color="blue"
             size="sm"
             :is-loading="uiFlags.addingComment"
             :disabled="!comment.trim() || uiFlags.addingComment"

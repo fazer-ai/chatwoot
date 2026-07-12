@@ -64,10 +64,14 @@ const actions = {
     }
     return true;
   },
-  fetchAll: async ({ commit }, { page = 1, status } = {}) => {
+  fetchAll: async ({ commit }, { page = 1, status, hideFinished } = {}) => {
     commit(types.default.SET_TICKETS_UI_FLAG, { fetchingList: true });
     try {
-      const response = await TicketsAPI.fetchAll({ page, status });
+      const response = await TicketsAPI.fetchAll({
+        page,
+        status,
+        hideFinished,
+      });
       const { payload = [], meta = {} } = response.data || {};
       commit(types.default.SET_TICKETS, payload);
       commit(types.default.SET_TICKETS_META, {

@@ -41,7 +41,7 @@ RSpec.describe Ticket do
       expect(described_class.for_user(agent)).to eq([mine])
     end
 
-    it 'recent_first orders newest first (drives the Meus Tickets list)' do
+    it 'recent_first orders by id desc so newest tickets show at the top of Meus Tickets' do
       older = create(:ticket, account: account, user: agent, created_at: 2.days.ago)
       newer = create(:ticket, account: account, user: agent, created_at: 1.hour.ago)
 

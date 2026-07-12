@@ -8,6 +8,12 @@ class Api::V1::Accounts::TicketsController < Api::V1::Accounts::BaseController
   def index
     @tickets = policy_scope(Ticket)
     @tickets = @tickets.where(clickup_status_name: status_filter) if status_filter.present?
+    # Meus Tickets has a "Ocultar finalizadas" checkbox that hides every
+    # ticket whose ClickUp status collapsed to 'encerrado' (the AurisChat
+    # closed state). Applied AFTER the status filter so the two can be
+    # combined (e.g. filter=aberto has no encerrados anyway; hide_finished
+    # with no filter drops just the closed ones).
+    @tickets = @tickets.where.not(clickup_status_name: 'encerrado') if hide_finished?
     @tickets = @tickets.recent_first.page(params[:page])
   end
 
@@ -59,6 +65,10 @@ class Api::V1::Accounts::TicketsController < Api::V1::Accounts::BaseController
 
   def status_filter
     params[:status].to_s.strip.presence
+  end
+
+  def hide_finished?
+    ActiveModel::Type::Boolean.new.cast(params[:hide_finished])
   end
 
   # PR2: attachments come in as multipart uploads. Persist each to
