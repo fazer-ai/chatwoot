@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.7
+  published_at: '2026-07-13T00:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.7
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Feedback flag next to messages is easier to see.** The small flag icon that opens "Send feedback on this message" was hard to spot. Now it's a touch larger.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Bandeirinha de feedback nas mensagens ficou mais fácil de ver.** O iconezinho de bandeira que abre "Dar feedback nesta mensagem" estava pequeno demais. Agora está um pouco maior.
 - tag: v4.15.1-auris.1.41.6
   published_at: '2026-07-12T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.6
@@ -303,11 +315,3 @@
 
       - **Copiar o número da conversa direto do cabeçalho.** Um botão pequeno do lado do nome do contato copia o número da conversa pra você colar onde precisar.
       - **Barra de ações em massa redesenhada.** Quando você seleciona várias conversas, a barra de ações agora flutua sobre a lista com um visual mais leve. Mesmas ações de antes.
-- tag: v4.13.0-auris.1.36
-  published_at: '2026-06-27T17:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.13.0-auris.1.36
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
