@@ -106,7 +106,7 @@ const statusBadgeClass = statusName => {
   const slug = (statusName || '').toLowerCase();
   if (slug === 'encerrado') return 'bg-n-teal-3 text-n-teal-11';
   if (['em análise', 'em analise'].includes(slug))
-    return 'bg-n-sky-3 text-n-sky-11';
+    return 'bg-n-blue-3 text-n-blue-11';
   return 'bg-n-slate-3 text-n-slate-11';
 };
 
@@ -199,7 +199,7 @@ onUnmounted(clearUnread);
               </BaseTableCell>
               <BaseTableCell>
                 <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
                   :class="statusBadgeClass(ticket.clickup_status_name)"
                 >
                   {{
@@ -218,7 +218,7 @@ onUnmounted(clearUnread);
                 <span v-else class="text-n-slate-10">{{ EMPTY_CELL }}</span>
               </BaseTableCell>
               <BaseTableCell v-if="isAdminOrManager">
-                <span class="text-body-main text-n-slate-11">
+                <span class="text-body-main text-n-slate-11 whitespace-nowrap">
                   {{ ticket.user?.name || EMPTY_CELL }}
                 </span>
               </BaseTableCell>
