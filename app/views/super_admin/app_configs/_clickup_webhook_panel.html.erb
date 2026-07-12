@@ -1,0 +1,51 @@
+<%
+  webhook_id = InstallationConfig.find_by(name: 'CLICKUP_WEBHOOK_ID')&.value.presence
+  api_key = InstallationConfig.find_by(name: 'CLICKUP_API_KEY')&.value.presence
+  frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:3000').chomp('/')
+%>
+
+<section class="main-content__body">
+  <hr class="my-8" />
+
+  <h2 class="text-lg font-medium mb-2">Webhook do ClickUp</h2>
+  <p class="text-sm text-slate-500 mb-4">
+    O webhook recebe as atualizações de tasks (status e Resposta para o Cliente) do ClickUp e
+    reflete no ticket em Meus Tickets. Endpoint: <code><%= frontend_url %>/webhooks/clickup</code>
+  </p>
+
+  <% if api_key.blank? %>
+    <div class="mb-4 p-3 rounded border border-slate-100 bg-slate-25">
+      <p class="text-sm text-slate-600">
+        Salve a <strong>ClickUp API Key</strong> acima antes de registrar o webhook.
+      </p>
+    </div>
+  <% elsif webhook_id.present? %>
+    <div class="mb-4 p-3 rounded border border-emerald-100 bg-emerald-25">
+      <p class="text-sm text-emerald-700">
+        Webhook registrado. ID: <code><%= webhook_id %></code>
+      </p>
+    </div>
+    <%= form_with url: register_webhook_super_admin_integrations_clickup_path,
+                  method: :post,
+                  html: { class: 'form',
+                          data: { turbo_confirm: 'Isso vai apagar o webhook atual no ClickUp e criar um novo. Confirmar?' } } do |form| %>
+      <div class="form-actions">
+        <%= form.submit 'Re-registrar webhook' %>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="mb-4 p-3 rounded border border-amber-100 bg-amber-25">
+      <p class="text-sm text-amber-700">
+        Webhook ainda não registrado no ClickUp. Salvar a API Key normalmente registra
+        automaticamente — se não funcionou, use o botão abaixo.
+      </p>
+    </div>
+    <%= form_with url: register_webhook_super_admin_integrations_clickup_path,
+                  method: :post,
+                  html: { class: 'form' } do |form| %>
+      <div class="form-actions">
+        <%= form.submit 'Registrar webhook' %>
+      </div>
+    <% end %>
+  <% end %>
+</section>

@@ -76,6 +76,10 @@
   <% end %>
 </section>
 
+<% if @config == 'clickup' %>
+  <%= render 'clickup_webhook_panel' %>
+<% end %>
+
 <% content_for :javascript do %>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
