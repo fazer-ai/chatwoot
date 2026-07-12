@@ -84,13 +84,28 @@ RSpec.describe Integrations::Clickup::CreateTaskJob do
       expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:comportamento_esperado]][:value])
         .to eq(ticket.comportamento_esperado)
       expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:user_id]][:value])
-        .to eq(agent.id.to_s)
+        .to eq(agent.id)
+      expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:id]][:value])
+        .to eq(ticket.display_id)
       expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:user_name]][:value])
         .to eq('Fábio Rocha')
       expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:account_id]][:value])
         .to eq(account.id)
       expect(field_map[Integrations::Clickup::FieldMap::FIELDS[:contexto]][:value])
         .to eq(Integrations::Clickup::FieldMap::CONTEXTO_OPTIONS[:mensagem])
+    end
+
+    # The ticket id used to be prefixed on the description as
+    # `TicketId = <n>` while the ClickUp board didn't have a dedicated
+    # number field. Now it rides in the "ID" custom field, so the
+    # description carries only the operator's problem report.
+    it 'sends the description as the raw problem report — no TicketId prefix' do
+      captured = stub_capture_create_task
+      ticket.update!(relatar_problema: 'A IA respondeu em outro idioma')
+
+      described_class.new.perform(ticket.id)
+
+      expect(captured[:description]).to eq('A IA respondeu em outro idioma')
     end
 
     it 'sends the aurischat deeplink pointing at the exact message so ops can jump straight in' do

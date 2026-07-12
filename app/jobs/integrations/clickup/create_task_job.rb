@@ -36,12 +36,8 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
     )
   end
 
-  # Prepend the local ticket id as a `TicketId = <n>` line so the ops team
-  # can cross-reference reports on ClickUp with what the operator sees on
-  # Meus Tickets. Kept in the description until product picks a dedicated
-  # custom field to promote it to.
   def build_task_description(ticket)
-    "TicketId = #{ticket.display_id}\n\n#{ticket.relatar_problema}"
+    ticket.relatar_problema.to_s
   end
 
   def apply_clickup_response(ticket, response)
@@ -106,13 +102,14 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
 
   def base_custom_fields(ticket)
     [
+      { id: Integrations::Clickup::FieldMap::FIELDS[:id], value: ticket.display_id },
       { id: Integrations::Clickup::FieldMap::FIELDS[:ambiente], value: Integrations::Clickup::FieldMap.ambiente_option_for(frontend_url) },
       { id: Integrations::Clickup::FieldMap::FIELDS[:contexto], value: Integrations::Clickup::FieldMap::CONTEXTO_OPTIONS[:mensagem] },
       { id: Integrations::Clickup::FieldMap::FIELDS[:chat_id], value: ticket.conversation&.display_id },
       { id: Integrations::Clickup::FieldMap::FIELDS[:account_id], value: ticket.account_id },
       { id: Integrations::Clickup::FieldMap::FIELDS[:aurischat_url], value: build_aurischat_url(ticket) },
       { id: Integrations::Clickup::FieldMap::FIELDS[:relatar_problema], value: ticket.relatar_problema.to_s },
-      { id: Integrations::Clickup::FieldMap::FIELDS[:user_id], value: ticket.user_id.to_s },
+      { id: Integrations::Clickup::FieldMap::FIELDS[:user_id], value: ticket.user_id },
       { id: Integrations::Clickup::FieldMap::FIELDS[:user_name], value: ticket.user&.name.to_s }
     ]
   end
