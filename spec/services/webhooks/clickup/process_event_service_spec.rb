@@ -21,13 +21,11 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
       event: 'taskUpdated',
       task_id: 'CU_TASK_1',
       history_items: [
-        { field: 'status', after: { id: 'sc_review', status: 'em análise', type: 'custom' } }
+        { field: 'status', after: { status: 'em análise', type: 'custom' } }
       ]
     ).perform
 
-    ticket.reload
-    expect(ticket.clickup_status_id).to eq('sc_review')
-    expect(ticket.clickup_status_name).to eq('em análise')
+    expect(ticket.reload.clickup_status_name).to eq('em análise')
   end
 
   # ClickUp exposes ~7 statuses but the operator only sees 3 in Meus Tickets.
@@ -48,7 +46,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
           event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
-            { field: 'status', after: { id: "sc_#{raw_clickup.parameterize}", status: raw_clickup, type: 'custom' } }
+            { field: 'status', after: { status: raw_clickup, type: 'custom' } }
           ]
         ).perform
 
@@ -61,7 +59,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
         event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
-          { field: 'status', after: { id: 'sc_new', status: 'aguardando produto', type: 'custom' } }
+          { field: 'status', after: { status: 'aguardando produto', type: 'custom' } }
         ]
       ).perform
 
@@ -69,13 +67,19 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
     end
   end
 
-  it 'is a no-op when the status id has not actually changed (dedup of retried webhooks)' do
+  # Two ClickUp raw statuses can map to the same AurisChat canonical name
+  # (e.g. "em andamento" and "aguardando engenharia" both collapse to
+  # "em análise"). Dedup on the canonical name skips those retransmissions
+  # so the frontend doesn't wake for a change the operator can't see.
+  it 'is a no-op when the mapped status has not actually changed' do
+    ticket.update!(clickup_status_name: 'em análise')
+
     expect do
       described_class.new(
         event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
-          { field: 'status', after: { id: ticket.clickup_status_id, status: ticket.clickup_status_name } }
+          { field: 'status', after: { status: 'aguardando engenharia', type: 'custom' } }
         ]
       ).perform
     end.not_to(change { ticket.reload.updated_at })
@@ -146,7 +150,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
         { event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
-            { field: 'status', after: { id: 'sc_done', status: 'resolvido', type: 'done' } }
+            { field: 'status', after: { status: 'resolvido', type: 'done' } }
           ] }
       end
 
@@ -161,7 +165,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
         { event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
-            { field: 'status', after: { id: 'sc_review', status: 'em análise', type: 'custom' } }
+            { field: 'status', after: { status: 'em análise', type: 'custom' } }
           ] }
       end
 
@@ -192,7 +196,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
           event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
-            { field: 'status', after: { id: ticket.clickup_status_id, status: ticket.clickup_status_name } }
+            { field: 'status', after: { status: ticket.clickup_status_name } }
           ]
         ).perform
       end.not_to have_enqueued_job(ActionCableBroadcastJob)
