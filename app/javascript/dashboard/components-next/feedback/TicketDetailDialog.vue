@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
@@ -84,19 +84,10 @@ const messageLink = computed(() => {
   return `${window.location.origin}/app/accounts/${account}/conversations/${conv}?messageId=${msg}`;
 });
 
-// Open the dialog first (mounts the teleported <dialog> element into the
-// DOM with an empty slot body), then set the ticket on the next tick.
-// Setting ticket before .open() triggers a render pass where the
-// v-if="ticket" block wants to mount inside a slot whose parent node
-// hasn't been created yet by the Teleport — Vue then throws
-// `Cannot read properties of null (reading 'parentNode')` and the slot
-// stays empty on screen.
 const openWith = fresh => {
+  ticket.value = fresh;
   comment.value = '';
   dialogRef.value?.open();
-  nextTick(() => {
-    ticket.value = fresh;
-  });
 };
 
 const handleClose = () => {
@@ -283,7 +274,7 @@ defineExpose({ openWith });
           <Button
             type="button"
             variant="solid"
-            color="brand"
+            color="blue"
             size="sm"
             :is-loading="uiFlags.addingComment"
             :disabled="!comment.trim() || uiFlags.addingComment"
