@@ -132,17 +132,9 @@ defineExpose({ openWith });
     @close="handleClose"
   >
     <div v-if="ticket" class="flex flex-col gap-5">
-      <!-- Header row: ID, Status, Agente in a compact 2-col grid.
-           Same visual style as the previous release; ID added inline. -->
+      <!-- Header grid: Status, Agente. ID lives in the dialog title so we
+           don't duplicate it here. -->
       <div class="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <p class="text-xs uppercase text-n-slate-11 mb-1">
-            {{ t('MEUS_TICKETS.DETAIL.ID') }}
-          </p>
-          <p class="text-n-slate-12 font-medium">
-            {{ ticket.display_id }}
-          </p>
-        </div>
         <div>
           <p class="text-xs uppercase text-n-slate-11 mb-1">
             {{ t('MEUS_TICKETS.DETAIL.STATUS') }}

@@ -31,21 +31,20 @@
     "DETAIL": {
       "TITLE": "Detalhes do ticket",
       "SUBTITLE": "Veja a atualização do nosso time e compartilhe mais contexto se precisar.",
-      "ID": "ID",
       "STATUS": "Status",
       "AGENT": "Agente",
-      "PROBLEM": "Problema",
+      "PROBLEM": "O que aconteceu de errado",
       "EXPECTED": "Comportamento esperado",
       "RESPONSE": "Atualização Auris",
       "PENDING_SYNC": "Este ticket ainda está sendo enviado ao nosso time. Pode levar alguns minutos.",
       "SYNC_FAILED": "Não foi possível enviar este ticket ao nosso time. O suporte foi avisado.",
       "GO_TO_MESSAGE": "Ver mensagem",
       "OPEN_IN_CLICKUP": "Abrir no ClickUp",
-      "ADD_COMMENT_LABEL": "Incluir mais contexto",
+      "ADD_COMMENT_LABEL": "Adicionar mais informação",
       "ADD_COMMENT_PLACEHOLDER": "Compartilhe mais contexto para o nosso time.",
       "ADD_COMMENT_SUBMIT": "Enviar",
-      "COMMENT_SUCCESS": "Contexto enviado ao nosso time.",
-      "COMMENT_ERROR": "Não foi possível enviar o contexto. Tente novamente."
+      "COMMENT_SUCCESS": "Informação enviada ao nosso time.",
+      "COMMENT_ERROR": "Não foi possível enviar a informação. Tente novamente."
     },
     "NOTIFICATIONS": {
       "STATUS_CHANGED": "Há novidades em um dos seus tickets de feedback."
