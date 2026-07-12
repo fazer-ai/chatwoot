@@ -18,7 +18,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
 
   it 'mirrors a status transition onto the ticket' do
     described_class.new(
-      event: 'taskStatusUpdated',
+      event: 'taskUpdated',
       task_id: 'CU_TASK_1',
       history_items: [
         { field: 'status', after: { id: 'sc_review', status: 'em análise', type: 'custom' } }
@@ -45,7 +45,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
     }.each do |raw_clickup, expected_auris|
       it "stores '#{expected_auris}' when ClickUp sends '#{raw_clickup}'" do
         described_class.new(
-          event: 'taskStatusUpdated',
+          event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
             { field: 'status', after: { id: "sc_#{raw_clickup.parameterize}", status: raw_clickup, type: 'custom' } }
@@ -58,7 +58,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
 
     it 'lets unknown statuses through untouched so a newly-added ClickUp option is visible instead of silently dropped' do
       described_class.new(
-        event: 'taskStatusUpdated',
+        event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
           { field: 'status', after: { id: 'sc_new', status: 'aguardando produto', type: 'custom' } }
@@ -72,7 +72,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
   it 'is a no-op when the status id has not actually changed (dedup of retried webhooks)' do
     expect do
       described_class.new(
-        event: 'taskStatusUpdated',
+        event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
           { field: 'status', after: { id: ticket.clickup_status_id, status: ticket.clickup_status_name } }
@@ -83,16 +83,16 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
 
   it 'ignores events for an unknown task id (event fired for a task not from this fork)' do
     expect do
-      described_class.new(event: 'taskStatusUpdated', task_id: 'not-ours', history_items: []).perform
+      described_class.new(event: 'taskUpdated', task_id: 'not-ours', history_items: []).perform
     end.not_to raise_error
   end
 
-  describe 'taskCustomFieldUpdated' do
+  describe 'taskUpdated' do
     let(:resposta_field_id) { Integrations::Clickup::FieldMap::FIELDS[:resposta_para_cliente] }
 
     it 'copies the new "Resposta para o Cliente" value onto the ticket' do
       described_class.new(
-        event: 'taskCustomFieldUpdated',
+        event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
           { field: 'custom_field',
@@ -104,13 +104,13 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
       expect(ticket.reload.resposta_para_cliente).to eq('Solucionado — reiniciar o navegador')
     end
 
-    # Guard: taskCustomFieldUpdated fires for every custom field change on the
+    # Guard: taskUpdated fires for every custom field change on the
     # task (Ambiente, Canal, Chat ID, etc). We only sync the one field the
     # operator sees — everything else is noise and would trash the ticket's
     # local state if we mirrored it back.
     it 'is a no-op for any custom field other than "Resposta para o Cliente"' do
       described_class.new(
-        event: 'taskCustomFieldUpdated',
+        event: 'taskUpdated',
         task_id: 'CU_TASK_1',
         history_items: [
           { field: 'custom_field',
@@ -143,7 +143,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
     # Tickets when this fires.
     it 'broadcasts ticket.updated with notify=true when transitioning into a notifiable status' do
       broadcast = enqueue_and_capture do
-        { event: 'taskStatusUpdated',
+        { event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
             { field: 'status', after: { id: 'sc_done', status: 'resolvido', type: 'done' } }
@@ -158,7 +158,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
 
     it 'broadcasts with notify=false on quiet transitions (e.g. "em análise")' do
       broadcast = enqueue_and_capture do
-        { event: 'taskStatusUpdated',
+        { event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
             { field: 'status', after: { id: 'sc_review', status: 'em análise', type: 'custom' } }
@@ -173,7 +173,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
       resposta_field_id = Integrations::Clickup::FieldMap::FIELDS[:resposta_para_cliente]
 
       broadcast = enqueue_and_capture do
-        { event: 'taskCustomFieldUpdated',
+        { event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
             { field: 'custom_field',
@@ -189,7 +189,7 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
     it 'does not broadcast when the status did not actually change' do
       expect do
         described_class.new(
-          event: 'taskStatusUpdated',
+          event: 'taskUpdated',
           task_id: 'CU_TASK_1',
           history_items: [
             { field: 'status', after: { id: ticket.clickup_status_id, status: ticket.clickup_status_name } }
