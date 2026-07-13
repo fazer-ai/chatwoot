@@ -33,18 +33,29 @@ class Integrations::Clickup::Client
     post_json("/task/#{task_id}/comment", { comment_text: text.to_s })
   end
 
-  # Uploads a file to a task. `io` is expected to be an IO-like object
-  # (ActionDispatch::Http::UploadedFile, ActiveStorage::Blob open, etc.);
-  # we forward it as-is to HTTParty's multipart layer.
+  # Uploads a file to a task. `io` is an IO-like object (typically the
+  # Tempfile ActiveStorage::Blob#open yields). HTTParty pulls the multipart
+  # filename from `file.path` basename, so an ActiveStorage tempfile
+  # (`RackMultipart-abc123` with no extension) reaches ClickUp as an
+  # extensionless upload and gets rejected with `400 Invalid upload`.
+  # Copy the bytes into a scratch directory under the original filename so
+  # HTTParty stamps the multipart part with the real name.
   def upload_attachment(task_id, io:, filename:)
-    response = HTTParty.post(
-      "#{BASE_URL}/task/#{task_id}/attachment",
-      headers: { 'Authorization' => auth_header },
-      multipart: true,
-      body: { attachment: io, filename: filename },
-      timeout: DEFAULT_TIMEOUT
-    )
-    parse(response)
+    Dir.mktmpdir('clickup-attachment') do |dir|
+      path = File.join(dir, File.basename(filename.to_s))
+      File.open(path, 'wb') { |f| IO.copy_stream(io, f) }
+
+      File.open(path, 'rb') do |file|
+        response = HTTParty.post(
+          "#{BASE_URL}/task/#{task_id}/attachment",
+          headers: { 'Authorization' => auth_header },
+          multipart: true,
+          body: { attachment: file },
+          timeout: DEFAULT_TIMEOUT
+        )
+        return parse(response)
+      end
+    end
   rescue HTTParty::Error, SocketError, Errno::ECONNREFUSED, Net::OpenTimeout, Net::ReadTimeout => e
     raise ProviderUnavailable, e.message
   end
