@@ -35,7 +35,7 @@ class Tickets::CreateService
       context: @message,
       conversation: @conversation,
       relatar_problema: @params[:relatar_problema].to_s.strip,
-      comportamento_esperado: @params[:comportamento_esperado].to_s.strip.presence,
+      comportamento_esperado: @params[:comportamento_esperado].to_s.strip,
       sync_status: :pending_sync
     )
   end

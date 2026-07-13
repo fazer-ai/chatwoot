@@ -108,13 +108,22 @@ module Integrations::Clickup::FieldMap
 
   # -- helpers --------------------------------------------------------
 
-  # Prod install if the panel URL is chat.auris.ia.br, everything else
-  # (homolog / worktrees / dev on localhost) maps to Homologação. Keeps
-  # the ops team from having to filter test noise out of production
-  # queries.
-  def self.ambiente_option_for(frontend_url)
-    prod = frontend_url.to_s.start_with?('https://chat.auris.ia.br')
-    prod ? AMBIENTE_OPTIONS[:producao] : AMBIENTE_OPTIONS[:homologacao]
+  # Resolves the Ambiente option for a ticket.
+  #
+  # Non-prod URLs (homolog panel, worktrees, localhost) always map to
+  # Homologação — the ops team doesn't want to eyeball whether a test
+  # ticket happened to come from a real Production-enrolled account.
+  #
+  # Under the production URL, we defer to the account's own environment
+  # enum: an Account can be flagged as `test` (internal / QA account
+  # living on prod) or `production` (real customer). This lets the ops
+  # team filter out demo-account noise inside the prod ClickUp queue.
+  def self.ambiente_option_for(frontend_url, account = nil)
+    prod_url = frontend_url.to_s.start_with?('https://chat.auris.ia.br')
+    return AMBIENTE_OPTIONS[:homologacao] unless prod_url
+    return AMBIENTE_OPTIONS[:homologacao] if account.respond_to?(:env_test?) && account.env_test?
+
+    AMBIENTE_OPTIONS[:producao]
   end
 
   # Collapse a raw ClickUp status name to the AurisChat canonical form.

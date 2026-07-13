@@ -102,10 +102,23 @@ RSpec.describe 'Tickets API', type: :request do
     it 'enqueues the ClickUp sync job for the freshly built ticket' do
       expect do
         post "/api/v1/accounts/#{account.id}/tickets",
-             params: { message_id: message.id, relatar_problema: 'x' },
+             params: { message_id: message.id, relatar_problema: 'x', comportamento_esperado: 'y' },
              headers: agent.create_new_auth_token,
              as: :json
       end.to have_enqueued_job(Integrations::Clickup::CreateTaskJob)
+    end
+
+    # comportamento_esperado turned into a required field so ops always has
+    # the two sides of the story (what happened, what should have happened).
+    # Ship a proper 422 with the message so the frontend can surface it.
+    it 'returns 422 when comportamento_esperado is missing' do
+      post "/api/v1/accounts/#{account.id}/tickets",
+           params: { message_id: message.id, relatar_problema: 'IA respondeu em espanhol' },
+           headers: agent.create_new_auth_token,
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to match(/comportamento/i)
     end
   end
 
