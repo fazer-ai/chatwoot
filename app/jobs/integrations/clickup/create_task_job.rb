@@ -101,9 +101,11 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
   end
 
   def base_custom_fields(ticket)
+    ambiente_option = Integrations::Clickup::FieldMap.ambiente_option_for(frontend_url, ticket.account)
+
     [
       { id: Integrations::Clickup::FieldMap::FIELDS[:id], value: ticket.display_id },
-      { id: Integrations::Clickup::FieldMap::FIELDS[:ambiente], value: Integrations::Clickup::FieldMap.ambiente_option_for(frontend_url) },
+      { id: Integrations::Clickup::FieldMap::FIELDS[:ambiente], value: ambiente_option },
       { id: Integrations::Clickup::FieldMap::FIELDS[:contexto], value: Integrations::Clickup::FieldMap::CONTEXTO_OPTIONS[:mensagem] },
       { id: Integrations::Clickup::FieldMap::FIELDS[:chat_id], value: ticket.conversation&.display_id },
       { id: Integrations::Clickup::FieldMap::FIELDS[:account_id], value: ticket.account_id },

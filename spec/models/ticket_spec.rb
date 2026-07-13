@@ -13,9 +13,10 @@ RSpec.describe Ticket do
       expect(ticket).not_to be_valid
     end
 
-    it 'allows a blank comportamento_esperado since the field is optional' do
-      ticket = build(:ticket, comportamento_esperado: nil)
-      expect(ticket).to be_valid
+    it 'requires comportamento_esperado — product decision to force operators to describe the desired behavior' do
+      ticket = build(:ticket, comportamento_esperado: '')
+      expect(ticket).not_to be_valid
+      expect(ticket.errors[:comportamento_esperado]).to be_present
     end
 
     it 'only accepts Message as context_type in Phase 1' do

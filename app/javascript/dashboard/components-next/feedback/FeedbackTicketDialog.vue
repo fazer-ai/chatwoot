@@ -39,7 +39,10 @@ const attachmentError = ref('');
 const uiFlags = computed(() => store.getters['tickets/getUIFlags'] || {});
 const isSubmitting = computed(() => uiFlags.value.creatingItem);
 const canSubmit = computed(
-  () => relatarProblema.value.trim().length > 0 && !isSubmitting.value
+  () =>
+    relatarProblema.value.trim().length > 0 &&
+    comportamentoEsperado.value.trim().length > 0 &&
+    !isSubmitting.value
 );
 
 const resetForm = () => {
@@ -158,7 +161,9 @@ onUnmounted(() => emitter.off(BUS_EVENTS.OPEN_FEEDBACK_TICKET, handleOpen));
           for="feedback-comportamento-esperado"
           class="text-sm font-medium text-n-slate-12"
         >
-          {{ t('CONVERSATION.FEEDBACK_TICKET.COMPORTAMENTO_ESPERADO_LABEL') }}
+          {{
+            `${t('CONVERSATION.FEEDBACK_TICKET.COMPORTAMENTO_ESPERADO_LABEL')} ${requiredMark}`
+          }}
         </label>
         <textarea
           id="feedback-comportamento-esperado"

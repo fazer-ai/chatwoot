@@ -62,7 +62,7 @@ class Ticket < ApplicationRecord
   validates :context_type, presence: true, inclusion: { in: %w[Message] }
   validates :context_id, presence: true
   validates :relatar_problema, presence: true, length: { maximum: 5000 }
-  validates :comportamento_esperado, length: { maximum: 5000 }, allow_blank: true
+  validates :comportamento_esperado, presence: true, length: { maximum: 5000 }
 
   scope :for_user, ->(u) { where(user_id: u.id) }
   scope :for_account, ->(a) { where(account_id: a.id) }

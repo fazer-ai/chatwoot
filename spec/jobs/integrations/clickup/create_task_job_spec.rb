@@ -121,8 +121,9 @@ RSpec.describe Integrations::Clickup::CreateTaskJob do
     end
   end
 
-  it 'chooses the Produção ambiente option when FRONTEND_URL is the auris prod host' do
+  it 'chooses the Produção ambiente option when FRONTEND_URL is the auris prod host and the account is env_production' do
     captured = stub_capture_create_task
+    account.update!(environment: :production)
 
     with_modified_env FRONTEND_URL: 'https://chat.auris.ia.br' do
       described_class.new.perform(ticket.id)
@@ -130,6 +131,21 @@ RSpec.describe Integrations::Clickup::CreateTaskJob do
 
     env_field = captured[:custom_fields].find { |f| f[:id] == Integrations::Clickup::FieldMap::FIELDS[:ambiente] }
     expect(env_field[:value]).to eq(Integrations::Clickup::FieldMap::AMBIENTE_OPTIONS[:producao])
+  end
+
+  # Prod URL + env_test account (internal QA / demo account living on the
+  # production install) keeps the ticket flagged as Homologação so the ops
+  # team can filter test noise out of the real production queue.
+  it 'chooses the Homologação ambiente option on the prod host when the account is env_test' do
+    captured = stub_capture_create_task
+    account.update!(environment: :test)
+
+    with_modified_env FRONTEND_URL: 'https://chat.auris.ia.br' do
+      described_class.new.perform(ticket.id)
+    end
+
+    env_field = captured[:custom_fields].find { |f| f[:id] == Integrations::Clickup::FieldMap::FIELDS[:ambiente] }
+    expect(env_field[:value]).to eq(Integrations::Clickup::FieldMap::AMBIENTE_OPTIONS[:homologacao])
   end
 
   it 'chooses the Homologação ambiente option on any non-prod URL' do

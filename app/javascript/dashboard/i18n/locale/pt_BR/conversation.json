@@ -375,7 +375,7 @@
       "SUBTITLE": "Seu feedback é importante para que o nosso time melhore cada vez mais a sua secretária.",
       "RELATAR_PROBLEMA_LABEL": "O que aconteceu de errado?",
       "RELATAR_PROBLEMA_PLACEHOLDER": "Descreva o que a IA errou nesta mensagem.",
-      "COMPORTAMENTO_ESPERADO_LABEL": "Qual deveria ter sido a resposta? (opcional)",
+      "COMPORTAMENTO_ESPERADO_LABEL": "Qual deveria ter sido a resposta?",
       "COMPORTAMENTO_ESPERADO_PLACEHOLDER": "Conte para o nosso time qual seria a resposta ou comportamento correto.",
       "ATTACHMENTS_LABEL": "Anexos (opcional)",
       "ATTACHMENTS_PICK": "Adicionar anexos",

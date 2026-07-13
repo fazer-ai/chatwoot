@@ -33,6 +33,8 @@ class Api::V1::Accounts::TicketsController < Api::V1::Accounts::BaseController
     schedule_attachment_uploads(@ticket) if attachment_uploads.present?
 
     render :show, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
   end
 
   def add_comment

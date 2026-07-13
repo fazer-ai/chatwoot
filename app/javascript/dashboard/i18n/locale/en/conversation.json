@@ -376,7 +376,7 @@
       "SUBTITLE": "Your feedback helps our team keep improving your assistant.",
       "RELATAR_PROBLEMA_LABEL": "What went wrong?",
       "RELATAR_PROBLEMA_PLACEHOLDER": "Describe what the AI got wrong on this message.",
-      "COMPORTAMENTO_ESPERADO_LABEL": "What should have happened instead? (optional)",
+      "COMPORTAMENTO_ESPERADO_LABEL": "What should have happened instead?",
       "COMPORTAMENTO_ESPERADO_PLACEHOLDER": "Tell our team what the correct answer or behavior should have been.",
       "ATTACHMENTS_LABEL": "Attachments (optional)",
       "ATTACHMENTS_PICK": "Add attachments",
