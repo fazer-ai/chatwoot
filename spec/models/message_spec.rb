@@ -204,6 +204,18 @@ RSpec.describe Message do
     it 'returns push event payload' do
       expect(push_event_data).to eq(expected_data)
     end
+
+    # The conversations table lets `contact_inbox_id` be NULL, so an
+    # orphan conversation (contact_inbox deleted, inbox migration gone
+    # sideways) used to 500 the entire /conversations index payload.
+    # Guard the safe-nav so those legacy rows serialize with a nil source
+    # id instead of blowing up the tab.
+    it 'does not crash when the conversation contact_inbox is nil' do
+      allow(message.conversation).to receive(:contact_inbox).and_return(nil)
+
+      expect { message.push_event_data }.not_to raise_error
+      expect(message.push_event_data[:conversation][:contact_inbox]).to eq(source_id: nil)
+    end
   end
 
   describe 'message create event' do
