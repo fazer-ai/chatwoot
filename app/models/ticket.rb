@@ -45,6 +45,7 @@ class Ticket < ApplicationRecord
   belongs_to :user, optional: true
   belongs_to :conversation, optional: true
   belongs_to :context, polymorphic: true
+  has_many :ticket_updates, dependent: :destroy
 
   # 3-state machine that tracks the ClickUp create-task job.
   # - `pending_sync`: local ticket exists, CreateTaskJob has not (yet) landed
@@ -88,10 +89,27 @@ class Ticket < ApplicationRecord
     core_fields.merge(clickup_fields).merge(
       resposta_para_cliente: resposta_para_cliente,
       resposta_notified_at: resposta_notified_at,
+      updates: ticket_updates_payload,
       user: user_push_event_data,
       created_at: created_at,
       updated_at: updated_at
     )
+  end
+
+  # Chronological Atualização timeline (oldest → newest) rendered as a
+  # data | quem | texto grid on the detail modal. Auris entries come from
+  # ClickUp's "Resposta para o Cliente"; user entries come from
+  # "Adicionar mais informação" comments.
+  def ticket_updates_payload
+    ticket_updates.chronological.map do |update|
+      {
+        id: update.id,
+        actor_name: update.actor_name,
+        user_id: update.user_id,
+        body: update.body,
+        created_at: update.created_at
+      }
+    end
   end
 
   private

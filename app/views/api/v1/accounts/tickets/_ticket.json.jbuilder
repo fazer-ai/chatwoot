@@ -17,6 +17,8 @@ json.clickup_status_name ticket.clickup_status_name
 json.resposta_para_cliente ticket.resposta_para_cliente
 json.resposta_notified_at ticket.resposta_notified_at
 
+json.updates ticket.ticket_updates_payload
+
 json.user do
   # `user` is nullable — a removed agent still has historic tickets, and we
   # want the manager view to keep rendering "Agente" even after the seat is

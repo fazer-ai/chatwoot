@@ -199,6 +199,20 @@ RSpec.describe 'Tickets API', type: :request do
       expect(response).to have_http_status(:accepted)
     end
 
+    it 'appends the comment onto the ticket Atualização timeline as a user entry' do
+      expect do
+        post "/api/v1/accounts/#{account.id}/tickets/#{ticket.id}/add_comment",
+             params: { comment: 'mais uma info' },
+             headers: agent.create_new_auth_token,
+             as: :json
+      end.to change { ticket.ticket_updates.count }.by(1)
+
+      last = ticket.ticket_updates.chronological.last
+      expect(last.user_id).to eq(agent.id)
+      expect(last.actor_name).to eq(agent.name)
+      expect(last.body).to eq('mais uma info')
+    end
+
     it 'refuses to comment on a ticket that has not synced yet — nothing to attach it to' do
       pending_ticket = create(:ticket, account: account, user: agent, sync_status: :pending_sync)
 

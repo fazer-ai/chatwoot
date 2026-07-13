@@ -72,6 +72,7 @@ class Webhooks::Clickup::ProcessEventService
     return if ticket.resposta_para_cliente == new_value
 
     ticket.update!(resposta_para_cliente: new_value, resposta_notified_at: Time.current)
+    ticket.ticket_updates.create!(actor_name: TicketUpdate::AURIS_ACTOR_NAME, body: new_value)
     # A brand-new customer-facing response is always worth a toast — the
     # ops team wrote it specifically for the operator to relay.
     broadcast(ticket, notify: true)

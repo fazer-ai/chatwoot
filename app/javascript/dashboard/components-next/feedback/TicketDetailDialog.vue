@@ -67,6 +67,29 @@ const canComment = computed(() => {
   );
 });
 
+// The Atualização timeline: each row is a chronological entry contributed
+// either by ops (via ClickUp's "Resposta para o Cliente") or the
+// operator / manager (via the "Adicionar mais informação" comment box).
+// Payload comes from the backend already chronologically sorted; the
+// fallback `[]` covers pre-timeline cached tickets.
+const updates = computed(() => ticket.value?.updates || []);
+
+const timestampFormatter = new Intl.DateTimeFormat(undefined, {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const formatUpdateTimestamp = value => {
+  if (!value) return EMPTY_CELL;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? EMPTY_CELL
+    : timestampFormatter.format(date);
+};
+
 // Same palette as the Meus Tickets grid — keeps the visual language of
 // status consistent between the list and the detail modal.
 const statusBadgeClass = statusName => {
@@ -177,14 +200,47 @@ defineExpose({ openWith });
         </p>
       </div>
 
-      <div v-if="ticket.resposta_para_cliente">
+      <div>
         <p class="text-xs uppercase text-n-slate-11 mb-1">
           {{ t('MEUS_TICKETS.DETAIL.RESPONSE') }}
         </p>
         <div
-          class="text-sm text-n-slate-12 whitespace-pre-wrap bg-n-teal-2 border border-n-teal-6 rounded-lg p-3"
+          v-if="updates.length === 0"
+          class="text-sm text-n-slate-11 bg-n-slate-2 border border-n-slate-6 rounded-lg p-3"
         >
-          {{ ticket.resposta_para_cliente }}
+          {{ t('MEUS_TICKETS.DETAIL.UPDATES_EMPTY') }}
+        </div>
+        <div
+          v-else
+          class="text-sm rounded-lg border border-n-slate-6 overflow-hidden"
+        >
+          <div
+            class="grid grid-cols-[8rem_8rem_1fr] gap-2 px-3 py-2 bg-n-slate-2 text-xs uppercase text-n-slate-11 font-medium"
+          >
+            <span>{{ t('MEUS_TICKETS.DETAIL.UPDATES_COLUMN_WHEN') }}</span>
+            <span>{{ t('MEUS_TICKETS.DETAIL.UPDATES_COLUMN_WHO') }}</span>
+            <span>{{ t('MEUS_TICKETS.DETAIL.UPDATES_COLUMN_TEXT') }}</span>
+          </div>
+          <ul class="divide-y divide-n-slate-6">
+            <li
+              v-for="update in updates"
+              :key="update.id"
+              class="grid grid-cols-[8rem_8rem_1fr] gap-2 px-3 py-2 items-start bg-n-alpha-black1"
+            >
+              <span class="text-xs text-n-slate-11 pt-0.5">
+                {{ formatUpdateTimestamp(update.created_at) }}
+              </span>
+              <span
+                class="text-xs font-medium pt-0.5"
+                :class="update.user_id ? 'text-n-slate-12' : 'text-n-teal-11'"
+              >
+                {{ update.actor_name }}
+              </span>
+              <span class="text-n-slate-12 whitespace-pre-wrap">
+                {{ update.body }}
+              </span>
+            </li>
+          </ul>
         </div>
       </div>
 
