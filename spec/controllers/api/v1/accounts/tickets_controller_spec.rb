@@ -37,6 +37,38 @@ RSpec.describe 'Tickets API', type: :request do
         expect(ids).to eq([agent_ticket.id, other_ticket.id].sort)
       end
 
+      # Manager is a separate role from administrator (agent=0, administrator=1,
+      # manager=2 on account_users). Both need the same "see every ticket in
+      # the account" behavior — Meus Tickets is the operations dashboard for
+      # both roles.
+      it 'returns every ticket in the account for managers' do
+        team_manager = create(:user, account: account, role: :manager)
+
+        get "/api/v1/accounts/#{account.id}/tickets",
+            headers: team_manager.create_new_auth_token,
+            as: :json
+
+        ids = response.parsed_body['payload'].pluck('id').sort
+        expect(ids).to eq([agent_ticket.id, other_ticket.id].sort)
+      end
+
+      # Cross-account isolation: an admin/manager on account A must never see
+      # tickets from account B. Guarded by `scope.where(account_id: account.id)`
+      # in TicketPolicy::Scope, but any regression here leaks tickets between
+      # tenants so keep it locked with an explicit spec.
+      it 'never leaks tickets from other accounts to admins on this account' do
+        other_account = create(:account)
+        other_account_agent = create(:user, account: other_account, role: :agent)
+        _foreign_ticket = create(:ticket, account: other_account, user: other_account_agent)
+
+        get "/api/v1/accounts/#{account.id}/tickets",
+            headers: manager.create_new_auth_token,
+            as: :json
+
+        ids = response.parsed_body['payload'].pluck('id').sort
+        expect(ids).to eq([agent_ticket.id, other_ticket.id].sort)
+      end
+
       it 'filters by ClickUp status name so Meus Tickets can offer a quick tab' do
         agent_ticket.update!(clickup_status_name: 'em análise')
 
@@ -76,6 +108,35 @@ RSpec.describe 'Tickets API', type: :request do
         ids = response.parsed_body['payload'].pluck('id').sort
         expect(ids).to eq([agent_ticket.id, other_ticket.id].sort)
       end
+    end
+  end
+
+  describe 'GET /api/v1/accounts/{account.id}/tickets/:id' do
+    let(:other_agent) { create(:user, account: account, role: :agent) }
+    let(:their_ticket) { create(:ticket, account: account, user: other_agent) }
+
+    it 'lets a manager open another agent ticket detail modal' do
+      team_manager = create(:user, account: account, role: :manager)
+
+      get "/api/v1/accounts/#{account.id}/tickets/#{their_ticket.id}",
+          headers: team_manager.create_new_auth_token,
+          as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['id']).to eq(their_ticket.id)
+    end
+
+    it 'refuses to show a cross-account ticket to a manager on this account' do
+      other_account = create(:account)
+      other_account_agent = create(:user, account: other_account, role: :agent)
+      foreign_ticket = create(:ticket, account: other_account, user: other_account_agent)
+      team_manager = create(:user, account: account, role: :manager)
+
+      get "/api/v1/accounts/#{account.id}/tickets/#{foreign_ticket.id}",
+          headers: team_manager.create_new_auth_token,
+          as: :json
+
+      expect(response.status).to be_in([401, 403, 404])
     end
   end
 
@@ -168,6 +229,40 @@ RSpec.describe 'Tickets API', type: :request do
            as: :json
 
       # Pundit responds 401 by default for unauthorized actions in this app's setup.
+      expect(response.status).to be_in([401, 403, 404])
+    end
+
+    # Manager can add comments to any ticket in the account — Meus Tickets
+    # dashboard is theirs to work with.
+    it 'lets a manager comment on another agent ticket in the same account' do
+      other_agent = create(:user, account: account, role: :agent)
+      other_ticket = create(:ticket, account: account, user: other_agent, sync_status: :synced, clickup_task_id: 'CU_3')
+      team_manager = create(:user, account: account, role: :manager)
+
+      expect do
+        post "/api/v1/accounts/#{account.id}/tickets/#{other_ticket.id}/add_comment",
+             params: { comment: 'follow-up do manager' },
+             headers: team_manager.create_new_auth_token,
+             as: :json
+      end.to have_enqueued_job(Integrations::Clickup::AddCommentJob).with(other_ticket.id, 'follow-up do manager', team_manager.id)
+
+      expect(response).to have_http_status(:accepted)
+    end
+
+    # A manager on account A must not be able to comment on account B tickets.
+    it 'forbids a manager from commenting on a ticket that belongs to another account' do
+      other_account = create(:account)
+      other_account_agent = create(:user, account: other_account, role: :agent)
+      foreign_ticket = create(:ticket, account: other_account, user: other_account_agent, sync_status: :synced, clickup_task_id: 'CU_4')
+      team_manager = create(:user, account: account, role: :manager)
+
+      post "/api/v1/accounts/#{account.id}/tickets/#{foreign_ticket.id}/add_comment",
+           params: { comment: 'oi' },
+           headers: team_manager.create_new_auth_token,
+           as: :json
+
+      # Ticket lookup already narrows to `Current.account.tickets`, so a
+      # cross-account id is a plain 404 (does not exist "for us").
       expect(response.status).to be_in([401, 403, 404])
     end
   end
