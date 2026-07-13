@@ -1,4 +1,24 @@
 ---
+- tag: v4.15.1-auris.1.41.9
+  published_at: '2026-07-13T18:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.9
+  notes:
+    en: |-
+      ### ✨ What's new
+
+      - **Feedback ticket detail is now a full conversation timeline.** Every reply from the support team and every extra note you add appears as a row with the date, who wrote it, and the message.
+
+      ### ⚡ Improvements
+
+      - **"What should have happened?" is required when opening a ticket.** Support always gets both sides of the story so investigation is faster.
+    pt_BR: |-
+      ### ✨ Novidades
+
+      - **Detalhes do ticket agora mostram a conversa completa.** Toda resposta do time e toda informação extra que você adiciona aparecem em linhas com data, quem escreveu e a mensagem.
+
+      ### ⚡ Melhorias
+
+      - **"Qual deveria ter sido a resposta?" virou obrigatório ao abrir o ticket.** O time de suporte sempre recebe os dois lados pra investigar mais rápido.
 - tag: v4.15.1-auris.1.41.8
   published_at: '2026-07-13T02:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.8
@@ -297,19 +317,3 @@
       Bug fixes and internal improvements.
     pt_BR: |-
       Correções de bugs e melhorias internas.
-- tag: v4.14.0-auris.1.37.1
-  published_at: '2026-07-02T18:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Contact edit form pre-selects the contact's language.** The language combobox was showing "Selecione o idioma" even when the language had been set — now it loads the current value.
-      - **Inbox name appears once in the conversation header.** After the last release the inbox name was duplicated above the contact name; now it shows only once.
-      - **Bulk actions bar fits.** The floating action bar was cutting the "Limpar" button as "Lim..." and pushing the counter text against it. Fonts are smaller and "Limpar" now shows in full.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Formulário de contato mostra o idioma que está no cadastro.** O campo de idioma aparecia sempre como "Selecione o idioma" mesmo quando já havia um configurado — agora carrega o valor atual.
-      - **Nome da caixa aparece uma vez só no cabeçalho da conversa.** Depois da última versão o nome da caixa aparecia duplicado acima do nome do contato; agora aparece só uma vez.
-      - **Barra de ações em massa cabe na tela.** A barra flutuante estava cortando o botão "Limpar" (aparecia como "Lim...") e apertando o texto do contador do lado. Fontes menores e o "Limpar" agora aparece inteiro.
