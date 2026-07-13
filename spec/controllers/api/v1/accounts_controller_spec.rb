@@ -212,6 +212,19 @@ RSpec.describe 'Accounts API', type: :request do
         expect(body['ai_status_uses_attribute']).to be(true)
         expect(body['multi_language_ai']).to be(true)
       end
+
+      # The frontend gates the "Meus Tickets" sidebar item, the flag icon
+      # on messages, and the /tickets route on this flag. Ship it on the
+      # account payload so no extra fetch is needed to render the shell.
+      it 'reflects Integrations::Clickup::Setup.ready? as clickup_integration_enabled' do
+        allow(Integrations::Clickup::Setup).to receive(:ready?).and_return(true)
+
+        get "/api/v1/accounts/#{account.id}",
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response.parsed_body['clickup_integration_enabled']).to be(true)
+      end
     end
   end
 

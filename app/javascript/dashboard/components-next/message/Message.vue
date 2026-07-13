@@ -157,6 +157,13 @@ const { t } = useI18n();
 const route = useRoute();
 const inboxGetter = useMapGetter('inboxes/getInbox');
 const inbox = computed(() => inboxGetter.value(props.inboxId) || {});
+const currentAccountId = useMapGetter('getCurrentAccountId');
+const accountGetter = useMapGetter('accounts/getAccount');
+const isClickupIntegrationEnabled = computed(
+  () =>
+    accountGetter.value(currentAccountId.value)?.clickup_integration_enabled ===
+    true
+);
 const router = useRouter();
 const { replaceInstallationName } = useBranding();
 
@@ -453,6 +460,7 @@ const canShowReactionToolbar = computed(() => {
 // or bot variants) — the operator flags what OUR side said, not incoming
 // user messages. Reuses the reaction toolbar's hover reveal.
 const canShowFeedbackButton = computed(() => {
+  if (!isClickupIntegrationEnabled.value) return false;
   if (!isBubble.value) return false;
   if (props.private) return false;
   if (isMessageDeleted.value) return false;
