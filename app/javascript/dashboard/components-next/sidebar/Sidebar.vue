@@ -73,6 +73,14 @@ const isFunnelEnabled = computed(
   () => accountGetter.value(accountId.value)?.funnel_enabled !== false
 );
 
+// ClickUp integration is only "wired up" when both the API key AND the
+// webhook are configured. Falsey/missing hides the "Meus Tickets" item
+// so the operator does not open dead-end tickets that never sync back.
+const isClickupIntegrationEnabled = computed(
+  () =>
+    accountGetter.value(accountId.value)?.clickup_integration_enabled === true
+);
+
 // Both menu flags default to false at the database level. Treat any
 // non-true value as "hidden" so a missing key in the cached account payload
 // behaves the same way an explicit `false` would.
@@ -477,16 +485,20 @@ const menuItems = computed(() => {
         count: 'internalChat/getUnreadCount',
       },
     },
-    {
-      name: 'Tickets',
-      label: t('SIDEBAR.MY_TICKETS'),
-      icon: 'i-lucide-flag',
-      to: accountScopedRoute('tickets_index'),
-      activeOn: ['tickets_index'],
-      getterKeys: {
-        count: 'tickets/getUnreadCount',
-      },
-    },
+    ...(isClickupIntegrationEnabled.value
+      ? [
+          {
+            name: 'Tickets',
+            label: t('SIDEBAR.MY_TICKETS'),
+            icon: 'i-lucide-flag',
+            to: accountScopedRoute('tickets_index'),
+            activeOn: ['tickets_index'],
+            getterKeys: {
+              count: 'tickets/getUnreadCount',
+            },
+          },
+        ]
+      : []),
     ...(isFunnelEnabled.value
       ? [
           {

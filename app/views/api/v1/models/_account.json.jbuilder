@@ -34,5 +34,6 @@ json.help_center_menu_enabled @account.help_center_menu_enabled
 json.support_email @account.support_email
 json.status @account.status
 json.environment @account.environment
+json.clickup_integration_enabled Integrations::Clickup::Setup.ready?
 json.simulator_inbox_id @account.simulator_inbox_id
 json.cache_keys @account.cache_keys
