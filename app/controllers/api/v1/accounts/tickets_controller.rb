@@ -42,11 +42,10 @@ class Api::V1::Accounts::TicketsController < Api::V1::Accounts::BaseController
     render json: { error: 'comment is required' }, status: :unprocessable_entity and return if params[:comment].blank?
     render json: { error: 'ticket not synced yet' }, status: :unprocessable_entity and return unless @ticket.sync_synced?
 
-    ::Integrations::Clickup::AddCommentJob.perform_later(
-      @ticket.id,
-      params[:comment].to_s,
-      Current.user&.id
-    )
+    comment_body = params[:comment].to_s
+    ::Integrations::Clickup::AddCommentJob.perform_later(@ticket.id, comment_body, Current.user&.id)
+    record_local_update(comment_body)
+    broadcast_ticket_update
 
     head :accepted
   end
@@ -71,6 +70,32 @@ class Api::V1::Accounts::TicketsController < Api::V1::Accounts::BaseController
 
   def hide_finished?
     ActiveModel::Type::Boolean.new.cast(params[:hide_finished])
+  end
+
+  # Local half of add_comment: append a row to the ticket's Atualização
+  # timeline immediately, so the operator sees their comment on the detail
+  # modal without waiting for the ClickUp round-trip. `actor_name` is
+  # snapshotted here — a later user rename doesn't rewrite history.
+  def record_local_update(body)
+    actor_name = Current.user&.name.presence || 'Agente'
+    @ticket.ticket_updates.create!(user: Current.user, actor_name: actor_name, body: body)
+  end
+
+  # Push the fresh timeline to every open Meus Tickets tab (owner + every
+  # admin/manager on the account). `notify: false` — the operator posted
+  # the comment themselves and does not need to toast their own tab.
+  def broadcast_ticket_update
+    tokens = []
+    tokens << @ticket.user.pubsub_token if @ticket.user&.pubsub_token.present?
+    tokens.concat(@ticket.account.administrators.pluck(:pubsub_token))
+    tokens = tokens.compact_blank.uniq
+    return if tokens.blank?
+
+    ::ActionCableBroadcastJob.perform_later(
+      tokens,
+      'ticket.updated',
+      { account_id: @ticket.account_id, ticket: @ticket.push_event_data, notify: false }
+    )
   end
 
   # PR2: attachments come in as multipart uploads. Persist each to

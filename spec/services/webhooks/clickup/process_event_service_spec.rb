@@ -108,6 +108,42 @@ RSpec.describe Webhooks::Clickup::ProcessEventService do
       expect(ticket.reload.resposta_para_cliente).to eq('Solucionado — reiniciar o navegador')
     end
 
+    it 'appends the new "Resposta para o Cliente" onto the ticket Atualização timeline as an Auris entry' do
+      expect do
+        described_class.new(
+          event: 'taskUpdated',
+          task_id: 'CU_TASK_1',
+          history_items: [
+            { field: 'custom_field',
+              custom_field: { id: resposta_field_id },
+              after: { value: 'Solucionado — reiniciar o navegador' } }
+          ]
+        ).perform
+      end.to change { ticket.ticket_updates.count }.by(1)
+
+      last = ticket.ticket_updates.chronological.last
+      expect(last.actor_name).to eq(TicketUpdate::AURIS_ACTOR_NAME)
+      expect(last.user_id).to be_nil
+      expect(last.body).to eq('Solucionado — reiniciar o navegador')
+    end
+
+    it 'does not add a duplicate timeline entry when ClickUp re-sends the same value' do
+      ticket.update!(resposta_para_cliente: 'Solucionado — reiniciar o navegador')
+      ticket.ticket_updates.create!(actor_name: TicketUpdate::AURIS_ACTOR_NAME, body: 'Solucionado — reiniciar o navegador')
+
+      expect do
+        described_class.new(
+          event: 'taskUpdated',
+          task_id: 'CU_TASK_1',
+          history_items: [
+            { field: 'custom_field',
+              custom_field: { id: resposta_field_id },
+              after: { value: 'Solucionado — reiniciar o navegador' } }
+          ]
+        ).perform
+      end.not_to(change { ticket.ticket_updates.count })
+    end
+
     # Guard: taskUpdated fires for every custom field change on the
     # task (Ambiente, Canal, Chat ID, etc). We only sync the one field the
     # operator sees — everything else is noise and would trash the ticket's
