@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.10
+  published_at: '2026-07-13T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.10
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **"Unassigned" tab loads again.** On some accounts the "Unassigned" tab was intermittently failing to load. Now it loads normally.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Aba "Não atribuídas" volta a carregar.** Em algumas contas a aba "Não atribuídas" às vezes não carregava. Agora carrega normalmente.
 - tag: v4.15.1-auris.1.41.9
   published_at: '2026-07-13T18:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.9
@@ -309,11 +321,3 @@
 
       - **Número brasileiro com/sem "9" deixa de criar contato duplicado.** O sistema reusa o contato existente independente do formato.
       - **Quando uma mensagem falha ao enviar, o motivo agora aparece na bolha.**
-- tag: v4.14.0-auris.1.37.2
-  published_at: '2026-07-02T19:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37.2
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
