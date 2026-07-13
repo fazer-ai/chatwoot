@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.8
+  published_at: '2026-07-13T02:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.8
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Files you attach to a ticket now reach the support team.** Attachments sent with feedback tickets weren't showing up on the team's side — they were being rejected as invalid uploads. Now every file you attach makes it through.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Arquivos que você anexa ao ticket agora chegam para o time de suporte.** Anexos enviados junto do feedback não estavam aparecendo do lado do time — eram rejeitados como upload inválido. Agora todo arquivo anexado chega.
 - tag: v4.15.1-auris.1.41.7
   published_at: '2026-07-13T00:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.7
@@ -301,17 +313,3 @@
       - **Formulário de contato mostra o idioma que está no cadastro.** O campo de idioma aparecia sempre como "Selecione o idioma" mesmo quando já havia um configurado — agora carrega o valor atual.
       - **Nome da caixa aparece uma vez só no cabeçalho da conversa.** Depois da última versão o nome da caixa aparecia duplicado acima do nome do contato; agora aparece só uma vez.
       - **Barra de ações em massa cabe na tela.** A barra flutuante estava cortando o botão "Limpar" (aparecia como "Lim...") e apertando o texto do contador do lado. Fontes menores e o "Limpar" agora aparece inteiro.
-- tag: v4.14.0-auris.1.37
-  published_at: '2026-07-01T21:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.37
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Copy the conversation number from the header.** A tiny button next to the contact name copies the conversation number so you can paste it wherever you need.
-      - **Redesigned bulk actions bar.** When you select multiple conversations, the action bar now floats above the list with a lighter look. Same actions as before.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Copiar o número da conversa direto do cabeçalho.** Um botão pequeno do lado do nome do contato copia o número da conversa pra você colar onde precisar.
-      - **Barra de ações em massa redesenhada.** Quando você seleciona várias conversas, a barra de ações agora flutua sobre a lista com um visual mais leve. Mesmas ações de antes.
