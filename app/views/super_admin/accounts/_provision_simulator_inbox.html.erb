@@ -1,0 +1,16 @@
+<section class="main-content__body">
+ <hr/>
+  <%= form_for([:provision_simulator_inbox, namespace, page.resource], method: :post, html: { class: "form" }) do |f| %>
+    <div class="form-actions">
+      <p class="pb-3">
+        Cria a caixa de entrada "Simulador" desta conta se ela ainda não existir.<br>
+        <% if page.resource.simulator_inbox_id.present? && Inbox.exists?(id: page.resource.simulator_inbox_id) %>
+          <span class="text-color-green">Já existe (inbox id: <%= page.resource.simulator_inbox_id %>). Clicar não faz nada.</span>
+        <% else %>
+          <span class="text-color-red">Nenhuma inbox do Simulador provisionada nesta conta.</span>
+        <% end %>
+      </p>
+      <%= f.submit 'Provisionar inbox do Simulador' %>
+    </div>
+  <% end %>
+</section>

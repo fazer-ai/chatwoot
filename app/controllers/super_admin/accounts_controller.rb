@@ -59,6 +59,18 @@ class SuperAdmin::AccountsController < SuperAdmin::ApplicationController
     # rubocop:enable Rails/I18nLocaleTexts
   end
 
+  # Prod accounts don't get the `env_test` auto-provisioning of the
+  # Simulador inbox, but QA / demo runs on them still benefit from one.
+  # `ensure_simulator_inbox!` is idempotent — a second click on an account
+  # that already has a live simulator inbox is a no-op.
+  def provision_simulator_inbox
+    account = requested_resource
+    already_had = account.simulator_inbox_id.present? && Inbox.exists?(id: account.simulator_inbox_id)
+    account.ensure_simulator_inbox!
+    notice = already_had ? 'Simulador inbox already exists — no action taken.' : 'Simulador inbox provisioned.'
+    redirect_back(fallback_location: [namespace, account], notice: notice)
+  end
+
   def destroy
     account = Account.find(params[:id])
 

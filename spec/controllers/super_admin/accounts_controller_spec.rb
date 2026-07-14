@@ -59,6 +59,50 @@ RSpec.describe 'Super Admin accounts API', type: :request do
     end
   end
 
+  describe 'POST /super_admin/accounts/{account_id}/provision_simulator_inbox' do
+    # Prod accounts don't auto-provision a Simulador inbox (that's env_test's
+    # after_commit). Super Admin gets a manual button for QA / demos.
+    let!(:prod_account) { create(:account, environment: :production) }
+
+    before { sign_in(super_admin, scope: :super_admin) }
+
+    it 'creates a Simulador channel + inbox and stamps simulator_inbox_id when the account has none' do
+      expect(prod_account.simulator_inbox_id).to be_nil
+
+      expect do
+        post "/super_admin/accounts/#{prod_account.id}/provision_simulator_inbox"
+      end.to change(Channel::Simulator, :count).by(1)
+
+      prod_account.reload
+      expect(prod_account.simulator_inbox_id).to be_present
+      expect(Inbox.find(prod_account.simulator_inbox_id).name).to eq('Simulador')
+      expect(flash[:notice]).to eq('Simulador inbox provisioned.')
+    end
+
+    it 'is a no-op when the account already has a live Simulador inbox' do
+      existing_channel = Channel::Simulator.create!(account: prod_account)
+      existing_inbox = prod_account.inboxes.create!(name: 'Simulador', channel: existing_channel)
+      prod_account.update!(simulator_inbox_id: existing_inbox.id)
+
+      expect do
+        post "/super_admin/accounts/#{prod_account.id}/provision_simulator_inbox"
+      end.not_to change(Channel::Simulator, :count)
+
+      expect(prod_account.reload.simulator_inbox_id).to eq(existing_inbox.id)
+      expect(flash[:notice]).to eq('Simulador inbox already exists — no action taken.')
+    end
+
+    it 'reprovisions when the cached simulator_inbox_id is stale (inbox deleted)' do
+      prod_account.update!(simulator_inbox_id: 999_999_999)
+
+      expect do
+        post "/super_admin/accounts/#{prod_account.id}/provision_simulator_inbox"
+      end.to change(Channel::Simulator, :count).by(1)
+
+      expect(prod_account.reload.simulator_inbox_id).not_to eq(999_999_999)
+    end
+  end
+
   describe 'PUT /super_admin/accounts/{account_id} (Auris settings section)' do
     let(:params) do
       {
