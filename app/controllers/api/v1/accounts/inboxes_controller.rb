@@ -1,6 +1,6 @@
 class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController # rubocop:disable Metrics/ClassLength
   include Api::V1::InboxesHelper
-  before_action :fetch_inbox, except: [:index, :create]
+  before_action :fetch_inbox, except: [:index, :create, :provision_simulator]
   before_action :fetch_agent_bot, only: [:set_agent_bot]
   before_action :validate_limit, only: [:create]
   # we are already handling the authorization in fetch inbox
@@ -53,6 +53,26 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     @inbox.update!(inbox_params)
     update_inbox_working_hours
     update_channel if channel_update_required?
+  end
+
+  # Standalone provisioning path for the Simulador inbox. The Settings →
+  # Inboxes → Novo page shows a Simulador card only when the account has
+  # none; clicking it calls this endpoint and then jumps to the standard
+  # "add agents" step of the create flow, same as any other channel.
+  #
+  # Delegates to Account#ensure_simulator_inbox! (idempotent, transactional,
+  # already used by the env_test auto-hook and the Super Admin button). We
+  # still return 422 when the account already has a live simulator inbox so
+  # a stale UI submission doesn't silently pretend to re-create.
+  def provision_simulator
+    if Current.account.simulator_inbox_id.present? && Inbox.exists?(id: Current.account.simulator_inbox_id)
+      render json: { error: I18n.t('errors.inbox.simulator_already_exists', default: 'Simulator inbox already exists for this account.') },
+             status: :unprocessable_entity and return
+    end
+
+    Current.account.ensure_simulator_inbox!
+    @inbox = Inbox.find(Current.account.reload.simulator_inbox_id)
+    render :show
   end
 
   def agent_bot

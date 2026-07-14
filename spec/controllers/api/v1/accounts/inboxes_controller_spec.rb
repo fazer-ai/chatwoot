@@ -447,6 +447,58 @@ RSpec.describe 'Inboxes API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/{account.id}/inboxes/provision_simulator' do
+    # Fresh env_test accounts auto-provision a simulator inbox via
+    # after_commit; force :production so the endpoint has an empty state
+    # to act on, matching the real product target (prod accounts that
+    # never got the auto-hook).
+    let(:prod_account) { create(:account, environment: :production) }
+    let(:prod_admin) { create(:user, account: prod_account, role: :administrator) }
+    let(:prod_agent) { create(:user, account: prod_account, role: :agent) }
+
+    it 'refuses unauthenticated callers' do
+      post "/api/v1/accounts/#{prod_account.id}/inboxes/provision_simulator"
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'refuses agents (needs administrator or manager)' do
+      post "/api/v1/accounts/#{prod_account.id}/inboxes/provision_simulator",
+           headers: prod_agent.create_new_auth_token,
+           as: :json
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'creates a Simulador channel + inbox and returns the inbox payload' do
+      expect(prod_account.simulator_inbox_id).to be_nil
+
+      expect do
+        post "/api/v1/accounts/#{prod_account.id}/inboxes/provision_simulator",
+             headers: prod_admin.create_new_auth_token,
+             as: :json
+      end.to change(Channel::Simulator, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      body = response.parsed_body
+      expect(body['name']).to eq('Simulador')
+      expect(prod_account.reload.simulator_inbox_id).to eq(body['id'])
+    end
+
+    it 'responds 422 when the account already has a live Simulador inbox' do
+      channel = Channel::Simulator.create!(account: prod_account)
+      inbox = prod_account.inboxes.create!(name: 'Simulador', channel: channel)
+      prod_account.update!(simulator_inbox_id: inbox.id)
+
+      expect do
+        post "/api/v1/accounts/#{prod_account.id}/inboxes/provision_simulator",
+             headers: prod_admin.create_new_auth_token,
+             as: :json
+      end.not_to change(Channel::Simulator, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to be_present
+    end
+  end
+
   describe 'PATCH /api/v1/accounts/{account.id}/inboxes/:id' do
     let(:inbox) { create(:inbox, account: account) }
 

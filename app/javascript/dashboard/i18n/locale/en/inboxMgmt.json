@@ -551,6 +551,13 @@
           "VOICE": {
             "TITLE": "Voice",
             "DESCRIPTION": "Integrate with Twilio Voice"
+          },
+          "SIMULATOR": {
+            "TITLE": "Simulator",
+            "DESCRIPTION": "Simulate AI conversations without leaving the panel",
+            "API": {
+              "ERROR_MESSAGE": "Could not create the Simulator inbox."
+            }
           }
         }
       },

@@ -2,14 +2,17 @@
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { useMapGetter } from 'dashboard/composables/store';
+import { useMapGetter, useStore } from 'dashboard/composables/store';
+import { useAlert } from 'dashboard/composables';
 
 import { useAccount } from 'dashboard/composables/useAccount';
 
+import InboxesAPI from 'dashboard/api/inboxes';
 import ChannelItem from 'dashboard/components/widgets/ChannelItem.vue';
 
 const { t } = useI18n();
 const router = useRouter();
+const store = useStore();
 const { accountId, currentAccount } = useAccount();
 
 const globalConfig = useMapGetter('globalConfig/get');
@@ -19,6 +22,13 @@ const enabledFeatures = ref({});
 const hasTiktokConfigured = computed(() => {
   return window.chatwootConfig?.tiktokAppId;
 });
+
+// Only offer the Simulador card while the account has no simulator inbox
+// yet. The card disappears the moment provisioning succeeds — the account
+// payload update flips `simulator_inbox_id` to a real id.
+const hasSimulatorInbox = computed(
+  () => !!currentAccount.value?.simulator_inbox_id
+);
 
 const channelList = computed(() => {
   const { apiChannelName } = globalConfig.value;
@@ -95,6 +105,15 @@ const channelList = computed(() => {
     icon: 'i-woot-voice',
   });
 
+  if (!hasSimulatorInbox.value) {
+    channels.push({
+      key: 'simulator',
+      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.SIMULATOR.TITLE'),
+      description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.SIMULATOR.DESCRIPTION'),
+      icon: 'i-woot-website',
+    });
+  }
+
   return channels;
 });
 
@@ -102,7 +121,31 @@ const initializeEnabledFeatures = async () => {
   enabledFeatures.value = currentAccount.value.features;
 };
 
+// Simulator has no config to gather — the click provisions the inbox
+// directly and jumps to the same "add agents" step the other channels
+// land on after their form. Frontend also refreshes the account record so
+// the card hides on the very next visit.
+const provisionSimulator = async () => {
+  try {
+    const { data } = await InboxesAPI.provisionSimulator();
+    await store.dispatch('accounts/get');
+    router.replace({
+      name: 'settings_inboxes_add_agents',
+      params: { page: 'new', inbox_id: data.id },
+    });
+  } catch (error) {
+    useAlert(
+      error?.response?.data?.error ||
+        t('INBOX_MGMT.ADD.AUTH.CHANNEL.SIMULATOR.API.ERROR_MESSAGE')
+    );
+  }
+};
+
 const initChannelAuth = channel => {
+  if (channel === 'simulator') {
+    provisionSimulator();
+    return;
+  }
   const params = {
     sub_page: channel,
     accountId: accountId.value,
