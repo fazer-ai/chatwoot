@@ -228,22 +228,16 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
     clear_unread_conversation_counts_cache
   end
 
-  private
-
-  def notify_creation
-    Rails.configuration.dispatcher.dispatch(ACCOUNT_CREATED, Time.zone.now, account: self)
-  end
-
-  def setup_internal_chat
-    InternalChat::DefaultChannelSetupService.new(account: self).perform
-  end
-
   # Provisions the "Simulador" inbox the WhatsApp simulator widget will talk
   # to. Idempotent: skips when there's already a cached `simulator_inbox_id`
   # pointing at a live inbox (an account that flips test→prod→test keeps its
   # original inbox + history). When the cached id is stale (inbox manually
   # deleted), we silently reprovision so the simulator never breaks for the
   # user opening the banner button.
+  #
+  # Public so Super Admin's "Provisionar inbox do Simulador" button can
+  # trigger it for prod accounts that don't get the `env_test`
+  # auto-provisioning but still want a simulator for QA / demos.
   def ensure_simulator_inbox!
     return if simulator_inbox_id.present? && Inbox.exists?(id: simulator_inbox_id)
 
@@ -254,6 +248,16 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
       update_column(:simulator_inbox_id, inbox.id)
       # rubocop:enable Rails/SkipsModelValidations
     end
+  end
+
+  private
+
+  def notify_creation
+    Rails.configuration.dispatcher.dispatch(ACCOUNT_CREATED, Time.zone.now, account: self)
+  end
+
+  def setup_internal_chat
+    InternalChat::DefaultChannelSetupService.new(account: self).perform
   end
 
   def clear_unread_conversation_counts_cache
