@@ -28,16 +28,16 @@ class Integrations::Clickup::CreateTaskJob < ApplicationJob
   private
 
   def create_clickup_task(client, ticket)
+    # Description stays empty on purpose: the full `relatar_problema`
+    # already rides on the "Relatar o Problema" custom field, and the
+    # title carries the truncated excerpt for scanning. Repeating it on
+    # the description was product noise the ops team asked us to drop.
     client.create_task(
       list_id: Integrations::Clickup::FieldMap::FEEDBACK_LIST_ID,
       name: build_task_name(ticket),
-      description: build_task_description(ticket),
+      description: '',
       custom_fields: build_custom_fields(ticket)
     )
-  end
-
-  def build_task_description(ticket)
-    ticket.relatar_problema.to_s
   end
 
   def apply_clickup_response(ticket, response)

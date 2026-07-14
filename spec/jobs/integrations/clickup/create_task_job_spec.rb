@@ -95,17 +95,17 @@ RSpec.describe Integrations::Clickup::CreateTaskJob do
         .to eq(Integrations::Clickup::FieldMap::CONTEXTO_OPTIONS[:mensagem])
     end
 
-    # The ticket id used to be prefixed on the description as
-    # `TicketId = <n>` while the ClickUp board didn't have a dedicated
-    # number field. Now it rides in the "ID" custom field, so the
-    # description carries only the operator's problem report.
-    it 'sends the description as the raw problem report — no TicketId prefix' do
+    # ClickUp task description is intentionally blank now — ops asked us
+    # to drop the duplicated `relatar_problema` (the title already carries
+    # the truncated excerpt, and the "Relatar o Problema" custom field
+    # already carries the full text).
+    it 'sends an empty description — the problem report already rides on title + custom field' do
       captured = stub_capture_create_task
       ticket.update!(relatar_problema: 'A IA respondeu em outro idioma')
 
       described_class.new.perform(ticket.id)
 
-      expect(captured[:description]).to eq('A IA respondeu em outro idioma')
+      expect(captured[:description]).to eq('')
     end
 
     it 'sends the aurischat deeplink pointing at the exact message so ops can jump straight in' do
