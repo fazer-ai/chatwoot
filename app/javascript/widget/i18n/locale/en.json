@@ -10,9 +10,6 @@
     "MESSAGE_BUBBLE": {
       "RETRY": "Send message again",
       "ERROR_MESSAGE": "Couldn't send, try again"
-    },
-    "SIMULATOR_FEEDBACK": {
-      "OPEN_BUTTON": "Send feedback on this message"
     }
   },
   "THUMBNAIL": {
@@ -108,11 +105,6 @@
     "PLACEHOLDER": "Search emojis",
     "NOT_FOUND": "No emoji match your search",
     "ARIA_LABEL": "Emoji picker"
-  },
-  "EMOJI_ICON_PICKER": {
-    "SEARCH_EMOJI": "Search emoji…",
-    "FREQUENTLY_USED": "Frequently used",
-    "NO_EMOJI": "No emoji match your search"
   },
   "CSAT": {
     "TITLE": "Rate your conversation",
