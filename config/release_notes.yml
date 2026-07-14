@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.41.12
+  published_at: '2026-07-14T02:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.12
+  notes:
+    en: |-
+      Bug fixes and internal improvements.
+    pt_BR: |-
+      Correções de bugs e melhorias internas.
 - tag: v4.15.1-auris.1.41.11
   published_at: '2026-07-13T22:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.11
@@ -285,25 +293,3 @@
       - **Ver e encerrar sessões abertas.** No seu perfil, você vê em quais dispositivos está logada e pode desconectar de qualquer um.
       - **Sessões do celular aparecem com o nome certo.** Antes ficava "Dispositivo desconhecido"; agora mostra "AurisChat Mobile".
       - **Central de ajuda mais rica.** Categorias com ícone/emoji, imagens redimensionáveis em artigos, mover vários artigos de categoria de uma vez.
-- tag: v4.14.0-auris.1.38.1
-  published_at: '2026-07-06T18:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **The enable/disable AI button for bulk conversations works again.** Before, clicking it did nothing. Now the menu opens correctly and you can apply the change to all selected conversations.
-      - **Unassign labels from several conversations at once.** Select the conversations, use the new button, and pick which labels to remove.
-
-      ### ⚡ Improvements
-
-      - **Unassign label on Contacts is clearer.** The icon is now different from "Assign label" (so you don't confuse the two) and the list only shows labels actually present on the selected contacts.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **O botão para ligar/desligar a IA em várias conversas voltou a funcionar.** Antes você clicava e nada acontecia. Agora o menu aparece direitinho e você aplica para todas.
-      - **Desatribuir etiquetas em várias conversas de uma vez.** Selecione as conversas, use o novo botão e escolha quais etiquetas remover.
-
-      ### ⚡ Melhorias
-
-      - **Nos contatos, desatribuir rótulo ficou mais claro.** O ícone agora é diferente do "atribuir rótulo" (não confunde mais os dois botões) e a lista só mostra rótulos que realmente estão nos contatos selecionados.
