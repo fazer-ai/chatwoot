@@ -396,4 +396,33 @@ RSpec.describe Inbox do
       end
     end
   end
+
+  # Product ask: deleting the Simulador inbox must let the operator open a
+  # new one from Settings → Novo. The front-end hides the card while
+  # `accounts.simulator_inbox_id` is present, so leaving a stale reference
+  # traps the account with no simulator and no way to recreate it.
+  describe 'clearing the account simulator_inbox_id on destroy' do
+    let(:prod_account) { create(:account, environment: :production) }
+
+    it 'nulls the FK when the simulator inbox itself is destroyed' do
+      channel = Channel::Simulator.create!(account: prod_account)
+      inbox = prod_account.inboxes.create!(name: 'Simulador', channel: channel)
+      prod_account.update!(simulator_inbox_id: inbox.id)
+
+      inbox.destroy!
+
+      expect(prod_account.reload.simulator_inbox_id).to be_nil
+    end
+
+    it 'does not touch the FK when an unrelated inbox on the same account is destroyed' do
+      simulator_channel = Channel::Simulator.create!(account: prod_account)
+      simulator_inbox = prod_account.inboxes.create!(name: 'Simulador', channel: simulator_channel)
+      prod_account.update!(simulator_inbox_id: simulator_inbox.id)
+
+      other = create(:inbox, account: prod_account)
+      other.destroy!
+
+      expect(prod_account.reload.simulator_inbox_id).to eq(simulator_inbox.id)
+    end
+  end
 end

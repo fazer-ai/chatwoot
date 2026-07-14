@@ -81,6 +81,12 @@ class Inbox < ApplicationRecord
   enum sender_name_type: { friendly: 0, professional: 1 }
 
   after_destroy :delete_round_robin_agents
+  # Keep `accounts.simulator_inbox_id` truthful when the Simulador inbox is
+  # deleted. Without this, the account payload keeps advertising a
+  # simulator_inbox_id that points nowhere — the Novo Inbox screen hides
+  # the "Simulador" card (because a value is present) even though there's
+  # nothing there, and the operator can't recreate it from the UI.
+  after_destroy :clear_simulator_inbox_reference
 
   after_create_commit :dispatch_create_event
   after_update_commit :dispatch_update_event
@@ -255,6 +261,12 @@ class Inbox < ApplicationRecord
 
   def delete_round_robin_agents
     ::AutoAssignment::InboxRoundRobinService.new(inbox: self).clear_queue
+  end
+
+  def clear_simulator_inbox_reference
+    return unless account&.simulator_inbox_id == id
+
+    account.update_column(:simulator_inbox_id, nil) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def check_channel_type?
