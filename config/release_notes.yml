@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.11
+  published_at: '2026-07-13T22:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.11
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Ticket detail closes after sending "Add more information".** After you hit "Send" on the extra context, the ticket window closes automatically instead of staying open.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Detalhe do ticket fecha depois de enviar "Adicionar mais informação".** Depois que você clica em "Enviar" na informação extra, a janela do ticket fecha sozinha.
 - tag: v4.15.1-auris.1.41.10
   published_at: '2026-07-13T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.10
@@ -295,29 +307,3 @@
       ### ⚡ Melhorias
 
       - **Nos contatos, desatribuir rótulo ficou mais claro.** O ícone agora é diferente do "atribuir rótulo" (não confunde mais os dois botões) e a lista só mostra rótulos que realmente estão nos contatos selecionados.
-- tag: v4.14.0-auris.1.38
-  published_at: '2026-07-06T17:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.14.0-auris.1.38
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Ad referral tag on inbound messages.** When a patient replies via a WhatsApp ad, the conversation now shows which campaign brought them in.
-      - **Message edits from the patient show up.** If the patient edits a message on WhatsApp, the edit reflects on the timeline (previous version preserved). If they delete a message, the bubble is marked as deleted.
-      - **Reply and react on internal notes.** Same shortcuts you use on regular messages now work on team notes too.
-
-      ### ⚡ Improvements
-
-      - **Brazilian phone with/without "9" no longer creates duplicate contacts.** The system reuses the existing contact regardless of the format.
-      - **When a message fails to send, the reason now appears on the bubble.**
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Etiqueta de anúncio nas mensagens que chegam.** Quando o paciente responde por um anúncio do WhatsApp, a conversa agora mostra de qual campanha ele veio.
-      - **Edição de mensagem do paciente aparece.** Se o paciente edita uma mensagem no WhatsApp, a edição reflete na timeline (versão anterior preservada). Se ele apaga, a bolha fica marcada como apagada.
-      - **Responder e reagir em anotações internas.** Os mesmos atalhos que você usa em mensagens normais agora funcionam nas notas de equipe também.
-
-      ### ⚡ Melhorias
-
-      - **Número brasileiro com/sem "9" deixa de criar contato duplicado.** O sistema reusa o contato existente independente do formato.
-      - **Quando uma mensagem falha ao enviar, o motivo agora aparece na bolha.**
