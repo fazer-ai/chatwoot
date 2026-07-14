@@ -56,6 +56,12 @@ const isActive = computed(() => {
     return props.enabledFeatures.channel_voice;
   }
 
+  // The Simulador card is always available (no account feature flag
+  // gates it). ChannelList only renders this card when the account has
+  // no simulator inbox yet, so an already-provisioned account never
+  // sees it in the first place.
+  if (key === 'simulator') return true;
+
   return [
     'website',
     'twilio',
