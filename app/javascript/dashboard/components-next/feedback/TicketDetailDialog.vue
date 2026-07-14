@@ -135,6 +135,7 @@ const submitComment = async () => {
     });
     useAlert(t('MEUS_TICKETS.DETAIL.COMMENT_SUCCESS'));
     comment.value = '';
+    dialogRef.value?.close();
   } catch (error) {
     useAlert(error?.message || t('MEUS_TICKETS.DETAIL.COMMENT_ERROR'));
   }
