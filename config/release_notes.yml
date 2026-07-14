@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.14
+  published_at: '2026-07-14T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.14
+  notes:
+    en: |-
+      ### ⚡ Improvements
+
+      - **Feedback flag now appears on messages that failed to send.** The bubbles that failed at delivery are exactly what you want to send to the AI team — the flag now shows on those too.
+    pt_BR: |-
+      ### ⚡ Melhorias
+
+      - **Bandeirinha de feedback aparece em mensagens que falharam ao enviar.** As bolhas que deram erro no envio são justamente as que você quer mandar pro time de IA — agora a bandeirinha aparece nelas também.
 - tag: v4.15.1-auris.1.41.13
   published_at: '2026-07-14T04:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.13
@@ -254,14 +266,6 @@
 - tag: v4.15.1-auris.1.39.2
   published_at: '2026-07-07T00:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.2
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
-- tag: v4.15.1-auris.1.39.1
-  published_at: '2026-07-06T23:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.1
   notes:
     en: |-
       Bug fixes and internal improvements.
