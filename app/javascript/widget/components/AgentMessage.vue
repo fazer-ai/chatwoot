@@ -139,6 +139,16 @@ export default {
     hasReplyTo() {
       return this.replyTo && (this.replyTo.content || this.replyTo.attachments);
     },
+    // Only show the AurisChat feedback flag when the widget is running
+    // inside AurisChat's simulator (SimulatorModal.vue starts the iframe
+    // with `simulator=1&clickup=1`). A regular customer embed never sees
+    // it. `simulator=1` alone is not enough — the parent also needs
+    // clickup to be wired end-to-end or the dialog would post to a
+    // dead-end.
+    canShowSimulatorFeedback() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('simulator') === '1' && params.get('clickup') === '1';
+    },
   },
   watch: {
     message() {
@@ -159,6 +169,19 @@ export default {
     },
     toggleReply() {
       emitter.emit(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.message);
+    },
+    // Hand off the message id (server pk) to the dashboard parent frame.
+    // Same-origin postMessage is safe here — SimulatorModal filters on
+    // both `event.origin` and the payload `type` before acting on it.
+    openFeedback() {
+      window.parent?.postMessage(
+        {
+          type: 'aurischat:open-feedback',
+          messageId: this.message.id,
+          conversationId: this.message.conversation_id,
+        },
+        window.location.origin
+      );
     },
   },
 };
@@ -239,11 +262,21 @@ export default {
               </div>
             </div>
           </div>
-          <div class="flex flex-col justify-end">
+          <div class="flex flex-col justify-end gap-1">
             <MessageReplyButton
               class="transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
               @click="toggleReply"
             />
+            <button
+              v-if="canShowSimulatorFeedback"
+              type="button"
+              class="p-1 mb-1 rounded-full text-n-slate-11 bg-n-slate-3 hover:text-n-slate-12 transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
+              :title="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+              :aria-label="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+              @click="openFeedback"
+            >
+              <i class="i-lucide-flag block w-[11px] h-[11px]" />
+            </button>
           </div>
         </div>
         <p
