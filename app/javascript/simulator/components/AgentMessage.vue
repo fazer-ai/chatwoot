@@ -278,21 +278,27 @@ export default {
             class="flex flex-col items-center gap-1 self-center transition-opacity delay-75 opacity-0 group-hover:opacity-100 sm:opacity-0"
           >
             <MessageReplyButton @click="toggleReply" />
-            <MessageReactionTrigger
-              v-if="shouldDisplayAgentMessage && typeof message.id === 'number'"
-              :message-id="message.id"
-              alignment="right"
-            />
-            <button
-              v-if="canShowSimulatorFeedback && typeof message.id === 'number'"
-              type="button"
-              class="p-1 rounded-full text-n-slate-11 bg-n-slate-3 hover:text-n-slate-12"
-              :title="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
-              :aria-label="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
-              @click="openFeedback"
-            >
-              <i class="i-lucide-flag block w-[11px] h-[11px]" />
-            </button>
+            <div class="flex items-center gap-1">
+              <MessageReactionTrigger
+                v-if="
+                  shouldDisplayAgentMessage && typeof message.id === 'number'
+                "
+                :message-id="message.id"
+                alignment="right"
+              />
+              <button
+                v-if="
+                  canShowSimulatorFeedback && typeof message.id === 'number'
+                "
+                type="button"
+                class="w-7 h-7 flex items-center justify-center rounded-full bg-white text-n-slate-11 shadow-[0_1px_2px_rgba(11,20,26,0.15)] hover:text-n-slate-12"
+                :title="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+                :aria-label="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+                @click="openFeedback"
+              >
+                <i class="i-lucide-flag size-4" />
+              </button>
+            </div>
           </div>
         </div>
         <p
