@@ -143,6 +143,15 @@ export default {
     hasReplyTo() {
       return this.replyTo && (this.replyTo.content || this.replyTo.attachments);
     },
+    // Only show the AurisChat feedback flag when the simulator was booted
+    // by the dashboard with the integration wired end-to-end
+    // (SimulatorModal.vue appends `?simulator=1&clickup=1`). Without
+    // both flags the click would post to a dialog the operator can't
+    // reach or the ClickUp side would fail to accept.
+    canShowSimulatorFeedback() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('simulator') === '1' && params.get('clickup') === '1';
+    },
   },
   watch: {
     message() {
@@ -163,6 +172,19 @@ export default {
     },
     toggleReply() {
       emitter.emit(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.message);
+    },
+    // Hand off the message id (server pk) to the dashboard parent frame.
+    // Same-origin postMessage is safe here — SimulatorModal filters on
+    // both `event.origin` and the payload `type` before acting on it.
+    openFeedback() {
+      window.parent?.postMessage(
+        {
+          type: 'aurischat:open-feedback',
+          messageId: this.message.id,
+          conversationId: this.message.conversation_id,
+        },
+        window.location.origin
+      );
     },
   },
 };
@@ -261,6 +283,16 @@ export default {
               :message-id="message.id"
               alignment="right"
             />
+            <button
+              v-if="canShowSimulatorFeedback && typeof message.id === 'number'"
+              type="button"
+              class="p-1 rounded-full text-n-slate-11 bg-n-slate-3 hover:text-n-slate-12"
+              :title="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+              :aria-label="$t('COMPONENTS.SIMULATOR_FEEDBACK.OPEN_BUTTON')"
+              @click="openFeedback"
+            >
+              <i class="i-lucide-flag block w-[11px] h-[11px]" />
+            </button>
           </div>
         </div>
         <p
