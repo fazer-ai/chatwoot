@@ -465,12 +465,19 @@ const canShowFeedbackButton = computed(() => {
   if (props.private) return false;
   if (isMessageDeleted.value) return false;
   if (props.contentAttributes?.isUnsupported) return false;
-  if (props.status === MESSAGE_STATUS.FAILED) return false;
+  // Do NOT hide on FAILED — a message that never went out is often the
+  // most valuable thing to flag ("the AI answered, provider errored").
+  // The failed row already has a real Message.id (persistence happens
+  // before the outbound call), so the feedback dialog keys off it
+  // normally. In-flight PROGRESS messages don't have a stable id yet,
+  // so keep that one guarded, plus a belt-and-suspenders id check.
   if (props.status === MESSAGE_STATUS.PROGRESS) return false;
   if (props.messageType === MESSAGE_TYPES.ACTIVITY) return false;
+  if (typeof props.id !== 'number') return false;
   return (
     variant.value === MESSAGE_VARIANTS.AGENT ||
-    variant.value === MESSAGE_VARIANTS.BOT
+    variant.value === MESSAGE_VARIANTS.BOT ||
+    variant.value === MESSAGE_VARIANTS.ERROR
   );
 });
 
