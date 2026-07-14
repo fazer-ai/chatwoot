@@ -10,6 +10,9 @@
     "MESSAGE_BUBBLE": {
       "RETRY": "Enviar mensagem novamente",
       "ERROR_MESSAGE": "Não foi possível enviar, tente novamente"
+    },
+    "SIMULATOR_FEEDBACK": {
+      "OPEN_BUTTON": "Dar feedback nesta mensagem"
     }
   },
   "THUMBNAIL": {

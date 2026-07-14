@@ -26,10 +26,35 @@ const simulatorInbox = computed(() =>
 const simulatorInboxId = computed(() => simulatorInbox.value?.id);
 
 const websiteToken = computed(() => simulatorInbox.value?.website_token || '');
+// Two extra query params tell the widget it's running in AurisChat's
+// simulator (not a real customer embed) and whether the feedback flow
+// is available on this instance. The widget only shows the flag icon
+// on incoming bubbles when both are true.
+const clickupEnabled = computed(
+  () => account.value?.clickup_integration_enabled === true
+);
 const iframeSrc = computed(() => {
   if (!websiteToken.value) return '';
-  return `/simulator?website_token=${encodeURIComponent(websiteToken.value)}`;
+  const params = new URLSearchParams({
+    website_token: websiteToken.value,
+    simulator: '1',
+  });
+  if (clickupEnabled.value) params.set('clickup', '1');
+  return `/simulator?${params.toString()}`;
 });
+
+// The widget posts a message to the parent when the operator clicks
+// the flag on an AI message. Same-origin iframe → we can trust the
+// origin check + payload shape, and translate straight into the same
+// bus event the dashboard flag uses.
+const handleWidgetMessage = event => {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.type !== 'aurischat:open-feedback') return;
+  emitter.emit(BUS_EVENTS.OPEN_FEEDBACK_TICKET, {
+    messageId: event.data.messageId,
+    conversationId: event.data.conversationId,
+  });
+};
 
 // The launcher becomes a *contextual* entry point: it only appears
 // when the operator is actually viewing the Simulador inbox in the
@@ -70,10 +95,12 @@ const handleOpenEvent = () => openSimulator();
 
 onMounted(() => {
   emitter.on(BUS_EVENTS.OPEN_SIMULATOR, handleOpenEvent);
+  window.addEventListener('message', handleWidgetMessage);
 });
 
 onUnmounted(() => {
   emitter.off(BUS_EVENTS.OPEN_SIMULATOR, handleOpenEvent);
+  window.removeEventListener('message', handleWidgetMessage);
 });
 </script>
 
