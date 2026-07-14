@@ -551,6 +551,13 @@
           "VOICE": {
             "TITLE": "Voz",
             "DESCRIPTION": "Integre com o Twilio Voice"
+          },
+          "SIMULATOR": {
+            "TITLE": "Simulador",
+            "DESCRIPTION": "Simule conversas com a IA sem sair do painel",
+            "API": {
+              "ERROR_MESSAGE": "Não foi possível criar a caixa do Simulador."
+            }
           }
         }
       },

@@ -42,6 +42,10 @@ class InboxPolicy < ApplicationPolicy
     @account_user.administrator? || @account_user.manager?
   end
 
+  def provision_simulator?
+    @account_user.administrator? || @account_user.manager?
+  end
+
   def update?
     @account_user.administrator? || @account_user.manager?
   end

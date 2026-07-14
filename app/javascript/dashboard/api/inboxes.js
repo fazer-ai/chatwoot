@@ -48,6 +48,13 @@ class Inboxes extends CacheEnabledApiClient {
     return axios.post(`${this.url}/${inboxId}/sync_templates`);
   }
 
+  // Creates the Simulador inbox for the current account. Backend responds
+  // 422 if one already exists, so the ChannelList card hides itself
+  // when the account payload already carries `simulator_inbox_id`.
+  provisionSimulator() {
+    return axios.post(`${this.url}/provision_simulator`);
+  }
+
   createCSATTemplate(inboxId, template) {
     return axios.post(`${this.url}/${inboxId}/csat_template`, {
       template,
