@@ -272,6 +272,7 @@ describe ActionCableListener do
   end
 
   describe '#inbox_provider_connection_updated' do
+    let!(:manager) { create(:user, account: account, role: :manager) }
     let(:event_name) { :'inbox.provider_connection_updated' }
     let(:provider_connection) do
       { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,qr', 'error' => nil }
@@ -285,14 +286,35 @@ describe ActionCableListener do
         { inbox_id: inbox.id, provider_connection: { connection: 'connecting' }, account_id: account.id }
       )
       allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([manager.pubsub_token], anything, anything)
 
       listener.inbox_provider_connection_updated(event)
     end
 
-    it 'sends the QR code and error only to administrators' do
+    it 'sends the QR code and error to administrators' do
       allow(ActionCableBroadcastJob).to receive(:perform_later).with([agent.pubsub_token], anything, anything)
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([manager.pubsub_token], anything, anything)
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
         [admin.pubsub_token],
+        'inbox.provider_connection_updated',
+        {
+          inbox_id: inbox.id,
+          provider_connection: { connection: 'connecting', qr_data_url: 'data:image/png;base64,qr', error: nil },
+          account_id: account.id
+        }
+      )
+
+      listener.inbox_provider_connection_updated(event)
+    end
+
+    # Managers manage Baileys pairings on their account too — a regression
+    # here locks them out of the "Conectar dispositivo" modal because the
+    # QR frame never lands on their WebSocket. Mirror the admin payload.
+    it 'sends the QR code and error to managers' do
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([agent.pubsub_token], anything, anything)
+      allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [manager.pubsub_token],
         'inbox.provider_connection_updated',
         {
           inbox_id: inbox.id,
@@ -323,6 +345,7 @@ describe ActionCableListener do
           }
         )
         allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([manager.pubsub_token], anything, anything)
 
         listener.inbox_provider_connection_updated(event)
       end
@@ -347,6 +370,7 @@ describe ActionCableListener do
           }
         )
         allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([manager.pubsub_token], anything, anything)
 
         listener.inbox_provider_connection_updated(event)
       end
