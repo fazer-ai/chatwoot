@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.15
+  published_at: '2026-07-16T18:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.15
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Managers can generate the WhatsApp QR code again.** Only admins were seeing the QR when connecting a WhatsApp device. Managers now get the QR too, matching the previous behavior.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Gestores conseguem gerar o QR Code do WhatsApp de novo.** Só administradores estavam vendo o QR ao conectar um dispositivo WhatsApp. Agora gestores também recebem o QR, como funcionava antes.
 - tag: v4.15.1-auris.1.41.14
   published_at: '2026-07-14T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.14
@@ -258,14 +270,6 @@
 - tag: v4.15.1-auris.1.39.3
   published_at: '2026-07-07T15:30:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.3
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
-- tag: v4.15.1-auris.1.39.2
-  published_at: '2026-07-07T00:30:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.2
   notes:
     en: |-
       Bug fixes and internal improvements.
