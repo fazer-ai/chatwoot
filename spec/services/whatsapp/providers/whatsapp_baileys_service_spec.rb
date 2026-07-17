@@ -1157,6 +1157,31 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(Rails.logger).to have_received(:error).with('error message')
       end
     end
+
+    # CanonicalPhoneResolverService probes with a full JID
+    # ("phone@s.whatsapp.net") and warm_session's retry path does the same.
+    # Before this guard, remote_jid re-appended the suffix and baileys-api
+    # rejected the request with `{"type":"validation"}`, which the resolver
+    # swallowed and returned the un-canonicalized phone. BR numbers
+    # registered under the pre-2012 12-digit format then stopped routing
+    # outbound entirely.
+    context 'when the caller already passed a fully-suffixed jid' do
+      it 'does not append @s.whatsapp.net a second time' do
+        prefixed = "#{phone_number.delete('+')}@s.whatsapp.net"
+
+        stub_request(:post, request_path)
+          .with(headers: stub_headers(whatsapp_channel), body: { jids: [prefixed] }.to_json)
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: { data: [{ jid: prefixed, exists: true }] }.to_json
+          )
+
+        response = service.on_whatsapp(prefixed)
+
+        expect(response).to eq({ 'jid' => prefixed, 'exists' => true })
+      end
+    end
   end
 
   describe '#delete_message' do

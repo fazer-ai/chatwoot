@@ -714,6 +714,15 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def remote_jid
     return @recipient_id if @recipient_id.ends_with?('@lid')
     return @recipient_id if @recipient_id.ends_with?('@g.us')
+    # Idempotent — callers that already pass a full JID (e.g.
+    # CanonicalPhoneResolverService probing on_whatsapp with
+    # "phone@s.whatsapp.net", warm_session's retry) used to get a
+    # doubly-suffixed jid `"...@s.whatsapp.net@s.whatsapp.net"` which
+    # baileys-api rejects with `{"type":"validation"}`. That silently
+    # broke phone canonicalization at contact creation, and legacy BR
+    # numbers registered under the pre-2012 12-digit format ended up
+    # persisted as 13d, blocking outbound routing entirely.
+    return @recipient_id if @recipient_id.ends_with?('@s.whatsapp.net')
 
     "#{@recipient_id.delete('+')}@s.whatsapp.net"
   end
