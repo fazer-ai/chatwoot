@@ -141,5 +141,11 @@ RSpec.describe InternalChat::Message do
         sender: sender.push_event_data
       )
     end
+
+    it 'exposes a nil sender for messages without a sender' do
+      message = create(:internal_chat_message, sender: nil, content: 'system note')
+
+      expect(message.push_event_data[:sender]).to be_nil
+    end
   end
 end
