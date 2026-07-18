@@ -44,7 +44,11 @@ const getMessageClasses = {
 
 const primaryActor = computed(() => props.inboxItem?.primaryActor);
 const meta = computed(() => primaryActor.value?.meta);
-const assigneeMeta = computed(() => meta.value?.sender);
+// Conversations expose the sender under primaryActor.meta.sender; internal chat
+// notifications (channel primary actor) carry it on the message secondary actor.
+const assigneeMeta = computed(
+  () => meta.value?.sender || props.inboxItem?.secondaryActor?.sender || {}
+);
 const isUnread = computed(() => !props.inboxItem?.readAt);
 const inbox = computed(() => props.stateInbox);
 

@@ -51,6 +51,12 @@ export default {
             ].includes(notification.value)
       );
     },
+    // Some types (e.g. internal chat) don't support email delivery yet
+    emailNotificationTypes() {
+      return this.filteredNotificationTypes.filter(
+        notification => !notification.pushOnly
+      );
+    },
   },
   watch: {
     emailFlags(value) {
@@ -213,6 +219,7 @@ export default {
             :class="`col-span-${type === 'push' ? 3 : 2}`"
           >
             <CheckBox
+              v-if="!(type === 'email' && notification.pushOnly)"
               :value="`${type}_${notification.value}`"
               :is-checked="
                 checkFlagStatus(type, notification.value, selectedPushFlags)
@@ -230,7 +237,7 @@ export default {
       </span>
       <div class="flex flex-col gap-4">
         <div
-          v-for="(notification, index) in filteredNotificationTypes"
+          v-for="(notification, index) in emailNotificationTypes"
           :key="index"
           class="flex flex-row items-start gap-2"
         >

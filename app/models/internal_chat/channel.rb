@@ -81,6 +81,17 @@ class InternalChat::Channel < ApplicationRecord
     channel_type_dm?
   end
 
+  def push_event_data
+    {
+      id: id,
+      uuid: uuid,
+      name: name,
+      channel_type: channel_type,
+      account_id: account_id,
+      meta: {}
+    }
+  end
+
   private
 
   def generate_uuid

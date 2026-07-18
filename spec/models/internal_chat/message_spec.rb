@@ -127,4 +127,19 @@ RSpec.describe InternalChat::Message do
         .to change { channel.reload.messages_count }.by(1)
     end
   end
+
+  describe '#push_event_data' do
+    it 'exposes the message payload used as a notification secondary actor' do
+      sender = create(:user)
+      message = create(:internal_chat_message, sender: sender, content: 'hello')
+
+      expect(message.push_event_data).to eq(
+        id: message.id,
+        content: 'hello',
+        content_type: 'text',
+        internal_chat_channel_id: message.internal_chat_channel_id,
+        sender: sender.push_event_data
+      )
+    end
+  end
 end

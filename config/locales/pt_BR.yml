@@ -238,6 +238,8 @@ pt_BR:
       sla_missed_first_response: 'Meta de SLA de Primeira Resposta não alcançada para a conversa (#%{display_id})'
       sla_missed_next_response: 'Meta de SLA de Próxima Resposta não alcançada para a conversa (#%{display_id})'
       sla_missed_resolution: 'Meta de SLA de Resolução não alcançada para a conversa (#%{display_id})'
+      internal_chat_mention: 'Você foi mencionado em %{name}'
+      internal_chat_new_message: 'Nova mensagem de %{name}'
     attachment: 'Anexo'
     no_content: 'Sem conteúdo'
   conversations:
