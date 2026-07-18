@@ -76,6 +76,8 @@ RSpec.describe 'Notifications API', type: :request do
 
       it 'scopes read_all to an internal chat channel primary actor' do
         channel = create(:internal_chat_channel, :public_channel, account: account)
+        # Force a same-id collision across actor types so the test fails if read_all ignores primary_actor_type
+        notification1.update_column(:primary_actor_id, channel.id) # rubocop:disable Rails/SkipsModelValidations
         message = create(:internal_chat_message, account: account, channel: channel)
         channel_notification = create(:notification, account: account, user: admin, notification_type: 'internal_chat_mention',
                                                      primary_actor: channel, secondary_actor: message)

@@ -45,6 +45,8 @@ export default {
         unreadCount: this.meta.unreadCount,
       });
 
+      if (!primaryActor) return;
+
       if (notificationType.startsWith('internal_chat')) {
         this.$router.push({
           name:
