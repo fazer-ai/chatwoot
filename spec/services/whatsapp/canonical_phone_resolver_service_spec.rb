@@ -4,7 +4,7 @@ describe Whatsapp::CanonicalPhoneResolverService do
   let!(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false) }
 
   describe '#resolve' do
-    context 'when the number is already registered in the canonical (13d) format' do
+    context 'when the number is registered in the canonical (13d) format' do
       it 'returns the 13d form without trying the 12d alternative' do
         phone = '5531998010696'
         registered = { 'exists' => true, 'jid' => "#{phone}@s.whatsapp.net" }
@@ -21,26 +21,44 @@ describe Whatsapp::CanonicalPhoneResolverService do
       it 'normalizes to 13d and returns it' do
         phone_12d = '553198010696'
         phone_13d = '5531998010696'
-        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_13d}@s.whatsapp.net").and_return({ 'exists' => true })
+        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_13d}@s.whatsapp.net")
+                                                         .and_return({ 'exists' => true, 'jid' => "#{phone_13d}@s.whatsapp.net" })
 
         result = described_class.new(channel: whatsapp_channel, phone: phone_12d).resolve
 
-        # Brazilian normalizer turns 12d → 13d before the on_whatsapp call,
-        # so 13d is the first (and only successful) candidate here.
         expect(result).to eq(phone_13d)
       end
     end
 
-    context 'when the WhatsApp account is registered under the pre-2012 12d format' do
-      it 'returns the 12d form after the 13d candidate fails' do
-        phone_typed = '5531998010696'
-        phone_canonical = '553198010696'
-        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_typed}@s.whatsapp.net").and_return({ 'exists' => false })
-        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_canonical}@s.whatsapp.net").and_return({ 'exists' => true })
+    # Real production case: contact phone is 13d, but WhatsApp registered the
+    # account under the pre-2012 12d form. baileys-api answers `exists: true`
+    # for the 13d probe too, but its `jid` field always carries the actual
+    # routing form. Trust that — matching only on `exists` would pick 13d and
+    # WA would silently drop the outbound.
+    context 'when the 13d probe reports exists=true but the returned jid is the 12d form' do
+      it 'returns the jid body from the response, not the input phone' do
+        phone_13d = '5591984122323'
+        phone_12d = '559184122323'
+        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_13d}@s.whatsapp.net")
+                                                         .and_return({ 'exists' => true, 'jid' => "#{phone_12d}@s.whatsapp.net" })
 
-        result = described_class.new(channel: whatsapp_channel, phone: phone_typed).resolve
+        result = described_class.new(channel: whatsapp_channel, phone: phone_13d).resolve
 
-        expect(result).to eq(phone_canonical)
+        expect(result).to eq(phone_12d)
+      end
+    end
+
+    context 'when the 13d probe returns exists=false and only the 12d alternative works' do
+      it 'returns the 12d form from the alternative probe response' do
+        phone_13d = '5531998010696'
+        phone_12d = '553198010696'
+        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_13d}@s.whatsapp.net").and_return({ 'exists' => false })
+        expect(whatsapp_channel).to receive(:on_whatsapp).with("#{phone_12d}@s.whatsapp.net")
+                                                         .and_return({ 'exists' => true, 'jid' => "#{phone_12d}@s.whatsapp.net" })
+
+        result = described_class.new(channel: whatsapp_channel, phone: phone_13d).resolve
+
+        expect(result).to eq(phone_12d)
       end
     end
 
@@ -94,7 +112,8 @@ describe Whatsapp::CanonicalPhoneResolverService do
 
     it 'tolerates the leading "+" in the input' do
       phone = '+5531998010696'
-      expect(whatsapp_channel).to receive(:on_whatsapp).with('5531998010696@s.whatsapp.net').and_return({ 'exists' => true })
+      expect(whatsapp_channel).to receive(:on_whatsapp).with('5531998010696@s.whatsapp.net')
+                                                       .and_return({ 'exists' => true, 'jid' => '5531998010696@s.whatsapp.net' })
 
       result = described_class.new(channel: whatsapp_channel, phone: phone).resolve
 
