@@ -26,17 +26,32 @@ class Whatsapp::CanonicalPhoneResolverService
   def resolve
     return @phone unless baileys_channel? && brazilian_phone?
 
-    candidates = phone_candidates
-    return @phone if candidates.size <= 1
-
-    canonical = candidates.find { |candidate| phone_registered?(candidate) }
-    canonical || @phone
+    lookup_canonical_jid || @phone
   rescue StandardError => e
     Rails.logger.warn("[canonical-phone] resolve failed for #{@phone}: #{e.message}")
     @phone
   end
 
   private
+
+  # Ask WhatsApp directly which JID it associates with the (normalized)
+  # number. baileys-api returns `exists: true` for the alternate BR format
+  # too — the 13d input for a 12d-registered account still comes back as
+  # existing — but the `jid` field always carries the canonical form the
+  # server actually routes under. Trust that, not the input format.
+  def lookup_canonical_jid
+    normalized = Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer.new.normalize(@phone) || @phone
+    server_jid = registered_jid_for(normalized)
+    return server_jid if server_jid.present?
+
+    # Fallback: try the 12d alternate — some accounts register only under
+    # the legacy short form and the normalized 13d probe reports
+    # `exists: false`. Same idea, the response's `jid` wins.
+    alternate = strip_brazilian_9(normalized)
+    return nil if alternate.blank?
+
+    registered_jid_for(alternate)
+  end
 
   def baileys_channel?
     @channel.is_a?(Channel::Whatsapp) && @channel.provider == 'baileys'
@@ -46,23 +61,19 @@ class Whatsapp::CanonicalPhoneResolverService
     @phone.match?(BRAZILIAN_PHONE_REGEX)
   end
 
-  # Always return both candidates in [normalized_13d, legacy_12d] order so the
-  # 13d form is tried first — matches the format the great majority of modern
-  # WhatsApp accounts are registered under.
-  def phone_candidates
-    normalized = Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer.new.normalize(@phone)
-    alternative = strip_brazilian_9(normalized)
-    [normalized, alternative].compact.uniq
-  end
-
   def strip_brazilian_9(phone)
     return nil unless phone.match?(BRAZILIAN_13D_REGEX)
 
     "#{phone[0, 4]}#{phone[5..]}"
   end
 
-  def phone_registered?(phone)
+  # Returns the digit-only body of the JID WhatsApp reports for this phone
+  # (canonical routing form), or nil when the number isn't registered.
+  def registered_jid_for(phone)
     response = @channel.on_whatsapp("#{phone}@s.whatsapp.net")
-    response.is_a?(Hash) && response['exists'] == true
+    jid = response.is_a?(Hash) && response['exists'] == true ? response['jid'].to_s : nil
+    return nil if jid.blank?
+
+    jid.split('@').first
   end
 end
