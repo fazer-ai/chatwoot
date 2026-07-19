@@ -178,12 +178,13 @@ const markAndUpdateCount = async ({ id, primaryActorId, primaryActorType }) => {
 
 const openInternalChatChannel = async notificationItem => {
   const { primaryActor, notificationType } = notificationItem;
-  if (!primaryActor) return;
 
   useTrack(INBOX_EVENTS.OPEN_CONVERSATION_VIA_INBOX, { notificationType });
 
   try {
     await markAndUpdateCount(notificationItem);
+    // Stale record without actor data: still mark it read, but there's nowhere to navigate.
+    if (!primaryActor) return;
     router.push({
       name:
         primaryActor.channelType === 'dm'
