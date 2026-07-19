@@ -39,11 +39,14 @@ class NotificationBuilder
     )
   end
 
-  # Non-conversation actors (e.g. internal chat channels) have no contact to block.
+  # Resolve the conversation the same way user_can_access_conversation? does, so message actors
+  # from blocked contacts stay suppressed. Non-conversation actors (e.g. internal chat channels)
+  # have no conversation/contact to block.
   def blocked_conversation?
-    return false unless primary_actor.is_a?(Conversation)
+    conversation = primary_actor.is_a?(Conversation) ? primary_actor : primary_actor.try(:conversation)
+    return false if conversation.blank?
 
-    primary_actor.contact.blocked? && notification_type != 'conversation_mention'
+    conversation.contact.blocked? && notification_type != 'conversation_mention'
   end
 
   def user_can_access_conversation?
