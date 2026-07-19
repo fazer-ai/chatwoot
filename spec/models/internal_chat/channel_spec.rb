@@ -137,5 +137,11 @@ RSpec.describe InternalChat::Channel do
         meta: {}
       )
     end
+
+    it 'exposes the dm channel_type and nil name for direct messages' do
+      channel = create(:internal_chat_channel, :dm)
+
+      expect(channel.push_event_data).to include(channel_type: 'dm', name: nil)
+    end
   end
 end
