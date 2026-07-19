@@ -168,7 +168,9 @@
       "conversation_mention": "Menção",
       "sla_missed_first_response": "SLA não alcançado",
       "sla_missed_next_response": "SLA não alcançado",
-      "sla_missed_resolution": "SLA não alcançado"
+      "sla_missed_resolution": "SLA não alcançado",
+      "internal_chat_mention": "Menção",
+      "internal_chat_new_message": "Mensagem direta"
     }
   },
   "NETWORK": {

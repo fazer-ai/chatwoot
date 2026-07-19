@@ -123,4 +123,25 @@ RSpec.describe InternalChat::Channel do
       end
     end
   end
+
+  describe '#push_event_data' do
+    it 'exposes the fields needed to route and render a notification' do
+      channel = create(:internal_chat_channel, :public_channel, name: 'general')
+
+      expect(channel.push_event_data).to eq(
+        id: channel.id,
+        uuid: channel.uuid,
+        name: 'general',
+        channel_type: 'public_channel',
+        account_id: channel.account_id,
+        meta: {}
+      )
+    end
+
+    it 'exposes the dm channel_type and nil name for direct messages' do
+      channel = create(:internal_chat_channel, :dm)
+
+      expect(channel.push_event_data).to include(channel_type: 'dm', name: nil)
+    end
+  end
 end

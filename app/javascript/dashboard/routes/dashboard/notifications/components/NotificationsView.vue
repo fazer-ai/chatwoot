@@ -27,11 +27,11 @@ export default {
       window.history.pushState({}, null, `${this.$route.path}?page=${page}`);
       this.$store.dispatch('notifications/get', { page });
     },
-    openConversation(notification) {
+    openNotification(notification) {
       const {
         primary_actor_id: primaryActorId,
         primary_actor_type: primaryActorType,
-        primary_actor: { id: conversationId },
+        primary_actor: primaryActor,
         notification_type: notificationType,
       } = notification;
 
@@ -45,8 +45,24 @@ export default {
         unreadCount: this.meta.unreadCount,
       });
 
+      if (!primaryActor) return;
+
+      if (notificationType.startsWith('internal_chat')) {
+        this.$router.push({
+          name:
+            primaryActor.channel_type === 'dm'
+              ? 'internal_chat_dm'
+              : 'internal_chat_channel',
+          params: {
+            accountId: this.accountId,
+            channelId: primaryActor.id,
+          },
+        });
+        return;
+      }
+
       this.$router.push(
-        `/app/accounts/${this.accountId}/conversations/${conversationId}`
+        `/app/accounts/${this.accountId}/conversations/${primaryActor.id}`
       );
     },
     onMarkAllDoneClick() {
@@ -64,7 +80,7 @@ export default {
         :notifications="records"
         :is-loading="uiFlags.isFetching"
         :is-updating="uiFlags.isUpdating"
-        :on-click-notification="openConversation"
+        :on-click-notification="openNotification"
         :on-mark-all-done-click="onMarkAllDoneClick"
       />
       <TableFooter

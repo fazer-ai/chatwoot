@@ -45,6 +45,29 @@ export default {
   },
   methods: {
     dynamicTime,
+    isInternalChat(notification) {
+      return notification.notification_type?.startsWith('internal_chat');
+    },
+    notificationTitle(notification) {
+      if (this.isInternalChat(notification)) {
+        const channel = notification.primary_actor;
+        if (channel?.channel_type !== 'dm' && channel?.name) {
+          return `#${channel.name}`;
+        }
+        return notification.secondary_actor?.sender?.name || '';
+      }
+      return `#${
+        notification.primary_actor
+          ? notification.primary_actor.id
+          : this.$t('NOTIFICATIONS_PAGE.DELETE_TITLE')
+      }`;
+    },
+    notificationAvatar(notification) {
+      if (this.isInternalChat(notification)) {
+        return notification.secondary_actor?.sender;
+      }
+      return notification.primary_actor?.meta?.assignee;
+    },
   },
 };
 </script>
@@ -82,13 +105,7 @@ export default {
               class="overflow-hidden flex-view notification-contant--wrap whitespace-nowrap text-ellipsis"
             >
               <h5 class="notification--title">
-                {{
-                  `#${
-                    notificationItem.primary_actor
-                      ? notificationItem.primary_actor.id
-                      : $t(`NOTIFICATIONS_PAGE.DELETE_TITLE`)
-                  }`
-                }}
+                {{ notificationTitle(notificationItem) }}
               </h5>
               <span
                 class="overflow-hidden notification--message-title whitespace-nowrap text-ellipsis"
@@ -108,10 +125,10 @@ export default {
           </td>
           <td class="thumbnail--column">
             <Avatar
-              v-if="notificationItem.primary_actor.meta.assignee"
-              :src="notificationItem.primary_actor.meta.assignee.thumbnail"
+              v-if="notificationAvatar(notificationItem)"
+              :src="notificationAvatar(notificationItem).thumbnail"
               :size="28"
-              :name="notificationItem.primary_actor.meta.assignee.name"
+              :name="notificationAvatar(notificationItem).name"
               rounded-full
             />
           </td>
