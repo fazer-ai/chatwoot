@@ -215,6 +215,25 @@ describe ContactInboxBuilder do
 
           expect(contact.reload.phone_number).to eq('+5531998010696')
         end
+
+        # The pencil (ContactsController#create) hands `source_id: <digits>`
+        # to the builder. Before, `@source_id ||= generate_source_id` skipped
+        # the resolver entirely for that path, and BR contacts on pre-2012
+        # accounts stayed on the 13d form — outbound stopped at "sent".
+        it 'runs the resolver and rewrites source_id even when the caller pre-computes it' do
+          contact.update!(phone_number: '+5591984122323')
+          resolver = instance_double(Whatsapp::CanonicalPhoneResolverService, resolve: '559184122323')
+          allow(Whatsapp::CanonicalPhoneResolverService).to receive(:new).and_return(resolver)
+
+          contact_inbox = described_class.new(
+            contact: contact,
+            inbox: baileys_inbox,
+            source_id: '5591984122323'
+          ).perform
+
+          expect(contact.reload.phone_number).to eq('+559184122323')
+          expect(contact_inbox.source_id).to eq('559184122323')
+        end
       end
     end
 

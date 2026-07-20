@@ -5,6 +5,14 @@ class ContactInboxBuilder
   pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false }]
 
   def perform
+    # Baileys always needs the canonical BR phone form for outbound routing,
+    # regardless of whether the caller pre-computed a source_id. When the
+    # pencil flow (ContactsController#create) passes an explicit
+    # `source_id: <digits>`, the previous `||=` skipped `generate_source_id`
+    # — which is where `wa_source_id` runs `resolve_canonical_phone_for_baileys`
+    # — so the contact stayed on the 13d input and outbound messages to
+    # pre-2012 accounts silently stopped at "sent".
+    force_baileys_canonical_source_id if baileys_wa_channel?
     @source_id ||= generate_source_id
     create_contact_inbox if source_id.present?
   end
@@ -55,7 +63,7 @@ class ContactInboxBuilder
   end
 
   def resolve_canonical_phone_for_baileys
-    return unless @inbox.channel.is_a?(Channel::Whatsapp) && @inbox.channel.provider == 'baileys'
+    return unless baileys_wa_channel?
 
     canonical = Whatsapp::CanonicalPhoneResolverService.new(
       channel: @inbox.channel,
@@ -65,6 +73,20 @@ class ContactInboxBuilder
     return if canonical.blank? || canonical == @contact.phone_number.delete('+')
 
     @contact.update!(phone_number: "+#{canonical}")
+  end
+
+  def baileys_wa_channel?
+    @inbox.channel_type == 'Channel::Whatsapp' &&
+      @inbox.channel.provider == 'baileys' &&
+      @contact.phone_number.present?
+  end
+
+  # Runs the resolver + rewrites `@source_id` from the canonical phone,
+  # even if the caller pre-computed one. Called only for Baileys WA where
+  # source_id == phone digits by convention.
+  def force_baileys_canonical_source_id
+    resolve_canonical_phone_for_baileys
+    @source_id = @contact.phone_number.delete('+').to_s
   end
 
   def twilio_source_id
