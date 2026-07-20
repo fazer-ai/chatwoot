@@ -1,4 +1,16 @@
 ---
+- tag: v4.15.1-auris.1.41.18
+  published_at: '2026-07-20T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.18
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **Messages sent from the "New conversation" pencil no longer stay stuck on "sent".** The previous fixes handled contacts created via inbound messages; this covers contacts created directly from the pencil, which had a separate creation path that skipped the phone canonicalization.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Mensagens enviadas pelo lápis de "Nova conversa" não travam mais em "enviada".** As correções anteriores pegaram contatos criados por mensagem recebida; essa cobre contatos criados direto pelo lápis, que tinham um caminho de criação separado que pulava a canonicalização do telefone.
 - tag: v4.15.1-auris.1.41.17
   published_at: '2026-07-19T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.17
@@ -275,11 +287,3 @@
       ### ✨ Novidades
 
       - **Baixar histórico da conversa em PDF.** Nos três pontinhos da conversa, clica em "Baixar transcrição (PDF)" e o arquivo cai no seu computador. Dá pra salvar, imprimir ou anexar em outro lugar.
-- tag: v4.15.1-auris.1.39.5
-  published_at: '2026-07-07T22:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.39.5
-  notes:
-    en: |-
-      Bug fixes and internal improvements.
-    pt_BR: |-
-      Correções de bugs e melhorias internas.
