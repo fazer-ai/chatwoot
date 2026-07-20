@@ -55,16 +55,7 @@ class Account < ApplicationRecord
   store_accessor :settings, :reporting_timezone
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :captain_auto_resolve_mode
-  store_accessor :settings, :hide_agent_unassigned_tab, :hide_agent_all_tab
-  before_validation :enforce_agent_assignee_tabs_constraint
-
-  def hide_agent_unassigned_tab=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def hide_agent_all_tab=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
+  include AccountAgentRestrictions
 
   include AccountCaptainAutoResolve
 
@@ -220,10 +211,6 @@ class Account < ApplicationRecord
     return if reporting_timezone.blank? || ActiveSupport::TimeZone[reporting_timezone].present?
 
     errors.add(:reporting_timezone, I18n.t('errors.account.reporting_timezone.invalid'))
-  end
-
-  def enforce_agent_assignee_tabs_constraint
-    self.hide_agent_all_tab = true if hide_agent_unassigned_tab
   end
 
   def validate_support_email_format

@@ -326,6 +326,30 @@ RSpec.describe Account do
       end
     end
 
+    context 'when toggling agent message deletion' do
+      it 'casts form input to boolean' do
+        account.disable_agent_message_deletion = '1'
+        expect(account.disable_agent_message_deletion).to be true
+
+        account.disable_agent_message_deletion = '0'
+        expect(account.disable_agent_message_deletion).to be false
+      end
+
+      it 'persists across save with the schema validator passing' do
+        account.update!(disable_agent_message_deletion: 'true')
+        reloaded = described_class.find(account.id)
+
+        expect(reloaded.disable_agent_message_deletion).to be true
+        expect(reloaded.settings['disable_agent_message_deletion']).to be true
+      end
+
+      it 'rejects non-boolean values via the JSON schema validator' do
+        account.settings = { disable_agent_message_deletion: 'maybe' }
+        expect(account).to be_invalid
+        expect(account.errors.messages).to have_key(:disable_agent_message_deletion)
+      end
+    end
+
     context 'when using with_auto_resolve scope' do
       it 'finds accounts with auto_resolve_after set' do
         account.update!(auto_resolve_after: 40 * 24 * 60)

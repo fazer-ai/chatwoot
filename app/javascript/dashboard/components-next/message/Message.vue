@@ -4,6 +4,7 @@ import { useTimeoutFn } from '@vueuse/core';
 import { provideMessageContext } from './provider.js';
 import { useTrack } from 'dashboard/composables';
 import { useMapGetter } from 'dashboard/composables/store';
+import { useAccount } from 'dashboard/composables/useAccount';
 import { emitter } from 'shared/helpers/mitt';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -11,6 +12,10 @@ import { LocalStorage } from 'shared/helpers/localStorage';
 import { ACCOUNT_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
+import {
+  canDeleteMessages,
+  getUserRole,
+} from 'dashboard/helper/permissionsHelper.js';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   MESSAGE_TYPES,
@@ -160,6 +165,17 @@ const inboxGetter = useMapGetter('inboxes/getInbox');
 const inbox = computed(() => inboxGetter.value(props.inboxId) || {});
 const router = useRouter();
 const { replaceInstallationName } = useBranding();
+const { accountId: currentAccountId, currentAccount } = useAccount();
+const currentUser = useMapGetter('getCurrentUser');
+
+// Mirrors `MessagePolicy#destroy?`: hiding the option is a convenience, the
+// endpoint enforces the same rule.
+const canDeleteMessage = computed(() =>
+  canDeleteMessages({
+    userRole: getUserRole(currentUser.value, currentAccountId.value),
+    accountSettings: currentAccount.value?.settings || {},
+  })
+);
 
 /**
  * Computes the message variant based on props
@@ -420,6 +436,7 @@ const contextMenuEnabledOptions = computed(() => {
   return {
     copy: hasText,
     delete:
+      canDeleteMessage.value &&
       (hasText || hasAttachments || hasRichContent) &&
       !isFailedOrProcessing &&
       !isMessageDeleted.value,

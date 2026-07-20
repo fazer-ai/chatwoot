@@ -98,3 +98,22 @@ export const getVisibleAssigneeTabPermissions = ({
     ...(hideAll ? {} : { all }),
   };
 };
+
+/**
+ * Resolves whether the user may delete messages, applying the account-level
+ * toggle that blocks deletion for basic agents. Admins and custom roles are
+ * never affected.
+ *
+ * The UI gate mirrors `MessagePolicy#destroy?` — hiding the option is a
+ * convenience, the endpoint enforces the same rule.
+ *
+ * @param {Object} params
+ * @param {String} params.userRole - Resolved user role for the account.
+ * @param {Object} [params.accountSettings] - Account settings holding the toggle.
+ * @returns {Boolean} Whether message deletion is allowed.
+ */
+export const canDeleteMessages = ({ userRole, accountSettings = {} } = {}) => {
+  if (userRole !== 'agent') return true;
+
+  return !accountSettings.disable_agent_message_deletion;
+};

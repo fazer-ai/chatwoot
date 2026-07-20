@@ -4,6 +4,7 @@ import {
   hasPermissions,
   filterItemsByPermission,
   getVisibleAssigneeTabPermissions,
+  canDeleteMessages,
 } from '../permissionsHelper';
 import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions';
 
@@ -224,5 +225,37 @@ describe('#getVisibleAssigneeTabPermissions', () => {
     });
 
     expect(Object.keys(result)).toEqual(['me']);
+  });
+});
+
+describe('#canDeleteMessages', () => {
+  const blocked = { disable_agent_message_deletion: true };
+
+  it('allows agents when the toggle is off', () => {
+    expect(canDeleteMessages({ userRole: 'agent', accountSettings: {} })).toBe(
+      true
+    );
+  });
+
+  it('blocks agents when the toggle is on', () => {
+    expect(
+      canDeleteMessages({ userRole: 'agent', accountSettings: blocked })
+    ).toBe(false);
+  });
+
+  it('allows administrators even when the toggle is on', () => {
+    expect(
+      canDeleteMessages({ userRole: 'administrator', accountSettings: blocked })
+    ).toBe(true);
+  });
+
+  it('allows custom roles even when the toggle is on', () => {
+    expect(
+      canDeleteMessages({ userRole: 'custom_role', accountSettings: blocked })
+    ).toBe(true);
+  });
+
+  it('allows deletion when called without arguments', () => {
+    expect(canDeleteMessages()).toBe(true);
   });
 });
