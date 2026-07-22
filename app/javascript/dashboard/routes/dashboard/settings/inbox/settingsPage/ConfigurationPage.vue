@@ -222,7 +222,7 @@ export default {
         // User dismissed the Meta popup without completing signup.
         if (!credentials) return;
 
-        await whatsappChannel.reauthorizeWhatsApp({
+        await whatsappChannel.postEmbeddedSignupAuthorization({
           inboxId: this.inbox.id,
           ...credentials,
         });

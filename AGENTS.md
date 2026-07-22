@@ -146,8 +146,9 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Account-level toggles: do NOT extend `config/features.yml`
 
-- `Account#feature_flags` is a `bigint` driven by FlagShihTzu, with each YAML entry mapped to bit position `index` (0-based). Signed bigint can only hold bits 0..63. Adding a 65th entry produces values >= 2^64 that overflow the column on write and silently break high-bit features.
-- `chatwoot-pro-main` already inserts `kanban` and `internal_chat_pro` mid-list, pushing upstream features to bits 60+. After merging into Pro, any new flag added on `main` lands at an even higher bit, accelerating the overflow. The `Featurable.feature_flag_value` helper applies a two's-complement workaround that only fixes manual SQL queries (`feature_flags & ? != 0`); it does NOT fix the FlagShihTzu write path used by the superadmin form.
+- Since upstream 4.16.0, account feature flags are multi-column: `Featurable::FEATURE_FLAG_COLUMNS` maps `config/features.yml` entries to `accounts.feature_flags` (default) or `accounts.feature_flags_ext_1` via each entry's `column:` key, with a hard cap of 63 flags per bigint column enforced at boot (`validate_feature_count!` raises). The default column is FULL (63/63) — any new upstream-style flag MUST set `column: feature_flags_ext_1` and be appended at the end.
+- Bit positions are persisted per column: never reorder or remove existing entries, and never change an existing feature's `column` after release.
+- `chatwoot-pro-main` inserts `kanban` and `internal_chat_pro` mid-list in the DEFAULT column. With the 63-per-column boot validation, the next CE→Pro merge will raise `ArgumentError` at boot until Pro's extra flags move to `feature_flags_ext_1` — and moving them changes their persisted bit positions on Pro installs, so that migration must remap existing account values.
 - Local DB pitfall: bit positions differ between `main` and `chatwoot-pro-main` because of the kanban/internal_chat_pro insertion. The same bit set on one branch maps to a different feature on the other. Use separate dev DBs per branch or reset `feature_flags` when switching.
 
 For NEW account-level toggles, prefer the `settings` jsonb column instead of `feature_flags`:
