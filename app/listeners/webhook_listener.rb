@@ -186,6 +186,8 @@ class WebhookListener < BaseListener
   end
 
   def deliver_account_webhooks(payload, account)
+    return unless account.api_and_webhooks_enabled?
+
     account.webhooks.account_type.each do |webhook|
       next unless webhook.subscriptions.include?(payload[:event])
       next if payload[:inbox].present? && webhook.inbox_id.present? && webhook.inbox_id != payload[:inbox][:id]

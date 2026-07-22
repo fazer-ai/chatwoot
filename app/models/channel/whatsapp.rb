@@ -44,6 +44,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   has_one :inbox, as: :channel, dependent: :destroy
 
   after_create :sync_templates
+  after_update_commit :log_credentials_transfer, if: :saved_change_to_provider_config?
   before_destroy :teardown_webhooks
   before_destroy :disconnect_channel_provider, if: -> { provider_service.respond_to?(:disconnect_channel_provider) }
   after_commit :setup_webhooks, on: :create, if: :should_auto_setup_webhooks?
@@ -123,6 +124,13 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     rescue StandardError => e
       Rails.logger.warn "[WHATSAPP CALL] disable webhook re-subscribe failed: #{e.message}"
     end
+  end
+
+  # Whether the pending (unsaved) provider_config change drops the embedded_signup
+  # source marker, i.e. this save is an embedded signup → manual setup transfer.
+  def embedded_to_manual_transfer_pending?
+    before, after = provider_config_change
+    before&.dig('source') == 'embedded_signup' && after['source'] != 'embedded_signup'
   end
 
   def mark_message_templates_updated
@@ -404,6 +412,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   def validate_provider_config
     errors.add(:provider_config, 'Invalid Credentials') unless provider_service.validate_provider_config?
+  end
+
+  # Logs only the embedded signup → manual migration (the save drops the
+  # embedded_signup source marker), so credential rotations on inboxes that are
+  # already manual stay silent.
+  def log_credentials_transfer
+    before, after = saved_change_to_provider_config
+    return unless before&.dig('source') == 'embedded_signup' && after['source'] != 'embedded_signup'
+
+    Rails.logger.info("[WHATSAPP_EMBEDDED_TO_MANUAL] success account_id=#{account_id} channel_id=#{id}")
   end
 
   def perform_webhook_setup

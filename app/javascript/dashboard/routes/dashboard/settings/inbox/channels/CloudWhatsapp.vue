@@ -5,6 +5,7 @@ import { useAlert } from 'dashboard/composables';
 import { required } from '@vuelidate/validators';
 import router from '../../../../index';
 import { isPhoneE164OrEmpty, isNumber } from 'shared/helpers/Validators';
+import InboxesAPI from 'dashboard/api/inboxes';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
@@ -21,6 +22,10 @@ export default {
     inbox: {
       type: Object,
       default: null,
+    },
+    enableCallingOnComplete: {
+      type: Boolean,
+      default: false,
     },
   },
   setup() {
@@ -101,6 +106,14 @@ export default {
             },
           }
         );
+
+        if (this.enableCallingOnComplete) {
+          try {
+            await InboxesAPI.enableWhatsappCalling(whatsappChannel.id);
+          } catch (_) {
+            useAlert(this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE_FAILED'));
+          }
+        }
 
         router.replace({
           name: 'settings_inboxes_add_agents',
@@ -215,6 +228,7 @@ export default {
 
     <div class="w-full mt-4">
       <NextButton
+        :disabled="uiFlags.isCreating || uiFlags.isUpdating"
         :is-loading="uiFlags.isCreating || uiFlags.isUpdating"
         type="submit"
         solid

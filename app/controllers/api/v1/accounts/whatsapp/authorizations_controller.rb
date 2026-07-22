@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts::BaseController
+  # Reconfiguring/reauthorizing a live inbox swaps its credentials, so restrict it to admins.
+  before_action :check_admin_authorization?, if: -> { params[:inbox_id].present? }
   before_action :fetch_and_validate_inbox, if: -> { params[:inbox_id].present? }
 
   # POST /api/v1/accounts/:account_id/whatsapp/authorization
@@ -8,8 +10,10 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
     validate_embedded_signup_params!
     channel = process_embedded_signup
     render_success_response(channel.inbox)
-  rescue StandardError => e
+  rescue CustomExceptions::Inbox::LimitExceeded => e
     render_error_response(e)
+  rescue StandardError => e
+    render_embedded_signup_error(e)
   end
 
   private
@@ -29,7 +33,7 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   end
 
   def validate_reauthorization_required
-    return if @inbox.channel.reauthorization_required? || can_upgrade_to_embedded_signup?
+    return if @inbox.channel.reauthorization_required? || can_reconfigure_channel?
 
     render json: {
       success: false,
@@ -40,8 +44,14 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # Accept any WhatsApp inbox here so the embedded signup flow can drive both
   # reauth/upgrade of an existing whatsapp_cloud inbox AND provider conversion
   # from a non-cloud WhatsApp inbox (baileys, zapi, 360dialog) to cloud.
-  def can_upgrade_to_embedded_signup?
-    @inbox.channel.is_a?(Channel::Whatsapp)
+  def can_reconfigure_channel?
+    channel = @inbox.channel
+    return false unless channel.is_a?(Channel::Whatsapp)
+
+    # Reconfiguring a live embedded-signup channel requires the feature flag.
+    return Current.account.feature_enabled?('whatsapp_reconfigure') if channel.provider_config['source'] == 'embedded_signup'
+
+    true
   end
 
   def render_success_response(inbox)
@@ -55,7 +65,7 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
     render json: response
   end
 
-  def render_error_response(error)
+  def render_embedded_signup_error(error)
     Rails.logger.error "[WHATSAPP AUTHORIZATION] Embedded signup error: #{error.message}"
     Rails.logger.error error.backtrace.join("\n")
     render json: {

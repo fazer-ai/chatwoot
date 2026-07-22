@@ -42,7 +42,17 @@ RSpec.describe Channel::Whatsapp do
                    body: { data: [{
                      id: '123456789', name: 'test_template'
                    }] }.to_json)
+      stub_request(:get, 'https://graph.facebook.com/v14.0//phone_numbers?fields=id&limit=100&access_token=test_key')
+        .to_return(status: 200, body: { data: [{ id: 'random_id' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
       expect(channel.save).to be(true)
+    end
+
+    it 'validates false when phone number id is wrong' do
+      stub_request(:get, 'https://graph.facebook.com/v14.0//message_templates?access_token=test_key')
+        .to_return(status: 200, body: { data: [] }.to_json)
+      stub_request(:get, 'https://graph.facebook.com/v14.0//phone_numbers?fields=id&limit=100&access_token=test_key')
+        .to_return(status: 200, body: { data: [{ id: 'another_phone_id' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
+      expect(channel.save).to be(false)
     end
   end
 
@@ -492,6 +502,9 @@ RSpec.describe Channel::Whatsapp do
         before do
           stub_request(:delete, "https://graph.facebook.com/v22.0/#{channel.provider_config['business_account_id']}/subscribed_apps")
             .to_return(status: 200, body: '', headers: {})
+          stub_request(:post, "https://graph.facebook.com/v22.0/#{channel.provider_config['phone_number_id']}")
+            .with(body: { webhook_configuration: { override_callback_uri: '' } }.to_json)
+            .to_return(status: 200, body: '', headers: {})
         end
 
         it 'does not invoke callback' do
@@ -760,6 +773,9 @@ RSpec.describe Channel::Whatsapp do
       stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*message_templates})
         .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
       stub_request(:delete, %r{graph\.facebook\.com/v\d+\.\d+/.*/subscribed_apps})
+        .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+      stub_request(:post, %r{graph\.facebook\.com/v\d+\.\d+/\d+\z})
+        .with(body: { webhook_configuration: { override_callback_uri: '' } }.to_json)
         .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
       webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
       allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)

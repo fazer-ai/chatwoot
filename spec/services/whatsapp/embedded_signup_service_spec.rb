@@ -160,6 +160,11 @@ describe Whatsapp::EmbeddedSignupService do
         # The service does `@account.inboxes.find(id).channel`; force the chain
         # to return the same Ruby instances the test sets expectations on so
         # the message expectations actually match.
+        # Materialize the factory records before doubling `account.inboxes` —
+        # inbox creation runs Enterprise's Inbox#ensure_create_permitted, which
+        # counts inboxes through the real association.
+        baileys_inbox
+
         inbox_relation = instance_double(ActiveRecord::Relation)
         allow(account).to receive(:inboxes).and_return(inbox_relation)
         allow(inbox_relation).to receive(:find).with(baileys_inbox.id).and_return(baileys_inbox)
