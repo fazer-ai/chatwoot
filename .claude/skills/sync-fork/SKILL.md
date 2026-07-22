@@ -152,6 +152,23 @@ Fork architecture: `Attachment#normalize_opus_blob_content_type!` (lazy, called 
 
 Upstream 4.14.x extracted the public portal layout into shared partials `app/views/layouts/_portal_head.html.erb` and `_portal_scripts.html.erb`, used by both `portal.html.erb` and the new `portal.html+documentation.erb` variant. The fork's `custom_head_html`/`custom_body_html` injection lives at the END of those partials (guarded by `!@is_plain_layout_enabled`). If upstream rewrites the layouts again, re-attach the injection to whatever shared partial both variants render. Also: `show_author` must stay in `Portal::CONFIG_JSON_KEYS`, and the fork's `merged_portal_params` controller helper is GONE — upstream's model-level `normalize_config` (merges `persisted_config`) replaced it.
 
+### Feature flags went multi-column (4.16.0)
+
+Upstream 4.16.0 rearchitected `Featurable`: `FEATURE_FLAG_COLUMNS = ['feature_flags', 'feature_flags_ext_1']`, max 63 flags per bigint column **validated at boot** (`validate_feature_count!` raises), and `features.yml` entries pick their column via `column:`. The default column is FULL (63/63). Decisions locked in the 4.16.0 merge:
+
+- The fork's `Featurable.feature_flag_value` two's-complement helper was **removed** (zero call sites in CE and Pro; semantically wrong under multi-column). Don't resurrect it.
+- Keep `save!` in `enable_features!`/`disable_features!` (upstream uses non-bang `save`).
+- CE `main` made no features.yml changes, so the file stays byte-identical to upstream — verify with `git diff <merge>^2 HEAD -- config/features.yml` (must be empty). Any fork-side reorder shifts persisted bits.
+- ⚠️ **CE→Pro merge landmine:** Pro inserts `kanban` + `internal_chat_pro` mid-list in the DEFAULT column → boot now raises `ArgumentError: ... supports up to 63 features`. Pro must move its flags to `column: feature_flags_ext_1`, and because their bit positions change, that requires a data migration remapping existing Pro accounts' `feature_flags` values. Plan this BEFORE merging CE 4.16.0+ into Pro.
+
+### WhatsApp embedded signup: fork API rename + new upstream HTTP calls (4.16.0)
+
+- **JS API rename trap:** the fork renamed `whatsappChannel.reauthorizeWhatsApp` → `postEmbeddedSignupAuthorization` (same body). Upstream keeps the old name and **adds new callers with it** (4.16.0: `ConfigurationPage.vue`'s `reconfigureWhatsApp()`). Auto-merges cleanly, fails at runtime with a swallowed TypeError (no spec covers it; frontend CI stays green — only the semantic-breakage sweep caught it). After every merge: `git grep -n 'reauthorizeWhatsApp' app/javascript` must return zero hits.
+- `Whatsapp::Providers::WhatsappCloudService#validate_provider_config?` now makes **two** Meta calls: GET `message_templates` + (when `provider_config_changed?`) GET `phone_numbers` to verify the phone_number_id belongs to the WABA. Fork specs that save a cloud channel must stub BOTH (return the expected id in `data: [{ id: ... }]`).
+- `Whatsapp::WebhookTeardownService` now also clears the phone-level override: POST `graph.facebook.com/<ver>/<phone_number_id>` with `webhook_configuration.override_callback_uri: ''`. Fork specs stubbing teardown need this stub next to the `subscribed_apps` DELETE one.
+- Controller gate: `can_reconfigure_channel?` (upstream name, our body) accepts any `Channel::Whatsapp` (fork conversion flow) and requires the `whatsapp_reconfigure` feature flag only when `provider_config['source'] == 'embedded_signup'`. Keep that shape.
+- Enterprise's new `Inbox#ensure_create_permitted` runs `account.inboxes.count` in `before_create` — fork specs that `instance_double` the `account.inboxes` relation must materialize factory records BEFORE installing the double (lazy `let` inside the `allow(...).with(baileys_inbox.id)` line fires mid-stub otherwise).
+
 ### db/schema.rb
 
 Always conflicts because both sides have different migration versions. Resolution is mechanical but has traps:
@@ -311,6 +328,10 @@ For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is trigger
 3. **Missing imports after removing conflict hunks.** When resolving AI (accept incoming) conflicts in JS/Vue files, you can accidentally delete imports you still need. Example from 4.13.0: `replaceVariablesInMessage` in `ReplyBox.vue` — the `replaceText` method came in from main but its import was above the conflict. After keeping `replaceText`, add the import.
 
 4. **Duplicate `defineExpose` / `setup()` returns.** Same category: when combining both sides of a Vue component, watch for duplicate `defineExpose({ ... })` calls or duplicate keys in the `setup()` return object. Consolidate.
+
+5. **Orphan closing markers after partial hunk edits.** Editing a conflict by rewriting only the top of the hunk leaves the trailing `>>>>>>> vX.Y.Z` in place — and a sweep that greps only `<<<<<<<` reports clean (real case: 4.16.0, both `conversation.json` locales, staged and committed; caught later by a Vite JSON parse error in vitest). Sweep with all three patterns anchored at line start: `git grep -nE '^(<{7}|>{7})( |$)'` plus `^={7}$` (evaluate markdown-heading false positives), and JSON-validate every resolved .json (`python3 -c "import json; json.load(open(...))"`).
+
+6. **`gh run watch --exit-status` can lie.** In the 4.16.0 merge it exited 0 while the run concluded `failure` (frontend job). Don't trust the watch exit code — poll `gh run view <id> --json status,conclusion` and read the actual conclusion string.
 
 ## What this skill deliberately does NOT cover
 
