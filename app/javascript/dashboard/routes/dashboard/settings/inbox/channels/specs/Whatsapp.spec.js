@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { defineComponent, h, nextTick, reactive } from 'vue';
+import { defineComponent, h, nextTick, reactive, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import Whatsapp from '../Whatsapp.vue';
 
@@ -18,6 +18,16 @@ vi.mock('vue-router', async () => {
     useRouter: () => ({ push: mockPush, replace: mockReplace }),
   };
 });
+
+// useAccount reads the Vuex store; these tests mount without one. Self-hosted
+// behavior (not on cloud) keeps the embedded signup gate open, matching the
+// scenarios below.
+vi.mock('dashboard/composables/useAccount', () => ({
+  useAccount: () => ({
+    isCloudFeatureEnabled: () => false,
+    isOnChatwootCloud: ref(false),
+  }),
+}));
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual('vue-i18n');

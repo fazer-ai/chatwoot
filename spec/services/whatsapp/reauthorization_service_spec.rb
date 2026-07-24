@@ -36,10 +36,12 @@ describe Whatsapp::ReauthorizationService do
   end
 
   before do
-    # Stub the Meta Graph call that backs `validate_provider_config?` so the
+    # Stub the Meta Graph calls that back `validate_provider_config?` so the
     # save inside ReauthorizationService doesn't reach out to the network and
     # doesn't fail validation with a network error.
     stub_request(:get, %r{https://graph.facebook.com/.*/message_templates}).to_return(status: 200, body: { data: [] }.to_json)
+    stub_request(:get, %r{https://graph.facebook.com/.*/phone_numbers})
+      .to_return(status: 200, body: { data: [{ id: 'new_phone_number_id' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
   describe '#perform' do
