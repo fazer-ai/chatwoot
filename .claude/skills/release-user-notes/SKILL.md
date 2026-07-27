@@ -1,5 +1,5 @@
 ---
-name: release-notes
+name: release-user-notes
 description: Use this skill whenever you are about to cut, edit, or backfill a GitHub release for fazer-ai/chatwoot. Generates the bilingual user-notes blocks (pt-BR + en) embedded in the release body for non-technical end users. Trigger before calling `gh release create`, `gh release edit`, or any flow that touches a release body on this repo (including the `release` skill from fazer-ai-tools and any retroactive backfill of historical releases).
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
