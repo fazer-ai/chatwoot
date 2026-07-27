@@ -39,7 +39,7 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 4. Run the **Validation flow** end-to-end (it is mandatory, not optional). Do not commit if any step fails.
 5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
 6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
-7. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+7. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
 

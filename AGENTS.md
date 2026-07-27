@@ -76,7 +76,7 @@ Automate this with your worktree tool's create hook (e.g. worktrunk's `pre-start
 ## Release Notes
 
 - Every GitHub release cut from this repo must include the bilingual `user-notes` blocks (pt-BR + en) in the release body, written for non-technical end users.
-- Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-notes` skill at `.claude/skills/release-notes/SKILL.md` to draft and validate the blocks.
+- Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-user-notes` skill at `.claude/skills/release-user-notes/SKILL.md` to draft and validate the blocks.
 
 ## Commit Messages
 
