@@ -105,10 +105,26 @@ const inboxChannelType = computed(() => props.targetInbox?.channelType || '');
 
 const voiceCallEnabled = computed(() => isVoiceCallEnabled(props.targetInbox));
 
+// Template-based WhatsApp flows (Cloud, Twilio) compose the content from the
+// template, so `message` stays optional there. Free-form WhatsApp providers
+// (Baileys, Z-API) send exactly what the form holds: without text nor an
+// attachment the backend would create an empty message that the provider
+// flags as unsupported, so require one of them.
 const validationRules = computed(() => ({
   selectedContact: { required },
   targetInbox: { required },
-  message: { required: requiredIf(!inboxTypes.value.isWhatsapp) },
+  message: {
+    required: requiredIf(() => {
+      if (!inboxTypes.value.isWhatsapp) return true;
+      if (
+        inboxTypes.value.isWhatsappBaileys ||
+        inboxTypes.value.isWhatsappZapi
+      ) {
+        return state.attachedFiles.length === 0;
+      }
+      return false;
+    }),
+  },
   subject: { required: requiredIf(inboxTypes.value.isEmail) },
 }));
 
