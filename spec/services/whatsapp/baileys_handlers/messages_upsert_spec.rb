@@ -398,6 +398,126 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'album and wrapped media handling' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+
+    context 'when receiving an album marker message' do
+      it 'ignores the marker and creates no message' do
+        raw_message = {
+          key: { id: 'msg_album_marker', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            albumMessage: { expectedImageCount: 2, expectedVideoCount: 0 }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.not_to change(Message, :count)
+      end
+    end
+
+    context 'when receiving an album child image message' do
+      it 'unwraps the wrapper and processes the message with media' do
+        raw_message = {
+          key: { id: 'msg_album_child_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            associatedChildMessage: {
+              message: {
+                imageMessage: {
+                  caption: 'Album photo',
+                  mimetype: 'image/jpeg',
+                  url: 'https://example.com/img.jpg'
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_album_child_1'))
+          .to_return(status: 200, body: 'fake image data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('Album photo')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+
+    context 'when receiving a lottie sticker message' do
+      it 'unwraps the wrapper and processes the sticker with media' do
+        raw_message = {
+          key: { id: 'msg_lottie_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2,
+              messageSecret: 'secret'
+            },
+            lottieStickerMessage: {
+              message: {
+                stickerMessage: {
+                  mimetype: 'application/was',
+                  url: 'https://example.com/sticker.was',
+                  isLottie: true
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_lottie_1'))
+          .to_return(status: 200, body: 'fake sticker data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+  end
+
   describe 'filename extraction' do
     let(:phone) { '5511912345678' }
 
