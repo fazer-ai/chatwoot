@@ -162,13 +162,20 @@ const actions = {
     }
   },
 
-  sendThreadReply: async ({ commit }, { channelId, parentMessageId, data }) => {
+  sendThreadReply: async (
+    { commit },
+    { channelId, parentMessageId, data, files = [] }
+  ) => {
     commit('SET_UI_FLAG', { isSending: true });
     try {
-      const response = await InternalChatMessagesAPI.createMessage(channelId, {
-        ...data,
-        parent_id: parentMessageId,
-      });
+      const response = await InternalChatMessagesAPI.createMessage(
+        channelId,
+        {
+          ...data,
+          parent_id: parentMessageId,
+        },
+        files
+      );
       const message = response.data;
       commit('ADD_THREAD_REPLY', {
         parentMessageId,
