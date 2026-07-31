@@ -1051,7 +1051,7 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       it 'anchors the reply to the quoted message' do
         contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
         contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
-        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox, contact: contact)
         original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_RICH_1')
 
         params = rich_params(
@@ -1201,7 +1201,7 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     it 'anchors the reply when the location quotes another message' do
       contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
       contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
-      conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+      conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox, contact: contact)
       original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_LOC_1')
 
       params = loc_params(
