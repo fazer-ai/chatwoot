@@ -64,6 +64,15 @@ RSpec.describe 'Agent Bot API', type: :request do
         expect(response).to have_http_status(:success)
         expect(response.body).to include(agent_bot.access_token.token)
       end
+
+      it 'returns the agent bots when authenticating with an api_access_token header' do
+        get "/api/v1/accounts/#{account.id}/agent_bots",
+            headers: { api_access_token: admin.access_token.token },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(agent_bot.name)
+      end
     end
   end
 
@@ -130,6 +139,15 @@ RSpec.describe 'Agent Bot API', type: :request do
       it 'creates the agent bot when administrator' do
         expect do
           post "/api/v1/accounts/#{account.id}/agent_bots", headers: admin.create_new_auth_token,
+                                                            params: valid_params
+        end.to change(AgentBot, :count).by(1)
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'creates the agent bot when administrator authenticates with an api_access_token header' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/agent_bots", headers: { api_access_token: admin.access_token.token },
                                                             params: valid_params
         end.to change(AgentBot, :count).by(1)
 
