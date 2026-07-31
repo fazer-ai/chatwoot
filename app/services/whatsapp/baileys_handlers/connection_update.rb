@@ -29,6 +29,7 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
       qr_data_url: data[:qrDataUrl] || nil,
       error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
+      quarantine: quarantine_payload(data),
       reachout_time_lock: reachout_time_lock_payload(data),
       # new_chat_cap never rides a connection.update (it arrives via message-capping.update / the
       # poll). update_provider_connection! replaces provider_connection wholesale, so without
@@ -36,6 +37,21 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       # off until the next cap push/poll. Preserve the existing value; .compact omits it when unset.
       new_chat_cap: inbox.channel.provider_connection['new_chat_cap'],
       epoch: data[:epoch]
+    }.compact
+  end
+
+  # Rides only the reconnect_loop_detected webhook (baileys-api quarantines a phone after a
+  # full failed reconnect cycle and reports how many cycles failed and when it will retry).
+  # Shares the error's lifecycle on purpose: any later connection.update without it (e.g. the
+  # next retry cycle's "reconnecting") clears it together with the error, so the UI never
+  # shows a stale "retrying at ..." for a phone that already reconnected.
+  def quarantine_payload(data)
+    raw = data[:quarantine]
+    return nil if raw.blank?
+
+    {
+      strikes: raw[:strikes],
+      until: raw[:until]
     }.compact
   end
 
