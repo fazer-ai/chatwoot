@@ -192,6 +192,29 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(inbox.channel.provider_connection['error']).to be_nil
       end
 
+      it 'persists the quarantine reported with a reconnect loop and clears it on the next update' do
+        params = base_params.merge(
+          {
+            data: {
+              error: 'reconnect_loop_detected',
+              quarantine: { strikes: 3, until: '2026-07-31T12:00:00.000Z' }
+            }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection).to include(
+          'error' => I18n.t('errors.inboxes.channel.provider_connection.reconnect_loop_detected'),
+          'quarantine' => { 'strikes' => 3, 'until' => '2026-07-31T12:00:00.000Z' }
+        )
+
+        next_cycle = base_params.merge({ data: { connection: 'connecting' } })
+        described_class.new(inbox: inbox, params: next_cycle).perform
+
+        expect(inbox.channel.reload.provider_connection['quarantine']).to be_nil
+      end
+
       context 'with reach-out time-lock (error 463 / account restriction)' do
         let(:reachout_data) do
           { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' }
