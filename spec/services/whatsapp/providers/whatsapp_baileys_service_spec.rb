@@ -147,6 +147,67 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(Rails.logger).to have_received(:error).with('error message').twice
       end
     end
+
+    context 'with a confirmed reconnect loop (quarantine strikes at the reset threshold)' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'reconnecting',
+          quarantine: { strikes: 3, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'discards the stored session before requesting the new connection, so a QR is offered' do
+        delete_stub = stub_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                      .to_return(status: 200)
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(delete_stub).to have_been_requested
+        expect(post_stub).to have_been_requested
+      end
+    end
+
+    context 'with quarantine strikes below the reset threshold' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'reconnecting',
+          quarantine: { strikes: 2, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'does not discard the stored session' do
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(post_stub).to have_been_requested
+        expect(a_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"))
+          .not_to have_been_made
+      end
+    end
+
+    context 'when the channel is open despite stale quarantine data' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'open',
+          quarantine: { strikes: 5, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'never discards the stored session of an open channel' do
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(post_stub).to have_been_requested
+        expect(a_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"))
+          .not_to have_been_made
+      end
+    end
   end
 
   describe '#import_session' do

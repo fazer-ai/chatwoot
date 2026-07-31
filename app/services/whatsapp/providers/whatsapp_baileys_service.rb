@@ -9,6 +9,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
+  # Consecutive failed reconnect cycles (provider quarantine strikes, see
+  # baileys-api) after which a reconnect attempt discards the stored session
+  # first. 3 full cycles span several minutes of backoff — a rejected
+  # session, not a transient blip.
+  RECONNECT_LOOP_RESET_STRIKES = 3
 
   def self.groups_enabled?
     ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false') == 'true'
@@ -38,6 +43,15 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def setup_channel_provider
+    # A session the server keeps rejecting can only be recovered by pairing a
+    # fresh QR, but the provider always resumes stored creds when they exist —
+    # so an operator asking to reconnect such a channel would just restart the
+    # loop. Discard the dead session first; the setup below then gets a QR.
+    # Gated on human intent by construction: this method only runs from
+    # explicit setup/reconnect requests and from the connection-check job,
+    # which is scheduled exclusively for channels that are `open`.
+    disconnect_channel_provider if rejected_session?
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
@@ -101,6 +115,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   rescue StandardError => e
     Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
     true
+  end
+
+  # Confirmed reconnect loop: the provider reported enough consecutive failed
+  # reconnect cycles (quarantine strikes ride the reconnect_loop_detected
+  # webhook and are persisted on provider_connection). An `open` channel never
+  # qualifies — any healthy open clears the quarantine upstream, and the
+  # strikes field is wiped by the next connection.update without it.
+  def rejected_session?
+    connection = whatsapp_channel.provider_connection || {}
+    return false if connection['connection'] == 'open'
+
+    connection.dig('quarantine', 'strikes').to_i >= RECONNECT_LOOP_RESET_STRIKES
   end
 
   def send_message(recipient_id, message)
