@@ -80,6 +80,17 @@ const shouldShowEmojiButton = computed(() => {
   );
 });
 
+// Attachments on conversation-create are supported for email/web widget and
+// for WhatsApp providers that send free-form media (Baileys, Z-API). The
+// template-based WhatsApp flows (Cloud, Twilio) can't start with media.
+const shouldShowAttachButton = computed(() => {
+  return (
+    props.isEmailOrWebWidgetInbox ||
+    props.isWhatsappBaileysInbox ||
+    props.isWhatsappZapiInbox
+  );
+});
+
 const isRegularMessageMode = computed(() => {
   return (
     (!props.isWhatsappInbox && !props.isTwilioWhatsAppInbox) ||
@@ -177,7 +188,7 @@ const keyboardEvents = {
 useKeyboardEvents(keyboardEvents);
 
 const onPaste = e => {
-  if (!props.isEmailOrWebWidgetInbox) return;
+  if (!shouldShowAttachButton.value) return;
 
   const files = e.clipboardData?.files;
   if (!files?.length) return;
@@ -230,7 +241,7 @@ useEventListener(document, 'paste', onPaste);
         />
       </div>
       <FileUpload
-        v-if="isEmailOrWebWidgetInbox"
+        v-if="shouldShowAttachButton"
         ref="uploadAttachment"
         input-id="composeNewConversationAttachment"
         :size="4096 * 4096"
