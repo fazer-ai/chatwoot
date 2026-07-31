@@ -85,6 +85,7 @@ export default {
     ...mapGetters({
       accountId: 'getCurrentAccountId',
       isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
+      isOnChatwootCloud: 'globalConfig/isOnChatwootCloud',
     }),
     isEmbeddedSignupWhatsApp() {
       return this.inbox.provider_config?.source === 'embedded_signup';
@@ -94,7 +95,9 @@ export default {
         this.isEmbeddedSignupWhatsApp &&
         this.isFeatureEnabledonAccount(
           this.accountId,
-          FEATURE_FLAGS.WHATSAPP_RECONFIGURE
+          this.isOnChatwootCloud
+            ? FEATURE_FLAGS.WHATSAPP_EMBEDDED_SIGNUP_FLOW
+            : FEATURE_FLAGS.WHATSAPP_RECONFIGURE
         )
       );
     },

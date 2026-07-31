@@ -40,8 +40,8 @@ describe Whatsapp::IncomingMessageService do
 
       it 'appends to last conversation when if conversation already exists' do
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
-        2.times.each { create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox) }
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        2.times.each { create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact) }
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # no new conversation should be created
         expect(whatsapp_channel.inbox.conversations.count).to eq(3)
@@ -65,7 +65,7 @@ describe Whatsapp::IncomingMessageService do
       it 'creates a new conversation if last conversation is resolved and lock to single conversation is disabled' do
         whatsapp_channel.inbox.update!(lock_to_single_conversation: false)
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         last_conversation.update!(status: 'resolved')
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # new conversation should be created
@@ -76,7 +76,7 @@ describe Whatsapp::IncomingMessageService do
       it 'will not create a new conversation if last conversation is not resolved and lock to single conversation is disabled' do
         whatsapp_channel.inbox.update!(lock_to_single_conversation: false)
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         last_conversation.update!(status: Conversation.statuses.except('resolved').keys.sample)
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # new conversation should be created
@@ -391,7 +391,7 @@ describe Whatsapp::IncomingMessageService do
       end
 
       before do
-        create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
       end
 
@@ -628,7 +628,7 @@ describe Whatsapp::IncomingMessageService do
 
       it 'appends to existing contact if contact inbox exists' do
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: wa_id)
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # no new conversation should be created
         expect(whatsapp_channel.inbox.conversations.count).to eq(1)
@@ -643,7 +643,7 @@ describe Whatsapp::IncomingMessageService do
       context 'when a contact inbox exists in the old format without 9 included' do
         it 'appends to existing contact' do
           contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: wa_id)
-          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
           described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
           # no new conversation should be created
           expect(whatsapp_channel.inbox.conversations.count).to eq(1)
@@ -655,7 +655,7 @@ describe Whatsapp::IncomingMessageService do
       context 'when a contact inbox exists in the new format with 9 included' do
         it 'appends to existing contact' do
           contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: '5541988887777')
-          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
           described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
           # no new conversation should be created
           expect(whatsapp_channel.inbox.conversations.count).to eq(1)
@@ -690,7 +690,7 @@ describe Whatsapp::IncomingMessageService do
         # Normalized format removes the 9 after country code
         normalized_wa_id = '541123456789'
         contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: normalized_wa_id)
-        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+        last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         # no new conversation should be created
         expect(whatsapp_channel.inbox.conversations.count).to eq(1)
@@ -707,7 +707,7 @@ describe Whatsapp::IncomingMessageService do
       context 'when a contact inbox exists with the same format' do
         it 'appends to existing contact' do
           contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: wa_id)
-          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
+          last_conversation = create(:conversation, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox, contact: contact_inbox.contact)
           described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
           # no new conversation should be created
           expect(whatsapp_channel.inbox.conversations.count).to eq(1)
