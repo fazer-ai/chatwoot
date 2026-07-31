@@ -473,6 +473,54 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
 
+    context 'when receiving an album child nested inside an ephemeral message' do
+      it 'unwraps the nested wrappers and processes the message with media' do
+        raw_message = {
+          key: { id: 'msg_nested_wrappers_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            ephemeralMessage: {
+              message: {
+                associatedChildMessage: {
+                  message: {
+                    imageMessage: {
+                      caption: 'Nested album photo',
+                      mimetype: 'image/jpeg',
+                      url: 'https://example.com/nested.jpg'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_nested_wrappers_1'))
+          .to_return(status: 200, body: 'fake image data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('Nested album photo')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+
     context 'when receiving a lottie sticker message' do
       it 'unwraps the wrapper and processes the sticker with media' do
         raw_message = {
