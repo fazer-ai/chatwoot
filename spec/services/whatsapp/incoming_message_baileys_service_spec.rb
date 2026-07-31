@@ -645,7 +645,7 @@ describe Whatsapp::IncomingMessageBaileysService do
           it 'creates a message on an existing conversation' do
             contact = create(:contact, account: inbox.account, name: 'John Doe')
             contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678')
-            existing_conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+            existing_conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox, contact: contact)
 
             described_class.new(inbox: inbox, params: params).perform
 
