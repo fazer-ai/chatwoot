@@ -140,6 +140,7 @@ async function handleSendReply(content, options = {}) {
         channelId: props.channelId,
         parentMessageId: props.parentMessage.id,
         data: { content, also_send_in_channel: !!options.alsoSendInChannel },
+        files: options.files || [],
       });
       deleteThreadDraft();
       await nextTick();
