@@ -233,5 +233,55 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         expect(attempt.online_user_ids).to include(team_member.id)
       end
     end
+
+    # Real production case (46907): between two IA re-escalations, the IA
+    # left itself as `assignee` (a real User row, not a bot). On the second
+    # handoff, `team_id` didn't change AND `assignee_id` was set to the IA
+    # user — so the earlier `assignee_id.nil?` gate missed this case. The
+    # broader "assignee is not a member of the target team" gate covers it.
+    context 'when the request re-sends the same team and the current assignee is the IA user, not a team member' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:team) { create(:team, account: account, allow_auto_assign: true) }
+      let(:team_member) { create(:user, account: account, role: :agent, auto_offline: false) }
+      let(:ia_user) { create(:user, account: account, role: :administrator, name: 'IA | Auris') }
+
+      before do
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+        create(:inbox_member, inbox: conversation.inbox, user: team_member)
+        create(:team_member, team: team, user: team_member)
+        # ia_user is intentionally NOT a team member.
+        conversation.update_columns(team_id: team.id, assignee_id: ia_user.id) # rubocop:disable Rails/SkipsModelValidations
+      end
+
+      it 'replaces the IA user with a team member via round-robin' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ team_member.id.to_s => 'online' })
+
+        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { team_id: team.id },
+             headers: ia_user.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.team).to eq(team)
+        expect(conversation.reload.assignee).to eq(team_member)
+      end
+
+      it 'clears the IA assignee and records a failed_no_online audit row when no team member is online' do
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({})
+
+        expect do
+          post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+               params: { team_id: team.id },
+               headers: ia_user.create_new_auth_token,
+               as: :json
+        end.to change(AiAssignmentAttempt, :count).by(1)
+
+        expect(conversation.reload.assignee).to be_nil
+        attempt = AiAssignmentAttempt.last
+        expect(attempt.agent_assigned_id).to be_nil
+        expect(attempt.status_tag).to eq('failed_no_online')
+      end
+    end
   end
 end
