@@ -191,7 +191,8 @@ class Inbox < ApplicationRecord
   def webhook_data
     {
       id: id,
-      name: name
+      name: name,
+      timezone: timezone
     }
   end
 
