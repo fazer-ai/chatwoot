@@ -425,4 +425,15 @@ RSpec.describe Inbox do
       expect(prod_account.reload.simulator_inbox_id).to eq(simulator_inbox.id)
     end
   end
+
+  # Downstream automations (n8n greeting, etc.) need the inbox's configured
+  # timezone to derive local time — deriving from server UTC breaks for
+  # accounts outside America/Sao_Paulo.
+  describe '#webhook_data' do
+    it 'includes the inbox timezone alongside id and name' do
+      inbox = create(:inbox, name: 'Support', timezone: 'America/Porto_Velho')
+
+      expect(inbox.webhook_data).to eq(id: inbox.id, name: 'Support', timezone: 'America/Porto_Velho')
+    end
+  end
 end
