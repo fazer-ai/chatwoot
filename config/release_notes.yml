@@ -1,4 +1,18 @@
 ---
+- tag: v4.15.1-auris.1.41.19
+  published_at: '2026-08-04T20:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.19
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **AI handoff to the team picks an agent again on its own.** When the AI passes a conversation to the team a second time, an agent is auto-assigned again — no more picking one manually.
+      - **WhatsApp template messages with line breaks or extra spaces now go through.** Templates that Meta was rejecting with no clear reason now send normally.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **A passagem da IA para o time volta a escolher um atendente sozinha.** Quando a IA passa uma conversa para a equipe uma segunda vez, o sistema volta a atribuir um atendente automaticamente — antes você precisava atribuir na mão.
+      - **Mensagens de template do WhatsApp com quebras de linha ou espaços extras agora saem sem erro.** Aqueles templates que a Meta rejeitava sem explicação passam a ser enviados normalmente.
 - tag: v4.15.1-auris.1.41.18
   published_at: '2026-07-20T14:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.18
@@ -275,15 +289,3 @@
       ### 🐛 Correções
 
       - **Renomear caixa de entrada agora funciona na primeira tentativa.** Editar o nome de uma caixa mostrava um aviso confuso e só salvava na segunda tentativa. Agora salva de primeira.
-- tag: v4.15.1-auris.1.40
-  published_at: '2026-07-08T03:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.40
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Download conversation transcript as PDF.** In the three-dot menu of a conversation, click "Download transcript (PDF)" and the file downloads to your computer. Save it, print it, or attach it elsewhere.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Baixar histórico da conversa em PDF.** Nos três pontinhos da conversa, clica em "Baixar transcrição (PDF)" e o arquivo cai no seu computador. Dá pra salvar, imprimir ou anexar em outro lugar.
