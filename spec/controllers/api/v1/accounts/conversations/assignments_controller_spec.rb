@@ -180,5 +180,58 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         expect(conversation.reload.team).to be_nil
       end
     end
+
+    # Real production case (IA re-escalation): operator resolved handoff #1
+    # without changing team, then the assignee was cleared. When the IA
+    # re-escalates and POSTs the SAME team_id, AssignmentHandler's
+    # `team_id_changed?` guard silently skips reassignment. The conversation
+    # ends up with a team but no assignee. The controller now forces the
+    # round-robin explicitly in that case.
+    context 'when the request re-sends the team the conversation already has and no assignee is set' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:team) { create(:team, account: account, allow_auto_assign: true) }
+      let(:team_member) { create(:user, account: account, role: :agent, auto_offline: false) }
+
+      before do
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+        create(:inbox_member, inbox: conversation.inbox, user: team_member)
+        create(:team_member, team: team, user: team_member)
+        # Bypass callbacks so the setup doesn't itself run the auto-assign
+        # code path we're about to test.
+        conversation.update_columns(team_id: team.id, assignee_id: nil) # rubocop:disable Rails/SkipsModelValidations
+      end
+
+      it 'runs the round-robin and assigns a team member even though team_id did not change' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ team_member.id.to_s => 'online' })
+
+        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { team_id: team.id },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.team).to eq(team)
+        expect(conversation.reload.assignee).to eq(team_member)
+      end
+
+      it 'records an AiAssignmentAttempt row when the caller is IA-driven' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ team_member.id.to_s => 'online' })
+        ia_user = create(:user, account: account, role: :administrator, name: 'IA | Auris')
+
+        expect do
+          post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+               params: { team_id: team.id },
+               headers: ia_user.create_new_auth_token,
+               as: :json
+        end.to change(AiAssignmentAttempt, :count).by(1)
+
+        attempt = AiAssignmentAttempt.last
+        expect(attempt.team).to eq(team)
+        expect(attempt.agent_assigned_id).to eq(team_member.id)
+        expect(attempt.online_user_ids).to include(team_member.id)
+      end
+    end
   end
 end

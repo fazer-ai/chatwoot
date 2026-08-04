@@ -49,6 +49,45 @@ class AiAssignmentAttempt < ApplicationRecord
     user.name.to_s.match?(IA_USER_NAME_PATTERN)
   end
 
+  # Records an attempt for the given conversation. Both the team.changed
+  # listener and the AssignmentsController use this so the audit stays
+  # consistent whether the assignment came from the natural
+  # `team_id_changed?` path or from the controller's fallback that fires
+  # even when the team was already set on the conversation.
+  #
+  # `triggered_by` defaults to `Current.user`; callers running outside a
+  # request (specs, jobs) should pass it explicitly.
+  def self.record_for(conversation, triggered_by: Current.user)
+    return if conversation.nil? || conversation.team_id.blank?
+    return unless ia_driven_user?(triggered_by)
+
+    create!(
+      conversation: conversation,
+      account_id: conversation.account_id,
+      team: conversation.team,
+      agent_assigned_id: conversation.assignee_id,
+      triggered_by: triggered_by,
+      online_user_ids: online_team_member_ids_for(conversation)
+    )
+  rescue StandardError => e
+    Rails.logger.warn("[AiAssignmentAttempt] failed to record for conversation=#{conversation&.id}: #{e.class}: #{e.message}")
+    nil
+  end
+
+  # "Active in the team" means anyone with a live heartbeat in Chatwoot
+  # (`online` or `busy`) AND a member of the target team. `busy` is
+  # included for the same reason the prior snapshot job did: those agents
+  # are logged in and the auto-assigner could still have routed to them.
+  ACTIVE_STATUSES = %w[online busy].freeze
+
+  def self.online_team_member_ids_for(conversation)
+    team_member_ids = conversation.team.members.ids
+    available = OnlineStatusTracker.get_available_users(conversation.account_id)
+                                   .select { |_, status| ACTIVE_STATUSES.include?(status) }
+                                   .keys.map(&:to_i)
+    available & team_member_ids
+  end
+
   # Categorises the attempt for the "IA → Humano" report. Mirrors the
   # status tags the old activity-message-based report emitted, but is
   # now derivable from a single row instead of regex + snapshot join.
