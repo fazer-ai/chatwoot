@@ -136,6 +136,15 @@ class Whatsapp::PopulateTemplateParametersService
     # Basic sanitization - remove dangerous characters and limit length
     sanitized = value.to_s.strip
     sanitized = sanitized.gsub(/[<>\"']/, '') # Remove potential HTML/JS chars
+    # Meta rejects template parameters that carry tabs, newlines, or more
+    # than 4 consecutive spaces with error #132018 ("There's an issue with
+    # the parameters in your template"). Upstream data pipelines routinely
+    # leak `\t`/`\n` from list concatenation (real case: `lista_exames`
+    # joined with "/\t" between items), and the UI renders those as
+    # ordinary whitespace so the problem is invisible until the send fails.
+    # Collapse any whitespace run into a single space so the caller doesn't
+    # need to know the Meta-side rules.
+    sanitized = sanitized.gsub(/\s+/, ' ')
     sanitized[0...1000] # Limit length to prevent DoS
   end
 

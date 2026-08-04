@@ -67,4 +67,34 @@ describe Whatsapp::PopulateTemplateParametersService do
       end
     end
   end
+
+  # Meta rejects template parameters that contain tabs, newlines, or more
+  # than 4 consecutive spaces with #132018. Real incident: `lista_exames`
+  # arrived as "ITEM_A/\tITEM_B" — invisible in the UI (tab renders as a
+  # space) but broke the send.
+  describe 'whitespace sanitization in text parameters' do
+    it 'collapses embedded tabs to a single space in positional text params' do
+      result = service.build_parameter("ITEM_A/\tITEM_B")
+
+      expect(result).to eq(type: 'text', text: 'ITEM_A/ ITEM_B')
+    end
+
+    it 'collapses embedded newlines to a single space in positional text params' do
+      result = service.build_parameter("line one\nline two")
+
+      expect(result).to eq(type: 'text', text: 'line one line two')
+    end
+
+    it 'collapses runs of multiple spaces to a single space in positional text params' do
+      result = service.build_parameter('too      many    spaces')
+
+      expect(result).to eq(type: 'text', text: 'too many spaces')
+    end
+
+    it 'collapses embedded whitespace in named text params' do
+      result = service.build_named_parameter('lista_exames', "A/\tB\nC   D")
+
+      expect(result).to eq(type: 'text', parameter_name: 'lista_exames', text: 'A/ B C D')
+    end
+  end
 end
