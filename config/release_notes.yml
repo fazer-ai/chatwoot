@@ -1,4 +1,12 @@
 ---
+- tag: v4.15.1-auris.1.41.20
+  published_at: '2026-08-05T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.20
+  notes:
+    en: |-
+      Internal improvements.
+    pt_BR: |-
+      Melhorias internas.
 - tag: v4.15.1-auris.1.41.19
   published_at: '2026-08-04T20:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.19
@@ -265,27 +273,3 @@
       ### 🐛 Correções
 
       - **Baixar transcrição da conversa em PDF agora funciona.** Desde que o botão foi lançado, clicar em "Baixar transcrição (PDF)" terminava em "Não foi possível gerar o PDF da transcrição. Tente novamente." O arquivo agora baixa direto no primeiro clique.
-- tag: v4.15.1-auris.1.41
-  published_at: '2026-07-10T20:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41
-  notes:
-    en: |-
-      ### ✨ What's new
-
-      - **Report an issue on a response.** Hover any AI or agent message and a flag icon appears next to the reactions. Click it to describe what went wrong, suggest the correct answer, and attach screenshots. The team receives the report and follows up.
-
-      - **Managers can delete contacts.** Users with the "manager" role can now delete contacts directly — this used to be admin-only.
-
-      ### 🐛 Fixes
-
-      - **Renaming an inbox now works on the first try.** Editing an inbox name showed a confusing warning and only saved on the retry. It now saves on the first click.
-    pt_BR: |-
-      ### ✨ Novidades
-
-      - **Relatar problema em uma resposta.** Passe o mouse por cima de qualquer mensagem da IA ou do agente e aparece um ícone de bandeira ao lado das reações. Um clique abre uma janela para descrever o que aconteceu, sugerir a resposta correta e anexar prints. O time recebe o relato e volta com o retorno.
-
-      - **Gestor pode excluir contatos.** Usuários com papel de "gestor" agora conseguem apagar um contato direto — antes só administradores tinham.
-
-      ### 🐛 Correções
-
-      - **Renomear caixa de entrada agora funciona na primeira tentativa.** Editar o nome de uma caixa mostrava um aviso confuso e só salvava na segunda tentativa. Agora salva de primeira.
