@@ -428,12 +428,30 @@ RSpec.describe Inbox do
 
   # Downstream automations (n8n greeting, etc.) need the inbox's configured
   # timezone to derive local time — deriving from server UTC breaks for
-  # accounts outside America/Sao_Paulo.
+  # accounts outside America/Sao_Paulo. Business Hours is rarely opened per
+  # inbox, so we fall back to the account-level reporting_timezone when the
+  # inbox one is still on the "UTC" default.
   describe '#webhook_data' do
-    it 'includes the inbox timezone alongside id and name' do
-      inbox = create(:inbox, name: 'Support', timezone: 'America/Porto_Velho')
+    let(:account) { create(:account) }
+
+    it 'uses the inbox timezone when it was explicitly configured' do
+      inbox = create(:inbox, account: account, name: 'Support', timezone: 'America/Porto_Velho')
+      account.update!(reporting_timezone: 'America/Sao_Paulo')
 
       expect(inbox.webhook_data).to eq(id: inbox.id, name: 'Support', timezone: 'America/Porto_Velho')
+    end
+
+    it 'falls back to the account reporting_timezone when the inbox stayed on the default UTC' do
+      inbox = create(:inbox, account: account, name: 'Support')
+      account.update!(reporting_timezone: 'America/Porto_Velho')
+
+      expect(inbox.webhook_data[:timezone]).to eq('America/Porto_Velho')
+    end
+
+    it 'emits UTC when neither the inbox nor the account has a timezone configured' do
+      inbox = create(:inbox, account: account, name: 'Support')
+
+      expect(inbox.webhook_data[:timezone]).to eq('UTC')
     end
   end
 end
