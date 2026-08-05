@@ -198,15 +198,15 @@ class Inbox < ApplicationRecord
 
   # Timezone the downstream consumer should treat as authoritative.
   # `inboxes.timezone` defaults to "UTC" and stays there for accounts that
-  # never open Business Hours — which is most of them. Fall back to the
-  # account's reporting timezone in that case so automations still get a
-  # meaningful local time (real world: nobody in the target market picks
-  # UTC on purpose, so treating "still default" as "not configured" is
-  # safe here).
+  # never open Business Hours. Use `working_hours_enabled?` as the signal
+  # of intent: if the operator turned Business Hours on, they went through
+  # the timezone dropdown deliberately (even if they kept UTC). Otherwise
+  # fall back to the account's reporting_timezone so automations get a
+  # meaningful local time without every inbox needing its own config.
   def effective_timezone
-    return timezone unless timezone == 'UTC'
+    return timezone if working_hours_enabled?
 
-    account.reporting_timezone.presence || 'UTC'
+    account.reporting_timezone.presence || timezone
   end
 
   def callback_webhook_url

@@ -427,29 +427,29 @@ RSpec.describe Inbox do
   end
 
   # Downstream automations (n8n greeting, etc.) need the inbox's configured
-  # timezone to derive local time — deriving from server UTC breaks for
-  # accounts outside America/Sao_Paulo. Business Hours is rarely opened per
-  # inbox, so we fall back to the account-level reporting_timezone when the
-  # inbox one is still on the "UTC" default.
+  # timezone to derive local time. Business Hours is rarely opened per
+  # inbox, so we use `working_hours_enabled?` as the signal of intent —
+  # if it's on, the operator went through the timezone dropdown; otherwise
+  # fall back to the account-level reporting_timezone.
   describe '#webhook_data' do
     let(:account) { create(:account) }
 
-    it 'uses the inbox timezone when it was explicitly configured' do
-      inbox = create(:inbox, account: account, name: 'Support', timezone: 'America/Porto_Velho')
+    it 'uses the inbox timezone when Business Hours is enabled (operator went through the dropdown)' do
+      inbox = create(:inbox, account: account, name: 'Support', timezone: 'America/Porto_Velho', working_hours_enabled: true)
       account.update!(reporting_timezone: 'America/Sao_Paulo')
 
       expect(inbox.webhook_data).to eq(id: inbox.id, name: 'Support', timezone: 'America/Porto_Velho')
     end
 
-    it 'falls back to the account reporting_timezone when the inbox stayed on the default UTC' do
-      inbox = create(:inbox, account: account, name: 'Support')
+    it 'falls back to the account reporting_timezone when Business Hours was never enabled' do
+      inbox = create(:inbox, account: account, name: 'Support', working_hours_enabled: false)
       account.update!(reporting_timezone: 'America/Porto_Velho')
 
       expect(inbox.webhook_data[:timezone]).to eq('America/Porto_Velho')
     end
 
-    it 'emits UTC when neither the inbox nor the account has a timezone configured' do
-      inbox = create(:inbox, account: account, name: 'Support')
+    it 'keeps the inbox timezone (UTC) when neither the inbox nor the account has a real timezone configured' do
+      inbox = create(:inbox, account: account, name: 'Support', working_hours_enabled: false)
 
       expect(inbox.webhook_data[:timezone]).to eq('UTC')
     end
