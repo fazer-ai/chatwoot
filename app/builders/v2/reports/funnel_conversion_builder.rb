@@ -30,12 +30,22 @@ class V2::Reports::FunnelConversionBuilder
     # rules are presentation-only and shouldn't change "completed" or "won"
     # arithmetic. The chart, on the other hand, walks the display groups.
     display_groups = build_display_groups(all_stages)
-    group_counts = fetch_group_counts(display_groups)
+    rows = display_groups.any? ? fetch_stage_change_rows(display_groups) : []
+    group_counts = build_group_counts(display_groups, rows)
+    universe = universe_counts_from(rows)
+    # The first bar's count is the universe of conversations that moved
+    # anywhere in the funnel during the period, not just entries into
+    # the first stage. Otherwise a conversation that entered the first
+    # stage BEFORE the period and only moved to a later stage INSIDE the
+    # period gets counted in that later bar but not in the first — and
+    # the funnel visualization ends up with a downstream bar bigger than
+    # "Total de leads", which operators read (correctly) as broken.
+    group_counts[display_groups.first[:key]] = universe if display_groups.any?
     stage_rows = build_stage_rows(display_groups, group_counts)
 
     {
       stages: stage_rows,
-      kpis: build_kpis(all_stages),
+      kpis: build_kpis(all_stages, universe[:count]),
       loss_reasons: build_loss_reasons_breakdown
     }
   end
@@ -101,14 +111,25 @@ class V2::Reports::FunnelConversionBuilder
   # group within the period, split by the conversation's CURRENT `ai_enabled`
   # state. Returns `{ count, count_ai, count_manual }` per group. Reentries by
   # the same conversation still count once (matches the rest of the funnel).
-  # One DB roundtrip + Ruby-side bucketing; the dataset is small in practice.
-  def fetch_group_counts(groups)
-    return {} if groups.empty?
-
-    rows = fetch_stage_change_rows(groups)
+  # Callers pass rows in so the DB roundtrip is shared with `universe_counts_from`.
+  def build_group_counts(groups, rows)
     groups.each_with_object({}) do |group, acc|
       acc[group[:key]] = split_counts_for(group, rows)
     end
+  end
+
+  # Universe = every distinct conversation that had at least one stage change
+  # into a chart-visible stage during the period. Used both as the first
+  # bar's count (so the funnel tapers monotonically) and as the KPI
+  # denominator (so all rates are anchored on the same "leads seen in the
+  # period" number). Split by ai/manual using the same rule as per-group counts.
+  def universe_counts_from(rows)
+    ai_ids = Set.new
+    manual_ids = Set.new
+    rows.each do |_new_stage, conv_id, ai_enabled|
+      (ai_enabled ? ai_ids : manual_ids) << conv_id
+    end
+    { count: ai_ids.size + manual_ids.size, count_ai: ai_ids.size, count_manual: manual_ids.size }
   end
 
   def fetch_stage_change_rows(groups)
@@ -198,10 +219,11 @@ class V2::Reports::FunnelConversionBuilder
   end
 
   # Four sales-funnel rates, all anchored on the same denominator (total
-  # leads entering the funnel in the period). Hidden stages still count —
-  # `chart_visible` only controls the chart bars, not the KPI math.
-  def build_kpis(all_stages)
-    total_leads = first_open_stage_count(all_stages)
+  # leads that touched the funnel in the period — same universe as the
+  # first chart bar). Hidden stages still contribute to the numerators
+  # (visibility is a chart concern), but they never enter the denominator
+  # because `universe` is built from chart-visible stages only.
+  def build_kpis(all_stages, total_leads)
     scheduling_count = distinct_count_for(scheduling_member_names(all_stages))
     confirmation_count = distinct_count_for([CONFIRMATION_STAGE_NAME])
     attendance_count = distinct_count_for([ATTENDANCE_STAGE_NAME])
@@ -228,13 +250,6 @@ class V2::Reports::FunnelConversionBuilder
     return nil if total.zero?
 
     ((count.to_f / total) * 100).round(2)
-  end
-
-  def first_open_stage_count(all_stages)
-    first_open = all_stages.reject(&:closed).first
-    return 0 if first_open.nil?
-
-    distinct_count_for([first_open.name])
   end
 
   def distinct_count_for(stage_names)

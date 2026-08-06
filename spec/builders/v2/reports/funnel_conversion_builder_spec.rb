@@ -134,25 +134,46 @@ RSpec.describe V2::Reports::FunnelConversionBuilder do
       # rubocop:enable RSpec/MultipleExpectations
     end
 
-    context 'when the next stage has more conversations than the current (entries from outside)' do
+    context 'when a downstream stage has entries the first stage does not (jumps / earlier-period entrants)' do
+      # Real prod incident: operators reported "Em Qualificação = 30" being
+      # bigger than "Total de leads = 21" and reading it (correctly) as a
+      # broken funnel. Root cause was the first bar counting entries into
+      # the first stage ONLY within the period; conversations that entered
+      # the first stage BEFORE the period and moved to a later stage IN
+      # the period showed up downstream but not on the first bar. The
+      # first bar now shows the universe of conversations touched by the
+      # funnel in the period, so it always caps the downstream bars.
       before do
-        # 1 conv into "lead", 2 distinct convs jumped straight into "qualified".
+        # 1 conv entered "lead" in-period.
         first = conversation_with_id
         stage_change(conv_id: first.id, new_stage: stages[:lead].name)
 
+        # 2 distinct convs entered "qualified" without touching "lead" in
+        # the period (e.g. they entered "lead" before the period, or the
+        # workflow moved them straight into qualified).
         2.times do
           conv = conversation_with_id
           stage_change(conv_id: conv.id, new_stage: stages[:qualified].name)
         end
       end
 
-      it 'shows conversion_rate above 100% and flags conversion_exceeds_previous' do
+      it 'anchors the first bar to the universe of stage changes so it always caps the downstream bars' do
         result = builder.build
         lead_row = result[:stages].find { |row| row[:name] == stages[:lead].name }
+        qualified_row = result[:stages].find { |row| row[:name] == stages[:qualified].name }
 
-        expect(lead_row[:conversion_rate]).to eq(200.0)
-        expect(lead_row[:conversion_exceeds_previous]).to be true
-        expect(lead_row[:drop_off_count]).to eq(0) # clamped — net influx isn't loss
+        # 3 distinct convs touched the funnel in the period → the first bar
+        # rolls all of them up, not just the one that entered "lead".
+        expect(lead_row[:count]).to eq(3)
+        expect(qualified_row[:count]).to eq(2)
+        expect(lead_row[:conversion_rate]).to be_within(0.01).of(66.67)
+        expect(lead_row[:conversion_exceeds_previous]).to be false
+        expect(lead_row[:drop_off_count]).to eq(1)
+      end
+
+      it 'uses the same universe as the KPI total_leads denominator' do
+        kpis = builder.build[:kpis]
+        expect(kpis[:total_leads]).to eq(3)
       end
     end
 
