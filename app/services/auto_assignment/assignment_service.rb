@@ -72,9 +72,25 @@ class AutoAssignment::AssignmentService
   end
 
   def assign_conversation(conversation, agent)
+    # Serialize concurrent AssignmentJob runs on the same conversation.
+    # Without the row lock, multiple workers each SELECT the conversation
+    # as unassigned, each call `update!(assignee: ...)`, and Rails dirty
+    # tracking compares in-memory (nil) vs new (agent_id) — not the DB —
+    # so `saved_change_to_assignee_id?` fires N times and produces N
+    # "Assigned via team" activity messages for a single real assignment.
+    assigned = false
     Current.executed_by = inbox.assignment_policy || inbox
-    conversation.update!(assignee: agent)
+    conversation.with_lock do
+      # Re-check inside the transaction: another worker may have assigned
+      # this conversation between our `unassigned` SELECT and here.
+      next if conversation.assignee_id.present?
+
+      conversation.update!(assignee: agent)
+      assigned = true
+    end
     Current.executed_by = nil
+
+    return false unless assigned
 
     rate_limiter = build_rate_limiter(agent)
     rate_limiter.track_assignment(conversation)

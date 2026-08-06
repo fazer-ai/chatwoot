@@ -355,4 +355,44 @@ RSpec.describe AutoAssignment::AssignmentService do
       end
     end
   end
+
+  # Real prod incident (conv 2690, account 101): 5 identical
+  # "Atribuído a Raira por Política Padrão" activities were created in
+  # a 2.3-second window for a single assignment. Root cause was
+  # concurrent AssignmentJob workers each loading the conversation as
+  # unassigned (before the first commit propagated), each calling
+  # `update!(assignee: agent)`, and Rails dirty tracking firing the
+  # "assignee changed" activity for each because it compares in-memory
+  # (nil) against new (agent_id) — never against the DB.
+  describe 'concurrent worker race on the same conversation' do
+    let(:rate_limiter) { instance_double(AutoAssignment::RateLimiter) }
+
+    before do
+      allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ agent.id.to_s => 'online' })
+      round_robin_selector = instance_double(AutoAssignment::RoundRobinSelector)
+      allow(AutoAssignment::RoundRobinSelector).to receive(:new).and_return(round_robin_selector)
+      allow(round_robin_selector).to receive(:select_agent).and_return(agent)
+      allow(AutoAssignment::RateLimiter).to receive(:new).and_return(rate_limiter)
+      allow(rate_limiter).to receive(:within_limit?).and_return(true)
+      allow(rate_limiter).to receive(:track_assignment)
+    end
+
+    it 'does not re-assign when another worker already assigned the conversation between our SELECT and UPDATE' do
+      conv = create(:conversation, inbox: inbox, status: 'open', assignee: nil)
+      # Load the stale copy BEFORE the first assignment: in-memory
+      # assignee_id is nil, matching what a parallel worker would see if
+      # it read the row between the first worker's SELECT and UPDATE.
+      stale_conv = Conversation.find(conv.id)
+
+      service.perform_bulk_assignment(limit: 1)
+      expect(conv.reload.assignee).to eq(agent)
+      expect(stale_conv.assignee_id).to be_nil # sanity: memory is stale
+
+      stale_service = described_class.new(inbox: inbox)
+      allow(stale_service).to receive(:unassigned_conversations).and_return([stale_conv])
+
+      expect { stale_service.perform_bulk_assignment(limit: 1) }
+        .not_to(change { conv.messages.where(message_type: :activity).where('content ILIKE ?', '%Política Padrão%').count })
+    end
+  end
 end
