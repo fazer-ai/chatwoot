@@ -1,4 +1,18 @@
 ---
+- tag: v4.15.1-auris.1.41.21
+  published_at: '2026-08-06T14:00:00Z'
+  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.21
+  notes:
+    en: |-
+      ### 🐛 Fixes
+
+      - **No more repeated "Assigned to X" lines on a conversation.** When the system auto-assigned a conversation, the timeline sometimes showed several identical "Assigned to X" entries within a few seconds. Now only one shows up.
+      - **The Funnel report tapers again.** In the "Conversion Funnel" report, the first column would sometimes end up smaller than a later column, making the funnel look broken. The first column now rolls up every conversation that moved through the funnel in the period, and the conversion rates use it as the denominator — so rates may read a bit lower for accounts that receive leads that first entered in earlier periods.
+    pt_BR: |-
+      ### 🐛 Correções
+
+      - **Sem repetições de "Atribuído a X" na conversa.** Quando o sistema atribuía a conversa automaticamente, às vezes apareciam várias linhas iguais de "Atribuído a X" em poucos segundos. Agora aparece só uma.
+      - **Relatório de Funil volta a fazer sentido.** No relatório "Funil de Conversão", a primeira coluna às vezes ficava menor que uma seguinte, dando impressão de funil errado. Agora a primeira coluna já engloba todas as conversas que passaram pelo funil no período, e as taxas de conversão usam esse mesmo número — então elas podem aparecer um pouco menores para contas que recebem leads que entraram no funil em períodos anteriores.
 - tag: v4.15.1-auris.1.41.20
   published_at: '2026-08-05T14:00:00Z'
   url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.20
@@ -261,15 +275,3 @@
       ### ⚡ Melhorias
 
       - **Textos mais leves ao dar feedback.** O botão de bandeirinha nas mensagens agora diz "Dar feedback" e o modal foca em ajudar a evoluir a sua secretária, não em reportar problema.
-- tag: v4.15.1-auris.1.41.1
-  published_at: '2026-07-11T17:00:00Z'
-  url: https://github.com/Tech-Auris/chatwoot/releases/tag/v4.15.1-auris.1.41.1
-  notes:
-    en: |-
-      ### 🐛 Fixes
-
-      - **Downloading the conversation transcript as a PDF now works.** Since the button was released, clicking "Download transcript (PDF)" ended with "Could not generate the transcript PDF. Try again." The file now downloads on the first click.
-    pt_BR: |-
-      ### 🐛 Correções
-
-      - **Baixar transcrição da conversa em PDF agora funciona.** Desde que o botão foi lançado, clicar em "Baixar transcrição (PDF)" terminava em "Não foi possível gerar o PDF da transcrição. Tente novamente." O arquivo agora baixa direto no primeiro clique.
