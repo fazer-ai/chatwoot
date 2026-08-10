@@ -388,6 +388,36 @@ describe Whatsapp::Providers::WhatsappCloudService do
         expect(message.reload.external_error).to be_nil
       end
     end
+
+    # Meta emits `(#131000) Something went wrong` and a few sibling codes
+    # on transient issues (their brief downtime, quick rate blips). We
+    # raise a specific exception so `SendReplyJob` can retry via Sidekiq,
+    # instead of marking the message failed on the first miss.
+    context 'when the error code is a documented Meta transient' do
+      let(:error_response) do
+        {
+          'error' => {
+            'message' => 'Something went wrong. Please try again.',
+            'code' => 131_000
+          }
+        }
+      end
+
+      it 'raises Whatsapp::Providers::TransientError and leaves the message untouched' do
+        raised = nil
+        begin
+          service.send(:handle_error, error_response_object, message)
+        rescue Whatsapp::Providers::TransientError => e
+          raised = e
+        end
+
+        expect(raised).not_to be_nil
+        expect(raised.error_code).to eq(131_000)
+        expect(raised.meta_message).to eq('Something went wrong. Please try again.')
+        expect(message.reload.status).not_to eq('failed')
+        expect(message.reload.external_error).to be_nil
+      end
+    end
   end
 
   describe 'CSAT template methods' do

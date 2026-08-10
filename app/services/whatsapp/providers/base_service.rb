@@ -85,6 +85,17 @@ class Whatsapp::Providers::BaseService
     error_message = error_message(response)
     return if error_message.blank?
 
+    error_code = response.parsed_response&.dig('error', 'code')
+    # Meta returns a small set of "please try again" errors on transient
+    # issues (their downtime, quick rate-limit blips, etc.). Instead of
+    # marking the outgoing message as `failed` on the first miss — forcing
+    # the operator to notice and hand-retry hours later — raise a specific
+    # exception so `SendReplyJob` can retry via Sidekiq's standard backoff.
+    # The message stays in `sent` until retries are exhausted.
+    if Whatsapp::Providers::TransientError.transient?(error_code)
+      raise Whatsapp::Providers::TransientError.new(error_code: error_code, meta_message: error_message)
+    end
+
     message.external_error = error_message
     message.status = :failed
     message.save!
