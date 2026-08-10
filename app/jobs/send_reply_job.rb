@@ -1,6 +1,21 @@
 class SendReplyJob < ApplicationJob
   queue_as :high
 
+  # Meta's WhatsApp Cloud API returns a small set of "please try again"
+  # errors on transient hiccups (their downtime, quick rate-limit blips).
+  # Retry with a bounded backoff so the operator does not have to
+  # hand-retry every time Meta blips for a few seconds. Only after the
+  # window is exhausted do we mark the message as failed with the last
+  # error we saw.
+  retry_on ::Whatsapp::Providers::TransientError,
+           attempts: 3,
+           wait: ->(executions) { [5, 15].fetch(executions - 1, 15).seconds } do |job, error|
+    Message.find_by(id: job.arguments.first)&.update!(
+      status: :failed,
+      external_error: error.meta_message
+    )
+  end
+
   CHANNEL_SERVICES = {
     'Channel::TwitterProfile' => '::Twitter::SendOnTwitterService',
     'Channel::TwilioSms' => '::Twilio::SendOnTwilioService',

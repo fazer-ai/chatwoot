@@ -123,4 +123,47 @@ RSpec.describe SendReplyJob do
       expect_mapped_service_to_perform(message, 'Tiktok::SendOnTiktokService')
     end
   end
+
+  # Real prod case: Meta returned `(#131000) Something went wrong` on a
+  # send; the previous behaviour marked the message failed immediately
+  # and forced the operator to hand-retry. Chatwoot now retries the job
+  # for a bounded window and only marks the message failed after the
+  # window is exhausted.
+  describe 'retry on Whatsapp::Providers::TransientError' do
+    let(:whatsapp_channel) { create(:channel_whatsapp, validate_provider_config: false, sync_templates: false) }
+    let(:whatsapp_message) { create(:message, conversation: create(:conversation, inbox: whatsapp_channel.inbox)) }
+
+    it 'marks the message failed once the retry budget is exhausted' do
+      failing_service = instance_double(Whatsapp::SendOnWhatsappService)
+      allow(Whatsapp::SendOnWhatsappService).to receive(:new).and_return(failing_service)
+      allow(failing_service).to receive(:perform)
+        .and_raise(Whatsapp::Providers::TransientError.new(error_code: '131000', meta_message: 'Something went wrong'))
+
+      perform_enqueued_jobs(only: described_class) do
+        described_class.perform_later(whatsapp_message.id)
+      end
+
+      whatsapp_message.reload
+      expect(whatsapp_message.status).to eq('failed')
+      expect(whatsapp_message.external_error).to eq('Something went wrong')
+    end
+
+    it 'stops retrying and leaves the message intact once the provider succeeds on a later attempt' do
+      call_count = 0
+      transient = Whatsapp::Providers::TransientError.new(error_code: '131000', meta_message: 'Something went wrong')
+      service = instance_double(Whatsapp::SendOnWhatsappService)
+      allow(Whatsapp::SendOnWhatsappService).to receive(:new).and_return(service)
+      allow(service).to receive(:perform) do
+        call_count += 1
+        raise transient if call_count == 1
+      end
+
+      perform_enqueued_jobs(only: described_class) do
+        described_class.perform_later(whatsapp_message.id)
+      end
+
+      expect(call_count).to be > 1
+      expect(whatsapp_message.reload.status).not_to eq('failed')
+    end
+  end
 end
