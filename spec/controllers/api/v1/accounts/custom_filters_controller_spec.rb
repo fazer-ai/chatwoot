@@ -142,6 +142,23 @@ RSpec.describe 'Custom Filters API', type: :request do
         expect(response.parsed_body['visibility']).to eq 'global'
       end
 
+      # Real prod case: manager could not create a clinic-wide folder because
+      # the SaveCustomView / CreateSegmentDialog components hid the visibility
+      # selector for non-administrators, and the manager profile silently
+      # defaulted to `personal`. Backend has always allowed managers to save
+      # global filters — this spec locks that in so a future frontend change
+      # cannot quietly regress the behaviour.
+      it 'allows managers to create global filters' do
+        manager = create(:user, account: account, role: :agent)
+        AccountUser.find_by(user: manager, account: account).update!(role: :manager)
+
+        post "/api/v1/accounts/#{account.id}/custom_filters", headers: manager.create_new_auth_token,
+                                                              params: { custom_filter: payload[:custom_filter].merge(visibility: 'global') }
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['visibility']).to eq 'global'
+      end
+
       it 'gives the error for 1001st record' do
         CustomFilter.delete_all
         Limits::MAX_CUSTOM_FILTERS_PER_USER.times do

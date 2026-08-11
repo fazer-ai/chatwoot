@@ -19,8 +19,11 @@ const store = useStore();
 
 const uiFlags = useMapGetter('customViews/getUIFlags');
 const isCreating = computed(() => uiFlags.value.isCreating);
-const isAdmin = computed(
-  () => store.getters.getCurrentRole === 'administrator'
+// Backend allows both administrators and managers to create global
+// segments (CustomFilterPolicy + CustomFilter#set_visibility). Restrict
+// to admin only silently forces managers into personal segments.
+const canManageGlobalFilters = computed(() =>
+  ['administrator', 'manager'].includes(store.getters.getCurrentRole)
 );
 
 const dialogRef = ref(null);
@@ -77,7 +80,7 @@ defineExpose({ dialogRef });
       :message-type="v$.name.$error ? 'error' : 'info'"
     />
     <VisibilitySelector
-      v-if="isAdmin"
+      v-if="canManageGlobalFilters"
       v-model="state.visibility"
       class="mt-4"
       i18n-prefix="CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.VISIBILITY"

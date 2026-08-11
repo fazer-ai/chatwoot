@@ -39,7 +39,12 @@ const filters = defineModel({
 const folderNameLocal = ref(props.folderName);
 const folderVisibilityLocal = ref(props.folderVisibility);
 const currentRole = useMapGetter('getCurrentRole');
-const isAdmin = computed(() => currentRole.value === 'administrator');
+// Backend allows both administrators and managers to edit global folder
+// visibility (CustomFilterPolicy). Restrict to admin only silently hides
+// the toggle from managers editing an existing folder.
+const canManageGlobalFilters = computed(() =>
+  ['administrator', 'manager'].includes(currentRole.value)
+);
 
 const DEFAULT_FILTER = {
   attributeKey: 'status',
@@ -132,7 +137,7 @@ const outsideClickHandler = [
           :placeholder="t('FILTER.INPUT_PLACEHOLDER')"
         />
         <VisibilitySelector
-          v-if="isAdmin"
+          v-if="canManageGlobalFilters"
           v-model="folderVisibilityLocal"
           i18n-prefix="FILTER.CUSTOM_VIEWS.VISIBILITY"
         />
