@@ -2,7 +2,63 @@
   "META_TEMPLATES": {
     "HEADER": {
       "TITLE": "Meta Templates",
-      "DESCRIPTION": "Manage the WhatsApp Business templates registered with Meta. Create, edit, delete, and track approval status here — no need to open business.facebook.com."
+      "DESCRIPTION": "Manage the WhatsApp Business templates registered with Meta. Browse, filter and inspect each template's structure and approval status here."
+    },
+    "LOADING": "Loading templates…",
+    "LAST_SYNCED": "Last synced:",
+    "FILTERS": {
+      "INBOX": "Inbox",
+      "STATUS": "Status",
+      "CATEGORY": "Category",
+      "SEARCH_PLACEHOLDER": "Search by template name or language"
+    },
+    "STATUS": {
+      "ALL": "All statuses",
+      "APPROVED": "Approved",
+      "PENDING": "Pending",
+      "REJECTED": "Rejected",
+      "PAUSED": "Paused",
+      "DISABLED": "Disabled",
+      "IN_APPEAL": "In appeal"
+    },
+    "CATEGORY": {
+      "ALL": "All categories",
+      "MARKETING": "Marketing",
+      "UTILITY": "Utility",
+      "AUTHENTICATION": "Authentication"
+    },
+    "TABLE": {
+      "NAME": "Name",
+      "CATEGORY": "Category",
+      "LANGUAGE": "Language",
+      "STATUS": "Status"
+    },
+    "SYNC": {
+      "BUTTON": "Sync with Meta",
+      "SUCCESS": "Templates refreshed from Meta.",
+      "FAILED": "Could not refresh templates from Meta. Please try again shortly."
+    },
+    "DETAIL": {
+      "HEADER": "Header",
+      "BODY": "Body",
+      "FOOTER": "Footer",
+      "BUTTONS": "Buttons",
+      "MEDIA_HEADER_NOTE": "Media header ({format}). The actual image / video / document is set at send time.",
+      "REJECTED_REASON": "Reason from Meta",
+      "SUBTITLE_SEPARATOR": "·",
+      "HEADER_FORMAT_LABEL": "{label} ({format})",
+      "CLOSE": "Close",
+      "URL_PREFIX": "URL:",
+      "PHONE_PREFIX": "Phone:",
+      "REJECTED_REASON_LABEL": "Reason from Meta:"
+    },
+    "EMPTY": {
+      "NO_CLOUD_INBOX": "This account has no WhatsApp Cloud inbox connected yet.",
+      "NO_TEMPLATES": "No templates registered on this inbox yet. Create one on business.facebook.com — full creation flow inside AurisChat is coming soon.",
+      "NO_MATCH": "No templates match the current filters."
+    },
+    "ERRORS": {
+      "FETCH_FAILED": "Could not load templates. Please try again."
     },
     "COMING_SOON": {
       "MESSAGE": "Meta template management will land here soon. For now, keep using business.facebook.com."

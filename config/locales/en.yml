@@ -183,6 +183,9 @@ en:
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Please try reconnecting the inbox.
+    meta_templates:
+      non_cloud_inbox: This endpoint is only available for inboxes using the WhatsApp Cloud provider.
+      sync_failed: Could not refresh templates from Meta. Please try again in a few seconds.
     custom_filters:
       number_of_records: Limit reached. The maximum number of allowed custom filters for a user per account is 1000.
       invalid_attribute: Invalid attribute key - [%{key}]. The key should be one of [%{allowed_keys}] or a custom attribute defined in the account.

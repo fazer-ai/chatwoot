@@ -2,7 +2,63 @@
   "META_TEMPLATES": {
     "HEADER": {
       "TITLE": "Templates Meta",
-      "DESCRIPTION": "Gerencie os templates do WhatsApp Business cadastrados na Meta. Crie, edite, exclua e acompanhe o status de aprovação aqui — sem precisar abrir o business.facebook.com."
+      "DESCRIPTION": "Gerencie os templates do WhatsApp Business cadastrados na Meta. Consulte, filtre e inspecione a estrutura e o status de aprovação de cada template aqui."
+    },
+    "LOADING": "Carregando templates…",
+    "LAST_SYNCED": "Última sincronização:",
+    "FILTERS": {
+      "INBOX": "Caixa de entrada",
+      "STATUS": "Status",
+      "CATEGORY": "Categoria",
+      "SEARCH_PLACEHOLDER": "Buscar por nome do template ou idioma"
+    },
+    "STATUS": {
+      "ALL": "Todos os status",
+      "APPROVED": "Aprovado",
+      "PENDING": "Pendente",
+      "REJECTED": "Reprovado",
+      "PAUSED": "Pausado",
+      "DISABLED": "Desativado",
+      "IN_APPEAL": "Em recurso"
+    },
+    "CATEGORY": {
+      "ALL": "Todas as categorias",
+      "MARKETING": "Marketing",
+      "UTILITY": "Utilidade",
+      "AUTHENTICATION": "Autenticação"
+    },
+    "TABLE": {
+      "NAME": "Nome",
+      "CATEGORY": "Categoria",
+      "LANGUAGE": "Idioma",
+      "STATUS": "Status"
+    },
+    "SYNC": {
+      "BUTTON": "Sincronizar com Meta",
+      "SUCCESS": "Templates atualizados a partir do Meta.",
+      "FAILED": "Não foi possível atualizar os templates junto ao Meta. Tente novamente em instantes."
+    },
+    "DETAIL": {
+      "HEADER": "Cabeçalho",
+      "BODY": "Corpo",
+      "FOOTER": "Rodapé",
+      "BUTTONS": "Botões",
+      "MEDIA_HEADER_NOTE": "Cabeçalho de mídia ({format}). A imagem / vídeo / documento é definido no momento do envio.",
+      "REJECTED_REASON": "Motivo do Meta",
+      "SUBTITLE_SEPARATOR": "·",
+      "HEADER_FORMAT_LABEL": "{label} ({format})",
+      "CLOSE": "Fechar",
+      "URL_PREFIX": "URL:",
+      "PHONE_PREFIX": "Telefone:",
+      "REJECTED_REASON_LABEL": "Motivo do Meta:"
+    },
+    "EMPTY": {
+      "NO_CLOUD_INBOX": "Esta conta ainda não tem uma caixa WhatsApp Cloud conectada.",
+      "NO_TEMPLATES": "Nenhum template cadastrado nesta caixa ainda. Cadastre um no business.facebook.com — o fluxo completo de criação dentro do AurisChat chega em breve.",
+      "NO_MATCH": "Nenhum template corresponde aos filtros aplicados."
+    },
+    "ERRORS": {
+      "FETCH_FAILED": "Não foi possível carregar os templates. Tente novamente."
     },
     "COMING_SOON": {
       "MESSAGE": "O gerenciamento de templates Meta vai aparecer aqui em breve. Enquanto isso, continue usando o business.facebook.com."

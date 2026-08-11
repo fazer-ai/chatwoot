@@ -619,6 +619,11 @@ Rails.application.routes.draw do
             end
           end
           resources :ia_human_distribution_reports, only: [:index]
+          resources :meta_templates, only: [:index] do
+            collection do
+              post :sync
+            end
+          end
         end
       end
     end
