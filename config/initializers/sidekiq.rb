@@ -63,7 +63,19 @@ Rails.application.reloader.to_prepare do
   # load_from_hash! upserts jobs from the YAML and removes any Redis-persisted
   # jobs that share the same source tag but are no longer in the file.
   # This ensures deleted schedule entries are cleaned up on deploy.
-  if File.exist?(schedule_file) && Sidekiq.server?
+  #
+  # Runs on EVERY Rails process boot (web, sidekiq server, console, rake) —
+  # not only on `Sidekiq.server?`. Rolling deploys often restart web
+  # containers while the sidekiq container survives untouched; a
+  # server-only guard means new cron entries added to schedule.yml stay
+  # missing from Redis until the sidekiq container itself restarts. Real
+  # incident: the `super_admin_health_score_daily_snapshot_job` cron was
+  # added in commit 6248fb2ee (25/05/2026), ran once the next day, and
+  # then silently sat unregistered for ~2.5 months because deploys never
+  # bounced the sidekiq container. Loading from any process is safe:
+  # Redis is shared, the operation is idempotent, and only sidekiq server
+  # actually executes the crons.
+  if File.exist?(schedule_file)
     schedule = YAML.load_file(schedule_file)
 
     # Cron entries removed from schedule.yml but possibly still in Redis
