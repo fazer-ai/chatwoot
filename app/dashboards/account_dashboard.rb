@@ -43,7 +43,13 @@ class AccountDashboard < Administrate::BaseDashboard
     status: Field::Select.with_options(collection: [%w[Active active], %w[Suspended suspended]]),
     environment: EnvironmentField.with_options(collection: [%w[Test test], %w[Production production]]),
     average_ticket: Field::Number.with_options(decimals: 2, step: 0.01),
-    reporting_timezone: Field::Select.with_options(collection: reporting_timezone_collection, include_blank: false),
+    # `searchable: false` is required: `reporting_timezone` is a
+    # `store_accessor :settings, :reporting_timezone` on the jsonb
+    # `settings` column, NOT a real DB column. Administrate's Field::Select
+    # is `searchable?` by default, so the auto-generated search SQL tries
+    # `LOWER(CAST(accounts.reporting_timezone AS CHAR(256)))` and Postgres
+    # 500s with "column accounts.reporting_timezone does not exist".
+    reporting_timezone: Field::Select.with_options(collection: reporting_timezone_collection, include_blank: false, searchable: false),
     auris_settings: AurisAccountSettingsField,
     auris_menus: AurisAccountMenusField,
     funnel_enabled: Field::Boolean,
