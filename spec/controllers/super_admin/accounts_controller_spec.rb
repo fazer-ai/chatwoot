@@ -22,6 +22,18 @@ RSpec.describe 'Super Admin accounts API', type: :request do
         expect(response.body).to include('New account')
         expect(response.body).to include(account.name)
       end
+
+      # Real prod incident: typing any text in the Super Admin accounts
+      # search box returned 500 ("column accounts.reporting_timezone does
+      # not exist"). `reporting_timezone` is a `store_accessor` on the
+      # jsonb `settings` column, not a real DB column — Administrate was
+      # trying to auto-search it because `Field::Select` is searchable
+      # by default. The dashboard entry now sets `searchable: false`.
+      it 'returns a successful response when a search term is provided' do
+        sign_in(super_admin, scope: :super_admin)
+        get '/super_admin/accounts', params: { search: 'harmonize' }
+        expect(response).to have_http_status(:success)
+      end
     end
   end
 
