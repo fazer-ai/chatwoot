@@ -35,7 +35,12 @@ const filters = defineModel({
 const segmentNameLocal = ref(props.segmentName);
 const segmentVisibilityLocal = ref(props.segmentVisibility);
 const currentRole = useMapGetter('getCurrentRole');
-const isAdmin = computed(() => currentRole.value === 'administrator');
+// Backend allows both administrators and managers to edit global segment
+// visibility (CustomFilterPolicy). Restrict to admin only silently hides
+// the toggle from managers editing an existing segment.
+const canManageGlobalFilters = computed(() =>
+  ['administrator', 'manager'].includes(currentRole.value)
+);
 
 const DEFAULT_FILTER = {
   attributeKey: 'name',
@@ -128,7 +133,7 @@ const outsideClickHandler = [
           :placeholder="t('CONTACTS_LAYOUT.FILTER.SEGMENT.INPUT_PLACEHOLDER')"
         />
         <VisibilitySelector
-          v-if="isAdmin"
+          v-if="canManageGlobalFilters"
           v-model="segmentVisibilityLocal"
           i18n-prefix="CONTACTS_LAYOUT.HEADER.ACTIONS.FILTERS.CREATE_SEGMENT.VISIBILITY"
         />

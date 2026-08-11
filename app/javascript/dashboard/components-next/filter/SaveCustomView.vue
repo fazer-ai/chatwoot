@@ -48,8 +48,16 @@ export default {
     isButtonDisabled() {
       return this.v$.name.$invalid;
     },
-    isAdmin() {
-      return this.$store.getters.getCurrentRole === 'administrator';
+    // Backend allows both administrators and managers to create/edit
+    // global custom filters (see CustomFilterPolicy + CustomFilter#set_visibility,
+    // which only downgrades to `personal` for agents). Keeping this gated on
+    // administrator only silently forces managers into personal filters —
+    // the visibility selector never renders, so a manager cannot create a
+    // clinic-wide folder even though the API would accept it.
+    canManageGlobalFilters() {
+      return ['administrator', 'manager'].includes(
+        this.$store.getters.getCurrentRole
+      );
     },
   },
 
@@ -120,7 +128,7 @@ export default {
         @blur="v$.name.$touch"
       />
       <VisibilitySelector
-        v-if="isAdmin"
+        v-if="canManageGlobalFilters"
         v-model="visibility"
         i18n-prefix="FILTER.CUSTOM_VIEWS.VISIBILITY"
       />
