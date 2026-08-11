@@ -214,6 +214,18 @@ useEventListener(document, 'touchmove', onResizeMove, { passive: false });
 useEventListener(document, 'touchend', onResizeEnd);
 
 const inboxes = useMapGetter('inboxes/getInboxes');
+// Meta Templates only makes sense when the account is actually running a
+// WhatsApp Cloud (Meta official API) inbox — Baileys inboxes don't have
+// the WABA / template-approval concept. The gate hides the sidebar entry
+// entirely for accounts without at least one Cloud inbox so the menu
+// stays uncluttered.
+const hasCloudWhatsappInbox = computed(() =>
+  inboxes.value.some(
+    inbox =>
+      inbox.channel_type === 'Channel::Whatsapp' &&
+      inbox.provider === 'whatsapp_cloud'
+  )
+);
 const labels = useMapGetter('labels/getLabelsOnSidebar');
 const dashboardApps = useMapGetter('dashboardApps/getAppsOnSidebar');
 const allUnreadCount = useMapGetter(
@@ -808,6 +820,16 @@ const menuItems = computed(() => {
           icon: 'i-lucide-blocks',
           to: accountScopedRoute('settings_applications'),
         },
+        ...(hasCloudWhatsappInbox.value
+          ? [
+              {
+                name: 'Settings Meta Templates',
+                label: t('SIDEBAR.META_TEMPLATES'),
+                icon: 'i-lucide-message-square-share',
+                to: accountScopedRoute('meta_templates_index'),
+              },
+            ]
+          : []),
         {
           name: 'Settings Audit Logs',
           label: t('SIDEBAR.AUDIT_LOGS'),

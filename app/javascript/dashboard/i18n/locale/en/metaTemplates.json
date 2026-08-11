@@ -1,0 +1,11 @@
+{
+  "META_TEMPLATES": {
+    "HEADER": {
+      "TITLE": "Meta Templates",
+      "DESCRIPTION": "Manage the WhatsApp Business templates registered with Meta. Create, edit, delete, and track approval status here — no need to open business.facebook.com."
+    },
+    "COMING_SOON": {
+      "MESSAGE": "Meta template management will land here soon. For now, keep using business.facebook.com."
+    }
+  }
+}
