@@ -274,6 +274,24 @@ describe('customViewsHelper', () => {
       expect(generateValuesForEditCustomViews(filter, params)).toEqual('1');
     });
 
+    it.each(['is_present', 'is_not_present'])(
+      'should return an empty array for the %s operator',
+      filterOperator => {
+        const params = {
+          filterTypes: advancedFilterTypes,
+          allCustomAttributes: [
+            { attribute_key: 'text_attribute', attribute_display_type: 'text' },
+          ],
+        };
+        const filter = {
+          attribute_key: 'text_attribute',
+          filter_operator: filterOperator,
+          values: [],
+        };
+        expect(generateValuesForEditCustomViews(filter, params)).toEqual([]);
+      }
+    );
+
     it('returns contact name for contact filters when contact is available', () => {
       const filter = {
         attribute_key: 'contact_id',

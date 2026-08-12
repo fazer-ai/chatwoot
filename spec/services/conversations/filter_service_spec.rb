@@ -485,6 +485,62 @@ describe Conversations::FilterService do
         result = filter_service.new(params, user_1, account).perform
         expect(result[:conversations].length).to be 1
       end
+
+      it 'filters conversations where the custom attribute is present' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_present',
+            values: [],
+            query_operator: nil,
+            custom_attribute_type: ''
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id)).to contain_exactly(en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
+      it 'filters conversations where the custom attribute is not present' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_not_present',
+            values: [],
+            query_operator: nil,
+            custom_attribute_type: ''
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        conversation_ids = result[:conversations].pluck(:id)
+        expect(conversation_ids).to include(en_conversation_1.id)
+        expect(conversation_ids).not_to include(en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
+      it 'filters conversations where the custom attribute is not present combined with another condition' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_not_present',
+            values: [],
+            query_operator: 'AND',
+            custom_attribute_type: ''
+          }.with_indifferent_access,
+          {
+            attribute_key: 'status',
+            filter_operator: 'equal_to',
+            values: ['pending'],
+            query_operator: nil
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id)).to contain_exactly(en_conversation_1.id)
+      end
     end
   end
 

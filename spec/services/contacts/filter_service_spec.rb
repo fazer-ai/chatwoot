@@ -408,6 +408,57 @@ describe Contacts::FilterService do
         expect(result[:contacts].pluck(:id)).to include(el_contact.id)
       end
 
+      it 'filters contacts where the custom attribute is present' do
+        params[:payload] = [
+          {
+            attribute_key: 'customer_type',
+            filter_operator: 'is_present',
+            values: [],
+            query_operator: nil
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(account, first_user, params).perform
+
+        expect(result[:contacts].pluck(:id)).to contain_exactly(el_contact.id, cs_contact.id)
+      end
+
+      it 'filters contacts where the custom attribute is not present' do
+        params[:payload] = [
+          {
+            attribute_key: 'customer_type',
+            filter_operator: 'is_not_present',
+            values: [],
+            query_operator: nil
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(account, first_user, params).perform
+
+        expect(result[:contacts].pluck(:id)).to contain_exactly(en_contact.id)
+      end
+
+      it 'keeps the null check scoped when not_equal_to is not the last condition' do
+        params[:payload] = [
+          {
+            attribute_key: 'customer_type',
+            filter_operator: 'not_equal_to',
+            values: ['platinum'],
+            query_operator: 'AND'
+          }.with_indifferent_access,
+          {
+            attribute_key: 'contact_additional_information',
+            filter_operator: 'equal_to',
+            values: ['test custom data'],
+            query_operator: nil
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(account, first_user, params).perform
+
+        expect(result[:contacts].pluck(:id)).to contain_exactly(en_contact.id)
+      end
+
       it 'binds custom date comparison values as dates' do
         date_value = '2024-01-01'
         params[:payload] = [
