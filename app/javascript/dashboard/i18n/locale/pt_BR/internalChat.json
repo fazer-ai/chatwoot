@@ -1,6 +1,22 @@
 {
   "INTERNAL_CHAT": {
     "TITLE": "Chat Interno",
+    "BACK": "Voltar para os canais",
+    "SIDEBAR": {
+      "EXPAND": "Expandir lista de canais",
+      "COLLAPSE": "Recolher lista de canais",
+      "RESIZE": "Redimensionar lista de canais"
+    },
+    "REACTIONS": {
+      "THUMBS_UP": "Joinha",
+      "HEART": "Coração",
+      "JOY": "Risada",
+      "SURPRISED": "Surpreso",
+      "SAD": "Triste",
+      "PRAY": "Obrigado",
+      "FIRE": "Fogo",
+      "PARTY": "Comemorar"
+    },
     "CHANNELS": "Canais",
     "DIRECT_MESSAGES": "Mensagens Diretas",
     "FAVORITES": "Favoritos",
@@ -75,6 +91,7 @@
       "BOLD": "Negrito",
       "ITALIC": "It\u00e1lico",
       "CODE": "C\u00f3digo",
+      "MORE_ACTIONS": "Mais ações",
       "COPY_LINK": "Copiar link",
       "LINK_COPIED": "Link da mensagem copiado",
       "DELETED_USER": "Usuário excluído"

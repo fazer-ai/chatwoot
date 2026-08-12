@@ -35,7 +35,7 @@ const emit = defineEmits([
   'send',
   'typing',
   'draftUpdate',
-  'create-poll',
+  'createPoll',
   'cancelEdit',
 ]);
 
@@ -281,7 +281,7 @@ defineExpose({ focus, setContent, getContent });
       <div
         v-for="(file, index) in attachedFiles"
         :key="index"
-        class="flex w-60 items-center gap-1.5 rounded-md bg-n-slate-3 p-1.5"
+        class="flex w-full items-center gap-1.5 rounded-md bg-n-slate-3 p-1.5 sm:w-60"
       >
         <div class="flex-shrink-0">
           <img
@@ -343,15 +343,18 @@ defineExpose({ focus, setContent, getContent });
       />
       <button
         type="button"
-        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-2 md:p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.MESSAGE.UPLOAD_FILE')"
         @click="openFilePicker"
       >
         <Icon icon="i-lucide-paperclip" class="size-4" />
       </button>
+      <!-- Mention shortcuts are hidden on the narrowest screens: they only type
+      a character the on-screen keyboard already offers, and the room they take
+      is worth more to the editor itself. -->
       <button
         type="button"
-        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        class="flex-shrink-0 hidden sm:flex items-center justify-center rounded-lg p-2 md:p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.MESSAGE.MENTION_USER')"
         @click="insertMentionTrigger('@')"
       >
@@ -359,7 +362,7 @@ defineExpose({ focus, setContent, getContent });
       </button>
       <button
         type="button"
-        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        class="flex-shrink-0 hidden sm:flex items-center justify-center rounded-lg p-2 md:p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.MESSAGE.MENTION_CONVERSATION')"
         @click="insertMentionTrigger('#')"
       >
@@ -368,15 +371,15 @@ defineExpose({ focus, setContent, getContent });
       <button
         v-if="showPoll"
         type="button"
-        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-2 md:p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.POLL.CREATE')"
-        @click="emit('create-poll')"
+        @click="emit('createPoll')"
       >
         <Icon icon="i-lucide-bar-chart-2" class="size-4" />
       </button>
       <button
         type="button"
-        class="flex-shrink-0 flex items-center justify-center rounded-lg p-1.5 transition-colors"
+        class="flex-shrink-0 flex items-center justify-center rounded-lg p-2 md:p-1.5 transition-colors"
         :class="
           canSend
             ? 'bg-n-brand text-white hover:opacity-90'

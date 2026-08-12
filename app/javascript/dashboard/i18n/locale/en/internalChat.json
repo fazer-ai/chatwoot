@@ -1,6 +1,22 @@
 {
   "INTERNAL_CHAT": {
     "TITLE": "Internal Chat",
+    "BACK": "Back to channels",
+    "SIDEBAR": {
+      "EXPAND": "Expand channel list",
+      "COLLAPSE": "Collapse channel list",
+      "RESIZE": "Resize channel list"
+    },
+    "REACTIONS": {
+      "THUMBS_UP": "Thumbs up",
+      "HEART": "Heart",
+      "JOY": "Laughing",
+      "SURPRISED": "Surprised",
+      "SAD": "Sad",
+      "PRAY": "Thank you",
+      "FIRE": "Fire",
+      "PARTY": "Celebrate"
+    },
     "CHANNELS": "Channels",
     "DIRECT_MESSAGES": "Direct Messages",
     "FAVORITES": "Favorites",
@@ -75,6 +91,7 @@
       "BOLD": "Bold",
       "ITALIC": "Italic",
       "CODE": "Code",
+      "MORE_ACTIONS": "More actions",
       "COPY_LINK": "Copy link",
       "LINK_COPIED": "Message link copied to clipboard",
       "DELETED_USER": "Deleted User"
