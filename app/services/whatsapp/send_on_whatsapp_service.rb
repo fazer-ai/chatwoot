@@ -14,7 +14,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
       return channel.provider == 'baileys' ? send_baileys_session_message : send_session_message
     end
 
-    message.update!(status: :failed, external_error: I18n.t('errors.whatsapp.message_outside_messaging_window'))
+    message.update_under_lock!(status: :failed, external_error: I18n.t('errors.whatsapp.message_outside_messaging_window'))
   end
 
   def send_template_message
@@ -27,7 +27,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     name, namespace, lang_code, processed_parameters = processor.call
 
     if name.blank?
-      message.update!(status: :failed, external_error: 'Template not found or invalid template name')
+      message.update_under_lock!(status: :failed, external_error: 'Template not found or invalid template name')
       return
     end
 
@@ -37,12 +37,18 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
                                          lang_code: lang_code,
                                          parameters: processed_parameters
                                        }, message)
-    message.update!(source_id: message_id) if message_id.present?
+    persist_source_id(message_id)
   end
 
   def send_baileys_session_message
     validate_announcement_mode!
-    with_baileys_channel_lock_on_outgoing_message(channel.id) { send_session_message }
+    with_baileys_channel_lock_on_outgoing_message(channel.id) do
+      # Waiting on the channel lock can take minutes when the inbox is busy, so re-check right before
+      # hitting the provider: the agent may have deleted the message while this job was queued.
+      next if deleted_in_database?
+
+      send_session_message
+    end
   end
 
   def validate_announcement_mode!
@@ -50,7 +56,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     return unless conversation.contact.additional_attributes&.dig('announce') == true
     return if inbox_admin_in_group?
 
-    message.update!(status: :failed, external_error: 'Only administrators are allowed to send messages in this group')
+    message.update_under_lock!(status: :failed, external_error: 'Only administrators are allowed to send messages in this group')
     raise StandardError, 'Only admins can send messages in this group'
   end
 
@@ -72,7 +78,27 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
   def send_session_message
     message_id = channel.send_message(recipient_id, message)
-    message.update!(source_id: message_id) if message_id.present?
+    persist_source_id(message_id)
+  end
+
+  # The message may have been deleted while this send was in flight — the DELETE endpoint found no
+  # `source_id` to revoke and skipped the provider, so it is on us to revoke it now that we have one.
+  # The flag is read from the same locked read the write took, which is also where the DELETE endpoint
+  # reads the `source_id`: whoever enters that critical section first leaves the revocation to the
+  # other side, so the provider delete is enqueued exactly once.
+  def persist_source_id(message_id)
+    return if message_id.blank?
+
+    message.update_under_lock!(source_id: message_id)
+    return unless message.deleted?
+
+    ::Messages::DeleteOnChannelJob.perform_later(message.id)
+  end
+
+  # Reads the flag straight from the database: a full `message.reload` would also drop the cached
+  # conversation/inbox/channel chain this service leans on.
+  def deleted_in_database?
+    Message.select(:id, :content_attributes).find_by(id: message.id)&.deleted?
   end
 
   def recipient_id
