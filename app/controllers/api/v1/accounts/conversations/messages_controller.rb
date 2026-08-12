@@ -40,12 +40,8 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def retry
     return if message.blank?
-    return head :unprocessable_entity if message.deleted?
-    return head :unprocessable_entity unless message.failed? && (message.outgoing? || message.template?)
+    return head :unprocessable_entity unless reset_message_for_retry
 
-    service = Messages::StatusUpdateService.new(message, 'sent')
-    service.perform
-    message.update!(content_attributes: {}, source_id: nil)
     ::SendReplyJob.perform_later(message.id)
   rescue StandardError => e
     render_could_not_create_error(e.message)
@@ -110,6 +106,22 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     return unless @conversation.inbox.channel.respond_to?(:delete_message)
 
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
+  end
+
+  # The `deleted?` check and the `content_attributes` reset have to share the lock the DELETE endpoint
+  # takes: a delete landing between them would have its flag wiped by the reset, and the job `retry`
+  # queues afterwards would then push the "deleted" placeholder to the contact.
+  def reset_message_for_retry
+    retryable = false
+    message.with_lock do
+      next if message.deleted?
+      next unless message.failed? && (message.outgoing? || message.template?)
+
+      retryable = true
+      Messages::StatusUpdateService.new(message, 'sent').perform
+      message.update!(content_attributes: {}, source_id: nil)
+    end
+    retryable
   end
 
   def edit_message_on_channel(new_content, original_content)
