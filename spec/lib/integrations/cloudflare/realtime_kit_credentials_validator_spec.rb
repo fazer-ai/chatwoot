@@ -1,6 +1,14 @@
 require 'rails_helper'
 
 RSpec.describe Integrations::Cloudflare::RealtimeKitCredentialsValidator do
+  # A zeitwerk reload earlier in the suite leaves the `described_class` captured
+  # when this file was loaded pointing at a stale copy, while `stub_const` resolves
+  # the name against the freshly-loaded one. The paging example then stubs
+  # APPS_PAGE_SIZE on one class and calls the other, which keeps the real value and
+  # stops after the first page. Re-resolving the constant on every example keeps
+  # both sides on the same class.
+  let(:described_class) { Integrations::Cloudflare::RealtimeKitCredentialsValidator } # rubocop:disable RSpec/DescribedClass
+
   let(:account_id) { 'account_id' }
   let(:app_id) { 'app_id' }
   let(:api_token) { 'api_token' }
