@@ -487,11 +487,11 @@ function handleUnvote(payload) {
             <div class="grid grid-cols-8 gap-0.5 border-b border-n-weak pb-1.5">
               <button
                 v-for="item in QUICK_EMOJIS"
-                :key="item.label"
+                :key="item.labelKey"
                 type="button"
                 class="flex min-w-0 items-center justify-center rounded p-1 text-base hover:bg-n-alpha-2"
-                :title="item.label"
-                :aria-label="item.label"
+                :title="t(`INTERNAL_CHAT.REACTIONS.${item.labelKey}`)"
+                :aria-label="t(`INTERNAL_CHAT.REACTIONS.${item.labelKey}`)"
                 @click="
                   hide();
                   toggleReaction(item.emoji);

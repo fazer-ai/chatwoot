@@ -35,7 +35,7 @@ const emit = defineEmits([
   'send',
   'typing',
   'draftUpdate',
-  'create-poll',
+  'createPoll',
   'cancelEdit',
 ]);
 
@@ -373,7 +373,7 @@ defineExpose({ focus, setContent, getContent });
         type="button"
         class="flex-shrink-0 flex items-center justify-center rounded-lg p-2 md:p-1.5 text-n-slate-11 hover:bg-n-alpha-2 hover:text-n-slate-12 transition-colors"
         :title="t('INTERNAL_CHAT.POLL.CREATE')"
-        @click="emit('create-poll')"
+        @click="emit('createPoll')"
       >
         <Icon icon="i-lucide-bar-chart-2" class="size-4" />
       </button>

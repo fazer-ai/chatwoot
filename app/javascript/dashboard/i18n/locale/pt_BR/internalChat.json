@@ -4,7 +4,18 @@
     "BACK": "Voltar para os canais",
     "SIDEBAR": {
       "EXPAND": "Expandir lista de canais",
-      "COLLAPSE": "Recolher lista de canais"
+      "COLLAPSE": "Recolher lista de canais",
+      "RESIZE": "Redimensionar lista de canais"
+    },
+    "REACTIONS": {
+      "THUMBS_UP": "Joinha",
+      "HEART": "Coração",
+      "JOY": "Risada",
+      "SURPRISED": "Surpreso",
+      "SAD": "Triste",
+      "PRAY": "Obrigado",
+      "FIRE": "Fogo",
+      "PARTY": "Comemorar"
     },
     "CHANNELS": "Canais",
     "DIRECT_MESSAGES": "Mensagens Diretas",

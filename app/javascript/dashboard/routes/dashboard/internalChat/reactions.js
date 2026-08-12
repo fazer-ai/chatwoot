@@ -1,12 +1,14 @@
+// `labelKey` is resolved under INTERNAL_CHAT.REACTIONS by the components that
+// render these, since the label surfaces as a tooltip and an accessible label.
 export const QUICK_EMOJIS = [
-  { emoji: '👍', label: 'thumbs up' },
-  { emoji: '❤️', label: 'heart' },
-  { emoji: '😂', label: 'joy' },
-  { emoji: '😮', label: 'surprised' },
-  { emoji: '😢', label: 'sad' },
-  { emoji: '🙏', label: 'pray' },
-  { emoji: '🔥', label: 'fire' },
-  { emoji: '🎉', label: 'party' },
+  { emoji: '👍', labelKey: 'THUMBS_UP' },
+  { emoji: '❤️', labelKey: 'HEART' },
+  { emoji: '😂', labelKey: 'JOY' },
+  { emoji: '😮', labelKey: 'SURPRISED' },
+  { emoji: '😢', labelKey: 'SAD' },
+  { emoji: '🙏', labelKey: 'PRAY' },
+  { emoji: '🔥', labelKey: 'FIRE' },
+  { emoji: '🎉', labelKey: 'PARTY' },
 ];
 
 export const findOwnReaction = (reactions, emoji, userId) =>

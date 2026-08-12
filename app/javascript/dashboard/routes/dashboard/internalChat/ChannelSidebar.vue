@@ -17,7 +17,11 @@ import {
   breakpointsTailwind,
   useEventListener,
 } from '@vueuse/core';
-import { useInternalChatSidebar } from 'dashboard/composables/useInternalChatSidebar';
+import {
+  useInternalChatSidebar,
+  MIN_WIDTH,
+  MAX_WIDTH,
+} from 'dashboard/composables/useInternalChatSidebar';
 
 const store = useStore();
 const { t } = useI18n();
@@ -33,6 +37,14 @@ const isSmallScreen = breakpoints.smaller('md');
 
 const { sidebarWidth, setSidebarWidth, commitWidth, collapse } =
   useInternalChatSidebar();
+
+// Arrow keys on the focused handle, so resizing isn't pointer-only.
+const KEYBOARD_STEP = 16;
+
+const nudgeWidth = delta => {
+  setSidebarWidth(sidebarWidth.value + (isRTL.value ? -delta : delta));
+  commitWidth();
+};
 
 // Resize handle, mirroring components-next/sidebar/Sidebar.vue
 const isResizing = ref(false);
@@ -488,7 +500,7 @@ async function handleDeleteCategory() {
 
 <template>
   <div
-    class="relative h-full w-full flex-col border-r border-n-slate-5 bg-n-solid-2 md:w-auto md:flex-shrink-0"
+    class="relative flex h-full w-full flex-col border-r border-n-slate-5 bg-n-solid-2 md:w-auto md:flex-shrink-0"
     :style="isSmallScreen ? undefined : { width: `${sidebarWidth}px` }"
   >
     <div class="px-3 pt-3 pb-1">
@@ -1159,9 +1171,20 @@ async function handleDeleteCategory() {
     <!-- Resize handle (desktop only) -->
     <div
       class="absolute top-0 z-40 hidden h-full w-1 cursor-col-resize group ltr:right-0 rtl:left-0 md:block"
+      role="separator"
+      aria-orientation="vertical"
+      tabindex="0"
+      :aria-label="t('INTERNAL_CHAT.SIDEBAR.RESIZE')"
+      :aria-valuenow="sidebarWidth"
+      :aria-valuemin="MIN_WIDTH"
+      :aria-valuemax="MAX_WIDTH"
       @mousedown="onResizeStart"
       @touchstart="onResizeStart"
       @dblclick="collapse"
+      @keydown.left.prevent="nudgeWidth(-KEYBOARD_STEP)"
+      @keydown.right.prevent="nudgeWidth(KEYBOARD_STEP)"
+      @keydown.enter.prevent="collapse"
+      @keydown.space.prevent="collapse"
     >
       <div
         class="absolute top-0 h-full w-px bg-transparent transition-colors group-hover:bg-n-brand ltr:right-0 rtl:left-0"
