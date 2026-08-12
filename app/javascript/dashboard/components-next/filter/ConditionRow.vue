@@ -138,6 +138,20 @@ const onAsyncSearch = query => {
   debouncedAsyncSearch(query);
 };
 
+/**
+ * Returns the empty value matching an input type, so the model stays compatible
+ * with the component that renders it. For example, a multi-select expects an
+ * array while a plain text input expects a string.
+ * @param {string} type - The input type
+ * @returns {Array|Object|string}
+ */
+const emptyValueForInputType = type => {
+  if (type === 'multiSelect') return [];
+  if (['searchSelect', 'asyncSearchSelect', 'booleanSelect'].includes(type))
+    return {};
+  return '';
+};
+
 const resetModelOnAttributeKeyChange = newAttributeKey => {
   /**
    * Resets the filter values and operator when the attribute key changes. This ensures that
@@ -147,21 +161,21 @@ const resetModelOnAttributeKeyChange = newAttributeKey => {
    */
   const filter = getFilterFromFilterTypes(newAttributeKey);
   const newOperator = getOperator(filter, filterOperator.value);
-  const newInputType = getInputType(newOperator, filter);
-  if (newInputType === 'multiSelect') {
-    values.value = [];
-  } else if (
-    ['searchSelect', 'asyncSearchSelect', 'booleanSelect'].includes(
-      newInputType
-    )
-  ) {
-    values.value = {};
-  } else {
-    values.value = '';
-  }
+  values.value = emptyValueForInputType(getInputType(newOperator, filter));
   asyncOptions.value = [];
   filterOperator.value = newOperator.value;
 };
+
+// Operators like `is_present` hide the input, so any previously typed value has to go with it.
+// Otherwise it stays in the model and gets persisted when the filter is saved as a folder.
+watch(currentOperator, (newOperator, oldOperator) => {
+  if (!newOperator || newOperator.value === oldOperator?.value) return;
+  if (newOperator.hasInput && oldOperator?.hasInput) return;
+
+  values.value = newOperator.hasInput
+    ? emptyValueForInputType(getInputType(newOperator, currentFilter.value))
+    : [];
+});
 
 watch([attributeKey, values, filterOperator], () => {
   showErrors.value = false;

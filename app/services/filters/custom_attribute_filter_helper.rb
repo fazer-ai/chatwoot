@@ -21,20 +21,18 @@ module Filters::CustomAttributeFilterHelper
 
   def build_custom_attr_query(query_hash, current_index)
     filter_operator_value = filter_operation(query_hash, current_index)
-    query_operator = query_hash[:query_operator]
+    data_type = attribute_data_type
     table_name = attribute_model == 'conversation_attribute' ? 'conversations' : 'contacts'
+    attribute_expression = data_type == 'text' ? "LOWER(#{table_name}.custom_attributes ->> ?)" : "(#{table_name}.custom_attributes ->> ?)"
 
-    query = if attribute_data_type == 'text'
-              ActiveRecord::Base.sanitize_sql_array(
-                ["LOWER(#{table_name}.custom_attributes ->> ?)::#{attribute_data_type} #{filter_operator_value} #{query_operator} ", @attribute_key]
-              )
-            else
-              ActiveRecord::Base.sanitize_sql_array(
-                ["(#{table_name}.custom_attributes ->> ?)::#{attribute_data_type} #{filter_operator_value} #{query_operator} ", @attribute_key]
-              )
-            end
+    condition = ActiveRecord::Base.sanitize_sql_array(
+      ["#{attribute_expression}::#{data_type} #{filter_operator_value}", @attribute_key]
+    )
+    condition += not_in_custom_attr_query(table_name, query_hash, data_type)
 
-    query + not_in_custom_attr_query(table_name, query_hash, attribute_data_type)
+    # The condition is wrapped so the optional `OR ... IS NULL` clause stays scoped to this attribute
+    # instead of spilling over the query operator that chains it to the next condition.
+    "(#{condition}) #{query_hash[:query_operator]} "
   end
 
   def custom_attribute(attribute_key, account, custom_attribute_type)

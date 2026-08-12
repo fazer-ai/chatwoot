@@ -129,6 +129,10 @@ export const getValuesForFilter = (filter, params) => {
 export const generateValuesForEditCustomViews = (filter, params) => {
   const { attribute_key, filter_operator, values } = filter;
   const { filterTypes, allCustomAttributes } = params;
+
+  // Presence operators have no input, so a saved folder holds no value to map back.
+  if (['is_present', 'is_not_present'].includes(filter_operator)) return [];
+
   const inputType = getInputType(attribute_key, filter_operator, filterTypes);
 
   if (inputType === undefined) {
