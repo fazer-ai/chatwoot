@@ -324,23 +324,19 @@ RSpec.describe 'Conversation Messages API', type: :request do
                       )
                       .to_return(status: 200, body: '{}')
 
-        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
-               headers: agent.create_new_auth_token,
-               as: :json
+        perform_enqueued_jobs(only: Messages::DeleteOnChannelJob) do
+          delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
+                 headers: agent.create_new_auth_token,
+                 as: :json
+        end
 
         expect(response).to have_http_status(:success)
         expect(message_with_source.reload.deleted).to be true
         expect(delete_stub).to have_been_requested
       end
 
-      it 'does not fail when channel delete_message raises an error' do
-        stub_request(:delete, delete_request_path)
-          .to_return(status: 400, body: 'Provider error')
-
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
-          .to_return(status: 200)
-
-        allow(Rails.logger).to receive(:error)
+      it 'does not fail when the provider is unreachable' do
+        stub_request(:delete, delete_request_path).to_return(status: 400, body: 'Provider error')
 
         delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
                headers: agent.create_new_auth_token,
@@ -348,15 +344,19 @@ RSpec.describe 'Conversation Messages API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(message_with_source.reload.deleted).to be true
+        # the deletion is retried by the job, so a provider hiccup never fails the agent's request
+        expect(Messages::DeleteOnChannelJob).to have_been_enqueued.with(message_with_source.id)
       end
 
       it 'skips channel deletion when message has no source_id' do
         message_without_source = create(:message, account: account, conversation: whatsapp_conversation, inbox: whatsapp_inbox, source_id: nil)
         delete_stub = stub_request(:delete, delete_request_path).to_return(status: 200, body: '{}')
 
-        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_without_source.id}",
-               headers: agent.create_new_auth_token,
-               as: :json
+        perform_enqueued_jobs(only: Messages::DeleteOnChannelJob) do
+          delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_without_source.id}",
+                 headers: agent.create_new_auth_token,
+                 as: :json
+        end
 
         expect(response).to have_http_status(:success)
         expect(message_without_source.reload.deleted).to be true
@@ -475,6 +475,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'returns unprocessable_entity for deleted messages' do
+        deleted_failed = create(:message, account: account, message_type: :outgoing, status: :failed,
+                                          content: 'This message was deleted', content_attributes: { deleted: true })
+        create(:inbox_member, inbox: deleted_failed.conversation.inbox, user: agent)
+        clear_enqueued_jobs # drop the SendReplyJob queued by the message creation itself
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{deleted_failed.conversation.display_id}/messages/#{deleted_failed.id}/retry",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        # retrying would wipe content_attributes and push the placeholder to the contact
+        expect(deleted_failed.reload).to be_deleted
+        expect(SendReplyJob).not_to have_been_enqueued.with(deleted_failed.id)
       end
     end
 

@@ -141,7 +141,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       @message_content = { text: @message.outgoing_content }.merge(reply_context)
       merge_mention_data
     else
-      @message.update!(is_unsupported: true)
+      @message.update_under_lock!(is_unsupported: true)
       return
     end
 
@@ -751,7 +751,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return unless timestamp
 
     external_created_at = baileys_extract_message_timestamp(timestamp)
-    @message.update!(external_created_at: external_created_at)
+    @message.update_under_lock!(external_created_at: external_created_at)
   end
 
   def build_participant_contacts(participants, inbox, skip_avatars: false)
