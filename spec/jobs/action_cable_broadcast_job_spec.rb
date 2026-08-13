@@ -44,6 +44,47 @@ RSpec.describe ActionCableBroadcastJob do
       end
     end
 
+    # The refresh rebuilds the payload from the conversation row, so it is the
+    # one place that can silently undo the contact-bound redaction done by
+    # ActionCableListener#broadcast_to_contact — and hand the contact's browser
+    # the private note over the websocket. The rule it encodes: refresh values,
+    # never widen the payload.
+    context 'when a contact-bound payload arrives stripped of agent-only keys' do
+      let(:event_name) { 'conversation.updated' }
+      let(:data) { base_data }
+
+      before do
+        create(:message, conversation: conversation, account: account,
+                         message_type: :outgoing, private: true, content: 'Internal only: overdue invoice')
+      end
+
+      it 'does not re-add last_non_activity_message' do
+        expect(ActionCable.server).to receive(:broadcast) do |_member, payload|
+          expect(payload[:data]).not_to have_key(:last_non_activity_message)
+          # The refresh still ran — this is not a pass-through.
+          expect(payload[:data][:status]).to eq(conversation.status)
+        end
+        described_class.new.perform(members, event_name, data)
+      end
+    end
+
+    context 'when an agent-bound payload carries agent-only keys' do
+      let(:event_name) { 'conversation.updated' }
+      let(:data) { base_data.merge(last_non_activity_message: { id: 0, content: 'stale snapshot' }) }
+
+      before do
+        create(:message, conversation: conversation, account: account,
+                         message_type: :outgoing, private: true, content: 'Internal only: overdue invoice')
+      end
+
+      it 'refreshes them instead of dropping them' do
+        expect(ActionCable.server).to receive(:broadcast) do |_member, payload|
+          expect(payload[:data][:last_non_activity_message][:content]).to eq('Internal only: overdue invoice')
+        end
+        described_class.new.perform(members, event_name, data)
+      end
+    end
+
     context 'when the event is not in the refresh list' do
       let(:event_name) { 'message.created' }
       let(:data) { base_data.merge(event_metadata: { source: 'reaction_toggle' }) }

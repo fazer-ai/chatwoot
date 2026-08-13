@@ -1,4 +1,16 @@
 class Conversations::EventDataPresenter < SimpleDelegator
+  # Keys in `push_data` that must never reach a contact. `last_non_activity_message`
+  # is the one that bites: `non_activity_messages` filters `message_type`, not
+  # `private`, so a trailing private note is exactly what that field resolves to.
+  # Agents need it (it is what keeps the chat list preview fresh), but the contact
+  # subscribes to `conversation.created`, `conversation.status_changed`,
+  # `conversation.updated` and the typing events too, so those broadcasts strip
+  # these keys before the payload leaves the server (ActionCableListener), and
+  # ActionCableBroadcastJob refuses to re-add them when it refreshes a payload.
+  # The REST payload is unaffected: `/conversations` is agent-authenticated, so
+  # the jbuilder keeps serving the private note as the chat list preview.
+  AGENT_ONLY_PUSH_KEYS = %i[last_non_activity_message].freeze
+
   def push_data # rubocop:disable Metrics/MethodLength
     {
       additional_attributes: additional_attributes,
