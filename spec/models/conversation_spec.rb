@@ -658,6 +658,19 @@ RSpec.describe Conversation do
 
       expect(conversation.dashboard_seed_message).to eq(regular)
     end
+
+    # Pagination compares ids, so on a `created_at` tie the cursor has to be the
+    # highest id — otherwise the rows between the two land outside both the seed
+    # and the `id < cursor` page. Bulk imports write second-precision
+    # timestamps, so ties are not hypothetical.
+    it 'breaks created_at ties by id' do
+      timestamp = 1.hour.ago
+      regular.update!(created_at: timestamp)
+      newest = create(:message, conversation: conversation, account: conversation.account)
+      newest.update!(created_at: timestamp)
+
+      expect(conversation.dashboard_seed_message).to eq(newest)
+    end
   end
 
   describe '#last_non_activity_message' do

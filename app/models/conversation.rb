@@ -180,11 +180,15 @@ class Conversation < ApplicationRecord
   # Chat list previews use `last_non_activity_message`: keep the two separate.
   # Agent-facing payloads only — the cable broadcast reaches the contact too and
   # keeps its own narrower query (see EventDataPresenter#push_messages).
+  # The `id` tie-break is load-bearing: pagination compares ids, so on a
+  # `created_at` tie the cursor has to be the highest id or the rows between
+  # them fall through the same crack. Imports write second-precision
+  # timestamps in bulk (DataImports::Intercom::Importer), so ties are real.
   def dashboard_seed_message
     messages.where(account_id: account_id)
             .hide_removed_reactions
             .includes([{ attachments: [{ file_attachment: [:blob] }] }])
-            .reorder(created_at: :desc)
+            .reorder(created_at: :desc, id: :desc)
             .first
   end
 
@@ -196,7 +200,7 @@ class Conversation < ApplicationRecord
             .non_activity_messages
             .hide_removed_reactions
             .includes([{ attachments: [{ file_attachment: [:blob] }] }])
-            .reorder(created_at: :desc)
+            .reorder(created_at: :desc, id: :desc)
             .first
   end
 
