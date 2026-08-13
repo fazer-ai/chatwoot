@@ -634,6 +634,63 @@ RSpec.describe Conversation do
     end
   end
 
+  # The dashboard pages backwards from this message with `id < cursor`, so any
+  # message_type/private filter here hides everything created after it.
+  describe '#dashboard_seed_message' do
+    let(:conversation) { create(:conversation) }
+    let!(:regular) { create(:message, conversation: conversation, account: conversation.account) }
+
+    it 'returns the newest message when it is an activity message' do
+      activity = create(:message, conversation: conversation, account: conversation.account, message_type: :activity)
+
+      expect(conversation.dashboard_seed_message).to eq(activity)
+    end
+
+    it 'returns the newest message when it is a private note' do
+      private_note = create(:message, conversation: conversation, account: conversation.account, private: true)
+
+      expect(conversation.dashboard_seed_message).to eq(private_note)
+    end
+
+    it 'skips reactions whose user-facing state is removed' do
+      create(:message, conversation: conversation, account: conversation.account, content: '',
+                       content_attributes: { is_reaction: true, deleted: true })
+
+      expect(conversation.dashboard_seed_message).to eq(regular)
+    end
+
+    # Pagination compares ids, so on a `created_at` tie the cursor has to be the
+    # highest id — otherwise the rows between the two land outside both the seed
+    # and the `id < cursor` page. Bulk imports write second-precision
+    # timestamps, so ties are not hypothetical.
+    it 'breaks created_at ties by id' do
+      timestamp = 1.hour.ago
+      regular.update!(created_at: timestamp)
+      newest = create(:message, conversation: conversation, account: conversation.account)
+      newest.update!(created_at: timestamp)
+
+      expect(conversation.dashboard_seed_message).to eq(newest)
+    end
+  end
+
+  describe '#last_non_activity_message' do
+    let(:conversation) { create(:conversation) }
+    let!(:regular) { create(:message, conversation: conversation, account: conversation.account) }
+
+    it 'skips activity messages' do
+      create(:message, conversation: conversation, account: conversation.account, message_type: :activity)
+
+      expect(conversation.last_non_activity_message).to eq(regular)
+    end
+
+    it 'skips reactions whose user-facing state is removed' do
+      create(:message, conversation: conversation, account: conversation.account, content: '',
+                       content_attributes: { is_reaction: true, deleted: true })
+
+      expect(conversation.last_non_activity_message).to eq(regular)
+    end
+  end
+
   describe 'unread_incoming_messages' do
     subject(:unread_incoming_messages) { conversation.unread_incoming_messages }
 

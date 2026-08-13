@@ -74,6 +74,24 @@ RSpec.describe Conversations::EventDataPresenter do
     end
   end
 
+  describe '#push_data messages' do
+    # `push_data` is broadcast to the contact as well (ActionCableListener
+    # bundles `user_tokens + contact_inbox_tokens` for conversation.created /
+    # status_changed / updated), so this array has to stay free of activity
+    # messages and private notes. It is NOT the dashboard seed — that one lives
+    # in the conversation jbuilder and is deliberately wider. If this spec
+    # breaks because someone mirrored the jbuilder here, the fix is to split
+    # the broadcast audience, not to widen the query.
+    it 'excludes activity messages and private notes' do
+      chat_message = create(:message, conversation: conversation, account: conversation.account, message_type: :outgoing)
+      create(:message, conversation: conversation, account: conversation.account, private: true)
+      create(:message, conversation: conversation, account: conversation.account,
+                       message_type: :activity, content: 'Conversation was marked resolved by John')
+
+      expect(presenter.push_data[:messages].pluck(:id)).to eq([chat_message.id])
+    end
+  end
+
   describe '#push_data last_non_activity_message' do
     it 'is nil when the conversation has no non-activity messages' do
       expect(presenter.push_data[:last_non_activity_message]).to be_nil
@@ -87,6 +105,18 @@ RSpec.describe Conversations::EventDataPresenter do
 
       expect(data[:id]).to eq(message.id)
       expect(data[:content]).to eq('Hello there')
+    end
+
+    # Counterpart of the seed: the chat list preview must never read
+    # "Conversation was marked resolved by ...". If this and #push_data messages
+    # ever agree on the same row for this scenario, the queries got merged.
+    it 'skips activity messages' do
+      message = create(:message, conversation: conversation, account: conversation.account,
+                                 message_type: :outgoing, content: 'Hello there')
+      create(:message, conversation: conversation, account: conversation.account,
+                       message_type: :activity, content: 'Conversation was marked resolved by John')
+
+      expect(presenter.push_data[:last_non_activity_message][:id]).to eq(message.id)
     end
 
     it 'skips reactions whose user-facing state is removed' do

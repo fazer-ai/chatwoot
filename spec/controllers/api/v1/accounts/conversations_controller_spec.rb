@@ -48,8 +48,52 @@ RSpec.describe 'Conversations API', type: :request do
             headers: agent.create_new_auth_token,
             as: :json
 
-        body = JSON.parse(response.body, symbolize_names: true)
-        expect(body[:data][:payload].first[:messages].first[:id]).to eq(private_note.id)
+        payload = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first
+        expect(payload[:messages].first[:id]).to eq(private_note.id)
+        # The card preview shows private notes too — only activity messages are
+        # filtered out of `last_non_activity_message`.
+        expect(payload[:last_non_activity_message][:id]).to eq(private_note.id)
+      end
+
+      # Regression (#350): the seed is the `before` cursor and pages with
+      # `id < before`, so filtering activity messages out of it hid every
+      # status/assignment change created after the last regular message. The
+      # card preview reads `last_non_activity_message`, which is a separate
+      # query — do not collapse the two again.
+      it 'seeds the latest message even when it is an activity message, without leaking it into the preview' do
+        message = create(:message, conversation: conversation, account: account)
+        activity = create(:message, conversation: conversation, account: account, message_type: :activity,
+                                    content: 'Conversation was marked resolved by John')
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        payload = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first
+        expect(payload[:messages].first[:id]).to eq(activity.id)
+        expect(payload[:last_non_activity_message][:id]).to eq(message.id)
+      end
+
+      # Regression (#350): the seed and the message pagination have to line up.
+      # This walks the exact path the dashboard takes on cold open — read the
+      # seed from the list, then page with it as the `before` cursor.
+      it 'reaches every activity message through the seed cursor' do
+        create(:message, conversation: conversation, account: account)
+        activity = create(:message, conversation: conversation, account: account, message_type: :activity,
+                                    content: 'Conversation was marked resolved by John')
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+        seed = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first[:messages]
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
+            params: { before: seed.first[:id] },
+            headers: agent.create_new_auth_token,
+            as: :json
+        paginated = JSON.parse(response.body, symbolize_names: true)[:payload]
+
+        expect(seed.pluck(:id) + paginated.pluck(:id)).to include(activity.id)
       end
 
       it 'returns conversations with empty messages array for conversations with out messages' do
