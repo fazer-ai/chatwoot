@@ -195,6 +195,7 @@ class Conversation < ApplicationRecord
     messages.where(account_id: account_id)
             .non_activity_messages
             .hide_removed_reactions
+            .includes([{ attachments: [{ file_attachment: [:blob] }] }])
             .reorder(created_at: :desc)
             .first
   end
