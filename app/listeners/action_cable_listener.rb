@@ -145,9 +145,12 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
   def conversation_created(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
+    # Built once and shared: `push_event_data` is several queries deep, and the
+    # contact's copy is a subset of the agents', never a fresher read.
+    payload = conversation.push_event_data
 
-    broadcast(account, tokens, CONVERSATION_CREATED, conversation.push_event_data)
+    broadcast(account, user_tokens(account, conversation.inbox.members), CONVERSATION_CREATED, payload)
+    broadcast_to_contact(account, conversation, CONVERSATION_CREATED, payload)
   end
 
   def conversation_read(event)
@@ -159,19 +162,21 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
   def conversation_status_changed(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
+    payload = conversation.push_event_data
 
-    broadcast(account, tokens, CONVERSATION_STATUS_CHANGED, conversation.push_event_data)
+    broadcast(account, user_tokens(account, conversation.inbox.members), CONVERSATION_STATUS_CHANGED, payload)
+    broadcast_to_contact(account, conversation, CONVERSATION_STATUS_CHANGED, payload)
   end
 
   def conversation_updated(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
 
     payload = conversation.push_event_data
     metadata = event.data[:broadcast_metadata]
     payload = payload.merge(event_metadata: metadata) if metadata.present?
-    broadcast(account, tokens, CONVERSATION_UPDATED, payload)
+
+    broadcast(account, user_tokens(account, conversation.inbox.members), CONVERSATION_UPDATED, payload)
+    broadcast_to_contact(account, conversation, CONVERSATION_UPDATED, payload)
   end
 
   def conversation_unread_count_changed(event)
@@ -193,7 +198,7 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_TYPING_ON,
-      conversation: conversation.push_event_data,
+      conversation: typing_conversation_data(conversation),
       user: user.push_event_data,
       is_private: event.data[:is_private] || false
     )
@@ -209,7 +214,7 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_RECORDING,
-      conversation: conversation.push_event_data,
+      conversation: typing_conversation_data(conversation),
       user: user.push_event_data,
       is_private: event.data[:is_private] || false
     )
@@ -225,7 +230,7 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_TYPING_OFF,
-      conversation: conversation.push_event_data,
+      conversation: typing_conversation_data(conversation),
       user: user.push_event_data,
       is_private: event.data[:is_private] || false
     )
@@ -298,6 +303,26 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
   def account_token(account)
     "account_#{account.id}"
+  end
+
+  # The contact subscribes to the same conversation events as the agents, but
+  # `push_event_data` carries agent-only content — a trailing private note is
+  # what `last_non_activity_message` resolves to. So the contact gets its own
+  # broadcast with those keys stripped, instead of riding along on the agents'
+  # payload. ActionCableBroadcastJob refuses to re-add them when it refreshes
+  # the payload; without that guard this stripping would be undone downstream.
+  def broadcast_to_contact(account, conversation, event_name, payload)
+    broadcast(account, contact_inbox_tokens(conversation.contact_inbox), event_name,
+              payload.except(*Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS))
+  end
+
+  # Typing events reach agents and the contact in a single payload, and the only
+  # thing any subscriber reads off the conversation here is its id. Rather than
+  # doubling the jobs on a per-keystroke path, drop the agent-only keys for
+  # everyone — otherwise every keystroke ships the latest private note to the
+  # contact's websocket.
+  def typing_conversation_data(conversation)
+    conversation.push_event_data.except(*Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS)
   end
 
   def typing_event_listener_tokens(account, conversation, user)

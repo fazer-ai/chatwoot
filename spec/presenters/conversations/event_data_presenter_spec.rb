@@ -107,6 +107,21 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(data[:content]).to eq('Hello there')
     end
 
+    # Deliberate, and the reason AGENT_ONLY_PUSH_KEYS exists: `non_activity_messages`
+    # filters `message_type`, not `private`, so the agent-facing chat list preview
+    # reads the private note when that is the newest thing that happened. Keeping
+    # it out of the contact's browser is the broadcast layer's job (see
+    # spec/listeners/action_cable_listener_spec.rb) — do NOT "fix" a leak by
+    # narrowing this query, that would blank the preview for agents on the REST
+    # path too, where no contact is listening.
+    it 'includes private notes' do
+      note = create(:message, conversation: conversation, account: conversation.account,
+                              message_type: :outgoing, private: true, content: 'Internal only')
+
+      expect(presenter.push_data[:last_non_activity_message][:id]).to eq(note.id)
+      expect(described_class::AGENT_ONLY_PUSH_KEYS).to include(:last_non_activity_message)
+    end
+
     # Counterpart of the seed: the chat list preview must never read
     # "Conversation was marked resolved by ...". If this and #push_data messages
     # ever agree on the same row for this scenario, the queries got merged.
