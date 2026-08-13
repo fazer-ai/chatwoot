@@ -33,20 +33,25 @@ class Conversations::EventDataPresenter < SimpleDelegator
 
   private
 
+  # This payload also reaches the contact: ActionCableListener broadcasts
+  # `conversation.created`, `conversation.status_changed` and
+  # `conversation.updated` to `user_tokens + contact_inbox_tokens` in a single
+  # message. `.chat` (no activity, no private) is what keeps agent-only content
+  # out of the contact's browser, so this array is deliberately NOT the
+  # dashboard seed — that one lives in the conversation jbuilder
+  # (`Conversation#dashboard_seed_message`) and is wider on purpose. Do not
+  # "mirror the jbuilder" here before splitting the broadcast audience.
   def push_messages
     [messages.where(account_id: account_id).chat.last&.push_event_data].compact
   end
 
-  # Mirrors the conversation jbuilder so cable subscribers can refresh the chat
-  # list preview after in-place reaction updates (the snake-cased field is read
-  # by the frontend store and `MessagePreview` to derive the latest visible
+  # Same query and reaction enrichment as the `last_non_activity_message` field
+  # in the conversation jbuilder, so cable subscribers can refresh the chat list
+  # preview after in-place reaction updates (the snake-cased field is read by
+  # the frontend store and `MessagePreview` to derive the latest visible
   # message). Without this, the snapshot taken at fetch time stays stale.
   def push_last_non_activity_message
-    msg = messages.where(account_id: account_id)
-                  .non_activity_messages
-                  .hide_removed_reactions
-                  .reorder(created_at: :desc)
-                  .first
+    msg = last_non_activity_message
     return nil unless msg
 
     data = msg.push_event_data

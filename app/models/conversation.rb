@@ -171,6 +171,34 @@ class Conversation < ApplicationRecord
     messages.where(account_id: account_id)&.incoming&.last
   end
 
+  # Seeds `currentChat.messages` in the dashboard AND doubles as the `before`
+  # cursor in setActiveChat → fetchPreviousMessages, where MessageFinder pages
+  # with `id < before`. It must therefore be the newest message the dashboard
+  # renders. Filtering by `message_type` or `private` here silently hides every
+  # message created after the one we pick — that is how activity messages
+  # ("Conversation was marked resolved by ...") vanished from the history.
+  # Chat list previews use `last_non_activity_message`: keep the two separate.
+  # Agent-facing payloads only — the cable broadcast reaches the contact too and
+  # keeps its own narrower query (see EventDataPresenter#push_messages).
+  def dashboard_seed_message
+    messages.where(account_id: account_id)
+            .hide_removed_reactions
+            .includes([{ attachments: [{ file_attachment: [:blob] }] }])
+            .reorder(created_at: :desc)
+            .first
+  end
+
+  # Drives the chat list preview, which must never read "Conversation was
+  # marked resolved by ...". Unlike `dashboard_seed_message`, skipping activity
+  # messages here is intentional.
+  def last_non_activity_message
+    messages.where(account_id: account_id)
+            .non_activity_messages
+            .hide_removed_reactions
+            .reorder(created_at: :desc)
+            .first
+  end
+
   def toggle_status
     # FIXME: implement state machine with aasm
     self.status = open? ? :resolved : :open

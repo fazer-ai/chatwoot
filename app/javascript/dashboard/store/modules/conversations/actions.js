@@ -198,7 +198,12 @@ const actions = {
       try {
         await dispatch('fetchPreviousMessages', {
           after,
-          before: data.messages[0].id,
+          // A conversation with no messages at all seeds an empty array.
+          // Without the cursor the finder returns the latest page instead, so
+          // the fetch still resolves and SET_CHAT_DATA_FETCHED runs — reading
+          // `.id` off `undefined` here used to throw and leave the chat stuck
+          // with `dataFetched` unset, which also blocks scroll pagination.
+          before: data.messages[0]?.id,
           conversationId: data.id,
         });
         commit(types.SET_CHAT_DATA_FETCHED, data.id);

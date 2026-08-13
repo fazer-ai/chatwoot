@@ -762,6 +762,24 @@ describe('#addMentions', () => {
       expect(localDispatch).not.toHaveBeenCalled();
     });
 
+    it('should fetch without a cursor when the conversation has no messages', async () => {
+      const localCommit = vi.fn();
+      const localDispatch = vi.fn().mockResolvedValue();
+      const data = { id: 42, messages: [] };
+
+      await actions.setActiveChat(
+        { commit: localCommit, dispatch: localDispatch },
+        { data }
+      );
+
+      expect(localDispatch).toHaveBeenCalledWith('fetchPreviousMessages', {
+        after: undefined,
+        before: undefined,
+        conversationId: 42,
+      });
+      expect(localCommit).toHaveBeenCalledWith(types.SET_CHAT_DATA_FETCHED, 42);
+    });
+
     it('should commit SET_CHAT_DATA_FETCHED by ID, not mutate the data object directly (race condition fix)', async () => {
       const localCommit = vi.fn();
       const localDispatch = vi.fn().mockResolvedValue();
