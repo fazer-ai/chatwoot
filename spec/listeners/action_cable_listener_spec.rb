@@ -326,10 +326,17 @@ describe ActionCableListener do
       listener.conversation_created(Events::Base.new(:'conversation.created', Time.zone.now, conversation: conversation))
       listener.conversation_status_changed(Events::Base.new(:'conversation.status_changed', Time.zone.now, conversation: conversation))
       listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+      # All three typing events share `typing_conversation_data`, so all three
+      # belong here — they are also the highest-frequency vector, firing per
+      # keystroke rather than per status change.
       listener.conversation_typing_on(Events::Base.new(:'conversation.typing_on', Time.zone.now,
                                                        conversation: conversation, user: agent, is_private: true))
+      listener.conversation_recording(Events::Base.new(:'conversation.recording', Time.zone.now,
+                                                       conversation: conversation, user: agent, is_private: true))
+      listener.conversation_typing_off(Events::Base.new(:'conversation.typing_off', Time.zone.now,
+                                                        conversation: conversation, user: agent, is_private: true))
 
-      expect(payloads.size).to eq(4)
+      expect(payloads.size).to eq(6)
       expect(payloads.to_s).not_to include(secret)
     end
 
