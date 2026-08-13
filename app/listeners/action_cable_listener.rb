@@ -198,9 +198,9 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_TYPING_ON,
-      conversation: typing_conversation_data(conversation),
-      user: user.push_event_data,
-      is_private: event.data[:is_private] || false
+      { conversation: typing_conversation_data(conversation),
+        user: user.push_event_data,
+        is_private: event.data[:is_private] || false }
     )
   end
 
@@ -214,9 +214,9 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_RECORDING,
-      conversation: typing_conversation_data(conversation),
-      user: user.push_event_data,
-      is_private: event.data[:is_private] || false
+      { conversation: typing_conversation_data(conversation),
+        user: user.push_event_data,
+        is_private: event.data[:is_private] || false }
     )
   end
 
@@ -230,9 +230,9 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
       account,
       tokens,
       CONVERSATION_TYPING_OFF,
-      conversation: typing_conversation_data(conversation),
-      user: user.push_event_data,
-      is_private: event.data[:is_private] || false
+      { conversation: typing_conversation_data(conversation),
+        user: user.push_event_data,
+        is_private: event.data[:is_private] || false }
     )
   end
 
@@ -306,23 +306,28 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   end
 
   # The contact subscribes to the same conversation events as the agents, but
-  # `push_event_data` carries agent-only content — a trailing private note is
-  # what `last_non_activity_message` resolves to. So the contact gets its own
-  # broadcast with those keys stripped, instead of riding along on the agents'
-  # payload. ActionCableBroadcastJob refuses to re-add them when it refreshes
-  # the payload; without that guard this stripping would be undone downstream.
+  # `push_event_data` is an agent payload. It gets its own broadcast built from
+  # the contact allowlist instead of riding along on the agents' hash.
+  # `payload` is passed in rather than re-derived so per-event extras the caller
+  # merged in (eg. `event_metadata`) survive the narrowing.
+  # ActionCableBroadcastJob preserves the shape it is handed; without that, the
+  # refresh would rebuild the full agent payload and undo this.
   def broadcast_to_contact(account, conversation, event_name, payload)
+    # `performer` is skipped rather than allowlisted: it is merged in below,
+    # after the narrowing, and carries the acting agent's name and availability
+    # status. The widget never reads it. Typing events keep it — they already
+    # send `user` on purpose so the widget can render "agent is typing".
     broadcast(account, contact_inbox_tokens(conversation.contact_inbox), event_name,
-              payload.except(*Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS))
+              Conversations::EventDataPresenter.contact_slice(payload), include_performer: false)
   end
 
-  # Typing events reach agents and the contact in a single payload, and the only
-  # thing any subscriber reads off the conversation here is its id. Rather than
-  # doubling the jobs on a per-keystroke path, drop the agent-only keys for
-  # everyone — otherwise every keystroke ships the latest private note to the
-  # contact's websocket.
+  # Typing events reach agents and the contact in a single payload, and no
+  # subscriber reads more than the conversation id here — the dashboard handlers
+  # key their timers off `conversation.id` and nothing else. So this ships the
+  # contact-sized payload to everyone rather than doubling the jobs on a
+  # per-keystroke path.
   def typing_conversation_data(conversation)
-    conversation.push_event_data.except(*Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS)
+    conversation.contact_push_event_data
   end
 
   def typing_event_listener_tokens(account, conversation, user)
@@ -377,13 +382,13 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
                          clean, clean])
   end
 
-  def broadcast(account, tokens, event_name, data)
+  def broadcast(account, tokens, event_name, data, include_performer: true)
     return if tokens.blank?
 
     payload = data.merge(account_id: account.id)
     # So the frondend knows who performed the action.
     # Useful in cases like conversation assignment for generating a notification with assigner name.
-    payload[:performer] = Current.user&.push_event_data if Current.user.present?
+    payload[:performer] = Current.user&.push_event_data if include_performer && Current.user.present?
 
     ::ActionCableBroadcastJob.perform_later(tokens.uniq, event_name, payload)
   end
