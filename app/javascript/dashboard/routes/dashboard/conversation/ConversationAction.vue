@@ -1,14 +1,18 @@
 <!-- eslint-disable vue/v-slot-style -->
 <script>
 import { mapGetters } from 'vuex';
-import { useAlert } from 'dashboard/composables';
 import { useAgentsList } from 'dashboard/composables/useAgentsList';
 import ContactDetailsItem from './ContactDetailsItem.vue';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import ConversationLabels from './labels/LabelBox.vue';
 import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
-import { useTrack } from 'dashboard/composables';
+import {
+  useAlert,
+  useTrack,
+  useAssignmentConflict,
+  assignmentConflictAgent,
+} from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
@@ -89,23 +93,23 @@ export default {
           }
         );
       },
-      set(agent) {
-        const agentId = agent ? agent.id : null;
+      async set(agent) {
         const assigneeType = agent ? agent.assignee_type || 'User' : null;
-        this.$store.dispatch('setCurrentChatAssignee', {
-          conversationId: this.currentChat.id,
-          assignee: agent,
-          assigneeType,
-        });
-        this.$store
-          .dispatch('assignAgent', {
+        try {
+          await this.$store.dispatch('assignAgent', {
             conversationId: this.currentChat.id,
-            agentId,
+            assignee: agent,
             assigneeType,
-          })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
+        } catch (error) {
+          const conflictAgent = assignmentConflictAgent(error);
+          if (conflictAgent === null) {
+            useAlert(this.$t('CONVERSATION.CHANGE_AGENT_FAILED'));
+            return;
+          }
+          useAssignmentConflict(conflictAgent);
+        }
       },
     },
     assignedTeam: {

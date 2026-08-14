@@ -10,6 +10,12 @@ RSpec.describe Inbox do
     it { is_expected.to validate_presence_of(:name) }
   end
 
+  describe 'prevent_assignment_takeover' do
+    it 'is opt-in, so existing inboxes keep the last-write-wins behaviour' do
+      expect(create(:inbox).prevent_assignment_takeover).to be(false)
+    end
+  end
+
   describe 'associations' do
     it { is_expected.to belong_to(:account) }
 

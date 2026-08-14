@@ -1,4 +1,5 @@
 import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 import analyticsHelper from 'dashboard/helper/AnalyticsHelper/index';
 
 /**
@@ -39,4 +40,27 @@ export const usePendingAlert = message => {
     action: { persistent: true, key },
   });
   return () => emitter.emit('dismissToastMessage', { key });
+};
+
+/**
+ * Opens the dialog that tells the agent a conversation is already someone
+ * else's. A toast is the wrong surface here: it fades on its own and the agent
+ * is about to start working a lead that is not theirs.
+ * @param {string} agentName - The agent currently handling the conversation.
+ */
+export const useAssignmentConflict = agentName => {
+  emitter.emit(BUS_EVENTS.ASSIGNMENT_CONFLICT, { agentName });
+};
+
+/**
+ * Reads the assignment conflict out of a rejected assignment request, if that
+ * is what it is. Returns null for any other failure so the caller can fall back
+ * to its regular error handling.
+ * @param {Object} error - The rejected axios error.
+ * @returns {string|null} The agent currently handling the conversation.
+ */
+export const assignmentConflictAgent = error => {
+  if (error?.response?.status !== 409) return null;
+
+  return error.response.data?.agent_name ?? '';
 };

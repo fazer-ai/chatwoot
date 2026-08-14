@@ -288,6 +288,12 @@
     "CHANGE_STATUS_FAILED": "Mudança de status da conversa falhou",
     "CHANGE_AGENT": "Novo agente atribuído",
     "CHANGE_AGENT_FAILED": "Falha ao atribuir outro agente",
+    "ASSIGNMENT_CONFLICT": {
+      "TITLE": "Conversa já atribuída",
+      "DESCRIPTION": "{agentName} já está atendendo esta conversa. Peça para liberar, ou peça a um administrador para reatribuir.",
+      "DESCRIPTION_UNKNOWN_AGENT": "Outro agente já está atendendo esta conversa. Peça para liberar, ou peça a um administrador para reatribuir.",
+      "CONFIRM": "Entendi"
+    },
     "ASSIGN_LABEL_SUCCESFUL": "Etiqueta atribuída com sucesso",
     "ASSIGN_LABEL_FAILED": "Falha ao atribuir etiqueta",
     "CHANGE_TEAM": "Status da conversa mudou",

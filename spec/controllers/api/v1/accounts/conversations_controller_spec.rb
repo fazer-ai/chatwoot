@@ -664,6 +664,24 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.status).to eq('snoozed')
         expect(conversation.reload.snoozed_until.to_i).to eq(snoozed_until)
       end
+
+      # Reopening self-assigns via `handle_human_open`, which is a second claim
+      # path that bypasses Conversations::AssignmentService entirely.
+      it 'answers 409 when reopening a conversation assigned to another agent' do
+        owner = create(:user, account: account, role: :agent)
+        create(:inbox_member, inbox: conversation.inbox, user: owner)
+        conversation.update!(status: 'resolved', assignee: owner)
+        conversation.inbox.update!(prevent_assignment_takeover: true)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+             headers: agent.create_new_auth_token,
+             params: { status: 'open' },
+             as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['agent_name']).to eq(owner.available_name)
+        expect(conversation.reload.assignee).to eq(owner)
+      end
     end
 
     context 'when it is an authenticated bot' do

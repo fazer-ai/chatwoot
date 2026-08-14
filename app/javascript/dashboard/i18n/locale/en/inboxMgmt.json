@@ -1097,6 +1097,8 @@
       "TITLE": "Conversation Assignment",
       "DESCRIPTION": "Automatically assign incoming conversations to available agents based on assignment policies",
       "ENABLE_AUTO_ASSIGNMENT": "Enable automatic conversation assignment",
+      "PREVENT_TAKEOVER": "Prevent assignment takeover",
+      "PREVENT_TAKEOVER_SUB_TEXT": "Once an agent takes a conversation, only they or an administrator can change who is handling it. Automatic assignment is not affected.",
       "DEFAULT_RULES_TITLE": "Default assignment rules",
       "DEFAULT_RULES_DESCRIPTION": "Using the default assignment behavior for all conversations",
       "DEFAULT_RULE_1": "Earliest created conversations first",

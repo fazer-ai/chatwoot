@@ -214,31 +214,39 @@ const actions = {
     ConversationApi.presenceSubscribe(data.id)?.catch(() => {});
   },
 
+  // Owns both the optimistic write and its rollback. Callers used to commit the
+  // new assignee themselves and nobody ever undid it, so a rejected assignment
+  // (an inbox with `prevent_assignment_takeover` answers 409) left the agent
+  // looking at their own name and believing they owned the conversation.
   assignAgent: async (
-    { dispatch },
-    { conversationId, agentId, assigneeType }
+    { commit, getters },
+    { conversationId, assignee, assigneeType }
   ) => {
+    const previousChat = getters.getConversationById(conversationId);
+    const previousAssignee = previousChat?.meta?.assignee ?? null;
+    const previousAssigneeType = previousChat?.meta?.assignee_type ?? null;
+
+    commit(types.ASSIGN_AGENT, { conversationId, assignee, assigneeType });
+
     try {
       const response = await ConversationApi.assignAgent({
         conversationId,
-        agentId,
+        agentId: assignee?.id ?? null,
         assigneeType,
       });
-      dispatch('setCurrentChatAssignee', {
+      commit(types.ASSIGN_AGENT, {
         conversationId,
         assignee: response.data,
         assigneeType,
       });
     } catch (error) {
-      // Handle error
+      commit(types.ASSIGN_AGENT, {
+        conversationId,
+        assignee: previousAssignee,
+        assigneeType: previousAssigneeType,
+      });
+      throw error;
     }
-  },
-
-  setCurrentChatAssignee(
-    { commit },
-    { conversationId, assignee, assigneeType }
-  ) {
-    commit(types.ASSIGN_AGENT, { conversationId, assignee, assigneeType });
   },
 
   assignTeam: async ({ dispatch }, { conversationId, teamId }) => {

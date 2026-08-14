@@ -2,7 +2,11 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import { useMapGetter } from 'dashboard/composables/store';
-import { useAlert } from 'dashboard/composables';
+import {
+  useAlert,
+  useAssignmentConflict,
+  assignmentConflictAgent,
+} from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import wootConstants from 'dashboard/constants/globals';
 
@@ -25,22 +29,13 @@ const { t } = useI18n();
 const currentChat = useMapGetter('getSelectedChat');
 const currentUser = useMapGetter('getCurrentUser');
 
-const assignedAgent = computed({
-  get() {
-    return currentChat.value?.meta?.assignee;
-  },
-  set(agent) {
-    const agentId = agent ? agent.id : null;
-    store.dispatch('setCurrentChatAssignee', {
-      conversationId: currentChat.value?.id,
-      assignee: agent,
-    });
-    store.dispatch('assignAgent', {
-      conversationId: currentChat.value?.id,
-      agentId,
-    });
-  },
-});
+const assignedAgent = computed(() => currentChat.value?.meta?.assignee);
+
+const assignAgent = agent =>
+  store.dispatch('assignAgent', {
+    conversationId: currentChat.value?.id,
+    assignee: agent,
+  });
 
 const isUserTyping = computed(
   () => props.message !== '' && !props.isOnPrivateNote
@@ -70,7 +65,7 @@ const botHandoffActionLabel = computed(() => {
 
 const selfAssignConversation = async () => {
   const { avatar_url, ...rest } = currentUser.value || {};
-  assignedAgent.value = { ...rest, thumbnail: avatar_url };
+  await assignAgent({ ...rest, thumbnail: avatar_url });
 };
 
 const needsAssignmentToCurrentUser = computed(() => {
@@ -82,7 +77,12 @@ const onClickSelfAssign = async () => {
     await selfAssignConversation();
     useAlert(t('CONVERSATION.CHANGE_AGENT'));
   } catch (error) {
-    useAlert(t('CONVERSATION.CHANGE_AGENT_FAILED'));
+    const conflictAgent = assignmentConflictAgent(error);
+    if (conflictAgent === null) {
+      useAlert(t('CONVERSATION.CHANGE_AGENT_FAILED'));
+      return;
+    }
+    useAssignmentConflict(conflictAgent);
   }
 };
 
@@ -103,7 +103,12 @@ const onClickBotHandoff = async () => {
 
     useAlert(t('CONVERSATION.BOT_HANDOFF_SUCCESS'));
   } catch (error) {
-    useAlert(t('CONVERSATION.BOT_HANDOFF_ERROR'));
+    const conflictAgent = assignmentConflictAgent(error);
+    if (conflictAgent === null) {
+      useAlert(t('CONVERSATION.BOT_HANDOFF_ERROR'));
+      return;
+    }
+    useAssignmentConflict(conflictAgent);
   }
 };
 </script>

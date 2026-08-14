@@ -1326,4 +1326,96 @@ RSpec.describe Conversation do
       expect(group_conversation).to be_group_type_group
     end
   end
+
+  describe 'assignment takeover guard' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:owner) { create(:user, account: account, role: :agent) }
+    let(:other_agent) { create(:user, account: account, role: :agent) }
+    let(:administrator) { create(:user, account: account, role: :administrator) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: owner) }
+
+    before do
+      create(:inbox_member, user: owner, inbox: inbox)
+      create(:inbox_member, user: other_agent, inbox: inbox)
+      conversation
+    end
+
+    after { Current.reset }
+
+    context 'when the inbox allows takeover' do
+      it 'lets another agent take the conversation over' do
+        Current.user = other_agent
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to change { conversation.reload.assignee }.from(owner).to(other_agent)
+      end
+    end
+
+    context 'when the inbox prevents takeover' do
+      before { inbox.update!(prevent_assignment_takeover: true) }
+
+      it 'refuses another agent with the current assignee name' do
+        Current.user = other_agent
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to raise_error(CustomExceptions::Conversation::AlreadyAssigned, /#{owner.available_name}/)
+        expect(conversation.reload.assignee).to eq(owner)
+      end
+
+      # Otherwise the takeover is just a two-step process: unassign, then claim.
+      it 'refuses another agent unassigning the conversation' do
+        Current.user = other_agent
+
+        expect { conversation.update!(assignee: nil) }
+          .to raise_error(CustomExceptions::Conversation::AlreadyAssigned)
+      end
+
+      it 'lets the current assignee hand the conversation over' do
+        Current.user = owner
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to change { conversation.reload.assignee }.from(owner).to(other_agent)
+      end
+
+      it 'lets the current assignee release the conversation' do
+        Current.user = owner
+
+        expect { conversation.update!(assignee: nil) }
+          .to change { conversation.reload.assignee }.from(owner).to(nil)
+      end
+
+      it 'lets an administrator reassign the conversation' do
+        Current.user = administrator
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to change { conversation.reload.assignee }.from(owner).to(other_agent)
+      end
+
+      # Round-robin, automation rules and voice webhooks all reach the callback
+      # without a Current.user, which is what tells them apart from a claim.
+      it 'lets automated assignment through' do
+        expect { conversation.update!(assignee: other_agent) }
+          .to change { conversation.reload.assignee }.from(owner).to(other_agent)
+      end
+
+      # A bot-authenticated request lands here with an AgentBot in Current.user,
+      # whose id would otherwise be compared against users.id.
+      it 'lets an agent bot reassign the conversation' do
+        Current.user = create(:agent_bot, account: account)
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to change { conversation.reload.assignee }.from(owner).to(other_agent)
+      end
+
+      it 'lets an agent claim a conversation that has no assignee' do
+        inbox.update!(enable_auto_assignment: false)
+        unassigned = create(:conversation, account: account, inbox: inbox, assignee: nil)
+        Current.user = other_agent
+
+        expect { unassigned.update!(assignee: other_agent) }
+          .to change { unassigned.reload.assignee }.from(nil).to(other_agent)
+      end
+    end
+  end
 end

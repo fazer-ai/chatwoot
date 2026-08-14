@@ -1027,6 +1027,8 @@
       "TITLE": "Atribuição de conversa",
       "DESCRIPTION": "Atribua automaticamente as conversas recebidas aos agentes disponíveis com base nas políticas de atribuição",
       "ENABLE_AUTO_ASSIGNMENT": "Ativar atribuição automática de conversas",
+      "PREVENT_TAKEOVER": "Impedir tomada de conversa atribuída",
+      "PREVENT_TAKEOVER_SUB_TEXT": "Depois que um agente assume uma conversa, só ele ou um administrador pode mudar quem está atendendo. Não afeta a atribuição automática.",
       "DEFAULT_RULES_TITLE": "Regras de atribuição padrão",
       "DEFAULT_RULES_DESCRIPTION": "Utilizando o comportamento de atribuição padrão para todas as conversas",
       "DEFAULT_RULE_1": "Conversas criadas mais antigas primeiro",

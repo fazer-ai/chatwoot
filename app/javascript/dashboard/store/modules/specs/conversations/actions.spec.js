@@ -351,32 +351,68 @@ describe('#actions', () => {
   });
 
   describe('#assignAgent', () => {
-    it('sends correct mutations if assignment is successful', async () => {
+    const owner = { id: 2, name: 'Owner' };
+    const getters = {
+      getConversationById: () => ({
+        meta: { assignee: owner, assignee_type: 'User' },
+      }),
+    };
+
+    it('commits the optimistic assignee and then the server response', async () => {
       axios.post.mockResolvedValue({
         data: { id: 1, name: 'User' },
       });
       await actions.assignAgent(
-        { dispatch },
-        { conversationId: 1, agentId: 1, assigneeType: 'AgentBot' }
+        { commit, getters },
+        {
+          conversationId: 1,
+          assignee: { id: 1, name: 'User' },
+          assigneeType: 'AgentBot',
+        }
       );
-      expect(dispatch).toHaveBeenCalledWith('setCurrentChatAssignee', {
-        conversationId: 1,
-        assignee: { id: 1, name: 'User' },
-        assigneeType: 'AgentBot',
-      });
+      expect(commit.mock.calls).toEqual([
+        [
+          'ASSIGN_AGENT',
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'AgentBot',
+          },
+        ],
+        [
+          'ASSIGN_AGENT',
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'AgentBot',
+          },
+        ],
+      ]);
     });
-  });
 
-  describe('#setCurrentChatAssignee', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      const payload = {
-        conversationId: 1,
-        assignee: { id: 1, name: 'User' },
-        assigneeType: 'AgentBot',
+    // Without the rollback the agent keeps seeing their own name in the
+    // assignee field and believes they own a conversation they were denied.
+    it('rolls back to the previous assignee and rethrows when rejected', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
       };
-      await actions.setCurrentChatAssignee({ commit }, payload);
-      expect(commit).toHaveBeenCalledTimes(1);
-      expect(commit.mock.calls).toEqual([['ASSIGN_AGENT', payload]]);
+      axios.post.mockRejectedValue(error);
+
+      await expect(
+        actions.assignAgent(
+          { commit, getters },
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'User',
+          }
+        )
+      ).rejects.toEqual(error);
+
+      expect(commit.mock.calls[1]).toEqual([
+        'ASSIGN_AGENT',
+        { conversationId: 1, assignee: owner, assigneeType: 'User' },
+      ]);
     });
   });
 
