@@ -1,14 +1,13 @@
 <!-- eslint-disable vue/v-slot-style -->
 <script>
 import { mapGetters } from 'vuex';
-import { useAlert } from 'dashboard/composables';
 import { useAgentsList } from 'dashboard/composables/useAgentsList';
 import ContactDetailsItem from './ContactDetailsItem.vue';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import ConversationLabels from './labels/LabelBox.vue';
 import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
-import { useTrack } from 'dashboard/composables';
+import { useAlert, useTrack, useAssignmentError } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
@@ -89,38 +88,37 @@ export default {
           }
         );
       },
-      set(agent) {
-        const agentId = agent ? agent.id : null;
+      async set(agent) {
         const assigneeType = agent ? agent.assignee_type || 'User' : null;
-        this.$store.dispatch('setCurrentChatAssignee', {
-          conversationId: this.currentChat.id,
-          assignee: agent,
-          assigneeType,
-        });
-        this.$store
-          .dispatch('assignAgent', {
+        try {
+          await this.$store.dispatch('assignAgent', {
             conversationId: this.currentChat.id,
-            agentId,
+            assignee: agent,
             assigneeType,
-          })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
+        } catch (error) {
+          useAssignmentError(
+            error,
+            this.$t('CONVERSATION.CHANGE_AGENT_FAILED')
+          );
+        }
       },
     },
     assignedTeam: {
       get() {
         return this.currentChat.meta.team;
       },
-      set(team) {
-        const conversationId = this.currentChat.id;
-        const teamId = team ? team.id : 0;
-        this.$store.dispatch('setCurrentChatTeam', { team, conversationId });
-        this.$store
-          .dispatch('assignTeam', { conversationId, teamId })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+      async set(team) {
+        try {
+          await this.$store.dispatch('assignTeam', {
+            conversationId: this.currentChat.id,
+            team,
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+        } catch (error) {
+          useAssignmentError(error, this.$t('CONVERSATION.CHANGE_TEAM_FAILED'));
+        }
       },
     },
     assignedPriority: {

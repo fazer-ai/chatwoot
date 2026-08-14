@@ -102,6 +102,7 @@ pt_BR:
       feature_not_enabled: SAML não está habilitado para esta conta
       sso_not_enabled: O SSO via SAML não está habilitado para esta instalação
     conversations:
+      already_assigned: '%{agent_name} já está atendendo esta conversa.'
       unread_counts:
         feature_not_enabled: O recurso de contagem de conversas não lidas não está habilitado para esta conta
     data_import:

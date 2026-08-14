@@ -15,4 +15,5 @@ export const BUS_EVENTS = {
   INSERT_INTO_RICH_EDITOR: 'insertIntoRichEditor',
   INSERT_INTO_NORMAL_EDITOR: 'insertIntoNormalEditor',
   NAVIGATE_TO_GROUP: 'navigateToGroup',
+  ASSIGNMENT_CONFLICT: 'assignmentConflict',
 };

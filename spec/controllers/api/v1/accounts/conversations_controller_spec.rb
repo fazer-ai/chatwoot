@@ -664,6 +664,49 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.status).to eq('snoozed')
         expect(conversation.reload.snoozed_until.to_i).to eq(snoozed_until)
       end
+
+      # Reopening self-assigns via `handle_human_open`, which is a second claim
+      # path that bypasses Conversations::AssignmentService entirely.
+      it 'answers 409 when reopening a conversation assigned to another agent' do
+        owner = create(:user, account: account, role: :agent)
+        create(:inbox_member, inbox: conversation.inbox, user: owner)
+        conversation.update!(status: 'resolved', assignee: owner)
+        conversation.inbox.update!(prevent_assignment_takeover: true)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+             headers: agent.create_new_auth_token,
+             params: { status: 'open' },
+             as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['agent_name']).to eq(owner.available_name)
+        expect(conversation.reload.assignee).to eq(owner)
+        # The status change and the self-assignment are separate saves; a refused
+        # request must not leave the conversation reopened behind the 409.
+        expect(conversation.reload.status).to eq('resolved')
+      end
+
+      # Regression: reopening self-assigns the agent, and that used to be a
+      # second save. `previous_changes` only carries the last save, so the
+      # status callbacks (reopen activity message, automations, reporting) went
+      # silent. Both changes have to land in one save.
+      it 'still reports the status change when reopening self-assigns the agent' do
+        conversation.update!(status: 'resolved', assignee: nil)
+        # Stubbed after the setup, which is itself a status change.
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+             headers: agent.create_new_auth_token,
+             params: { status: 'open' },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.assignee).to eq(agent)
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::CONVERSATION_STATUS_CHANGED, kind_of(Time), hash_including(conversation: conversation))
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::CONVERSATION_OPENED, kind_of(Time), hash_including(conversation: conversation))
+      end
     end
 
     context 'when it is an authenticated bot' do

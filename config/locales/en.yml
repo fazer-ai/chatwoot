@@ -123,6 +123,7 @@ en:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation
     conversations:
+      already_assigned: '%{agent_name} is already handling this conversation.'
       unread_counts:
         feature_not_enabled: Conversation unread counts feature not enabled for this account
     data_import:

@@ -99,7 +99,7 @@ describe('useConversationHotKeys', () => {
         childAction.handler({ agentInfo: { id: 2 } });
         expect(store.dispatch).toHaveBeenCalledWith('assignAgent', {
           conversationId: 1,
-          agentId: 2,
+          assignee: { id: 2 },
         });
       }
     }

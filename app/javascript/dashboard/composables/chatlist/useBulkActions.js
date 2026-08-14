@@ -1,6 +1,6 @@
 import { ref, unref } from 'vue';
 import { useStore } from 'vuex';
-import { useAlert } from 'dashboard/composables';
+import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store.js';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
@@ -57,28 +57,38 @@ export function useBulkActions() {
   }
 
   // Same method used in context menu, conversationId being passed from there.
+  // The context menu always carries a single conversation, so it goes through
+  // the synchronous assignment endpoint: bulk_actions answers `head :ok` before
+  // the job runs and could never report a rejected assignment back to the agent.
   async function onAssignAgent(agent, conversationId = null) {
+    const [singleConversationId] = [conversationId].flat().filter(Boolean);
+
     try {
+      if (singleConversationId) {
+        await store.dispatch('assignAgent', {
+          conversationId: singleConversationId,
+          assignee: agent,
+        });
+        useAlert(
+          t('CONVERSATION.CARD_CONTEXT_MENU.API.AGENT_ASSIGNMENT.SUCCESFUL', {
+            agentName: agent.name,
+            conversationId: singleConversationId,
+          })
+        );
+        return;
+      }
+
       await store.dispatch('bulkActions/process', {
         type: 'Conversation',
-        ids: conversationId || selectedConversations.value,
+        ids: selectedConversations.value,
         fields: {
           assignee_id: agent.id,
         },
       });
       store.dispatch('bulkActions/clearSelectedConversationIds');
-      if (conversationId) {
-        useAlert(
-          t('CONVERSATION.CARD_CONTEXT_MENU.API.AGENT_ASSIGNMENT.SUCCESFUL', {
-            agentName: agent.name,
-            conversationId,
-          })
-        );
-      } else {
-        useAlert(t('BULK_ACTION.ASSIGN_SUCCESFUL'));
-      }
+      useAlert(t('BULK_ACTION.ASSIGN_SUCCESFUL'));
     } catch (err) {
-      useAlert(t('BULK_ACTION.ASSIGN_FAILED'));
+      useAssignmentError(err, t('BULK_ACTION.ASSIGN_FAILED'));
     }
   }
 

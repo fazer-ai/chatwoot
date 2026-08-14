@@ -214,51 +214,79 @@ const actions = {
     ConversationApi.presenceSubscribe(data.id)?.catch(() => {});
   },
 
+  // Owns both the optimistic write and its rollback. Callers used to commit the
+  // new assignee themselves and nobody ever undid it, so a rejected assignment
+  // (an inbox with `prevent_assignment_takeover` answers 409) left the agent
+  // looking at their own name and believing they owned the conversation.
   assignAgent: async (
-    { dispatch },
-    { conversationId, agentId, assigneeType }
+    { commit, dispatch, getters },
+    { conversationId, assignee, assigneeType }
   ) => {
+    const previousChat = getters.getConversationById(conversationId);
+    const previousAssignee = previousChat?.meta?.assignee ?? null;
+    const previousAssigneeType = previousChat?.meta?.assignee_type ?? null;
+
+    commit(types.ASSIGN_AGENT, { conversationId, assignee, assigneeType });
+
     try {
       const response = await ConversationApi.assignAgent({
         conversationId,
-        agentId,
+        agentId: assignee?.id ?? null,
         assigneeType,
       });
-      dispatch('setCurrentChatAssignee', {
+      commit(types.ASSIGN_AGENT, {
         conversationId,
         assignee: response.data,
         assigneeType,
       });
     } catch (error) {
-      // Handle error
+      commit(types.ASSIGN_AGENT, {
+        conversationId,
+        assignee: previousAssignee,
+        assigneeType: previousAssigneeType,
+      });
+      // The rollback restores what this client last knew, and during a
+      // concurrent claim that snapshot is exactly what went stale: the server
+      // handed the conversation to someone else while the request was in
+      // flight, so the local copy is either the wrong agent or nobody. Re-read
+      // it so the field ends up on the real owner.
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
+      throw error;
     }
   },
 
-  setCurrentChatAssignee(
-    { commit },
-    { conversationId, assignee, assigneeType }
-  ) {
-    commit(types.ASSIGN_AGENT, { conversationId, assignee, assigneeType });
-  },
+  // Owns the optimistic write and its rollback for the same reason assignAgent
+  // does. Picking a team that excludes the current assignee moves the assignee
+  // too (`ensure_assignee_is_from_team`), so a protected inbox answers 409 and
+  // the team must not stay changed on screen.
+  assignTeam: async (
+    { commit, dispatch, getters },
+    { conversationId, team }
+  ) => {
+    const previousTeam =
+      getters.getConversationById(conversationId)?.meta?.team ?? null;
 
-  assignTeam: async ({ dispatch }, { conversationId, teamId }) => {
+    commit(types.ASSIGN_TEAM, { team: team ?? null, conversationId });
+
     try {
       const response = await ConversationApi.assignTeam({
         conversationId,
-        teamId,
+        teamId: team?.id ?? 0,
       });
-      dispatch('setCurrentChatTeam', { team: response.data, conversationId });
+      commit(types.ASSIGN_TEAM, { team: response.data, conversationId });
     } catch (error) {
-      // Handle error
+      commit(types.ASSIGN_TEAM, { team: previousTeam, conversationId });
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
+      throw error;
     }
   },
 
-  setCurrentChatTeam({ commit }, { team, conversationId }) {
-    commit(types.ASSIGN_TEAM, { team, conversationId });
-  },
-
   toggleStatus: async (
-    { commit },
+    { commit, dispatch },
     { conversationId, status, snoozedUntil = null, customAttributes = null }
   ) => {
     try {
@@ -292,7 +320,13 @@ const actions = {
         snoozedUntil: updatedSnoozedUntil,
       });
     } catch (error) {
-      // Handle error
+      // Reopening self-assigns the agent, so a protected inbox can refuse the
+      // whole request. Swallowing that left the caller announcing a status
+      // change that never happened.
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
+      throw error;
     }
   },
 

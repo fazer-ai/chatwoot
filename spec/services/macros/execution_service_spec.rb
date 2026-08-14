@@ -47,6 +47,30 @@ RSpec.describe Macros::ExecutionService, type: :service do
         end
       end
     end
+
+    # A refused save leaves its attributes dirty on the record, and the next
+    # action would save them too. An inbox that prevents assignment takeover is
+    # one way to get here; any rejected save is another.
+    context 'when an action is refused mid-macro' do
+      let(:owner) { create(:user, account: account, role: :agent) }
+
+      before do
+        create(:inbox_member, user: owner, inbox: conversation.inbox)
+        conversation.update!(assignee: owner)
+        conversation.inbox.update!(prevent_assignment_takeover: true)
+        allow(macro).to receive(:actions).and_return([
+                                                       { action_name: 'assign_agent', action_params: ['self'] },
+                                                       { action_name: 'change_status', action_params: ['resolved'] }
+                                                     ])
+      end
+
+      it 'still runs the actions that follow it' do
+        service.perform
+
+        expect(conversation.reload.assignee).to eq(owner)
+        expect(conversation.reload.status).to eq('resolved')
+      end
+    end
   end
 
   describe '#assign_team' do

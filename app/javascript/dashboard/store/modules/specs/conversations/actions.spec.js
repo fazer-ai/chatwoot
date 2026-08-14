@@ -351,32 +351,100 @@ describe('#actions', () => {
   });
 
   describe('#assignAgent', () => {
-    it('sends correct mutations if assignment is successful', async () => {
+    const owner = { id: 2, name: 'Owner' };
+    const getters = {
+      getConversationById: () => ({
+        meta: { assignee: owner, assignee_type: 'User' },
+      }),
+    };
+
+    it('commits the optimistic assignee and then the server response', async () => {
       axios.post.mockResolvedValue({
         data: { id: 1, name: 'User' },
       });
       await actions.assignAgent(
-        { dispatch },
-        { conversationId: 1, agentId: 1, assigneeType: 'AgentBot' }
+        { commit, getters },
+        {
+          conversationId: 1,
+          assignee: { id: 1, name: 'User' },
+          assigneeType: 'AgentBot',
+        }
       );
-      expect(dispatch).toHaveBeenCalledWith('setCurrentChatAssignee', {
-        conversationId: 1,
-        assignee: { id: 1, name: 'User' },
-        assigneeType: 'AgentBot',
-      });
+      expect(commit.mock.calls).toEqual([
+        [
+          'ASSIGN_AGENT',
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'AgentBot',
+          },
+        ],
+        [
+          'ASSIGN_AGENT',
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'AgentBot',
+          },
+        ],
+      ]);
     });
-  });
 
-  describe('#setCurrentChatAssignee', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      const payload = {
-        conversationId: 1,
-        assignee: { id: 1, name: 'User' },
-        assigneeType: 'AgentBot',
+    // Without the rollback the agent keeps seeing their own name in the
+    // assignee field and believes they own a conversation they were denied.
+    it('rolls back to the previous assignee and rethrows when rejected', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
       };
-      await actions.setCurrentChatAssignee({ commit }, payload);
-      expect(commit).toHaveBeenCalledTimes(1);
-      expect(commit.mock.calls).toEqual([['ASSIGN_AGENT', payload]]);
+      axios.post.mockRejectedValue(error);
+
+      await expect(
+        actions.assignAgent(
+          { commit, dispatch, getters },
+          {
+            conversationId: 1,
+            assignee: { id: 1, name: 'User' },
+            assigneeType: 'User',
+          }
+        )
+      ).rejects.toEqual(error);
+
+      expect(commit.mock.calls[1]).toEqual([
+        'ASSIGN_AGENT',
+        { conversationId: 1, assignee: owner, assigneeType: 'User' },
+      ]);
+    });
+
+    // The rolled-back snapshot is the thing that went stale during a
+    // concurrent claim, so the conflict has to be reconciled with the server.
+    it('re-reads the conversation when the assignment was refused', async () => {
+      dispatch.mockClear();
+      axios.post.mockRejectedValue({
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      });
+
+      await expect(
+        actions.assignAgent(
+          { commit, dispatch, getters },
+          { conversationId: 1, assignee: { id: 1, name: 'User' } }
+        )
+      ).rejects.toBeTruthy();
+
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
+    });
+
+    it('does not re-read the conversation on an unrelated failure', async () => {
+      dispatch.mockClear();
+      axios.post.mockRejectedValue({ response: { status: 500 } });
+
+      await expect(
+        actions.assignAgent(
+          { commit, dispatch, getters },
+          { conversationId: 1, assignee: { id: 1, name: 'User' } }
+        )
+      ).rejects.toBeTruthy();
+
+      expect(dispatch).not.toHaveBeenCalledWith('getConversation', 1);
     });
   });
 
@@ -403,32 +471,70 @@ describe('#actions', () => {
         ],
       ]);
     });
-  });
 
-  describe('#assignTeam', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      axios.post.mockResolvedValue({
-        data: { id: 1, name: 'Team' },
-      });
-      await actions.assignTeam({ commit }, { conversationId: 1, teamId: 1 });
-      expect(commit).toHaveBeenCalledTimes(0);
-      expect(commit.mock.calls).toEqual([]);
+    // Reopening self-assigns the agent, so a protected inbox refuses the whole
+    // request. Swallowing that left every caller announcing a status change
+    // that never happened.
+    it('rethrows and reconciles when the status change is refused', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      };
+      axios.post.mockRejectedValue(error);
+      dispatch.mockClear();
+
+      await expect(
+        actions.toggleStatus(
+          { commit, dispatch },
+          { conversationId: 1, status: 'open' }
+        )
+      ).rejects.toEqual(error);
+
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
     });
   });
 
-  describe('#setCurrentChatTeam', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      axios.post.mockResolvedValue({
-        data: { id: 1, name: 'Team' },
-      });
-      await actions.setCurrentChatTeam(
-        { commit },
-        { team: { id: 1, name: 'Team' }, conversationId: 1 }
+  describe('#assignTeam', () => {
+    const previousTeam = { id: 9, name: 'Previous' };
+    const team = { id: 1, name: 'Team' };
+    const getters = {
+      getConversationById: () => ({ meta: { team: previousTeam } }),
+    };
+
+    it('commits the optimistic team and then the server response', async () => {
+      axios.post.mockResolvedValue({ data: team });
+
+      await actions.assignTeam(
+        { commit, dispatch, getters },
+        { conversationId: 1, team }
       );
-      expect(commit).toHaveBeenCalledTimes(1);
+
       expect(commit.mock.calls).toEqual([
-        ['ASSIGN_TEAM', { team: { id: 1, name: 'Team' }, conversationId: 1 }],
+        ['ASSIGN_TEAM', { team, conversationId: 1 }],
+        ['ASSIGN_TEAM', { team, conversationId: 1 }],
       ]);
+    });
+
+    // Picking a team that excludes the current assignee moves the assignee too,
+    // so a protected inbox refuses the whole thing.
+    it('rolls back and reconciles when the team change is refused', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      };
+      axios.post.mockRejectedValue(error);
+      dispatch.mockClear();
+
+      await expect(
+        actions.assignTeam(
+          { commit, dispatch, getters },
+          { conversationId: 1, team }
+        )
+      ).rejects.toEqual(error);
+
+      expect(commit.mock.calls[1]).toEqual([
+        'ASSIGN_TEAM',
+        { team: previousTeam, conversationId: 1 },
+      ]);
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
     });
   });
 

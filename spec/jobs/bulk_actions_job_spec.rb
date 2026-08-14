@@ -62,6 +62,24 @@ RSpec.describe BulkActionsJob do
       expect(conversation_3.reload.assignee_id).to eq(agent.id)
     end
 
+    it 'skips conversations another agent already owns and updates the rest' do
+      owner = create(:user, account: account, role: :agent)
+      create(:inbox_member, inbox: conversation_1.inbox, user: owner)
+      conversation_1.update!(assignee: owner)
+      conversation_1.inbox.update!(prevent_assignment_takeover: true)
+      params = {
+        type: 'Conversation',
+        fields: { assignee_id: agent.id },
+        ids: conversation_ids
+      }
+
+      expect { described_class.perform_now(account: account, params: params, user: agent) }.not_to raise_error
+
+      expect(conversation_1.reload.assignee).to eq(owner)
+      expect(conversation_2.reload.assignee).to eq(agent)
+      expect(conversation_3.reload.assignee).to eq(agent)
+    end
+
     it 'bulk updates the snoozed_until' do
       params = {
         type: 'Conversation',

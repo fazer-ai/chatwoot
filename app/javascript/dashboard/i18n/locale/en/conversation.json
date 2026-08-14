@@ -302,9 +302,16 @@
     "CHANGE_STATUS_FAILED": "Conversation status change failed",
     "CHANGE_AGENT": "Conversation Assignee changed",
     "CHANGE_AGENT_FAILED": "Assignee change failed",
+    "ASSIGNMENT_CONFLICT": {
+      "TITLE": "Conversation already assigned",
+      "DESCRIPTION": "{agentName} is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
+      "DESCRIPTION_UNKNOWN_AGENT": "Another agent is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
+      "CONFIRM": "Got it"
+    },
     "ASSIGN_LABEL_SUCCESFUL": "Label assigned successfully",
     "ASSIGN_LABEL_FAILED": "Label assignment failed",
     "CHANGE_TEAM": "Conversation team changed",
+    "CHANGE_TEAM_FAILED": "Team change failed",
     "SUCCESS_DELETE_CONVERSATION": "Conversation deleted successfully",
     "FAIL_DELETE_CONVERSATION": "Couldn't delete conversation! Try again",
     "FILE_SIZE_LIMIT": "File exceeds the {MAXIMUM_SUPPORTED_FILE_UPLOAD_SIZE} MB attachment limit",

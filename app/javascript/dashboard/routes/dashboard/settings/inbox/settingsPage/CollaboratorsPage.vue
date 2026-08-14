@@ -33,6 +33,7 @@ const { isEnterprise } = useConfig();
 const selectedAgentIds = ref([]);
 const isAgentListUpdating = ref(false);
 const enableAutoAssignment = ref(false);
+const preventAssignmentTakeover = ref(false);
 const maxAssignmentLimit = ref(null);
 const assignmentPolicy = ref(null);
 const isLoadingPolicy = ref(false);
@@ -257,6 +258,24 @@ const handleToggleAutoAssignment = async val => {
     await store.dispatch('inboxes/updateInbox', payload);
     useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
   } catch (error) {
+    // Defaults are only re-read when the inbox id changes, so a failed save
+    // would otherwise leave the switch showing a setting the server rejected.
+    enableAutoAssignment.value = props.inbox.enable_auto_assignment;
+    useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+  }
+};
+
+const handleTogglePreventTakeover = async val => {
+  preventAssignmentTakeover.value = val;
+  try {
+    await store.dispatch('inboxes/updateInbox', {
+      id: props.inbox.id,
+      formData: false,
+      prevent_assignment_takeover: val,
+    });
+    useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+  } catch (error) {
+    preventAssignmentTakeover.value = props.inbox.prevent_assignment_takeover;
     useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
   }
 };
@@ -343,6 +362,7 @@ const deleteAssignmentPolicy = async () => {
 
 const setDefaults = () => {
   enableAutoAssignment.value = props.inbox.enable_auto_assignment;
+  preventAssignmentTakeover.value = props.inbox.prevent_assignment_takeover;
   maxAssignmentLimit.value =
     props.inbox.auto_assignment_config?.max_assignment_limit || null;
   fetchAttachedAgents();
@@ -666,6 +686,15 @@ onMounted(() => {
           </template>
         </template>
       </SettingsToggleSection>
+
+      <SettingsToggleSection
+        v-model="preventAssignmentTakeover"
+        compact
+        class="mt-4"
+        :header="$t('INBOX_MGMT.ASSIGNMENT.PREVENT_TAKEOVER')"
+        :description="$t('INBOX_MGMT.ASSIGNMENT.PREVENT_TAKEOVER_SUB_TEXT')"
+        @update:model-value="handleTogglePreventTakeover"
+      />
     </SettingsAccordion>
 
     <woot-modal

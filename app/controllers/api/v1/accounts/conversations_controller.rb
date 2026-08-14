@@ -85,15 +85,23 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def toggle_status
     # FIXME: move this logic into a service object
-    if bot_handoff?
-      @conversation.bot_handoff!
-    elsif params[:status].present?
+    return @conversation.bot_handoff! if bot_handoff?
+
+    if params[:status].present?
       set_conversation_status
-      @status = @conversation.save!
     else
-      @status = @conversation.toggle_status
+      @conversation.status = @conversation.toggled_status
     end
+
+    # Reopening self-assigns, and both changes have to land in the same save.
+    # `previous_changes` only carries the last one, so saving twice would hide
+    # the status change from every callback that reads `saved_change_to_status?`
+    # (the reopen activity message, automations, reporting). Saving once also
+    # means an inbox with `prevent_assignment_takeover` cannot answer 409 with
+    # the conversation already reopened.
     handle_human_open if @conversation.open? && Current.user.is_a?(User)
+
+    @status = @conversation.save!
   end
 
   def bot_handoff?
@@ -204,10 +212,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversation.snoozed_until = parse_date_time(params[:snoozed_until].to_s) if params[:snoozed_until]
   end
 
+  # Only stages the change; `toggle_status` owns the save.
   def handle_human_open
     @conversation.assignee_agent_bot = nil
     @conversation.assignee = Current.user if Current.user.agent?
-    @conversation.save!
   end
 
   def conversation
