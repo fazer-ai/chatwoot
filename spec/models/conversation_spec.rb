@@ -374,6 +374,21 @@ RSpec.describe Conversation do
     end
   end
 
+  describe '#toggled_status' do
+    it 'reports where a toggle would land without writing it' do
+      conversation = create(:conversation, status: 'open')
+
+      expect(conversation.toggled_status).to eq(:resolved)
+      expect(conversation.reload.status).to eq('open')
+    end
+
+    it 'reopens from every non-open status' do
+      %w[resolved pending snoozed].each do |status|
+        expect(create(:conversation, status: status).toggled_status).to eq(:open)
+      end
+    end
+  end
+
   describe '#bot_handoff!' do
     let(:conversation) { create(:conversation, status: :pending) }
 

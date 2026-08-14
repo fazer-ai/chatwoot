@@ -219,7 +219,7 @@ const actions = {
   // (an inbox with `prevent_assignment_takeover` answers 409) left the agent
   // looking at their own name and believing they owned the conversation.
   assignAgent: async (
-    { commit, getters },
+    { commit, dispatch, getters },
     { conversationId, assignee, assigneeType }
   ) => {
     const previousChat = getters.getConversationById(conversationId);
@@ -245,6 +245,14 @@ const actions = {
         assignee: previousAssignee,
         assigneeType: previousAssigneeType,
       });
+      // The rollback restores what this client last knew, and during a
+      // concurrent claim that snapshot is exactly what went stale: the server
+      // handed the conversation to someone else while the request was in
+      // flight, so the local copy is either the wrong agent or nobody. Re-read
+      // it so the field ends up on the real owner.
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
       throw error;
     }
   },

@@ -400,7 +400,7 @@ describe('#actions', () => {
 
       await expect(
         actions.assignAgent(
-          { commit, getters },
+          { commit, dispatch, getters },
           {
             conversationId: 1,
             assignee: { id: 1, name: 'User' },
@@ -413,6 +413,38 @@ describe('#actions', () => {
         'ASSIGN_AGENT',
         { conversationId: 1, assignee: owner, assigneeType: 'User' },
       ]);
+    });
+
+    // The rolled-back snapshot is the thing that went stale during a
+    // concurrent claim, so the conflict has to be reconciled with the server.
+    it('re-reads the conversation when the assignment was refused', async () => {
+      dispatch.mockClear();
+      axios.post.mockRejectedValue({
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      });
+
+      await expect(
+        actions.assignAgent(
+          { commit, dispatch, getters },
+          { conversationId: 1, assignee: { id: 1, name: 'User' } }
+        )
+      ).rejects.toBeTruthy();
+
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
+    });
+
+    it('does not re-read the conversation on an unrelated failure', async () => {
+      dispatch.mockClear();
+      axios.post.mockRejectedValue({ response: { status: 500 } });
+
+      await expect(
+        actions.assignAgent(
+          { commit, dispatch, getters },
+          { conversationId: 1, assignee: { id: 1, name: 'User' } }
+        )
+      ).rejects.toBeTruthy();
+
+      expect(dispatch).not.toHaveBeenCalledWith('getConversation', 1);
     });
   });
 

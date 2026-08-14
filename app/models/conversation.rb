@@ -206,9 +206,18 @@ class Conversation < ApplicationRecord
 
   def toggle_status
     # FIXME: implement state machine with aasm
-    self.status = open? ? :resolved : :open
-    self.status = :open if pending? || snoozed?
+    self.status = toggled_status
     save # rubocop:disable Rails/SaveBang
+  end
+
+  # The status a toggle lands on, without writing it. Callers that have another
+  # change to make in the same save need this: `previous_changes` only carries
+  # the last save, and every status callback reads `saved_change_to_status?`
+  # from it.
+  def toggled_status
+    return :open if pending? || snoozed?
+
+    open? ? :resolved : :open
   end
 
   def toggle_priority(priority = nil)
