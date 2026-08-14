@@ -1399,6 +1399,25 @@ RSpec.describe Conversation do
           .to change { conversation.reload.assignee }.from(owner).to(other_agent)
       end
 
+      # Two agents claiming the same free conversation both load it with a nil
+      # assignee, so a guard that trusted `assignee_id_was` would let both write
+      # and the second would silently win. That is the very race this feature
+      # exists to close, so it is checked against the database under a row lock.
+      it 'refuses a claim made against a stale copy of the conversation' do
+        inbox.update!(enable_auto_assignment: false)
+        free = create(:conversation, account: account, inbox: inbox, assignee: nil)
+        stale = described_class.find(free.id)
+
+        Current.user = owner
+        free.update!(assignee: owner)
+
+        Current.user = other_agent
+        stale.assignee = other_agent
+
+        expect { stale.save! }.to raise_error(CustomExceptions::Conversation::AlreadyAssigned)
+        expect(free.reload.assignee).to eq(owner)
+      end
+
       # A bot-authenticated request lands here with an AgentBot in Current.user,
       # whose id would otherwise be compared against users.id.
       it 'lets an agent bot reassign the conversation' do

@@ -16,13 +16,28 @@ module AssignmentHandler
   # assignee and administrators get to change that; every other agent is turned
   # away with a 409.
   def ensure_assignment_not_taken
-    return if new_record? || assignee_id_was.blank?
+    return if new_record?
     return unless inbox.prevent_assignment_takeover?
-    return if assignment_change_allowed?
+
+    current_assignee_id = locked_assignee_id
+    return if current_assignee_id.blank? || current_assignee_id == assignee_id
+    return if assignment_change_allowed?(current_assignee_id)
 
     raise CustomExceptions::Conversation::AlreadyAssigned.new(
-      agent_name: account.users.find_by(id: assignee_id_was)&.available_name
+      agent_name: account.users.find_by(id: current_assignee_id)&.available_name
     )
+  end
+
+  # Locks the row for the rest of the surrounding save transaction and reads the
+  # owner back from the database. `assignee_id_was` would be cheaper but it is
+  # the value *this instance* loaded, and two agents claiming the same free
+  # conversation at the same instant both load it as nil: each would clear the
+  # check and the second write would silently win, which is the exact race this
+  # feature exists to close. Blocking here makes the second transaction wait for
+  # the first to commit and then see its owner. Same approach as
+  # Voice::Provider::Twilio::ConferenceService#claim_call!.
+  def locked_assignee_id
+    self.class.lock.where(id: id).pick(:assignee_id)
   end
 
   # `Current.user` is the same discriminator `process_assignment_activities`
@@ -35,9 +50,9 @@ module AssignmentHandler
   # The `is_a?(User)` test is not just a nil check: a bot-authenticated request
   # puts an AgentBot in `Current.user`, and its id lives in a different sequence
   # than `users.id`, so comparing the two would match by coincidence.
-  def assignment_change_allowed?
+  def assignment_change_allowed?(current_assignee_id)
     return true unless Current.user.is_a?(User)
-    return true if Current.user.id == assignee_id_was
+    return true if Current.user.id == current_assignee_id
 
     account.account_users.exists?(user_id: Current.user.id, role: :administrator)
   end

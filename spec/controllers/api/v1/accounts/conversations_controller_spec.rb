@@ -681,6 +681,9 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:conflict)
         expect(response.parsed_body['agent_name']).to eq(owner.available_name)
         expect(conversation.reload.assignee).to eq(owner)
+        # The status change and the self-assignment are separate saves; a refused
+        # request must not leave the conversation reopened behind the 409.
+        expect(conversation.reload.status).to eq('resolved')
       end
     end
 

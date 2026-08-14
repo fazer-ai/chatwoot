@@ -85,15 +85,21 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def toggle_status
     # FIXME: move this logic into a service object
-    if bot_handoff?
-      @conversation.bot_handoff!
-    elsif params[:status].present?
-      set_conversation_status
-      @status = @conversation.save!
-    else
-      @status = @conversation.toggle_status
+    # The status change and the self-assignment are two separate saves, so they
+    # need a transaction: an inbox with `prevent_assignment_takeover` refuses the
+    # second one, and without this the caller would get the refusal back with the
+    # conversation already reopened.
+    ActiveRecord::Base.transaction do
+      if bot_handoff?
+        @conversation.bot_handoff!
+      elsif params[:status].present?
+        set_conversation_status
+        @status = @conversation.save!
+      else
+        @status = @conversation.toggle_status
+      end
+      handle_human_open if @conversation.open? && Current.user.is_a?(User)
     end
-    handle_human_open if @conversation.open? && Current.user.is_a?(User)
   end
 
   def bot_handoff?
