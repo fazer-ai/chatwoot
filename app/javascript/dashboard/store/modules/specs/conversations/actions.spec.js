@@ -471,32 +471,70 @@ describe('#actions', () => {
         ],
       ]);
     });
-  });
 
-  describe('#assignTeam', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      axios.post.mockResolvedValue({
-        data: { id: 1, name: 'Team' },
-      });
-      await actions.assignTeam({ commit }, { conversationId: 1, teamId: 1 });
-      expect(commit).toHaveBeenCalledTimes(0);
-      expect(commit.mock.calls).toEqual([]);
+    // Reopening self-assigns the agent, so a protected inbox refuses the whole
+    // request. Swallowing that left every caller announcing a status change
+    // that never happened.
+    it('rethrows and reconciles when the status change is refused', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      };
+      axios.post.mockRejectedValue(error);
+      dispatch.mockClear();
+
+      await expect(
+        actions.toggleStatus(
+          { commit, dispatch },
+          { conversationId: 1, status: 'open' }
+        )
+      ).rejects.toEqual(error);
+
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
     });
   });
 
-  describe('#setCurrentChatTeam', () => {
-    it('sends correct mutations if assignment is successful', async () => {
-      axios.post.mockResolvedValue({
-        data: { id: 1, name: 'Team' },
-      });
-      await actions.setCurrentChatTeam(
-        { commit },
-        { team: { id: 1, name: 'Team' }, conversationId: 1 }
+  describe('#assignTeam', () => {
+    const previousTeam = { id: 9, name: 'Previous' };
+    const team = { id: 1, name: 'Team' };
+    const getters = {
+      getConversationById: () => ({ meta: { team: previousTeam } }),
+    };
+
+    it('commits the optimistic team and then the server response', async () => {
+      axios.post.mockResolvedValue({ data: team });
+
+      await actions.assignTeam(
+        { commit, dispatch, getters },
+        { conversationId: 1, team }
       );
-      expect(commit).toHaveBeenCalledTimes(1);
+
       expect(commit.mock.calls).toEqual([
-        ['ASSIGN_TEAM', { team: { id: 1, name: 'Team' }, conversationId: 1 }],
+        ['ASSIGN_TEAM', { team, conversationId: 1 }],
+        ['ASSIGN_TEAM', { team, conversationId: 1 }],
       ]);
+    });
+
+    // Picking a team that excludes the current assignee moves the assignee too,
+    // so a protected inbox refuses the whole thing.
+    it('rolls back and reconciles when the team change is refused', async () => {
+      const error = {
+        response: { status: 409, data: { agent_name: 'Owner' } },
+      };
+      axios.post.mockRejectedValue(error);
+      dispatch.mockClear();
+
+      await expect(
+        actions.assignTeam(
+          { commit, dispatch, getters },
+          { conversationId: 1, team }
+        )
+      ).rejects.toEqual(error);
+
+      expect(commit.mock.calls[1]).toEqual([
+        'ASSIGN_TEAM',
+        { team: previousTeam, conversationId: 1 },
+      ]);
+      expect(dispatch).toHaveBeenCalledWith('getConversation', 1);
     });
   });
 

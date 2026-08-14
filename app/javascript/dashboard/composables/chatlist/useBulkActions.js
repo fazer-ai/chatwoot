@@ -1,10 +1,6 @@
 import { ref, unref } from 'vue';
 import { useStore } from 'vuex';
-import {
-  useAlert,
-  useAssignmentConflict,
-  assignmentConflictAgent,
-} from 'dashboard/composables';
+import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store.js';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
@@ -92,12 +88,7 @@ export function useBulkActions() {
       store.dispatch('bulkActions/clearSelectedConversationIds');
       useAlert(t('BULK_ACTION.ASSIGN_SUCCESFUL'));
     } catch (err) {
-      const conflictAgent = assignmentConflictAgent(err);
-      if (conflictAgent === null) {
-        useAlert(t('BULK_ACTION.ASSIGN_FAILED'));
-        return;
-      }
-      useAssignmentConflict(conflictAgent);
+      useAssignmentError(err, t('BULK_ACTION.ASSIGN_FAILED'));
     }
   }
 

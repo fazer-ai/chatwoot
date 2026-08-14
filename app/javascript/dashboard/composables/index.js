@@ -43,24 +43,24 @@ export const usePendingAlert = message => {
 };
 
 /**
- * Opens the dialog that tells the agent a conversation is already someone
- * else's. A toast is the wrong surface here: it fades on its own and the agent
- * is about to start working a lead that is not theirs.
- * @param {string} agentName - The agent currently handling the conversation.
- */
-export const useAssignmentConflict = agentName => {
-  emitter.emit(BUS_EVENTS.ASSIGNMENT_CONFLICT, { agentName });
-};
-
-/**
- * Reads the assignment conflict out of a rejected assignment request, if that
- * is what it is. Returns null for any other failure so the caller can fall back
- * to its regular error handling.
+ * Reports a conversation action that the server refused.
+ *
+ * A 409 means an inbox with `prevent_assignment_takeover` would not move the
+ * conversation away from the agent handling it, which can come from assigning
+ * an agent, from picking a team that excludes the current one, or from
+ * reopening. It gets a dialog rather than a toast: the toast fades on its own
+ * and the agent is about to start working a conversation that is not theirs.
+ * Anything else falls back to the caller's own message.
  * @param {Object} error - The rejected axios error.
- * @returns {string|null} The agent currently handling the conversation.
+ * @param {string} fallbackMessage - Toast shown when it is not a conflict.
  */
-export const assignmentConflictAgent = error => {
-  if (error?.response?.status !== 409) return null;
+export const useAssignmentError = (error, fallbackMessage) => {
+  if (error?.response?.status !== 409) {
+    useAlert(fallbackMessage);
+    return;
+  }
 
-  return error.response.data?.agent_name ?? '';
+  emitter.emit(BUS_EVENTS.ASSIGNMENT_CONFLICT, {
+    agentName: error.response.data?.agent_name ?? '',
+  });
 };

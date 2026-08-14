@@ -257,24 +257,36 @@ const actions = {
     }
   },
 
-  assignTeam: async ({ dispatch }, { conversationId, teamId }) => {
+  // Owns the optimistic write and its rollback for the same reason assignAgent
+  // does. Picking a team that excludes the current assignee moves the assignee
+  // too (`ensure_assignee_is_from_team`), so a protected inbox answers 409 and
+  // the team must not stay changed on screen.
+  assignTeam: async (
+    { commit, dispatch, getters },
+    { conversationId, team }
+  ) => {
+    const previousTeam =
+      getters.getConversationById(conversationId)?.meta?.team ?? null;
+
+    commit(types.ASSIGN_TEAM, { team: team ?? null, conversationId });
+
     try {
       const response = await ConversationApi.assignTeam({
         conversationId,
-        teamId,
+        teamId: team?.id ?? 0,
       });
-      dispatch('setCurrentChatTeam', { team: response.data, conversationId });
+      commit(types.ASSIGN_TEAM, { team: response.data, conversationId });
     } catch (error) {
-      // Handle error
+      commit(types.ASSIGN_TEAM, { team: previousTeam, conversationId });
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
+      throw error;
     }
   },
 
-  setCurrentChatTeam({ commit }, { team, conversationId }) {
-    commit(types.ASSIGN_TEAM, { team, conversationId });
-  },
-
   toggleStatus: async (
-    { commit },
+    { commit, dispatch },
     { conversationId, status, snoozedUntil = null, customAttributes = null }
   ) => {
     try {
@@ -308,7 +320,13 @@ const actions = {
         snoozedUntil: updatedSnoozedUntil,
       });
     } catch (error) {
-      // Handle error
+      // Reopening self-assigns the agent, so a protected inbox can refuse the
+      // whole request. Swallowing that left the caller announcing a status
+      // change that never happened.
+      if (error?.response?.status === 409) {
+        dispatch('getConversation', conversationId);
+      }
+      throw error;
     }
   },
 

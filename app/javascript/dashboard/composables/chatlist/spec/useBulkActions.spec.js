@@ -21,13 +21,11 @@ vi.mock('dashboard/composables/useConversationRequiredAttributes', () => ({
 }));
 
 const useAlert = vi.fn();
-const useAssignmentConflict = vi.fn();
+const useAssignmentError = vi.fn();
 
 vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => useAlert(...args),
-  useAssignmentConflict: (...args) => useAssignmentConflict(...args),
-  assignmentConflictAgent: error =>
-    error?.response?.status === 409 ? error.response.data.agent_name : null,
+  useAssignmentError: (...args) => useAssignmentError(...args),
 }));
 
 describe('useBulkActions#onAssignAgent', () => {
@@ -37,7 +35,7 @@ describe('useBulkActions#onAssignAgent', () => {
     dispatch.mockReset();
     dispatch.mockResolvedValue({});
     useAlert.mockReset();
-    useAssignmentConflict.mockReset();
+    useAssignmentError.mockReset();
   });
 
   // The context menu carries a single conversation and needs a synchronous
@@ -54,15 +52,17 @@ describe('useBulkActions#onAssignAgent', () => {
     });
   });
 
-  it('opens the conflict dialog when the assignment is rejected', async () => {
-    dispatch.mockRejectedValue({
-      response: { status: 409, data: { agent_name: 'Owner' } },
-    });
+  it('reports a rejected assignment through the conflict handler', async () => {
+    const error = { response: { status: 409, data: { agent_name: 'Owner' } } };
+    dispatch.mockRejectedValue(error);
     const { onAssignAgent } = useBulkActions();
 
     await onAssignAgent(agent, [42]);
 
-    expect(useAssignmentConflict).toHaveBeenCalledWith('Owner');
+    expect(useAssignmentError).toHaveBeenCalledWith(
+      error,
+      'BULK_ACTION.ASSIGN_FAILED'
+    );
     expect(useAlert).not.toHaveBeenCalled();
   });
 

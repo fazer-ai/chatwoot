@@ -7,12 +7,7 @@ import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import ConversationLabels from './labels/LabelBox.vue';
 import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
-import {
-  useAlert,
-  useTrack,
-  useAssignmentConflict,
-  assignmentConflictAgent,
-} from 'dashboard/composables';
+import { useAlert, useTrack, useAssignmentError } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
@@ -103,12 +98,10 @@ export default {
           });
           useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
         } catch (error) {
-          const conflictAgent = assignmentConflictAgent(error);
-          if (conflictAgent === null) {
-            useAlert(this.$t('CONVERSATION.CHANGE_AGENT_FAILED'));
-            return;
-          }
-          useAssignmentConflict(conflictAgent);
+          useAssignmentError(
+            error,
+            this.$t('CONVERSATION.CHANGE_AGENT_FAILED')
+          );
         }
       },
     },
@@ -116,15 +109,16 @@ export default {
       get() {
         return this.currentChat.meta.team;
       },
-      set(team) {
-        const conversationId = this.currentChat.id;
-        const teamId = team ? team.id : 0;
-        this.$store.dispatch('setCurrentChatTeam', { team, conversationId });
-        this.$store
-          .dispatch('assignTeam', { conversationId, teamId })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+      async set(team) {
+        try {
+          await this.$store.dispatch('assignTeam', {
+            conversationId: this.currentChat.id,
+            team,
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+        } catch (error) {
+          useAssignmentError(error, this.$t('CONVERSATION.CHANGE_TEAM_FAILED'));
+        }
       },
     },
     assignedPriority: {

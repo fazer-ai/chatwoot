@@ -3,11 +3,7 @@ import { useI18n } from 'vue-i18n';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useRoute } from 'vue-router';
 import { emitter } from 'shared/helpers/mitt';
-import {
-  useAlert,
-  useAssignmentConflict,
-  assignmentConflictAgent,
-} from 'dashboard/composables';
+import { useAssignmentError } from 'dashboard/composables';
 import { useConversationLabels } from 'dashboard/composables/useConversationLabels';
 import { useCaptain } from 'dashboard/composables/useCaptain';
 import { useAgentsList } from 'dashboard/composables/useAgentsList';
@@ -183,12 +179,7 @@ export function useConversationHotKeys() {
         assignee: action.agentInfo,
       });
     } catch (error) {
-      const conflictAgent = assignmentConflictAgent(error);
-      if (conflictAgent === null) {
-        useAlert(t('CONVERSATION.CHANGE_AGENT_FAILED'));
-        return;
-      }
-      useAssignmentConflict(conflictAgent);
+      useAssignmentError(error, t('CONVERSATION.CHANGE_AGENT_FAILED'));
     }
   };
 
@@ -199,11 +190,15 @@ export function useConversationHotKeys() {
     });
   };
 
-  const onChangeTeam = action => {
-    store.dispatch('assignTeam', {
-      conversationId: currentChat.value.id,
-      teamId: action.teamInfo.id,
-    });
+  const onChangeTeam = async action => {
+    try {
+      await store.dispatch('assignTeam', {
+        conversationId: currentChat.value.id,
+        team: action.teamInfo,
+      });
+    } catch (error) {
+      useAssignmentError(error, t('CONVERSATION.CHANGE_TEAM_FAILED'));
+    }
   };
 
   const statusActions = computed(() => {

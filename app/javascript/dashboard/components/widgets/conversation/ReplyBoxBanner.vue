@@ -2,11 +2,7 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import { useMapGetter } from 'dashboard/composables/store';
-import {
-  useAlert,
-  useAssignmentConflict,
-  assignmentConflictAgent,
-} from 'dashboard/composables';
+import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import wootConstants from 'dashboard/constants/globals';
 
@@ -77,12 +73,7 @@ const onClickSelfAssign = async () => {
     await selfAssignConversation();
     useAlert(t('CONVERSATION.CHANGE_AGENT'));
   } catch (error) {
-    const conflictAgent = assignmentConflictAgent(error);
-    if (conflictAgent === null) {
-      useAlert(t('CONVERSATION.CHANGE_AGENT_FAILED'));
-      return;
-    }
-    useAssignmentConflict(conflictAgent);
+    useAssignmentError(error, t('CONVERSATION.CHANGE_AGENT_FAILED'));
   }
 };
 
@@ -103,12 +94,7 @@ const onClickBotHandoff = async () => {
 
     useAlert(t('CONVERSATION.BOT_HANDOFF_SUCCESS'));
   } catch (error) {
-    const conflictAgent = assignmentConflictAgent(error);
-    if (conflictAgent === null) {
-      useAlert(t('CONVERSATION.BOT_HANDOFF_ERROR'));
-      return;
-    }
-    useAssignmentConflict(conflictAgent);
+    useAssignmentError(error, t('CONVERSATION.BOT_HANDOFF_ERROR'));
   }
 };
 </script>

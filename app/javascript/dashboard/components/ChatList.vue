@@ -30,7 +30,7 @@ import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirecti
 import ConversationResolveAttributesModal from 'dashboard/components-next/ConversationWorkflow/ConversationResolveAttributesModal.vue';
 
 import { useUISettings } from 'dashboard/composables/useUISettings';
-import { useAlert } from 'dashboard/composables';
+import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useBulkActions } from 'dashboard/composables/chatlist/useBulkActions';
 import { useFilter } from 'shared/composables/useFilter';
 import { useTrack } from 'dashboard/composables';
@@ -760,10 +760,7 @@ async function markAsRead(conversationId) {
 
 async function onAssignTeam(team, conversationId = null) {
   try {
-    await store.dispatch('assignTeam', {
-      conversationId,
-      teamId: team.id,
-    });
+    await store.dispatch('assignTeam', { conversationId, team });
     useAlert(
       t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.SUCCESFUL', {
         team: team.name,
@@ -771,7 +768,10 @@ async function onAssignTeam(team, conversationId = null) {
       })
     );
   } catch (error) {
-    useAlert(t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.FAILED'));
+    useAssignmentError(
+      error,
+      t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.FAILED')
+    );
   }
 }
 
@@ -791,9 +791,12 @@ function toggleConversationStatus(
     payload.customAttributes = customAttributes;
   }
 
-  store.dispatch('toggleStatus', payload).then(() => {
-    useAlert(t('CONVERSATION.CHANGE_STATUS'));
-  });
+  store
+    .dispatch('toggleStatus', payload)
+    .then(() => useAlert(t('CONVERSATION.CHANGE_STATUS')))
+    .catch(error =>
+      useAssignmentError(error, t('CONVERSATION.CHANGE_STATUS_FAILED'))
+    );
 }
 
 function handleResolveConversation(conversationId, status, snoozedUntil) {
