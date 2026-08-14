@@ -258,6 +258,9 @@ const handleToggleAutoAssignment = async val => {
     await store.dispatch('inboxes/updateInbox', payload);
     useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
   } catch (error) {
+    // Defaults are only re-read when the inbox id changes, so a failed save
+    // would otherwise leave the switch showing a setting the server rejected.
+    enableAutoAssignment.value = props.inbox.enable_auto_assignment;
     useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
   }
 };
@@ -272,6 +275,7 @@ const handleTogglePreventTakeover = async val => {
     });
     useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
   } catch (error) {
+    preventAssignmentTakeover.value = props.inbox.prevent_assignment_takeover;
     useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
   }
 };
