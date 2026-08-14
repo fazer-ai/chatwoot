@@ -45,22 +45,28 @@ RSpec.describe ActionCableBroadcastJob do
     end
 
     # The refresh rebuilds the payload from the conversation row, so it is the
-    # one place that can silently undo the contact-bound redaction done by
-    # ActionCableListener#broadcast_to_contact — and hand the contact's browser
-    # the private note over the websocket. The rule it encodes: refresh values,
-    # never widen the payload.
-    context 'when a contact-bound payload arrives stripped of agent-only keys' do
+    # one place that can silently undo the narrowing done by
+    # ActionCableListener#broadcast_to_contact and hand the contact's browser the
+    # full agent payload. The rule it encodes: refresh the values, preserve the
+    # shape. That keeps this job from having to know which keys are agent-only —
+    # including the ones Pro and Enterprise add to `push_data`.
+    context 'when a contact-bound payload arrives narrowed to the allowlist' do
       let(:event_name) { 'conversation.updated' }
-      let(:data) { base_data }
+      let(:data) do
+        Conversations::EventDataPresenter.contact_slice(conversation.push_event_data)
+                                         .merge(account_id: account.id)
+      end
 
       before do
         create(:message, conversation: conversation, account: account,
                          message_type: :outgoing, private: true, content: 'Internal only: overdue invoice')
       end
 
-      it 'does not re-add last_non_activity_message' do
+      it 'does not widen it back to the agent payload' do
         expect(ActionCable.server).to receive(:broadcast) do |_member, payload|
           expect(payload[:data]).not_to have_key(:last_non_activity_message)
+          expect(payload[:data]).not_to have_key(:labels)
+          expect(payload[:data]).not_to have_key(:custom_attributes)
           # The refresh still ran — this is not a pass-through.
           expect(payload[:data][:status]).to eq(conversation.status)
         end
@@ -70,7 +76,10 @@ RSpec.describe ActionCableBroadcastJob do
 
     context 'when an agent-bound payload carries agent-only keys' do
       let(:event_name) { 'conversation.updated' }
-      let(:data) { base_data.merge(last_non_activity_message: { id: 0, content: 'stale snapshot' }) }
+      let(:data) do
+        conversation.push_event_data.merge(account_id: account.id,
+                                           last_non_activity_message: { id: 0, content: 'stale snapshot' })
+      end
 
       before do
         create(:message, conversation: conversation, account: account,

@@ -107,7 +107,7 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(data[:content]).to eq('Hello there')
     end
 
-    # Deliberate, and the reason AGENT_ONLY_PUSH_KEYS exists: `non_activity_messages`
+    # Deliberate, and the reason the contact allowlist exists: `non_activity_messages`
     # filters `message_type`, not `private`, so the agent-facing chat list preview
     # reads the private note when that is the newest thing that happened. Keeping
     # it out of the contact's browser is the broadcast layer's job (see
@@ -119,7 +119,7 @@ RSpec.describe Conversations::EventDataPresenter do
                               message_type: :outgoing, private: true, content: 'Internal only')
 
       expect(presenter.push_data[:last_non_activity_message][:id]).to eq(note.id)
-      expect(described_class::AGENT_ONLY_PUSH_KEYS).to include(:last_non_activity_message)
+      expect(described_class::CONTACT_PUSH_KEYS).not_to include(:last_non_activity_message)
     end
 
     # Counterpart of the seed: the chat list preview must never read

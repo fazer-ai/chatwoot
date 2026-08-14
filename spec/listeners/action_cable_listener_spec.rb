@@ -7,12 +7,11 @@ describe ActionCableListener do
   let!(:agent) { create(:user, account: account, role: :agent) }
   let!(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: agent) }
 
-  # Typing payloads reach the contact, so they ship without the agent-only keys
-  # (`last_non_activity_message` resolves to a trailing private note). Building
-  # the expectation from the same constant the listener uses keeps this honest:
-  # adding a key to AGENT_ONLY_PUSH_KEYS updates both sides at once.
+  # Typing payloads reach the contact, so they ship the contact-sized hash.
+  # Building the expectation from the same allowlist the listener uses keeps
+  # this honest: changing CONTACT_PUSH_KEYS updates both sides at once.
   let(:redacted_conversation_data) do
-    conversation.push_event_data.except(*Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS)
+    conversation.push_event_data.slice(*Conversations::EventDataPresenter::CONTACT_PUSH_KEYS)
   end
 
   before do
@@ -256,7 +255,7 @@ describe ActionCableListener do
       listener.conversation_updated(event)
     end
 
-    it 'sends the contact its own broadcast without the agent-only keys' do
+    it 'sends the contact its own broadcast built from the allowlist' do
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
         [conversation.contact_inbox.pubsub_token],
         'conversation.updated',
@@ -308,6 +307,10 @@ describe ActionCableListener do
   # and these three events broadcast to `contact_inbox_tokens`. Assert on the
   # note's literal content so the example fails loudly if the payload is ever
   # re-unified, whatever key the content ends up under.
+  #
+  # The `agent context` example below is the general guard: the private note is
+  # only the leak that was found first, and asserting on the allowlist catches
+  # the next field someone adds to `push_data` without asserting on each by name.
   describe 'private note leakage to the contact' do
     let(:secret) { 'Internal only: customer has an overdue invoice' }
     let(:contact_token) { conversation.contact_inbox.pubsub_token }
@@ -338,6 +341,42 @@ describe ActionCableListener do
 
       expect(payloads.size).to eq(6)
       expect(payloads.to_s).not_to include(secret)
+    end
+
+    # The general guard, and the whole point of the allowlist. It asserts on the
+    # SHAPE of the contact payload instead of on any one field, so the next key
+    # added to `push_data` — CE, Enterprise or Pro — fails here rather than
+    # shipping to the contact's browser. `last_non_activity_message` and Pro's
+    # `kanban_task` both got in because the previous denylist only knew about
+    # the fields someone had remembered to name.
+    it 'never sends the contact a key outside the allowlist' do
+      keys = []
+      allow(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, payload|
+        keys.concat(payload.keys) if tokens.include?(contact_token)
+      end
+
+      listener.conversation_created(Events::Base.new(:'conversation.created', Time.zone.now, conversation: conversation))
+      listener.conversation_status_changed(Events::Base.new(:'conversation.status_changed', Time.zone.now, conversation: conversation))
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+
+      allowed = Conversations::EventDataPresenter::CONTACT_PUSH_KEYS +
+                Conversations::EventDataPresenter::CONTACT_SAFE_EVENT_KEYS +
+                %i[account_id]
+      expect(keys.uniq - allowed).to be_empty
+    end
+
+    it 'keeps the operational fields agents work with out of the contact copy' do
+      conversation.update!(custom_attributes: { internal_score: 'high risk' }, priority: 'urgent')
+      conversation.add_labels(['inadimplente'])
+
+      payload = nil
+      allow(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, data|
+        payload = data if tokens.include?(contact_token)
+      end
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+
+      expect(payload.keys).not_to include(:labels, :custom_attributes, :priority, :meta, :additional_attributes)
+      expect(payload.to_s).not_to include('inadimplente', 'high risk')
     end
 
     it 'still gives the agents the private note as the chat list preview' do

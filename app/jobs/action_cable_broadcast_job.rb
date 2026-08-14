@@ -28,22 +28,19 @@ class ActionCableBroadcastJob < ApplicationJob
     account = Account.find(data[:account_id])
     conversation = account.conversations.find_by!(display_id: data[:id])
     fresh_data = conversation.push_event_data.merge(account_id: data[:account_id])
-    # Refresh values, never widen the payload. Contact-bound broadcasts reach
-    # this job already stripped of agent-only keys (ActionCableListener
-    # #broadcast_to_contact), and `push_event_data` would hand the contact right
-    # back the private note that stripping removed. An agent-only key is
-    # therefore refreshed only when the caller sent it in the first place.
-    fresh_data = fresh_data.except(*absent_agent_only_keys(data))
+    # Refresh the values, preserve the shape. Contact-bound broadcasts arrive
+    # here already narrowed to the contact allowlist (ActionCableListener
+    # #broadcast_to_contact), and rebuilding from the conversation row would
+    # hand the contact back the whole agent payload. Keeping to the keys the
+    # caller sent means this job never has to know which those are — including
+    # the ones Pro and Enterprise add.
+    fresh_data = fresh_data.slice(*data.keys)
     # The refreshed payload comes from the conversation row; transient per-event
     # metadata set by the listener (eg. `source: 'reaction_toggle'` so the
     # frontend skips SCROLL_TO_MESSAGE) lives only on the original `data` hash,
     # so carry it forward explicitly.
     fresh_data[:event_metadata] = data[:event_metadata] if data[:event_metadata].present?
     fresh_data
-  end
-
-  def absent_agent_only_keys(data)
-    Conversations::EventDataPresenter::AGENT_ONLY_PUSH_KEYS.reject { |key| data.key?(key) }
   end
 
   def broadcast_to_members(members, event_name, broadcast_data)

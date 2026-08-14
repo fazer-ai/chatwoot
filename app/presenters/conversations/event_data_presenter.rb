@@ -1,15 +1,48 @@
 class Conversations::EventDataPresenter < SimpleDelegator
-  # Keys in `push_data` that must never reach a contact. `last_non_activity_message`
-  # is the one that bites: `non_activity_messages` filters `message_type`, not
-  # `private`, so a trailing private note is exactly what that field resolves to.
-  # Agents need it (it is what keeps the chat list preview fresh), but the contact
-  # subscribes to `conversation.created`, `conversation.status_changed`,
-  # `conversation.updated` and the typing events too, so those broadcasts strip
-  # these keys before the payload leaves the server (ActionCableListener), and
-  # ActionCableBroadcastJob refuses to re-add them when it refreshes a payload.
-  # The REST payload is unaffected: `/conversations` is agent-authenticated, so
-  # the jbuilder keeps serving the private note as the chat list preview.
-  AGENT_ONLY_PUSH_KEYS = %i[last_non_activity_message].freeze
+  # What a contact is allowed to receive over the cable. This is an ALLOWLIST on
+  # purpose: `contact_push_data` is built FROM this list, never subtracted from
+  # `push_data`. A new field therefore reaches agents only, until someone adds it
+  # here deliberately.
+  #
+  # A denylist was tried first and failed open. Every field added to `push_data`
+  # leaked by default, and two did within a month: `last_non_activity_message`
+  # (which resolves to a trailing private note, since `non_activity_messages`
+  # filters `message_type` but not `private`) and, on Pro, `kanban_task` (board
+  # name, funnel step names, and the agent roster with availability). Anything
+  # operational — labels, custom attributes, priority, assignee, SLA — is agent
+  # context and stays out by construction.
+  #
+  # The list is this short because that is what the contact actually consumes:
+  # the widget store keeps only `id` and `status` from cable payloads
+  # (widget/store/modules/conversationAttributes.js), and the typing handlers
+  # read only `conversation.id`. The rest is here because it describes the
+  # contact's own side of the conversation and costs nothing to keep, so a
+  # widget change does not immediately land on this list. Everything else the
+  # widget needs comes from its own REST endpoint, which is scoped to the
+  # contact and unaffected by this.
+  #
+  # Only the cable is narrowed. `/api/v1/accounts/.../conversations` is
+  # agent-authenticated and keeps serving the full payload.
+  CONTACT_PUSH_KEYS = %i[
+    id status can_reply channel messages unread_count
+    agent_last_seen_at contact_last_seen_at created_at updated_at timestamp
+  ].freeze
+
+  # Transient per-event tags the listener merges onto a payload after building
+  # it. They are not `push_data` fields, so they are named separately, but they
+  # are contact-safe and have to survive the narrowing.
+  CONTACT_SAFE_EVENT_KEYS = %i[event_metadata].freeze
+
+  # The contact's copy of `push_data`. See CONTACT_PUSH_KEYS before widening it.
+  def contact_push_data
+    push_data.slice(*CONTACT_PUSH_KEYS)
+  end
+
+  # Narrows an already-built agent payload instead of rebuilding it, so a
+  # listener that broadcasts to both audiences pays for `push_data` once.
+  def self.contact_slice(payload)
+    payload.slice(*CONTACT_PUSH_KEYS, *CONTACT_SAFE_EVENT_KEYS)
+  end
 
   def push_data # rubocop:disable Metrics/MethodLength
     {
