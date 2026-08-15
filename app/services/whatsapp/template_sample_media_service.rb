@@ -17,9 +17,13 @@ class Whatsapp::TemplateSampleMediaService
   # Keyed on the URL without its query, because Meta re-signs the handle on every template sync while
   # the file behind it stays the same. Keying on the full URL would re-upload the same media every time
   # the signature rotated.
+  #
+  # Scoped to the phone number rather than to the channel, because a media id belongs to the Cloud
+  # account that uploaded it: reauthorizing an inbox swaps the phone number id while keeping the channel
+  # record, and an id minted under the old account is not addressable by the new one.
   def cache_key
     path = Addressable::URI.parse(url).omit(:query, :fragment).to_s
-    "whatsapp_template_sample_media/#{channel.id}/#{Digest::SHA256.hexdigest(path)}"
+    "whatsapp_template_sample_media/#{channel.provider_config['phone_number_id']}/#{Digest::SHA256.hexdigest(path)}"
   end
 
   def upload

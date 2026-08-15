@@ -52,6 +52,17 @@ describe Whatsapp::TemplateSampleMediaService do
     expect { service.media_id }.to raise_error(Down::ClientError)
   end
 
+  # Reauthorizing an inbox swaps the phone number id while keeping the channel record. A media id minted
+  # under the old Cloud account is not addressable by the new one, so it must not be served from cache.
+  it 'uploads again after the inbox is reauthorized onto another Cloud account' do
+    service.media_id
+    channel.provider_config = channel.provider_config.merge('phone_number_id' => 'reauthorized_id')
+
+    described_class.new(channel: channel, url: url).media_id
+
+    expect(provider).to have_received(:upload_media).twice
+  end
+
   # Meta re-signs the handle on every template sync. The file behind it does not change, so a rotated
   # signature must not cost a second upload.
   it 'reuses the upload when only the signature rotated' do
