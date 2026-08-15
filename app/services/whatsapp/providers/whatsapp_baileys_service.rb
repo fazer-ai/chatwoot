@@ -687,8 +687,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message_request
-    # Reserved before the request so `updated_at` (and with it the idempotency
-    # key below) is already settled when the body is built.
     message_id = reserve_source_id
 
     response = HTTParty.post(
@@ -721,10 +719,21 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # of our own message — it lands as a fresh "sent from the phone" message. Reserving the id up front
   # closes that window, and a Sidekiq retry reuses it so WhatsApp still sees a single message.
   # Shape mirrors Baileys' generateMessageIDV2: the "3EB0" prefix followed by 18 uppercase hex chars.
+  #
+  # Written with `update_columns` under the row lock: the reservation is bookkeeping for a send that
+  # has not happened yet, so it must not fire `message.updated` (cable, webhooks, agent bots, search
+  # reindex) nor bump `updated_at`, which the idempotency key above is built from — a retry has to
+  # reuse the same key. `lock!` re-reads the row first, so the merge below can't write back a stale
+  # `content_attributes`.
   def reserve_source_id
     return @message.pending_source_id if @message.pending_source_id.present?
 
-    "3EB0#{SecureRandom.hex(9).upcase}".tap { |id| @message.update_under_lock!(pending_source_id: id) }
+    "3EB0#{SecureRandom.hex(9).upcase}".tap do |id|
+      @message.with_lock do
+        @message.pending_source_id = id
+        @message.update_columns(content_attributes: @message.content_attributes) # rubocop:disable Rails/SkipsModelValidations
+      end
+    end
   end
 
   def process_response(response)

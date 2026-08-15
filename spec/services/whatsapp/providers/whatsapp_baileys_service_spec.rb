@@ -750,6 +750,18 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         reserved = unsent_message.reload.pending_source_id
         expect(reserved).to match(/\A3EB0[0-9A-F]{18}\z/)
         expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == reserved })
+        # Stored so the echo handler's lookup can read it back out of the JSON column.
+        expect(Message.where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", reserved)).to exist
+      end
+
+      # The reservation is bookkeeping for a send that has not happened yet: it must not look like a
+      # message update to integrations, nor invalidate the idempotency key a retry has to reuse.
+      it 'does not touch updated_at when reserving' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        expect { service.send_message(test_send_phone_number, unsent_message) }
+          .not_to(change { unsent_message.reload.updated_at })
       end
 
       it 'reuses the reserved id when the same message is sent again' do

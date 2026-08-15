@@ -4,7 +4,6 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   private
 
   def build_and_save_message(conversation:, sender:, attach_media: false)
-    return if confirm_reserved_outgoing_message(conversation)
     return build_and_save_contact_messages(conversation: conversation, sender: sender) if message_type == 'contact'
 
     @message = conversation.messages.build(content: message_content, **webhook_message_attributes(sender))
@@ -38,19 +37,24 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   # never saw and would be stored as a new sender-less outgoing message, rendered as if an agent had
   # replied from the phone. Baileys sends reserve their WhatsApp id before the request
   # (`reserve_source_id`), so match on that instead and just fill in the `source_id` the response
-  # never delivered. Scoped to the conversation the echo resolved to, which is the one holding the
-  # message we sent.
-  def confirm_reserved_outgoing_message(conversation)
+  # never delivered.
+  #
+  # Runs before the conversation is picked: a delayed echo whose original thread was resolved
+  # meanwhile would otherwise reopen it or open a stray new one just to hold a message that is
+  # already stored. The lookup spans every conversation the contact has in this inbox, since that
+  # is where the sent message can be, and answers with the conversation actually holding it.
+  def confirm_reserved_outgoing_message(contact)
     return false if incoming?
 
-    reserved = conversation.messages
-                           .where(message_type: :outgoing)
-                           .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", raw_message_id)
-                           .first
+    reserved = Message.where(conversation_id: contact.conversations.where(inbox_id: inbox.id).select(:id))
+                      .where(message_type: :outgoing)
+                      .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", raw_message_id)
+                      .first
     return false if reserved.nil?
 
     reserved.update_under_lock!(source_id: raw_message_id) if reserved.source_id.blank?
     @message = reserved
+    @conversation = reserved.conversation
     true
   end
 

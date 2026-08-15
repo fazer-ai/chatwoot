@@ -938,6 +938,22 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(sent.reload.source_id).to eq('RESERVED_1')
     end
 
+    # A delayed echo must not reopen the thread it belongs to, nor open a new one to hold a message
+    # that is already stored.
+    it 'confirms a reserved message whose conversation was resolved meanwhile' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_3' })
+      conversation.update!(status: :resolved)
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_3')).perform
+      end.to not_change(Message, :count).and not_change(Conversation, :count)
+
+      expect(sent.reload.source_id).to eq('RESERVED_3')
+      expect(conversation.reload.status).to eq('resolved')
+    end
+
     it 'keeps the source_id already confirmed by the send response' do
       sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
                               content: '**John** olá', source_id: 'RESERVED_2',
