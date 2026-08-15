@@ -227,21 +227,30 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def parse_upload_response(response)
-    # A 429 or a 5xx is the API having a bad minute, not a file it refuses. Answering with
-    # MediaUploadError would be indistinguishable from a rejected file and would fail the message for
-    # good; letting these through keeps Sidekiq's retry.
-    response.value if response.code == '429' || response.is_a?(Net::HTTPServerError)
-
-    body = JSON.parse(response.body)
+    body = parse_json(response.body)
     return body['id'] if body['id'].present?
+
+    error = body['error'] || {}
+    # An API having a bad minute is not a file it refuses. Answering with MediaUploadError would be
+    # indistinguishable from a rejected file and would fail the message for good; letting these through
+    # keeps Sidekiq's retry. The HTTP status alone can't tell the two apart, because Graph reports
+    # throttling and other transient conditions inside a 400 envelope flagged `is_transient`.
+    response.value if transient_upload_error?(response, error)
 
     # The generic `error.message` for a rejected upload is just "(#100) Invalid parameter"; the reason
     # an agent can act on ("File Too Large", unsupported format) is in `error_data.details`.
-    error = body['error'] || {}
     raise CustomExceptions::Whatsapp::MediaUploadError,
-          "Media upload failed: #{error.dig('error_data', 'details') || error['message']}"
+          "Media upload failed: #{error.dig('error_data', 'details') || error['message'] || "HTTP #{response.code}"}"
+  end
+
+  def transient_upload_error?(response, error)
+    response.code == '429' || response.is_a?(Net::HTTPServerError) || error['is_transient'] == true
+  end
+
+  def parse_json(body)
+    JSON.parse(body.to_s)
   rescue JSON::ParserError
-    raise CustomExceptions::Whatsapp::MediaUploadError, "Media upload failed with HTTP #{response.code}"
+    {}
   end
 
   def voice_message?(type, attachment)

@@ -722,5 +722,14 @@ describe Whatsapp::Providers::WhatsappCloudService do
 
       expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
     end
+
+    # Graph reports throttling and other passing conditions inside a 400 envelope, so the status alone
+    # would read them as a rejected file.
+    it 'lets a transient error dressed as HTTP 400 propagate so the job can be retried' do
+      body = { error: { message: '(#4) Application request limit reached', code: 4, is_transient: true } }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
+    end
   end
 end
