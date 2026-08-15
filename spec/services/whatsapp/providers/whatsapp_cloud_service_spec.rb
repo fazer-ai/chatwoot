@@ -681,4 +681,33 @@ describe Whatsapp::Providers::WhatsappCloudService do
       expect(service.send_message('+123456789', message_with_reaction)).to eq 'message_id'
     end
   end
+
+  describe '#upload_media' do
+    let(:upload_url) { 'https://graph.facebook.com/v24.0/123456789/media' }
+    let(:file) { Tempfile.new(['sample', '.jpg']) }
+
+    after { file.close! }
+
+    it 'returns the media id' do
+      stub_request(:post, upload_url).to_return(status: 200, body: { id: '4565669250245108' }.to_json, headers: response_headers)
+
+      expect(service.upload_media(file, 'image/jpeg')).to eq '4565669250245108'
+    end
+
+    # `error.message` for a rejected upload is only "(#100) Invalid parameter"; the actionable reason
+    # (sample media above Meta's size limit, unsupported format) lives in `error_data.details`.
+    it 'raises with the detail Meta gives, not the generic message' do
+      body = {
+        error: {
+          message: '(#100) Invalid parameter',
+          code: 100,
+          error_data: { messaging_product: 'whatsapp', details: 'File Too Large: The file you uploaded is too large.' }
+        }
+      }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'video/mp4') }
+        .to raise_error(CustomExceptions::Whatsapp::MediaUploadError, /File Too Large/)
+    end
+  end
 end

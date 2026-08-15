@@ -34,16 +34,13 @@ class Whatsapp::PopulateTemplateParametersService
     end
   end
 
-  def build_media_parameter(url, media_type, media_name = nil)
-    return nil if url.blank?
+  # `source` is what the API should fetch the media by: either `{ link: url }` or `{ id: media_id }`.
+  def build_media_parameter(source, media_type, media_name = nil)
+    source = { link: source } if source.is_a?(String)
+    return nil if source[:link].blank? && source[:id].blank?
 
-    # A URL is not free text, so it never goes through `sanitize_parameter`: that helper strips
-    # characters and truncates at 1000 chars, which turns a long signed link into one that still
-    # looks valid but no longer resolves. The Cloud API only reports that back as a generic
-    # "131053 Media upload error", with no hint that we were the ones who broke the link.
-    normalized_url = normalize_url(url.to_s.strip)
-    validate_url(normalized_url)
-    build_media_type_parameter(normalized_url, media_type.downcase, media_name)
+    source = { link: prepare_url(source[:link]) } if source[:id].blank?
+    build_media_type_parameter(source, media_type.downcase, media_name)
   end
 
   def build_named_parameter(parameter_name, value)
@@ -97,32 +94,17 @@ class Whatsapp::PopulateTemplateParametersService
     }
   end
 
-  def build_media_type_parameter(sanitized_url, media_type, media_name = nil)
+  def build_media_type_parameter(source, media_type, media_name = nil)
     case media_type
     when 'image'
-      build_image_parameter(sanitized_url)
+      { type: 'image', image: source }
     when 'video'
-      build_video_parameter(sanitized_url)
+      { type: 'video', video: source }
     when 'document'
-      build_document_parameter(sanitized_url, media_name)
+      { type: 'document', document: media_name.present? ? source.merge(filename: media_name) : source }
     else
       raise ArgumentError, "Unsupported media type: #{media_type}"
     end
-  end
-
-  def build_image_parameter(url)
-    { type: 'image', image: { link: url } }
-  end
-
-  def build_video_parameter(url)
-    { type: 'video', video: { link: url } }
-  end
-
-  def build_document_parameter(url, media_name = nil)
-    document_params = { link: url }
-    document_params[:filename] = media_name if media_name.present?
-
-    { type: 'document', document: document_params }
   end
 
   def rich_formatting?(text)
@@ -144,6 +126,16 @@ class Whatsapp::PopulateTemplateParametersService
     sanitized = value.to_s.strip
     sanitized = sanitized.gsub(/[<>\"']/, '') # Remove potential HTML/JS chars
     sanitized[0...1000] # Limit length to prevent DoS
+  end
+
+  # A URL is not free text, so it never goes through `sanitize_parameter`: that helper strips characters
+  # and truncates at 1000 chars, which turns a long signed link into one that still looks valid but no
+  # longer resolves. The Cloud API only reports that back as a generic "131053 Media upload error", with
+  # no hint that we were the ones who broke the link.
+  def prepare_url(url)
+    normalized_url = normalize_url(url.to_s.strip)
+    validate_url(normalized_url)
+    normalized_url
   end
 
   def normalize_url(url)

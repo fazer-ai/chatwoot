@@ -95,6 +95,30 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     "#{api_base_path}/v13.0/#{media_id}"
   end
 
+  # Uploads a file to the WhatsApp media store and returns its id, which can then be used in place of a
+  # `link` anywhere the API takes media. Meta keeps the upload for 30 days.
+  # https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media#upload-media
+  #
+  # This is the one call that does not go through HTTParty: its multipart bodies are streamed with
+  # chunked encoding, and the Graph API answers "(#100) The parameter file is required" to those.
+  # Net::HTTP sends a Content-Length, which is what the endpoint expects.
+  def upload_media(file, content_type)
+    uri = URI.parse("#{phone_id_path('v24.0')}/media")
+    request = Net::HTTP::Post.new(uri)
+    request['Authorization'] = "Bearer #{whatsapp_channel.provider_config['api_key']}"
+    request.set_form(
+      [
+        %w[messaging_product whatsapp],
+        ['type', content_type],
+        ['file', file, { filename: File.basename(file.path), content_type: content_type }]
+      ],
+      'multipart/form-data'
+    )
+
+    response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(request) }
+    parse_upload_response(response)
+  end
+
   def toggle_typing_status(typing_status, last_message:, **)
     return false unless [Events::Types::CONVERSATION_TYPING_ON, Events::Types::CONVERSATION_RECORDING].include?(typing_status)
 
@@ -200,6 +224,19 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   def error_message(response)
     # https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/#sample-response
     response.parsed_response.dig('error', 'message') if response.parsed_response.is_a?(Hash)
+  end
+
+  def parse_upload_response(response)
+    body = JSON.parse(response.body)
+    return body['id'] if body['id'].present?
+
+    # The generic `error.message` for a rejected upload is just "(#100) Invalid parameter"; the reason
+    # an agent can act on ("File Too Large", unsupported format) is in `error_data.details`.
+    error = body['error'] || {}
+    raise CustomExceptions::Whatsapp::MediaUploadError,
+          "Media upload failed: #{error.dig('error_data', 'details') || error['message']}"
+  rescue JSON::ParserError
+    raise CustomExceptions::Whatsapp::MediaUploadError, "Media upload failed with HTTP #{response.code}"
   end
 
   def voice_message?(type, attachment)
