@@ -2073,11 +2073,13 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     }
   end
 
-  # The service reserves the WhatsApp message id before posting, which also settles `updated_at`.
-  # Reserving it here keeps the expected body (and the idempotency key built from `updated_at`)
-  # in sync with what the send actually posts.
+  # The service reserves the WhatsApp message id before posting, so reserve it here too or the
+  # expected body would carry a different `messageId`. The reload matters: the reservation runs
+  # under a row lock, which re-reads the row, so the service builds the idempotency key from the
+  # database `updated_at` (microseconds) rather than the in-memory one written by `update!`.
   def send_message_body(hash, msg = message)
     msg.update_under_lock!(pending_source_id: 'reserved_msg_id') if msg.pending_source_id.blank?
+    msg.reload
     hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}", messageId: msg.pending_source_id).to_json
   end
 end
