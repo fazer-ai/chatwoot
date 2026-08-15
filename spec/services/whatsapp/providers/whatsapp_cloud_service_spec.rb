@@ -681,4 +681,55 @@ describe Whatsapp::Providers::WhatsappCloudService do
       expect(service.send_message('+123456789', message_with_reaction)).to eq 'message_id'
     end
   end
+
+  describe '#upload_media' do
+    let(:upload_url) { 'https://graph.facebook.com/v24.0/123456789/media' }
+    let(:file) { Tempfile.new(['sample', '.jpg']) }
+
+    after { file.close! }
+
+    it 'returns the media id' do
+      stub_request(:post, upload_url).to_return(status: 200, body: { id: '4565669250245108' }.to_json, headers: response_headers)
+
+      expect(service.upload_media(file, 'image/jpeg')).to eq '4565669250245108'
+    end
+
+    # `error.message` for a rejected upload is only "(#100) Invalid parameter"; the actionable reason
+    # (sample media above Meta's size limit, unsupported format) lives in `error_data.details`.
+    it 'raises with the detail Meta gives, not the generic message' do
+      body = {
+        error: {
+          message: '(#100) Invalid parameter',
+          code: 100,
+          error_data: { messaging_product: 'whatsapp', details: 'File Too Large: The file you uploaded is too large.' }
+        }
+      }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'video/mp4') }
+        .to raise_error(CustomExceptions::Whatsapp::MediaUploadError, /File Too Large/)
+    end
+
+    # MediaUploadError fails the message for good, so a blip must not raise it.
+    it 'lets a server error propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 503, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPFatalError)
+    end
+
+    it 'lets a rate limit propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 429, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
+    end
+
+    # Graph reports throttling and other passing conditions inside a 400 envelope, so the status alone
+    # would read them as a rejected file.
+    it 'lets a transient error dressed as HTTP 400 propagate so the job can be retried' do
+      body = { error: { message: '(#4) Application request limit reached', code: 4, is_transient: true } }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
+    end
+  end
 end

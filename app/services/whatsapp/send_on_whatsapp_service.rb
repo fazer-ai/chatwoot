@@ -38,6 +38,11 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
                                          parameters: processed_parameters
                                        }, message)
     persist_source_id(message_id)
+  rescue ArgumentError, CustomExceptions::Whatsapp::MediaUploadError => e
+    # Parameter validation (media URL, coupon code, media type) rejected the template, or its sample
+    # media could not be uploaded. Retrying can't fix either, so surface the reason on the message
+    # instead of letting the job die silently.
+    message.update_under_lock!(status: :failed, external_error: e.message)
   end
 
   def send_baileys_session_message
