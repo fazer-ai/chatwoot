@@ -28,12 +28,11 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
   def process_group_message
     @group_contact_inbox, @group_contact = find_or_create_group_contact
 
-    consolidate_contact(baileys_sender_phone, baileys_sender_lid, baileys_sender_identifier)
-    @sender_contact = find_or_create_sender_contact
-    if @sender_contact
-      update_contact_whatsapp_info(@sender_contact, baileys_sender_phone, baileys_sender_identifier, name: extract_sender_name)
-      try_update_contact_avatar(@sender_contact)
-    end
+    # The echo of a message Chatwoot sent under a reserved id is already stored; confirming it
+    # before the conversation is picked keeps it from reopening (or opening) a group thread for it.
+    return if confirm_reserved_outgoing_message(@group_contact)
+
+    resolve_group_sender_contact
 
     # Reaction removals don't produce a new Message row; handle them before
     # find_or_create_group_conversation so a blank webhook can't create a
@@ -60,6 +59,15 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
       sender: @sender_contact,
       attach_media: should_attach_media?
     )
+  end
+
+  def resolve_group_sender_contact
+    consolidate_contact(baileys_sender_phone, baileys_sender_lid, baileys_sender_identifier)
+    @sender_contact = find_or_create_sender_contact
+    return if @sender_contact.blank?
+
+    update_contact_whatsapp_info(@sender_contact, baileys_sender_phone, baileys_sender_identifier, name: extract_sender_name)
+    try_update_contact_avatar(@sender_contact)
   end
 
   def find_or_create_participant_contact(participant)

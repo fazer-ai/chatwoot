@@ -687,6 +687,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message_request
+    message_id = reserve_source_id
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
@@ -698,7 +700,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         # only `id` would make every follow-up send hit the cached response and
         # never reach WhatsApp. Suffixing with updated_at gives each send a fresh
         # key while still letting Sidekiq retries of the same attempt dedupe.
-        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}"
+        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}",
+        messageId: message_id
       }.to_json,
       timeout: 120
     )
@@ -708,6 +711,32 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     update_external_created_at(response)
     response.parsed_response.dig('data', 'key', 'id')
+  end
+
+  # The WhatsApp message id this send will use, picked here instead of letting Baileys generate it.
+  # `source_id` can only be written from the response, so a send whose response never arrives (socket
+  # drop, read timeout, worker restart) leaves us with no way to recognize the `messages.upsert` echo
+  # of our own message — it lands as a fresh "sent from the phone" message. Reserving the id up front
+  # closes that window, and a Sidekiq retry reuses it so WhatsApp still sees a single message.
+  # Shape mirrors Baileys' generateMessageIDV2: the "3EB0" prefix followed by 18 uppercase hex chars.
+  #
+  # The whole read-or-generate runs under the row lock, which re-reads the row: this send may have
+  # been queued behind the channel lock for minutes, and a reaction toggle in the meantime clears the
+  # reservation precisely to force a fresh id — sending under the id we loaded before waiting would
+  # resend the previous reaction and leave its echo unmatchable.
+  #
+  # Written with `update_columns`: the reservation is bookkeeping for a send that has not happened
+  # yet, so it must not fire `message.updated` (cable, webhooks, agent bots, search reindex) nor bump
+  # `updated_at`, which the idempotency key above is built from — a retry has to reuse the same key.
+  def reserve_source_id
+    @message.with_lock do
+      next @message.pending_source_id if @message.pending_source_id.present?
+
+      id = "3EB0#{SecureRandom.hex(9).upcase}"
+      @message.pending_source_id = id
+      @message.update_columns(content_attributes: @message.content_attributes) # rubocop:disable Rails/SkipsModelValidations
+      id
+    end
   end
 
   def process_response(response)
