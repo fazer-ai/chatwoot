@@ -82,11 +82,9 @@ class Webhooks::InstagramEventsJob < MutexApplicationJob
   end
 
   def instagram_id(messaging)
-    if agent_message_via_echo?(messaging)
-      messaging[:sender][:id]
-    else
-      messaging[:recipient][:id]
-    end
+    return messaging.dig(:sender, :id) if agent_message_via_echo?(messaging)
+
+    messaging.dig(:recipient, :id)
   end
 
   def ig_account_id
@@ -115,6 +113,10 @@ class Webhooks::InstagramEventsJob < MutexApplicationJob
   end
 
   def find_channel(instagram_id)
+    # `channel_facebook_pages.instagram_id` is nullable, so a blank lookup would match an arbitrary
+    # page from any account instead of returning nothing.
+    return if instagram_id.blank?
+
     # There will be chances for the instagram account to be connected to a facebook page,
     # so we need to check for both instagram and facebook page channels
     # priority is for instagram channel which created via instagram login
@@ -125,8 +127,10 @@ class Webhooks::InstagramEventsJob < MutexApplicationJob
     channel
   end
 
+  # Resolved per event: a single webhook batch mixes event types, and the job iterates over every
+  # entry and every messaging item within it.
   def event_name(messaging)
-    @event_name ||= SUPPORTED_EVENTS.find { |key| messaging.key?(key) }
+    SUPPORTED_EVENTS.find { |key| messaging[key].present? }
   end
 
   def message(messaging, channel)
