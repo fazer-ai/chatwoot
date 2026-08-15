@@ -1,4 +1,8 @@
 class Whatsapp::PopulateTemplateParametersService
+  # Characters that may appear literally in a URI (RFC 3986 reserved + unreserved), plus `%` so
+  # escapes that are already in the URL are left alone.
+  URL_CHARACTER_CLASS = "#{Addressable::URI::CharacterClasses::RESERVED}#{Addressable::URI::CharacterClasses::UNRESERVED}%".freeze
+
   def build_parameter(value)
     case value
     when String
@@ -33,8 +37,11 @@ class Whatsapp::PopulateTemplateParametersService
   def build_media_parameter(url, media_type, media_name = nil)
     return nil if url.blank?
 
-    sanitized_url = sanitize_parameter(url)
-    normalized_url = normalize_url(sanitized_url)
+    # A URL is not free text, so it never goes through `sanitize_parameter`: that helper strips
+    # characters and truncates at 1000 chars, which turns a long signed link into one that still
+    # looks valid but no longer resolves. The Cloud API only reports that back as a generic
+    # "131053 Media upload error", with no hint that we were the ones who broke the link.
+    normalized_url = normalize_url(url.to_s.strip)
     validate_url(normalized_url)
     build_media_type_parameter(normalized_url, media_type.downcase, media_name)
   end
@@ -140,18 +147,16 @@ class Whatsapp::PopulateTemplateParametersService
   end
 
   def normalize_url(url)
-    # Use Addressable::URI for better URL normalization
-    # It handles spaces, special characters, and encoding automatically
-    Addressable::URI.parse(url).normalize.to_s
-  rescue Addressable::URI::InvalidURIError
-    # Fallback: simple space encoding if Addressable fails
-    url.gsub(' ', '%20')
+    # Percent-encode only what is illegal in a URI (spaces, non-ASCII), leaving existing escapes
+    # untouched. `Addressable::URI#normalize` can't be used here because it *decodes* escaped
+    # octets that map back to allowed characters (`%3F` becomes a literal `?`, splitting the query
+    # in two), which invalidates signed links such as the `header_handle` sample media that ships
+    # with a WhatsApp template.
+    Addressable::URI.encode_component(url, URL_CHARACTER_CLASS)
   end
 
   def validate_url(url)
     return if url.blank?
-
-    # url is already normalized by the caller
 
     uri = URI.parse(url)
     raise ArgumentError, "Invalid URL scheme: #{uri.scheme}. Only http and https are allowed" unless %w[http https].include?(uri.scheme)

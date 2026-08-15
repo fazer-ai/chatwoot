@@ -325,6 +325,19 @@ describe Whatsapp::SendOnWhatsappService do
         expect { described_class.new(message: message).perform }.not_to raise_error
       end
 
+      it 'fails the message with the reason when a media parameter is rejected' do
+        processed_params = {
+          'body' => { '1' => '3' },
+          'header' => { 'media_url' => 'ftp://example.com/image.jpg', 'media_type' => 'image' }
+        }
+        rejected_template_params = build_sample_template_params(processed_params)
+        message = create_message_with_template('', rejected_template_params)
+
+        expect { described_class.new(message: message).perform }.not_to raise_error
+        expect(message.reload.status).to eq('failed')
+        expect(message.external_error).to eq('Invalid URL scheme: ftp. Only http and https are allowed')
+      end
+
       it 'processes template with rich text formatting' do
         processed_params = { 'body' => { '1' => '*Bold text* and _italic text_' } }
         rich_text_template_params = build_sample_template_params(processed_params)
