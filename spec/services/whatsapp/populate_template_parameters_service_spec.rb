@@ -39,6 +39,26 @@ describe Whatsapp::PopulateTemplateParametersService do
 
       expect(normalized).to eq('https://example.com/image.jpg?caption=%22quoted%22%20%3Ctag%3E')
     end
+
+    # Brackets are legal in a host (IPv6) but not in a path, so the encoding has to be per component:
+    # left literal, URI.parse rejects the whole URL.
+    it 'escapes brackets in the path' do
+      normalized = service.send(:normalize_url, 'https://example.com/album[1]/image.jpg')
+
+      expect(normalized).to eq('https://example.com/album%5B1%5D/image.jpg')
+      expect { URI.parse(normalized) }.not_to raise_error
+    end
+
+    it 'converts an internationalized host to punycode rather than percent-encoding it' do
+      normalized = service.send(:normalize_url, 'https://exämple.com/image.jpg')
+
+      expect(normalized).to eq('https://xn--exmple-cua.com/image.jpg')
+    end
+
+    it 'raises on a value that is not a URL at all' do
+      expect { service.send(:normalize_url, '4::aW1hZ2UvcG5n:ARZopaque') }
+        .to raise_error(ArgumentError, /Invalid URL format/)
+    end
   end
 
   describe '#build_media_parameter' do

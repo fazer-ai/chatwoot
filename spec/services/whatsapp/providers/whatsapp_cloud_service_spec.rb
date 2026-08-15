@@ -709,5 +709,18 @@ describe Whatsapp::Providers::WhatsappCloudService do
       expect { service.upload_media(file, 'video/mp4') }
         .to raise_error(CustomExceptions::Whatsapp::MediaUploadError, /File Too Large/)
     end
+
+    # MediaUploadError fails the message for good, so a blip must not raise it.
+    it 'lets a server error propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 503, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPFatalError)
+    end
+
+    it 'lets a rate limit propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 429, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
+    end
   end
 end

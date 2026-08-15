@@ -26,9 +26,23 @@ describe Whatsapp::TemplateSampleMediaService do
     expect(provider).to have_received(:upload_media).once
   end
 
-  it 'raises with a readable reason when the download fails' do
+  it 'raises with a readable reason when the media itself is gone' do
     stub_request(:get, url).to_return(status: 404)
 
     expect { service.media_id }.to raise_error(CustomExceptions::Whatsapp::MediaUploadError, /Could not download/)
+  end
+
+  # A blip must stay retryable: MediaUploadError fails the message for good, so only a deterministic
+  # rejection may raise it.
+  it 'lets a CDN outage propagate so the job can be retried' do
+    stub_request(:get, url).to_return(status: 503)
+
+    expect { service.media_id }.to raise_error(Down::ServerError)
+  end
+
+  it 'lets a connection timeout propagate so the job can be retried' do
+    stub_request(:get, url).to_timeout
+
+    expect { service.media_id }.to raise_error(Down::TimeoutError)
   end
 end

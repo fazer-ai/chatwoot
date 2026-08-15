@@ -21,7 +21,10 @@ class Whatsapp::TemplateSampleMediaService
   def upload
     file = Down.download(url)
     channel.provider_service.upload_media(file, file.content_type)
-  rescue Down::Error => e
+  rescue Down::ClientError, Down::InvalidUrl => e
+    # Only a 4xx or a malformed URL is the media's own fault and worth failing the message over. A
+    # timeout, a refused connection or a 5xx is the CDN having a bad minute: those propagate so Sidekiq
+    # retries, instead of dropping the send for good over a blip.
     raise CustomExceptions::Whatsapp::MediaUploadError, "Could not download the template sample media: #{e.message}"
   ensure
     file&.close

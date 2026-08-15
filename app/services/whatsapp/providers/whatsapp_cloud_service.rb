@@ -227,6 +227,11 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def parse_upload_response(response)
+    # A 429 or a 5xx is the API having a bad minute, not a file it refuses. Answering with
+    # MediaUploadError would be indistinguishable from a rejected file and would fail the message for
+    # good; letting these through keeps Sidekiq's retry.
+    response.value if response.code == '429' || response.is_a?(Net::HTTPServerError)
+
     body = JSON.parse(response.body)
     return body['id'] if body['id'].present?
 

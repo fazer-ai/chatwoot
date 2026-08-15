@@ -1,7 +1,5 @@
 class Whatsapp::PopulateTemplateParametersService
-  # Characters that may appear literally in a URI (RFC 3986 reserved + unreserved), plus `%` so
-  # escapes that are already in the URL are left alone.
-  URL_CHARACTER_CLASS = "#{Addressable::URI::CharacterClasses::RESERVED}#{Addressable::URI::CharacterClasses::UNRESERVED}%".freeze
+  CHARACTER_CLASSES = Addressable::URI::CharacterClasses
 
   def build_parameter(value)
     case value
@@ -138,13 +136,34 @@ class Whatsapp::PopulateTemplateParametersService
     normalized_url
   end
 
+  # Percent-encodes only what is illegal in each component, leaving existing escapes untouched.
+  #
+  # `Addressable::URI#normalize` can't be used here because it *decodes* escaped octets that map back
+  # to characters the component allows: `%3F` becomes a literal `?` that splits the query in two, which
+  # invalidates a signed link such as the `header_handle` sample media a WhatsApp template ships with.
+  # Encoding the URI as one string against the union of every reserved character is wrong in the other
+  # direction: it leaves a bracket in the path unescaped, which `URI.parse` then rejects, and turns an
+  # internationalized host into percent-encoded UTF-8 instead of punycode.
   def normalize_url(url)
-    # Percent-encode only what is illegal in a URI (spaces, non-ASCII), leaving existing escapes
-    # untouched. `Addressable::URI#normalize` can't be used here because it *decodes* escaped
-    # octets that map back to allowed characters (`%3F` becomes a literal `?`, splitting the query
-    # in two), which invalidates signed links such as the `header_handle` sample media that ships
-    # with a WhatsApp template.
-    Addressable::URI.encode_component(url, URL_CHARACTER_CLASS)
+    uri = Addressable::URI.parse(url)
+    Addressable::URI.new(
+      scheme: uri.scheme,
+      userinfo: uri.userinfo,
+      host: uri.normalized_host,
+      port: uri.port,
+      path: encode_uri_component(uri.path, CHARACTER_CLASSES::PATH),
+      query: encode_uri_component(uri.query, CHARACTER_CLASSES::QUERY),
+      fragment: encode_uri_component(uri.fragment, CHARACTER_CLASSES::FRAGMENT)
+    ).to_s
+  rescue Addressable::URI::InvalidURIError => e
+    raise ArgumentError, "Invalid URL format: #{e.message}. Please enter a valid URL like https://example.com/document.pdf"
+  end
+
+  # `%` joins the class so escapes already present survive untouched instead of being double-encoded.
+  def encode_uri_component(value, character_class)
+    return value if value.nil?
+
+    Addressable::URI.encode_component(value, "#{character_class}%")
   end
 
   def validate_url(url)
