@@ -52,10 +52,18 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
                       .first
     return false if reserved.nil?
 
-    reserved.update_under_lock!(source_id: raw_message_id) if reserved.source_id.blank?
+    confirm_source_id(reserved) if reserved.source_id.blank?
     @message = reserved
     @conversation = reserved.conversation
     true
+  end
+
+  # Mirrors Whatsapp::SendOnWhatsappService#persist_source_id: the id the send never got to store is
+  # what a revoke needs, so a message deleted while that send was in flight can only be taken off the
+  # contact's phone once this echo supplies it.
+  def confirm_source_id(reserved)
+    reserved.update_under_lock!(source_id: raw_message_id)
+    ::Messages::DeleteOnChannelJob.perform_later(reserved.id) if reserved.deleted?
   end
 
   # Mirrors the Cloud provider (create_contact_messages): one message per shared

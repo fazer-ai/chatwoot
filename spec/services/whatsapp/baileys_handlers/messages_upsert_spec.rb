@@ -954,6 +954,20 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(conversation.reload.status).to eq('resolved')
     end
 
+    # Deleting a message whose send is still in flight leaves nobody holding its provider id, so the
+    # echo is the only chance to learn it — and to revoke the message on the contact's phone.
+    it 'revokes on the channel when the confirmed message was deleted meanwhile' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: 'Mensagem apagada', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_4', deleted: true })
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_4')).perform
+      end.to have_enqueued_job(Messages::DeleteOnChannelJob).with(sent.id)
+
+      expect(sent.reload.source_id).to eq('RESERVED_4')
+    end
+
     it 'keeps the source_id already confirmed by the send response' do
       sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
                               content: '**John** olá', source_id: 'RESERVED_2',

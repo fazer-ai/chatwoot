@@ -31,7 +31,11 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     # here. Exactly one of the two sides enqueues the provider delete.
     reached_provider = false
     message.with_lock do
-      message.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: { deleted: true })
+      # The reserved provider id survives the wipe: a send still in flight is what this delete races
+      # with, and dropping the reservation would leave its echo unmatchable — the deleted content
+      # would come back as a fresh incoming-looking message.
+      deleted_attributes = { deleted: true, pending_source_id: message.pending_source_id }.compact
+      message.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: deleted_attributes)
       message.attachments.destroy_all
       reached_provider = message.source_id.present?
     end

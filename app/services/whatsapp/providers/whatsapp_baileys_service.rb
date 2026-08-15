@@ -720,19 +720,22 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # closes that window, and a Sidekiq retry reuses it so WhatsApp still sees a single message.
   # Shape mirrors Baileys' generateMessageIDV2: the "3EB0" prefix followed by 18 uppercase hex chars.
   #
-  # Written with `update_columns` under the row lock: the reservation is bookkeeping for a send that
-  # has not happened yet, so it must not fire `message.updated` (cable, webhooks, agent bots, search
-  # reindex) nor bump `updated_at`, which the idempotency key above is built from — a retry has to
-  # reuse the same key. `lock!` re-reads the row first, so the merge below can't write back a stale
-  # `content_attributes`.
+  # The whole read-or-generate runs under the row lock, which re-reads the row: this send may have
+  # been queued behind the channel lock for minutes, and a reaction toggle in the meantime clears the
+  # reservation precisely to force a fresh id — sending under the id we loaded before waiting would
+  # resend the previous reaction and leave its echo unmatchable.
+  #
+  # Written with `update_columns`: the reservation is bookkeeping for a send that has not happened
+  # yet, so it must not fire `message.updated` (cable, webhooks, agent bots, search reindex) nor bump
+  # `updated_at`, which the idempotency key above is built from — a retry has to reuse the same key.
   def reserve_source_id
-    return @message.pending_source_id if @message.pending_source_id.present?
+    @message.with_lock do
+      next @message.pending_source_id if @message.pending_source_id.present?
 
-    "3EB0#{SecureRandom.hex(9).upcase}".tap do |id|
-      @message.with_lock do
-        @message.pending_source_id = id
-        @message.update_columns(content_attributes: @message.content_attributes) # rubocop:disable Rails/SkipsModelValidations
-      end
+      id = "3EB0#{SecureRandom.hex(9).upcase}"
+      @message.pending_source_id = id
+      @message.update_columns(content_attributes: @message.content_attributes) # rubocop:disable Rails/SkipsModelValidations
+      id
     end
   end
 

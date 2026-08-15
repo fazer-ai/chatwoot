@@ -754,6 +754,18 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(Message.where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", reserved)).to exist
       end
 
+      # A send can sit behind the channel lock for minutes; the row may have been re-reserved (or
+      # cleared and re-reserved by a reaction toggle) since it was loaded.
+      it 'reads the reservation under the lock instead of the copy loaded before waiting' do
+        Message.find(unsent_message.id).update!(content_attributes: { pending_source_id: 'RESERVED_ELSEWHERE' })
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == 'RESERVED_ELSEWHERE' })
+      end
+
       # The reservation is bookkeeping for a send that has not happened yet: it must not look like a
       # message update to integrations, nor invalidate the idempotency key a retry has to reuse.
       it 'does not touch updated_at when reserving' do

@@ -268,6 +268,20 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(message.reload.content_attributes['bcc_emails']).to be_nil
       end
 
+      # The provider id reserved before an in-flight send is the only handle on the message once the
+      # send response is lost, so the delete must not wipe it along with the rest.
+      it 'keeps the reserved provider id while wiping the other content attributes' do
+        message.update!(content_attributes: message.content_attributes.merge('pending_source_id' => 'RESERVED_1'))
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message.reload.content_attributes['pending_source_id']).to eq 'RESERVED_1'
+        expect(message.content_attributes['bcc_emails']).to be_nil
+      end
+
       it 'deletes interactive messages' do
         interactive_message = create(
           :message, message_type: :outgoing, content: 'test', content_type: 'input_select',
