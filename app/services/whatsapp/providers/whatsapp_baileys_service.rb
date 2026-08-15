@@ -687,6 +687,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def send_message_request
+    # Reserved before the request so `updated_at` (and with it the idempotency
+    # key below) is already settled when the body is built.
+    message_id = reserve_source_id
+
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
@@ -698,7 +702,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         # only `id` would make every follow-up send hit the cached response and
         # never reach WhatsApp. Suffixing with updated_at gives each send a fresh
         # key while still letting Sidekiq retries of the same attempt dedupe.
-        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}"
+        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}",
+        messageId: message_id
       }.to_json,
       timeout: 120
     )
@@ -708,6 +713,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     update_external_created_at(response)
     response.parsed_response.dig('data', 'key', 'id')
+  end
+
+  # The WhatsApp message id this send will use, picked here instead of letting Baileys generate it.
+  # `source_id` can only be written from the response, so a send whose response never arrives (socket
+  # drop, read timeout, worker restart) leaves us with no way to recognize the `messages.upsert` echo
+  # of our own message — it lands as a fresh "sent from the phone" message. Reserving the id up front
+  # closes that window, and a Sidekiq retry reuses it so WhatsApp still sees a single message.
+  # Shape mirrors Baileys' generateMessageIDV2: the "3EB0" prefix followed by 18 uppercase hex chars.
+  def reserve_source_id
+    return @message.pending_source_id if @message.pending_source_id.present?
+
+    "3EB0#{SecureRandom.hex(9).upcase}".tap { |id| @message.update_under_lock!(pending_source_id: id) }
   end
 
   def process_response(response)

@@ -738,6 +738,33 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    context 'when reserving the WhatsApp message id' do
+      let(:unsent_message) { create(:message, inbox: whatsapp_channel.inbox, content: 'Hello') }
+
+      it 'sends under a reserved id and persists it before the request' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+
+        reserved = unsent_message.reload.pending_source_id
+        expect(reserved).to match(/\A3EB0[0-9A-F]{18}\z/)
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == reserved })
+      end
+
+      it 'reuses the reserved id when the same message is sent again' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+        reserved = unsent_message.reload.pending_source_id
+        service.send_message(test_send_phone_number, unsent_message)
+
+        expect(unsent_message.reload.pending_source_id).to eq(reserved)
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == reserved }.twice)
+      end
+    end
+
     context 'when request is unsuccessful' do
       it 'raises ProviderUnavailableError' do
         stub_request(:post, request_path)
@@ -2022,7 +2049,11 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     }
   end
 
+  # The service reserves the WhatsApp message id before posting, which also settles `updated_at`.
+  # Reserving it here keeps the expected body (and the idempotency key built from `updated_at`)
+  # in sync with what the send actually posts.
   def send_message_body(hash, msg = message)
-    hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}").to_json
+    msg.update_under_lock!(pending_source_id: 'reserved_msg_id') if msg.pending_source_id.blank?
+    hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}", messageId: msg.pending_source_id).to_json
   end
 end

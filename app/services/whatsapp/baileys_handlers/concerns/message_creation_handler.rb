@@ -4,17 +4,10 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   private
 
   def build_and_save_message(conversation:, sender:, attach_media: false)
+    return if confirm_reserved_outgoing_message(conversation)
     return build_and_save_contact_messages(conversation: conversation, sender: sender) if message_type == 'contact'
 
-    @message = conversation.messages.build(
-      content: message_content,
-      account_id: inbox.account_id,
-      inbox_id: inbox.id,
-      source_id: raw_message_id,
-      sender: incoming? ? sender : nil,
-      message_type: incoming? ? :incoming : :outgoing,
-      content_attributes: build_message_content_attributes
-    )
+    @message = conversation.messages.build(content: message_content, **webhook_message_attributes(sender))
 
     attach_media_to_message if attach_media
     attach_location_to_message if message_type == 'location'
@@ -24,6 +17,41 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     inbox.channel.received_messages([@message], conversation) if incoming?
 
     @message
+  end
+
+  # Columns shared by every message built from the current webhook: an incoming message keeps its
+  # sender, while a message the session sent (echoed back by WhatsApp) is stored sender-less.
+  def webhook_message_attributes(sender)
+    {
+      account_id: inbox.account_id,
+      inbox_id: inbox.id,
+      source_id: raw_message_id,
+      sender: incoming? ? sender : nil,
+      message_type: incoming? ? :incoming : :outgoing,
+      content_attributes: build_message_content_attributes
+    }
+  end
+
+  # WhatsApp echoes back every message the session sends, including the ones Chatwoot itself
+  # dispatched. Those echoes are normally recognized by `source_id`, which is only written from the
+  # send response — when that response is lost and the job retries, the echo carries an id Chatwoot
+  # never saw and would be stored as a new sender-less outgoing message, rendered as if an agent had
+  # replied from the phone. Baileys sends reserve their WhatsApp id before the request
+  # (`reserve_source_id`), so match on that instead and just fill in the `source_id` the response
+  # never delivered. Scoped to the conversation the echo resolved to, which is the one holding the
+  # message we sent.
+  def confirm_reserved_outgoing_message(conversation)
+    return false if incoming?
+
+    reserved = conversation.messages
+                           .where(message_type: :outgoing)
+                           .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", raw_message_id)
+                           .first
+    return false if reserved.nil?
+
+    reserved.update_under_lock!(source_id: raw_message_id) if reserved.source_id.blank?
+    @message = reserved
+    true
   end
 
   # Mirrors the Cloud provider (create_contact_messages): one message per shared
@@ -39,11 +67,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     fields = baileys_contact_fields(contact)
     return if fields[:phone].blank? && fields[:name].blank?
 
-    message = conversation.messages.build(
-      content: baileys_contact_line(contact), account_id: inbox.account_id, inbox_id: inbox.id,
-      source_id: raw_message_id, sender: incoming? ? sender : nil,
-      message_type: incoming? ? :incoming : :outgoing, content_attributes: build_message_content_attributes
-    )
+    message = conversation.messages.build(content: baileys_contact_line(contact), **webhook_message_attributes(sender))
     attach_contact_card(message, fields)
     message.save!
     message

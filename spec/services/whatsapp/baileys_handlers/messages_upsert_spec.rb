@@ -907,6 +907,61 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'echo of a message sent by Chatwoot' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+    let(:contact) { create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid") }
+    let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid) }
+    let(:conversation) { create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox) }
+
+    def echo_params(id)
+      raw_message = {
+        key: { id: id, remoteJid: "#{lid}@lid", remoteJidAlt: "#{phone}@s.whatsapp.net", fromMe: true, addressingMode: 'lid' },
+        messageTimestamp: timestamp,
+        message: { conversation: '*John* olá' }
+      }
+      { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert', data: { type: 'append', messages: [raw_message] } }
+    end
+
+    # The send response never arrived, so `source_id` is still blank and only the id reserved before
+    # the request identifies the message. Without that match the echo would land as a second message
+    # attributed to WhatsApp instead of the agent.
+    it 'confirms the reserved message instead of creating a duplicate' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_1' })
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_1')).perform
+      end.not_to change(Message, :count)
+
+      expect(sent.reload.source_id).to eq('RESERVED_1')
+    end
+
+    it 'keeps the source_id already confirmed by the send response' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: 'RESERVED_2',
+                              content_attributes: { pending_source_id: 'RESERVED_2' })
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_2')).perform
+
+      expect(sent.reload.source_id).to eq('RESERVED_2')
+    end
+
+    it 'still stores a message actually sent from the phone' do
+      conversation
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('PHONE_MSG_1')).perform
+      end.to change(Message, :count).by(1)
+
+      message = Message.find_by(source_id: 'PHONE_MSG_1')
+      expect(message).to be_outgoing
+      expect(message.sender).to be_nil
+      expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
+    end
+  end
+
   describe 'membership request stub handling' do
     let(:group_jid) { '123456789123456789@g.us' }
     let(:requester_lid) { '12345678' }
