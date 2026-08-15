@@ -45,4 +45,22 @@ describe Whatsapp::TemplateSampleMediaService do
 
     expect { service.media_id }.to raise_error(Down::TimeoutError)
   end
+
+  it 'lets a CDN rate limit propagate so the job can be retried' do
+    stub_request(:get, url).to_return(status: 429)
+
+    expect { service.media_id }.to raise_error(Down::ClientError)
+  end
+
+  # Meta re-signs the handle on every template sync. The file behind it does not change, so a rotated
+  # signature must not cost a second upload.
+  it 'reuses the upload when only the signature rotated' do
+    rotated = 'https://scontent.whatsapp.net/v/t61.29466-34/sample_n.jpg?oh=02_XyZz&oe=6BB80061'
+    stub_request(:get, rotated).to_return(status: 200, body: 'image data', headers: { 'Content-Type' => 'image/jpeg' })
+
+    service.media_id
+    described_class.new(channel: channel, url: rotated).media_id
+
+    expect(provider).to have_received(:upload_media).once
+  end
 end

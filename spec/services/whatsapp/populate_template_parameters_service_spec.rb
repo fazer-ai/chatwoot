@@ -55,6 +55,13 @@ describe Whatsapp::PopulateTemplateParametersService do
       expect(normalized).to eq('https://xn--exmple-cua.com/image.jpg')
     end
 
+    it 'escapes a literal percent sign without touching real escapes' do
+      normalized = service.send(:normalize_url, 'https://example.com/100%.jpg?caption=a%20b')
+
+      expect(normalized).to eq('https://example.com/100%25.jpg?caption=a%20b')
+      expect { URI.parse(normalized) }.not_to raise_error
+    end
+
     it 'raises on a value that is not a URL at all' do
       expect { service.send(:normalize_url, '4::aW1hZ2UvcG5n:ARZopaque') }
         .to raise_error(ArgumentError, /Invalid URL format/)

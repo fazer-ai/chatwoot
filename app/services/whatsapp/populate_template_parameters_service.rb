@@ -160,10 +160,12 @@ class Whatsapp::PopulateTemplateParametersService
   end
 
   # `%` joins the class so escapes already present survive untouched instead of being double-encoded.
+  # A `%` that does not start a valid escape is a literal one (`/100%.jpg`), and leaving it raw would
+  # make `URI.parse` reject the whole URL, so it is escaped first.
   def encode_uri_component(value, character_class)
     return value if value.nil?
 
-    Addressable::URI.encode_component(value, "#{character_class}%")
+    Addressable::URI.encode_component(value.gsub(/%(?![0-9A-Fa-f]{2})/, '%25'), "#{character_class}%")
   end
 
   def validate_url(url)

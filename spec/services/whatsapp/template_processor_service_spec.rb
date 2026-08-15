@@ -46,6 +46,23 @@ describe Whatsapp::TemplateProcessorService do
     end
   end
 
+  # A scheduled message or a campaign stores the sample URL at compose time. By the time it fires, the
+  # sync has refreshed the template and Meta has re-signed the handle, so the stored string no longer
+  # matches character for character.
+  context 'when the stored sample URL carries a signature that has since rotated' do
+    let(:media_url) { 'https://scontent.whatsapp.net/v/t61.29466-34/sample_n.jpg?ccb=1-7&oh=00_OldSig&oe=6A000000' }
+
+    it 'uploads the handle the template carries now' do
+      allow(Whatsapp::TemplateSampleMediaService).to receive(:new)
+        .with(channel: channel, url: sample_url)
+        .and_return(instance_double(Whatsapp::TemplateSampleMediaService, media_id: 'uploaded_id'))
+
+      expect(processed_parameters).to include(
+        { type: 'header', parameters: [{ type: 'image', image: { id: 'uploaded_id' } }] }
+      )
+    end
+  end
+
   context 'when the agent supplies their own URL' do
     let(:media_url) { 'https://cdn.example.com/promo.jpg' }
 
