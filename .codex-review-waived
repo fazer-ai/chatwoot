@@ -1,1 +1,2 @@
 app/javascript/dashboard/components/ChatList.vue: Reset offset pagination after unpinning  # PR#366
+app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366

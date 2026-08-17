@@ -295,10 +295,14 @@ RSpec.describe Conversation do
 
   describe 'pins on status change' do
     let(:account) { create(:account) }
-    let(:conversation) { create(:conversation, status: 'open', account: account) }
-    let(:user) { create(:user, account: account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:conversation) { create(:conversation, status: 'open', account: account, inbox: inbox) }
+    let(:user) { create(:user, account: account, role: :agent) }
 
-    before { create(:conversation_pin, conversation: conversation, user: user, account: account) }
+    before do
+      create(:inbox_member, user: user, inbox: inbox)
+      create(:conversation_pin, conversation: conversation, user: user, account: account)
+    end
 
     it 'removes every pin when the conversation is resolved' do
       expect { conversation.update!(status: :resolved) }.to change { conversation.conversation_pins.count }.from(1).to(0)

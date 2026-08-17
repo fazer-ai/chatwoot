@@ -23,6 +23,7 @@ en:
     conversation_pins:
       limit_reached: You can pin up to %{limit} conversations.
       conversation_resolved: A resolved conversation cannot be pinned.
+      conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
     inboxes:
       channel:
         provider_connection:

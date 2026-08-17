@@ -24,6 +24,7 @@ class ConversationPin < ApplicationRecord
   validates :user_id, uniqueness: { scope: [:conversation_id] }
   validate :within_limit, on: :create
   validate :conversation_not_resolved, on: :create
+  validate :conversation_visible, on: :create
 
   belongs_to :account
   belongs_to :conversation
@@ -34,9 +35,22 @@ class ConversationPin < ApplicationRecord
   # and out of the limit. Filtering rather than deleting covers every way visibility can change, including
   # the ones a callback would miss, and gives the pin back if access returns.
   scope :visible_to, lambda { |user, account|
-    accessible = Conversations::PermissionFilterService.new(account.conversations, user, account).perform
-    where(user: user, account_id: account.id, conversation_id: accessible.select(:id))
+    where(user: user, account_id: account.id, conversation_id: accessible_conversations(user, account).select(:id))
   }
+
+  # The list is what a pin reorders, so its visibility rule is the one that decides which pins may exist and
+  # which ones are still worth keeping. ConversationPolicy#show? is deliberately broader (it also lets an
+  # agent open a team's conversation by link), and a pin on something the list never shows does nothing.
+  def self.accessible_conversations(user, account)
+    Conversations::PermissionFilterService.new(account.conversations, user, account).perform
+  end
+
+  # Access can be lost in more ways than a callback could follow: an inbox left, a role changed, a team or
+  # custom role edited. Reconciling before the cap is what keeps a hidden pin from holding a slot forever
+  # without letting the persisted set outgrow it either.
+  def self.prune_hidden(user, account)
+    where(user: user, account_id: account.id).where.not(id: visible_to(user, account).select(:id)).destroy_all
+  end
 
   before_validation :ensure_account_id
   after_create_commit :dispatch_pinned_event
@@ -50,7 +64,7 @@ class ConversationPin < ApplicationRecord
 
   def within_limit
     return if user_id.blank? || account_id.blank?
-    return if self.class.visible_to(user, account).count < MAX_PER_USER
+    return if self.class.where(user_id: user_id, account_id: account_id).count < MAX_PER_USER
 
     errors.add(:base, I18n.t('errors.conversation_pins.limit_reached', limit: MAX_PER_USER))
   end
@@ -61,6 +75,15 @@ class ConversationPin < ApplicationRecord
     return if conversation.blank? || !conversation.resolved?
 
     errors.add(:base, I18n.t('errors.conversation_pins.conversation_resolved'))
+  end
+
+  # Creating a pin the list would never show it on would leave it visible until the next reload and then
+  # silently gone, so it is rejected instead.
+  def conversation_visible
+    return if conversation.blank? || user.blank? || account.blank?
+    return if self.class.accessible_conversations(user, account).exists?(id: conversation_id)
+
+    errors.add(:base, I18n.t('errors.conversation_pins.conversation_not_visible'))
   end
 
   def dispatch_pinned_event

@@ -15,17 +15,20 @@ RSpec.describe ConversationPin do
 
   describe 'validations' do
     let(:account) { create(:account) }
-    let(:user) { create(:user, account: account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:user) { create(:user, account: account, role: :agent) }
+
+    before { create(:inbox_member, user: user, inbox: inbox) }
 
     it 'ensures account is present' do
-      conversation = create(:conversation, account: account)
+      conversation = create(:conversation, account: account, inbox: inbox)
       conversation_pin = build(:conversation_pin, conversation: conversation, user: user, account_id: nil)
       conversation_pin.valid?
       expect(conversation_pin.account_id).to eq(conversation.account_id)
     end
 
     it 'does not allow the same user to pin a conversation twice' do
-      conversation = create(:conversation, account: account)
+      conversation = create(:conversation, account: account, inbox: inbox)
       create(:conversation_pin, conversation: conversation, user: user, account: account)
       duplicate = build(:conversation_pin, conversation: conversation, user: user, account: account)
 
@@ -34,8 +37,9 @@ RSpec.describe ConversationPin do
     end
 
     it 'allows two users to pin the same conversation' do
-      conversation = create(:conversation, account: account)
-      other_user = create(:user, account: account)
+      conversation = create(:conversation, account: account, inbox: inbox)
+      other_user = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: other_user, inbox: inbox)
       create(:conversation_pin, conversation: conversation, user: user, account: account)
 
       expect(build(:conversation_pin, conversation: conversation, user: other_user, account: account)).to be_valid
@@ -44,10 +48,13 @@ RSpec.describe ConversationPin do
 
   describe 'resolved conversations' do
     let(:account) { create(:account) }
-    let(:user) { create(:user, account: account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:user) { create(:user, account: account, role: :agent) }
+
+    before { create(:inbox_member, user: user, inbox: inbox) }
 
     it 'rejects a pin on a resolved conversation' do
-      conversation = create(:conversation, account: account, status: :resolved)
+      conversation = create(:conversation, account: account, inbox: inbox, status: :resolved)
       pin = build(:conversation_pin, conversation: conversation, user: user, account: account)
 
       expect(pin).not_to be_valid
@@ -55,13 +62,13 @@ RSpec.describe ConversationPin do
     end
 
     it 'allows a pin on a pending conversation' do
-      conversation = create(:conversation, account: account, status: :pending)
+      conversation = create(:conversation, account: account, inbox: inbox, status: :pending)
 
       expect(build(:conversation_pin, conversation: conversation, user: user, account: account)).to be_valid
     end
 
     it 'does not free the slot of an existing pin when the conversation is resolved later' do
-      conversation = create(:conversation, account: account)
+      conversation = create(:conversation, account: account, inbox: inbox)
       pin = create(:conversation_pin, conversation: conversation, user: user, account: account)
 
       expect(pin.reload).to be_persisted
@@ -157,25 +164,59 @@ RSpec.describe ConversationPin do
       expect(described_class.visible_to(user, account)).to be_empty
     end
 
-    it 'frees the slot of a pin the agent can no longer see' do
+    it 'rejects a pin on a conversation the list would never show' do
+      other_inbox = create(:inbox, account: account)
+      unreachable = create(:conversation, account: account, inbox: other_inbox)
+      pin = build(:conversation_pin, conversation: unreachable, user: user, account: account)
+
+      expect(pin).not_to be_valid
+      expect(pin.errors.full_messages).to eq(['This conversation is not in your list, so it cannot be pinned.'])
+    end
+
+    it 'counts hidden pins against the limit until they are pruned' do
       described_class::MAX_PER_USER.times do
         pinned = create(:conversation, account: account, inbox: inbox)
         create(:conversation_pin, conversation: pinned, user: user, account: account)
       end
       inbox_member.destroy!
-
       other_inbox = create(:inbox, account: account)
       create(:inbox_member, user: user, inbox: other_inbox)
       reachable = create(:conversation, account: account, inbox: other_inbox)
 
+      expect(build(:conversation_pin, conversation: reachable, user: user, account: account)).not_to be_valid
+    end
+
+    it 'frees those slots once they are pruned' do
+      described_class::MAX_PER_USER.times do
+        pinned = create(:conversation, account: account, inbox: inbox)
+        create(:conversation_pin, conversation: pinned, user: user, account: account)
+      end
+      inbox_member.destroy!
+      other_inbox = create(:inbox, account: account)
+      create(:inbox_member, user: user, inbox: other_inbox)
+      reachable = create(:conversation, account: account, inbox: other_inbox)
+
+      described_class.prune_hidden(user, account)
+
+      expect(described_class.where(user: user).count).to eq(0)
       expect(build(:conversation_pin, conversation: reachable, user: user, account: account)).to be_valid
+    end
+
+    it 'keeps the pins the agent can still see when pruning' do
+      pin = create(:conversation_pin, conversation: conversation, user: user, account: account)
+
+      expect { described_class.prune_hidden(user, account) }.not_to change(described_class, :count)
+      expect(pin.reload).to be_persisted
     end
   end
 
   describe 'events' do
     let(:account) { create(:account) }
-    let(:user) { create(:user, account: account) }
-    let(:conversation) { create(:conversation, account: account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:user) { create(:user, account: account, role: :agent) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+
+    before { create(:inbox_member, user: user, inbox: inbox) }
 
     it 'dispatches a pinned event with serialized data' do
       allow(Rails.configuration.dispatcher).to receive(:dispatch)

@@ -1336,6 +1336,7 @@ RSpec.describe 'Conversations API', type: :request do
 
       it 'removes only the pin of the current agent' do
         other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: other_agent, inbox: conversation.inbox)
         create(:conversation_pin, conversation: conversation, user: agent, account: account)
         create(:conversation_pin, conversation: conversation, user: other_agent, account: account)
 
@@ -1369,6 +1370,7 @@ RSpec.describe 'Conversations API', type: :request do
 
       it 'does not remove the pin of another agent' do
         other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: other_agent, inbox: conversation.inbox)
         create(:conversation_pin, conversation: conversation, user: other_agent, account: account)
 
         delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
@@ -1397,7 +1399,10 @@ RSpec.describe 'Conversations API', type: :request do
 
       it 'returns the pins of the current agent in the current account' do
         pin = create(:conversation_pin, conversation: conversation, user: agent, account: account)
-        create(:conversation_pin, conversation: create(:conversation, account: account), user: create(:user, account: account), account: account)
+        other_agent = create(:user, account: account, role: :agent)
+        other_conversation = create(:conversation, account: account)
+        create(:inbox_member, user: other_agent, inbox: other_conversation.inbox)
+        create(:conversation_pin, conversation: other_conversation, user: other_agent, account: account)
 
         get "/api/v1/accounts/#{account.id}/conversations/pins",
             headers: agent.create_new_auth_token,

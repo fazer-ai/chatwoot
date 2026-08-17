@@ -83,6 +83,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def pin
     pin = Current.user.with_lock do
       @conversation.with_lock do
+        ConversationPin.prune_hidden(Current.user, Current.account)
         @conversation.conversation_pins.find_or_create_by!(user: Current.user)
       end
     end
