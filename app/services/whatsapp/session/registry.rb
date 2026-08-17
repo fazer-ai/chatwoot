@@ -98,8 +98,10 @@ module Whatsapp::Session::Registry
       capabilities
     end
 
-    # Kill switch for the group subsystem, kept compatible with the Baileys-era name so
-    # existing deployments do not have to change their env on upgrade.
+    # Kill switch for the whole group subsystem, legacy providers included: the Baileys
+    # service delegates here so the capability list and `allow_group_creation` can never
+    # disagree. The Baileys-era name still works, so an existing deployment does not have
+    # to change its env on upgrade.
     def groups_enabled?
       value = ENV.fetch('WHATSAPP_GROUPS_ENABLED', nil) || ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false')
       value == 'true'

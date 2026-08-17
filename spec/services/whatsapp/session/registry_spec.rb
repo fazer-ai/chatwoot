@@ -65,6 +65,18 @@ RSpec.describe Whatsapp::Session::Registry do
         expect(described_class.groups_enabled?).to be(true)
       end
     end
+
+    # Two readers of one switch is how an inbox ends up advertising `groups` in its
+    # capabilities while refusing to create one.
+    it 'is the same answer the legacy service gives' do
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true', BAILEYS_WHATSAPP_GROUPS_ENABLED: nil do
+        expect(Whatsapp::Providers::WhatsappBaileysService.groups_enabled?).to be(true)
+      end
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'false', BAILEYS_WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect(Whatsapp::Providers::WhatsappBaileysService.groups_enabled?).to be(false)
+      end
+    end
   end
 
   it 'refuses to build a backend for a provider it does not serve' do
