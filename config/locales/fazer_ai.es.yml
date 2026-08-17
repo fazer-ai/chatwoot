@@ -20,6 +20,10 @@ es:
       cannot_delete_processed: No se puede eliminar un mensaje programado que ya se envió o que falló
     conversations:
       already_assigned: "%{agent_name} ya está atendiendo esta conversación."
+    conversation_pins:
+      limit_reached: Puede fijar hasta %{limit} conversaciones.
+      conversation_resolved: No se puede fijar una conversación resuelta.
+      conversation_not_visible: Esta conversación no está en su lista, así que no se puede fijar.
     inboxes:
       channel:
         provider_connection:

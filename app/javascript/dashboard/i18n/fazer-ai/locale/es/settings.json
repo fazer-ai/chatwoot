@@ -52,5 +52,10 @@
     "INTERNAL_CHAT": "Chat interno",
     "KANBAN": "Kanban",
     "APPS": "Apps"
+  },
+  "KEYBOARD_SHORTCUTS": {
+    "TITLE": {
+      "PIN_CONVERSATION": "Fijar / dejar de fijar la conversación"
+    }
   }
 }
