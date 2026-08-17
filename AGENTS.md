@@ -11,7 +11,7 @@
   - CLI path: `bundle exec rails runner "Internal::SeedAccountJob.perform_now(Account.find(<id>))"` (or call `Seeders::AccountSeeder.new(account: Account.find(<id>)).perform!` directly).
 - **Lint JS/Vue**: `pnpm eslint` / `pnpm eslint:fix`
 - **Lint Ruby**: `bundle exec rubocop -a`
-- **Test JS**: `pnpm test` or `pnpm test:watch`
+- **Test JS**: `pnpm test` or `pnpm test:watch`. Pass the file directly (`pnpm test <file>`), never `pnpm test -- <file>`
 - **Test Ruby**: `bundle exec rspec spec/path/to/file_spec.rb`
 - **Single Test**: `bundle exec rspec spec/path/to/file_spec.rb:LINE_NUMBER`
 - **Run Project**: `overmind start -f Procfile.dev`
@@ -53,6 +53,8 @@
 - Break down complex tasks into small, testable units
 - Iterate after confirmation
 - New features must include specs covering the main flows (happy path + critical edge cases). Bugfixes should add a regression spec when the fix is non-trivial. Skip specs only for purely cosmetic changes (CSS tweaks, copy adjustments, log message edits) or when the user explicitly asks to skip.
+- A spec must cover behavior that can actually break. Drop the ones that only restate the implementation or exist as documentation: a redundant spec costs CI time and gets rewritten with the code it mirrors.
+- A backend change usually has a frontend half, and the reverse. Check for the counterpart before calling the change done.
 - In specs, avoid custom helper methods for setup/data. Prefer `let` values and direct per-example setup; only add a helper when it removes meaningful repeated complexity.
 - Remove dead/unreachable/unused code
 - Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
@@ -175,6 +177,7 @@ Both are deep-merged on top of upstream's: the frontend in `i18n/index.js` via `
 
 ## Branding / White-labeling note
 
+- The brand is always written `fazer.ai`, lowercase and with the dot. Never `Fazer.ai`, `FAZER.AI` or `fazer-ai` in prose, comments, or user-facing copy. The only exceptions are slugs where a dot is illegal (the `fazer-ai` GitHub org, the `@fazer-ai-pro` npm scope), env vars (`FAZER_AI_HUB_URL`), and code identifiers following the language's convention (`fazerAi`, `FazerAi`, `fazer_ai`).
 - For user-facing strings that currently contain "Chatwoot" but should adapt to branded/self-hosted installs, prefer applying `replaceInstallationName` from `shared/composables/useBranding` in the UI layer (for example tooltip and suggestion labels) instead of adding hardcoded brand-specific copy.
 
 ## Account-level toggles: do NOT extend `config/features.yml`
