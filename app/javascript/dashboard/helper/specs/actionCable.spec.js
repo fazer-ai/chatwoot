@@ -459,4 +459,50 @@ describe('ActionCableConnector - Copilot Tests', () => {
       expect(mockDispatch).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('conversation pin event handlers', () => {
+    it('dispatches conversationPins/add on conversation.pinned', () => {
+      actionCable.onReceived({
+        event: 'conversation.pinned',
+        data: { account_id: 1, conversation_id: 7, pinned_at: 100 },
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/add', {
+        account_id: 1,
+        conversation_id: 7,
+        pinned_at: 100,
+      });
+    });
+
+    it('dispatches conversationPins/remove on conversation.unpinned', () => {
+      actionCable.onReceived({
+        event: 'conversation.unpinned',
+        data: { account_id: 1, conversation_id: 7, pinned_at: 100 },
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/remove', {
+        account_id: 1,
+        conversation_id: 7,
+        pinned_at: 100,
+      });
+    });
+
+    it('ignores events from another account', () => {
+      actionCable.onReceived({
+        event: 'conversation.pinned',
+        data: { account_id: 2, conversation_id: 7, pinned_at: 100 },
+      });
+
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it('refetches the pins when the account cache is invalidated', () => {
+      actionCable.onReceived({
+        event: 'account.cache_invalidated',
+        data: { account_id: 1, cache_keys: {} },
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
+    });
+  });
 });

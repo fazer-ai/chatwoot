@@ -149,6 +149,7 @@ Rails.application.routes.draw do
               get :meta
               get :search
               get :unread_counts, to: 'conversations/unread_counts#index'
+              get :pins
               post :filter
               post :presence_subscribe_bulk
             end
@@ -175,6 +176,8 @@ Rails.application.routes.draw do
             member do
               post :mute
               post :unmute
+              post :pin
+              delete :unpin
               post :transcript
               post :toggle_status
               post :toggle_priority

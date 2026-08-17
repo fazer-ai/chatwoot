@@ -3,7 +3,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include DateRangeHelper
   include HmacConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk]
+  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -71,6 +71,39 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def unmute
     @conversation.unmute!
     head :ok
+  end
+
+  # Pins belong to a User; agent bots never reach these actions, they are not in BOT_ACCESSIBLE_ENDPOINTS.
+  #
+  # Both checks the pin runs read state a concurrent request can change before the insert lands, and they
+  # need different rows to serialize against: the agent's row for the per-user limit (same shape as
+  # AgentBuilder's seat limit), the conversation's for the resolved check, since only that one blocks a
+  # concurrent resolve from committing mid-flight. This is the only place that takes both, so the order
+  # cannot invert.
+  def pin
+    pin = Current.user.with_lock do
+      @conversation.with_lock do
+        ConversationPin.prune_hidden(Current.user, Current.account)
+        @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+      end
+    end
+    render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
+  end
+
+  # Looked up through the pin rather than the conversation, and deliberately not through `current_user_pins`:
+  # removing your own pin never depends on still being able to see the conversation.
+  def unpin
+    Current.user.conversation_pins
+           .where(account_id: Current.account.id)
+           .joins(:conversation).where(conversations: { display_id: params[:id] })
+           .destroy_all
+    head :ok
+  end
+
+  # Joined, not just eager loaded: Conversation destroys its pins asynchronously, so between the row going
+  # away and the job running, an orphaned pin would render `nil.display_id`.
+  def pins
+    @conversation_pins = current_user_pins.joins(:conversation).includes(:conversation)
   end
 
   def transcript
@@ -221,6 +254,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def conversation
     @conversation ||= Current.account.conversations.find_by!(display_id: params[:id])
     authorize @conversation, :show?
+  end
+
+  def current_user_pins
+    ConversationPin.visible_to(Current.user, Current.account)
   end
 
   def inbox

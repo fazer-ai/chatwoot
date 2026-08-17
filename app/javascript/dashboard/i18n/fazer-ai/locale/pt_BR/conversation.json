@@ -72,6 +72,16 @@
         "CAPPED": "Este número atingiu o limite do WhatsApp para iniciar novas conversas neste ciclo.",
         "CAPPED_WITH_QUOTA": "Este número atingiu o limite do WhatsApp ({used} de {total}) para iniciar novas conversas neste ciclo."
       }
+    },
+    "PIN": {
+      "PIN": "Fixar conversa",
+      "UNPIN": "Desafixar conversa",
+      "PINNED_TOOLTIP": "Conversa fixada",
+      "ERROR": "Não foi possível atualizar a fixação. Tente novamente."
+    },
+    "CARD_CONTEXT_MENU": {
+      "PIN": "Fixar",
+      "UNPIN": "Desafixar"
     }
   },
   "CONVERSATION_SIDEBAR": {

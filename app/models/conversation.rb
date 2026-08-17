@@ -111,6 +111,18 @@ class Conversation < ApplicationRecord
     open.where('last_activity_at < ?', Time.now.utc - auto_resolve_after.minutes)
   }
 
+  # Puts the conversations the given user pinned first, most recently pinned on top. The join is kept as a
+  # literal SQL string (with the table name spelled out in the ON clause) so Rails does not promote it to an
+  # eager load, and the unique index on [user_id, conversation_id] keeps it 1:0..1, so no row is duplicated.
+  scope :pinned_first_for, lambda { |user|
+    joins(
+      sanitize_sql_array(
+        ['LEFT OUTER JOIN conversation_pins ON conversation_pins.conversation_id = conversations.id AND conversation_pins.user_id = ?',
+         user.id]
+      )
+    ).order(Arel.sql('conversation_pins.created_at DESC NULLS LAST'))
+  }
+
   scope :last_user_message_at, lambda {
     joins(
       "INNER JOIN (#{last_messaged_conversations.to_sql}) AS grouped_conversations
@@ -131,6 +143,7 @@ class Conversation < ApplicationRecord
   has_many :messages, dependent: :destroy_async, autosave: true
   has_one :csat_survey_response, dependent: :destroy_async
   has_many :conversation_participants, dependent: :destroy_async
+  has_many :conversation_pins, dependent: :destroy_async
   has_many :notifications, as: :primary_actor, dependent: :destroy_async
   has_many :attachments, through: :messages
   has_many :reporting_events, dependent: :destroy_async
@@ -308,6 +321,7 @@ class Conversation < ApplicationRecord
 
   def execute_after_update_commit_callbacks
     handle_resolved_status_change
+    unpin_for_everyone_on_resolve
     notify_status_change
     create_activity
     invalidate_filtered_unread_count_conversation
@@ -321,6 +335,13 @@ class Conversation < ApplicationRecord
     # rubocop:disable Rails/SkipsModelValidations
     update_column(:waiting_since, nil)
     # rubocop:enable Rails/SkipsModelValidations
+  end
+
+  # A resolved conversation leaves the agent's open list, so it should not keep occupying one of their pin slots.
+  def unpin_for_everyone_on_resolve
+    return unless saved_change_to_status? && resolved?
+
+    conversation_pins.destroy_all
   end
 
   def ensure_snooze_until_reset

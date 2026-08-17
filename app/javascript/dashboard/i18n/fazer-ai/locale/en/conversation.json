@@ -72,6 +72,16 @@
         "CAPPED": "This number has reached its WhatsApp limit for starting new conversations this cycle.",
         "CAPPED_WITH_QUOTA": "This number has reached its WhatsApp limit ({used} of {total}) for starting new conversations this cycle."
       }
+    },
+    "PIN": {
+      "PIN": "Pin conversation",
+      "UNPIN": "Unpin conversation",
+      "PINNED_TOOLTIP": "Pinned conversation",
+      "ERROR": "Could not update the pin. Please try again."
+    },
+    "CARD_CONTEXT_MENU": {
+      "PIN": "Pin",
+      "UNPIN": "Unpin"
     }
   },
   "CONVERSATION_SIDEBAR": {

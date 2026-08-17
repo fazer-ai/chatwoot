@@ -8,6 +8,7 @@ import InboxName from '../InboxName.vue';
 import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
 import CardLabels from './conversationCardComponents/CardLabels.vue';
 import CardPriorityIcon from 'dashboard/components-next/Conversation/ConversationCard/CardPriorityIcon.vue';
+import CardPinIcon from 'dashboard/components-next/Conversation/ConversationCard/CardPinIcon.vue';
 import UnreadBadge from 'dashboard/components-next/Conversation/ConversationCard/UnreadBadge.vue';
 import SLACardLabel from './components/SLACardLabel.vue';
 import VoiceCallStatus from './VoiceCallStatus.vue';
@@ -26,6 +27,7 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
   typingPreview: { type: String, default: '' },
   hasGroupActivity: { type: Boolean, default: false },
+  isPinned: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -244,6 +246,7 @@ watch(
           v-else-if="hasGroupActivity"
           class="shadow-lg rounded-full ltr:ml-auto rtl:mr-auto mt-1 size-2 bg-n-teal-9"
         />
+        <CardPinIcon v-if="isPinned" class="ltr:ml-auto rtl:mr-auto mt-1" />
       </div>
       <CardLabels
         v-if="showLabelsSection"

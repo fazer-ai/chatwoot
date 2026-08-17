@@ -369,6 +369,11 @@
   $ref: ./application/conversation/meta.yml
 /api/v1/accounts/{account_id}/conversations:
   $ref: ./application/conversation/index.yml
+/api/v1/accounts/{account_id}/conversations/pins:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+  get:
+    $ref: ./application/conversation/pins.yml
 /api/v1/accounts/{account_id}/conversations/filter:
   parameters:
     - $ref: '#/components/parameters/account_id'
@@ -382,6 +387,18 @@
     $ref: ./application/conversation/show.yml
   patch:
     $ref: ./application/conversation/update.yml
+/api/v1/accounts/{account_id}/conversations/{conversation_id}/pin:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/conversation_id'
+  post:
+    $ref: ./application/conversation/pin.yml
+/api/v1/accounts/{account_id}/conversations/{conversation_id}/unpin:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/conversation_id'
+  delete:
+    $ref: ./application/conversation/unpin.yml
 /api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_status:
   parameters:
     - $ref: '#/components/parameters/account_id'

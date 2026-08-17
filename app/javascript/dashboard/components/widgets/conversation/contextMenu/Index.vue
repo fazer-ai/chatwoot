@@ -18,6 +18,7 @@ import Icon from 'dashboard/components-next/icon/Icon.vue';
 const MENU = {
   MARK_AS_READ: 'mark-as-read',
   MARK_AS_UNREAD: 'mark-as-unread',
+  PIN: 'pin',
   PRIORITY: 'priority',
   STATUS: 'status',
   SNOOZE: 'snooze',
@@ -50,6 +51,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
     inboxId: {
       type: Number,
       default: null,
@@ -76,6 +81,7 @@ export default {
     'assignPriority',
     'markAsUnread',
     'markAsRead',
+    'togglePin',
     'assignAgent',
     'assignTeam',
     'assignLabel',
@@ -101,6 +107,14 @@ export default {
       unreadOption: {
         label: this.$t('CONVERSATION.CARD_CONTEXT_MENU.MARK_AS_UNREAD'),
         icon: 'mail-unread',
+      },
+      pinOption: {
+        label: this.$t('CONVERSATION.CARD_CONTEXT_MENU.PIN'),
+        icon: 'pin',
+      },
+      unpinOption: {
+        label: this.$t('CONVERSATION.CARD_CONTEXT_MENU.UNPIN'),
+        icon: 'pin-off',
       },
       statusMenuConfig: [
         {
@@ -297,7 +311,9 @@ export default {
   <div
     class="p-1 rounded-md shadow-xl bg-n-alpha-3/50 backdrop-blur-[100px] outline-1 outline outline-n-weak/50"
   >
-    <template v-if="isAllowed([MENU.MARK_AS_READ, MENU.MARK_AS_UNREAD])">
+    <template
+      v-if="isAllowed([MENU.MARK_AS_READ, MENU.MARK_AS_UNREAD, MENU.PIN])"
+    >
       <MenuItem
         v-if="!hasUnreadMessages"
         :option="unreadOption"
@@ -309,6 +325,12 @@ export default {
         :option="readOption"
         variant="icon"
         @click.stop="$emit('markAsRead')"
+      />
+      <MenuItem
+        v-if="isPinned || status !== STATUS_TYPE.RESOLVED"
+        :option="isPinned ? unpinOption : pinOption"
+        variant="icon"
+        @click.stop="$emit('togglePin')"
       />
       <hr class="m-1 rounded border-b border-n-weak dark:border-n-weak" />
     </template>

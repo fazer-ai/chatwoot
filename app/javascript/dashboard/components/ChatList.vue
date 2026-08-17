@@ -111,6 +111,7 @@ const allChatList = useMapGetter('getAllStatusChats');
 const unAssignedChatsList = useMapGetter('getUnAssignedChats');
 const participatingChatsList = useMapGetter('getParticipatingChats');
 const chatListLoading = useMapGetter('getChatListLoadingStatus');
+const pinnedAtById = useMapGetter('conversationPins/getRecords');
 const activeInbox = useMapGetter('getSelectedInbox');
 const conversationStats = useMapGetter('conversationStats/getStats');
 const appliedFilters = useMapGetter('getAppliedConversationFiltersV2');
@@ -347,6 +348,13 @@ function filterByAssigneeTab(conversations) {
 
 function sortByUnreadStatus(conversations) {
   return [...conversations].sort((a, b) => {
+    // Pinned conversations lead this sort too, mirroring what every other sort option does.
+    const pinnedAtA = pinnedAtById.value[a.id];
+    const pinnedAtB = pinnedAtById.value[b.id];
+    if (pinnedAtA && pinnedAtB) return pinnedAtB - pinnedAtA;
+    if (pinnedAtA) return -1;
+    if (pinnedAtB) return 1;
+
     const unreadCountDiff = (b.unread_count || 0) - (a.unread_count || 0);
     if (unreadCountDiff !== 0) return unreadCountDiff;
 
@@ -719,6 +727,18 @@ function redirectToConversationList() {
   );
 }
 
+async function togglePin(conversationId) {
+  const isPinned = Boolean(pinnedAtById.value[conversationId]);
+  try {
+    await store.dispatch(
+      isPinned ? 'conversationPins/unpin' : 'conversationPins/pin',
+      conversationId
+    );
+  } catch (error) {
+    useAlert(error?.message ?? t('CONVERSATION.PIN.ERROR'));
+  }
+}
+
 async function assignPriority(priority, conversationId = null) {
   store.dispatch('setCurrentChatPriority', {
     priority,
@@ -924,6 +944,7 @@ provide('updateConversationStatus', handleResolveConversation);
 provide('markAsUnread', markAsUnread);
 provide('markAsRead', markAsRead);
 provide('assignPriority', assignPriority);
+provide('togglePin', togglePin);
 provide('isConversationSelected', isConversationSelected);
 provide('deleteConversation', handleDelete);
 

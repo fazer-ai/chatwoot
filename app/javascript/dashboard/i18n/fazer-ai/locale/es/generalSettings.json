@@ -7,5 +7,11 @@
       "internal_chat_mention": "Mención",
       "internal_chat_new_message": "Mensaje directo"
     }
+  },
+  "COMMAND_BAR": {
+    "COMMANDS": {
+      "PIN_CONVERSATION": "Fijar la conversación",
+      "UNPIN_CONVERSATION": "Dejar de fijar la conversación"
+    }
   }
 }

@@ -161,7 +161,16 @@ const sortConfig = {
   },
 };
 
-export const sortComparator = (a, b, sortKey) => {
+// Pinned conversations lead the list on every sort option, most recently pinned first, mirroring what the
+// API already returns. `pinnedAtById` maps a conversation id to the epoch seconds it was pinned at.
+export const sortComparator = (a, b, sortKey, pinnedAtById = {}) => {
+  const pinnedAtA = pinnedAtById[a.id];
+  const pinnedAtB = pinnedAtById[b.id];
+
+  if (pinnedAtA && pinnedAtB) return pinnedAtB - pinnedAtA;
+  if (pinnedAtA) return -1;
+  if (pinnedAtB) return 1;
+
   const [sortMethod, sortDirection] =
     SORT_OPTIONS[sortKey] || SORT_OPTIONS.last_activity_at_desc;
   return sortConfig[sortMethod](a, b, sortDirection);

@@ -1,10 +1,5 @@
-# Waived after adjudication. One entry per line: <repo-relative-path>: <finding title>
-
-# The swallow is Whatsapp::OneoffCampaignService's own pre-existing design ("continue processing
-# remaining contacts"), not something this branch introduced: `channel.send_template` failing on a
-# network blip was already skipped the same silent way, and before this branch a media-header campaign
-# failed for every recipient anyway, with 131053. Not raising is also the safer half of the trade:
-# the rescue is per recipient, so letting it through would fail the whole campaign job and Sidekiq
-# would re-run it, re-sending to everyone already delivered. Per-recipient retry is a mechanism the
-# campaign service does not have, and building it belongs in its own PR.
-app/services/whatsapp/template_processor_service.rb: Preserve retries for campaign sample uploads
+app/javascript/dashboard/store/modules/conversationPins.js: Reset offset pagination after unpinning  # PR#366
+app/javascript/dashboard/store/modules/conversationPins.js: Prevent delayed pin events from surviving a newer snapshot  # PR#366
+app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when a remote pin arrives  # PR#366
+app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
+app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366

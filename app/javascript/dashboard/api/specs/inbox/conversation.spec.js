@@ -16,6 +16,9 @@ describe('#ConversationAPI', () => {
     expect(conversationAPI).toHaveProperty('toggleTyping');
     expect(conversationAPI).toHaveProperty('mute');
     expect(conversationAPI).toHaveProperty('unmute');
+    expect(conversationAPI).toHaveProperty('pin');
+    expect(conversationAPI).toHaveProperty('unpin');
+    expect(conversationAPI).toHaveProperty('fetchPins');
     expect(conversationAPI).toHaveProperty('meta');
     expect(conversationAPI).toHaveProperty('sendEmailTranscript');
     expect(conversationAPI).toHaveProperty('filter');
@@ -146,6 +149,25 @@ describe('#ConversationAPI', () => {
       expect(axiosMock.post).toHaveBeenCalledWith(
         '/api/v1/conversations/45/unmute'
       );
+    });
+
+    it('#pin', () => {
+      conversationAPI.pin(45);
+      expect(axiosMock.post).toHaveBeenCalledWith(
+        '/api/v1/conversations/45/pin'
+      );
+    });
+
+    it('#unpin', () => {
+      conversationAPI.unpin(45);
+      expect(axiosMock.delete).toHaveBeenCalledWith(
+        '/api/v1/conversations/45/unpin'
+      );
+    });
+
+    it('#fetchPins', () => {
+      conversationAPI.fetchPins();
+      expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/conversations/pins');
     });
 
     it('#meta', () => {

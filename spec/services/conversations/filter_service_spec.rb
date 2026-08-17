@@ -358,6 +358,48 @@ describe Conversations::FilterService do
     end
   end
 
+  describe '#perform with pinned conversations' do
+    let!(:params) { { payload: [], page: 1 } }
+    let(:pinned_conversation) { user_2_assigned_conversation }
+
+    before do
+      # Oldest conversation gets the oldest activity, so without a pin it always sorts last.
+      conversations = account.conversations.order(:created_at).to_a
+      conversations.each_with_index do |conversation, index|
+        conversation.update_columns(last_activity_at: (conversations.length - index).minutes.ago) # rubocop:disable Rails/SkipsModelValidations
+      end
+      create(:conversation_pin, conversation: pinned_conversation, user: user_1, account: account)
+    end
+
+    it 'puts the pinned conversation first for the agent who pinned it' do
+      result = filter_service.new(params, user_1, account).perform
+
+      expect(result[:conversations].first.id).to eq(pinned_conversation.id)
+    end
+
+    it 'keeps the default order for every other agent' do
+      result = filter_service.new(params, user_2, account).perform
+
+      expect(result[:conversations].last.id).to eq(pinned_conversation.id)
+    end
+
+    it 'does not change the conversation counts' do
+      counts_with_pin = filter_service.new(params, user_1, account).perform[:count]
+      ConversationPin.destroy_all
+
+      expect(filter_service.new(params, user_1, account).perform[:count]).to eq(counts_with_pin)
+    end
+
+    it 'still applies the filters' do
+      params[:payload] = [{ attribute_key: 'status', filter_operator: 'not_equal_to', values: %w[open],
+                            query_operator: nil, custom_attribute_type: '' }.with_indifferent_access]
+
+      result = filter_service.new(params, user_1, account).perform
+
+      expect(result[:conversations].map(&:id)).not_to include(pinned_conversation.id)
+    end
+  end
+
   describe '#perform on custom attribute' do
     context 'with query present' do
       let!(:params) { { payload: [], page: 1 } }

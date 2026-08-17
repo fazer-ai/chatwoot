@@ -141,6 +141,8 @@ class ReconnectService {
   onReconnect = async () => {
     await this.handleRouteSpecificFetch();
     await this.revalidateCaches();
+    // Pin events that fired while the socket was down are lost, so the map is rebuilt from the server.
+    await this.store.dispatch('conversationPins/fetch');
     emitter.emit(BUS_EVENTS.WEBSOCKET_RECONNECT_COMPLETED);
   };
 }
