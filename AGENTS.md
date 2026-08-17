@@ -100,6 +100,11 @@ gh repo set-default fazer-ai/chatwoot   # writes remote.origin.gh-resolved=base
 
 When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, `--repo fazer-ai/chatwoot-pro`).
 
+### Merge strategy
+
+- Default for every PR: `gh pr merge <n> --squash --admin`.
+- **Exception — upstream sync PRs (`chore/merge-upstream-X.Y.Z`): merge with `--merge`, never `--squash`.** A squash drops the merge commit's second parent, so the upstream tag stops being an ancestor of `main`: GitHub reports `main` as permanently "N commits behind chatwoot:develop" (the count only grows), and the next sync bases on a stale tag and replays a whole version's diff as conflicts. After merging a sync PR, `git rev-list --count main..vX.Y.Z` must be 0 — when it isn't, see the `sync-fork` skill's **Repairing a squashed sync** recipe.
+
 ## PR Description Format
 
 - Start with a short, user-facing paragraph describing the product change.
