@@ -53,7 +53,11 @@ module Whatsapp::Session::Registry
       pairing_modes: %w[qr],
       capabilities: %w[qr_pairing revoke reactions read_receipts check_number]
     ),
-    Descriptor.new(key: 'whatsapp_cloud', family: 'cloud', capabilities: %w[reactions media_download calls]),
+    # typing and read_receipts included: the Cloud service implements both
+    # (`toggle_typing_status` and `read_messages` post to the Graph API), and the
+    # dashboard gates them by capability now.
+    Descriptor.new(key: 'whatsapp_cloud', family: 'cloud',
+                   capabilities: %w[reactions typing read_receipts media_download calls]),
     Descriptor.new(key: 'default', family: 'cloud', capabilities: %w[media_download])
   ].index_by(&:key).freeze
 

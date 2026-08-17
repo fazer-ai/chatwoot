@@ -12,6 +12,17 @@ RSpec.describe Whatsapp::Session::Registry do
     expect(described_class.session_provider?('whatsapp_cloud')).to be(false)
   end
 
+  # The descriptor is what the dashboard reads to decide whether to offer a feature, so
+  # a capability missing here silently disables something the provider can actually do.
+  it 'credits the cloud provider with the typing and read-receipt calls it implements' do
+    expect(described_class.descriptor('whatsapp_cloud').capabilities).to include('typing', 'read_receipts')
+    expect(Whatsapp::Providers::WhatsappCloudService.instance_methods).to include(:toggle_typing_status, :read_messages)
+  end
+
+  it 'does not credit 360dialog with them, since it implements neither' do
+    expect(described_class.descriptor('default').capabilities).not_to include('typing', 'read_receipts')
+  end
+
   it 'describes the legacy providers without serving them' do
     expect(described_class.descriptor('baileys')).to have_attributes(legacy: true, family: 'session')
     expect(described_class.descriptor('baileys').served?).to be(false)

@@ -58,10 +58,35 @@ module Whatsapp::Session::Model::Content
     end
   end
 
-  class Rich < Data.define(:kind, :text, :media)
+  # An interactive or templated card. The parts are kept separate because that is how the
+  # dashboard renders them; `preview_text` is what the message row stores as content.
+  class Rich < Data.define(:kind, :title, :body, :footer, :buttons, :media)
     include Serializable
     wire_type 'rich', embed: true
     coerce media: Media
+    defaults buttons: []
+
+    def preview_text
+      lines = [title, body, footer, *button_lines]
+      lines.compact_blank.join("\n\n").presence
+    end
+
+    # What content_attributes['rich'] stores, matching the shape the Baileys layer
+    # already persists so the message bubble renders both the same way.
+    def to_content_attribute
+      { 'type' => kind, 'title' => title, 'body' => body, 'footer' => footer,
+        'buttons' => Array(buttons).presence }.compact.presence
+    end
+
+    private
+
+    def button_lines
+      Array(buttons).map do |button|
+        button = button.stringify_keys
+        suffix = button['url'].presence || button['phone'].presence
+        suffix ? "\u25B8 #{button['text']}: #{suffix}" : "\u25B8 #{button['text']}"
+      end
+    end
   end
 
   class Unsupported < Data.define(:reason)
