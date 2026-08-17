@@ -1401,8 +1401,7 @@ RSpec.describe 'Conversations API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['pins']).to eq([{ 'conversation_id' => conversation.display_id, 'pinned_at' => pin.created_at.to_f }])
-        expect(response.parsed_body['synced_at']).to be_present
+        expect(response.parsed_body).to eq([{ 'conversation_id' => conversation.display_id, 'pinned_at' => pin.created_at.to_f }])
       end
 
       it 'skips a pin whose conversation is already gone' do
@@ -1415,7 +1414,7 @@ RSpec.describe 'Conversations API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['pins']).to eq([])
+        expect(response.parsed_body).to eq([])
       end
 
       it 'returns an empty list when nothing is pinned' do
@@ -1424,17 +1423,7 @@ RSpec.describe 'Conversations API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['pins']).to eq([])
-      end
-
-      it 'stamps synced_at before reading the pins' do
-        freeze_time do
-          get "/api/v1/accounts/#{account.id}/conversations/pins",
-              headers: agent.create_new_auth_token,
-              as: :json
-
-          expect(response.parsed_body['synced_at']).to eq(Time.zone.now.to_f)
-        end
+        expect(response.parsed_body).to eq([])
       end
     end
   end

@@ -24,6 +24,7 @@ class InboxMember < ApplicationRecord
 
   after_create :add_agent_to_round_robin
   after_destroy :remove_agent_from_round_robin
+  after_destroy :remove_conversation_pins
   after_commit :invalidate_filtered_unread_count_visibility, on: [:create, :destroy]
 
   private
@@ -34,6 +35,14 @@ class InboxMember < ApplicationRecord
 
   def remove_agent_from_round_robin
     ::AutoAssignment::InboxRoundRobinService.new(inbox: inbox).remove_agent_from_queue(user_id) if inbox.present?
+  end
+
+  # A pin only exists to lift a conversation in the agent's own list. Once the inbox is gone from that
+  # list the pin is unreachable from the dashboard, and it would keep occupying one of their slots.
+  def remove_conversation_pins
+    return if inbox.blank?
+
+    ConversationPin.where(user_id: user_id, conversation_id: inbox.conversations.select(:id)).destroy_all
   end
 
   def invalidate_filtered_unread_count_visibility

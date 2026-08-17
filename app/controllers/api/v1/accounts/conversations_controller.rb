@@ -98,11 +98,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   # Joined, not just eager loaded: Conversation destroys its pins asynchronously, so between the row going
   # away and the job running, an orphaned pin would render `nil.display_id`.
-  #
-  # `synced_at` is stamped before the query so it can never be later than the rows it describes, which is
-  # what lets the client tell a pin the snapshot could not have seen from one it deliberately omits.
   def pins
-    @pins_synced_at = Time.zone.now
     @conversation_pins = current_user_pins.joins(:conversation).includes(:conversation)
   end
 

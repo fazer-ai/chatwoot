@@ -12,10 +12,13 @@ import ConversationApi from '../../api/inbox/conversation';
 const state = {
   records: {},
   appliedAt: {},
+  revision: 0,
   uiFlags: {
     isFetching: false,
   },
 };
+
+const FETCH_ATTEMPTS = 2;
 
 export const getters = {
   getUIFlags: $state => $state.uiFlags,
@@ -24,12 +27,23 @@ export const getters = {
 };
 
 export const actions = {
-  fetch: async ({ commit }) => {
+  fetch: async ({ commit, state: $state }) => {
     commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
 
     try {
-      const { data } = await ConversationApi.fetchPins();
-      commit(types.SET_CONVERSATION_PINS, data);
+      // A pin that landed while the request was in flight is newer than the snapshot, and the two cannot be
+      // ordered by any clock: `pinned_at` is written before the transaction commits, so it can precede a
+      // snapshot that could not see the row yet. Retrying is the only honest answer; if it keeps racing,
+      // the events already carry the newer state.
+      for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt += 1) {
+        const { revision } = $state;
+        // eslint-disable-next-line no-await-in-loop
+        const { data } = await ConversationApi.fetchPins();
+        if ($state.revision === revision) {
+          commit(types.SET_CONVERSATION_PINS, data);
+          break;
+        }
+      }
     } catch (error) {
       // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
     } finally {
@@ -69,29 +83,17 @@ export const mutations = {
     $state.uiFlags = { ...$state.uiFlags, ...data };
   },
 
-  [types.SET_CONVERSATION_PINS]($state, { pins, synced_at: syncedAt }) {
-    const records = (pins || []).reduce(
-      (acc, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
-        ...acc,
+  [types.SET_CONVERSATION_PINS]($state, data) {
+    $state.records = (data || []).reduce(
+      (records, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
+        ...records,
         [conversationId]: pinnedAt,
       }),
       {}
     );
-
-    // An event applied after the server built the snapshot is newer than it, in both directions: a pin the
-    // snapshot could not have seen has to survive, and one it still lists must not come back.
-    Object.entries($state.appliedAt).forEach(([conversationId, appliedAt]) => {
-      if (syncedAt === undefined || appliedAt <= syncedAt) return;
-
-      const local = $state.records[conversationId];
-      if (local === undefined) delete records[conversationId];
-      else records[conversationId] = local;
-    });
-
-    $state.records = records;
     // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
     // event that was already superseded.
-    $state.appliedAt = { ...$state.appliedAt, ...records };
+    $state.appliedAt = { ...$state.appliedAt, ...$state.records };
   },
 
   [types.SET_CONVERSATION_PIN](
@@ -109,6 +111,7 @@ export const mutations = {
 
     $state.records = { ...$state.records, [conversationId]: pinnedAt };
     $state.appliedAt = { ...$state.appliedAt, [conversationId]: pinnedAt };
+    $state.revision += 1;
   },
 
   [types.REMOVE_CONVERSATION_PIN](
@@ -126,6 +129,7 @@ export const mutations = {
       ...$state.appliedAt,
       [conversationId]: Math.max(pinnedAt ?? 0, appliedAt ?? 0),
     };
+    $state.revision += 1;
   },
 };
 

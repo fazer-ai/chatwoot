@@ -107,6 +107,35 @@ RSpec.describe ConversationPin do
     end
   end
 
+  describe 'inbox access' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:user) { create(:user, account: account) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+    let!(:inbox_member) { create(:inbox_member, user: user, inbox: inbox) }
+
+    it 'removes the pins of an agent dropped from the inbox' do
+      create(:conversation_pin, conversation: conversation, user: user, account: account)
+
+      expect { inbox_member.destroy! }.to change(described_class, :count).from(1).to(0)
+    end
+
+    it 'keeps the pins of the agents still in the inbox' do
+      other_user = create(:user, account: account)
+      create(:inbox_member, user: other_user, inbox: inbox)
+      create(:conversation_pin, conversation: conversation, user: other_user, account: account)
+
+      expect { inbox_member.destroy! }.not_to change(described_class, :count)
+    end
+
+    it 'keeps the pins of the same agent in other inboxes' do
+      other_conversation = create(:conversation, account: account)
+      create(:conversation_pin, conversation: other_conversation, user: user, account: account)
+
+      expect { inbox_member.destroy! }.not_to change(described_class, :count)
+    end
+  end
+
   describe 'events' do
     let(:account) { create(:account) }
     let(:user) { create(:user, account: account) }
