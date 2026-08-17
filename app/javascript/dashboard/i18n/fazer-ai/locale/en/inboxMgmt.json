@@ -1,0 +1,145 @@
+{
+  "INBOX_MGMT": {
+    "ADD": {
+      "WHATSAPP": {
+        "PROVIDERS": {
+          "360_DIALOG_DESC": "Connect via 360Dialog credentials",
+          "BAILEYS": "Baileys",
+          "BAILEYS_DESC": "Connect via non-official API Baileys",
+          "ZAPI": "Z-API",
+          "ZAPI_DESC": "Connect via non-official API Z-API"
+        },
+        "PROVIDER_URL": {
+          "LABEL": "Provider URL",
+          "PLACEHOLDER": "If provider is not running locally, please provide the URL",
+          "ERROR": "Please enter a valid URL"
+        },
+        "MARK_AS_READ": {
+          "LABEL": "Send read receipts"
+        },
+        "PRESENCE_SUBSCRIBE": {
+          "LABEL": "Show contact typing indicators"
+        },
+        "INSTANCE_ID": {
+          "LABEL": "Instance ID",
+          "PLACEHOLDER": "Please enter your instance ID",
+          "ERROR": "This field is required"
+        },
+        "TOKEN": {
+          "LABEL": "Token",
+          "PLACEHOLDER": "Please enter your instance Token",
+          "ERROR": "This field is required"
+        },
+        "CLIENT_TOKEN": {
+          "LABEL": "Security Token",
+          "PLACEHOLDER": "Please enter your Security Token (see Security tab on Z-API dashboard)",
+          "ERROR": "This field is required"
+        },
+        "ADVANCED_OPTIONS": "Advanced options",
+        "EXTERNAL_PROVIDER": {
+          "SUBTITLE": "Click below to setup the WhatsApp channel.",
+          "LINK_BUTTON": "Link device",
+          "LINK_DEVICE_MODAL": {
+            "TITLE": "Link your device",
+            "SUBTITLE": "Scan the QR code to link your device. Make sure the phone number is correct before scanning.",
+            "LOADING_QRCODE": "Loading QR code...",
+            "RECONNECTING": "Connecting...",
+            "LINK_DEVICE": "Link device",
+            "DISCONNECT": "Disconnect",
+            "CONNECTED": "Your device has been connected successfully. You can now start sending and receiving messages.",
+            "IMPORT_SESSION_TITLE": "QR code not working?",
+            "IMPORT_SESSION_SHOW_MORE": "Show more",
+            "IMPORT_SESSION_DESC": "WhatsApp now requires a passkey when linking some accounts, which blocks the QR code. Install the browser extension to import a session you're already logged into on WhatsApp Web.",
+            "IMPORT_SESSION_INSTALL": "Install the extension"
+          }
+        }
+      }
+    },
+    "CONVERT": {
+      "BUTTON": "Convert",
+      "CONFIRM": {
+        "TITLE": "Convert inbox provider",
+        "INTRO": "You are about to change the WhatsApp provider for '{inboxName}' (currently {currentProvider}). Before continuing, review what will happen:",
+        "EFFECT_DISCONNECT": "The current session with {currentProvider} will be disconnected.",
+        "EFFECT_TEMPLATES": "Message templates will be cleared and must be resynced on the new provider.",
+        "EFFECT_CONNECTION": "Provider connection state will be reset.",
+        "EFFECT_PRESERVED": "Conversations, messages, contacts, agent assignments and history are preserved.",
+        "EFFECT_IDENTITY": "Inbox name and phone number stay the same.",
+        "CONFIRM_PROMPT": "To confirm, type the inbox name below:",
+        "PLACE_HOLDER": "Type {inboxName} to continue",
+        "CONTINUE": "Continue to convert",
+        "CANCEL": "Cancel"
+      },
+      "SELECT_PROVIDER_TITLE": "Select the new provider",
+      "SELECT_PROVIDER_DESCRIPTION": "Converting '{inboxName}' from {currentProvider}.",
+      "SUBMIT_BUTTON": "Convert inbox",
+      "API": {
+        "SUCCESS_MESSAGE": "Inbox successfully converted",
+        "ERROR_MESSAGE": "Could not convert inbox. Please check the credentials and try again."
+      }
+    },
+    "SETTINGS_POPUP": {
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Manage Provider Connection",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Link your device and manage the provider connection.",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Manage connection",
+      "WHATSAPP_PROVIDER_URL_TITLE": "Provider URL",
+      "WHATSAPP_PROVIDER_URL_SUBHEADER": "If the provider is not running locally, please provide the URL.",
+      "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Enter the provider URL",
+      "WHATSAPP_PROVIDER_URL_ERROR": "Please enter a valid URL",
+      "WHATSAPP_MARK_AS_READ_TITLE": "Read receipts",
+      "WHATSAPP_MARK_AS_READ_SUBHEADER": "If turned off, when a message is viewed in Chatwoot, a read receipt will not be sent to the sender. Your messages will still be able to receive read receipts from the sender.",
+      "WHATSAPP_MARK_AS_READ_LABEL": "Send read receipts",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_TITLE": "Contact typing indicators",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "When enabled, you will see typing indicators in the conversation when a WhatsApp contact is typing or recording audio. Requires reconnecting the channel to take effect.",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_LABEL": "Show contact typing indicators",
+      "WHATSAPP_INSTANCE_ID_TITLE": "Instance ID",
+      "WHATSAPP_INSTANCE_ID_SUBHEADER": "Your Z-API Instance ID.",
+      "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Update Instance ID",
+      "WHATSAPP_INSTANCE_ID_UPDATE_SUBHEADER": "Enter the new Instance ID here",
+      "WHATSAPP_TOKEN_TITLE": "Token",
+      "WHATSAPP_TOKEN_SUBHEADER": "Your Z-API instance Token.",
+      "WHATSAPP_TOKEN_UPDATE_TITLE": "Update Token",
+      "WHATSAPP_TOKEN_UPDATE_SUBHEADER": "Enter the new instance Token here",
+      "WHATSAPP_CLIENT_TOKEN_TITLE": "Security Token",
+      "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Your Z-API Client Token (see Security tab on Z-API dashboard).",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Update Security Token",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Enter the new Security Token here"
+    },
+    "ASSIGNMENT": {
+      "PREVENT_TAKEOVER": "Prevent assignment takeover",
+      "PREVENT_TAKEOVER_SUB_TEXT": "Once an agent takes a conversation, only they or an administrator can change who is handling it. Automatic assignment is not affected."
+    },
+    "CSAT": {
+      "TEMPLATE_MODE": {
+        "LABEL": "Template source",
+        "CREATE_NEW": "Create new template",
+        "USE_EXISTING": "Use existing template"
+      },
+      "EXISTING_TEMPLATE": {
+        "LABEL": "Select template",
+        "PLACEHOLDER": "Select an approved template",
+        "SYNC_BUTTON": "Sync templates",
+        "SYNCING": "Syncing...",
+        "EMPTY_STATE": "No compatible templates found. Templates must have a URL button with a dynamic parameter.",
+        "LINK_SUCCESS": "Template linked successfully",
+        "LINK_ERROR": "Failed to link template",
+        "LOADING": "Loading templates...",
+        "USING_LABEL": "Using existing template: {name}",
+        "SYNC_ERROR": "Failed to sync templates. Please try again."
+      },
+      "TEMPLATE_VARIABLES": {
+        "TITLE": "Template variables",
+        "DESCRIPTION": "Set values for the template body variables. You can use dynamic variables like {'{{'} contact.name {'}}'} that will be resolved at send time.",
+        "VARIABLE_LABEL": "Variable {variable}",
+        "VARIABLE_PLACEHOLDER": "Enter value for {variable}",
+        "VARIABLE_REQUIRED": "This variable is required",
+        "VALIDATION_ERROR": "Please set all template variables before saving.",
+        "INSERT_VARIABLE": "Insert variable"
+      }
+    },
+    "CHANNELS": {
+      "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
+      "WHATSAPP_ZAPI": "WhatsApp - Z-API"
+    }
+  }
+}

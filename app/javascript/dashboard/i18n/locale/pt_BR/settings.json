@@ -66,37 +66,10 @@
         "BTN_TEXT": "Salvar assinatura da mensagem",
         "API_ERROR": "Não foi possível salvar a assinatura! Tente novamente",
         "API_SUCCESS": "Assinatura salva com sucesso",
-        "RESET_TO_DEFAULT": "Restaurar para padrão",
-        "RESET_SUCCESS": "Assinatura da caixa de entrada removida, usando assinatura padrão",
-        "INBOX_SELECTOR": {
-          "LABEL": "Caixa de entrada",
-          "DEFAULT": "Padrão (todas as caixas de entrada)",
-          "CUSTOM": "Personalizada"
-        },
         "IMAGE_UPLOAD_ERROR": "Não foi possível fazer o upload da imagem! Tente novamente",
         "IMAGE_UPLOAD_SUCCESS": "Imagem adicionada com sucesso. Por favor clique em salvar para salvar a assinatura",
         "IMAGE_UPLOAD_SIZE_ERROR": "O tamanho da imagem deve ser menor que {size}MB",
-        "INLINE_IMAGE_WARNING": "Imagens incorporadas coladas foram removidas. Por favor, use o botão enviar imagem para adicionar imagens à sua assinatura.",
-        "SIGNATURE_POSITION": {
-          "LABEL": "Posição da assinatura",
-          "OPTIONS": {
-            "TOP": "Início da mensagem",
-            "BOTTOM": "Final da mensagem"
-          }
-        },
-        "SIGNATURE_SEPARATOR": {
-          "LABEL": "Separador da assinatura",
-          "OPTIONS": {
-            "BLANK": "Linha em branco",
-            "HORIZONTAL_LINE": "Linha horizontal (--)"
-          }
-        },
-        "PREVIEW": {
-          "TITLE": "Pré-visualização da Assinatura",
-          "NOTE": "Esta é a aparência da sua assinatura nas mensagens",
-          "EMPTY": "Digite uma assinatura acima para ver a pré-visualização",
-          "SAMPLE_MESSAGE": "Olá! Obrigado por entrar em contato. Como posso ajudá-lo hoje?"
-        }
+        "INLINE_IMAGE_WARNING": "Imagens incorporadas coladas foram removidas. Por favor, use o botão enviar imagem para adicionar imagens à sua assinatura."
       },
       "MESSAGE_SIGNATURE": {
         "LABEL": "Assinatura da mensagem",
@@ -172,7 +145,7 @@
           "CONDITION_TWO": "Enviar alertas a cada 30 segundos até que todas as conversas atribuídas sejam lidas"
         },
         "SOUND_PERMISSION_ERROR": "A reprodução automática está desativada no seu navegador. Para ouvir alertas automaticamente, habilite a permissão de som nas configurações do seu navegador ou interaja com a página.",
-        "READ_MORE": "Ler mais"
+        "READ_MORE": "Saiba mais"
       },
       "EMAIL_NOTIFICATIONS_SECTION": {
         "TITLE": "Notificações por e-mail",
@@ -199,9 +172,7 @@
           "PARTICIPATING_CONVERSATION_NEW_MESSAGE": "Uma nova mensagem foi criada em uma conversa que você participa",
           "SLA_MISSED_FIRST_RESPONSE": "Uma conversa perde o SLA de primeira resposta",
           "SLA_MISSED_NEXT_RESPONSE": "Uma conversa perde o SLA da próxima resposta",
-          "SLA_MISSED_RESOLUTION": "Uma conversa perde o SLA de resolução",
-          "INTERNAL_CHAT_MENTION": "Você é mencionado no chat interno",
-          "INTERNAL_CHAT_NEW_MESSAGE": "Uma nova mensagem direta no chat interno"
+          "SLA_MISSED_RESOLUTION": "Uma conversa perde o SLA de resolução"
         },
         "BROWSER_PERMISSION": "Ative notificações push em seu navegador para poder recebê-las"
       },
@@ -318,10 +289,6 @@
       "INSTAGRAM_STORY_UNAVAILABLE": "Este story não está mais disponível.",
       "INSTAGRAM_STORY_REPLY": "Respondido ao seu story:"
     },
-    "REFERRAL_CARD": {
-      "AD_LABEL": "Veio de um anúncio",
-      "VIEW_AD": "Ver anúncio"
-    },
     "LOCATION_BUBBLE": {
       "SEE_ON_MAP": "Ver Localização"
     },
@@ -330,8 +297,6 @@
     },
     "MEDIA": {
       "IMAGE_UNAVAILABLE": "Esta imagem não está mais disponível.",
-      "AUDIO_UNAVAILABLE": "Este áudio não está mais disponível.",
-      "VIDEO_UNAVAILABLE": "Este vídeo não está mais disponível.",
       "LOADING_FAILED": "Falha no carregamento"
     }
   },
@@ -358,8 +323,6 @@
     "ACTIVE": "Ativo",
     "COMPANIES": "Empresas",
     "ALL_COMPANIES": "Todas as empresas",
-    "INTERNAL_CHAT": "Chat Interno",
-    "KANBAN": "Kanban",
     "CAPTAIN": "Capitão",
     "CAPTAIN_ASSISTANTS": "Assistentes",
     "CAPTAIN_OVERVIEW": "Visão geral",
@@ -373,7 +336,6 @@
     "HOME": "Principal",
     "AGENTS": "Agentes",
     "AGENT_BOTS": "Robôs",
-    "APPS": "Apps",
     "AUDIT_LOGS": "Auditoria",
     "INBOXES": "Caixas de Entrada",
     "NOTIFICATIONS": "Notificações",
@@ -1101,58 +1063,6 @@
       "DESCRIPTION": "Tem certeza de que deseja excluir esta política? Essa ação não pode ser desfeita.",
       "CONFIRM_BUTTON_LABEL": "Excluir",
       "CANCEL_BUTTON_LABEL": "Cancelar"
-    }
-  },
-  "CONVERSATION_WORKFLOW": {
-    "INDEX": {
-      "HEADER": {
-        "TITLE": "Fluxos de Conversa",
-        "DESCRIPTION": "Configure regras e campos obrigatórios para resolução de conversas."
-      }
-    },
-    "REQUIRED_ATTRIBUTES": {
-      "TITLE": "Atributos obrigatórios na resolução",
-      "DESCRIPTION": "Ao resolver uma conversa, os agentes serão solicitados a preencher esses atributos se ainda não o fizeram.",
-      "NO_ATTRIBUTES": "Nenhum atributo adicionado ainda",
-      "ADD": {
-        "TITLE": "Adicionar Atributos",
-        "SEARCH_PLACEHOLDER": "Buscar atributos"
-      },
-      "SAVE": {
-        "SUCCESS": "Atributos obrigatórios atualizados",
-        "ERROR": "Não foi possível atualizar os atributos obrigatórios, tente novamente"
-      },
-      "MODAL": {
-        "TITLE": "Resolver conversa",
-        "DESCRIPTION": "Por favor, preencha os seguintes atributos personalizados antes de resolver esta conversa",
-        "ACTIONS": {
-          "RESOLVE": "Resolver conversa",
-          "CANCEL": "Cancelar"
-        },
-        "PLACEHOLDERS": {
-          "TEXT": "Escreva uma nota...",
-          "NUMBER": "Insira um número",
-          "LINK": "Adicione um link",
-          "DATE": "Escolha uma data",
-          "LIST": "Selecione uma opção"
-        },
-        "CHECKBOX": {
-          "YES": "Sim",
-          "NO": "Não"
-        }
-      },
-      "PAYWALL": {
-        "TITLE": "Faça upgrade para usar atributos obrigatórios",
-        "AVAILABLE_ON": "O recurso de atributos obrigatórios de conversa está disponível nos planos Business e Enterprise.",
-        "UPGRADE_PROMPT": "Faça upgrade do seu plano para solicitar que os agentes preencham atributos obrigatórios antes da resolução da conversa.",
-        "UPGRADE_NOW": "Fazer upgrade agora",
-        "CANCEL_ANYTIME": "Você pode alterar ou cancelar seu plano a qualquer momento"
-      },
-      "ENTERPRISE_PAYWALL": {
-        "AVAILABLE_ON": "O recurso de atributos obrigatórios de conversa está disponível nos planos pagos.",
-        "UPGRADE_PROMPT": "Faça upgrade para um plano pago para exigir atributos obrigatórios antes da resolução da conversa.",
-        "ASK_ADMIN": "Entre em contato com seu administrador para o upgrade."
-      }
     }
   }
 }

@@ -10,7 +10,6 @@
     "SUBMIT": "Atualizar configurações",
     "BACK": "Anterior",
     "DISMISS": "Recusar",
-    "SUPER_ADMIN_ONLY_NOTICE": "Esta mensagem só é visível para administradores do sistema.",
     "UPDATE": {
       "ERROR": "Não foi possível atualizar as configurações, tente novamente!",
       "SUCCESS": "Configurações de conta atualizadas com sucesso"
@@ -168,9 +167,7 @@
       "conversation_mention": "Menção",
       "sla_missed_first_response": "SLA não alcançado",
       "sla_missed_next_response": "SLA não alcançado",
-      "sla_missed_resolution": "SLA não alcançado",
-      "internal_chat_mention": "Menção",
-      "internal_chat_new_message": "Mensagem direta"
+      "sla_missed_resolution": "SLA não alcançado"
     }
   },
   "NETWORK": {

@@ -1,0 +1,11 @@
+{
+  "GENERAL_SETTINGS": {
+    "SUPER_ADMIN_ONLY_NOTICE": "Esta mensagem só é visível para administradores do sistema."
+  },
+  "NOTIFICATIONS_PAGE": {
+    "TYPE_LABEL": {
+      "internal_chat_mention": "Menção",
+      "internal_chat_new_message": "Mensagem direta"
+    }
+  }
+}

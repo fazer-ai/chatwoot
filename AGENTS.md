@@ -116,10 +116,7 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 
 ## Project-Specific
 
-- **Translations**:
-  - Update `en.yml`/`en.json` and `pt_BR.yml`/`pt_BR.json`
-  - Other languages are handled by the community
-  - Backend i18n → `.yml`, Frontend i18n → `.json`
+- **Translations**: the fork's strings live in their own tree, never inside upstream's locale files. See **Fork translations** below.
 - **Frontend**:
   - Use `components-next/` for message bubbles (the rest is being deprecated)
 
@@ -144,6 +141,29 @@ Practical checklist for any change impacting core logic or public APIs
 - When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
 - Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
 - When modifying existing OSS features for Enterprise-only behavior, add an Enterprise module (via `prepend_mod_with`/`include_mod_with`) instead of editing OSS files directly—especially for policies, controllers, and services. For Enterprise-exclusive features, place code directly under `enterprise/`.
+
+## Fork translations
+
+Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside `app/javascript/dashboard/i18n/locale/` or `config/locales/<locale>.yml`** — CI fails if you do, and the next upstream sync would conflict on every string we own.
+
+Everything the fork translates lives in two places:
+
+- Frontend → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
+- Backend → `config/locales/fazer_ai.<locale>.yml` (and `fazer_ai.mailers.<locale>.yml` for the Chatwoot mailer copy upstream hardcodes in ERB)
+
+Both are deep-merged on top of upstream's: the frontend in `i18n/index.js` via `withForkMessages`, the backend by Rails, which already loads every `config/locales/*.yml`. No registration step — files are picked up by directory scan, which is also why CE → Pro merges don't conflict here.
+
+**Which file does a key go in?**
+
+- A namespace that is entirely ours gets its own file: `kanban.json`, `internalChat.json`, `groups.json`, `scheduledMessages.json`, `fazerAi.json`.
+- A key we add *inside* an upstream namespace goes in a file named after the upstream file it extends: `INBOX_MGMT.ADD.WHATSAPP.*` → `fazer-ai/locale/en/inboxMgmt.json`.
+- Replacing an upstream string goes in `overrides.json`, and only there. Overrides apply per language: overriding in `en` does not change `es`.
+
+**Adding a language**: `ruby scripts/i18n/fork_translations.rb scaffold <locale>` copies the `en` tree as a starting point. Translate the values; untranslated keys fall back to `en` (vue-i18n's default `fallbackLocale`, and `config.i18n.fallbacks` in production), so a partial language degrades to English rather than breaking.
+
+**Checks**: `ruby scripts/i18n/fork_translations.rb check` enforces the boundaries and reports per-language coverage. `drift` compares upstream's files against the tracked release and needs that tag fetched first. Both run in `.github/workflows/fazer_ai_i18n.yml`.
+
+**On upstream sync**: bump `UPSTREAM_BASE` in `scripts/i18n/fork_translations.rb` to the new release, then run `drift`. If it fails, upstream changed a file we also changed and the resolution belongs in our tree, not theirs.
 
 ## Branding / White-labeling note
 

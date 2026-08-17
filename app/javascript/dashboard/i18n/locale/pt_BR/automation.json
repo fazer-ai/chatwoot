@@ -99,12 +99,7 @@
       "TEAM_MESSAGE_INPUT_PLACEHOLDER": "Escreva sua mensagem aqui",
       "TEAM_DROPDOWN_PLACEHOLDER": "Selecione times",
       "EMAIL_INPUT_PLACEHOLDER": "Insira o e-mail",
-      "URL_INPUT_PLACEHOLDER": "Insira a URL",
-      "SCHEDULED_MESSAGE_DELAY_LABEL": "Atraso",
-      "ATTACHMENT_ADD": "Adicionar anexo",
-      "TEMPLATE_SELECT": "Usar template",
-      "TEMPLATE_SELECTED": "Template: {name}",
-      "TEMPLATE_USE": "Usar este template"
+      "URL_INPUT_PLACEHOLDER": "Insira a URL"
     },
     "TOGGLE": {
       "ACTIVATION_TITLE": "Ativar regra de automação",
@@ -158,7 +153,6 @@
       "SEND_WEBHOOK_EVENT": "Enviar evento de Webhook",
       "SEND_ATTACHMENT": "Enviar Anexo",
       "SEND_MESSAGE": "Enviar Mensagem",
-      "CREATE_SCHEDULED_MESSAGE": "Criar Mensagem Agendada",
       "ADD_PRIVATE_NOTE": "Adicionar uma Nota Privada",
       "CHANGE_PRIORITY": "Alterar Prioridade",
       "ADD_SLA": "Adicionar SLA",

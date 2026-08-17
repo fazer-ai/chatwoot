@@ -1,0 +1,145 @@
+{
+  "INBOX_MGMT": {
+    "ADD": {
+      "WHATSAPP": {
+        "PROVIDERS": {
+          "360_DIALOG_DESC": "Conectar através de credenciais 360Dialog",
+          "BAILEYS": "Baileys",
+          "BAILEYS_DESC": "Conectar via API não-oficial Baileys",
+          "ZAPI": "Z-API",
+          "ZAPI_DESC": "Conectar via API não-oficial Z-API"
+        },
+        "PROVIDER_URL": {
+          "LABEL": "URL do provedor",
+          "PLACEHOLDER": "Se o provedor não está rodando localmente, por favor, insira a URL do provedor",
+          "ERROR": "Por favor, insira uma URL válida"
+        },
+        "MARK_AS_READ": {
+          "LABEL": "Enviar confirmações de leitura"
+        },
+        "PRESENCE_SUBSCRIBE": {
+          "LABEL": "Mostrar indicadores de digitação do contato"
+        },
+        "INSTANCE_ID": {
+          "LABEL": "ID da instância",
+          "PLACEHOLDER": "Por favor, insira o ID da sua instância",
+          "ERROR": "Este campo é obrigatório"
+        },
+        "TOKEN": {
+          "LABEL": "Token",
+          "PLACEHOLDER": "Por favor, insira o Token da sua instância",
+          "ERROR": "Este campo é obrigatório"
+        },
+        "CLIENT_TOKEN": {
+          "LABEL": "Token de Segurança",
+          "PLACEHOLDER": "Por favor, insira o Token de Segurança (veja a aba Segurança no painel do Z-API)",
+          "ERROR": "Este campo é obrigatório"
+        },
+        "ADVANCED_OPTIONS": "Opções avançadas",
+        "EXTERNAL_PROVIDER": {
+          "SUBTITLE": "Clique abaixo para configurar o canal do WhatsApp.",
+          "LINK_BUTTON": "Conectar dispositivo",
+          "LINK_DEVICE_MODAL": {
+            "TITLE": "Conecte o seu dispositivo",
+            "SUBTITLE": "Escaneie o QR code para conectar seu dispositivo. Certifique-se de que o número de telefone esteja correto antes de escanear.",
+            "LOADING_QRCODE": "Carregando QR code...",
+            "RECONNECTING": "Conectando...",
+            "LINK_DEVICE": "Conectar dispositivo",
+            "DISCONNECT": "Desconectar",
+            "CONNECTED": "Seu dispositivo foi conectado com sucesso. Agora você pode começar a enviar e receber mensagens.",
+            "IMPORT_SESSION_TITLE": "O QR code não funciona?",
+            "IMPORT_SESSION_SHOW_MORE": "Ver mais",
+            "IMPORT_SESSION_DESC": "O WhatsApp passou a exigir chave de acesso ao vincular algumas contas, o que bloqueia o QR code. Instale a extensão de navegador para importar uma sessão em que você já está logado no WhatsApp Web.",
+            "IMPORT_SESSION_INSTALL": "Instalar a extensão"
+          }
+        }
+      }
+    },
+    "CONVERT": {
+      "BUTTON": "Converter",
+      "CONFIRM": {
+        "TITLE": "Converter provedor da caixa de entrada",
+        "INTRO": "Você está prestes a trocar o provedor de WhatsApp de '{inboxName}' (atualmente {currentProvider}). Antes de continuar, revise o que vai acontecer:",
+        "EFFECT_DISCONNECT": "A sessão atual com {currentProvider} será desconectada.",
+        "EFFECT_TEMPLATES": "Modelos de mensagem serão limpos e precisarão ser re-sincronizados no novo provedor.",
+        "EFFECT_CONNECTION": "O estado de conexão do provedor será resetado.",
+        "EFFECT_PRESERVED": "Conversas, mensagens, contatos, atribuições de agentes e histórico são preservados.",
+        "EFFECT_IDENTITY": "O nome da caixa de entrada e o número de telefone permanecem os mesmos.",
+        "CONFIRM_PROMPT": "Para confirmar, digite o nome da caixa de entrada abaixo:",
+        "PLACE_HOLDER": "Digite {inboxName} para continuar",
+        "CONTINUE": "Continuar conversão",
+        "CANCEL": "Cancelar"
+      },
+      "SELECT_PROVIDER_TITLE": "Selecione o novo provedor",
+      "SELECT_PROVIDER_DESCRIPTION": "Convertendo '{inboxName}' de {currentProvider}.",
+      "SUBMIT_BUTTON": "Converter caixa de entrada",
+      "API": {
+        "SUCCESS_MESSAGE": "Caixa de entrada convertida com sucesso",
+        "ERROR_MESSAGE": "Não foi possível converter a caixa de entrada. Verifique as credenciais e tente novamente."
+      }
+    },
+    "SETTINGS_POPUP": {
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Gerenciar Conexão do Provedor",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Conecte o seu dispositivo e gerencie a conexão do provedor.",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Gerenciar conexão",
+      "WHATSAPP_PROVIDER_URL_TITLE": "URL do provedor",
+      "WHATSAPP_PROVIDER_URL_SUBHEADER": "Se o provedor não estiver rodando localmente, por favor, forneça a URL.",
+      "WHATSAPP_PROVIDER_URL_PLACEHOLDER": "Digite a URL do provedor",
+      "WHATSAPP_PROVIDER_URL_ERROR": "Por favor, insira uma URL válida",
+      "WHATSAPP_MARK_AS_READ_TITLE": "Confirmações de leitura",
+      "WHATSAPP_MARK_AS_READ_SUBHEADER": "Se essa opção estiver desativada, ao visualizar uma mensagem pelo Chatwoot, não será enviada uma confirmação de leitura para o remetente. As suas mensagens ainda poderão receber confirmações de leitura.",
+      "WHATSAPP_MARK_AS_READ_LABEL": "Enviar confirmações de leitura",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_TITLE": "Indicadores de digitação do contato",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "Quando ativado, você verá indicadores de digitação na conversa quando um contato do WhatsApp estiver digitando ou gravando áudio. Requer reconectar o canal para entrar em vigor.",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_LABEL": "Mostrar indicadores de digitação do contato",
+      "WHATSAPP_INSTANCE_ID_TITLE": "ID da Instância",
+      "WHATSAPP_INSTANCE_ID_SUBHEADER": "Seu ID da Instância Z-API.",
+      "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Atualizar ID da Instância",
+      "WHATSAPP_INSTANCE_ID_UPDATE_SUBHEADER": "Digite o novo ID da Instância aqui",
+      "WHATSAPP_TOKEN_TITLE": "Token",
+      "WHATSAPP_TOKEN_SUBHEADER": "Seu Token da Instância Z-API.",
+      "WHATSAPP_TOKEN_UPDATE_TITLE": "Atualizar Token",
+      "WHATSAPP_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token aqui",
+      "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de Segurança",
+      "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Seu Token de Segurança Z-API (veja a aba Segurança no painel do Z-API).",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Atualizar Token de Segurança",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token de Segurança aqui"
+    },
+    "ASSIGNMENT": {
+      "PREVENT_TAKEOVER": "Impedir tomada de conversa atribuída",
+      "PREVENT_TAKEOVER_SUB_TEXT": "Depois que um agente assume uma conversa, só ele ou um administrador pode mudar quem está atendendo. Não afeta a atribuição automática."
+    },
+    "CSAT": {
+      "TEMPLATE_MODE": {
+        "LABEL": "Origem do modelo",
+        "CREATE_NEW": "Criar novo modelo",
+        "USE_EXISTING": "Usar modelo existente"
+      },
+      "EXISTING_TEMPLATE": {
+        "LABEL": "Selecionar modelo",
+        "PLACEHOLDER": "Selecione um modelo aprovado",
+        "SYNC_BUTTON": "Sincronizar modelos",
+        "SYNCING": "Sincronizando...",
+        "EMPTY_STATE": "Nenhum modelo compatível encontrado. Os modelos devem ter um botão de URL com um parâmetro dinâmico.",
+        "LINK_SUCCESS": "Modelo vinculado com sucesso",
+        "LINK_ERROR": "Falha ao vincular o modelo",
+        "LOADING": "Carregando modelos...",
+        "USING_LABEL": "Usando modelo existente: {name}",
+        "SYNC_ERROR": "Falha ao sincronizar modelos. Por favor, tente novamente."
+      },
+      "TEMPLATE_VARIABLES": {
+        "TITLE": "Variáveis do modelo",
+        "DESCRIPTION": "Defina os valores para as variáveis do corpo do modelo. Você pode usar variáveis dinâmicas como {'{{'} contact.name {'}}'} que serão resolvidas no momento do envio.",
+        "VARIABLE_LABEL": "Variável {variable}",
+        "VARIABLE_PLACEHOLDER": "Insira o valor para {variable}",
+        "VARIABLE_REQUIRED": "Esta variável é obrigatória",
+        "VALIDATION_ERROR": "Por favor, defina todas as variáveis do modelo antes de salvar.",
+        "INSERT_VARIABLE": "Inserir variável"
+      }
+    },
+    "CHANNELS": {
+      "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
+      "WHATSAPP_ZAPI": "WhatsApp - Z-API"
+    }
+  }
+}

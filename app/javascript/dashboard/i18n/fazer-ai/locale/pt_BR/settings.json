@@ -1,0 +1,56 @@
+{
+  "PROFILE_SETTINGS": {
+    "FORM": {
+      "MESSAGE_SIGNATURE_SECTION": {
+        "RESET_TO_DEFAULT": "Restaurar para padrão",
+        "RESET_SUCCESS": "Assinatura da caixa de entrada removida, usando assinatura padrão",
+        "INBOX_SELECTOR": {
+          "LABEL": "Caixa de entrada",
+          "DEFAULT": "Padrão (todas as caixas de entrada)",
+          "CUSTOM": "Personalizada"
+        },
+        "SIGNATURE_POSITION": {
+          "LABEL": "Posição da assinatura",
+          "OPTIONS": {
+            "TOP": "Início da mensagem",
+            "BOTTOM": "Final da mensagem"
+          }
+        },
+        "SIGNATURE_SEPARATOR": {
+          "LABEL": "Separador da assinatura",
+          "OPTIONS": {
+            "BLANK": "Linha em branco",
+            "HORIZONTAL_LINE": "Linha horizontal (--)"
+          }
+        },
+        "PREVIEW": {
+          "TITLE": "Pré-visualização da Assinatura",
+          "NOTE": "Esta é a aparência da sua assinatura nas mensagens",
+          "EMPTY": "Digite uma assinatura acima para ver a pré-visualização",
+          "SAMPLE_MESSAGE": "Olá! Obrigado por entrar em contato. Como posso ajudá-lo hoje?"
+        }
+      },
+      "NOTIFICATIONS": {
+        "TYPES": {
+          "INTERNAL_CHAT_MENTION": "Você é mencionado no chat interno",
+          "INTERNAL_CHAT_NEW_MESSAGE": "Uma nova mensagem direta no chat interno"
+        }
+      }
+    }
+  },
+  "COMPONENTS": {
+    "REFERRAL_CARD": {
+      "AD_LABEL": "Veio de um anúncio",
+      "VIEW_AD": "Ver anúncio"
+    },
+    "MEDIA": {
+      "AUDIO_UNAVAILABLE": "Este áudio não está mais disponível.",
+      "VIDEO_UNAVAILABLE": "Este vídeo não está mais disponível."
+    }
+  },
+  "SIDEBAR": {
+    "INTERNAL_CHAT": "Chat Interno",
+    "KANBAN": "Kanban",
+    "APPS": "Apps"
+  }
+}

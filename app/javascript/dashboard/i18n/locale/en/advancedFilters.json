@@ -65,8 +65,7 @@
       "CUSTOM_ATTRIBUTE_LINK": "Link",
       "CUSTOM_ATTRIBUTE_CHECKBOX": "Checkbox",
       "CREATED_AT": "Created at",
-      "LAST_ACTIVITY": "Last activity",
-      "GROUP_TYPE": "Group type"
+      "LAST_ACTIVITY": "Last activity"
     },
     "ERRORS": {
       "VALUE_REQUIRED": "Value is required",
@@ -97,13 +96,7 @@
         }
       },
       "EDIT": {
-        "EDIT_BUTTON": "Edit folder",
-        "API_FOLDERS": {
-          "ERROR_MESSAGE": "Error while updating folder."
-        },
-        "API_SEGMENTS": {
-          "ERROR_MESSAGE": "Error while updating segment."
-        }
+        "EDIT_BUTTON": "Edit folder"
       },
       "DELETE": {
         "DELETE_BUTTON": "Delete filter",
@@ -123,19 +116,7 @@
           "SUCCESS_MESSAGE": "Segment deleted successfully.",
           "ERROR_MESSAGE": "Error while deleting segment."
         }
-      },
-      "VISIBILITY": {
-        "LABEL": "Visibility",
-        "GLOBAL": {
-          "LABEL": "Public",
-          "DESCRIPTION": "Available to all agents in this account."
-        },
-        "PERSONAL": {
-          "LABEL": "Private",
-          "DESCRIPTION": "Only you will be able to see and manage this filter."
-        }
-      },
-      "READ_ONLY_TOOLTIP": "Public folder. Ask an administrator to edit or delete it."
+      }
     }
   }
 }

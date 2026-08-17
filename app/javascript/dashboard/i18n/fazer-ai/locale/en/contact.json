@@ -1,0 +1,36 @@
+{
+  "EDIT_CONTACT": {
+    "CONFIRM_DISCARD": {
+      "TITLE": "Discard changes?",
+      "MESSAGE": "You have unsaved changes. Are you sure you want to discard them?",
+      "YES": "Discard",
+      "NO": "Keep editing"
+    }
+  },
+  "CONTACTS_LAYOUT": {
+    "HEADER": {
+      "ACTIONS": {
+        "FILTERS": {
+          "CREATE_SEGMENT": {
+            "VISIBILITY": {
+              "LABEL": "Visibility",
+              "GLOBAL": {
+                "LABEL": "Public",
+                "DESCRIPTION": "Available to all agents in this account."
+              },
+              "PERSONAL": {
+                "LABEL": "Private",
+                "DESCRIPTION": "Only you will be able to see and manage this segment."
+              }
+            },
+            "READ_ONLY_TOOLTIP": "Public segment. Ask an administrator to edit or delete it."
+          }
+        }
+      }
+    }
+  },
+  "COMPOSE_NEW_CONVERSATION": {
+    "TAB_CONVERSATION": "Conversation",
+    "TAB_GROUP": "Group"
+  }
+}
