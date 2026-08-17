@@ -4,3 +4,4 @@ app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
 app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
 app/javascript/dashboard/helper/actionCable.js: Refresh cached permissions before applying this gate  # PR#367
+app/javascript/dashboard/helper/actionCable.js: Align bot assignments with frontend list visibility  # PR#367
