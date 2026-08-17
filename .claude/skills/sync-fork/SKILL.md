@@ -341,7 +341,7 @@ For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is trigger
 
 ## Merging the sync PR: merge commit, NEVER squash
 
-This fork's default PR strategy is `--squash`. **Sync PRs are the one exception**, and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
+This fork's default PR strategy is `--squash`. **Sync PRs are one of the two exceptions** (the other is a PR already merged into `chatwoot-pro-main` — see **Merge strategy** in `AGENTS.md`), and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
 
 - GitHub shows `main` as "N commits behind chatwoot:develop" forever, and the count only grows with each squashed sync (after the squashed 4.16.2 sync it read 197).
 - The NEXT sync's merge base falls back to the last non-squashed tag, so git replays an entire version's diff and manufactures conflicts on every file the fork changed in between.

@@ -103,7 +103,15 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 ### Merge strategy
 
 - Default for every PR: `gh pr merge <n> --squash --admin`.
-- **Exception — upstream sync PRs (`chore/merge-upstream-X.Y.Z`): merge with `--merge`, never `--squash`.** A squash drops the merge commit's second parent, so the upstream tag stops being an ancestor of `main`: GitHub reports `main` as permanently "N commits behind chatwoot:develop" (the count only grows), and the next sync bases on a stale tag and replays a whole version's diff as conflicts. After merging a sync PR, `git rev-list --count main..vX.Y.Z` must be 0 — when it isn't, see the `sync-fork` skill's **Repairing a squashed sync** recipe.
+- **Exception 1 — upstream sync PRs (`chore/merge-upstream-X.Y.Z`): merge with `--merge`, never `--squash`.** A squash drops the merge commit's second parent, so the upstream tag stops being an ancestor of `main`: GitHub reports `main` as permanently "N commits behind chatwoot:develop" (the count only grows), and the next sync bases on a stale tag and replays a whole version's diff as conflicts. After merging a sync PR, `git rev-list --count main..vX.Y.Z` must be 0 — when it isn't, see the `sync-fork` skill's **Repairing a squashed sync** recipe.
+- **Exception 2 — a PR whose branch was already merged into `chatwoot-pro-main`: merge with `--merge`.** Same root cause pointing the other way. The squash lands a commit with no ancestry to the branch Pro already contains, so the next CE → Pro merge treats the whole delivery as new content and hands it back as conflicts. Measured on the i18n stack (#364/#365) on 2026-08-17: squash → 18 conflicting files in the CE → Pro sync, squash plus redoing the work on Pro → 8, merge commit → 0.
+- Before merging a delivery Pro already has, measure instead of guessing — in a throwaway worktree, run each candidate route as `git merge --no-commit --no-ff <ref>` and count `git diff --name-only --diff-filter=U`.
+- **Stacked PRs:** after the lower PR is squashed, the upper one needs `git rebase --onto origin/main <lower-branch> <upper-branch>` before it can merge. The squash leaves the upper PR's merge base at the original divergence point, so GitHub replays the lower PR's whole diff over the squash and conflicts even when the two trees are identical.
+
+### Pro repo gotchas
+
+- **Pro's living trunk is `chatwoot-pro-main`.** The `main` branch in `fazer-ai/chatwoot-pro` is a stale ancestor kept only as the repo's nominal GitHub default. A workflow copied over from CE with `push: branches: [main]` therefore never fires there — swap the filter for `chatwoot-pro-main`.
+- **Pro's enterprise specs have no CI.** `run_foss_spec.yml` runs `rm -rf enterprise spec/enterprise` before the suite, so nothing in `spec/enterprise` is ever executed by a workflow. Run it locally before merging anything that touches `enterprise/`.
 
 ## PR Description Format
 
