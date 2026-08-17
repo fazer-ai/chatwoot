@@ -180,9 +180,11 @@ export const parseNaturalDate = (text, locale = 'en', now = new Date()) => {
     locale.startsWith(key)
   );
   const primary = CHRONO_PARSERS[language] ?? chrono;
-  // English is always tried as a fallback so that an agent typing "tomorrow"
-  // in a non-English dashboard still gets a date, as it did before.
-  const candidates = primary === chrono ? [chrono] : [primary, chrono];
+  // PT and EN are always tried as fallbacks, whatever the dashboard language:
+  // preProcessDateInput rewrites Portuguese expressions unconditionally, so
+  // dropping chrono.pt here would stop parsing input it just normalized.
+  // Deduplicated so the primary parser keeps its precedence on a tie.
+  const candidates = [...new Set([primary, chrono.pt, chrono])];
   const matchLen = results => results.reduce((s, r) => s + r.text.length, 0);
   // Pick the parser that matched more of the input text
   const best = candidates

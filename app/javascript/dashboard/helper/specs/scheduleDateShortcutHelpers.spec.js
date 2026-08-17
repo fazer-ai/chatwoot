@@ -300,6 +300,29 @@ describe('#scheduleDateShortcutHelpers', () => {
       expect(result).toBeInstanceOf(Date);
       expect(result.getDate()).toBe(15);
     });
+
+    // preProcessDateInput normalizes PT regardless of locale, so the PT parser
+    // has to stay reachable from every dashboard language.
+    it('still parses PT input on an EN dashboard', () => {
+      const result = parseNaturalDate('amanhã às 19', 'en', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(19);
+    });
+
+    it('still parses a PT weekday on an EN dashboard', () => {
+      const result = parseNaturalDate('sexta às 10', 'en', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(16);
+      expect(result.getHours()).toBe(10);
+    });
+
+    it('parses PT input on an ES dashboard', () => {
+      const result = parseNaturalDate('amanhã às 19', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(19);
+    });
   });
 
   describe('formatFullDateTime', () => {
