@@ -15,6 +15,8 @@ import {
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
+import { CONVERSATION_UNASSIGNED_PERMISSIONS } from 'dashboard/constants/permissions';
 
 const { isImpersonating } = useImpersonation();
 const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 5000;
@@ -133,7 +135,30 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (id) {
       this.app.$store.dispatch('updateConversation', payload);
     }
+    if (this.assignmentMayHaveGrantedAccess(payload)) {
+      this.app.$store.dispatch('conversationPins/fetch');
+    }
     this.fetchConversationStats();
+  };
+
+  // A custom role can scope what an agent sees down to the conversations assigned to them or left
+  // unassigned, so an assignment can hand back a conversation that was invisible when the pins were last
+  // read. The server then leads the list with a pin the client no longer knows about, and the client
+  // re-sorts it away as unpinned until the next reconnect. Being added as a participant grants access the
+  // same way but emits no event, so that path still waits for one.
+  assignmentMayHaveGrantedAccess = payload => {
+    const { assignee, assignee_type: assigneeType } = payload.meta || {};
+    const user = this.app.$store.getters.getCurrentUser;
+
+    // This event reaches every member of the inbox, not just the agents the assignment moved between, so
+    // it is only worth a request when it could have changed what this agent sees.
+    if (assigneeType === 'User' && assignee?.id === user?.id) return true;
+    if (assignee) return false;
+
+    const accountId = this.app.$store.getters.getCurrentAccountId;
+    return getUserPermissions(user, accountId).includes(
+      CONVERSATION_UNASSIGNED_PERMISSIONS
+    );
   };
 
   onConversationCreated = data => {

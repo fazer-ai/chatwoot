@@ -505,4 +505,59 @@ describe('ActionCableConnector - Copilot Tests', () => {
       expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
     });
   });
+
+  describe('pin refresh on assignment', () => {
+    const assigneeChanged = (assignee, assigneeType = 'User') => ({
+      event: 'assignee.changed',
+      data: {
+        account_id: 1,
+        id: 7,
+        meta: { assignee, assignee_type: assigneeType },
+      },
+    });
+
+    beforeEach(() => {
+      store.$store.getters.getCurrentUser = { id: 11, accounts: [] };
+    });
+
+    it('refetches the pins when the conversation is assigned to the current user', () => {
+      actionCable.onReceived(assigneeChanged({ id: 11 }));
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
+    it('does not refetch when the conversation is assigned to someone else', () => {
+      actionCable.onReceived(assigneeChanged({ id: 12 }));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
+    it('does not refetch when an agent bot shares the current user id', () => {
+      actionCable.onReceived(assigneeChanged({ id: 11 }, 'AgentBot'));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
+    it('refetches when the conversation is unassigned and the role sees unassigned ones', () => {
+      store.$store.getters.getCurrentUser = {
+        id: 11,
+        accounts: [{ id: 1, permissions: ['conversation_unassigned_manage'] }],
+      };
+
+      actionCable.onReceived(assigneeChanged(null, null));
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
+    it('does not refetch when the conversation is unassigned and the role does not scope by it', () => {
+      store.$store.getters.getCurrentUser = {
+        id: 11,
+        accounts: [{ id: 1, permissions: ['conversation_manage'] }],
+      };
+
+      actionCable.onReceived(assigneeChanged(null, null));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+  });
 });
