@@ -1,0 +1,36 @@
+{
+  "EDIT_CONTACT": {
+    "CONFIRM_DISCARD": {
+      "TITLE": "Descartar alterações?",
+      "MESSAGE": "Você tem alterações não salvas. Tem certeza de que deseja descartá-las?",
+      "YES": "Descartar",
+      "NO": "Continuar editando"
+    }
+  },
+  "CONTACTS_LAYOUT": {
+    "HEADER": {
+      "ACTIONS": {
+        "FILTERS": {
+          "CREATE_SEGMENT": {
+            "VISIBILITY": {
+              "LABEL": "Visibilidade",
+              "GLOBAL": {
+                "LABEL": "Pública",
+                "DESCRIPTION": "Disponível para todos os agentes desta conta."
+              },
+              "PERSONAL": {
+                "LABEL": "Privada",
+                "DESCRIPTION": "Apenas você poderá ver e gerenciar este segmento."
+              }
+            },
+            "READ_ONLY_TOOLTIP": "Segmento público. Peça a um administrador para editar ou excluir."
+          }
+        }
+      }
+    }
+  },
+  "COMPOSE_NEW_CONVERSATION": {
+    "TAB_CONVERSATION": "Conversa",
+    "TAB_GROUP": "Grupo"
+  }
+}

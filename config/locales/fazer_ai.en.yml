@@ -1,0 +1,101 @@
+# fazer.ai fork translations.
+#
+# Rails deep-merges every config/locales/*.yml, so these keys land on top of
+# upstream's <locale>.yml without touching it. Keys for our own features go
+# here; upstream copy we merely translate does not.
+#
+# Adding a language means adding fazer_ai.<locale>.yml. Nothing else changes.
+en:
+  internal_chat:
+    default_category_name: Channels
+    default_channel_name: General
+    messages:
+      deleted: This message was deleted
+  errors:
+    automation:
+      scheduled_message:
+        delay_out_of_range: Delay must be between 1 minute and 999 days
+        content_attachment_or_template_required: Scheduled message must have content, attachment, or template
+    scheduled_messages:
+      cannot_delete_processed: Cannot delete a scheduled message that has already been sent or failed
+    conversations:
+      already_assigned: "%{agent_name} is already handling this conversation."
+    inboxes:
+      channel:
+        provider_connection:
+          wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
+          reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.
+  notifications:
+    notification_title:
+      internal_chat_mention: You have been mentioned in %{name}
+      internal_chat_new_message: New message from %{name}
+  conversations:
+    activity:
+      group_participants:
+        add:
+          single: "%{author_name} added %{contact_name} to the group"
+          multiple: "%{author_name} added %{contact_names} and %{last_contact_name} to the group"
+        join: "%{contact_name} joined using the group invite link"
+        leave: "%{contact_name} left the group"
+        remove:
+          single: "%{author_name} removed %{contact_name} from the group"
+          multiple: "%{author_name} removed %{contact_names} and %{last_contact_name} from the group"
+        promote:
+          single: "%{author_name} promoted %{contact_name} to admin"
+          multiple: "%{author_name} promoted %{contact_names} and %{last_contact_name} to admin"
+        demote:
+          single: "%{author_name} demoted %{contact_name} to member"
+          multiple: "%{author_name} demoted %{contact_names} and %{last_contact_name} to member"
+      groups_update:
+        subject_changed: '%{author_name} changed the group name to "%{value}"'
+        description_changed: "%{author_name} changed the group description"
+        description_removed: "%{author_name} removed the group description"
+        restrict_enabled: "%{author_name} changed the settings so only admins can edit the group settings"
+        restrict_disabled: "%{author_name} changed the settings so all members can edit the group settings"
+        announce_enabled: "%{author_name} changed this group's settings to allow only admins to send messages to this group"
+        announce_disabled: "%{author_name} changed this group's settings to allow all members to send messages to this group"
+        member_add_mode_enabled: "%{author_name} changed this group's setting to allow all members to add others to this group"
+        member_add_mode_disabled: "%{author_name} changed this group's setting to allow only admins to add others to this group"
+        join_approval_mode_enabled: "%{author_name} turned on admin approval to join this group"
+        join_approval_mode_disabled: "%{author_name} turned off admin approval to join this group"
+        invite_link_reset: "%{author_name} reset this group's invite link"
+        membership_request_created: "%{contact_name} wants to join the group"
+        membership_request_revoked: "%{contact_name} no longer wants to join the group"
+        icon_changed: "%{author_name} changed the group image"
+      recurring_message_failed: Recurring scheduled message failed to send. Next occurrence scheduled for %{next_date}.
+      recurring_message_completed: Recurring scheduled message series completed after %{count} occurrences.
+      recurring_message_cancelled: Recurring scheduled message has been stopped by %{agent}.
+      unknown_agent: Unknown
+  contacts:
+    sync_group:
+      not_a_group: Contact is not a group
+      no_identifier: Contact does not have a group identifier
+      no_supported_inbox: No inbox with group sync support found for this contact
+      metadata_unavailable: Could not retrieve group metadata from the provider
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: Every day
+        other: Every %{count} days
+      weekly:
+        one: Every week
+        other: Every %{count} weeks
+      weekly_on: "%{prefix} on %{days}"
+      monthly:
+        one: Monthly
+        other: Every %{count} months
+      monthly_on_weekday: "%{prefix} on the %{ordinal} %{weekday}"
+      yearly:
+        one: Every year
+        other: Every %{count} years
+      until_date: until %{date}
+      after_count:
+        one: "%{count} occurrence"
+        other: "%{count} occurrences"
+      ordinals:
+        first: first
+        second: second
+        third: third
+        fourth: fourth
+        fifth: fifth
+        last: last

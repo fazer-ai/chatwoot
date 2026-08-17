@@ -64,13 +64,7 @@
   "EDIT_CONTACT": {
     "BUTTON_LABEL": "Edit Contact",
     "TITLE": "Edit contact",
-    "DESC": "Edit contact details",
-    "CONFIRM_DISCARD": {
-      "TITLE": "Discard changes?",
-      "MESSAGE": "You have unsaved changes. Are you sure you want to discard them?",
-      "YES": "Discard",
-      "NO": "Keep editing"
-    }
+    "DESC": "Edit contact details"
   },
   "DELETE_CONTACT": {
     "BUTTON_LABEL": "Delete Contact",
@@ -372,19 +366,7 @@
             "PLACEHOLDER": "Enter the name of the filter",
             "ERROR": "Enter a valid name",
             "SUCCESS_MESSAGE": "Filter saved successfully",
-            "ERROR_MESSAGE": "Unable to save filter. Please try again later.",
-            "VISIBILITY": {
-              "LABEL": "Visibility",
-              "GLOBAL": {
-                "LABEL": "Public",
-                "DESCRIPTION": "Available to all agents in this account."
-              },
-              "PERSONAL": {
-                "LABEL": "Private",
-                "DESCRIPTION": "Only you will be able to see and manage this segment."
-              }
-            },
-            "READ_ONLY_TOOLTIP": "Public segment. Ask an administrator to edit or delete it."
+            "ERROR_MESSAGE": "Unable to save filter. Please try again later."
           },
           "DELETE_SEGMENT": {
             "TITLE": "Confirm Deletion",
@@ -629,8 +611,6 @@
   },
 
   "COMPOSE_NEW_CONVERSATION": {
-    "TAB_CONVERSATION": "Conversation",
-    "TAB_GROUP": "Group",
     "CONTACT_SEARCH": {
       "ERROR_MESSAGE": "We couldn’t complete the search. Please try again."
     },

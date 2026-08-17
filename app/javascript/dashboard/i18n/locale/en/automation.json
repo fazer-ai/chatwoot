@@ -99,12 +99,7 @@
       "TEAM_MESSAGE_INPUT_PLACEHOLDER": "Enter your message here",
       "TEAM_DROPDOWN_PLACEHOLDER": "Select teams",
       "EMAIL_INPUT_PLACEHOLDER": "Enter email",
-      "URL_INPUT_PLACEHOLDER": "Enter URL",
-      "SCHEDULED_MESSAGE_DELAY_LABEL": "Delay",
-      "ATTACHMENT_ADD": "Add attachment",
-      "TEMPLATE_SELECT": "Use template",
-      "TEMPLATE_SELECTED": "Template: {name}",
-      "TEMPLATE_USE": "Use this template"
+      "URL_INPUT_PLACEHOLDER": "Enter URL"
     },
     "TOGGLE": {
       "ACTIVATION_TITLE": "Activate Automation Rule",
@@ -158,7 +153,6 @@
       "SEND_WEBHOOK_EVENT": "Send Webhook Event",
       "SEND_ATTACHMENT": "Send Attachment",
       "SEND_MESSAGE": "Send a Message",
-      "CREATE_SCHEDULED_MESSAGE": "Create Scheduled Message",
       "ADD_PRIVATE_NOTE": "Add a Private Note",
       "CHANGE_PRIORITY": "Change Priority",
       "ADD_SLA": "Add SLA",

@@ -59,33 +59,18 @@
             "CONVERSATION_STATUS_CHANGED": "Status de conversa alterado",
             "CONVERSATION_UPDATED": "Conversa Atualizada",
             "MESSAGE_CREATED": "Mensagem criada",
-            "MESSAGE_INCOMING": "Mensagem recebida",
-            "MESSAGE_OUTGOING": "Mensagem enviada",
             "MESSAGE_UPDATED": "Mensagem atualizada",
             "WEBWIDGET_TRIGGERED": "Widget de chat aberto pelo usuário",
             "CONTACT_CREATED": "Contato criado",
             "CONTACT_UPDATED": "Contato atualizado",
             "CONVERSATION_TYPING_ON": "Status de Digitação ativado",
             "CONVERSATION_TYPING_OFF": "Status de Digitação desativado",
-            "CONVERSATION_RECORDING": "Gravação de Áudio na Conversa",
-            "PROVIDER_EVENT_RECEIVED": "Evento do Provedor Recebido",
-            "INTERNAL_CHAT_MESSAGE_CREATED": "Mensagem do chat interno criada",
-            "INTERNAL_CHAT_MESSAGE_UPDATED": "Mensagem do chat interno atualizada",
-            "INTERNAL_CHAT_MESSAGE_DELETED": "Mensagem do chat interno excluída",
-            "INTERNAL_CHAT_CHANNEL_UPDATED": "Canal do chat interno atualizado",
             "INBOX_UPDATED": "Caixa de entrada atualizada"
           }
         },
         "NAME": {
           "LABEL": "Nome do Webhook",
-          "PLACEHOLDER": "Insira o nome do webhook"
-        },
-        "INBOX": {
-          "LABEL": "Caixa de Entrada",
-          "TITLE": "Selecione a caixa de entrada",
-          "PLACEHOLDER": "Todas as caixas de entrada",
-          "NO_RESULTS": "Nenhuma caixa de entrada encontrada",
-          "INPUT_PLACEHOLDER": "Buscar caixa de entrada"
+          "PLACEHOLDER": "Informe o nome do webhook"
         },
         "END_POINT": {
           "LABEL": "URL do Webhook",
@@ -236,10 +221,7 @@
         "TITLE": "Tom",
         "OPTIONS": {
           "PROFESSIONAL": "Profissional",
-          "FRIENDLY": "Amigável",
-          "CASUAL": "Casual",
-          "STRAIGHTFORWARD": "Direto",
-          "CONFIDENT": "Confiante"
+          "FRIENDLY": "Amigável"
         }
       },
       "BUTTONS": {
@@ -278,17 +260,13 @@
         "EDIT_TOOLTIP": "Alterar aplicativo",
         "DELETE_TOOLTIP": "Excluir aplicativo"
       },
-      "VIEW": {
-        "NOT_FOUND": "Não encontramos este aplicativo do painel."
-      },
       "FORM": {
         "TITLE_LABEL": "Nome",
         "TITLE_PLACEHOLDER": "Digite um nome para o aplicativo",
         "TITLE_ERROR": "É necessário um nome para o aplicativo",
         "URL_LABEL": "Endpoint",
         "URL_PLACEHOLDER": "Digite a URL do endpoint onde seu aplicativo está hospedado",
-        "URL_ERROR": "É necessário uma URL válida",
-        "SHOW_ON_SIDEBAR_LABEL": "Mostrar na barra lateral"
+        "URL_ERROR": "É necessário uma URL válida"
       },
       "CREATE": {
         "HEADER": "Adicionar um novo aplicativo",

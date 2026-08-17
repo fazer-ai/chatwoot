@@ -65,8 +65,7 @@
       "CUSTOM_ATTRIBUTE_LINK": "Link",
       "CUSTOM_ATTRIBUTE_CHECKBOX": "Checkbox",
       "CREATED_AT": "Criado em",
-      "LAST_ACTIVITY": "Última atividade",
-      "GROUP_TYPE": "Tipo de conversa"
+      "LAST_ACTIVITY": "Última atividade"
     },
     "ERRORS": {
       "VALUE_REQUIRED": "Valor obrigatório",
@@ -97,13 +96,7 @@
         }
       },
       "EDIT": {
-        "EDIT_BUTTON": "Alterar Pasta",
-        "API_FOLDERS": {
-          "ERROR_MESSAGE": "Erro ao atualizar a pasta."
-        },
-        "API_SEGMENTS": {
-          "ERROR_MESSAGE": "Erro ao atualizar o segmento."
-        }
+        "EDIT_BUTTON": "Alterar Pasta"
       },
       "DELETE": {
         "DELETE_BUTTON": "Excluir filtro",
@@ -123,19 +116,7 @@
           "SUCCESS_MESSAGE": "Segmento apagado com sucesso.",
           "ERROR_MESSAGE": "Erro ao excluir segmento."
         }
-      },
-      "VISIBILITY": {
-        "LABEL": "Visibilidade",
-        "GLOBAL": {
-          "LABEL": "Pública",
-          "DESCRIPTION": "Disponível para todos os agentes desta conta."
-        },
-        "PERSONAL": {
-          "LABEL": "Privada",
-          "DESCRIPTION": "Apenas você poderá ver e gerenciar este filtro."
-        }
-      },
-      "READ_ONLY_TOOLTIP": "Pasta pública. Peça a um administrador para editar ou excluir."
+      }
     }
   }
 }

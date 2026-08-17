@@ -64,13 +64,7 @@
   "EDIT_CONTACT": {
     "BUTTON_LABEL": "Editar Contato",
     "TITLE": "Editar contato",
-    "DESC": "Alterar detalhes do contato",
-    "CONFIRM_DISCARD": {
-      "TITLE": "Descartar alterações?",
-      "MESSAGE": "Você tem alterações não salvas. Tem certeza de que deseja descartá-las?",
-      "YES": "Descartar",
-      "NO": "Continuar editando"
-    }
+    "DESC": "Alterar detalhes do contato"
   },
   "DELETE_CONTACT": {
     "BUTTON_LABEL": "Excluir Contato",
@@ -371,19 +365,7 @@
             "PLACEHOLDER": "Informe o nome para esse filtro",
             "ERROR": "Informe um nome válido",
             "SUCCESS_MESSAGE": "Filtro salvo com sucesso",
-            "ERROR_MESSAGE": "Não foi possível salvar o filtro. Por favor, tente mais tarde.",
-            "VISIBILITY": {
-              "LABEL": "Visibilidade",
-              "GLOBAL": {
-                "LABEL": "Pública",
-                "DESCRIPTION": "Disponível para todos os agentes desta conta."
-              },
-              "PERSONAL": {
-                "LABEL": "Privada",
-                "DESCRIPTION": "Apenas você poderá ver e gerenciar este segmento."
-              }
-            },
-            "READ_ONLY_TOOLTIP": "Segmento público. Peça a um administrador para editar ou excluir."
+            "ERROR_MESSAGE": "Não foi possível salvar o filtro. Por favor, tente mais tarde."
           },
           "DELETE_SEGMENT": {
             "TITLE": "Confirmar exclusão",
@@ -627,8 +609,6 @@
     }
   },
   "COMPOSE_NEW_CONVERSATION": {
-    "TAB_CONVERSATION": "Conversa",
-    "TAB_GROUP": "Grupo",
     "CONTACT_SEARCH": {
       "ERROR_MESSAGE": "Não foi possível completar a pesquisa. Por favor, tente novamente."
     },

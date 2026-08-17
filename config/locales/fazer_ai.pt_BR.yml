@@ -1,0 +1,97 @@
+# fazer.ai fork translations.
+#
+# Rails deep-merges every config/locales/*.yml, so these keys land on top of
+# upstream's <locale>.yml without touching it. Keys for our own features go
+# here; upstream copy we merely translate does not.
+#
+# Adding a language means adding fazer_ai.<locale>.yml. Nothing else changes.
+pt_BR:
+  internal_chat:
+    default_category_name: Canais
+    default_channel_name: Geral
+  errors:
+    automation:
+      scheduled_message:
+        delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias
+        content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou template
+    conversations:
+      already_assigned: "%{agent_name} já está atendendo esta conversa."
+    inboxes:
+      channel:
+        provider_connection:
+          wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.
+          reconnect_loop_detected: Não foi possível restabelecer a conexão após várias tentativas. Novas tentativas automáticas continuam em intervalos crescentes. Se o problema persistir, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.
+  notifications:
+    notification_title:
+      internal_chat_mention: Você foi mencionado em %{name}
+      internal_chat_new_message: Nova mensagem de %{name}
+  conversations:
+    activity:
+      group_participants:
+        add:
+          single: "%{author_name} adicionou %{contact_name} ao grupo"
+          multiple: "%{author_name} adicionou %{contact_names} e %{last_contact_name} ao grupo"
+        join: "%{contact_name} entrou usando o link do grupo"
+        leave: "%{contact_name} saiu do grupo"
+        remove:
+          single: "%{author_name} removeu %{contact_name} do grupo"
+          multiple: "%{author_name} removeu %{contact_names} e %{last_contact_name} do grupo"
+        promote:
+          single: "%{author_name} promoveu %{contact_name} a admin"
+          multiple: "%{author_name} promoveu %{contact_names} e %{last_contact_name} a admin"
+        demote:
+          single: "%{author_name} rebaixou %{contact_name} a membro"
+          multiple: "%{author_name} rebaixou %{contact_names} e %{last_contact_name} a membro"
+      groups_update:
+        subject_changed: '%{author_name} alterou o nome do grupo para "%{value}"'
+        description_changed: "%{author_name} alterou a descrição do grupo"
+        description_removed: "%{author_name} removeu a descrição do grupo"
+        restrict_enabled: "%{author_name} mudou as configurações para permitir que somente admins editem as configurações do grupo"
+        restrict_disabled: "%{author_name} mudou as configurações para permitir que todos os membros editem as configurações do grupo"
+        announce_enabled: "%{author_name} mudou as configurações desse grupo para permitir que somente admins enviem mensagens ao grupo"
+        announce_disabled: "%{author_name} mudou as configurações do grupo para permitir que todos os membros enviem mensagens"
+        member_add_mode_enabled: "%{author_name} mudou as configurações do grupo para permitir que todos os membros adicionem outras pessoas"
+        member_add_mode_disabled: "%{author_name} mudou as configurações deste grupo para permitir que somente admins adicionem outras pessoas ao grupo"
+        join_approval_mode_enabled: "%{author_name} ativou a autorização de admins para entrar neste grupo"
+        join_approval_mode_disabled: "%{author_name} desativou a autorização de admins para entrar neste grupo"
+        invite_link_reset: "%{author_name} redefiniu o link do grupo para convidar outras pessoas"
+        membership_request_created: "%{contact_name} deseja entrar no grupo"
+        membership_request_revoked: "%{contact_name} não deseja mais fazer parte do grupo"
+        icon_changed: "%{author_name} alterou a imagem do grupo"
+      recurring_message_failed: Mensagem agendada recorrente falhou ao enviar. Próxima ocorrência agendada para %{next_date}.
+      recurring_message_completed: Série de mensagem agendada recorrente concluída após %{count} ocorrências.
+      recurring_message_cancelled: Recorrência de mensagem agendada foi interrompida por %{agent}.
+      unknown_agent: Desconhecido
+  contacts:
+    sync_group:
+      not_a_group: O contato não é um grupo
+      no_identifier: O contato não possui um identificador de grupo
+      no_supported_inbox: Nenhuma caixa de entrada com suporte a sincronização de grupo encontrada para este contato
+      metadata_unavailable: Não foi possível obter os metadados do grupo do provedor
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: Todos os dias
+        other: A cada %{count} dias
+      weekly:
+        one: Semanal
+        other: A cada %{count} semanas
+      weekly_on: "%{prefix}: %{days}"
+      monthly:
+        one: Mensal
+        other: A cada %{count} meses
+      monthly_on_weekday: "%{prefix} no(a) %{ordinal} %{weekday}"
+      yearly:
+        one: Anual
+        other: A cada %{count} anos
+      until_date: até %{date}
+      after_count:
+        one: "%{count} ocorrência"
+        other: "%{count} ocorrências"
+      ordinals:
+        first: primeiro(a)
+        second: segundo(a)
+        third: terceiro(a)
+        fourth: quarto(a)
+        fifth: quinto(a)
+        last: último(a)

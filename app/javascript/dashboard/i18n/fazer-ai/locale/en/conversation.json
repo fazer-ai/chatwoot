@@ -1,0 +1,82 @@
+{
+  "CONVERSATION": {
+    "ANNOUNCEMENT_MODE_BANNER": "Only administrators are allowed to send messages in this group",
+    "GROUP_LEFT_BANNER": "You are no longer part of this group and cannot send messages in it",
+    "GROUPS_DISABLED_BANNER": "Group messages are disabled. Enable full group support (free) to view and send messages.",
+    "GROUPS_DISABLED_BANNER_NON_ADMIN": "Group messages are disabled. Contact your administrator to enable full group support.",
+    "GROUPS_DISABLED_CTA": "Learn how to enable (free)",
+    "FOOTER": {
+      "SIGNATURE_LABEL_TOP": "↓ Signature",
+      "SIGNATURE_LABEL_TOP_TOOLTIP": "The signature will be sent at the top of the message",
+      "SIGNATURE_LABEL_BOTTOM": "↑ Signature",
+      "SIGNATURE_LABEL_BOTTOM_TOOLTIP": "The signature will be sent at the bottom of the message",
+      "ANNOUNCEMENT_MODE_RESTRICTED": "Only administrators are allowed to send messages in this group",
+      "GROUP_LEFT_RESTRICTED": "You are no longer part of this group and cannot send messages in it",
+      "GROUPS_DISABLED_RESTRICTED": "Group messages are disabled — enable for free"
+    },
+    "REPLYBOX": {
+      "SCHEDULE_SEND": "Schedule send"
+    },
+    "ASSIGNMENT_CONFLICT": {
+      "TITLE": "Conversation already assigned",
+      "DESCRIPTION": "{agentName} is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
+      "DESCRIPTION_UNKNOWN_AGENT": "Another agent is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
+      "CONFIRM": "Got it"
+    },
+    "CHANGE_TEAM_FAILED": "Team change failed",
+    "MESSAGE_DELETED_BY_CONTACT": "Deleted by the contact",
+    "WHATSAPP": "WhatsApp",
+    "CONTEXT_MENU": {
+      "EDIT": {
+        "LABEL": "Edit",
+        "TITLE": "Edit message",
+        "PLACEHOLDER": "Enter message content",
+        "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "SUCCESS": "Message edited successfully",
+        "ERROR": "Failed to edit message",
+        "EMPTY_CONTENT": "Message content cannot be empty"
+      }
+    },
+    "REACTIONS": {
+      "ADD_REACTION": "Add reaction",
+      "MORE_EMOJIS": "More emojis",
+      "FAILED": "Couldn't update reaction. Try again.",
+      "YOU": "You",
+      "CLICK_TO_REMOVE": "Click to remove",
+      "QUICK": {
+        "THUMBS_UP": "Thumbs up",
+        "HEART": "Heart",
+        "JOY": "Joy",
+        "SURPRISED": "Surprised",
+        "SAD": "Sad",
+        "PRAY": "Pray",
+        "FIRE": "Fire",
+        "PARTY": "Party"
+      }
+    },
+    "INBOX": {
+      "WHATSAPP_PROVIDER_CONNECTION": {
+        "NOT_CONNECTED": "WhatsApp is not connected. Please link your device again.",
+        "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp is not connected. Click this button to try to reconnect, or please contact your administrator to link your device again.",
+        "LINK_DEVICE": "Link device",
+        "RECONNECT_FAILED": "Failed to reconnect. Please contact your administrator to link your device again."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "WhatsApp has temporarily restricted starting new conversations from this number.",
+        "RESTRICTED_UNTIL": "WhatsApp has temporarily restricted starting new conversations from this number until {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "This number is approaching its WhatsApp limit for starting new conversations this cycle.",
+        "WARNING_WITH_QUOTA": "This number has started {used} of {total} new conversations allowed by WhatsApp this cycle.",
+        "CAPPED": "This number has reached its WhatsApp limit for starting new conversations this cycle.",
+        "CAPPED_WITH_QUOTA": "This number has reached its WhatsApp limit ({used} of {total}) for starting new conversations this cycle."
+      }
+    }
+  },
+  "CONVERSATION_SIDEBAR": {
+    "ACCORDION": {
+      "SCHEDULED_MESSAGES": "Scheduled Messages"
+    }
+  }
+}

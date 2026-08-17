@@ -66,37 +66,10 @@
         "BTN_TEXT": "Save message signature",
         "API_ERROR": "Couldn't save signature! Try again",
         "API_SUCCESS": "Signature saved successfully",
-        "RESET_TO_DEFAULT": "Reset to default",
-        "RESET_SUCCESS": "Inbox signature removed, using default signature",
-        "INBOX_SELECTOR": {
-          "LABEL": "Inbox",
-          "DEFAULT": "Default (all inboxes)",
-          "CUSTOM": "Custom"
-        },
         "IMAGE_UPLOAD_ERROR": "Couldn't upload image! Try again",
         "IMAGE_UPLOAD_SUCCESS": "Image added successfully. Please click on save to save the signature",
         "IMAGE_UPLOAD_SIZE_ERROR": "Image size should be less than {size}MB",
-        "INLINE_IMAGE_WARNING": "Pasted inline images were removed. Please use the image upload button to add images to your signature.",
-        "SIGNATURE_POSITION": {
-          "LABEL": "Signature Position",
-          "OPTIONS": {
-            "TOP": "Top of the message",
-            "BOTTOM": "Bottom of the message"
-          }
-        },
-        "SIGNATURE_SEPARATOR": {
-          "LABEL": "Signature Separator",
-          "OPTIONS": {
-            "BLANK": "Blank line",
-            "HORIZONTAL_LINE": "Horizontal line (--)"
-          }
-        },
-        "PREVIEW": {
-          "TITLE": "Signature Preview",
-          "NOTE": "This is how your signature will appear in messages",
-          "EMPTY": "Enter a signature above to see the preview",
-          "SAMPLE_MESSAGE": "Hello! Thank you for contacting us. How can I help you today?"
-        }
+        "INLINE_IMAGE_WARNING": "Pasted inline images were removed. Please use the image upload button to add images to your signature."
       },
       "MESSAGE_SIGNATURE": {
         "LABEL": "Message Signature",
@@ -199,9 +172,7 @@
           "PARTICIPATING_CONVERSATION_NEW_MESSAGE": "A new message is created in a participating conversation",
           "SLA_MISSED_FIRST_RESPONSE": "A conversation misses first response SLA",
           "SLA_MISSED_NEXT_RESPONSE": "A conversation misses next response SLA",
-          "SLA_MISSED_RESOLUTION": "A conversation misses resolution SLA",
-          "INTERNAL_CHAT_MENTION": "You are mentioned in internal chat",
-          "INTERNAL_CHAT_NEW_MESSAGE": "A new direct message in internal chat"
+          "SLA_MISSED_RESOLUTION": "A conversation misses resolution SLA"
         },
         "BROWSER_PERMISSION": "Enable push notifications for your browser so you’re able to receive them"
       },
@@ -319,10 +290,6 @@
       "INSTAGRAM_STORY_UNAVAILABLE": "This story is no longer available.",
       "INSTAGRAM_STORY_REPLY": "Replied to your story:"
     },
-    "REFERRAL_CARD": {
-      "AD_LABEL": "From an ad",
-      "VIEW_AD": "View ad"
-    },
     "LOCATION_BUBBLE": {
       "SEE_ON_MAP": "See on map"
     },
@@ -331,8 +298,6 @@
     },
     "MEDIA": {
       "IMAGE_UNAVAILABLE": "This image is no longer available.",
-      "AUDIO_UNAVAILABLE": "This audio is no longer available.",
-      "VIDEO_UNAVAILABLE": "This video is no longer available.",
       "LOADING_FAILED": "Loading failed"
     }
   },
@@ -359,8 +324,6 @@
     "ACTIVE": "Active",
     "COMPANIES": "Companies",
     "ALL_COMPANIES": "All Companies",
-    "INTERNAL_CHAT": "Internal Chat",
-    "KANBAN": "Kanban",
     "CAPTAIN": "Captain",
     "CALLS": "Calls",
     "CAPTAIN_ASSISTANTS": "Assistants",
@@ -375,7 +338,6 @@
     "HOME": "Home",
     "AGENTS": "Agents",
     "AGENT_BOTS": "Bots",
-    "APPS": "Apps",
     "AUDIT_LOGS": "Audit Logs",
     "INBOXES": "Inboxes",
     "NOTIFICATIONS": "Notifications",
