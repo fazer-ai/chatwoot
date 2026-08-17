@@ -19,6 +19,7 @@ import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
 import {
   CONVERSATION_PARTICIPATING_PERMISSIONS,
   CONVERSATION_UNASSIGNED_PERMISSIONS,
+  MANAGE_ALL_CONVERSATION_PERMISSIONS,
 } from 'dashboard/constants/permissions';
 
 const { isImpersonating } = useImpersonation();
@@ -162,6 +163,10 @@ class ActionCableConnector extends BaseActionCableConnector {
 
     // This event reaches every member of the inbox, and auto assignment fires it constantly, so it is only
     // worth a request for the roles that can lose a conversation to an assignment in the first place.
+    // Manage-all is checked first because holding it says nothing on its own: the role editor adds both
+    // scoped permissions alongside it, and the backend reads it with precedence over them, so such a role
+    // sees by inbox membership like a plain agent does.
+    if (permissions.includes(MANAGE_ALL_CONVERSATION_PERMISSIONS)) return false;
     if (!permissions.some(held => ASSIGNMENT_SCOPED_PERMISSIONS.includes(held)))
       return false;
 

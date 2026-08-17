@@ -561,6 +561,21 @@ describe('ActionCableConnector - Copilot Tests', () => {
       expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
     });
 
+    // The role editor adds both scoped permissions whenever manage-all is picked, so this is what a
+    // manage-all role looks like in practice, and the backend reads manage-all with precedence.
+    it('does not refetch for a manage-all role carrying the scoped permissions too', () => {
+      store.$store.getters.getCurrentUser = userWith([
+        'conversation_manage',
+        'conversation_unassigned_manage',
+        'conversation_participating_manage',
+      ]);
+
+      actionCable.onReceived(assigneeChanged({ id: 11 }));
+      actionCable.onReceived(assigneeChanged(null, null));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
     it('refetches when the conversation is unassigned and the role sees unassigned ones', () => {
       store.$store.getters.getCurrentUser = userWith([
         'conversation_unassigned_manage',
