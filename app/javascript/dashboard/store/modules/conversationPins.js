@@ -34,6 +34,7 @@ export const getters = {
 // have to order a snapshot against the pin events that land under it. Overlapping callers collapse into a
 // single follow-up run, so the last one still gets a read issued after it asked.
 let inFlightHydration = null;
+let inFlightRevision = null;
 let followUpRequested = false;
 
 const hydrate = async ({ commit, rootGetters, state: $state }) => {
@@ -66,16 +67,19 @@ const hydrate = async ({ commit, rootGetters, state: $state }) => {
   }
 };
 
-const hydrateUntilSettled = async context => {
+const hydrateUntilSettled = async (context, runRevision) => {
   await hydrate(context);
+
+  // A reset abandoned this run and started its own, which now owns the marker.
+  if (inFlightRevision !== runRevision) return;
 
   if (followUpRequested) {
     followUpRequested = false;
-    await hydrateUntilSettled(context);
+    await hydrateUntilSettled(context, runRevision);
     return;
   }
 
-  // Released here, in the same synchronous block as the check above, rather than from a `.finally` on the
+  // Released here, in the same synchronous block as the checks above, rather than from a `.finally` on the
   // run: between the run resolving and such a callback there is a microtask in which the marker still
   // reads as busy, so a caller landing there would only raise a flag that nobody reads again.
   inFlightHydration = null;
@@ -83,12 +87,20 @@ const hydrateUntilSettled = async context => {
 
 export const actions = {
   fetch: context => {
-    if (inFlightHydration) {
+    const { revision } = context.state;
+
+    // Serialization holds between reads of the same map. A reset threw the running read's map away and it
+    // can no longer commit, so folding the new account behind it would leave that account with no pins for
+    // as long as a request nothing bounds takes to settle. The abandoned read still returns, and its own
+    // revision check drops it.
+    if (inFlightHydration && inFlightRevision === revision) {
       followUpRequested = true;
       return inFlightHydration;
     }
 
-    inFlightHydration = hydrateUntilSettled(context);
+    followUpRequested = false;
+    inFlightRevision = revision;
+    inFlightHydration = hydrateUntilSettled(context, revision);
     return inFlightHydration;
   },
 

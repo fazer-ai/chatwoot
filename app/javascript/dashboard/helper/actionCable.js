@@ -16,7 +16,10 @@ import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
-import { CONVERSATION_UNASSIGNED_PERMISSIONS } from 'dashboard/constants/permissions';
+import {
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+} from 'dashboard/constants/permissions';
 
 const { isImpersonating } = useImpersonation();
 const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 5000;
@@ -24,6 +27,12 @@ const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS = 30000;
 const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS = 15000;
 const MENTION_UNREAD_COUNTS_REFETCH_DELAY_MS =
   UNREAD_COUNTS_REFETCH_THROTTLE_MS;
+// The only roles whose accessible set follows assignment. Everyone else, plain agents and administrators
+// included, sees by inbox membership, so no assignment can hide a conversation and later hand it back.
+const ASSIGNMENT_SCOPED_PERMISSIONS = [
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+];
 const getFilteredUnreadCountsRefreshRetryDelay = () =>
   FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS +
   Math.random() * FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS;
@@ -147,17 +156,21 @@ class ActionCableConnector extends BaseActionCableConnector {
   // re-sorts it away as unpinned until the next reconnect. Being added as a participant grants access the
   // same way but emits no event, so that path still waits for one.
   assignmentMayHaveGrantedAccess = payload => {
-    const { assignee, assignee_type: assigneeType } = payload.meta || {};
     const user = this.app.$store.getters.getCurrentUser;
-
-    // This event reaches every member of the inbox, not just the agents the assignment moved between, so
-    // it is only worth a request when it could have changed what this agent sees.
-    if (assigneeType === 'User' && assignee?.id === user?.id) return true;
-    if (assignee) return false;
-
     const accountId = this.app.$store.getters.getCurrentAccountId;
-    return getUserPermissions(user, accountId).includes(
-      CONVERSATION_UNASSIGNED_PERMISSIONS
+    const permissions = getUserPermissions(user, accountId);
+
+    // This event reaches every member of the inbox, and auto assignment fires it constantly, so it is only
+    // worth a request for the roles that can lose a conversation to an assignment in the first place.
+    if (!permissions.some(held => ASSIGNMENT_SCOPED_PERMISSIONS.includes(held)))
+      return false;
+
+    const { assignee, assignee_type: assigneeType } = payload.meta || {};
+    if (assigneeType === 'User' && assignee?.id === user?.id) return true;
+
+    // Losing the assignee hands the conversation back to a role that sees the unassigned ones.
+    return (
+      !assignee && permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
     );
   };
 

@@ -516,8 +516,15 @@ describe('ActionCableConnector - Copilot Tests', () => {
       },
     });
 
+    const userWith = permissions => ({
+      id: 11,
+      accounts: [{ id: 1, permissions }],
+    });
+
     beforeEach(() => {
-      store.$store.getters.getCurrentUser = { id: 11, accounts: [] };
+      store.$store.getters.getCurrentUser = userWith([
+        'conversation_participating_manage',
+      ]);
     });
 
     it('refetches the pins when the conversation is assigned to the current user', () => {
@@ -538,23 +545,33 @@ describe('ActionCableConnector - Copilot Tests', () => {
       expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
     });
 
+    it('does not refetch for a plain agent, whose access never followed the assignee', () => {
+      store.$store.getters.getCurrentUser = { id: 11, accounts: [{ id: 1 }] };
+
+      actionCable.onReceived(assigneeChanged({ id: 11 }));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
+    it('does not refetch for a role that sees every conversation in its inboxes', () => {
+      store.$store.getters.getCurrentUser = userWith(['conversation_manage']);
+
+      actionCable.onReceived(assigneeChanged({ id: 11 }));
+
+      expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
     it('refetches when the conversation is unassigned and the role sees unassigned ones', () => {
-      store.$store.getters.getCurrentUser = {
-        id: 11,
-        accounts: [{ id: 1, permissions: ['conversation_unassigned_manage'] }],
-      };
+      store.$store.getters.getCurrentUser = userWith([
+        'conversation_unassigned_manage',
+      ]);
 
       actionCable.onReceived(assigneeChanged(null, null));
 
       expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
     });
 
-    it('does not refetch when the conversation is unassigned and the role does not scope by it', () => {
-      store.$store.getters.getCurrentUser = {
-        id: 11,
-        accounts: [{ id: 1, permissions: ['conversation_manage'] }],
-      };
-
+    it('does not refetch when the conversation is unassigned and the role only sees its own', () => {
       actionCable.onReceived(assigneeChanged(null, null));
 
       expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');

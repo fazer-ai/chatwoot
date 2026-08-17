@@ -132,6 +132,32 @@ describe('#actions', () => {
       });
     });
 
+    it('does not make a reset wait behind the read of the account it left', async () => {
+      const $state = { revision: 0, appliedAt: {}, records: {} };
+      let releaseFirst;
+      axios.get
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              releaseFirst = () => resolve({ data: [] });
+            })
+        )
+        .mockResolvedValue({ data: [] });
+
+      actions.fetch({ commit, rootGetters, state: $state });
+      // What an account switch does: CLEAR_CONVERSATION_PINS, then a fetch for the account arrived at.
+      $state.revision += 1;
+      const afterReset = actions.fetch({ commit, rootGetters, state: $state });
+
+      // The read for the account left behind has not answered and nothing bounds how long it may take.
+      const readsWhileItHung = axios.get.mock.calls.length;
+
+      releaseFirst();
+      await afterReset;
+
+      expect(readsWhileItHung).toBe(2);
+    });
+
     it('discards a snapshot whose map a reset threw away mid-flight', async () => {
       const $state = { revision: 0, appliedAt: {} };
       axios.get.mockImplementation(() => {
