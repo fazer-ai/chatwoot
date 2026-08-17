@@ -3,17 +3,27 @@ import messages from 'dashboard/i18n';
 import { forkMessages, withForkMessages } from 'dashboard/i18n/fazer-ai';
 import upstreamEn from 'dashboard/i18n/locale/en';
 import upstreamPtBr from 'dashboard/i18n/locale/pt_BR';
+import upstreamEs from 'dashboard/i18n/locale/es';
 import upstreamFr from 'dashboard/i18n/locale/fr';
 
 describe('fazer.ai translation overlay', () => {
   it('exposes a fork tree for every language we translate', () => {
-    expect(Object.keys(forkMessages).sort()).toEqual(['en', 'pt_BR']);
+    expect(Object.keys(forkMessages).sort()).toEqual(['en', 'es', 'pt_BR']);
   });
 
   it('adds namespaces that upstream does not ship', () => {
     expect(upstreamEn.INTERNAL_CHAT).toBeUndefined();
     expect(messages.en.INTERNAL_CHAT).toBeDefined();
     expect(messages.pt_BR.SCHEDULED_MESSAGES).toBeDefined();
+    expect(messages.es.SCHEDULED_MESSAGES).toBeDefined();
+  });
+
+  it('translates the fork keys rather than copying the en tree', () => {
+    expect(messages.es.INTERNAL_CHAT.TITLE).toBe('Chat interno');
+    expect(messages.es.GROUP.SETTINGS.LEAVE_GROUP).toBe('Salir del grupo');
+    expect(messages.es.INBOX_MGMT.CONVERT.BUTTON).not.toBe(
+      messages.en.INBOX_MGMT.CONVERT.BUTTON
+    );
   });
 
   it('adds fork keys inside an upstream namespace without dropping upstream keys', () => {
@@ -30,6 +40,9 @@ describe('fazer.ai translation overlay', () => {
     );
     expect(messages.pt_BR.CONVERSATION.UNSUPPORTED_MESSAGE).not.toBe(
       upstreamPtBr.CONVERSATION.UNSUPPORTED_MESSAGE
+    );
+    expect(messages.es.CONVERSATION.UNSUPPORTED_MESSAGE).not.toBe(
+      upstreamEs.CONVERSATION.UNSUPPORTED_MESSAGE
     );
   });
 

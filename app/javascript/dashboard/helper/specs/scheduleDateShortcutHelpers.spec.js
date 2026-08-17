@@ -260,6 +260,46 @@ describe('#scheduleDateShortcutHelpers', () => {
     it('returns null for unrecognizable input', () => {
       expect(parseNaturalDate('xyz abc', 'en', now)).toBeNull();
     });
+
+    it('parses ES "mañana a las 8"', () => {
+      const result = parseNaturalDate('mañana a las 8', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(8);
+    });
+
+    it('parses ES "manana a las 19" (no accents) via preprocessing', () => {
+      const result = parseNaturalDate('manana a las 19', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(19);
+    });
+
+    it('parses ES "mañana por la tarde" via preprocessing', () => {
+      const result = parseNaturalDate('mañana por la tarde', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(13);
+    });
+
+    it('parses ES weekday names forward — "viernes"', () => {
+      const result = parseNaturalDate('viernes', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(16);
+    });
+
+    it('still parses EN input on an ES dashboard', () => {
+      const result = parseNaturalDate('tomorrow at 8am', 'es', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+      expect(result.getHours()).toBe(8);
+    });
+
+    it('falls back to EN for a language chrono does not cover', () => {
+      const result = parseNaturalDate('tomorrow at 8am', 'ta', now);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getDate()).toBe(15);
+    });
   });
 
   describe('formatFullDateTime', () => {

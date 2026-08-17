@@ -1,0 +1,82 @@
+{
+  "CONVERSATION": {
+    "ANNOUNCEMENT_MODE_BANNER": "Solo los administradores pueden enviar mensajes en este grupo",
+    "GROUP_LEFT_BANNER": "Ya no forma parte de este grupo y no puede enviar mensajes en él",
+    "GROUPS_DISABLED_BANNER": "Los mensajes de grupo están desactivados. Active la compatibilidad completa con grupos (gratis) para ver y enviar mensajes.",
+    "GROUPS_DISABLED_BANNER_NON_ADMIN": "Los mensajes de grupo están desactivados. Contacte a su administrador para activar la compatibilidad completa con grupos.",
+    "GROUPS_DISABLED_CTA": "Vea cómo activarla (gratis)",
+    "FOOTER": {
+      "SIGNATURE_LABEL_TOP": "↓ Firma",
+      "SIGNATURE_LABEL_TOP_TOOLTIP": "La firma se enviará al principio del mensaje",
+      "SIGNATURE_LABEL_BOTTOM": "↑ Firma",
+      "SIGNATURE_LABEL_BOTTOM_TOOLTIP": "La firma se enviará al final del mensaje",
+      "ANNOUNCEMENT_MODE_RESTRICTED": "Solo los administradores pueden enviar mensajes en este grupo",
+      "GROUP_LEFT_RESTRICTED": "Ya no forma parte de este grupo y no puede enviar mensajes en él",
+      "GROUPS_DISABLED_RESTRICTED": "Los mensajes de grupo están desactivados: actívelos gratis"
+    },
+    "REPLYBOX": {
+      "SCHEDULE_SEND": "Programar envío"
+    },
+    "ASSIGNMENT_CONFLICT": {
+      "TITLE": "La conversación ya está asignada",
+      "DESCRIPTION": "{agentName} ya está atendiendo esta conversación. Pídale que la libere o pida a un administrador que la reasigne.",
+      "DESCRIPTION_UNKNOWN_AGENT": "Otro agente ya está atendiendo esta conversación. Pídale que la libere o pida a un administrador que la reasigne.",
+      "CONFIRM": "Entendido"
+    },
+    "CHANGE_TEAM_FAILED": "No se pudo cambiar el equipo",
+    "MESSAGE_DELETED_BY_CONTACT": "Eliminado por el contacto",
+    "WHATSAPP": "WhatsApp",
+    "CONTEXT_MENU": {
+      "EDIT": {
+        "LABEL": "Editar",
+        "TITLE": "Editar mensaje",
+        "PLACEHOLDER": "Escriba el contenido del mensaje",
+        "SAVE": "Guardar",
+        "CANCEL": "Cancelar",
+        "SUCCESS": "Mensaje editado correctamente",
+        "ERROR": "No se pudo editar el mensaje",
+        "EMPTY_CONTENT": "El contenido del mensaje no puede estar vacío"
+      }
+    },
+    "REACTIONS": {
+      "ADD_REACTION": "Añadir reacción",
+      "MORE_EMOJIS": "Más emojis",
+      "FAILED": "No se pudo actualizar la reacción. Inténtelo de nuevo.",
+      "YOU": "Usted",
+      "CLICK_TO_REMOVE": "Haga clic para quitarla",
+      "QUICK": {
+        "THUMBS_UP": "Pulgar arriba",
+        "HEART": "Corazón",
+        "JOY": "Risa",
+        "SURPRISED": "Sorpresa",
+        "SAD": "Tristeza",
+        "PRAY": "Súplica",
+        "FIRE": "Fuego",
+        "PARTY": "Fiesta"
+      }
+    },
+    "INBOX": {
+      "WHATSAPP_PROVIDER_CONNECTION": {
+        "NOT_CONNECTED": "WhatsApp no está conectado. Vincule su dispositivo de nuevo.",
+        "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp no está conectado. Haga clic en este botón para intentar reconectar o contacte a su administrador para vincular el dispositivo de nuevo.",
+        "LINK_DEVICE": "Vincular dispositivo",
+        "RECONNECT_FAILED": "No se pudo reconectar. Contacte a su administrador para vincular el dispositivo de nuevo."
+      },
+      "WHATSAPP_REACHOUT_RESTRICTION": {
+        "RESTRICTED": "WhatsApp ha restringido temporalmente el inicio de conversaciones nuevas desde este número.",
+        "RESTRICTED_UNTIL": "WhatsApp ha restringido temporalmente el inicio de conversaciones nuevas desde este número hasta las {time}."
+      },
+      "WHATSAPP_NEW_CHAT_CAP": {
+        "WARNING": "Este número se está acercando a su límite de WhatsApp para iniciar conversaciones nuevas en este ciclo.",
+        "WARNING_WITH_QUOTA": "Este número ha iniciado {used} de {total} conversaciones nuevas permitidas por WhatsApp en este ciclo.",
+        "CAPPED": "Este número alcanzó su límite de WhatsApp para iniciar conversaciones nuevas en este ciclo.",
+        "CAPPED_WITH_QUOTA": "Este número alcanzó su límite de WhatsApp ({used} de {total}) para iniciar conversaciones nuevas en este ciclo."
+      }
+    }
+  },
+  "CONVERSATION_SIDEBAR": {
+    "ACCORDION": {
+      "SCHEDULED_MESSAGES": "Mensajes programados"
+    }
+  }
+}

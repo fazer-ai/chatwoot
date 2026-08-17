@@ -1,0 +1,10 @@
+{
+  "CONVERSATION": {
+    "UNSUPPORTED_MESSAGE": "Este mensaje no es compatible. Puede verlo en la aplicación."
+  },
+  "INBOX_MGMT": {
+    "CSAT": {
+      "WHATSAPP_NOTE": "Nota: puede crear una plantilla nueva (que se enviará a WhatsApp para su aprobación como Utilidad, aunque Meta puede clasificarla como Marketing según el contenido) o usar una plantilla ya aprobada de su administrador de plantillas de Meta. Las encuestas se envían una sola vez por conversación, según la regla de la encuesta."
+    }
+  }
+}

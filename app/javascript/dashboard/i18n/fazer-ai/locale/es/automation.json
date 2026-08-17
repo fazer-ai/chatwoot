@@ -1,0 +1,14 @@
+{
+  "AUTOMATION": {
+    "ACTION": {
+      "SCHEDULED_MESSAGE_DELAY_LABEL": "Retraso",
+      "ATTACHMENT_ADD": "Añadir archivo adjunto",
+      "TEMPLATE_SELECT": "Usar plantilla",
+      "TEMPLATE_SELECTED": "Plantilla: {name}",
+      "TEMPLATE_USE": "Usar esta plantilla"
+    },
+    "ACTIONS": {
+      "CREATE_SCHEDULED_MESSAGE": "Crear mensaje programado"
+    }
+  }
+}
