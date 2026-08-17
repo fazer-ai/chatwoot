@@ -2,9 +2,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   include BaileysHelper
 
   class MessageContentTypeNotSupported < StandardError; end
-  class ProviderUnavailableError < StandardError; end
-  class GroupParticipantNotAllowedError < StandardError; end
-  class MessageAlreadyProcessingError < StandardError; end
+  # Legacy errors inherit from the session hierarchy so every caller rescues a single
+  # namespace, whatever the provider. Nothing else about this service changes: it is
+  # frozen until baileys is removed.
+  class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
+  class GroupParticipantNotAllowedError < Whatsapp::Session::Errors::GroupParticipantNotAllowed; end
+  class MessageAlreadyProcessingError < Whatsapp::Session::Errors::MessageAlreadyProcessing; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)

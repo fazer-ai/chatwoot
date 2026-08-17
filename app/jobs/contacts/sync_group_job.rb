@@ -7,7 +7,7 @@ class Contacts::SyncGroupJob < ApplicationJob
     return if !force && recently_synced?(contact)
 
     Contacts::SyncGroupService.new(contact: contact, soft: soft).perform
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::ProviderUnavailable => e
     Rails.logger.error "SyncGroupJob failed for contact #{contact.id}: #{e.message}"
   end
 
