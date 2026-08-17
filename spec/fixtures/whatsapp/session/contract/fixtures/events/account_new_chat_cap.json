@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "id": "01920000-0000-7000-8000-000000000042",
+  "type": "account.new_chat_cap",
+  "sid": "9f1c0f4e-6a2b-4c8e-9d1a-2b3c4d5e6f70",
+  "epoch": 7,
+  "seq": 42,
+  "ts": 1755440000123,
+  "inst": "connector-a1b2c3",
+  "payload": {
+    "new_chat_cap": {
+      "capping_status": "ACTIVE",
+      "total_quota": 1000,
+      "used_quota": 137,
+      "cycle_start_timestamp": 1755353600123,
+      "cycle_end_timestamp": 1755526400123
+    }
+  }
+}

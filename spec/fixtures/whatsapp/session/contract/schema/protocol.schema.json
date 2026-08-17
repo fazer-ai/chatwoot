@@ -1,0 +1,991 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fazer.ai/schemas/whatsapp-connector/v1/protocol.schema.json",
+  "title": "fazer.ai WhatsApp session protocol v1",
+  "description": "Canonical wire contract shared by the Go connector (native provider) and the Rails session layer (native + uazapi backends). Frames are validated after decoding: numeric fields are numbers here even though Redis stream fields are transported as strings.",
+  "oneOf": [
+    { "$ref": "#/definitions/event" },
+    { "$ref": "#/definitions/command" },
+    { "$ref": "#/definitions/reply" }
+  ],
+  "definitions": {
+    "protocol_version": { "type": "integer", "const": 1 },
+    "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "digits": { "type": "string", "pattern": "^[0-9]+$" },
+    "message_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+
+    "address": {
+      "type": "object",
+      "description": "A WhatsApp addressable entity. `id` never carries the @server suffix, the device or the agent part.",
+      "properties": {
+        "kind": { "enum": ["phone", "lid", "group", "newsletter", "broadcast", "status"] },
+        "id": { "type": "string", "minLength": 1 }
+      },
+      "required": ["kind", "id"],
+      "additionalProperties": false
+    },
+
+    "party": {
+      "type": "object",
+      "description": "The human/business behind an address. At least one of phone or lid is always present.",
+      "properties": {
+        "phone": { "$ref": "#/definitions/digits" },
+        "lid": { "$ref": "#/definitions/digits" },
+        "push_name": { "type": ["string", "null"] },
+        "verified_name": { "type": ["string", "null"] }
+      },
+      "anyOf": [{ "required": ["phone"] }, { "required": ["lid"] }],
+      "additionalProperties": true
+    },
+
+    "quarantine": {
+      "type": "object",
+      "properties": {
+        "strikes": { "type": "integer", "minimum": 0 },
+        "until": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["strikes"],
+      "additionalProperties": true
+    },
+
+    "ban": {
+      "type": "object",
+      "properties": {
+        "kind": { "enum": ["temporary", "permanent"] },
+        "expires_at": { "$ref": "#/definitions/timestamp_ms" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "required": ["kind"],
+      "additionalProperties": true
+    },
+
+    "connection_state": {
+      "type": "object",
+      "description": "Shape persisted in channel_whatsapp.provider_connection by ConnectionStateWriter.",
+      "properties": {
+        "connection": { "enum": ["close", "connecting", "reconnecting", "open"] },
+        "qr_data_url": { "type": ["string", "null"] },
+        "pairing_code": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"], "description": "i18n key suffix under errors.inboxes.channel.provider_connection" },
+        "epoch": { "type": "integer", "minimum": 0 },
+        "phone_number": { "type": ["string", "null"] },
+        "lid": { "type": ["string", "null"] },
+        "quarantine": { "oneOf": [{ "$ref": "#/definitions/quarantine" }, { "type": "null" }] },
+        "ban": { "oneOf": [{ "$ref": "#/definitions/ban" }, { "type": "null" }] },
+        "reachout_time_lock": { "type": ["object", "null"] },
+        "new_chat_cap": { "type": ["object", "null"] }
+      },
+      "required": ["connection"],
+      "additionalProperties": true
+    },
+
+    "media_ref": {
+      "type": "object",
+      "description": "How to fetch the bytes of an inbound media message. `connector_blob` and `url` are fetched over HTTP; `uazapi_message` needs a /message/download round trip.",
+      "properties": {
+        "kind": { "enum": ["url", "connector_blob", "uazapi_message"] },
+        "id": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"] },
+        "headers": { "type": "object" },
+        "size": { "type": ["integer", "null"], "minimum": 0 },
+        "mime": { "type": ["string", "null"] },
+        "sha256": { "type": ["string", "null"] },
+        "expires_at": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] }
+      },
+      "required": ["kind"],
+      "additionalProperties": true
+    },
+
+    "content_text": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "text" },
+        "body": { "type": "string" }
+      },
+      "required": ["type", "body"],
+      "additionalProperties": true
+    },
+
+    "content_media": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "media" },
+        "kind": { "enum": ["image", "video", "audio", "document", "sticker"] },
+        "mime": { "type": ["string", "null"] },
+        "filename": { "type": ["string", "null"] },
+        "caption": { "type": ["string", "null"] },
+        "voice_note": { "type": "boolean" },
+        "size": { "type": ["integer", "null"], "minimum": 0 },
+        "duration": { "type": ["integer", "null"], "minimum": 0 },
+        "thumbnail": { "type": ["string", "null"], "description": "data: URI, at most 32 KiB" },
+        "ref": { "oneOf": [{ "$ref": "#/definitions/media_ref" }, { "type": "null" }] }
+      },
+      "required": ["type", "kind"],
+      "additionalProperties": true
+    },
+
+    "content_location": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "location" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "name": { "type": ["string", "null"] },
+        "address": { "type": ["string", "null"] },
+        "live": { "type": "boolean" }
+      },
+      "required": ["type", "latitude", "longitude"],
+      "additionalProperties": true
+    },
+
+    "content_contacts": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "contacts" },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "display_name": { "type": ["string", "null"] },
+              "phone": { "type": ["string", "null"] },
+              "vcard": { "type": ["string", "null"] }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": ["type", "contacts"],
+      "additionalProperties": true
+    },
+
+    "content_reaction": {
+      "type": "object",
+      "description": "Outbound only. Inbound reactions arrive as the message.reaction event.",
+      "properties": {
+        "type": { "const": "reaction" },
+        "target_id": { "$ref": "#/definitions/message_id" },
+        "emoji": { "type": "string", "description": "empty string removes the reaction" }
+      },
+      "required": ["type", "target_id", "emoji"],
+      "additionalProperties": true
+    },
+
+    "content_rich": {
+      "type": "object",
+      "description": "Interactive/templated payloads rendered from the raw provider node by Whatsapp::Baileys::RichMessageParser.",
+      "properties": {
+        "type": { "const": "rich" },
+        "kind": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"] },
+        "media": { "oneOf": [{ "$ref": "#/definitions/content_media" }, { "type": "null" }] }
+      },
+      "required": ["type"],
+      "additionalProperties": true
+    },
+
+    "content_unsupported": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "unsupported" },
+        "reason": { "enum": ["unknown_type", "undecryptable", "protocol", "empty"] }
+      },
+      "required": ["type", "reason"],
+      "additionalProperties": true
+    },
+
+    "content": {
+      "oneOf": [
+        { "$ref": "#/definitions/content_text" },
+        { "$ref": "#/definitions/content_media" },
+        { "$ref": "#/definitions/content_location" },
+        { "$ref": "#/definitions/content_contacts" },
+        { "$ref": "#/definitions/content_reaction" },
+        { "$ref": "#/definitions/content_rich" },
+        { "$ref": "#/definitions/content_unsupported" }
+      ]
+    },
+
+    "inbound_message": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/message_id" },
+        "chat": { "$ref": "#/definitions/address" },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "from_me": { "type": "boolean" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" },
+        "content": { "$ref": "#/definitions/content" },
+        "quoted_id": { "type": ["string", "null"] },
+        "mentions": { "type": "array", "items": { "$ref": "#/definitions/address" } },
+        "referral": { "type": ["object", "null"], "description": "Click-to-WhatsApp ad context" },
+        "entry_point": { "type": ["object", "null"] },
+        "client_ref": { "type": ["string", "null"], "description": "echo correlation token for providers that cannot accept a caller-supplied id" },
+        "ephemeral": { "type": ["integer", "null"], "description": "disappearing-message expiration in seconds" },
+        "raw": { "type": ["object", "null"], "description": "provider node, kept for the rich parser and for debugging" }
+      },
+      "required": ["id", "chat", "from_me", "timestamp", "content"],
+      "additionalProperties": true
+    },
+
+    "group_participant": {
+      "type": "object",
+      "properties": {
+        "party": { "$ref": "#/definitions/party" },
+        "role": { "enum": ["member", "admin", "superadmin"] }
+      },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+
+    "group_info": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "subject": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "owner": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "created_at": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
+        "participants": { "type": "array", "items": { "$ref": "#/definitions/group_participant" } },
+        "size": { "type": ["integer", "null"], "minimum": 0 },
+        "announce": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "join_approval": { "type": "boolean" },
+        "member_add_mode": { "enum": ["admin_add", "all_member_add"] },
+        "picture_url": { "type": ["string", "null"] },
+        "invite_code": { "type": ["string", "null"] }
+      },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+
+    "error_code": {
+      "enum": [
+        "invalid_payload", "unsupported", "session_not_found", "not_connected", "not_paired",
+        "owned_elsewhere", "quarantined", "client_outdated", "rate_limited", "expired", "timeout",
+        "media_too_large", "media_unavailable", "recipient_not_on_whatsapp", "group_participant_not_allowed",
+        "wa_error", "internal"
+      ]
+    },
+
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "$ref": "#/definitions/error_code" },
+        "message": { "type": ["string", "null"] },
+        "retryable": { "type": "boolean" }
+      },
+      "required": ["code"],
+      "additionalProperties": true
+    },
+
+    "event_frame": {
+      "type": "object",
+      "description": "One entry of wa:events:<shard>. seq is monotonic per (sid, epoch).",
+      "properties": {
+        "v": { "$ref": "#/definitions/protocol_version" },
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "sid": { "type": "string", "minLength": 1 },
+        "epoch": { "type": "integer", "minimum": 0 },
+        "seq": { "type": "integer", "minimum": 0 },
+        "ts": { "$ref": "#/definitions/timestamp_ms" },
+        "inst": { "type": "string" },
+        "payload": { "type": "object" }
+      },
+      "required": ["v", "id", "type", "sid", "epoch", "seq", "ts", "payload"],
+      "additionalProperties": false
+    },
+
+    "command_frame": {
+      "type": "object",
+      "description": "One entry of wa:cmd:<sid> or wa:control. reply_to is the wa:reply:<id> list an RPC answer is pushed to.",
+      "properties": {
+        "v": { "$ref": "#/definitions/protocol_version" },
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "sid": { "type": "string", "minLength": 1 },
+        "ts": { "$ref": "#/definitions/timestamp_ms" },
+        "reply_to": { "type": ["string", "null"] },
+        "deadline": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
+        "idempotency_key": { "type": ["string", "null"] },
+        "payload": { "type": "object" }
+      },
+      "required": ["v", "id", "type", "sid", "ts", "payload"],
+      "additionalProperties": false
+    },
+
+    "reply": {
+      "type": "object",
+      "description": "Single element pushed to wa:reply:<command_id>.",
+      "properties": {
+        "v": { "$ref": "#/definitions/protocol_version" },
+        "id": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean" },
+        "result": { "type": ["object", "null"] },
+        "error": { "oneOf": [{ "$ref": "#/definitions/error" }, { "type": "null" }] }
+      },
+      "required": ["v", "id", "ok"],
+      "additionalProperties": false
+    },
+
+    "event": {
+      "allOf": [
+        { "$ref": "#/definitions/event_frame" },
+        {
+          "oneOf": [
+            { "properties": { "type": { "const": "session.state" }, "payload": { "$ref": "#/definitions/event_session_state" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.logged_out" }, "payload": { "$ref": "#/definitions/event_session_logged_out" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.stream_replaced" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.temporary_ban" }, "payload": { "$ref": "#/definitions/event_session_temporary_ban" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.client_outdated" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.connect_failure" }, "payload": { "$ref": "#/definitions/event_session_connect_failure" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.qr" }, "payload": { "$ref": "#/definitions/event_pairing_qr" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.code" }, "payload": { "$ref": "#/definitions/event_pairing_code" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.success" }, "payload": { "$ref": "#/definitions/event_pairing_success" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.error" }, "payload": { "$ref": "#/definitions/event_pairing_error" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.passkey_request" }, "payload": { "$ref": "#/definitions/event_pairing_passkey_request" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.passkey_confirmation" }, "payload": { "$ref": "#/definitions/event_pairing_passkey_confirmation" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.received" }, "payload": { "$ref": "#/definitions/event_message_received" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.receipt" }, "payload": { "$ref": "#/definitions/event_message_receipt" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.edited" }, "payload": { "$ref": "#/definitions/event_message_edited" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.revoked" }, "payload": { "$ref": "#/definitions/event_message_revoked" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.reaction" }, "payload": { "$ref": "#/definitions/event_message_reaction" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "media.download_failed" }, "payload": { "$ref": "#/definitions/event_media_download_failed" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "command.failed" }, "payload": { "$ref": "#/definitions/event_command_failed" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "chat.presence" }, "payload": { "$ref": "#/definitions/event_chat_presence" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "presence.update" }, "payload": { "$ref": "#/definitions/event_presence_update" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.picture_changed" }, "payload": { "$ref": "#/definitions/event_contact_picture_changed" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.identity_changed" }, "payload": { "$ref": "#/definitions/event_contact_identity_changed" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.joined" }, "payload": { "$ref": "#/definitions/event_group_joined" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.updated" }, "payload": { "$ref": "#/definitions/event_group_updated" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.picture_changed" }, "payload": { "$ref": "#/definitions/event_group_picture_changed" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.activity" }, "payload": { "$ref": "#/definitions/event_group_activity" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "account.reachout_timelock" }, "payload": { "$ref": "#/definitions/event_account_reachout_timelock" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "account.new_chat_cap" }, "payload": { "$ref": "#/definitions/event_account_new_chat_cap" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.offer" }, "payload": { "$ref": "#/definitions/event_call_offer" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/event_call_terminate" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "history.sync" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "raw" }, "payload": { "$ref": "#/definitions/event_raw" } }, "required": ["type"] }
+          ]
+        }
+      ]
+    },
+
+    "event_session_state": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["close", "connecting", "reconnecting", "open"] },
+        "reason": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "lid": { "type": ["string", "null"] },
+        "quarantine": { "oneOf": [{ "$ref": "#/definitions/quarantine" }, { "type": "null" }] },
+        "ban": { "oneOf": [{ "$ref": "#/definitions/ban" }, { "type": "null" }] }
+      },
+      "required": ["state"],
+      "additionalProperties": true
+    },
+    "event_session_logged_out": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": ["string", "null"] },
+        "on_connect": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "event_session_temporary_ban": {
+      "type": "object",
+      "properties": { "ban": { "$ref": "#/definitions/ban" } },
+      "required": ["ban"],
+      "additionalProperties": true
+    },
+    "event_session_connect_failure": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": ["string", "null"] },
+        "code": { "type": ["string", "integer", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "event_pairing_qr": {
+      "type": "object",
+      "properties": {
+        "png_data_url": { "type": "string", "pattern": "^data:image/png;base64," },
+        "expires_in_ms": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["png_data_url"],
+      "additionalProperties": true
+    },
+    "event_pairing_code": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 4 },
+        "phone": { "$ref": "#/definitions/digits" }
+      },
+      "required": ["code"],
+      "additionalProperties": true
+    },
+    "event_pairing_success": {
+      "type": "object",
+      "properties": {
+        "phone": { "$ref": "#/definitions/digits" },
+        "lid": { "$ref": "#/definitions/digits" },
+        "platform": { "type": ["string", "null"] }
+      },
+      "required": ["phone"],
+      "additionalProperties": true
+    },
+    "event_pairing_error": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string" },
+        "message": { "type": ["string", "null"] }
+      },
+      "required": ["reason"],
+      "additionalProperties": true
+    },
+    "event_pairing_passkey_request": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "public_key": { "type": "object", "description": "WebAuthn PublicKeyCredentialRequestOptions, base64url encoded fields" }
+      },
+      "required": ["request_id", "public_key"],
+      "additionalProperties": true
+    },
+    "event_pairing_passkey_confirmation": {
+      "type": "object",
+      "properties": { "code": { "type": "string" } },
+      "required": ["code"],
+      "additionalProperties": true
+    },
+    "event_message_received": {
+      "type": "object",
+      "properties": { "message": { "$ref": "#/definitions/inbound_message" } },
+      "required": ["message"],
+      "additionalProperties": true
+    },
+    "event_message_receipt": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "message_ids": { "type": "array", "items": { "$ref": "#/definitions/message_id" }, "minItems": 1 },
+        "type": { "enum": ["delivered", "read", "played", "failed"] },
+        "participant": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+        "error": { "oneOf": [{ "$ref": "#/definitions/error" }, { "type": "null" }] },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["chat", "message_ids", "type"],
+      "additionalProperties": true
+    },
+    "event_message_edited": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "from_me": { "type": "boolean" },
+        "content": { "$ref": "#/definitions/content" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["chat", "message_id", "content"],
+      "additionalProperties": true
+    },
+    "event_message_revoked": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "by": { "enum": ["contact", "self"] },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["chat", "message_id", "by"],
+      "additionalProperties": true
+    },
+    "event_message_reaction": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/message_id" },
+        "chat": { "$ref": "#/definitions/address" },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "from_me": { "type": "boolean" },
+        "target_id": { "$ref": "#/definitions/message_id" },
+        "emoji": { "type": "string" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["chat", "target_id", "emoji"],
+      "additionalProperties": true
+    },
+    "event_media_download_failed": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "reason": { "type": "string" }
+      },
+      "required": ["message_id", "reason"],
+      "additionalProperties": true
+    },
+    "event_command_failed": {
+      "type": "object",
+      "properties": {
+        "command_id": { "type": "string" },
+        "command_type": { "type": "string" },
+        "message_id": { "type": ["string", "null"] },
+        "error": { "$ref": "#/definitions/error" }
+      },
+      "required": ["command_type", "error"],
+      "additionalProperties": true
+    },
+    "event_chat_presence": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "state": { "enum": ["composing", "recording", "paused"] }
+      },
+      "required": ["chat", "state"],
+      "additionalProperties": true
+    },
+    "event_presence_update": {
+      "type": "object",
+      "properties": {
+        "party": { "$ref": "#/definitions/party" },
+        "state": { "enum": ["available", "unavailable"] },
+        "last_seen": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] }
+      },
+      "required": ["party", "state"],
+      "additionalProperties": true
+    },
+    "event_contact_picture_changed": {
+      "type": "object",
+      "properties": {
+        "party": { "$ref": "#/definitions/party" },
+        "removed": { "type": "boolean" }
+      },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+    "event_contact_identity_changed": {
+      "type": "object",
+      "properties": {
+        "party": { "$ref": "#/definitions/party" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+    "event_group_joined": {
+      "type": "object",
+      "properties": { "info": { "$ref": "#/definitions/group_info" } },
+      "required": ["info"],
+      "additionalProperties": true
+    },
+    "event_group_updated": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "actor": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" },
+        "changes": {
+          "type": "object",
+          "properties": {
+            "subject": { "type": ["string", "null"] },
+            "description": { "type": ["string", "null"] },
+            "announce": { "type": "boolean" },
+            "locked": { "type": "boolean" },
+            "join_approval": { "type": "boolean" },
+            "member_add_mode": { "enum": ["admin_add", "all_member_add"] },
+            "join": { "type": "array", "items": { "$ref": "#/definitions/party" } },
+            "leave": { "type": "array", "items": { "$ref": "#/definitions/party" } },
+            "promote": { "type": "array", "items": { "$ref": "#/definitions/party" } },
+            "demote": { "type": "array", "items": { "$ref": "#/definitions/party" } }
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["group", "changes"],
+      "additionalProperties": true
+    },
+    "event_group_picture_changed": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "actor": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
+        "removed": { "type": "boolean" }
+      },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+    "event_group_activity": {
+      "type": "object",
+      "description": "Groups with recent traffic; the handler soft-syncs each one instead of doing a full fetch.",
+      "properties": {
+        "groups": { "type": "array", "items": { "$ref": "#/definitions/address" }, "minItems": 1 }
+      },
+      "required": ["groups"],
+      "additionalProperties": true
+    },
+    "event_account_reachout_timelock": {
+      "type": "object",
+      "properties": { "reachout_time_lock": { "type": "object" } },
+      "required": ["reachout_time_lock"],
+      "additionalProperties": true
+    },
+    "event_account_new_chat_cap": {
+      "type": "object",
+      "properties": { "new_chat_cap": { "type": "object" } },
+      "required": ["new_chat_cap"],
+      "additionalProperties": true
+    },
+    "event_call_offer": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" },
+        "from": { "$ref": "#/definitions/party" },
+        "video": { "type": "boolean" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+      },
+      "required": ["call_id", "from"],
+      "additionalProperties": true
+    },
+    "event_call_terminate": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" },
+        "from": { "$ref": "#/definitions/party" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "required": ["call_id"],
+      "additionalProperties": true
+    },
+    "event_raw": {
+      "type": "object",
+      "properties": {
+        "provider_event": { "type": "string" },
+        "data": { "type": ["object", "array", "null"] }
+      },
+      "required": ["provider_event"],
+      "additionalProperties": true
+    },
+
+    "command": {
+      "allOf": [
+        { "$ref": "#/definitions/command_frame" },
+        {
+          "oneOf": [
+            { "properties": { "type": { "const": "session.connect" }, "payload": { "$ref": "#/definitions/command_session_connect" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.disconnect" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.logout" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.delete" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.update" }, "payload": { "$ref": "#/definitions/command_session_update" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.status" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.wake" }, "payload": { "$ref": "#/definitions/command_session_wake" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "admin.ping" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.request_code" }, "payload": { "$ref": "#/definitions/command_pairing_request_code" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.passkey_response" }, "payload": { "$ref": "#/definitions/command_pairing_passkey_response" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "pairing.passkey_confirm" }, "payload": { "$ref": "#/definitions/command_pairing_passkey_confirm" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.send" }, "payload": { "$ref": "#/definitions/command_message_send" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.edit" }, "payload": { "$ref": "#/definitions/command_message_edit" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.revoke" }, "payload": { "$ref": "#/definitions/command_message_revoke" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.react" }, "payload": { "$ref": "#/definitions/command_message_react" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.mark_read" }, "payload": { "$ref": "#/definitions/command_message_mark_read" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.mark_unread" }, "payload": { "$ref": "#/definitions/command_message_mark_unread" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "message.download_media" }, "payload": { "$ref": "#/definitions/command_message_download_media" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "presence.set" }, "payload": { "$ref": "#/definitions/command_presence_set" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "presence.subscribe" }, "payload": { "$ref": "#/definitions/command_presence_subscribe" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "chat.presence" }, "payload": { "$ref": "#/definitions/command_chat_presence" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.check" }, "payload": { "$ref": "#/definitions/command_contact_check" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.profile_picture" }, "payload": { "$ref": "#/definitions/command_contact_profile_picture" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.info" }, "payload": { "$ref": "#/definitions/command_contact_target" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "contact.resolve" }, "payload": { "$ref": "#/definitions/command_contact_target" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.create" }, "payload": { "$ref": "#/definitions/command_group_create" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.info" }, "payload": { "$ref": "#/definitions/command_group_target" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.list" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.leave" }, "payload": { "$ref": "#/definitions/command_group_target" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.participants.update" }, "payload": { "$ref": "#/definitions/command_group_participants_update" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.name.set" }, "payload": { "$ref": "#/definitions/command_group_name_set" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.description.set" }, "payload": { "$ref": "#/definitions/command_group_description_set" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.photo.set" }, "payload": { "$ref": "#/definitions/command_group_photo_set" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.settings.set" }, "payload": { "$ref": "#/definitions/command_group_settings_set" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.invite.get" }, "payload": { "$ref": "#/definitions/command_group_invite_get" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.join_requests.list" }, "payload": { "$ref": "#/definitions/command_group_target" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "group.join_requests.update" }, "payload": { "$ref": "#/definitions/command_group_join_requests_update" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.reject" }, "payload": { "$ref": "#/definitions/command_call_reject" } }, "required": ["type"] }
+          ]
+        }
+      ]
+    },
+
+    "command_session_connect": {
+      "type": "object",
+      "properties": {
+        "pairing": { "enum": ["qr", "code", "resume"] },
+        "phone": { "$ref": "#/definitions/digits" },
+        "device_name": { "type": ["string", "null"] },
+        "proxy": { "type": ["object", "null"], "properties": { "url": { "type": "string" } }, "additionalProperties": true },
+        "groups": { "type": "boolean" },
+        "history_sync": { "type": "boolean" },
+        "calls": { "type": "object", "properties": { "auto_reject": { "type": "boolean" } }, "additionalProperties": true }
+      },
+      "required": ["pairing"],
+      "additionalProperties": true
+    },
+    "command_session_update": {
+      "type": "object",
+      "properties": { "config": { "type": "object" } },
+      "required": ["config"],
+      "additionalProperties": true
+    },
+    "command_session_wake": {
+      "type": "object",
+      "properties": { "desired": { "enum": ["connected", "disconnected"] } },
+      "required": ["desired"],
+      "additionalProperties": true
+    },
+    "command_pairing_request_code": {
+      "type": "object",
+      "properties": { "phone": { "$ref": "#/definitions/digits" } },
+      "required": ["phone"],
+      "additionalProperties": true
+    },
+    "command_pairing_passkey_response": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "credential": { "type": "object" }
+      },
+      "required": ["request_id", "credential"],
+      "additionalProperties": true
+    },
+    "command_pairing_passkey_confirm": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "confirmed": { "type": "boolean" }
+      },
+      "required": ["request_id", "confirmed"],
+      "additionalProperties": true
+    },
+    "command_message_send": {
+      "type": "object",
+      "properties": {
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "to": { "$ref": "#/definitions/address" },
+        "content": { "$ref": "#/definitions/content" },
+        "quoted": {
+          "type": ["object", "null"],
+          "properties": {
+            "id": { "$ref": "#/definitions/message_id" },
+            "participant": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+            "from_me": { "type": "boolean" }
+          },
+          "required": ["id"],
+          "additionalProperties": true
+        },
+        "mentions": { "type": "array", "items": { "$ref": "#/definitions/address" } },
+        "ephemeral": { "type": ["integer", "null"] },
+        "client_ref": { "type": ["string", "null"] }
+      },
+      "required": ["message_id", "to", "content"],
+      "additionalProperties": true
+    },
+    "command_message_edit": {
+      "type": "object",
+      "properties": {
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "target_id": { "$ref": "#/definitions/message_id" },
+        "to": { "$ref": "#/definitions/address" },
+        "content": { "$ref": "#/definitions/content" }
+      },
+      "required": ["target_id", "to", "content"],
+      "additionalProperties": true
+    },
+    "command_message_revoke": {
+      "type": "object",
+      "properties": {
+        "target_id": { "$ref": "#/definitions/message_id" },
+        "to": { "$ref": "#/definitions/address" },
+        "participant": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] }
+      },
+      "required": ["target_id", "to"],
+      "additionalProperties": true
+    },
+    "command_message_react": {
+      "type": "object",
+      "properties": {
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "to": { "$ref": "#/definitions/address" },
+        "target_id": { "$ref": "#/definitions/message_id" },
+        "target_from_me": { "type": "boolean" },
+        "target_participant": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+        "emoji": { "type": "string" }
+      },
+      "required": ["to", "target_id", "emoji"],
+      "additionalProperties": true
+    },
+    "command_message_mark_read": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "message_ids": { "type": "array", "items": { "$ref": "#/definitions/message_id" }, "minItems": 1 },
+        "sender": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+        "type": { "enum": ["read", "played"] }
+      },
+      "required": ["chat", "message_ids"],
+      "additionalProperties": true
+    },
+    "command_message_mark_unread": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "last_message_id": { "type": ["string", "null"] },
+        "from_me": { "type": "boolean" }
+      },
+      "required": ["chat"],
+      "additionalProperties": true
+    },
+    "command_message_download_media": {
+      "type": "object",
+      "properties": {
+        "chat": { "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+        "message_id": { "$ref": "#/definitions/message_id" },
+        "ref": { "oneOf": [{ "$ref": "#/definitions/media_ref" }, { "type": "null" }] }
+      },
+      "required": ["message_id"],
+      "additionalProperties": true
+    },
+    "command_presence_set": {
+      "type": "object",
+      "properties": { "state": { "enum": ["available", "unavailable"] } },
+      "required": ["state"],
+      "additionalProperties": true
+    },
+    "command_presence_subscribe": {
+      "type": "object",
+      "properties": { "party": { "$ref": "#/definitions/address" } },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+    "command_chat_presence": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "state": { "enum": ["composing", "recording", "paused"] }
+      },
+      "required": ["chat", "state"],
+      "additionalProperties": true
+    },
+    "command_contact_check": {
+      "type": "object",
+      "properties": { "phones": { "type": "array", "items": { "$ref": "#/definitions/digits" }, "minItems": 1 } },
+      "required": ["phones"],
+      "additionalProperties": true
+    },
+    "command_contact_profile_picture": {
+      "type": "object",
+      "properties": {
+        "party": { "$ref": "#/definitions/address" },
+        "preview": { "type": "boolean" }
+      },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+    "command_contact_target": {
+      "type": "object",
+      "properties": { "party": { "$ref": "#/definitions/address" } },
+      "required": ["party"],
+      "additionalProperties": true
+    },
+    "command_group_create": {
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string", "minLength": 1 },
+        "participants": { "type": "array", "items": { "$ref": "#/definitions/address" } }
+      },
+      "required": ["subject", "participants"],
+      "additionalProperties": true
+    },
+    "command_group_target": {
+      "type": "object",
+      "properties": { "group": { "$ref": "#/definitions/address" } },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+    "command_group_participants_update": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "participants": { "type": "array", "items": { "$ref": "#/definitions/address" }, "minItems": 1 },
+        "action": { "enum": ["add", "remove", "promote", "demote"] }
+      },
+      "required": ["group", "participants", "action"],
+      "additionalProperties": true
+    },
+    "command_group_name_set": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "subject": { "type": "string" }
+      },
+      "required": ["group", "subject"],
+      "additionalProperties": true
+    },
+    "command_group_description_set": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "description": { "type": ["string", "null"] }
+      },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+    "command_group_photo_set": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "image": { "type": ["string", "null"], "description": "base64 JPEG; null removes the picture" }
+      },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+    "command_group_settings_set": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "setting": { "enum": ["announce", "locked", "join_approval", "member_add_mode"] },
+        "value": { "type": ["boolean", "string"] }
+      },
+      "required": ["group", "setting", "value"],
+      "additionalProperties": true
+    },
+    "command_group_invite_get": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "revoke": { "type": "boolean" }
+      },
+      "required": ["group"],
+      "additionalProperties": true
+    },
+    "command_group_join_requests_update": {
+      "type": "object",
+      "properties": {
+        "group": { "$ref": "#/definitions/address" },
+        "participants": { "type": "array", "items": { "$ref": "#/definitions/address" }, "minItems": 1 },
+        "action": { "enum": ["approve", "reject"] }
+      },
+      "required": ["group", "participants", "action"],
+      "additionalProperties": true
+    },
+    "command_call_reject": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" },
+        "from": { "$ref": "#/definitions/address" }
+      },
+      "required": ["call_id", "from"],
+      "additionalProperties": true
+    }
+  }
+}
