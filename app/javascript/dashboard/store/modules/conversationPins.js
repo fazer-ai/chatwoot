@@ -26,35 +26,65 @@ export const getters = {
   isPinned: $state => conversationId => Boolean($state.records[conversationId]),
 };
 
+// Two hydrations in flight at once have no sound order: the guards below can tell which one committed
+// last, never which one read the newer state, so the older request winning the race would replace a fresh
+// snapshot with a stale one. Running them one at a time removes the question, and the checks inside only
+// have to order a snapshot against the pin events that land under it. Overlapping callers collapse into a
+// single follow-up run, so the last one still gets a read issued after it asked.
+let inFlightHydration = null;
+let followUpRequested = false;
+
+const hydrate = async ({ commit, rootGetters, state: $state }) => {
+  commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
+
+  const accountId = rootGetters.getCurrentAccountId;
+  const revision = $state.revision;
+  // Which conversations the snapshot may not speak for is decided by what changes under it, not by a
+  // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
+  // against a snapshot that could not see its row yet.
+  const appliedAtBefore = { ...$state.appliedAt };
+  // An unpin keeps the version of the pin it removes, so the applied version alone cannot see one land
+  // mid-flight. What the map held has to travel with it.
+  const recordsBefore = { ...$state.records };
+
+  try {
+    const { data } = await ConversationApi.fetchPins();
+    if (rootGetters.getCurrentAccountId !== accountId) return;
+    if ($state.revision !== revision) return;
+
+    commit(types.SET_CONVERSATION_PINS, {
+      pins: data,
+      appliedAtBefore,
+      recordsBefore,
+    });
+  } catch (error) {
+    // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
+  } finally {
+    commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false });
+  }
+};
+
+const hydrateUntilSettled = async context => {
+  await hydrate(context);
+  if (!followUpRequested) return;
+
+  followUpRequested = false;
+  await hydrateUntilSettled(context);
+};
+
 export const actions = {
-  fetch: async ({ commit, rootGetters, state: $state }) => {
-    commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
-
-    const accountId = rootGetters.getCurrentAccountId;
-    const revision = $state.revision;
-    // Which conversations the snapshot may not speak for is decided by what changes under it, not by a
-    // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
-    // against a snapshot that could not see its row yet.
-    const appliedAtBefore = { ...$state.appliedAt };
-    // An unpin keeps the version of the pin it removes, so the applied version alone cannot see one land
-    // mid-flight. What the map held has to travel with it.
-    const recordsBefore = { ...$state.records };
-
-    try {
-      const { data } = await ConversationApi.fetchPins();
-      if (rootGetters.getCurrentAccountId !== accountId) return;
-      if ($state.revision !== revision) return;
-
-      commit(types.SET_CONVERSATION_PINS, {
-        pins: data,
-        appliedAtBefore,
-        recordsBefore,
-      });
-    } catch (error) {
-      // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
-    } finally {
-      commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false });
+  fetch: context => {
+    if (inFlightHydration) {
+      followUpRequested = true;
+      return inFlightHydration;
     }
+
+    inFlightHydration = hydrateUntilSettled(context).finally(() => {
+      inFlightHydration = null;
+      followUpRequested = false;
+    });
+
+    return inFlightHydration;
   },
 
   pin: async ({ commit, rootGetters }, conversationId) => {

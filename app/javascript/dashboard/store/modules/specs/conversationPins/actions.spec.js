@@ -63,6 +63,54 @@ describe('#actions', () => {
       ]);
     });
 
+    it('runs overlapping hydrations one after another, newest read last', async () => {
+      const $state = { revision: 0, appliedAt: {}, records: {} };
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const responses = [
+        [{ conversation_id: 1, pinned_at: 100 }],
+        [{ conversation_id: 2, pinned_at: 200 }],
+      ];
+      axios.get.mockImplementation(async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        return { data: responses.shift() };
+      });
+
+      const first = actions.fetch({ commit, rootGetters, state: $state });
+      const second = actions.fetch({ commit, rootGetters, state: $state });
+      await Promise.all([first, second]);
+
+      expect(maxInFlight).toBe(1);
+      expect(axios.get).toHaveBeenCalledTimes(2);
+      // The second caller asked after the first request was issued, so its own read is the one that lands.
+      const snapshots = commit.mock.calls.filter(
+        ([type]) => type === types.SET_CONVERSATION_PINS
+      );
+      expect(snapshots.at(-1)[1].pins).toEqual([
+        { conversation_id: 2, pinned_at: 200 },
+      ]);
+    });
+
+    it('collapses several overlapping callers into a single follow-up read', async () => {
+      const $state = { revision: 0, appliedAt: {}, records: {} };
+      axios.get.mockImplementation(async () => {
+        await Promise.resolve();
+        return { data: [] };
+      });
+
+      const calls = [
+        actions.fetch({ commit, rootGetters, state: $state }),
+        actions.fetch({ commit, rootGetters, state: $state }),
+        actions.fetch({ commit, rootGetters, state: $state }),
+      ];
+      await Promise.all(calls);
+
+      expect(axios.get).toHaveBeenCalledTimes(2);
+    });
+
     it('discards a snapshot that another hydration already replaced', async () => {
       const $state = { revision: 0, appliedAt: {} };
       axios.get.mockImplementation(() => {
