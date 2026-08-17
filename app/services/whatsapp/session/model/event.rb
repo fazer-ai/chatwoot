@@ -13,6 +13,12 @@ class Whatsapp::Session::Model::Event < Data.define(:type, :payload, :id, :sid, 
     # every Redis stream field is transported as one.
     def from_frame(frame)
       frame = frame.stringify_keys
+      version = frame['v']
+      unless Whatsapp::Session.protocol_compatible?(version)
+        raise Whatsapp::Session::Errors::InvalidEvent, "event frame on protocol #{version.inspect}, this build reads " \
+                                                       "#{Whatsapp::Session::MIN_PROTOCOL_VERSION}..#{Whatsapp::Session::PROTOCOL_VERSION}"
+      end
+
       type = frame['type']
       raise Whatsapp::Session::Errors::InvalidEvent, 'event frame without a type' if type.blank?
 

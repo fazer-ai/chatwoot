@@ -35,6 +35,33 @@ RSpec.describe Whatsapp::Session::Model do
     expect(model::Attachment.new(url: 'https://example.test/a.pdf').kind).to eq('document')
   end
 
+  describe 'protocol version' do
+    def frame(version)
+      { 'v' => version, 'id' => 'evt_1', 'type' => 'session.state', 'sid' => 's',
+        'epoch' => 1, 'seq' => 1, 'ts' => 1_755_440_000_123, 'payload' => { 'state' => 'open' } }
+    end
+
+    it 'reads a frame on a major this build serves' do
+      expect(model::Event.from_frame(frame(Whatsapp::Session::PROTOCOL_VERSION)).type).to eq('session.state')
+      expect(model::Event.from_frame(frame(Whatsapp::Session::PROTOCOL_VERSION.to_s)).type).to eq('session.state')
+    end
+
+    it 'refuses a newer major instead of reading it as this one' do
+      expect { model::Event.from_frame(frame(Whatsapp::Session::PROTOCOL_VERSION + 1)) }
+        .to raise_error(Whatsapp::Session::Errors::InvalidEvent, /protocol/)
+    end
+
+    it 'refuses a frame that carries no version at all' do
+      expect { model::Event.from_frame(frame(nil)) }
+        .to raise_error(Whatsapp::Session::Errors::InvalidEvent, /protocol/)
+    end
+
+    it 'refuses a command frame on another major too' do
+      expect { model::Command.from_frame({ 'v' => 99, 'type' => 'session.status' }) }
+        .to raise_error(Whatsapp::Session::Errors::InvalidPayload, /protocol/)
+    end
+  end
+
   it 'still refuses a value outside the enum, symbol or not' do
     expect { model::ConnectionState.new(connection: :sideways) }
       .to raise_error(Whatsapp::Session::Errors::InvalidPayload)

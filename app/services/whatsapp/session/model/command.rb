@@ -14,6 +14,12 @@ class Whatsapp::Session::Model::Command < Data.define(:type, :payload, :id, :sid
 
     def from_frame(frame)
       frame = frame.stringify_keys
+      version = frame['v']
+      unless Whatsapp::Session.protocol_compatible?(version)
+        raise Whatsapp::Session::Errors::InvalidPayload, "command frame on protocol #{version.inspect}, this build reads " \
+                                                         "#{Whatsapp::Session::MIN_PROTOCOL_VERSION}..#{Whatsapp::Session::PROTOCOL_VERSION}"
+      end
+
       type = frame['type']
       new(
         type: type, payload: Commands.build(type, frame['payload']), id: frame['id'], sid: frame['sid'],
