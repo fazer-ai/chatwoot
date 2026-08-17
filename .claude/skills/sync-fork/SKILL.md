@@ -39,9 +39,33 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 4. Run the **Validation flow** end-to-end (it is mandatory, not optional). Do not commit if any step fails.
 5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
 6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
-7. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+7. Merge the CE sync PR with a **merge commit, never squash** (**Merging the sync PR** section), then verify the upstream tag is an ancestor of `main`.
+8. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
+
+**Before creating the sync branch (CE), check that the last synced upstream tag is still an ancestor of `main`:**
+
+```bash
+git merge-base --is-ancestor <last-synced-tag> main && echo "ancestry ok" || echo "ANCESTRY BROKEN — see below"
+git merge-base main <new-tag> | xargs git log -1 --format='%h %s'   # this is the base the merge will use
+```
+
+If it says BROKEN, a previous sync PR was squashed and the merge you're about to run will base on a much older tag — replaying a whole version's diff and fabricating conflicts on every file the fork touched since. Restore the lost parent on the sync branch first (see **Repairing a squashed sync** below), then merge.
+
+> **Precedent: v4.16.2 (PR #348), already repaired.** That PR was merged with `--squash`, so `v4.16.2` stopped being an ancestor of `main` — the merge base fell back to `00a50dd79c` (`Merge branch 'release/4.16.0'`), 52 commits behind, and GitHub reported `main` as 197 commits behind `chatwoot:develop`. Repaired on 2026-08-17 by commit `590ca10ebf`, which recorded the PR head `2efdd58b30` as a second parent with the recipe below (the squashed commit `0a29032c9f` had a byte-identical tree, so nothing on disk changed). `git rev-list --count main..v4.16.2` is now 0.
+
+### Repairing a squashed sync
+
+```bash
+git checkout -b chore/merge-upstream-X.Y.Z main
+git diff --stat <squashed-pr-head> <squash-commit>   # MUST be empty — proves the tree already contains that sync
+git merge -s ours <squashed-pr-head> -m "chore: restore upstream vA.B.C ancestry (squashed in #NNN)"
+git merge-base --is-ancestor vA.B.C HEAD && echo "link restored"
+git merge vX.Y.Z    # now bases on vA.B.C instead of the stale tag
+```
+
+`-s ours` records the second parent without touching a single file — it does not re-apply anything, it only tells git what the tree already contains. If the `git diff --stat` above is NOT empty, stop: the squash and the branch diverged, and `-s ours` would permanently hide the difference. Resolve that by hand before merging.
 
 After `git merge upstream/develop` (CE) or `git merge main` (Pro), before touching anything:
 
@@ -314,6 +338,29 @@ gh run watch <run-id>                                                           
 ```
 
 For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered the same way against `chatwoot-pro-main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
+
+## Merging the sync PR: merge commit, NEVER squash
+
+This fork's default PR strategy is `--squash`. **Sync PRs are the one exception**, and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
+
+- GitHub shows `main` as "N commits behind chatwoot:develop" forever, and the count only grows with each squashed sync (after the squashed 4.16.2 sync it read 197).
+- The NEXT sync's merge base falls back to the last non-squashed tag, so git replays an entire version's diff and manufactures conflicts on every file the fork changed in between.
+
+```bash
+gh pr merge <n> --merge --admin --repo fazer-ai/chatwoot   # sync PRs ONLY — every other PR stays --squash
+```
+
+Verify the link immediately after merging — this is the check that catches a wrong strategy while it is still cheap to fix:
+
+```bash
+git checkout main && git pull origin main
+git merge-base --is-ancestor vX.Y.Z main && echo "upstream tag is an ancestor: ok"
+git rev-list --count main..vX.Y.Z      # MUST be 0
+```
+
+If it isn't 0, the PR was squashed: repair it right away with the `-s ours` recipe in **Repairing a squashed sync** (using the PR head commit, still reachable via `git fetch origin refs/pull/<n>/head`) rather than leaving it for the next sync.
+
+`git rev-list --count main..upstream/develop` stays non-zero — that's just `develop` moving past the tag we synced, which is expected. What must be zero is the count against the tag we actually merged.
 
 ## Pre-commit pitfalls
 
