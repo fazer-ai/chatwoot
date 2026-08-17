@@ -111,6 +111,27 @@ describe('#actions', () => {
       expect(axios.get).toHaveBeenCalledTimes(2);
     });
 
+    // The moment a caller lands in decides whether the run can still fold it into a follow-up or has to
+    // start a new one, and only one of those microtasks is the settling window. Sweeping the first few
+    // keeps the case covered even if the run's depth changes, which pinning a single count would not.
+    [1, 2, 3, 4].forEach(ticks => {
+      it(`does not lose a fetch dispatched ${ticks} microtask(s) into a running hydration`, async () => {
+        const $state = { revision: 0, appliedAt: {}, records: {} };
+        axios.get.mockResolvedValue({ data: [] });
+
+        const first = actions.fetch({ commit, rootGetters, state: $state });
+        await Array.from({ length: ticks }).reduce(
+          promise => promise.then(() => {}),
+          Promise.resolve()
+        );
+        actions.fetch({ commit, rootGetters, state: $state });
+        await first;
+        await Promise.resolve();
+
+        expect(axios.get).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it('discards a snapshot that another hydration already replaced', async () => {
       const $state = { revision: 0, appliedAt: {} };
       axios.get.mockImplementation(() => {

@@ -66,10 +66,17 @@ const hydrate = async ({ commit, rootGetters, state: $state }) => {
 
 const hydrateUntilSettled = async context => {
   await hydrate(context);
-  if (!followUpRequested) return;
 
-  followUpRequested = false;
-  await hydrateUntilSettled(context);
+  if (followUpRequested) {
+    followUpRequested = false;
+    await hydrateUntilSettled(context);
+    return;
+  }
+
+  // Released here, in the same synchronous block as the check above, rather than from a `.finally` on the
+  // run: between the run resolving and such a callback there is a microtask in which the marker still
+  // reads as busy, so a caller landing there would only raise a flag that nobody reads again.
+  inFlightHydration = null;
 };
 
 export const actions = {
@@ -79,11 +86,7 @@ export const actions = {
       return inFlightHydration;
     }
 
-    inFlightHydration = hydrateUntilSettled(context).finally(() => {
-      inFlightHydration = null;
-      followUpRequested = false;
-    });
-
+    inFlightHydration = hydrateUntilSettled(context);
     return inFlightHydration;
   },
 
