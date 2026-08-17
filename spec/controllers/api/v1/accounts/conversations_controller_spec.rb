@@ -1404,6 +1404,19 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response.parsed_body).to eq([{ 'conversation_id' => conversation.display_id, 'pinned_at' => pin.created_at.to_f }])
       end
 
+      it 'skips a pin whose conversation is already gone' do
+        create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        # `dependent: :destroy_async` leaves the pins behind until the job runs.
+        Conversation.where(id: conversation.id).delete_all
+
+        get "/api/v1/accounts/#{account.id}/conversations/pins",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq([])
+      end
+
       it 'returns an empty list when nothing is pinned' do
         get "/api/v1/accounts/#{account.id}/conversations/pins",
             headers: agent.create_new_auth_token,

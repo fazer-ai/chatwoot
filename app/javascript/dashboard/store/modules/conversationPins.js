@@ -87,10 +87,12 @@ export const mutations = {
     { conversation_id: conversationId, pinned_at: pinnedAt }
   ) {
     const appliedAt = $state.appliedAt[conversationId];
+    // Re-applying the pin currently held is a no-op; anything else at or below the applied version is an
+    // event a newer pin or unpin already superseded.
     const isSupersededPin =
       appliedAt !== undefined &&
       pinnedAt <= appliedAt &&
-      $state.records[conversationId] === undefined;
+      $state.records[conversationId] !== pinnedAt;
     if (isSupersededPin) return;
 
     $state.records = { ...$state.records, [conversationId]: pinnedAt };

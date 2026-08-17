@@ -74,8 +74,15 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   # Pins belong to a User; agent bots never reach these actions, they are not in BOT_ACCESSIBLE_ENDPOINTS.
+  #
+  # Both the per-user limit and the resolved check read state a concurrent request can change before the
+  # insert lands, so they run under a lock on the pinning agent's row, the narrowest scope that still
+  # covers every request able to conflict (pins are per-user). Same shape as AgentBuilder's seat limit.
   def pin
-    pin = @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+    pin = Current.user.with_lock do
+      @conversation.reload
+      @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+    end
     render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
   end
 
@@ -86,8 +93,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
+  # Joined, not just eager loaded: Conversation destroys its pins asynchronously, so between the row going
+  # away and the job running, an orphaned pin would render `nil.display_id`.
   def pins
-    @conversation_pins = current_user_pins.includes(:conversation)
+    @conversation_pins = current_user_pins.joins(:conversation).includes(:conversation)
   end
 
   def transcript

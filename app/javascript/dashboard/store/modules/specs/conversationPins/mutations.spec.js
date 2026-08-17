@@ -82,6 +82,40 @@ describe('#mutations', () => {
       expect(state.records).toEqual({ 1: 200 });
     });
 
+    it('ignores a pin event older than the pin currently held', () => {
+      const state = { records: {}, appliedAt: {} };
+      // pin -> unpin -> re-pin, with the first pin's broadcast arriving last.
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 200,
+      });
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+
+      expect(state.records).toEqual({ 1: 200 });
+      expect(state.appliedAt).toEqual({ 1: 200 });
+    });
+
+    it('does not let a stale unpin remove the pin that replaced it', () => {
+      const state = { records: {}, appliedAt: {} };
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 200,
+      });
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+
+      expect(state.records).toEqual({ 1: 200 });
+    });
+
     it('keeps the versions of unpinned conversations across a hydration', () => {
       const state = { records: {}, appliedAt: {} };
       mutations[types.REMOVE_CONVERSATION_PIN](state, {
