@@ -115,7 +115,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
       candidate_index: import_session_params[:candidate_index].to_i
     )
     head :ok
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError
+  rescue Whatsapp::Session::Errors::ProviderUnavailable
     render json: { error: 'WhatsApp provider is currently unavailable. Please try again.' }, status: :service_unavailable
   end
 

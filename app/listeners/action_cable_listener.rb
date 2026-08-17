@@ -64,10 +64,7 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
     broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
                 inbox_id: inbox.id,
-                provider_connection: connection.merge(
-                  qr_data_url: provider_connection['qr_data_url'],
-                  error: provider_connection['error']
-                )
+                provider_connection: connection.merge(inbox.channel.provider_connection_admin_data(provider_connection))
               })
   end
 
