@@ -576,6 +576,18 @@ describe('ActionCableConnector - Copilot Tests', () => {
       expect(mockDispatch).not.toHaveBeenCalledWith('conversationPins/fetch');
     });
 
+    // The assignment service clears `assignee_id` when a bot takes over, so the backend sees no assignee
+    // even though the payload names the bot.
+    it('refetches when a bot takes over and the role sees unassigned ones', () => {
+      store.$store.getters.getCurrentUser = userWith([
+        'conversation_unassigned_manage',
+      ]);
+
+      actionCable.onReceived(assigneeChanged({ id: 99 }, 'AgentBot'));
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
+    });
+
     it('refetches when the conversation is unassigned and the role sees unassigned ones', () => {
       store.$store.getters.getCurrentUser = userWith([
         'conversation_unassigned_manage',
