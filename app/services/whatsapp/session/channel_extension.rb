@@ -27,15 +27,13 @@ module Whatsapp::Session::ChannelExtension
     session_capabilities.include?('reactions')
   end
 
-  # `error` is stored as an i18n key rather than a sentence, so that a banner reads in the
-  # locale of whoever is looking instead of the one the background job happened to run
-  # under. It is resolved here, which is also why this has to be the only place the
-  # payload is built: the cable push goes through the same method.
+  # Three fields the legacy providers have no equivalent for. They are admin-only for the
+  # same reason the QR is: a pairing code links the WhatsApp account. Built here so the
+  # REST payload and the Action Cable push cannot drift, since both call this.
   def provider_connection_admin_data(connection = provider_connection)
     data = super
     return data unless session_provider?
 
-    data[:error] = translated_provider_connection_error(connection['error']) if connection['error'].present?
     data.merge(connection.slice('pairing_code', 'quarantine', 'ban').compact_blank.symbolize_keys)
   end
 
@@ -61,9 +59,5 @@ module Whatsapp::Session::ChannelExtension
     return super unless session_provider?
 
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16)
-  end
-
-  def translated_provider_connection_error(key)
-    I18n.t("errors.inboxes.channel.provider_connection.#{key}", default: key.to_s.humanize)
   end
 end

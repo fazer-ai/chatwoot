@@ -36,12 +36,23 @@ class Whatsapp::Session::ConnectionStateWriter
 
   def merge(state, persisted)
     payload = state.to_h
+    payload['error'] = translate(payload['error']) if payload['error'].present?
     payload['connection'] ||= persisted['connection']
     payload['epoch'] ||= persisted['epoch']
     STICKY_KEYS.each do |key|
       payload[key] = persisted[key] if payload[key].nil? && persisted[key].present?
     end
     payload.compact
+  end
+
+  # The wire carries an i18n key; what is persisted is the sentence. Resolving here rather
+  # than on read is what keeps the REST payload and the Action Cable push identical: a
+  # broadcast has no single reader whose locale could be used, so translating on read
+  # would hand every administrator the locale of whichever job happened to emit the
+  # event, and the live update would then overwrite a correctly localized REST value with
+  # it. This matches what the Baileys handler has always done.
+  def translate(key)
+    I18n.t("errors.inboxes.channel.provider_connection.#{key}", default: key.to_s.humanize)
   end
 
   # Events without an epoch (Uazapi, which has no ownership model) are always accepted.

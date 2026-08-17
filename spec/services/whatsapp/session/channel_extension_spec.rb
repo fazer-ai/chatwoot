@@ -82,15 +82,25 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     let(:channel) do
       create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
     end
-    let(:connection) do
-      { 'connection' => 'close', 'error' => 'logged_out', 'pairing_code' => 'K7QP-2M4X',
-        'quarantine' => { 'strikes' => 2 }, 'qr_data_url' => nil }
+    let(:state) do
+      Whatsapp::Session::Model::ConnectionState.new(
+        connection: 'close', error: 'logged_out', pairing_code: 'K7QP-2M4X', quarantine: { 'strikes' => 2 }
+      )
     end
 
-    it 'resolves the error key and exposes the pairing details to an administrator' do
-      data = channel.provider_connection_admin_data(connection)
+    # A broadcast has no single reader whose locale could be used, so the key is resolved
+    # once on the way in rather than per read. Anything else hands every administrator the
+    # locale of whichever job emitted the event.
+    it 'stores the error already resolved, not as the key the wire carried' do
+      Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
 
-      expect(data[:error]).to eq(I18n.t('errors.inboxes.channel.provider_connection.logged_out'))
+      expect(channel.reload.provider_connection['error'])
+        .to eq(I18n.t('errors.inboxes.channel.provider_connection.logged_out'))
+    end
+
+    it 'exposes the pairing details to an administrator' do
+      data = channel.provider_connection_admin_data({ 'pairing_code' => 'K7QP-2M4X', 'quarantine' => { 'strikes' => 2 } })
+
       expect(data).to include(pairing_code: 'K7QP-2M4X', quarantine: { 'strikes' => 2 })
     end
 
@@ -98,7 +108,7 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     # separately, so a live update replaced the resolved sentence with the raw key and
     # dropped the pairing details until the next refetch.
     it 'answers the same for the live push as for the inbox payload' do
-      channel.update_provider_connection!(connection)
+      Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
       allow(Current).to receive(:account_user).and_return(create(:account_user, account: account, role: :administrator))
 
       rest = channel.provider_connection_data
@@ -111,8 +121,8 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       baileys = create(:channel_whatsapp, account: account, provider: 'baileys',
                                           validate_provider_config: false, sync_templates: false)
 
-      expect(baileys.provider_connection_admin_data(connection))
-        .to eq({ qr_data_url: nil, error: 'logged_out' })
+      expect(baileys.provider_connection_admin_data({ 'error' => 'Already a sentence', 'pairing_code' => 'ignored' }))
+        .to eq({ qr_data_url: nil, error: 'Already a sentence' })
     end
   end
 
@@ -131,13 +141,15 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     let(:channel) { build_channel('native') }
 
     before do
-      channel.update_provider_connection!(
-        'connection' => 'close', 'error' => 'logged_out', 'pairing_code' => 'K7QP-2M4X',
-        'quarantine' => { 'strikes' => 2 }, 'ban' => { 'kind' => 'temporary' }
+      Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
+        Whatsapp::Session::Model::ConnectionState.new(
+          connection: 'close', error: 'logged_out', pairing_code: 'K7QP-2M4X',
+          quarantine: { 'strikes' => 2 }, ban: { 'kind' => 'temporary' }
+        )
       )
     end
 
-    it 'translates the stored error key for administrators' do
+    it 'exposes the resolved error and the pairing details to administrators' do
       allow(Current).to receive(:account_user).and_return(create(:account_user, account: account, role: :administrator))
 
       data = channel.provider_connection_data

@@ -2,8 +2,9 @@
 # channel_whatsapp.provider_connection by ConnectionStateWriter, keeping the shape the
 # Baileys layer already writes so the dashboard needs no migration.
 #
-# `error` stores an i18n key suffix (resolved under
-# `errors.inboxes.channel.provider_connection`), never a provider message.
+# `error` carries an i18n key suffix on the wire, never a provider message.
+# ConnectionStateWriter resolves it under `errors.inboxes.channel.provider_connection`
+# before persisting, so what the dashboard reads is already a sentence.
 class Whatsapp::Session::Model::ConnectionState < Data.define(
   :connection, :qr_data_url, :pairing_code, :error, :epoch, :phone_number, :lid,
   :quarantine, :ban, :reachout_time_lock, :new_chat_cap
