@@ -4,8 +4,9 @@ name: fazer.ai i18n
 on:
   push:
     branches: [main]
+  # No branch filter: stacked PRs target another feature branch, and filtering
+  # on `main` would let them merge without ever running this gate.
   pull_request:
-    branches: [main]
 
 jobs:
   fork-translations:
