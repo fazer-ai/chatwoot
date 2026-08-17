@@ -146,7 +146,7 @@ Practical checklist for any change impacting core logic or public APIs
 
 Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside `app/javascript/dashboard/i18n/locale/` or `config/locales/<locale>.yml`** — CI fails if you do, and the next upstream sync would conflict on every string we own.
 
-Everything the fork translates lives in two places:
+We ship our features in **en, pt_BR and es**; upstream keeps translating the other ~55 languages, and our keys fall back to `en` there. Everything the fork translates lives in two places:
 
 - Frontend → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
 - Backend → `config/locales/fazer_ai.<locale>.yml` (and `fazer_ai.mailers.<locale>.yml` for the Chatwoot mailer copy upstream hardcodes in ERB)

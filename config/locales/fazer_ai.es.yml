@@ -1,0 +1,101 @@
+# fazer.ai fork translations.
+#
+# Rails deep-merges every config/locales/*.yml, so these keys land on top of
+# upstream's <locale>.yml without touching it. Keys for our own features go
+# here; upstream copy we merely translate does not.
+#
+# Adding a language means adding fazer_ai.<locale>.yml. Nothing else changes.
+es:
+  internal_chat:
+    default_category_name: Canales
+    default_channel_name: General
+    messages:
+      deleted: Este mensaje fue eliminado
+  errors:
+    automation:
+      scheduled_message:
+        delay_out_of_range: El retraso debe estar entre 1 minuto y 999 días
+        content_attachment_or_template_required: El mensaje programado debe tener contenido, un archivo adjunto o una plantilla
+    scheduled_messages:
+      cannot_delete_processed: No se puede eliminar un mensaje programado que ya se envió o que falló
+    conversations:
+      already_assigned: "%{agent_name} ya está atendiendo esta conversación."
+    inboxes:
+      channel:
+        provider_connection:
+          wrong_phone_number: El número de teléfono que intenta vincular no es el mismo que tiene configurado. Verifique que el número sea correcto antes de escanear el código QR.
+          reconnect_loop_detected: No se pudo restablecer la conexión después de varios intentos. Los reintentos automáticos continúan a intervalos cada vez mayores. Si el problema persiste, desconecte la bandeja de entrada y vuelva a vincularla escaneando un código QR nuevo.
+  notifications:
+    notification_title:
+      internal_chat_mention: Le mencionaron en %{name}
+      internal_chat_new_message: Mensaje nuevo de %{name}
+  conversations:
+    activity:
+      group_participants:
+        add:
+          single: "%{author_name} añadió a %{contact_name} al grupo"
+          multiple: "%{author_name} añadió a %{contact_names} y %{last_contact_name} al grupo"
+        join: "%{contact_name} se unió mediante el enlace de invitación del grupo"
+        leave: "%{contact_name} salió del grupo"
+        remove:
+          single: "%{author_name} quitó a %{contact_name} del grupo"
+          multiple: "%{author_name} quitó a %{contact_names} y %{last_contact_name} del grupo"
+        promote:
+          single: "%{author_name} promovió a %{contact_name} a administrador"
+          multiple: "%{author_name} promovió a %{contact_names} y %{last_contact_name} a administradores"
+        demote:
+          single: "%{author_name} degradó a %{contact_name} a miembro"
+          multiple: "%{author_name} degradó a %{contact_names} y %{last_contact_name} a miembros"
+      groups_update:
+        subject_changed: '%{author_name} cambió el nombre del grupo a "%{value}"'
+        description_changed: "%{author_name} cambió la descripción del grupo"
+        description_removed: "%{author_name} eliminó la descripción del grupo"
+        restrict_enabled: "%{author_name} cambió la configuración para que solo los administradores puedan editar la configuración del grupo"
+        restrict_disabled: "%{author_name} cambió la configuración para que todos los miembros puedan editar la configuración del grupo"
+        announce_enabled: "%{author_name} cambió la configuración de este grupo para que solo los administradores puedan enviar mensajes"
+        announce_disabled: "%{author_name} cambió la configuración de este grupo para que todos los miembros puedan enviar mensajes"
+        member_add_mode_enabled: "%{author_name} cambió la configuración de este grupo para que todos los miembros puedan añadir a otras personas"
+        member_add_mode_disabled: "%{author_name} cambió la configuración de este grupo para que solo los administradores puedan añadir a otras personas"
+        join_approval_mode_enabled: "%{author_name} activó la aprobación del administrador para unirse a este grupo"
+        join_approval_mode_disabled: "%{author_name} desactivó la aprobación del administrador para unirse a este grupo"
+        invite_link_reset: "%{author_name} restableció el enlace de invitación de este grupo"
+        membership_request_created: "%{contact_name} quiere unirse al grupo"
+        membership_request_revoked: "%{contact_name} ya no quiere unirse al grupo"
+        icon_changed: "%{author_name} cambió la imagen del grupo"
+      recurring_message_failed: No se pudo enviar el mensaje programado recurrente. La siguiente repetición está programada para %{next_date}.
+      recurring_message_completed: La serie de mensajes programados recurrentes terminó después de %{count} repeticiones.
+      recurring_message_cancelled: "%{agent} detuvo el mensaje programado recurrente."
+      unknown_agent: Desconocido
+  contacts:
+    sync_group:
+      not_a_group: El contacto no es un grupo
+      no_identifier: El contacto no tiene un identificador de grupo
+      no_supported_inbox: No se encontró ninguna bandeja de entrada con soporte de sincronización de grupos para este contacto
+      metadata_unavailable: No se pudieron obtener los metadatos del grupo desde el proveedor
+  recurring_scheduled_messages:
+    description:
+      daily:
+        one: Todos los días
+        other: Cada %{count} días
+      weekly:
+        one: Cada semana
+        other: Cada %{count} semanas
+      weekly_on: "%{prefix} el %{days}"
+      monthly:
+        one: Cada mes
+        other: Cada %{count} meses
+      monthly_on_weekday: "%{prefix} el %{ordinal} %{weekday}"
+      yearly:
+        one: Cada año
+        other: Cada %{count} años
+      until_date: hasta el %{date}
+      after_count:
+        one: "%{count} repetición"
+        other: "%{count} repeticiones"
+      ordinals:
+        first: primer
+        second: segundo
+        third: tercer
+        fourth: cuarto
+        fifth: quinto
+        last: último
