@@ -429,6 +429,10 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.app.$store.dispatch('labels/revalidate', { newKey: keys.label });
     this.app.$store.dispatch('inboxes/revalidate', { newKey: keys.inbox });
     this.app.$store.dispatch('teams/revalidate', { newKey: keys.team });
+    // Same reason as the unread counts below: which pins are visible follows the accessible set, so a
+    // regained role or custom role would otherwise leave a pinned conversation rendering as unpinned until
+    // the next reconnect. Inbox membership does not emit this event, so that path still waits for one.
+    this.app.$store.dispatch('conversationPins/fetch');
 
     if (this.isFilteredUnreadCountsEnabled()) {
       // Inbox/team/label visibility changes can change the accessible set used

@@ -495,5 +495,14 @@ describe('ActionCableConnector - Copilot Tests', () => {
 
       expect(mockDispatch).not.toHaveBeenCalled();
     });
+
+    it('refetches the pins when the account cache is invalidated', () => {
+      actionCable.onReceived({
+        event: 'account.cache_invalidated',
+        data: { account_id: 1, cache_keys: {} },
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith('conversationPins/fetch');
+    });
   });
 });
