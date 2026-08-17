@@ -9,6 +9,12 @@ module Whatsapp::Session::ChannelExtension
     Whatsapp::Session::Registry.session_provider?(provider)
   end
 
+  # True for the legacy session providers too: callers that ask this want "is this a
+  # paired phone" (no messaging window, no templates), not "is this served here".
+  def session_family?
+    Whatsapp::Session::Registry.session_family?(provider)
+  end
+
   # Surfaced on the inbox payload so the dashboard gates features by capability instead
   # of by provider name.
   def session_capabilities

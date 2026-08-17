@@ -107,7 +107,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   end
 
   def recipient_id
-    return message.conversation.contact_inbox.source_id unless %w[baileys zapi].include?(channel.provider)
+    return message.conversation.contact_inbox.source_id unless channel.session_family?
 
     # NOTE: `identifier` must be in the WhatsApp LID format
     message.conversation.contact.phone_number&.gsub(/[^\d]/, '') || message.conversation.contact.identifier

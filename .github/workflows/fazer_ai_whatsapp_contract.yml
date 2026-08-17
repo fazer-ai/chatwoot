@@ -1,0 +1,28 @@
+# The WhatsApp session protocol contract is owned by fazer-ai/whatsapp-connector and
+# vendored under spec/fixtures/whatsapp/session/contract, pinned by CONTRACT_REF. The
+# full spec suite only runs on tags, so this keeps a locally edited contract from
+# reaching main: re-vendor with `rails whatsapp:contract:sync[<ref>]` instead.
+name: WhatsApp session contract
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'spec/fixtures/whatsapp/session/contract/**'
+      - 'lib/whatsapp/session_contract.rb'
+      - 'lib/tasks/whatsapp_session.rake'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      # No database or Redis: the task only reads the vendored files.
+      - name: Verify the vendored contract
+        run: bundle exec rails whatsapp:contract:verify
