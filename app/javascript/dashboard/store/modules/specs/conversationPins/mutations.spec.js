@@ -179,12 +179,31 @@ describe('#mutations', () => {
       expect(state.records).toEqual({});
     });
 
+    it('drops a conversation unpinned mid-flight even though the unpin kept its version', () => {
+      const state = { records: { 1: 500 }, appliedAt: { 1: 500 }, revision: 0 };
+      const appliedAtBefore = { ...state.appliedAt };
+      const recordsBefore = { ...state.records };
+
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 500,
+      });
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [{ conversation_id: 1, pinned_at: 500 }],
+        appliedAtBefore,
+        recordsBefore,
+      });
+
+      expect(state.records).toEqual({});
+    });
+
     it('takes the server value for everything the events did not touch', () => {
       const state = { records: { 1: 500 }, appliedAt: { 1: 500 }, revision: 0 };
 
       mutations[types.SET_CONVERSATION_PINS](state, {
         pins: [{ conversation_id: 2, pinned_at: 700 }],
         appliedAtBefore: { 1: 500 },
+        recordsBefore: { 1: 500 },
       });
 
       expect(state.records).toEqual({ 2: 700 });

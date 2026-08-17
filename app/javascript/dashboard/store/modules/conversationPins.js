@@ -36,13 +36,20 @@ export const actions = {
     // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
     // against a snapshot that could not see its row yet.
     const appliedAtBefore = { ...$state.appliedAt };
+    // An unpin keeps the version of the pin it removes, so the applied version alone cannot see one land
+    // mid-flight. What the map held has to travel with it.
+    const recordsBefore = { ...$state.records };
 
     try {
       const { data } = await ConversationApi.fetchPins();
       if (rootGetters.getCurrentAccountId !== accountId) return;
       if ($state.revision !== revision) return;
 
-      commit(types.SET_CONVERSATION_PINS, { pins: data, appliedAtBefore });
+      commit(types.SET_CONVERSATION_PINS, {
+        pins: data,
+        appliedAtBefore,
+        recordsBefore,
+      });
     } catch (error) {
       // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
     } finally {
@@ -101,7 +108,10 @@ export const mutations = {
     $state.revision += 1;
   },
 
-  [types.SET_CONVERSATION_PINS]($state, { pins, appliedAtBefore = {} }) {
+  [types.SET_CONVERSATION_PINS](
+    $state,
+    { pins, appliedAtBefore = {}, recordsBefore = {} }
+  ) {
     const records = (pins || []).reduce(
       (acc, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
         ...acc,
@@ -113,9 +123,14 @@ export const mutations = {
     // Only the conversations whose state moved while the request was in flight are kept from local state;
     // the server speaks for every other one. Discarding the whole snapshot instead would leave a cold
     // hydration with nothing but the deltas those events carried.
+    // Both halves are needed: an unpin carries the version of the pin it removes, so it moves the map
+    // without moving the version, and a snapshot taken before it would otherwise put the pin back.
     Object.keys($state.appliedAt).forEach(conversationId => {
-      if ($state.appliedAt[conversationId] === appliedAtBefore[conversationId])
-        return;
+      const sameVersion =
+        $state.appliedAt[conversationId] === appliedAtBefore[conversationId];
+      const samePin =
+        $state.records[conversationId] === recordsBefore[conversationId];
+      if (sameVersion && samePin) return;
 
       const local = $state.records[conversationId];
       if (local === undefined) delete records[conversationId];

@@ -20,22 +20,30 @@ describe('#actions', () => {
       await actions.fetch({
         commit,
         rootGetters,
-        state: { revision: 0, appliedAt: {} },
+        state: { revision: 0, appliedAt: {}, records: {} },
       });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
-        [types.SET_CONVERSATION_PINS, { pins: data, appliedAtBefore: {} }],
+        [
+          types.SET_CONVERSATION_PINS,
+          { pins: data, appliedAtBefore: {}, recordsBefore: {} },
+        ],
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
       ]);
     });
 
-    it('hands the mutation the versions it started from, so events under it win', async () => {
-      const $state = { revision: 0, appliedAt: { 1: 100 } };
+    it('hands the mutation the versions and the map it started from, so events under it win', async () => {
+      const $state = {
+        revision: 0,
+        appliedAt: { 1: 100 },
+        records: { 1: 100 },
+      };
       const data = [{ conversation_id: 1, pinned_at: 100 }];
       axios.get.mockImplementation(() => {
-        // An unpin lands while the request is in flight.
-        $state.appliedAt = { 1: 200 };
+        // An unpin lands while the request is in flight. It keeps the pin's own version, so only the map
+        // it left behind tells the mutation that anything moved.
+        $state.records = {};
         return Promise.resolve({ data });
       });
 
@@ -45,7 +53,11 @@ describe('#actions', () => {
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
         [
           types.SET_CONVERSATION_PINS,
-          { pins: data, appliedAtBefore: { 1: 100 } },
+          {
+            pins: data,
+            appliedAtBefore: { 1: 100 },
+            recordsBefore: { 1: 100 },
+          },
         ],
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
       ]);
