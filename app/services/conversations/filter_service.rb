@@ -47,7 +47,7 @@ class Conversations::FilterService < FilterService
   end
 
   def conversations
-    @conversations.sort_on_last_activity_at.page(current_page).per(per_page)
+    @conversations.pinned_first_for(@user).sort_on_last_activity_at.page(current_page).per(per_page)
   end
 
   def per_page

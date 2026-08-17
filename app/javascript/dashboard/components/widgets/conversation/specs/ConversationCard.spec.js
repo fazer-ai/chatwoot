@@ -11,7 +11,7 @@ const defaultChat = {
   created_at: 1700000000,
 };
 
-const mountComponent = (chat, currentContact = {}) =>
+const mountComponent = (chat, currentContact = {}, props = {}) =>
   shallowMount(ConversationCard, {
     props: {
       chat: { ...defaultChat, ...chat },
@@ -22,6 +22,7 @@ const mountComponent = (chat, currentContact = {}) =>
         ...currentContact,
       },
       inbox: { id: 1 },
+      ...props,
     },
     global: {
       stubs: {
@@ -56,5 +57,17 @@ describe('ConversationCard', () => {
     );
 
     expect(wrapper.findComponent({ name: 'CardLabels' }).exists()).toBe(false);
+  });
+
+  it('does not show the pin icon by default', () => {
+    const wrapper = mountComponent({});
+
+    expect(wrapper.findComponent({ name: 'CardPinIcon' }).exists()).toBe(false);
+  });
+
+  it('shows the pin icon when the conversation is pinned', () => {
+    const wrapper = mountComponent({}, {}, { isPinned: true });
+
+    expect(wrapper.findComponent({ name: 'CardPinIcon' }).exists()).toBe(true);
   });
 });

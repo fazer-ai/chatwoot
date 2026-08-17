@@ -52,5 +52,10 @@
     "INTERNAL_CHAT": "Internal Chat",
     "KANBAN": "Kanban",
     "APPS": "Apps"
+  },
+  "KEYBOARD_SHORTCUTS": {
+    "TITLE": {
+      "PIN_CONVERSATION": "Pin / unpin conversation"
+    }
   }
 }

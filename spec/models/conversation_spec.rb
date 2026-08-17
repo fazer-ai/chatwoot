@@ -293,6 +293,27 @@ RSpec.describe Conversation do
     end
   end
 
+  describe 'pins on status change' do
+    let(:account) { create(:account) }
+    let(:conversation) { create(:conversation, status: 'open', account: account) }
+    let(:user) { create(:user, account: account) }
+
+    before { create(:conversation_pin, conversation: conversation, user: user, account: account) }
+
+    it 'removes every pin when the conversation is resolved' do
+      expect { conversation.update!(status: :resolved) }.to change { conversation.conversation_pins.count }.from(1).to(0)
+    end
+
+    it 'keeps the pins when the conversation is snoozed' do
+      expect { conversation.update!(status: :snoozed, snoozed_until: 1.day.from_now) }
+        .not_to(change { conversation.conversation_pins.count })
+    end
+
+    it 'keeps the pins when the conversation is set to pending' do
+      expect { conversation.update!(status: :pending) }.not_to(change { conversation.conversation_pins.count })
+    end
+  end
+
   describe '#update_labels' do
     let(:account) { create(:account) }
     let(:conversation) { create(:conversation, account: account) }

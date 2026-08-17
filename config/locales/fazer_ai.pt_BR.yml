@@ -20,6 +20,8 @@ pt_BR:
       cannot_delete_processed: Não é possível excluir uma mensagem agendada que já foi enviada ou falhou
     conversations:
       already_assigned: "%{agent_name} já está atendendo esta conversa."
+    conversation_pins:
+      limit_reached: Você pode fixar no máximo %{limit} conversas.
     inboxes:
       channel:
         provider_connection:

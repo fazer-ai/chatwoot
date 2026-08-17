@@ -255,6 +255,7 @@ onMounted(() => {
   store.dispatch('customViews/get', 'conversation');
   store.dispatch('customViews/get', 'contact');
   store.dispatch('dashboardApps/get');
+  store.dispatch('conversationPins/fetch');
 });
 
 watch([accountId, hasConversationUnreadCounts], fetchConversationUnreadCounts, {

@@ -10,16 +10,18 @@ module SortHandler
       order(created_at: sort_direction)
     end
 
+    # Columns are table-qualified because these sorts also run on relations that join contacts,
+    # messages or conversation_pins, which carry columns by the same name.
     def sort_on_priority(sort_direction = :desc)
-      order(generate_sql_query("priority #{sort_direction.to_s.upcase} NULLS LAST, last_activity_at DESC"))
+      order(generate_sql_query("priority #{sort_direction.to_s.upcase} NULLS LAST, #{table_name}.last_activity_at DESC"))
     end
 
     def sort_on_priority_created_at(sort_direction = :desc)
-      order(generate_sql_query("priority #{sort_direction.to_s.upcase} NULLS LAST, created_at ASC"))
+      order(generate_sql_query("priority #{sort_direction.to_s.upcase} NULLS LAST, #{table_name}.created_at ASC"))
     end
 
     def sort_on_waiting_since(sort_direction = :asc)
-      order(generate_sql_query("(waiting_since IS NULL), waiting_since #{sort_direction.to_s.upcase}, created_at ASC"))
+      order(generate_sql_query("(waiting_since IS NULL), waiting_since #{sort_direction.to_s.upcase}, #{table_name}.created_at ASC"))
     end
 
     def last_messaged_conversations

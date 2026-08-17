@@ -299,7 +299,29 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     broadcast(account, [user.pubsub_token], CONVERSATION_MENTIONED, conversation.push_event_data)
   end
 
+  def conversation_pinned(event)
+    broadcast_conversation_pin(event, CONVERSATION_PINNED)
+  end
+
+  def conversation_unpinned(event)
+    broadcast_conversation_pin(event, CONVERSATION_UNPINNED)
+  end
+
   private
+
+  # Pins are personal, so the event only reaches the sessions of the agent who pinned the conversation.
+  def broadcast_conversation_pin(event, event_name)
+    pin_data = event.data[:conversation_pin]
+
+    user = User.find_by(id: pin_data[:user_id])
+    account = Account.find_by(id: pin_data[:account_id])
+    return if user.blank? || account.blank?
+
+    broadcast(account, [user.pubsub_token], event_name, {
+                conversation_id: pin_data[:conversation_id],
+                pinned_at: pin_data[:pinned_at]
+              })
+  end
 
   def account_token(account)
     "account_#{account.id}"

@@ -1,7 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { applyRoleFilter } from '../helpers';
+import { applyRoleFilter, sortComparator } from '../helpers';
 
 describe('Conversation Helpers', () => {
+  describe('#sortComparator', () => {
+    const older = { id: 1, last_activity_at: 1000 };
+    const newer = { id: 2, last_activity_at: 2000 };
+
+    it('keeps the requested sort when nothing is pinned', () => {
+      expect(
+        sortComparator(older, newer, 'last_activity_at_desc')
+      ).toBeGreaterThan(0);
+    });
+
+    it('puts a pinned conversation before an unpinned one', () => {
+      expect(
+        sortComparator(older, newer, 'last_activity_at_desc', { 1: 500 })
+      ).toBeLessThan(0);
+    });
+
+    it('puts an unpinned conversation after a pinned one', () => {
+      expect(
+        sortComparator(newer, older, 'last_activity_at_desc', { 1: 500 })
+      ).toBeGreaterThan(0);
+    });
+
+    it('sorts two pinned conversations by the most recent pin', () => {
+      expect(
+        sortComparator(older, newer, 'last_activity_at_desc', {
+          1: 500,
+          2: 900,
+        })
+      ).toBeGreaterThan(0);
+    });
+  });
+
   describe('#applyRoleFilter', () => {
     // Test data for conversations
     const conversationWithAssignee = {

@@ -5,6 +5,7 @@ import CardAvatar from './CardAvatar.vue';
 import CardContent from './CardContent.vue';
 import CardLabels from './CardLabelsV5.vue';
 import CardPriorityIcon from './CardPriorityIcon.vue';
+import CardPinIcon from './CardPinIcon.vue';
 import InboxName from 'dashboard/components-next/Conversation/InboxName.vue';
 import Avatar from 'next/avatar/Avatar.vue';
 import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
@@ -23,6 +24,7 @@ const props = defineProps({
   showAssignee: { type: Boolean, default: false },
   showInboxName: { type: Boolean, default: false },
   isInboxView: { type: Boolean, default: false },
+  isPinned: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -92,6 +94,10 @@ const selectedModel = computed({
 
       <div class="w-4 flex items-center justify-center flex-shrink-0">
         <CardPriorityIcon :priority="chat.priority" show-empty />
+      </div>
+
+      <div class="w-4 flex items-center justify-center flex-shrink-0">
+        <CardPinIcon v-if="isPinned" />
       </div>
 
       <div class="w-4 flex items-center justify-center flex-shrink-0">

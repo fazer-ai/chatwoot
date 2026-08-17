@@ -3,7 +3,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include DateRangeHelper
   include HmacConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk]
+  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -71,6 +71,21 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def unmute
     @conversation.unmute!
     head :ok
+  end
+
+  # Pins belong to a User; agent bots never reach these actions, they are not in BOT_ACCESSIBLE_ENDPOINTS.
+  def pin
+    pin = @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+    render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
+  end
+
+  def unpin
+    @conversation.conversation_pins.where(user: Current.user).destroy_all
+    head :ok
+  end
+
+  def pins
+    @conversation_pins = Current.user.conversation_pins.where(account_id: Current.account.id).includes(:conversation)
   end
 
   def transcript

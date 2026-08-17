@@ -20,6 +20,8 @@ en:
       cannot_delete_processed: Cannot delete a scheduled message that has already been sent or failed
     conversations:
       already_assigned: "%{agent_name} is already handling this conversation."
+    conversation_pins:
+      limit_reached: You can pin up to %{limit} conversations.
     inboxes:
       channel:
         provider_connection:

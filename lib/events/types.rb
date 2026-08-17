@@ -37,6 +37,8 @@ module Events::Types
   CONVERSATION_TYPING_OFF = 'conversation.typing_off'
   CONVERSATION_MENTIONED = 'conversation.mentioned'
   CONVERSATION_UNREAD = 'conversation.unread'
+  CONVERSATION_PINNED = 'conversation.pinned'
+  CONVERSATION_UNPINNED = 'conversation.unpinned'
 
   # message events
   MESSAGE_CREATED = 'message.created'

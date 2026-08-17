@@ -222,6 +222,9 @@ class ConversationFinder # rubocop:disable Metrics/ClassLength
 
   def conversations
     @conversations = conversations_base_query
+    # Pinned conversations lead the list regardless of the sort the agent picked, since every sort_on_* scope
+    # only appends to the ORDER BY.
+    @conversations = @conversations.pinned_first_for(current_user)
 
     sort_by, sort_order = SORT_OPTIONS[params[:sort_by]] || SORT_OPTIONS['last_activity_at_desc']
     @conversations = @conversations.send(sort_by, sort_order)

@@ -181,6 +181,67 @@ describe ActionCableListener do
     end
   end
 
+  describe '#conversation_pinned' do
+    let(:pinned_at) { Time.zone.now.to_f }
+    let(:pin_data) do
+      {
+        account_id: account.id,
+        user_id: agent.id,
+        conversation_id: conversation.display_id,
+        pinned_at: pinned_at
+      }
+    end
+    let!(:event) { Events::Base.new(:'conversation.pinned', Time.zone.now, conversation_pin: pin_data) }
+
+    it 'sends the message only to the agent who pinned the conversation' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'conversation.pinned',
+        {
+          account_id: account.id,
+          conversation_id: conversation.display_id,
+          pinned_at: pinned_at
+        }
+      )
+
+      listener.conversation_pinned(event)
+    end
+
+    it 'does not broadcast when the user is gone' do
+      event = Events::Base.new(:'conversation.pinned', Time.zone.now, conversation_pin: pin_data.merge(user_id: 0))
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.conversation_pinned(event)
+    end
+  end
+
+  describe '#conversation_unpinned' do
+    let(:pin_data) do
+      {
+        account_id: account.id,
+        user_id: agent.id,
+        conversation_id: conversation.display_id,
+        pinned_at: Time.zone.now.to_f
+      }
+    end
+    let!(:event) { Events::Base.new(:'conversation.unpinned', Time.zone.now, conversation_pin: pin_data) }
+
+    it 'sends the message only to the agent who unpinned the conversation' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'conversation.unpinned',
+        {
+          account_id: account.id,
+          conversation_id: conversation.display_id,
+          pinned_at: pin_data[:pinned_at]
+        }
+      )
+
+      listener.conversation_unpinned(event)
+    end
+  end
+
   describe '#notification_deleted' do
     let(:event_name) { :'notification.deleted' }
     let!(:notification) { create(:notification, account: account, user: agent) }

@@ -37,6 +37,8 @@ import {
   SEND_TRANSCRIPT_ACTION,
   UNMUTE_ACTION,
   MUTE_ACTION,
+  PIN_ACTION,
+  UNPIN_ACTION,
 } from 'dashboard/helper/commandbar/actions';
 import {
   isAConversationRoute,
@@ -153,6 +155,7 @@ export function useConversationHotKeys() {
   const currentChat = useMapGetter('getSelectedChat');
   const replyMode = useMapGetter('draftMessages/getReplyEditorMode');
   const contextMenuChatId = useMapGetter('getContextMenuChatId');
+  const isPinned = useMapGetter('conversationPins/isPinned');
   const teams = useMapGetter('teams/getTeams');
   const getDraftMessage = useMapGetter('draftMessages/get');
 
@@ -340,6 +343,7 @@ export function useConversationHotKeys() {
     return prepareActions(
       [
         currentChat.value.muted ? UNMUTE_ACTION : MUTE_ACTION,
+        isPinned.value(currentChat.value.id) ? UNPIN_ACTION : PIN_ACTION,
         SEND_TRANSCRIPT_ACTION,
       ],
       t

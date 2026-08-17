@@ -418,6 +418,28 @@ describe('#getters', () => {
     });
   });
 
+  describe('#getAllConversations with pinned conversations', () => {
+    it('puts pinned conversations first, most recently pinned on top', () => {
+      const state = {
+        allConversations: [...conversations],
+        chatSortFilter: 'last_activity_at_desc',
+      };
+      const rootGetters = {
+        'conversationPins/getRecords': {
+          [conversations[0].id]: 100,
+          [conversations[3].id]: 200,
+        },
+      };
+
+      expect(getters.getAllConversations(state, {}, {}, rootGetters)).toEqual([
+        conversations[3],
+        conversations[0],
+        conversations[1],
+        conversations[2],
+      ]);
+    });
+  });
+
   describe('#getFilteredConversations', () => {
     const mockConversations = [
       {
@@ -474,6 +496,36 @@ describe('#getters', () => {
         mockConversations[2],
         mockConversations[1],
         mockConversations[0],
+      ]);
+    });
+
+    it('puts pinned conversations first', () => {
+      const state = {
+        allConversations: mockConversations,
+        chatSortFilter: 'last_activity_at_desc',
+        appliedFilters: [],
+      };
+
+      const rootGetters = {
+        ...mockRootGetters,
+        getCurrentUser: {
+          ...mockRootGetters.getCurrentUser,
+          accounts: [{ id: 1, role: 'administrator', permissions: [] }],
+        },
+        'conversationPins/getRecords': { [mockConversations[0].id]: 100 },
+      };
+
+      const result = getters.getFilteredConversations(
+        state,
+        {},
+        {},
+        rootGetters
+      );
+
+      expect(result).toEqual([
+        mockConversations[0],
+        mockConversations[2],
+        mockConversations[1],
       ]);
     });
 

@@ -241,6 +241,81 @@ describe ConversationFinder do
       end
     end
 
+    context 'with pinned conversations' do
+      let(:params) { { status: 'all', assignee_type: 'all' } }
+      let(:pinned_conversation) { inbox.conversations.order(:created_at).first }
+
+      before do
+        # Oldest conversation gets the oldest activity, so without a pin it always sorts last.
+        conversations = inbox.conversations.order(:created_at).to_a
+        conversations.each_with_index do |conversation, index|
+          conversation.update_columns(last_activity_at: (conversations.length - index).minutes.ago) # rubocop:disable Rails/SkipsModelValidations
+        end
+        create(:conversation_pin, conversation: pinned_conversation, user: user_1, account: account)
+      end
+
+      it 'puts the pinned conversation first for the agent who pinned it' do
+        result = described_class.new(user_1, params).perform
+
+        expect(result[:conversations].first.id).to eq(pinned_conversation.id)
+      end
+
+      it 'keeps the default order for every other agent' do
+        result = described_class.new(user_2, params).perform
+
+        expect(result[:conversations].last.id).to eq(pinned_conversation.id)
+      end
+
+      it 'combines with the search and source_id filters, which select distinct rows' do
+        described_class::SORT_OPTIONS.each_key do |sort_by|
+          expect { described_class.new(user_1, params.merge(q: 'hello', sort_by: sort_by)).perform[:conversations].to_a }
+            .not_to raise_error, "failed for q with sort_by=#{sort_by}"
+          expect do
+            described_class.new(user_1, params.merge(source_id: 'testing_source_id', sort_by: sort_by)).perform[:conversations].to_a
+          end.not_to raise_error, "failed for source_id with sort_by=#{sort_by}"
+        end
+      end
+
+      it 'puts the pinned conversation first on every sort option' do
+        described_class::SORT_OPTIONS.each_key do |sort_by|
+          result = described_class.new(user_1, params.merge(sort_by: sort_by)).perform
+
+          expect(result[:conversations].first.id).to eq(pinned_conversation.id), "failed for sort_by=#{sort_by}"
+        end
+      end
+
+      it 'puts the most recently pinned conversation on top' do
+        latest_pinned = inbox.conversations.order(:created_at).last
+        create(:conversation_pin, conversation: latest_pinned, user: user_1, account: account)
+
+        result = described_class.new(user_1, params).perform
+
+        expect(result[:conversations].map(&:id).first(2)).to eq([latest_pinned.id, pinned_conversation.id])
+      end
+
+      it 'does not change the conversation counts' do
+        counts_with_pin = described_class.new(user_1, params).perform[:count]
+        ConversationPin.destroy_all
+
+        expect(described_class.new(user_1, params).perform[:count]).to eq(counts_with_pin)
+      end
+
+      it 'filters conversations by labels' do
+        pinned_conversation.update_labels('resolved')
+
+        result = described_class.new(user_1, params.merge(labels: ['resolved'])).perform
+
+        expect(result[:conversations].map(&:id)).to eq([pinned_conversation.id])
+      end
+
+      it 'returns all conversations in range with updated_within' do
+        result = described_class.new(user_1, params.merge(updated_within: 3600)).perform
+
+        expect(result[:conversations].first.id).to eq(pinned_conversation.id)
+        expect(result[:conversations].length).to eq(inbox.conversations.count)
+      end
+    end
+
     context 'with pagination' do
       let(:params) { { status: 'open', assignee_type: 'me', page: 1 } }
 
