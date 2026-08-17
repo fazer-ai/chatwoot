@@ -2,3 +2,4 @@ app/javascript/dashboard/store/modules/conversationPins.js: Reset offset paginat
 app/javascript/dashboard/store/modules/conversationPins.js: Prevent delayed pin events from surviving a newer snapshot  # PR#366
 app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when a remote pin arrives  # PR#366
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
+app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
