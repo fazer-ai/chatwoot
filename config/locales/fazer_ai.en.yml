@@ -26,9 +26,20 @@ en:
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
     inboxes:
       channel:
+        provider_unavailable: This WhatsApp provider is not available on this installation yet.
+        invalid_provider_config: 'Invalid configuration for: %{keys}'
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.
+          invalid_credentials: The provider rejected the credentials for this inbox. Check the address and the token and try again.
+          logged_out: This device was disconnected from WhatsApp on the phone. Pair it again to keep receiving messages.
+          stream_replaced: This session was replaced by another connection to the same WhatsApp account. Pair it again to use it here.
+          temporary_ban: WhatsApp temporarily blocked this number. Wait until the block expires before pairing again.
+          client_outdated: The WhatsApp connector is out of date and can no longer connect. Update it to restore the connection.
+          quarantined: Too many failed reconnection attempts in a row. New attempts continue at increasing intervals.
+          connector_unavailable: The WhatsApp connector is not responding. Messages will only be sent again once it is back.
+          connector_incompatible: The WhatsApp connector version is incompatible with this Chatwoot version. Update the connector.
+          connect_failure: WhatsApp refused the connection. New attempts continue automatically.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}

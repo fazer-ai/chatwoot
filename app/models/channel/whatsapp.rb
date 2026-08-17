@@ -21,19 +21,22 @@
 #
 #  index_channel_whatsapp_on_phone_number                    (phone_number) UNIQUE
 #  index_channel_whatsapp_on_phone_number_health_checked_at  (phone_number_health_checked_at)
-#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text])) USING gin
+#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[])) USING gin
 #
 # rubocop:enable Layout/LineLength
 
 class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Channelable
   include Reauthorizable
+  # Session providers (native, uazapi) answer through this module; every override falls
+  # back to `super` for the cloud and legacy providers.
+  prepend Whatsapp::Session::ChannelExtension
 
   self.table_name = 'channel_whatsapp'
   EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
 
   # default at the moment is 360dialog lets change later.
-  PROVIDERS = %w[default whatsapp_cloud baileys zapi].freeze
+  PROVIDERS = (%w[default whatsapp_cloud baileys zapi] + Whatsapp::Session::PROVIDERS).freeze
   REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi].freeze
   # UI-relevant subset of the baileys new-chat message cap payload that we persist in
   # provider_connection. server_sent_timestamp is intentionally dropped (it changes on every

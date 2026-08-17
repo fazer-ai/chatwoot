@@ -26,9 +26,20 @@ es:
       conversation_not_visible: Esta conversación no está en su lista, así que no se puede fijar.
     inboxes:
       channel:
+        provider_unavailable: Este proveedor de WhatsApp aún no está disponible en esta instalación.
+        invalid_provider_config: 'Configuración inválida en: %{keys}'
         provider_connection:
           wrong_phone_number: El número de teléfono que intenta vincular no es el mismo que tiene configurado. Verifique que el número sea correcto antes de escanear el código QR.
           reconnect_loop_detected: No se pudo restablecer la conexión después de varios intentos. Los reintentos automáticos continúan a intervalos cada vez mayores. Si el problema persiste, desconecte la bandeja de entrada y vuelva a vincularla escaneando un código QR nuevo.
+          invalid_credentials: El proveedor rechazó las credenciales de esta bandeja de entrada. Verifique la dirección y el token e inténtelo de nuevo.
+          logged_out: Este dispositivo fue desconectado de WhatsApp desde el teléfono. Vuelva a vincularlo para seguir recibiendo mensajes.
+          stream_replaced: Esta sesión fue reemplazada por otra conexión de la misma cuenta de WhatsApp. Vuelva a vincularla para usarla aquí.
+          temporary_ban: WhatsApp bloqueó temporalmente este número. Espere a que termine el bloqueo antes de volver a vincularlo.
+          client_outdated: El conector de WhatsApp está desactualizado y ya no puede conectarse. Actualícelo para restablecer la conexión.
+          quarantined: Demasiados intentos de reconexión fallidos seguidos. Los nuevos intentos continúan a intervalos cada vez mayores.
+          connector_unavailable: El conector de WhatsApp no responde. Los mensajes volverán a enviarse cuando esté disponible.
+          connector_incompatible: La versión del conector de WhatsApp es incompatible con esta versión de Chatwoot. Actualice el conector.
+          connect_failure: WhatsApp rechazó la conexión. Los nuevos intentos continúan automáticamente.
   notifications:
     notification_title:
       internal_chat_mention: Le mencionaron en %{name}
