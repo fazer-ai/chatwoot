@@ -78,6 +78,44 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  describe 'connection payload' do
+    let(:channel) do
+      create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
+    end
+    let(:connection) do
+      { 'connection' => 'close', 'error' => 'logged_out', 'pairing_code' => 'K7QP-2M4X',
+        'quarantine' => { 'strikes' => 2 }, 'qr_data_url' => nil }
+    end
+
+    it 'resolves the error key and exposes the pairing details to an administrator' do
+      data = channel.provider_connection_admin_data(connection)
+
+      expect(data[:error]).to eq(I18n.t('errors.inboxes.channel.provider_connection.logged_out'))
+      expect(data).to include(pairing_code: 'K7QP-2M4X', quarantine: { 'strikes' => 2 })
+    end
+
+    # The REST serializer and the Action Cable push used to build this payload
+    # separately, so a live update replaced the resolved sentence with the raw key and
+    # dropped the pairing details until the next refetch.
+    it 'answers the same for the live push as for the inbox payload' do
+      channel.update_provider_connection!(connection)
+      allow(Current).to receive(:account_user).and_return(create(:account_user, account: account, role: :administrator))
+
+      rest = channel.provider_connection_data
+      push = channel.provider_connection_admin_data(channel.provider_connection)
+
+      expect(push).to eq(rest.slice(*push.keys))
+    end
+
+    it 'leaves the legacy providers presenting exactly what they did' do
+      baileys = create(:channel_whatsapp, account: account, provider: 'baileys',
+                                          validate_provider_config: false, sync_templates: false)
+
+      expect(baileys.provider_connection_admin_data(connection))
+        .to eq({ qr_data_url: nil, error: 'logged_out' })
+    end
+  end
+
   describe 'webhook secret' do
     it 'generates one for a session provider, which is what authenticates its callback' do
       expect(build_channel('uazapi').provider_config['webhook_verify_token']).to be_present

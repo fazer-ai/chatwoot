@@ -14,8 +14,12 @@ module Whatsapp::Session::Registry
       key: 'native',
       backend: 'Whatsapp::Session::Backends::Connector::Backend',
       pairing_modes: %w[qr code],
+      # No session_import: that is the Baileys credential import, which whatsmeow cannot
+      # consume, and there is no such command in the contract. Its replacement for the
+      # same problem (pairing without a QR the operator can scan) is the passkey relay,
+      # which rides on the pairing commands.
       capabilities: %w[
-        qr_pairing code_pairing session_import echo_by_reserved_id edit revoke reactions typing presence
+        qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
         presence_subscribe read_receipts mark_unread check_number profile_picture groups group_admin
         group_invites group_join_requests account_limits media_download
       ],

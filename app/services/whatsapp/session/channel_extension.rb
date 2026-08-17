@@ -27,12 +27,16 @@ module Whatsapp::Session::ChannelExtension
     session_capabilities.include?('reactions')
   end
 
-  def provider_connection_data
+  # `error` is stored as an i18n key rather than a sentence, so that a banner reads in the
+  # locale of whoever is looking instead of the one the background job happened to run
+  # under. It is resolved here, which is also why this has to be the only place the
+  # payload is built: the cable push goes through the same method.
+  def provider_connection_admin_data(connection = provider_connection)
     data = super
-    return data unless session_provider? && administrator?
+    return data unless session_provider?
 
-    data[:error] = translated_provider_connection_error if provider_connection['error'].present?
-    data.merge(provider_connection.slice('pairing_code', 'quarantine', 'ban').compact_blank.symbolize_keys)
+    data[:error] = translated_provider_connection_error(connection['error']) if connection['error'].present?
+    data.merge(connection.slice('pairing_code', 'quarantine', 'ban').compact_blank.symbolize_keys)
   end
 
   private
@@ -59,12 +63,7 @@ module Whatsapp::Session::ChannelExtension
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16)
   end
 
-  def translated_provider_connection_error
-    key = provider_connection['error']
+  def translated_provider_connection_error(key)
     I18n.t("errors.inboxes.channel.provider_connection.#{key}", default: key.to_s.humanize)
-  end
-
-  def administrator?
-    Current.account_user&.administrator?
   end
 end
