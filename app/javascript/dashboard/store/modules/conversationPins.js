@@ -94,6 +94,9 @@ export const mutations = {
     // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
     // event that was already superseded.
     $state.appliedAt = { ...$state.appliedAt, ...$state.records };
+    // Bumped like any other change, so two hydrations racing each other cannot end with the older response
+    // overwriting the newer one: the loser sees the revision move and retries.
+    $state.revision += 1;
   },
 
   [types.SET_CONVERSATION_PIN](

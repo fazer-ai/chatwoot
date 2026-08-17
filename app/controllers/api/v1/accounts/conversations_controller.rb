@@ -89,10 +89,13 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
   end
 
-  # Looked up through the pin rather than the conversation: an agent who lost access to an inbox still has
-  # to be able to free the slot their pin is holding.
+  # Looked up through the pin rather than the conversation, and deliberately not through `current_user_pins`:
+  # removing your own pin never depends on still being able to see the conversation.
   def unpin
-    current_user_pins.joins(:conversation).where(conversations: { display_id: params[:id] }).destroy_all
+    Current.user.conversation_pins
+           .where(account_id: Current.account.id)
+           .joins(:conversation).where(conversations: { display_id: params[:id] })
+           .destroy_all
     head :ok
   end
 
@@ -253,7 +256,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def current_user_pins
-    Current.user.conversation_pins.where(account_id: Current.account.id)
+    ConversationPin.visible_to(Current.user, Current.account)
   end
 
   def inbox

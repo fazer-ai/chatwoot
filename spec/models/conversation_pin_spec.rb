@@ -70,16 +70,19 @@ RSpec.describe ConversationPin do
 
   describe 'pin limit' do
     let(:account) { create(:account) }
-    let(:user) { create(:user, account: account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:user) { create(:user, account: account, role: :agent) }
 
     before do
+      create(:inbox_member, user: user, inbox: inbox)
       described_class::MAX_PER_USER.times do
-        create(:conversation_pin, conversation: create(:conversation, account: account), user: user, account: account)
+        conversation = create(:conversation, account: account, inbox: inbox)
+        create(:conversation_pin, conversation: conversation, user: user, account: account)
       end
     end
 
     it 'rejects a pin beyond the limit' do
-      extra = build(:conversation_pin, conversation: create(:conversation, account: account), user: user, account: account)
+      extra = build(:conversation_pin, conversation: create(:conversation, account: account, inbox: inbox), user: user, account: account)
 
       expect(extra).not_to be_valid
       expect(extra.errors.full_messages).to eq(["You can pin up to #{described_class::MAX_PER_USER} conversations."])
@@ -87,52 +90,85 @@ RSpec.describe ConversationPin do
 
     it 'counts the limit per account' do
       other_account = create(:account)
-      create(:account_user, account: other_account, user: user)
-      conversation = create(:conversation, account: other_account)
+      other_inbox = create(:inbox, account: other_account)
+      create(:account_user, account: other_account, user: user, role: :agent)
+      create(:inbox_member, user: user, inbox: other_inbox)
+      conversation = create(:conversation, account: other_account, inbox: other_inbox)
 
       expect(build(:conversation_pin, conversation: conversation, user: user, account: other_account)).to be_valid
     end
 
     it 'counts the limit per user' do
-      other_user = create(:user, account: account)
-      conversation = create(:conversation, account: account)
+      other_user = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: other_user, inbox: inbox)
+      conversation = create(:conversation, account: account, inbox: inbox)
 
       expect(build(:conversation_pin, conversation: conversation, user: other_user, account: account)).to be_valid
     end
 
     it 'frees a slot when a pin is removed' do
       described_class.where(user: user).first.destroy!
+      conversation = create(:conversation, account: account, inbox: inbox)
 
-      expect(build(:conversation_pin, conversation: create(:conversation, account: account), user: user, account: account)).to be_valid
+      expect(build(:conversation_pin, conversation: conversation, user: user, account: account)).to be_valid
     end
   end
 
-  describe 'inbox access' do
+  describe 'visibility' do
     let(:account) { create(:account) }
     let(:inbox) { create(:inbox, account: account) }
-    let(:user) { create(:user, account: account) }
+    let(:user) { create(:user, account: account, role: :agent) }
     let(:conversation) { create(:conversation, account: account, inbox: inbox) }
     let!(:inbox_member) { create(:inbox_member, user: user, inbox: inbox) }
 
-    it 'removes the pins of an agent dropped from the inbox' do
-      create(:conversation_pin, conversation: conversation, user: user, account: account)
+    it 'lists a pin the agent can still see' do
+      pin = create(:conversation_pin, conversation: conversation, user: user, account: account)
 
-      expect { inbox_member.destroy! }.to change(described_class, :count).from(1).to(0)
+      expect(described_class.visible_to(user, account)).to eq([pin])
     end
 
-    it 'keeps the pins of the agents still in the inbox' do
-      other_user = create(:user, account: account)
+    it 'hides a pin once the agent leaves the inbox' do
+      create(:conversation_pin, conversation: conversation, user: user, account: account)
+      inbox_member.destroy!
+
+      expect(described_class.visible_to(user, account)).to be_empty
+    end
+
+    it 'gives the pin back when access returns' do
+      pin = create(:conversation_pin, conversation: conversation, user: user, account: account)
+      inbox_member.destroy!
+      create(:inbox_member, user: user, inbox: inbox)
+
+      expect(described_class.visible_to(user, account)).to eq([pin])
+    end
+
+    it 'hides a pin whose conversation is already gone' do
+      create(:conversation_pin, conversation: conversation, user: user, account: account)
+      Conversation.where(id: conversation.id).delete_all
+
+      expect(described_class.visible_to(user, account)).to be_empty
+    end
+
+    it 'hides the pins of other agents' do
+      other_user = create(:user, account: account, role: :agent)
       create(:inbox_member, user: other_user, inbox: inbox)
       create(:conversation_pin, conversation: conversation, user: other_user, account: account)
 
-      expect { inbox_member.destroy! }.not_to change(described_class, :count)
+      expect(described_class.visible_to(user, account)).to be_empty
     end
 
-    it 'keeps the pins of the same agent in other inboxes' do
-      other_conversation = create(:conversation, account: account)
-      create(:conversation_pin, conversation: other_conversation, user: user, account: account)
+    it 'frees the slot of a pin the agent can no longer see' do
+      described_class::MAX_PER_USER.times do
+        pinned = create(:conversation, account: account, inbox: inbox)
+        create(:conversation_pin, conversation: pinned, user: user, account: account)
+      end
+      inbox_member.destroy!
 
-      expect { inbox_member.destroy! }.not_to change(described_class, :count)
+      other_inbox = create(:inbox, account: account)
+      create(:inbox_member, user: user, inbox: other_inbox)
+      reachable = create(:conversation, account: account, inbox: other_inbox)
+
+      expect(build(:conversation_pin, conversation: reachable, user: user, account: account)).to be_valid
     end
   end
 

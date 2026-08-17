@@ -29,6 +29,15 @@ class ConversationPin < ApplicationRecord
   belongs_to :conversation
   belongs_to :user
 
+  # A pin only does anything while the agent can still see the conversation, so an inbox they left, a role
+  # change, or a conversation deleted but not yet reaped by `destroy_async` takes the pin out of the list
+  # and out of the limit. Filtering rather than deleting covers every way visibility can change, including
+  # the ones a callback would miss, and gives the pin back if access returns.
+  scope :visible_to, lambda { |user, account|
+    accessible = Conversations::PermissionFilterService.new(account.conversations, user, account).perform
+    where(user: user, account_id: account.id, conversation_id: accessible.select(:id))
+  }
+
   before_validation :ensure_account_id
   after_create_commit :dispatch_pinned_event
   after_destroy_commit :dispatch_unpinned_event
@@ -41,7 +50,7 @@ class ConversationPin < ApplicationRecord
 
   def within_limit
     return if user_id.blank? || account_id.blank?
-    return if self.class.where(user_id: user_id, account_id: account_id).count < MAX_PER_USER
+    return if self.class.visible_to(user, account).count < MAX_PER_USER
 
     errors.add(:base, I18n.t('errors.conversation_pins.limit_reached', limit: MAX_PER_USER))
   end

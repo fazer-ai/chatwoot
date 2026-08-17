@@ -1302,8 +1302,11 @@ RSpec.describe 'Conversations API', type: :request do
       end
 
       it 'returns unprocessable entity when the limit is reached' do
+        pinned_inbox = create(:inbox, account: account, enable_auto_assignment: false)
+        create(:inbox_member, user: agent, inbox: pinned_inbox)
         ConversationPin::MAX_PER_USER.times do
-          create(:conversation_pin, conversation: create(:conversation, account: account), user: agent, account: account)
+          pinned = create(:conversation, account: account, inbox: pinned_inbox)
+          create(:conversation_pin, conversation: pinned, user: agent, account: account)
         end
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
