@@ -5,6 +5,13 @@
 # Each override answers for the session providers and falls straight back to `super` for
 # the legacy and cloud ones, so no existing provider changes behavior.
 module Whatsapp::Session::ChannelExtension
+  # Registers the rollout gate as a real validation so it covers both paths that can
+  # put an inbox on a session provider: creating one and converting an existing one
+  # (`convert_provider!` pre-validates with `valid?` before it persists anything).
+  def self.prepended(base)
+    base.validate :validate_session_provider_enabled
+  end
+
   def session_provider?
     Whatsapp::Session::Registry.session_provider?(provider)
   end
@@ -44,6 +51,18 @@ module Whatsapp::Session::ChannelExtension
   end
 
   private
+
+  # The account toggles are the rollout switch, and a picker that hides a provider is
+  # not a gate: the API would happily create a `native` inbox for any account. Only new
+  # records and provider changes are checked, so turning a toggle back off never makes
+  # an inbox that already exists unsaveable.
+  def validate_session_provider_enabled
+    return unless session_provider?
+    return unless new_record? || provider_changed?
+    return if account&.whatsapp_session_provider_enabled?(provider)
+
+    errors.add(:provider, I18n.t('errors.inboxes.channel.provider_not_enabled_for_account'))
+  end
 
   # Session backends validate their config against the descriptor's field list, never
   # against the provider itself: saving an inbox must not depend on a provider being up.
