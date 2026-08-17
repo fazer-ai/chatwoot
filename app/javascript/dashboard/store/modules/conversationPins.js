@@ -9,8 +9,10 @@ import ConversationApi from '../../api/inbox/conversation';
 // `appliedAt` is the version of the last pin/unpin applied per conversation. Both events for the same pin
 // carry that pin's `pinned_at`, and the broadcast jobs are asynchronous, so a `pinned` event that lost the
 // race with the `unpin` right after it would otherwise resurrect a pin the server no longer has.
-// `revision` counts snapshots and resets, so a hydration can tell whether another one already replaced the
-// map underneath it; individual pin events are handled by `appliedAt` instead.
+// `revision` counts resets, so a hydration can tell that the map it was going to replace has been thrown
+// away under it. It does not count snapshots: hydrations run one at a time, so no other one can land
+// mid-flight, and the guard could only ever see which of two overlapping reads committed last, not which
+// read the newer state. Individual pin events are handled by `appliedAt` instead.
 const state = {
   records: {},
   appliedAt: {},
@@ -26,35 +28,80 @@ export const getters = {
   isPinned: $state => conversationId => Boolean($state.records[conversationId]),
 };
 
+// Two hydrations in flight at once have no sound order: the guards below can tell which one committed
+// last, never which one read the newer state, so the older request winning the race would replace a fresh
+// snapshot with a stale one. Running them one at a time removes the question, and the checks inside only
+// have to order a snapshot against the pin events that land under it. Overlapping callers collapse into a
+// single follow-up run, so the last one still gets a read issued after it asked.
+let inFlightHydration = null;
+let inFlightRevision = null;
+let followUpRequested = false;
+
+const hydrate = async ({ commit, rootGetters, state: $state }) => {
+  commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
+
+  const accountId = rootGetters.getCurrentAccountId;
+  const revision = $state.revision;
+  // Which conversations the snapshot may not speak for is decided by what changes under it, not by a
+  // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
+  // against a snapshot that could not see its row yet.
+  const appliedAtBefore = { ...$state.appliedAt };
+  // An unpin keeps the version of the pin it removes, so the applied version alone cannot see one land
+  // mid-flight. What the map held has to travel with it.
+  const recordsBefore = { ...$state.records };
+
+  try {
+    const { data } = await ConversationApi.fetchPins();
+    if (rootGetters.getCurrentAccountId !== accountId) return;
+    if ($state.revision !== revision) return;
+
+    commit(types.SET_CONVERSATION_PINS, {
+      pins: data,
+      appliedAtBefore,
+      recordsBefore,
+    });
+  } catch (error) {
+    // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
+  } finally {
+    commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false });
+  }
+};
+
+const hydrateUntilSettled = async (context, runRevision) => {
+  await hydrate(context);
+
+  // A reset abandoned this run and started its own, which now owns the marker.
+  if (inFlightRevision !== runRevision) return;
+
+  if (followUpRequested) {
+    followUpRequested = false;
+    await hydrateUntilSettled(context, runRevision);
+    return;
+  }
+
+  // Released here, in the same synchronous block as the checks above, rather than from a `.finally` on the
+  // run: between the run resolving and such a callback there is a microtask in which the marker still
+  // reads as busy, so a caller landing there would only raise a flag that nobody reads again.
+  inFlightHydration = null;
+};
+
 export const actions = {
-  fetch: async ({ commit, rootGetters, state: $state }) => {
-    commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
+  fetch: context => {
+    const { revision } = context.state;
 
-    const accountId = rootGetters.getCurrentAccountId;
-    const revision = $state.revision;
-    // Which conversations the snapshot may not speak for is decided by what changes under it, not by a
-    // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
-    // against a snapshot that could not see its row yet.
-    const appliedAtBefore = { ...$state.appliedAt };
-    // An unpin keeps the version of the pin it removes, so the applied version alone cannot see one land
-    // mid-flight. What the map held has to travel with it.
-    const recordsBefore = { ...$state.records };
-
-    try {
-      const { data } = await ConversationApi.fetchPins();
-      if (rootGetters.getCurrentAccountId !== accountId) return;
-      if ($state.revision !== revision) return;
-
-      commit(types.SET_CONVERSATION_PINS, {
-        pins: data,
-        appliedAtBefore,
-        recordsBefore,
-      });
-    } catch (error) {
-      // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
-    } finally {
-      commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false });
+    // Serialization holds between reads of the same map. A reset threw the running read's map away and it
+    // can no longer commit, so folding the new account behind it would leave that account with no pins for
+    // as long as a request nothing bounds takes to settle. The abandoned read still returns, and its own
+    // revision check drops it.
+    if (inFlightHydration && inFlightRevision === revision) {
+      followUpRequested = true;
+      return inFlightHydration;
     }
+
+    followUpRequested = false;
+    inFlightRevision = revision;
+    inFlightHydration = hydrateUntilSettled(context, revision);
+    return inFlightHydration;
   },
 
   pin: async ({ commit, rootGetters }, conversationId) => {
@@ -141,7 +188,6 @@ export const mutations = {
     // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
     // event that was already superseded.
     $state.appliedAt = { ...$state.appliedAt, ...records };
-    $state.revision += 1;
   },
 
   [types.SET_CONVERSATION_PIN](
