@@ -20,7 +20,10 @@ class Whatsapp::Session::Model::ConnectionState < Data.define(
     connection = attributes[:connection].to_s
     raise Whatsapp::Session::Errors::InvalidPayload, "unknown connection: #{connection}" unless CONNECTIONS.include?(connection)
 
-    super
+    # Normalized, not just validated: a bare `super` would forward the caller's own
+    # value, so a symbol would pass validation and then be stored as a symbol, making
+    # `open?` false and putting a non-canonical value on the wire.
+    super(**attributes, connection: connection)
   end
 
   def open?

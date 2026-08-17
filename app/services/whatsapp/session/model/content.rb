@@ -23,7 +23,7 @@ module Whatsapp::Session::Model::Content
       kind = attributes[:kind].to_s
       raise Whatsapp::Session::Errors::InvalidPayload, "unknown media kind: #{kind}" unless KINDS.include?(kind)
 
-      super
+      super(**attributes, kind: kind)
     end
 
     # Maps to the `file_type` enum Chatwoot attachments use.

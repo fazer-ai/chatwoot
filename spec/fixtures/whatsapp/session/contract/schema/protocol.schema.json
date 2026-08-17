@@ -173,12 +173,30 @@
 
     "content_rich": {
       "type": "object",
-      "description": "Interactive/templated payloads rendered from the raw provider node by Whatsapp::Baileys::RichMessageParser.",
+      "description": "Interactive or templated card (template, buttons, list, interactive). Carries the rendered parts as the dashboard shows them; the message preview text is derived from those parts, not sent separately.",
       "properties": {
         "type": { "const": "rich" },
-        "kind": { "type": ["string", "null"] },
-        "text": { "type": ["string", "null"] },
-        "media": { "oneOf": [{ "$ref": "#/definitions/content_media" }, { "type": "null" }] }
+        "kind": { "type": ["string", "null"], "description": "template, interactive, buttons, list or flow" },
+        "title": { "type": ["string", "null"] },
+        "body": { "type": ["string", "null"] },
+        "footer": { "type": ["string", "null"] },
+        "buttons": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "url": { "type": ["string", "null"] },
+              "phone": { "type": ["string", "null"] }
+            },
+            "required": ["text"],
+            "additionalProperties": true
+          }
+        },
+        "media": {
+          "description": "Media in the header of the card, if any.",
+          "oneOf": [{ "$ref": "#/definitions/content_media" }, { "type": "null" }]
+        }
       },
       "required": ["type"],
       "additionalProperties": true

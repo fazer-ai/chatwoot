@@ -14,7 +14,7 @@ class Whatsapp::Session::Model::MediaRef < Data.define(:kind, :id, :url, :header
     kind = attributes[:kind].to_s
     raise Whatsapp::Session::Errors::InvalidPayload, "unknown media ref kind: #{kind}" unless KINDS.include?(kind)
 
-    super
+    super(**attributes, kind: kind)
   end
 
   def fetchable?

@@ -18,7 +18,7 @@ module Whatsapp::Session::Model::Commands
       pairing = attributes[:pairing].to_s
       raise Whatsapp::Session::Errors::InvalidPayload, "unknown pairing mode: #{pairing}" unless PAIRING_MODES.include?(pairing)
 
-      super
+      super(**attributes, pairing: pairing)
     end
   end
 

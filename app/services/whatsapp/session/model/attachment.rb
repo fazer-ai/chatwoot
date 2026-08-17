@@ -19,7 +19,7 @@ class Whatsapp::Session::Model::Attachment < Data.define(:url, :mime, :filename,
       raise Whatsapp::Session::Errors::InvalidPayload, "unknown attachment kind: #{kind}"
     end
 
-    super
+    super(**attributes, kind: kind)
   end
 
   def to_content(caption: nil)
