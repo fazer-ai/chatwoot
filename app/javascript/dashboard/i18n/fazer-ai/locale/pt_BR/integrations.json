@@ -23,15 +23,6 @@
         }
       }
     },
-    "OPEN_AI": {
-      "TONE": {
-        "OPTIONS": {
-          "CASUAL": "Casual",
-          "STRAIGHTFORWARD": "Direto",
-          "CONFIDENT": "Confiante"
-        }
-      }
-    },
     "DASHBOARD_APPS": {
       "VIEW": {
         "NOT_FOUND": "Não encontramos este aplicativo do painel."

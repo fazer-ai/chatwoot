@@ -9,11 +9,15 @@ pt_BR:
   internal_chat:
     default_category_name: Canais
     default_channel_name: Geral
+    messages:
+      deleted: Esta mensagem foi excluída
   errors:
     automation:
       scheduled_message:
         delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias
         content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou template
+    scheduled_messages:
+      cannot_delete_processed: Não é possível excluir uma mensagem agendada que já foi enviada ou falhou
     conversations:
       already_assigned: "%{agent_name} já está atendendo esta conversa."
     inboxes:
