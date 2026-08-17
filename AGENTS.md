@@ -77,7 +77,7 @@ Automate this with your worktree tool's create hook (e.g. worktrunk's `pre-start
 
 ## Release Notes
 
-- Every GitHub release cut from this repo must include the bilingual `user-notes` blocks (pt-BR + en) in the release body, written for non-technical end users.
+- Every GitHub release cut from this repo must include a `user-notes` block per shipped language (en, pt-BR, es) in the release body, written for non-technical end users.
 - Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-user-notes` skill at `.claude/skills/release-user-notes/SKILL.md` to draft and validate the blocks.
 
 ## Commit Messages
@@ -156,7 +156,7 @@ Practical checklist for any change impacting core logic or public APIs
 
 Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside `app/javascript/dashboard/i18n/locale/` or `config/locales/<locale>.yml`** — CI fails if you do, and the next upstream sync would conflict on every string we own.
 
-We ship our features in **en, pt_BR and es**; upstream keeps translating the other ~55 languages, and our keys fall back to `en` there. Everything the fork translates lives in two places:
+We ship our features in **en, pt_BR and es**, and every key must exist in all three: `check` fails when a key present in `en` is missing from another language we ship. Upstream keeps translating the other ~55 languages, and our keys fall back to `en` there. Everything the fork translates lives in two places:
 
 - Frontend → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
 - Backend → `config/locales/fazer_ai.<locale>.yml` (and `fazer_ai.mailers.<locale>.yml` for the Chatwoot mailer copy upstream hardcodes in ERB)
@@ -167,11 +167,11 @@ Both are deep-merged on top of upstream's: the frontend in `i18n/index.js` via `
 
 - A namespace that is entirely ours gets its own file: `kanban.json`, `internalChat.json`, `groups.json`, `scheduledMessages.json`, `fazerAi.json`.
 - A key we add *inside* an upstream namespace goes in a file named after the upstream file it extends: `INBOX_MGMT.ADD.WHATSAPP.*` → `fazer-ai/locale/en/inboxMgmt.json`.
-- Replacing an upstream string goes in `overrides.json`, and only there. Overrides apply per language: overriding in `en` does not change `es`.
+- Replacing an upstream string goes in `overrides.json`, and only there. Overrides apply per language: overriding in `en` does not change `es`, and they are exempt from the coverage rule, since fixing upstream's English says nothing about whether its Spanish needs fixing too.
 
-**Adding a language**: `ruby scripts/i18n/fork_translations.rb scaffold <locale>` copies the `en` tree as a starting point. Translate the values; untranslated keys fall back to `en` (vue-i18n's default `fallbackLocale`, and `config.i18n.fallbacks` in production), so a partial language degrades to English rather than breaking.
+**Adding a language**: `ruby scripts/i18n/fork_translations.rb scaffold <locale>` copies the `en` tree as a starting point, so the new language starts complete (in English) and the coverage check stays green while you translate the values in place. The `en` fallback is still there (vue-i18n's `fallbackLocale`, `config.i18n.fallbacks` in production), but for the languages we ship it is a safety net, not a plan: leaving a key untranslated fails CI.
 
-**Checks**: `ruby scripts/i18n/fork_translations.rb check` enforces the boundaries and reports per-language coverage. `drift` compares upstream's files against the tracked release and needs that tag fetched first. Both run in `.github/workflows/fazer_ai_i18n.yml`.
+**Checks**: `ruby scripts/i18n/fork_translations.rb check` enforces the boundaries and full coverage in every language present under `fazer-ai/locale/`. `drift` compares upstream's files against the tracked release and needs that tag fetched first. Both run in `.github/workflows/fazer_ai_i18n.yml`.
 
 **On upstream sync**: bump `UPSTREAM_BASE` in `scripts/i18n/fork_translations.rb` to the new release, then run `drift`. If it fails, upstream changed a file we also changed and the resolution belongs in our tree, not theirs.
 
