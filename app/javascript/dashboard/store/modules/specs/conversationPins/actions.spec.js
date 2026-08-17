@@ -132,9 +132,10 @@ describe('#actions', () => {
       });
     });
 
-    it('discards a snapshot that another hydration already replaced', async () => {
+    it('discards a snapshot whose map a reset threw away mid-flight', async () => {
       const $state = { revision: 0, appliedAt: {} };
       axios.get.mockImplementation(() => {
+        // What CLEAR_CONVERSATION_PINS does on an account switch.
         $state.revision += 1;
         return Promise.resolve({
           data: [{ conversation_id: 1, pinned_at: 100 }],

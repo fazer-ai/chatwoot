@@ -9,8 +9,10 @@ import ConversationApi from '../../api/inbox/conversation';
 // `appliedAt` is the version of the last pin/unpin applied per conversation. Both events for the same pin
 // carry that pin's `pinned_at`, and the broadcast jobs are asynchronous, so a `pinned` event that lost the
 // race with the `unpin` right after it would otherwise resurrect a pin the server no longer has.
-// `revision` counts snapshots and resets, so a hydration can tell whether another one already replaced the
-// map underneath it; individual pin events are handled by `appliedAt` instead.
+// `revision` counts resets, so a hydration can tell that the map it was going to replace has been thrown
+// away under it. It does not count snapshots: hydrations run one at a time, so no other one can land
+// mid-flight, and the guard could only ever see which of two overlapping reads committed last, not which
+// read the newer state. Individual pin events are handled by `appliedAt` instead.
 const state = {
   records: {},
   appliedAt: {},
@@ -174,7 +176,6 @@ export const mutations = {
     // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
     // event that was already superseded.
     $state.appliedAt = { ...$state.appliedAt, ...records };
-    $state.revision += 1;
   },
 
   [types.SET_CONVERSATION_PIN](
