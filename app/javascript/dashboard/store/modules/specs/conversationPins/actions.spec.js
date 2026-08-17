@@ -3,6 +3,7 @@ import { actions } from '../../conversationPins';
 import types from '../../../mutation-types';
 
 const commit = vi.fn();
+const rootGetters = { getCurrentAccountId: 1 };
 global.axios = axios;
 vi.mock('axios');
 
@@ -12,22 +13,46 @@ afterEach(() => {
 
 describe('#actions', () => {
   describe('#fetch', () => {
-    it('replaces the pin map when the API succeeds', async () => {
+    it('applies the snapshot when nothing changed under it', async () => {
       const data = [{ conversation_id: 1, pinned_at: 100 }];
       axios.get.mockResolvedValue({ data });
 
-      await actions.fetch({ commit, state: { revision: 0 } });
+      await actions.fetch({
+        commit,
+        rootGetters,
+        state: { revision: 0, appliedAt: {} },
+      });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
-        [types.SET_CONVERSATION_PINS, data],
+        [types.SET_CONVERSATION_PINS, { pins: data, appliedAtBefore: {} }],
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
       ]);
     });
 
-    it('discards a snapshot that a pin event overtook', async () => {
-      // The event bumps the revision while the request is in flight, on every attempt.
-      const $state = { revision: 0 };
+    it('hands the mutation the versions it started from, so events under it win', async () => {
+      const $state = { revision: 0, appliedAt: { 1: 100 } };
+      const data = [{ conversation_id: 1, pinned_at: 100 }];
+      axios.get.mockImplementation(() => {
+        // An unpin lands while the request is in flight.
+        $state.appliedAt = { 1: 200 };
+        return Promise.resolve({ data });
+      });
+
+      await actions.fetch({ commit, rootGetters, state: $state });
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
+        [
+          types.SET_CONVERSATION_PINS,
+          { pins: data, appliedAtBefore: { 1: 100 } },
+        ],
+        [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
+      ]);
+    });
+
+    it('discards a snapshot that another hydration already replaced', async () => {
+      const $state = { revision: 0, appliedAt: {} };
       axios.get.mockImplementation(() => {
         $state.revision += 1;
         return Promise.resolve({
@@ -35,7 +60,7 @@ describe('#actions', () => {
         });
       });
 
-      await actions.fetch({ commit, state: $state });
+      await actions.fetch({ commit, rootGetters, state: $state });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
@@ -43,20 +68,23 @@ describe('#actions', () => {
       ]);
     });
 
-    it('applies the snapshot on the retry when the race does not repeat', async () => {
-      const $state = { revision: 0 };
-      const data = [{ conversation_id: 1, pinned_at: 100 }];
-      axios.get.mockImplementationOnce(() => {
-        $state.revision += 1;
-        return Promise.resolve({ data });
+    it('discards a snapshot that outlived the account it was made in', async () => {
+      const movingRootGetters = { getCurrentAccountId: 1 };
+      axios.get.mockImplementation(() => {
+        movingRootGetters.getCurrentAccountId = 2;
+        return Promise.resolve({
+          data: [{ conversation_id: 1, pinned_at: 100 }],
+        });
       });
-      axios.get.mockImplementationOnce(() => Promise.resolve({ data }));
 
-      await actions.fetch({ commit, state: $state });
+      await actions.fetch({
+        commit,
+        rootGetters: movingRootGetters,
+        state: { revision: 0, appliedAt: {} },
+      });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
-        [types.SET_CONVERSATION_PINS, data],
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
       ]);
     });
@@ -64,7 +92,11 @@ describe('#actions', () => {
     it('keeps the inbox usable when the API fails', async () => {
       axios.get.mockRejectedValue({ message: 'Incorrect header' });
 
-      await actions.fetch({ commit, state: { revision: 0 } });
+      await actions.fetch({
+        commit,
+        rootGetters,
+        state: { revision: 0, appliedAt: {} },
+      });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
@@ -79,7 +111,7 @@ describe('#actions', () => {
         data: { conversation_id: 1, pinned_at: 100 },
       });
 
-      await actions.pin({ commit }, 1);
+      await actions.pin({ commit, rootGetters }, 1);
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PIN, { conversation_id: 1, pinned_at: 100 }],
@@ -91,9 +123,23 @@ describe('#actions', () => {
         response: { data: { message: 'You can pin up to 5 conversations.' } },
       });
 
-      await expect(actions.pin({ commit }, 1)).rejects.toThrow(
+      await expect(actions.pin({ commit, rootGetters }, 1)).rejects.toThrow(
         'You can pin up to 5 conversations.'
       );
+      expect(commit.mock.calls).toEqual([]);
+    });
+
+    it('drops a response that outlived the account it was made in', async () => {
+      const movingRootGetters = { getCurrentAccountId: 1 };
+      axios.post.mockImplementation(() => {
+        movingRootGetters.getCurrentAccountId = 2;
+        return Promise.resolve({
+          data: { conversation_id: 1, pinned_at: 100 },
+        });
+      });
+
+      await actions.pin({ commit, rootGetters: movingRootGetters }, 1);
+
       expect(commit.mock.calls).toEqual([]);
     });
   });
@@ -102,7 +148,10 @@ describe('#actions', () => {
     it('removes the pin', async () => {
       axios.delete.mockResolvedValue({});
 
-      await actions.unpin({ commit, state: { records: { 1: 100 } } }, 1);
+      await actions.unpin(
+        { commit, rootGetters, state: { records: { 1: 100 } } },
+        1
+      );
 
       expect(commit.mock.calls).toEqual([
         [types.REMOVE_CONVERSATION_PIN, { conversation_id: 1, pinned_at: 100 }],

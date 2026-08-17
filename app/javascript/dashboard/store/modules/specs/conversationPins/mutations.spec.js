@@ -5,24 +5,26 @@ describe('#mutations', () => {
   describe('#SET_CONVERSATION_PINS', () => {
     it('replaces the whole map', () => {
       const state = { records: { 9: 1 }, appliedAt: {}, revision: 0 };
-      mutations[types.SET_CONVERSATION_PINS](state, [
-        { conversation_id: 1, pinned_at: 100 },
-        { conversation_id: 2, pinned_at: 200 },
-      ]);
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [
+          { conversation_id: 1, pinned_at: 100 },
+          { conversation_id: 2, pinned_at: 200 },
+        ],
+      });
       expect(state.records).toEqual({ 1: 100, 2: 200 });
     });
 
     it('clears the map when the payload is empty', () => {
       const state = { records: { 9: 1 }, appliedAt: {}, revision: 0 };
-      mutations[types.SET_CONVERSATION_PINS](state, []);
+      mutations[types.SET_CONVERSATION_PINS](state, { pins: [] });
       expect(state.records).toEqual({});
     });
 
     it('bumps the revision so an older in-flight hydration is discarded', () => {
       const state = { records: {}, appliedAt: {}, revision: 3 };
-      mutations[types.SET_CONVERSATION_PINS](state, [
-        { conversation_id: 1, pinned_at: 100 },
-      ]);
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [{ conversation_id: 1, pinned_at: 100 }],
+      });
       expect(state.revision).toBe(4);
     });
   });
@@ -141,15 +143,51 @@ describe('#mutations', () => {
         conversation_id: 1,
         pinned_at: 100,
       });
-      mutations[types.SET_CONVERSATION_PINS](state, [
-        { conversation_id: 2, pinned_at: 300 },
-      ]);
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [{ conversation_id: 2, pinned_at: 300 }],
+        appliedAtBefore: { ...state.appliedAt },
+      });
       mutations[types.SET_CONVERSATION_PIN](state, {
         conversation_id: 1,
         pinned_at: 100,
       });
 
       expect(state.records).toEqual({ 2: 300 });
+    });
+  });
+
+  describe('snapshots racing events', () => {
+    it('keeps a conversation whose pin landed while the request was in flight', () => {
+      const state = { records: { 1: 500 }, appliedAt: { 1: 500 }, revision: 0 };
+
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [],
+        appliedAtBefore: {},
+      });
+
+      expect(state.records).toEqual({ 1: 500 });
+    });
+
+    it('drops a conversation whose unpin landed while the request was in flight', () => {
+      const state = { records: {}, appliedAt: { 1: 500 }, revision: 0 };
+
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [{ conversation_id: 1, pinned_at: 500 }],
+        appliedAtBefore: {},
+      });
+
+      expect(state.records).toEqual({});
+    });
+
+    it('takes the server value for everything the events did not touch', () => {
+      const state = { records: { 1: 500 }, appliedAt: { 1: 500 }, revision: 0 };
+
+      mutations[types.SET_CONVERSATION_PINS](state, {
+        pins: [{ conversation_id: 2, pinned_at: 700 }],
+        appliedAtBefore: { 1: 500 },
+      });
+
+      expect(state.records).toEqual({ 2: 700 });
     });
   });
 

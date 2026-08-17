@@ -9,6 +9,8 @@ import ConversationApi from '../../api/inbox/conversation';
 // `appliedAt` is the version of the last pin/unpin applied per conversation. Both events for the same pin
 // carry that pin's `pinned_at`, and the broadcast jobs are asynchronous, so a `pinned` event that lost the
 // race with the `unpin` right after it would otherwise resurrect a pin the server no longer has.
+// `revision` counts snapshots and resets, so a hydration can tell whether another one already replaced the
+// map underneath it; individual pin events are handled by `appliedAt` instead.
 const state = {
   records: {},
   appliedAt: {},
@@ -18,8 +20,6 @@ const state = {
   },
 };
 
-const FETCH_ATTEMPTS = 2;
-
 export const getters = {
   getUIFlags: $state => $state.uiFlags,
   getRecords: $state => $state.records,
@@ -27,23 +27,22 @@ export const getters = {
 };
 
 export const actions = {
-  fetch: async ({ commit, state: $state }) => {
+  fetch: async ({ commit, rootGetters, state: $state }) => {
     commit(types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true });
 
+    const accountId = rootGetters.getCurrentAccountId;
+    const revision = $state.revision;
+    // Which conversations the snapshot may not speak for is decided by what changes under it, not by a
+    // clock: `pinned_at` is written before the transaction commits, so no timestamp orders an event
+    // against a snapshot that could not see its row yet.
+    const appliedAtBefore = { ...$state.appliedAt };
+
     try {
-      // A pin that landed while the request was in flight is newer than the snapshot, and the two cannot be
-      // ordered by any clock: `pinned_at` is written before the transaction commits, so it can precede a
-      // snapshot that could not see the row yet. Retrying is the only honest answer; if it keeps racing,
-      // the events already carry the newer state.
-      for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt += 1) {
-        const { revision } = $state;
-        // eslint-disable-next-line no-await-in-loop
-        const { data } = await ConversationApi.fetchPins();
-        if ($state.revision === revision) {
-          commit(types.SET_CONVERSATION_PINS, data);
-          break;
-        }
-      }
+      const { data } = await ConversationApi.fetchPins();
+      if (rootGetters.getCurrentAccountId !== accountId) return;
+      if ($state.revision !== revision) return;
+
+      commit(types.SET_CONVERSATION_PINS, { pins: data, appliedAtBefore });
     } catch (error) {
       // A failed hydration only costs the pinned ordering, so it should not block the inbox from booting.
     } finally {
@@ -51,19 +50,27 @@ export const actions = {
     }
   },
 
-  pin: async ({ commit }, conversationId) => {
+  pin: async ({ commit, rootGetters }, conversationId) => {
+    // Display ids restart per account, so a response that outlives the account it was made in would pin an
+    // unrelated conversation.
+    const accountId = rootGetters.getCurrentAccountId;
     try {
       const { data } = await ConversationApi.pin(conversationId);
+      if (rootGetters.getCurrentAccountId !== accountId) return;
+
       commit(types.SET_CONVERSATION_PIN, data);
     } catch (error) {
       throwErrorMessage(error);
     }
   },
 
-  unpin: async ({ commit, state: $state }, conversationId) => {
+  unpin: async ({ commit, rootGetters, state: $state }, conversationId) => {
+    const accountId = rootGetters.getCurrentAccountId;
     const pinnedAt = $state.records[conversationId];
     try {
       await ConversationApi.unpin(conversationId);
+      if (rootGetters.getCurrentAccountId !== accountId) return;
+
       commit(types.REMOVE_CONVERSATION_PIN, {
         conversation_id: conversationId,
         pinned_at: pinnedAt,
@@ -94,19 +101,31 @@ export const mutations = {
     $state.revision += 1;
   },
 
-  [types.SET_CONVERSATION_PINS]($state, data) {
-    $state.records = (data || []).reduce(
-      (records, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
-        ...records,
+  [types.SET_CONVERSATION_PINS]($state, { pins, appliedAtBefore = {} }) {
+    const records = (pins || []).reduce(
+      (acc, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
+        ...acc,
         [conversationId]: pinnedAt,
       }),
       {}
     );
+
+    // Only the conversations whose state moved while the request was in flight are kept from local state;
+    // the server speaks for every other one. Discarding the whole snapshot instead would leave a cold
+    // hydration with nothing but the deltas those events carried.
+    Object.keys($state.appliedAt).forEach(conversationId => {
+      if ($state.appliedAt[conversationId] === appliedAtBefore[conversationId])
+        return;
+
+      const local = $state.records[conversationId];
+      if (local === undefined) delete records[conversationId];
+      else records[conversationId] = local;
+    });
+
+    $state.records = records;
     // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
     // event that was already superseded.
-    $state.appliedAt = { ...$state.appliedAt, ...$state.records };
-    // Bumped like any other change, so two hydrations racing each other cannot end with the older response
-    // overwriting the newer one: the loser sees the revision move and retries.
+    $state.appliedAt = { ...$state.appliedAt, ...records };
     $state.revision += 1;
   },
 
@@ -125,7 +144,6 @@ export const mutations = {
 
     $state.records = { ...$state.records, [conversationId]: pinnedAt };
     $state.appliedAt = { ...$state.appliedAt, [conversationId]: pinnedAt };
-    $state.revision += 1;
   },
 
   [types.REMOVE_CONVERSATION_PIN](
@@ -143,7 +161,6 @@ export const mutations = {
       ...$state.appliedAt,
       [conversationId]: Math.max(pinnedAt ?? 0, appliedAt ?? 0),
     };
-    $state.revision += 1;
   },
 };
 
