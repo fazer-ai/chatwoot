@@ -6,8 +6,12 @@ import ConversationApi from '../../api/inbox/conversation';
 // Pins are personal, so the store holds the current agent's pins for the current account only, keyed by the
 // conversation display id: { [conversationId]: pinnedAt }. Conversation objects stay untouched, which keeps
 // the pin state correct no matter how a conversation entered the list (fetch, websocket, reopen).
+// `appliedAt` is the version of the last pin/unpin applied per conversation. Both events for the same pin
+// carry that pin's `pinned_at`, and the broadcast jobs are asynchronous, so a `pinned` event that lost the
+// race with the `unpin` right after it would otherwise resurrect a pin the server no longer has.
 const state = {
   records: {},
+  appliedAt: {},
   uiFlags: {
     isFetching: false,
   },
@@ -42,11 +46,13 @@ export const actions = {
     }
   },
 
-  unpin: async ({ commit }, conversationId) => {
+  unpin: async ({ commit, state: $state }, conversationId) => {
+    const pinnedAt = $state.records[conversationId];
     try {
       await ConversationApi.unpin(conversationId);
       commit(types.REMOVE_CONVERSATION_PIN, {
         conversation_id: conversationId,
+        pinned_at: pinnedAt,
       });
     } catch (error) {
       throwErrorMessage(error);
@@ -71,18 +77,41 @@ export const mutations = {
       }),
       {}
     );
+    // Versions of conversations that are no longer pinned are kept, so a snapshot cannot re-arm an event
+    // that was already superseded.
+    $state.appliedAt = { ...$state.appliedAt, ...$state.records };
   },
 
   [types.SET_CONVERSATION_PIN](
     $state,
     { conversation_id: conversationId, pinned_at: pinnedAt }
   ) {
+    const appliedAt = $state.appliedAt[conversationId];
+    const isSupersededPin =
+      appliedAt !== undefined &&
+      pinnedAt <= appliedAt &&
+      $state.records[conversationId] === undefined;
+    if (isSupersededPin) return;
+
     $state.records = { ...$state.records, [conversationId]: pinnedAt };
+    $state.appliedAt = { ...$state.appliedAt, [conversationId]: pinnedAt };
   },
 
-  [types.REMOVE_CONVERSATION_PIN]($state, { conversation_id: conversationId }) {
+  [types.REMOVE_CONVERSATION_PIN](
+    $state,
+    { conversation_id: conversationId, pinned_at: pinnedAt }
+  ) {
+    const appliedAt = $state.appliedAt[conversationId];
+    const isSupersededUnpin =
+      pinnedAt !== undefined && appliedAt !== undefined && pinnedAt < appliedAt;
+    if (isSupersededUnpin) return;
+
     const { [conversationId]: _removed, ...rest } = $state.records;
     $state.records = rest;
+    $state.appliedAt = {
+      ...$state.appliedAt,
+      [conversationId]: Math.max(pinnedAt ?? 0, appliedAt ?? 0),
+    };
   },
 };
 

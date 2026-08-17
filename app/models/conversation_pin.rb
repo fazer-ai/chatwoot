@@ -23,6 +23,7 @@ class ConversationPin < ApplicationRecord
   validates :user_id, presence: true
   validates :user_id, uniqueness: { scope: [:conversation_id] }
   validate :within_limit, on: :create
+  validate :conversation_not_resolved, on: :create
 
   belongs_to :account
   belongs_to :conversation
@@ -43,6 +44,14 @@ class ConversationPin < ApplicationRecord
     return if self.class.where(user_id: user_id, account_id: account_id).count < MAX_PER_USER
 
     errors.add(:base, I18n.t('errors.conversation_pins.limit_reached', limit: MAX_PER_USER))
+  end
+
+  # A resolved conversation is dropped from the agent's list and loses its pins on the way out, so pinning
+  # one from the resolved view would only burn a slot.
+  def conversation_not_resolved
+    return if conversation.blank? || !conversation.resolved?
+
+    errors.add(:base, I18n.t('errors.conversation_pins.conversation_resolved'))
   end
 
   def dispatch_pinned_event

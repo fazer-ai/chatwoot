@@ -4,7 +4,7 @@ import types from '../../../mutation-types';
 describe('#mutations', () => {
   describe('#SET_CONVERSATION_PINS', () => {
     it('replaces the whole map', () => {
-      const state = { records: { 9: 1 } };
+      const state = { records: { 9: 1 }, appliedAt: {} };
       mutations[types.SET_CONVERSATION_PINS](state, [
         { conversation_id: 1, pinned_at: 100 },
         { conversation_id: 2, pinned_at: 200 },
@@ -13,7 +13,7 @@ describe('#mutations', () => {
     });
 
     it('clears the map when the payload is empty', () => {
-      const state = { records: { 9: 1 } };
+      const state = { records: { 9: 1 }, appliedAt: {} };
       mutations[types.SET_CONVERSATION_PINS](state, []);
       expect(state.records).toEqual({});
     });
@@ -21,7 +21,7 @@ describe('#mutations', () => {
 
   describe('#SET_CONVERSATION_PIN', () => {
     it('adds a pin without dropping the others', () => {
-      const state = { records: { 1: 100 } };
+      const state = { records: { 1: 100 }, appliedAt: {} };
       mutations[types.SET_CONVERSATION_PIN](state, {
         conversation_id: 2,
         pinned_at: 200,
@@ -32,9 +32,71 @@ describe('#mutations', () => {
 
   describe('#REMOVE_CONVERSATION_PIN', () => {
     it('removes a single pin', () => {
-      const state = { records: { 1: 100, 2: 200 } };
+      const state = { records: { 1: 100, 2: 200 }, appliedAt: {} };
       mutations[types.REMOVE_CONVERSATION_PIN](state, { conversation_id: 1 });
       expect(state.records).toEqual({ 2: 200 });
+    });
+  });
+
+  describe('out-of-order websocket events', () => {
+    it('ignores a pinned event that lost the race with the unpin after it', () => {
+      const state = { records: {}, appliedAt: {} };
+      // The unpin broadcast wins the race, so the pin it removed arrives afterwards.
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+
+      expect(state.records).toEqual({});
+    });
+
+    it('ignores an unpin event older than the pin already applied', () => {
+      const state = { records: {}, appliedAt: {} };
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 200,
+      });
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+
+      expect(state.records).toEqual({ 1: 200 });
+    });
+
+    it('applies a pin created after the last event', () => {
+      const state = { records: {}, appliedAt: {} };
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 200,
+      });
+
+      expect(state.records).toEqual({ 1: 200 });
+    });
+
+    it('keeps the versions of unpinned conversations across a hydration', () => {
+      const state = { records: {}, appliedAt: {} };
+      mutations[types.REMOVE_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+      mutations[types.SET_CONVERSATION_PINS](state, [
+        { conversation_id: 2, pinned_at: 300 },
+      ]);
+      mutations[types.SET_CONVERSATION_PIN](state, {
+        conversation_id: 1,
+        pinned_at: 100,
+      });
+
+      expect(state.records).toEqual({ 2: 300 });
     });
   });
 

@@ -1290,6 +1290,17 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.conversation_pins.count).to eq(1)
       end
 
+      it 'returns unprocessable entity for a resolved conversation' do
+        conversation.update!(status: :resolved)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to eq('A resolved conversation cannot be pinned.')
+      end
+
       it 'returns unprocessable entity when the limit is reached' do
         ConversationPin::MAX_PER_USER.times do
           create(:conversation_pin, conversation: create(:conversation, account: account), user: agent, account: account)
@@ -1339,6 +1350,29 @@ RSpec.describe 'Conversations API', type: :request do
                as: :json
 
         expect(response).to have_http_status(:success)
+      end
+
+      it 'still removes the pin after the agent loses access to the inbox' do
+        create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        agent.inbox_members.destroy_all
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.conversation_pins.count).to eq(0)
+      end
+
+      it 'does not remove the pin of another agent' do
+        other_agent = create(:user, account: account, role: :agent)
+        create(:conversation_pin, conversation: conversation, user: other_agent, account: account)
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(conversation.conversation_pins.pluck(:user_id)).to eq([other_agent.id])
       end
     end
   end

@@ -7,6 +7,7 @@ import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { emitter } from 'shared/helpers/mitt';
+import wootConstants from 'dashboard/constants/globals';
 import EmailTranscriptModal from './EmailTranscriptModal.vue';
 import ResolveAction from '../../buttons/ResolveAction.vue';
 import ButtonV4 from 'dashboard/components-next/button/Button.vue';
@@ -30,6 +31,12 @@ const [showActionsDropdown, toggleDropdown] = useToggle(false);
 const currentChat = computed(() => store.getters.getSelectedChat);
 const isPinnedGetter = useMapGetter('conversationPins/isPinned');
 const isPinned = computed(() => isPinnedGetter.value(currentChat.value.id));
+// Resolving drops the pins, so pinning a resolved conversation would only burn one of the five slots.
+const canTogglePin = computed(
+  () =>
+    isPinned.value ||
+    currentChat.value.status !== wootConstants.STATUS_TYPE.RESOLVED
+);
 
 const pin = async () => {
   try {
@@ -47,7 +54,11 @@ const unpin = async () => {
   }
 };
 
-const togglePin = () => (isPinned.value ? unpin() : pin());
+const togglePin = () => {
+  if (!canTogglePin.value) return undefined;
+
+  return isPinned.value ? unpin() : pin();
+};
 
 useKeyboardEvents({
   'Alt+KeyI': { action: togglePin },
@@ -72,14 +83,16 @@ const actionMenuItems = computed(() => {
     });
   }
 
-  items.push({
-    icon: isPinned.value ? 'i-lucide-pin-off' : 'i-lucide-pin',
-    label: isPinned.value
-      ? t('CONVERSATION.PIN.UNPIN')
-      : t('CONVERSATION.PIN.PIN'),
-    action: 'toggle_pin',
-    value: 'toggle_pin',
-  });
+  if (canTogglePin.value) {
+    items.push({
+      icon: isPinned.value ? 'i-lucide-pin-off' : 'i-lucide-pin',
+      label: isPinned.value
+        ? t('CONVERSATION.PIN.UNPIN')
+        : t('CONVERSATION.PIN.PIN'),
+      action: 'toggle_pin',
+      value: 'toggle_pin',
+    });
+  }
 
   items.push({
     icon: 'i-lucide-share',

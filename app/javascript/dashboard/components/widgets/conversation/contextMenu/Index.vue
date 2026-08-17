@@ -327,6 +327,7 @@ export default {
         @click.stop="$emit('markAsRead')"
       />
       <MenuItem
+        v-if="isPinned || status !== STATUS_TYPE.RESOLVED"
         :option="isPinned ? unpinOption : pinOption"
         variant="icon"
         @click.stop="$emit('togglePin')"

@@ -22,6 +22,7 @@ en:
       already_assigned: "%{agent_name} is already handling this conversation."
     conversation_pins:
       limit_reached: You can pin up to %{limit} conversations.
+      conversation_resolved: A resolved conversation cannot be pinned.
     inboxes:
       channel:
         provider_connection:

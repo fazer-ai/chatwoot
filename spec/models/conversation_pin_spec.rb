@@ -42,6 +42,32 @@ RSpec.describe ConversationPin do
     end
   end
 
+  describe 'resolved conversations' do
+    let(:account) { create(:account) }
+    let(:user) { create(:user, account: account) }
+
+    it 'rejects a pin on a resolved conversation' do
+      conversation = create(:conversation, account: account, status: :resolved)
+      pin = build(:conversation_pin, conversation: conversation, user: user, account: account)
+
+      expect(pin).not_to be_valid
+      expect(pin.errors.full_messages).to eq(['A resolved conversation cannot be pinned.'])
+    end
+
+    it 'allows a pin on a pending conversation' do
+      conversation = create(:conversation, account: account, status: :pending)
+
+      expect(build(:conversation_pin, conversation: conversation, user: user, account: account)).to be_valid
+    end
+
+    it 'does not free the slot of an existing pin when the conversation is resolved later' do
+      conversation = create(:conversation, account: account)
+      pin = create(:conversation_pin, conversation: conversation, user: user, account: account)
+
+      expect(pin.reload).to be_persisted
+    end
+  end
+
   describe 'pin limit' do
     let(:account) { create(:account) }
     let(:user) { create(:user, account: account) }

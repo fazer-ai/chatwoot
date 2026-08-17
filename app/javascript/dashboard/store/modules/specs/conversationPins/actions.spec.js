@@ -67,10 +67,10 @@ describe('#actions', () => {
     it('removes the pin', async () => {
       axios.delete.mockResolvedValue({});
 
-      await actions.unpin({ commit }, 1);
+      await actions.unpin({ commit, state: { records: { 1: 100 } } }, 1);
 
       expect(commit.mock.calls).toEqual([
-        [types.REMOVE_CONVERSATION_PIN, { conversation_id: 1 }],
+        [types.REMOVE_CONVERSATION_PIN, { conversation_id: 1, pinned_at: 100 }],
       ]);
     });
   });

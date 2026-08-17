@@ -340,14 +340,18 @@ export function useConversationHotKeys() {
   });
 
   const conversationAdditionalActions = computed(() => {
-    return prepareActions(
-      [
-        currentChat.value.muted ? UNMUTE_ACTION : MUTE_ACTION,
-        isPinned.value(currentChat.value.id) ? UNPIN_ACTION : PIN_ACTION,
-        SEND_TRANSCRIPT_ACTION,
-      ],
-      t
-    );
+    const actions = [currentChat.value.muted ? UNMUTE_ACTION : MUTE_ACTION];
+    if (isPinned.value(currentChat.value.id)) {
+      actions.push(UNPIN_ACTION);
+    } else if (
+      currentChat.value.status !== wootConstants.STATUS_TYPE.RESOLVED
+    ) {
+      // Resolving drops the pins, so pinning a resolved conversation would only burn one of the five slots.
+      actions.push(PIN_ACTION);
+    }
+    actions.push(SEND_TRANSCRIPT_ACTION);
+
+    return prepareActions(actions, t);
   });
 
   const AIAssistActions = computed(() => {

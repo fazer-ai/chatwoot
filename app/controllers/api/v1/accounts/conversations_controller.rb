@@ -3,7 +3,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include DateRangeHelper
   include HmacConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins]
+  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -79,13 +79,15 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
   end
 
+  # Looked up through the pin rather than the conversation: an agent who lost access to an inbox still has
+  # to be able to free the slot their pin is holding.
   def unpin
-    @conversation.conversation_pins.where(user: Current.user).destroy_all
+    current_user_pins.joins(:conversation).where(conversations: { display_id: params[:id] }).destroy_all
     head :ok
   end
 
   def pins
-    @conversation_pins = Current.user.conversation_pins.where(account_id: Current.account.id).includes(:conversation)
+    @conversation_pins = current_user_pins.includes(:conversation)
   end
 
   def transcript
@@ -236,6 +238,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def conversation
     @conversation ||= Current.account.conversations.find_by!(display_id: params[:id])
     authorize @conversation, :show?
+  end
+
+  def current_user_pins
+    Current.user.conversation_pins.where(account_id: Current.account.id)
   end
 
   def inbox

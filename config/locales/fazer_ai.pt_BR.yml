@@ -22,6 +22,7 @@ pt_BR:
       already_assigned: "%{agent_name} já está atendendo esta conversa."
     conversation_pins:
       limit_reached: Você pode fixar no máximo %{limit} conversas.
+      conversation_resolved: Não é possível fixar uma conversa resolvida.
     inboxes:
       channel:
         provider_connection:

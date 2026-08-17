@@ -215,6 +215,16 @@ describe('useConversationHotKeys', () => {
     expect(unpinAction).toBeDefined();
   });
 
+  it('should not return the pin action when the conversation is resolved', () => {
+    store.getters.getSelectedChat = { ...mockCurrentChat, status: 'resolved' };
+    const { conversationHotKeys } = useConversationHotKeys();
+    const pinAction = conversationHotKeys.value.find(
+      action => action.id === 'pin_conversation'
+    );
+
+    expect(pinAction).toBeUndefined();
+  });
+
   it('should not return conversation hot keys when not in conversation or inbox route', () => {
     useRoute.mockReturnValue({ name: 'some_other_route' });
     const { conversationHotKeys } = useConversationHotKeys();
