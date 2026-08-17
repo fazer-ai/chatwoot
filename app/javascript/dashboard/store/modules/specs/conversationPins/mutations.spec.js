@@ -27,6 +27,17 @@ describe('#mutations', () => {
     });
   });
 
+  describe('#CLEAR_CONVERSATION_PINS', () => {
+    it('drops the map, the versions and any hydration in flight', () => {
+      const state = { records: { 1: 100 }, appliedAt: { 1: 100 }, revision: 3 };
+      mutations[types.CLEAR_CONVERSATION_PINS](state);
+
+      expect(state.records).toEqual({});
+      expect(state.appliedAt).toEqual({});
+      expect(state.revision).toBe(4);
+    });
+  });
+
   describe('#SET_CONVERSATION_PIN', () => {
     it('adds a pin without dropping the others', () => {
       const state = { records: { 1: 100 }, appliedAt: {}, revision: 0 };

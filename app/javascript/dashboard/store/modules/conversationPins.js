@@ -73,6 +73,8 @@ export const actions = {
     }
   },
 
+  reset: ({ commit }) => commit(types.CLEAR_CONVERSATION_PINS),
+
   add: ({ commit }, data) => commit(types.SET_CONVERSATION_PIN, data),
 
   remove: ({ commit }, data) => commit(types.REMOVE_CONVERSATION_PIN, data),
@@ -81,6 +83,15 @@ export const actions = {
 export const mutations = {
   [types.SET_CONVERSATION_PINS_UI_FLAG]($state, data) {
     $state.uiFlags = { ...$state.uiFlags, ...data };
+  },
+
+  // Pins are keyed by conversation display id, which restarts per account, so carrying a map across an
+  // account switch would light up unrelated conversations. Bumping the revision also discards a hydration
+  // still in flight for the account being left.
+  [types.CLEAR_CONVERSATION_PINS]($state) {
+    $state.records = {};
+    $state.appliedAt = {};
+    $state.revision += 1;
   },
 
   [types.SET_CONVERSATION_PINS]($state, data) {

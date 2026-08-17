@@ -110,6 +110,14 @@ describe('#actions', () => {
     });
   });
 
+  describe('#reset', () => {
+    it('clears the account-scoped state', () => {
+      actions.reset({ commit });
+
+      expect(commit.mock.calls).toEqual([[types.CLEAR_CONVERSATION_PINS]]);
+    });
+  });
+
   describe('#add and #remove', () => {
     it('commits the websocket payload as is', () => {
       actions.add({ commit }, { conversation_id: 1, pinned_at: 100 });

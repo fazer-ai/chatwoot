@@ -116,6 +116,12 @@ const fetchSidebarSortPreferences = ([currentAccountId, userId]) => {
   store.dispatch('sidebarSortPreferences/initialize');
 };
 
+const fetchConversationPins = currentAccountId => {
+  if (!currentAccountId) return;
+  store.dispatch('conversationPins/reset');
+  store.dispatch('conversationPins/fetch');
+};
+
 const toggleShortcutModalFn = show => {
   if (show) {
     emit('openKeyShortcutModal');
@@ -255,7 +261,6 @@ onMounted(() => {
   store.dispatch('customViews/get', 'conversation');
   store.dispatch('customViews/get', 'contact');
   store.dispatch('dashboardApps/get');
-  store.dispatch('conversationPins/fetch');
 });
 
 watch([accountId, hasConversationUnreadCounts], fetchConversationUnreadCounts, {
@@ -265,6 +270,8 @@ watch([accountId, hasConversationUnreadCounts], fetchConversationUnreadCounts, {
 watch([accountId, currentUserId], fetchSidebarSortPreferences, {
   immediate: true,
 });
+
+watch(accountId, fetchConversationPins, { immediate: true });
 
 const hasUnreadCountsForSection = section => {
   if (section === SIDEBAR_SORT_SECTIONS.FOLDERS) {
