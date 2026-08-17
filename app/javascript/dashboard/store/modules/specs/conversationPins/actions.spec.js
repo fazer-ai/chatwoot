@@ -13,15 +13,17 @@ afterEach(() => {
 describe('#actions', () => {
   describe('#fetch', () => {
     it('replaces the pin map when the API succeeds', async () => {
-      axios.get.mockResolvedValue({
-        data: [{ conversation_id: 1, pinned_at: 100 }],
-      });
+      const data = {
+        synced_at: 1000,
+        pins: [{ conversation_id: 1, pinned_at: 100 }],
+      };
+      axios.get.mockResolvedValue({ data });
 
       await actions.fetch({ commit });
 
       expect(commit.mock.calls).toEqual([
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: true }],
-        [types.SET_CONVERSATION_PINS, [{ conversation_id: 1, pinned_at: 100 }]],
+        [types.SET_CONVERSATION_PINS, data],
         [types.SET_CONVERSATION_PINS_UI_FLAG, { isFetching: false }],
       ]);
     });

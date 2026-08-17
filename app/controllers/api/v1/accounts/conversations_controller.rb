@@ -75,13 +75,16 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   # Pins belong to a User; agent bots never reach these actions, they are not in BOT_ACCESSIBLE_ENDPOINTS.
   #
-  # Both the per-user limit and the resolved check read state a concurrent request can change before the
-  # insert lands, so they run under a lock on the pinning agent's row, the narrowest scope that still
-  # covers every request able to conflict (pins are per-user). Same shape as AgentBuilder's seat limit.
+  # Both checks the pin runs read state a concurrent request can change before the insert lands, and they
+  # need different rows to serialize against: the agent's row for the per-user limit (same shape as
+  # AgentBuilder's seat limit), the conversation's for the resolved check, since only that one blocks a
+  # concurrent resolve from committing mid-flight. This is the only place that takes both, so the order
+  # cannot invert.
   def pin
     pin = Current.user.with_lock do
-      @conversation.reload
-      @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+      @conversation.with_lock do
+        @conversation.conversation_pins.find_or_create_by!(user: Current.user)
+      end
     end
     render json: { conversation_id: @conversation.display_id, pinned_at: pin.created_at.to_f }
   end
@@ -95,7 +98,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   # Joined, not just eager loaded: Conversation destroys its pins asynchronously, so between the row going
   # away and the job running, an orphaned pin would render `nil.display_id`.
+  #
+  # `synced_at` is stamped before the query so it can never be later than the rows it describes, which is
+  # what lets the client tell a pin the snapshot could not have seen from one it deliberately omits.
   def pins
+    @pins_synced_at = Time.zone.now
     @conversation_pins = current_user_pins.joins(:conversation).includes(:conversation)
   end
 

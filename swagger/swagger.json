@@ -5533,17 +5533,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "conversation_id": {
-                        "type": "number",
-                        "description": "The display id of the pinned conversation"
-                      },
-                      "pinned_at": {
-                        "type": "number",
-                        "description": "Unix timestamp of when the conversation was pinned"
+                  "type": "object",
+                  "properties": {
+                    "synced_at": {
+                      "type": "number",
+                      "description": "Unix timestamp taken before the pins were read, so the client can tell a pin this snapshot could not have seen from one it omits"
+                    },
+                    "pins": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "number",
+                            "description": "The display id of the pinned conversation"
+                          },
+                          "pinned_at": {
+                            "type": "number",
+                            "description": "Unix timestamp of when the conversation was pinned"
+                          }
+                        }
                       }
                     }
                   }

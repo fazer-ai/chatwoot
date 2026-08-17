@@ -69,17 +69,29 @@ export const mutations = {
     $state.uiFlags = { ...$state.uiFlags, ...data };
   },
 
-  [types.SET_CONVERSATION_PINS]($state, data) {
-    $state.records = (data || []).reduce(
-      (records, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
-        ...records,
+  [types.SET_CONVERSATION_PINS]($state, { pins, synced_at: syncedAt }) {
+    const records = (pins || []).reduce(
+      (acc, { conversation_id: conversationId, pinned_at: pinnedAt }) => ({
+        ...acc,
         [conversationId]: pinnedAt,
       }),
       {}
     );
-    // Versions of conversations that are no longer pinned are kept, so a snapshot cannot re-arm an event
-    // that was already superseded.
-    $state.appliedAt = { ...$state.appliedAt, ...$state.records };
+
+    // An event applied after the server built the snapshot is newer than it, in both directions: a pin the
+    // snapshot could not have seen has to survive, and one it still lists must not come back.
+    Object.entries($state.appliedAt).forEach(([conversationId, appliedAt]) => {
+      if (syncedAt === undefined || appliedAt <= syncedAt) return;
+
+      const local = $state.records[conversationId];
+      if (local === undefined) delete records[conversationId];
+      else records[conversationId] = local;
+    });
+
+    $state.records = records;
+    // Versions of conversations that are no longer pinned are kept, so a later snapshot cannot re-arm an
+    // event that was already superseded.
+    $state.appliedAt = { ...$state.appliedAt, ...records };
   },
 
   [types.SET_CONVERSATION_PIN](
