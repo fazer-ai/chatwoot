@@ -107,9 +107,14 @@ class Whatsapp::Session::Inbound::ContactResolver
   def placeholder_name?(name)
     return true if name.blank?
     return true if name == party.identifier
+    # Nothing but a number and the punctuation a number is written with. Stripping the
+    # separators first would read "Ana 2" as the digit 2; requiring the whole name to
+    # look like a phone keeps a real name out, while still catching the formatted forms
+    # ("+55 41 99999-0000") a conversion or an import leaves behind.
+    return false unless name.match?(/\A\+?[\d\s().-]+\z/)
 
-    digits = name.delete('+')
-    return false unless digits.match?(/\A\d+\z/)
+    digits = Whatsapp::Session::PhoneMatch.digits(name)
+    return false if digits.blank?
     return true if digits.in?([party.phone, party.lid].compact)
 
     party.phone.present? && Whatsapp::Session::PhoneMatch.same_number?(digits, party.phone)

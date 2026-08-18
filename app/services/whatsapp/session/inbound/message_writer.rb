@@ -115,8 +115,14 @@ class Whatsapp::Session::Inbound::MessageWriter
 
   # One message per shared contact, each with a native contact attachment, so the
   # dashboard renders them in the contact bubble instead of as plain text.
+  # One transaction for the whole share, as the Cloud path wraps its own message
+  # creation: a card failing to save after its siblings were committed would leave the
+  # event's source id stored, and the redelivery would then be read as a duplicate and
+  # drop the cards that never landed.
   def build_contact_messages
-    messages = Array(content.contacts).filter_map { |card| build_contact_message(card) }
+    messages = ActiveRecord::Base.transaction do
+      Array(content.contacts).filter_map { |card| build_contact_message(card) }
+    end
     return messages.last if messages.present?
 
     unsupported_contact_message

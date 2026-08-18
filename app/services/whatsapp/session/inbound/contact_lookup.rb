@@ -18,11 +18,13 @@ module Whatsapp::Session::Inbound::ContactLookup
     find(inbox: inbox, party: party)&.contact
   end
 
+  # In priority order, never as one `IN`: while both keys still have a row, which is the
+  # window before consolidation merges them, an unordered match can answer with the
+  # phone-keyed copy that is on its way out, and the event would update that one.
+  # `Party#source_id` makes the LID the canonical key, so it is asked for first.
   def by_source_id(inbox, party)
     keys = [party.lid, party.phone].compact_blank
-    return if keys.empty?
-
-    inbox.contact_inboxes.find_by(source_id: keys)
+    keys.lazy.filter_map { |key| inbox.contact_inboxes.find_by(source_id: key) }.first
   end
 
   def by_variant_source_id(inbox, party)

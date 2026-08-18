@@ -28,8 +28,16 @@ class Whatsapp::Session::Inbound::GroupResolver
   end
 
   # The thread of the group, honouring the same reopen rules as a 1:1 conversation.
+  #
+  # Not `find_or_create_group_conversation`: that one only reuses open and pending rows,
+  # so a group whose thread was snoozed, or resolved under `lock_to_single_conversation`,
+  # would get a second conversation and split the group in two. It lives in the concern
+  # the frozen Baileys layer also uses, so the policy is applied here instead of changed
+  # there.
   def conversation_for(group_contact_inbox)
-    find_or_create_group_conversation(group_contact_inbox)
+    Whatsapp::Session::Inbound::ConversationFinder.new(
+      inbox: inbox, contact: group_contact_inbox.contact, contact_inbox: group_contact_inbox
+    ).perform
   end
 
   # Membership writes live in GroupConversationHandler, which keeps them private

@@ -19,7 +19,7 @@ class Whatsapp::Session::Inbound::ConversationFinder
 
   def perform
     conversation = conversation_for_reaction || conversation_by_inbox_config
-    return backfill_first_touch(conversation) if conversation
+    return backfill_first_touch(mark_as_group(conversation)) if conversation
 
     ::Conversation.create!(conversation_params)
   end
@@ -50,7 +50,19 @@ class Whatsapp::Session::Inbound::ConversationFinder
       contact_id: contact.id, contact_inbox_id: contact_inbox.id
     }
     params[:additional_attributes] = attribution if attribution.present?
+    params[:group_type] = :group if group?
     params
+  end
+
+  # Asked of the contact rather than passed in: the group contact is the one thing that
+  # already knows, and a caller that forgot the flag would open an ordinary thread for a
+  # group. A thread that predates the group being recognised as one is repaired here,
+  # which is what GroupConversationHandler also does when it reuses a conversation.
+  def group? = contact.group_type_group?
+
+  def mark_as_group(conversation)
+    conversation.update!(group_type: :group) if group? && !conversation.group_type_group?
+    conversation
   end
 
   # When the message reuses an existing thread, what conversation_params would have

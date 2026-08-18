@@ -235,6 +235,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
+    # Each card was committed on its own, so a later one failing left the earlier rows
+    # holding the event's source id and the redelivery was read as a duplicate: the
+    # cards that never landed were dropped for good.
+    context 'when a later card cannot be saved' do
+      let(:content) do
+        model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' },
+                                                { 'display_name' => 'Bruno Lima', 'phone' => '+5541977776666' }])
+      end
+
+      before do
+        allow_any_instance_of(Message).to receive(:save!).and_wrap_original do |original, *args| # rubocop:disable RSpec/AnyInstance
+          raise ActiveRecord::RecordInvalid, original.receiver if original.receiver.content&.start_with?('Bruno Lima')
+
+          original.call(*args)
+        end
+      end
+
+      it 'stores none of them, so the redelivery can store all of them' do
+        expect { dispatch }.to raise_error(ActiveRecord::RecordInvalid)
+
+        expect(inbox.messages).to be_empty
+      end
+    end
+
     # The conversation is opened before the cards are read, so a share with nothing to
     # render used to leave an empty thread and no row holding the source id, which meant
     # every redelivery walked the same path again.
@@ -271,6 +295,49 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
         message = inbox.messages.last
         expect(message.content).to include('Carlos Dias', '+55 41 98888-1111')
         expect(message.attachments.first.file_type).to eq('contact')
+      end
+    end
+  end
+
+  # `GroupConversationHandler#find_or_create_group_conversation` only reuses open and
+  # pending rows, so a snoozed group thread, or a resolved one under
+  # `lock_to_single_conversation`, used to get a second conversation and split the group.
+  context 'with a group message whose thread is not open' do
+    let(:chat) { model::Address.group('120363041234567890') }
+    let(:inbound) do
+      model::InboundMessage.new(id: '3EB0AAAA0002', chat: chat, sender: sender, from_me: false,
+                                timestamp: 1_755_440_000_123, content: content)
+    end
+    let(:group_dispatch) do
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+      end
+    end
+    let(:group_contact) do
+      create(:contact, account: channel.account, identifier: '120363041234567890@g.us', group_type: :group)
+    end
+    let(:group_contact_inbox) do
+      create(:contact_inbox, inbox: inbox, contact: group_contact, source_id: '120363041234567890')
+    end
+    let!(:existing) do
+      create(:conversation, inbox: inbox, account: channel.account, contact: group_contact,
+                            contact_inbox: group_contact_inbox, group_type: :group, status: :snoozed)
+    end
+
+    it 'reuses the snoozed thread instead of opening a second one' do
+      expect { group_dispatch }.not_to change(inbox.conversations, :count)
+
+      expect(inbox.messages.last.conversation_id).to eq(existing.id)
+    end
+
+    context 'when the thread was resolved and the inbox locks to a single conversation' do
+      before do
+        existing.update!(status: :resolved)
+        inbox.update!(lock_to_single_conversation: true)
+      end
+
+      it 'reuses it too' do
+        expect { group_dispatch }.not_to change(inbox.conversations, :count)
       end
     end
   end

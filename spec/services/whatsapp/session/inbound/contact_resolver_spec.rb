@@ -59,6 +59,29 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
     expect(described_class.new(inbox: inbox, party: model::Party.new(push_name: 'Ana')).perform).to be_nil
   end
 
+  # A conversion or an import leaves the number formatted, and only stripping the plus
+  # left the separators behind, so the digit check failed and the contact kept showing
+  # as a phone number forever.
+  it 'replaces a name that is the phone number written out' do
+    contact = create(:contact, account: channel.account, name: '+55 41 99999-0000', phone_number: '+5541999990000')
+    create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5541999990000')
+
+    described_class.new(inbox: inbox, party: model::Party.new(phone: '5541999990000', push_name: 'Ana Souza'),
+                        overwrite: true).perform
+
+    expect(contact.reload.name).to eq('Ana Souza')
+  end
+
+  it 'keeps a real name that happens to carry a digit' do
+    contact = create(:contact, account: channel.account, name: 'Ana 2', phone_number: '+5541999990000')
+    create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5541999990000')
+
+    described_class.new(inbox: inbox, party: model::Party.new(phone: '5541999990000', push_name: 'Ana Souza'),
+                        overwrite: true).perform
+
+    expect(contact.reload.name).to eq('Ana 2')
+  end
+
   it 'replaces a name that is only the contact phone number' do
     contact = create(:contact, account: channel.account, name: '5541999990000', phone_number: '+5541999990000')
     create(:contact_inbox, contact: contact, inbox: inbox, source_id: '182736451928374')
