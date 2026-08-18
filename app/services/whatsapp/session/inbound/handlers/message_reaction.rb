@@ -3,7 +3,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   def perform
     return :ignored unless actionable?
 
-    inbound::Locks.with_chat_lock(inbox, payload.chat.id) do
+    inbound::Locks.with_chat_lock(inbox, chat_lock_ids) do
       payload.removal? ? remove : add
     end
   end
@@ -73,5 +73,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     return payload.sender if !payload.from_me && payload.sender.present?
 
     model::Party.from_address(payload.chat)
+  end
+
+  # Same aliasing as an inbound message: the peer is named by phone in one event and by
+  # LID in the next, and both have to serialize against each other.
+  def chat_lock_ids
+    return [payload.chat.id] if payload.chat.group?
+
+    [payload.chat.id, peer_party&.phone, peer_party&.lid]
   end
 end

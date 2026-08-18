@@ -7,7 +7,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     inbound::Locks.with_message_lock(inbox, message.id) do
       next :duplicate if find_message(message.id)
 
-      inbound::Locks.with_chat_lock(inbox, message.chat.id) do
+      inbound::Locks.with_chat_lock(inbox, chat_lock_ids) do
         # Re-checked under the chat lock: an agent's send can be slow enough for the
         # echo to arrive before its source_id is stored.
         next :duplicate if find_message(message.id)
@@ -70,6 +70,16 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     return false if message.incoming?
 
     inbound::EchoMatcher.new(inbox: inbox, message_id: message.id, client_ref: message.client_ref).perform.present?
+  end
+
+  # Every id this chat can be addressed by. WhatsApp names the same 1:1 peer by phone in
+  # one event and by LID in the next, and both resolve to one contact: locking only the
+  # id this event carries lets a worker holding the other alias run alongside, and each
+  # opens a conversation of its own.
+  def chat_lock_ids
+    return [message.chat.id] if message.group?
+
+    [message.chat.id, peer_party&.phone, peer_party&.lid]
   end
 
   # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is

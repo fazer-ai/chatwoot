@@ -18,6 +18,34 @@ RSpec.describe Whatsapp::Session::Inbound::Locks do
       end
     end
 
+    # WhatsApp names the same 1:1 peer by phone in one event and by LID in the next, and
+    # both resolve to one contact: locking only the id an event carries let a worker
+    # holding the other alias run alongside, and each opened a conversation of its own.
+    it 'refuses a chat another worker holds under a different alias' do
+      described_class.with_chat_lock(inbox, %w[5541999990000 182736451928374]) do
+        expect { described_class.with_chat_lock(inbox, '182736451928374') { :nested } }
+          .to raise_error(described_class::Busy)
+      end
+    end
+
+    it 'releases every alias it took' do
+      described_class.with_chat_lock(inbox, %w[5541999990000 182736451928374]) { :done }
+
+      expect(Redis::Alfred.get(described_class.chat_key(inbox, '182736451928374'))).to be_nil
+      expect(Redis::Alfred.get(described_class.chat_key(inbox, '5541999990000'))).to be_nil
+    end
+
+    # The second alias being held is a Busy for the whole call, and the first must not be
+    # left behind: the next delivery would find it locked by nobody until the TTL.
+    it 'releases what it took when a later alias is already held' do
+      Redis::Alfred.set(described_class.chat_key(inbox, '182736451928374'), 'other', ex: 30)
+
+      expect { described_class.with_chat_lock(inbox, %w[5541999990000 182736451928374]) { :never } }
+        .to raise_error(described_class::Busy)
+
+      expect(Redis::Alfred.get(described_class.chat_key(inbox, '5541999990000'))).to be_nil
+    end
+
     # An operation that outran the TTL, syncing a large group roster being the realistic
     # one, used to delete the lock a second worker had already taken: from there the two
     # interleave their conversation, membership and activity writes.

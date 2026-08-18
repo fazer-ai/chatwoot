@@ -32,6 +32,10 @@ class Whatsapp::Session::UpdateContactAvatarJob < ApplicationJob
     # has the same window on the Baileys paths. Do not delete this note without closing
     # the issue.
     ::Avatar::AvatarFromUrlJob.perform_later(contact, url) if url.present?
+  rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
+    # Raised on so the `retry_on` above can see it: a rescue in this method catches the
+    # error first, and the retry declaration never runs.
+    raise
   rescue Whatsapp::Session::Errors::Error => e
     # What is left here cannot be retried into working: the backend does not support the
     # lookup, the credentials are wrong, or the party has no picture to give.

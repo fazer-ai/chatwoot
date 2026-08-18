@@ -45,22 +45,31 @@ module Whatsapp::Session::Inbound::Locks
   # Serializes everything that resolves a contact or picks a conversation for one chat,
   # so two messages of the same chat cannot each create their own conversation.
   #
-  # Released by token, not by key. `Redis::LockManager#unlock` deletes unconditionally,
-  # so an operation that outran the TTL (syncing a large group roster is the realistic
-  # one) would delete the lock a second worker had already taken, and from there the two
-  # interleave their conversation, membership and activity writes.
-  def with_chat_lock(inbox, chat)
-    return yield if chat.blank?
+  # Takes every id the chat can be addressed by, because WhatsApp names the same 1:1 peer
+  # by phone in one event and by LID in the next: locking only the one an event happens
+  # to carry lets two workers each find no conversation and open one. The ids are locked
+  # in a fixed order, so two workers holding different aliases cannot deadlock, and each
+  # is released by token: `Redis::LockManager#unlock` deletes unconditionally, so an
+  # operation that outran the TTL (syncing a large group roster is the realistic one)
+  # would delete a lock a second worker had already taken.
+  def with_chat_lock(inbox, *chats)
+    keys = chats.flatten.compact_blank.uniq.sort.map { |chat| chat_key(inbox, chat) }
+    return yield if keys.empty?
 
-    key = chat_key(inbox, chat)
-    token = SecureRandom.uuid
-    raise Busy, "chat #{chat} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: CHAT_LOCK_TTL)
-
+    held = {}
     begin
+      keys.each { |key| held[key] = claim(key, inbox) }
       yield
     ensure
-      Redis::Alfred.delete_if_equals(key, token)
+      held.each { |key, token| Redis::Alfred.delete_if_equals(key, token) }
     end
+  end
+
+  def claim(key, inbox)
+    token = SecureRandom.uuid
+    raise Busy, "#{key} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: CHAT_LOCK_TTL)
+
+    token
   end
 
   def processing?(inbox, message_id)
