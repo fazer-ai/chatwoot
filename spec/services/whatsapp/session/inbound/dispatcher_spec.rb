@@ -25,8 +25,11 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
   # this its chats would be filed here in the meantime.
   context 'when the inbox has disowned its session' do
     before do
+      # Written the way the state handler writes it: the sentence for the dashboard and
+      # the key for code to compare against.
       channel.update_provider_connection!(
-        'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
+        'connection' => 'close', 'error_code' => 'wrong_phone_number',
+        'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
       )
     end
 

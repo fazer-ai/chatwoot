@@ -36,7 +36,14 @@ class Whatsapp::Session::ConnectionStateWriter
 
   def merge(state, persisted)
     payload = state.to_h
-    payload['error'] = translate(payload['error']) if payload['error'].present?
+    # The sentence is what the dashboard renders, and the key is what code compares
+    # against: the sentence depends on the locale in force when it was written and on
+    # the translation not having been reworded since, so a guard reading it would fail
+    # open without anybody noticing.
+    if payload['error'].present?
+      payload['error_code'] = payload['error']
+      payload['error'] = translate(payload['error'])
+    end
     payload['connection'] ||= persisted['connection']
     payload['epoch'] ||= persisted['epoch']
     STICKY_KEYS.each do |key|

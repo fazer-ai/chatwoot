@@ -10,6 +10,12 @@ module Whatsapp::Session::Inbound::Locks
   class Busy < StandardError; end
 
   CHAT_LOCK_TTL = 30.seconds
+  # Reading a group's whole roster is the one guarded operation that can run for minutes:
+  # each participant is resolved, and a large group has hundreds. A lease that expires
+  # mid-way is not a lock at all, because a second worker takes the key and the two
+  # interleave their membership writes, and releasing by token only stops the first from
+  # deleting the second's lease.
+  GROUP_SYNC_LOCK_TTL = 2.minutes
   # Long enough to cover one processing pass, short enough that a marker orphaned by a
   # killed worker heals on its own within the job's retry budget.
   MESSAGE_LOCK_TTL = 30.seconds
@@ -52,22 +58,22 @@ module Whatsapp::Session::Inbound::Locks
   # is released by token: `Redis::LockManager#unlock` deletes unconditionally, so an
   # operation that outran the TTL (syncing a large group roster is the realistic one)
   # would delete a lock a second worker had already taken.
-  def with_chat_lock(inbox, *chats)
+  def with_chat_lock(inbox, *chats, ttl: CHAT_LOCK_TTL)
     keys = chats.flatten.compact_blank.uniq.sort.map { |chat| chat_key(inbox, chat) }
     return yield if keys.empty?
 
     held = {}
     begin
-      keys.each { |key| held[key] = claim(key, inbox) }
+      keys.each { |key| held[key] = claim(key, inbox, ttl) }
       yield
     ensure
       held.each { |key, token| Redis::Alfred.delete_if_equals(key, token) }
     end
   end
 
-  def claim(key, inbox)
+  def claim(key, inbox, ttl)
     token = SecureRandom.uuid
-    raise Busy, "#{key} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: CHAT_LOCK_TTL)
+    raise Busy, "#{key} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: ttl)
 
     token
   end

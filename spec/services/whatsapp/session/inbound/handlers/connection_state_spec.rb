@@ -51,8 +51,12 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     it 'refuses the session and says why' do
       expect(dispatch).to eq(:handled)
 
+      # Both: the sentence is what the dashboard renders, and the key is what the
+      # dispatcher compares against to keep the wrong account's chats out. Comparing the
+      # sentence would fail open under another locale or a reworded translation.
       expect(channel.reload.provider_connection).to include(
-        'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
+        'connection' => 'close', 'error_code' => 'wrong_phone_number',
+        'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
       )
       expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
     end

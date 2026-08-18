@@ -124,7 +124,10 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
     # Only this inbox's threads, which the flag above cannot manage. Closing another
     # number's conversations because *this* session left would end a thread it can
     # still use.
-    @group_contact_inbox.conversations.where(status: %i[open pending]).find_each { |thread| thread.update!(status: :resolved) }
+    # Snoozed as well: the snooze job reopens on its own schedule, and a thread reopened
+    # for a group this inbox has left can no longer send anything.
+    @group_contact_inbox.conversations.where(status: %i[open pending snoozed])
+                        .find_each { |thread| thread.update!(status: :resolved) }
   end
 
   # WhatsApp may describe the session's own participant by LID alone, in which case the

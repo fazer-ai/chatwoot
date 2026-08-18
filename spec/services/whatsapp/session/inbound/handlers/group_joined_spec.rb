@@ -91,6 +91,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupJoined do
 
       expect(resolved.reload.status).to eq('open')
     end
+
+    # The snooze job reopens on its own schedule, and this event creates no message to
+    # trigger the reopen a message would: the restored group stayed hidden until then.
+    context 'when the thread was snoozed rather than resolved' do
+      before { resolved.update!(status: :snoozed, snoozed_until: 2.days.from_now) }
+
+      it 'reopens it as well' do
+        expect(dispatch).to eq(:handled)
+
+        expect(resolved.reload.status).to eq('open')
+      end
+    end
   end
 
   # An ordinary contact update does not carry `group_members`, so without this an open

@@ -38,7 +38,22 @@ class Whatsapp::Session::Groups::Syncer
   end
 
   def perform
-    info = @info || fetch_info
+    # A snapshot handed in came with an event the caller already serialized, so this only
+    # takes the lock when it fetches one: a scheduled or manual sync otherwise races the
+    # group's own events and can apply metadata older than what just landed, reviving
+    # members that left or overwriting `group_left`.
+    return apply(@info) if @info.present?
+
+    Whatsapp::Session::Inbound::Locks.with_chat_lock(
+      inbox, group_address&.id, ttl: Whatsapp::Session::Inbound::Locks::GROUP_SYNC_LOCK_TTL
+    ) { apply(fetch_info) }
+  end
+
+  private
+
+  def inbox = channel.inbox
+
+  def apply(info)
     return if info.blank?
 
     update_contact(info)
@@ -47,13 +62,14 @@ class Whatsapp::Session::Groups::Syncer
     group_contact
   end
 
-  private
-
-  def inbox = channel.inbox
+  def group_address
+    address = Model::Address.parse(group_contact.identifier)
+    address if address.present? && address.group?
+  end
 
   def fetch_info
-    address = Model::Address.parse(group_contact.identifier)
-    return if address.blank? || !address.group?
+    address = group_address
+    return if address.blank?
 
     channel.provider_service.group_info(Model::Commands::GroupInfo.new(group: address))
   rescue Whatsapp::Session::Errors::Error => e

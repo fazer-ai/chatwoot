@@ -6,7 +6,8 @@ class Whatsapp::Session::Inbound::Handlers::GroupJoined < Whatsapp::Session::Inb
     return :ignored unless capability?(:groups)
     return :ignored if payload.info.blank?
 
-    inbound::Locks.with_chat_lock(inbox, payload.info.group.id) { sync }
+    # The long lease: this syncs the whole roster from the snapshot the event carried.
+    inbound::Locks.with_chat_lock(inbox, payload.info.group.id, ttl: inbound::Locks::GROUP_SYNC_LOCK_TTL) { sync }
   end
 
   private
@@ -26,8 +27,11 @@ class Whatsapp::Session::Inbound::Handlers::GroupJoined < Whatsapp::Session::Inb
     :handled
   end
 
+  # Snoozed counts as closed here: this event creates no message, so nothing triggers the
+  # reopen a message would, and the restored group would stay hidden until the old snooze
+  # happened to expire.
   def reopen(conversation)
-    conversation.open! if conversation.resolved?
+    conversation.open! if conversation.resolved? || conversation.snoozed?
     conversation
   end
 

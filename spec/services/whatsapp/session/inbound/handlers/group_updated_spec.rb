@@ -96,6 +96,27 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # A thread the snooze job would reopen for a group this inbox has left can no longer
+  # send anything, so leaving has to close that one too.
+  context 'when the session itself leaves and its thread is snoozed' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(leave: [model::Party.new(phone: '5541988887777')]) }
+    let(:group_contact) do
+      create(:contact, account: channel.account, identifier: '120363041234567890@g.us', group_type: :group)
+    end
+    let!(:snoozed) do
+      contact_inbox = create(:contact_inbox, inbox: inbox, contact: group_contact, source_id: '120363041234567890')
+      create(:conversation, inbox: inbox, account: channel.account, contact: group_contact,
+                            contact_inbox: contact_inbox, group_type: :group, status: :snoozed,
+                            snoozed_until: 2.days.from_now)
+    end
+
+    it 'resolves it' do
+      expect(dispatch).to eq(:handled)
+
+      expect(snoozed.reload.status).to eq('resolved')
+    end
+  end
+
   context 'when a setting changed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(announce: true, locked: false) }
 
