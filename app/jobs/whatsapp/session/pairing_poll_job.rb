@@ -13,15 +13,17 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   DEADLINES = { 'qr' => 2.minutes, 'code' => 5.minutes }.freeze
 
   # `pairing` is the mode the connect command asked for; `deadline_at` is set on the first
-  # run and carried forward so re-enqueueing never extends the ceiling. `provider` is the
-  # provider that started this pairing: an inbox converted while a poll sat in the queue
-  # would otherwise be polled, and failed, against whatever it became.
-  def perform(channel, pairing: 'qr', deadline_at: nil, provider: nil)
+  # run and carried forward so re-enqueueing never extends the ceiling. `provider` and
+  # `attempt` say which pairing this chain belongs to: an inbox converted, or connected
+  # again, while a poll sat in the queue would otherwise be polled against whatever it
+  # became, and this chain's timeout would land on somebody else's live QR.
+  def perform(channel, pairing: 'qr', deadline_at: nil, provider: nil, attempt: nil)
     @channel = channel
     @pairing = pairing.to_s
-    @provider = provider || channel.provider
+    @provider = provider
+    @attempt = attempt
     @deadline_at = deadline_at || (Time.current + DEADLINES.fetch(@pairing, DEADLINES['qr']))
-    return unless channel.provider == @provider
+    return unless current?
 
     backend = channel.session_backend
     poll(backend) if backend.class.state_polling?
@@ -34,21 +36,38 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
 
   private
 
-  attr_reader :channel, :pairing, :provider, :deadline_at
+  attr_reader :channel, :pairing, :provider, :attempt, :deadline_at
+
+  # Whether the inbox is still the one this chain started on, and still on this attempt.
+  # Re-read every time, including after the provider request, because a conversion or a
+  # second connect can land while this job is waiting on the network.
+  def current?
+    channel.reload
+    return false if provider.present? && channel.provider != provider
+    return true if attempt.blank?
+
+    channel.provider_connection['pairing_attempt'] == attempt
+  end
 
   def poll(backend)
     state = backend.fetch_connection_state
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
+    return unless current?
+
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with(pairing_attempt: attempt))
     return if settled?(state)
     return give_up('pairing_timed_out') if Time.current + INTERVAL >= deadline_at
 
-    self.class.set(wait: INTERVAL).perform_later(channel, pairing: pairing, deadline_at: deadline_at, provider: provider)
+    self.class.set(wait: INTERVAL).perform_later(
+      channel, pairing: pairing, deadline_at: deadline_at, provider: provider, attempt: attempt
+    )
   end
 
   # Both ways a pairing ends without succeeding write the reason to the connection record.
   # Leaving the last `connecting` state in place parks the dashboard on a QR that expired
   # minutes ago, waiting for a rotation that is never coming.
   def give_up(error)
+    return unless current?
+
     Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
       Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: error)
     )

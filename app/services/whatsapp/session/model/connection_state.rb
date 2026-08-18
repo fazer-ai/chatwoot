@@ -7,7 +7,7 @@
 # before persisting, so what the dashboard reads is already a sentence.
 class Whatsapp::Session::Model::ConnectionState < Data.define(
   :connection, :qr_data_url, :pairing_code, :error, :epoch, :phone_number, :lid,
-  :quarantine, :ban, :reachout_time_lock, :new_chat_cap
+  :quarantine, :ban, :reachout_time_lock, :new_chat_cap, :pairing_attempt
 )
   include Whatsapp::Session::Model::Serializable
 

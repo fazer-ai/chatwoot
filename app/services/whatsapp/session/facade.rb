@@ -34,6 +34,10 @@ class Whatsapp::Session::Facade
   # "Make sure this session is up": resumes an existing pairing, or starts a new one.
   def setup_channel_provider
     mode = pairing_mode
+    # Identifies this attempt. Two connects for the same provider produce two polling
+    # chains, and without a token the older one cannot tell that the QR on screen is no
+    # longer the one it was following: it would time out and overwrite a live pairing.
+    attempt = SecureRandom.uuid
     state = backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
@@ -43,8 +47,12 @@ class Whatsapp::Session::Facade
     # The connect answer is the first state the dashboard has to show (it carries the QR
     # for a provider that returns one), and for a polled backend it is also what starts
     # the pairing poll: nothing else would refresh the code as it rotates.
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state, reset: true)
-    Whatsapp::Session::PairingPollJob.perform_later(channel, pairing: mode) if backend.class.state_polling?
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with(pairing_attempt: attempt), reset: true)
+    if backend.class.state_polling?
+      Whatsapp::Session::PairingPollJob.perform_later(
+        channel, pairing: mode, provider: channel.provider, attempt: attempt
+      )
+    end
     state
   end
 

@@ -78,6 +78,23 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(channel.reload.provider_connection).to eq({})
   end
 
+  # Connecting twice leaves two chains running. The older one keeps its earlier deadline,
+  # and without knowing which attempt it belongs to it would time out over the QR the
+  # operator is looking at right now.
+  it 'lets a newer pairing attempt retire the older chain' do
+    channel.update_provider_connection!(
+      { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,NEW', 'pairing_attempt' => 'attempt-2' }
+    )
+    allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
+
+    described_class.perform_now(channel, pairing: 'qr', deadline_at: 10.seconds.from_now, attempt: 'attempt-1')
+
+    expect(backend).not_to have_received(:fetch_connection_state)
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,NEW'
+    )
+  end
+
   it 'gives a pairing code longer than a QR, since the operator has to type it' do
     expect(described_class::DEADLINES['code']).to be > described_class::DEADLINES['qr']
   end

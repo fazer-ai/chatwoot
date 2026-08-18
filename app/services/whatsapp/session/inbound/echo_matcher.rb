@@ -44,23 +44,16 @@ class Whatsapp::Session::Inbound::EchoMatcher
          .first
   end
 
-  # The id the send never got to store is what a revoke needs, so a message deleted
-  # while that send was in flight can only be taken off the contact's phone once this
-  # echo supplies it.
-  #
-  # Both the read and the decision happen inside the row lock, and only whoever moves
-  # `source_id` from blank to set enqueues the revoke. There are two writers of that
-  # column on a send (this echo and the send response), and the revoke job is not
-  # idempotent: the second one asks the provider to revoke a message it has already
-  # revoked, and fails five times retrying.
+  # The id the send never got to store is what a revoke needs, so a message deleted while
+  # that send was in flight can only be taken off the contact's phone once this echo
+  # supplies it. Same rule as the send response, through the same helper: whoever moves
+  # `source_id` from blank to set owes the revoke, decided under the row lock, enqueued
+  # after it commits. Enqueued inside, the job can run before the commit, read a blank id
+  # and return, while the other writer sees the id already set and enqueues nothing.
   def confirm_source_id(reserved)
     return if message_id.blank?
+    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(reserved, { source_id: message_id })
 
-    reserved.with_lock do
-      next if reserved.source_id.present?
-
-      reserved.update!(source_id: message_id)
-      Messages::DeleteOnChannelJob.perform_later(reserved.id) if reserved.deleted?
-    end
+    Messages::DeleteOnChannelJob.perform_later(reserved.id)
   end
 end

@@ -12,6 +12,8 @@ module Whatsapp::Session::Facade::Groups
   end
 
   def create_group(subject, participants)
+    raise Whatsapp::Session::Errors::NotSupported, 'groups are disabled on this installation' unless capability?('groups')
+
     info = backend.create_group(model::Commands::GroupCreate.new(subject: subject, participants: addresses(participants)))
     # Groups::CreateService reads :id from this, the same key the Baileys response had.
     { id: info.group.to_jid, subject: info.subject }
@@ -75,12 +77,21 @@ module Whatsapp::Session::Facade::Groups
   end
 
   def sync_group(conversation, soft: false)
+    return unless capability?('groups')
+
     Whatsapp::Session::Groups::Syncer.new(channel: channel, group_contact: conversation.contact, soft: soft).perform
   end
 
   private
 
+  # `WHATSAPP_GROUPS_ENABLED=false` takes every group capability away from the descriptor,
+  # and the dashboard hides the group panel accordingly. The API endpoints behind that
+  # panel are still routable, though, so the switch has to be enforced where the calls
+  # land: gating only creation left participants, metadata, invites, settings, leaving and
+  # syncing reaching the provider on an installation that turned groups off.
   def group(group_jid)
+    raise Whatsapp::Session::Errors::NotSupported, 'groups are disabled on this installation' unless capability?('groups')
+
     parsed = model::Address.parse(group_jid)
     raise Whatsapp::Session::Errors::InvalidPayload, "not a group: #{group_jid}" unless parsed&.group?
 

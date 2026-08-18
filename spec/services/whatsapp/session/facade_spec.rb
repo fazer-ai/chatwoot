@@ -52,30 +52,6 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(response).to eq({ 'jid' => '5541999990000@s.whatsapp.net', 'exists' => true })
   end
 
-  it 'reports the group it created with the key the create service reads' do
-    group = channel.create_group('Equipe', ['5541999990000@s.whatsapp.net'])
-
-    expect(group[:id]).to end_with('@g.us')
-    expect(backend.last_command.participants.map(&:id)).to eq(['5541999990000'])
-  end
-
-  it 'refuses a group setting it has no name for' do
-    expect { channel.group_setting_update('120363041234567890@g.us', 'teleport', true) }
-      .to raise_error(Whatsapp::Session::Errors::InvalidPayload)
-  end
-
-  it 'translates a group settings toggle into the contract name' do
-    channel.group_member_add_mode('120363041234567890@g.us', 'all_member_add')
-
-    expect(backend.last_command.setting).to eq('member_add_mode')
-    expect(backend.last_command.value).to be(true)
-  end
-
-  it 'refuses to address a group by anything but a group jid' do
-    expect { channel.group_leave('5541999990000@s.whatsapp.net') }
-      .to raise_error(Whatsapp::Session::Errors::InvalidPayload)
-  end
-
   # The factory neutralizes Channel::Whatsapp#sync_templates, so the facade is asked directly.
   it 'has no templates to sync or to send' do
     expect(facade.sync_templates).to be(true)
@@ -94,8 +70,10 @@ RSpec.describe Whatsapp::Session::Facade do
 
     allow(backend.class).to receive(:state_polling?).and_return(true)
 
+    # The attempt token is generated per connect, so it is matched by shape, not value.
     expect { channel.provider_service.setup_channel_provider }
-      .to have_enqueued_job(Whatsapp::Session::PairingPollJob).with(channel, pairing: 'qr')
+      .to have_enqueued_job(Whatsapp::Session::PairingPollJob)
+      .with(channel, hash_including(pairing: 'qr', provider: 'native'))
   end
 
   # The inbound layer keeps an inbox paired with the wrong number quarantined, and no
@@ -163,7 +141,48 @@ RSpec.describe Whatsapp::Session::Facade do
   end
 
   describe 'the group half' do
+    subject(:facade) { channel.provider_service }
+
     let(:group_jid) { '120363041234567890@g.us' }
+
+    around { |example| with_modified_env(WHATSAPP_GROUPS_ENABLED: 'true') { example.run } }
+
+    it 'reports the group it created with the key the create service reads' do
+      group = channel.create_group('Equipe', ['5541999990000@s.whatsapp.net'])
+
+      expect(group[:id]).to end_with('@g.us')
+      expect(backend.last_command.participants.map(&:id)).to eq(['5541999990000'])
+    end
+
+    it 'refuses a group setting it has no name for' do
+      expect { channel.group_setting_update('120363041234567890@g.us', 'teleport', true) }
+        .to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+    end
+
+    it 'translates a group settings toggle into the contract name' do
+      channel.group_member_add_mode('120363041234567890@g.us', 'all_member_add')
+
+      expect(backend.last_command.setting).to eq('member_add_mode')
+      expect(backend.last_command.value).to be(true)
+    end
+
+    it 'refuses to address a group by anything but a group jid' do
+      expect { channel.group_leave('5541999990000@s.whatsapp.net') }
+        .to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+    end
+
+    # The dashboard hides the group panel when the switch is off, but the endpoints behind
+    # it stay routable, so the switch has to hold where the calls land.
+    it 'refuses every group operation while the installation has groups off' do
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'false' do
+        expect { channel.provider_service.group_leave(group_jid) }
+          .to raise_error(Whatsapp::Session::Errors::NotSupported, /groups are disabled/)
+        expect { channel.provider_service.create_group('Equipe', []) }
+          .to raise_error(Whatsapp::Session::Errors::NotSupported, /groups are disabled/)
+      end
+
+      expect(backend.commands).to be_empty
+    end
 
     it 'answers group creation in the shape Groups::CreateService reads' do
       result = facade.create_group('Equipe de Vendas', ['5541999990000@s.whatsapp.net'])
