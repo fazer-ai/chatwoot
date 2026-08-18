@@ -41,6 +41,16 @@ module Whatsapp::Session::ChannelExtension
     Whatsapp::Session::Registry.backend_for(self)
   end
 
+  # A session provider fetches outbound media from Rails itself, so on an installation
+  # where it cannot reach the public frontend URL (local Active Storage behind a private
+  # network) the operator points INTERNAL_HOST_URL at something it can. Setting it is the
+  # whole opt-in: unlike the Baileys flag this replaces, there is nothing else to turn on.
+  def use_internal_host?
+    return super unless session_provider?
+
+    ENV['INTERNAL_HOST_URL'].present?
+  end
+
   def supports_reactions?
     return super unless session_provider?
 

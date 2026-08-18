@@ -6,8 +6,6 @@
 # afterwards. Downloading inline would stall the consumer thread that keeps a session's
 # events in order, and the attachment lands within seconds either way.
 class Whatsapp::Session::Inbound::MessageWriter
-  Content = Whatsapp::Session::Model::Content
-
   attr_reader :conversation, :inbound, :sender
 
   def initialize(conversation:, inbound:, sender: nil)
@@ -17,7 +15,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   end
 
   def perform
-    return build_contact_messages if content.is_a?(Content::Contacts)
+    return build_contact_messages if content_type == 'contacts'
 
     message = conversation.messages.build(content: message_content, **message_attributes)
     attach_location(message)
@@ -32,6 +30,11 @@ class Whatsapp::Session::Inbound::MessageWriter
   def inbox = conversation.inbox
   def content = inbound.content
   def incoming? = inbound.incoming?
+
+  # The kind of content, as the string the contract names it by. Never as a class: a
+  # class captured before a reload no longer matches the payload's own, and every branch
+  # below would fall through in silence.
+  def content_type = content&.wire_type
 
   def message_attributes
     {
@@ -49,10 +52,10 @@ class Whatsapp::Session::Inbound::MessageWriter
   end
 
   def message_content
-    case content
-    when Content::Text then convert_mentions(content.body)
-    when Content::Media then content.caption
-    when Content::Rich then content.preview_text
+    case content_type
+    when 'text' then convert_mentions(content.body)
+    when 'media' then content.caption
+    when 'rich' then content.preview_text
     end
   end
 
@@ -69,16 +72,16 @@ class Whatsapp::Session::Inbound::MessageWriter
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,
       is_unsupported: (true if unsupported?),
-      rich: (content.to_content_attribute if content.is_a?(Content::Rich))
+      rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
   end
 
   # A rich card with no text and no media header renders as an empty bubble, which is
   # what the unsupported flag exists for.
   def unsupported?
-    return true if content.is_a?(Content::Unsupported)
+    return true if content_type == 'unsupported'
 
-    content.is_a?(Content::Rich) && content.preview_text.blank? && content.media.blank?
+    content_type == 'rich' && content.preview_text.blank? && content.media.blank?
   end
 
   def convert_mentions(text)
@@ -91,7 +94,7 @@ class Whatsapp::Session::Inbound::MessageWriter
 
   # Location carries no downloadable bytes: the coordinates are the attachment.
   def attach_location(message)
-    return unless content.is_a?(Content::Location)
+    return unless content_type == 'location'
 
     name = [content.name, content.address].compact_blank.join(', ')
     message.attachments.build(
@@ -107,8 +110,8 @@ class Whatsapp::Session::Inbound::MessageWriter
   # same downloadable reference a plain media message has: without this the card is
   # stored with its text and no attachment.
   def enqueue_media_fetch(message)
-    media = content if content.is_a?(Content::Media)
-    media ||= content.media if content.is_a?(Content::Rich)
+    media = content if content_type == 'media'
+    media ||= content.media if content_type == 'rich'
     return if media.blank? || media.ref.blank?
 
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h)

@@ -236,6 +236,7 @@ module Whatsapp::Session::Model::Events
   # failing the whole shard.
   class Unknown < Data.define(:type, :payload)
     include Serializable
+    wire_type 'unknown'
   end
 
   CLASSES = [

@@ -2,7 +2,8 @@ require 'rails_helper'
 
 RSpec.describe Whatsapp::Session::PairingPollJob do
   let(:channel) do
-    create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
+    create(:channel_whatsapp, provider: 'uazapi', phone_number: '+5541988887777',
+                              validate_provider_config: false, sync_templates: false)
   end
   let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
@@ -36,6 +37,20 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
 
     expect { described_class.perform_now(channel) }.not_to have_enqueued_job(described_class)
     expect(channel.reload.provider_connection['connection']).to eq('open')
+  end
+
+  # The poll writes state without ever passing through an event handler, so it used to be
+  # a way around the ownership check: a missed webhook and a polled `open` was enough to
+  # put the inbox back to work on the account the operator scanned by mistake.
+  it 'refuses a polled state that reports a number this inbox is not configured for' do
+    allow(backend).to receive(:fetch_connection_state).and_return(state('open', phone_number: '5541900001111'))
+
+    described_class.perform_now(channel)
+
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'close', 'error_code' => 'wrong_phone_number'
+    )
+    expect(Whatsapp::Session::LogoutJob).to have_been_enqueued
   end
 
   it 'stops at the ceiling instead of polling a pairing nobody completed' do

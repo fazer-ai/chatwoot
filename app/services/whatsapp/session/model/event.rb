@@ -52,7 +52,7 @@ class Whatsapp::Session::Model::Event < Data.define(:type, :payload, :id, :sid, 
   end
 
   def known?
-    !payload.is_a?(Events::Unknown)
+    payload.present? && payload.wire_type != 'unknown'
   end
 
   def at

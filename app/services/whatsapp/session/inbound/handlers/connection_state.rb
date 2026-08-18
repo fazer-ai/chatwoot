@@ -5,14 +5,11 @@
 # writer allowed to touch it. The i18n key in `error` is what the dashboard renders;
 # a provider message never reaches the UI.
 class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session::Inbound::Handlers::Base
-  Events = Whatsapp::Session::Model::Events
-
   def perform
     state = build_state
     return :ignored if state.nil?
 
     result = Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
-    after_write(state) if result == :written
     result == :stale ? :ignored : :handled
   end
 
@@ -20,53 +17,42 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
 
   # Every event that only means "the session closed, and here is why" maps straight to
   # its i18n key; the rest need a little more than that.
+  #
+  # Keyed by wire type rather than by event class. A class in a constant is captured when
+  # this file loads, and after a reload the incoming payload is an instance of the new
+  # generation: the lookup misses, the case below misses too, and the session state is
+  # dropped without an error anywhere.
   CLOSING_ERRORS = {
-    Events::SessionLoggedOut => 'logged_out',
-    Events::SessionStreamReplaced => 'stream_replaced',
-    Events::SessionTemporaryBan => 'temporary_ban',
-    Events::SessionClientOutdated => 'client_outdated',
-    Events::SessionConnectFailure => 'connect_failure',
-    Events::PairingError => 'connect_failure'
+    'session.logged_out' => 'logged_out',
+    'session.stream_replaced' => 'stream_replaced',
+    'session.temporary_ban' => 'temporary_ban',
+    'session.client_outdated' => 'client_outdated',
+    'session.connect_failure' => 'connect_failure',
+    'pairing.error' => 'connect_failure'
   }.freeze
 
   def build_state
-    error = CLOSING_ERRORS[payload.class]
+    type = payload&.wire_type
+    error = CLOSING_ERRORS[type]
     return closed(error, ban: payload.try(:ban)) if error
 
-    case payload
-    when Events::SessionState then session_state
-    when Events::PairingQr then connecting(qr_data_url: payload.png_data_url)
-    when Events::PairingCode then connecting(pairing_code: payload.code)
-    when Events::PairingSuccess then pairing_success
+    case type
+    when 'session.state' then session_state
+    when 'pairing.qr' then connecting(qr_data_url: payload.png_data_url)
+    when 'pairing.code' then connecting(pairing_code: payload.code)
+    when 'pairing.success' then pairing_success
     end
   end
 
-  # The same check pairing does, and for the same reason. `pairing.success` is not the
-  # only event that names the paired number: a `session.state` already queued behind it,
-  # or one arriving because the logout below failed, would otherwise be accepted on its
-  # own and put the inbox back to work on somebody else's WhatsApp account.
+  # Whose account this is, is not decided here: the writer refuses any state that names
+  # the wrong number, or that names none while the inbox is quarantined, because the poll
+  # and the connect answer write states without ever passing through a handler.
   def session_state
-    return closed(wrong_phone_error) if wrong_phone? || unidentified_while_disowned?
-
     state(payload.state, error: payload.reason, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end
 
-  def pairing_success
-    return closed(wrong_phone_error) if wrong_phone?
-
-    connecting(phone_number: payload.phone, lid: payload.lid)
-  end
-
-  # `session.state` only requires `state`: the contract's own `connecting` fixture carries
-  # nothing else, and an `open` can arrive the same way. Such a state says nothing about
-  # whose account is connected, and writing it would clear the quarantine below while the
-  # logout that removes the wrong account is still being retried, so the dispatcher would
-  # start filing that account's chats here again. The quarantine is lifted only by a state
-  # that names a number, and names the right one.
-  def unidentified_while_disowned?
-    payload.phone.blank? && Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
-  end
+  def pairing_success = connecting(phone_number: payload.phone, lid: payload.lid)
 
   def closed(error, **attributes) = state('close', error: error, **attributes)
   def connecting(**attributes) = state('connecting', **attributes)
@@ -80,27 +66,4 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   def epoch
     event.epoch.to_i.positive? ? event.epoch.to_i : nil
   end
-
-  # The operator scanned the QR with a different number than the inbox is configured
-  # for. Keeping that session would file the wrong contacts under this inbox, so it is
-  # dropped and the inbox says why.
-  #
-  # Compared through the normalizers, never as raw digits: a Brazilian line is reported
-  # by WhatsApp with or without the ninth digit depending on when it was registered, so
-  # a textual comparison would reject the very number the operator configured.
-  def wrong_phone?
-    configured = channel.phone_number.to_s
-    paired = payload.phone.to_s
-    configured.present? && paired.present? && !Whatsapp::Session::PhoneMatch.same_number?(configured, paired)
-  end
-
-  # Through a job, not inline. The state has already been written by the time this runs,
-  # so a repeat of the same event is reported as unchanged and never gets here again: a
-  # logout that failed once inline would never be attempted a second time, and the wrong
-  # WhatsApp account would stay connected.
-  def after_write(state)
-    Whatsapp::Session::LogoutJob.perform_later(channel) if state.error == wrong_phone_error
-  end
-
-  def wrong_phone_error = Whatsapp::Session::ConnectionStateWriter::WRONG_PHONE_ERROR
 end

@@ -68,7 +68,7 @@ class Whatsapp::Session::Outbound::MessageSender
   # Only the first attachment travels with the message: WhatsApp has no multi-media
   # message, and Chatwoot splits the rest into their own messages upstream.
   def attachment_content
-    outbound::AttachmentAdapter.new(message.attachments.first, caption: message.outgoing_content).perform
+    outbound::AttachmentAdapter.new(message.attachments.first, caption: message.outgoing_content, channel: channel).perform
   end
 
   # The agent typed "@Name"; WhatsApp matches mentions by id, so the rendered text

@@ -8,11 +8,12 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   # Chatwoot's file_type enum, in the terms the WhatsApp protocol uses.
   KINDS = { 'image' => 'image', 'audio' => 'audio', 'video' => 'video', 'file' => 'document' }.freeze
 
-  attr_reader :attachment, :caption
+  attr_reader :attachment, :caption, :channel
 
-  def initialize(attachment, caption: nil)
+  def initialize(attachment, caption: nil, channel: nil)
     @attachment = attachment
     @caption = caption
+    @channel = channel
   end
 
   # Resolved per call rather than aliased: a constant pointing at another file's class
@@ -21,6 +22,18 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   def content = Whatsapp::Session::Model::Content
   def media_ref = Whatsapp::Session::Model::MediaRef
 
+  # `download_url` is built from Rails' default url options, which are the public
+  # FRONTEND_URL. That is the right address for a provider reaching Rails over the
+  # internet and the wrong one for a connector sitting next to it on a private network,
+  # so the host is swapped for the internal one where the inbox says to use it.
+  def media_url
+    url = attachment.download_url
+    internal = ENV.fetch('INTERNAL_HOST_URL', nil)
+    return url unless channel&.use_internal_host? && internal.present?
+
+    url.sub(%r{\A[a-z]+://[^/]+}, internal.chomp('/'))
+  end
+
   def perform
     return if attachment.blank? || !attachment.file.attached?
 
@@ -28,7 +41,7 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
     content::Media.new(
       kind: kind, mime: file.content_type, filename: file.filename.to_s, caption: caption.presence,
       voice_note: voice_note?, size: file.byte_size,
-      ref: media_ref.url(attachment.download_url, mime: file.content_type, size: file.byte_size)
+      ref: media_ref.url(media_url, mime: file.content_type, size: file.byte_size)
     )
   end
 

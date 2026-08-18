@@ -43,7 +43,7 @@ class Whatsapp::Session::Facade
     # The connect answer is the first state the dashboard has to show (it carries the QR
     # for a provider that returns one), and for a polled backend it is also what starts
     # the pairing poll: nothing else would refresh the code as it rotates.
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state, reset: true)
     Whatsapp::Session::PairingPollJob.perform_later(channel, pairing: mode) if backend.class.state_polling?
     state
   end
@@ -103,12 +103,18 @@ class Whatsapp::Session::Facade
     backend.mark_read(model::Commands::MessageMarkRead.new(chat: address(recipient_id), message_ids: source_ids))
   end
 
+  # Addressed from the conversation's contact rather than from `recipient_id`: the
+  # channel always hands this one `contact.phone_number`, which for a LID contact is not
+  # the id WhatsApp knows the chat by, and for a LID-only contact is nothing at all.
   def unread_message(recipient_id, message)
     return unless capability?('mark_unread')
 
+    contact = message.conversation&.contact
+    chat = contact.present? ? model::Address.for_contact(contact) : address(recipient_id)
+
     backend.mark_unread(
       model::Commands::MessageMarkUnread.new(
-        chat: address(recipient_id), last_message_id: message.source_id, from_me: message.outgoing?
+        chat: chat, last_message_id: message.source_id, from_me: message.outgoing?
       )
     )
   end
@@ -142,14 +148,14 @@ class Whatsapp::Session::Facade
     backend.update_presence(model::Commands::PresenceSet.new(state: status))
   end
 
+  # The command's `party` field carries an Address, not a Party: `PresenceSubscribe`
+  # coerces it as one, and `.new` does not run that coercion, so building a Party here
+  # put `{phone, lid}` on the wire where the connector expects `{kind, id}`.
   def presence_subscribe(jids)
     return unless capability?('presence_subscribe')
 
-    Array(jids).each do |jid|
-      party = model::Party.from_address(model::Address.parse(jid))
-      next if party.blank?
-
-      backend.subscribe_presence(model::Commands::PresenceSubscribe.new(party: party))
+    Array(jids).filter_map { |jid| model::Address.parse(jid) }.each do |address|
+      backend.subscribe_presence(model::Commands::PresenceSubscribe.new(party: address))
     end
   end
 

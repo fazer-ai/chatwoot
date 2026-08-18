@@ -1,14 +1,20 @@
 # The only writer of channel_whatsapp.provider_connection for session providers.
 #
-# Three rules live here, all of them learned from the Baileys layer:
+# Four rules live here, all of them learned from the Baileys layer:
 #   1. Ownership fencing: a late event from a previous owner (lower lease epoch) must not
 #      overwrite the current owner's state, or the inbox gets stuck reporting a stale
 #      status while the connection is actually open.
-#   2. Whole-hash replacement: qr_data_url, pairing_code, error and quarantine share the
+#   2. Number ownership: a session paired with a number this inbox is not configured for
+#      is somebody else's WhatsApp account, and no state may report it as usable.
+#   3. Whole-hash replacement: qr_data_url, pairing_code, error and quarantine share the
 #      lifecycle of the state they arrived with, so anything the new state does not carry
 #      is cleared.
-#   3. Sticky keys: reach-out lock and new-chat cap arrive out of band (poll or their own
+#   4. Sticky keys: reach-out lock and new-chat cap arrive out of band (poll or their own
 #      event), so they survive a state update instead of flickering off until the next poll.
+#
+# Rule 2 lives here rather than in the event handler because a handler is only one of the
+# ways a state is written: the pairing poll and the connect answer write one directly, and
+# a check on the handler leaves those two admitting the wrong account.
 class Whatsapp::Session::ConnectionStateWriter
   STICKY_KEYS = Whatsapp::Session::Model::ConnectionState::STICKY_KEYS
 
@@ -29,8 +35,13 @@ class Whatsapp::Session::ConnectionStateWriter
   end
 
   # Returns :written, :stale or :unchanged.
-  def apply(state)
-    channel.with_lock do
+  #
+  # `reset: true` means the operator asked for this connection: a quarantine from the
+  # previous pairing does not carry over, because re-pairing is the way out of one.
+  def apply(state, reset: false)
+    state = enforce_number_ownership(state, reset: reset)
+
+    result = channel.with_lock do
       persisted = channel.provider_connection.presence || {}
       next :stale if stale?(state, persisted)
 
@@ -40,9 +51,45 @@ class Whatsapp::Session::ConnectionStateWriter
       channel.update_provider_connection!(payload)
       :written
     end
+
+    # Through a job, not inline. The state is already written when this runs, so a repeat
+    # of the same state is reported as unchanged and never gets here again: a logout that
+    # failed once inline would never be attempted a second time, and the wrong WhatsApp
+    # account would stay connected.
+    Whatsapp::Session::LogoutJob.perform_later(channel) if result == :written && state.error == WRONG_PHONE_ERROR
+    result
   end
 
   private
+
+  # Two ways a state can belong to the wrong account. It can name the wrong number, which
+  # is the operator having scanned with a different phone. Or it can name no number at all
+  # while the inbox is already quarantined: `session.state` only requires `state`, so a
+  # live session reports itself without saying whose it is, and accepting one of those
+  # would clear the quarantine while the logout that removes that account is still being
+  # retried. Only a state that names the configured number lifts it.
+  def enforce_number_ownership(state, reset:)
+    return quarantine(state) if wrong_phone?(state)
+    return state if reset || state.phone_number.present?
+    return state unless self.class.disowned?(channel)
+
+    quarantine(state)
+  end
+
+  def quarantine(state)
+    Whatsapp::Session::Model::ConnectionState.new(
+      connection: 'close', error: WRONG_PHONE_ERROR, epoch: state.epoch
+    )
+  end
+
+  # Compared through the normalizers, never as raw digits: a Brazilian line is reported by
+  # WhatsApp with or without the ninth digit depending on when it was registered, so a
+  # textual comparison would reject the very number the operator configured.
+  def wrong_phone?(state)
+    configured = channel.phone_number.to_s
+    paired = state.phone_number.to_s
+    configured.present? && paired.present? && !Whatsapp::Session::PhoneMatch.same_number?(configured, paired)
+  end
 
   def merge(state, persisted)
     payload = state.to_h
