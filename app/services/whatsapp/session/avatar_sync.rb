@@ -11,13 +11,19 @@ module Whatsapp::Session::AvatarSync
 
   module_function
 
+  # Read and written under the row lock. `additional_attributes` is one JSON column that
+  # also carries the group's description, its settings and `group_left`, and the caller
+  # is often a job that fetched group info first: writing the whole hash it read before
+  # that round trip would throw away whatever landed in the meantime.
   def reset(contact)
     return if contact.blank?
 
-    attributes = (contact.additional_attributes || {}).except(*MARKERS)
-    return if attributes == contact.additional_attributes
+    contact.with_lock do
+      attributes = (contact.additional_attributes || {}).except(*MARKERS)
+      next if attributes == contact.additional_attributes
 
-    contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
+      contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
+    end
   end
 
   # Clears the markers and asks for the picture at `url`, which the caller already has.

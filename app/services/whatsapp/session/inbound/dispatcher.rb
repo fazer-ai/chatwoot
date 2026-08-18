@@ -63,11 +63,23 @@ class Whatsapp::Session::Inbound::Dispatcher
 
     handler = HANDLERS[event.type]
     return skip('no handler') if handler.nil?
+    return skip('inbox disowned its session') unless allowed_while_disowned?(handler)
 
     "Whatsapp::Session::Inbound::Handlers::#{handler}".constantize.new(channel: channel, event: event).perform
   end
 
   private
+
+  # A session paired with a number this inbox is not configured for is somebody else's
+  # WhatsApp account, and its chats must not be filed here. The logout that removes it is
+  # asynchronous and can be retried for a while, so this is what keeps the wrong account's
+  # messages out in the meantime. Connection events still run, because they are how the
+  # inbox reports the problem and how a correct pairing clears it.
+  def allowed_while_disowned?(handler)
+    return true if handler == 'ConnectionState'
+
+    channel.provider_connection['error'] != I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
+  end
 
   def skip(reason)
     Rails.logger.debug { "[WHATSAPP SESSION] #{event.type} skipped on inbox #{channel.inbox&.id}: #{reason}" }

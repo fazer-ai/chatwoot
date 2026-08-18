@@ -11,17 +11,26 @@ class Whatsapp::Session::Inbound::ReactionStore
     @sender = sender
   end
 
-  # True when anything is still reacting to this target, from anyone. Cheap enough to ask
-  # before resolving a sender, which is what keeps a removal aimed at nothing from
-  # creating a contact on its way to doing nothing.
-  def self.active?(inbox:, target_id:)
+  # True when *this sender* still has a reaction on this target. Asked before the sender
+  # is resolved, which is what keeps a removal aimed at nothing from creating a contact
+  # on its way to doing nothing: scoped to the target alone, somebody else's reaction
+  # would answer yes and the contact would be created anyway.
+  #
+  # `sender` is the Contact, or nil for a reaction written from the connected phone, and
+  # the caller finds it without creating one.
+  def self.active?(inbox:, target_id:, sender:, from_me: false)
     json = "(content_attributes#>>'{}')::jsonb"
-    Message.where(inbox_id: inbox.id)
-           .where("#{json}->>'is_reaction' = 'true'")
-           .where("#{json}->>'in_reply_to_external_id' = ?", target_id)
-           .where.not(content: '')
-           .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
-           .exists?
+    scope = Message.where(inbox_id: inbox.id)
+                   .where("#{json}->>'is_reaction' = 'true'")
+                   .where("#{json}->>'in_reply_to_external_id' = ?", target_id)
+                   .where.not(content: '')
+                   .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
+    scope = if from_me
+              scope.where(sender_id: nil, sender_type: nil).where(message_type: Message.message_types[:outgoing])
+            else
+              scope.where(sender: sender)
+            end
+    scope.exists?
   end
 
   def write(conversation)

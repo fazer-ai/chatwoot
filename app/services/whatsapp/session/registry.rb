@@ -91,7 +91,13 @@ module Whatsapp::Session::Registry
       descriptor = descriptor(channel.provider)
       raise Whatsapp::Session::Errors::InvalidConfig, "#{channel.provider} is not served by the session layer" unless descriptor&.served?
 
-      descriptor.backend_class.new(channel)
+      # A descriptor can name a backend that has not shipped yet, which is how a provider
+      # gets described and labelled before it can be created. Saying so beats the
+      # NoMethodError that constantizing nothing produces.
+      backend = descriptor.backend_class
+      raise Whatsapp::Session::Errors::NotSupported, "#{channel.provider} has no backend in this build" if backend.nil?
+
+      backend.new(channel)
     end
 
     # The capabilities of a channel as the dashboard should see them: the descriptor's

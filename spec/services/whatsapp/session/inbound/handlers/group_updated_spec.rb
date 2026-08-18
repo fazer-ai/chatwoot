@@ -85,6 +85,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # `changes` is a Data instance and is never blank, so a payload reporting nothing, or
+  # nothing this build knows, used to open a group contact, a conversation and a sync
+  # broadcast for an event that says nothing.
+  context 'when the payload reports no change this build knows' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new }
+
+    it 'ignores it instead of opening the group' do
+      expect { expect(dispatch).to eq(:ignored) }.not_to change(Contact, :count)
+    end
+  end
+
   context 'when a setting changed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(announce: true, locked: false) }
 

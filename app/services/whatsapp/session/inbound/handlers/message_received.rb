@@ -79,7 +79,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def chat_lock_ids
     return [message.chat.id] if message.group?
 
-    [message.chat.id, peer_party&.phone, peer_party&.lid]
+    # Every ninth-digit form as well: WhatsApp reports a Brazilian or Argentinian line
+    # with or without the extra digit, `ContactResolver` files both under one contact,
+    # and two keys differing by that digit would not serialize against each other.
+    [message.chat.id, peer_party&.lid, *Whatsapp::Session::PhoneMatch.variants(peer_party&.phone)]
   end
 
   # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is

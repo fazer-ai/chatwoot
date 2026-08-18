@@ -23,6 +23,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     attach_location(message)
     message.save!
     enqueue_media_fetch(message)
+    acknowledge([message])
     message
   end
 
@@ -123,9 +124,24 @@ class Whatsapp::Session::Inbound::MessageWriter
     messages = ActiveRecord::Base.transaction do
       Array(content.contacts).filter_map { |card| build_contact_message(card) }
     end
-    return messages.last if messages.present?
+    return acknowledge(messages).last if messages.present?
 
     unsupported_contact_message
+  end
+
+  # Tells WhatsApp the message was received, which is what puts the second tick on the
+  # contact's screen and, when the inbox asks for it, marks the chat read. The Baileys
+  # and Z-API writers both do this for every incoming row; without it every message this
+  # layer stores stays unread on the contact's phone forever.
+  def acknowledge(messages)
+    return messages unless incoming? && messages.present?
+
+    inbox.channel.received_messages(messages, conversation)
+    messages
+  rescue Whatsapp::Session::Errors::NotSupported
+    # The backend cannot acknowledge, or has not shipped yet. Storing the message is what
+    # matters; the tick on the contact's screen is not worth failing the event over.
+    messages
   end
 
   # An empty share, or one whose cards carry no name, no phone and no vCard, leaves
@@ -136,7 +152,9 @@ class Whatsapp::Session::Inbound::MessageWriter
   def unsupported_contact_message
     attributes = message_attributes
     attributes[:content_attributes] = attributes[:content_attributes].merge(is_unsupported: true)
-    conversation.messages.create!(content: nil, **attributes)
+    message = conversation.messages.create!(content: nil, **attributes)
+    acknowledge([message])
+    message
   end
 
   def build_contact_message(card)

@@ -119,6 +119,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
   # Resolving the peer creates a Contact, a ContactInbox and an avatar job, and a
   # reaction whose target was never stored has nothing to annotate: it used to open a
   # thread of its own to hold a reaction pointing at a message that does not exist.
+  # Scoped to the target alone, somebody else's reaction answered yes and the removal
+  # resolved a contact on its way to doing nothing, which is the exact leak the guard
+  # exists to stop.
+  context 'when the removal comes from somebody who never reacted' do
+    let(:emoji) { nil }
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '3EB0REMOVE2', chat: model::Address.phone('5541900002222'),
+        sender: model::Party.new(phone: '5541900002222'), from_me: false,
+        target_id: target.source_id, emoji: '', timestamp: 1_755_440_000_123
+      )
+    end
+
+    before do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, sender: contact, content: '👍',
+                       content_attributes: { is_reaction: true, in_reply_to_external_id: '3EB0TARGET' })
+    end
+
+    it 'leaves no contact behind' do
+      expect { expect(dispatch).to eq(:ignored) }.not_to change(Contact, :count)
+    end
+  end
+
   context 'when the message it reacts to was never stored' do
     let(:reaction) do
       model::Events::MessageReaction.new(

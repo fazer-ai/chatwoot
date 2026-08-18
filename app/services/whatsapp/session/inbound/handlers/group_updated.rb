@@ -6,7 +6,7 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
 
   def perform
     return :ignored unless capability?(:groups)
-    return :ignored if changes.blank?
+    return :ignored unless changes.respond_to?(:any?) && changes.any?
 
     inbound::Locks.with_chat_lock(inbox, payload.group.id) do
       apply

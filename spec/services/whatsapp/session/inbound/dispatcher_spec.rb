@@ -20,6 +20,32 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
     expect(missing).to be_empty
   end
 
+  # A session paired with a number the inbox is not configured for is somebody else's
+  # WhatsApp account. The logout that removes it is asynchronous and retried, so without
+  # this its chats would be filed here in the meantime.
+  context 'when the inbox has disowned its session' do
+    before do
+      channel.update_provider_connection!(
+        'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
+      )
+    end
+
+    it 'refuses a message event' do
+      inbound = model::InboundMessage.new(id: '3EB0AAAA0001', chat: model::Address.phone('5541999990000'),
+                                          from_me: false, content: model::Content::Text.new(body: 'oi'))
+      event = model::Event.build(model::Events::MessageReceived.new(message: inbound))
+
+      expect(described_class.dispatch(channel, event)).to eq(:ignored)
+      expect(channel.inbox.messages).to be_empty
+    end
+
+    it 'still takes connection events, which is how the inbox recovers' do
+      event = model::Event.build(model::Events::PairingQr.new(png_data_url: 'data:image/png;base64,AAA'), epoch: 9)
+
+      expect(described_class.dispatch(channel, event)).to eq(:handled)
+    end
+  end
+
   # An added type is additive, so it ships on the same protocol major. A frame on a
   # major this build does not read is refused earlier, by the parser.
   it 'ignores a type this build does not know instead of failing the shard' do

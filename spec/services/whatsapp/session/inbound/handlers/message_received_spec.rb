@@ -31,6 +31,31 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     expect(message.conversation).to eq(inbox.conversations.last)
   end
 
+  # The Baileys and Z-API writers both acknowledge every incoming row, which is what puts
+  # the second tick on the contact's screen and, when the inbox asks for it, marks the
+  # chat read. Without it every message this layer stores stays unread on their phone.
+  # `any_instance` because the writer reaches the channel through the conversation's own
+  # inbox, which is a different object than the one this spec holds.
+  it 'tells the provider the message was received' do
+    # `any_instance` because the writer reaches the channel through the conversation's
+    # own inbox, which is a different object than the one this spec holds.
+    expect_any_instance_of(Channel::Whatsapp).to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
+
+    dispatch
+  end
+
+  it 'says nothing to the provider about a message the phone itself sent' do
+    expect_any_instance_of(Channel::Whatsapp).not_to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
+
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(
+      channel,
+      model::Event.build(model::Events::MessageReceived.new(
+                           message: model::InboundMessage.new(id: '3EB0ECHO01', chat: chat, sender: nil, from_me: true,
+                                                              timestamp: 1_755_440_000_123, content: content)
+                         ))
+    )
+  end
+
   it 'creates the contact behind the message' do
     dispatch
 

@@ -84,13 +84,11 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     configured.present? && paired.present? && !Whatsapp::Session::PhoneMatch.same_number?(configured, paired)
   end
 
+  # Through a job, not inline. The state has already been written by the time this runs,
+  # so a repeat of the same event is reported as unchanged and never gets here again: a
+  # logout that failed once inline would never be attempted a second time, and the wrong
+  # WhatsApp account would stay connected.
   def after_write(state)
-    logout_wrong_number if state.error == 'wrong_phone_number'
-  end
-
-  def logout_wrong_number
-    channel.provider_service.logout
-  rescue Whatsapp::Session::Errors::Error => e
-    Rails.logger.warn("[WHATSAPP SESSION] logout after wrong number failed for inbox #{inbox.id}: #{e.message}")
+    Whatsapp::Session::LogoutJob.perform_later(channel) if state.error == 'wrong_phone_number'
   end
 end

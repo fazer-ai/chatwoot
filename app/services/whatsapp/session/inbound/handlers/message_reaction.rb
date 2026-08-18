@@ -18,10 +18,14 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   end
 
   # Checked before the sender is resolved: resolving creates a Contact, a ContactInbox
-  # and an avatar job, and a removal aimed at a message nobody here reacted to has
-  # nothing to remove. Without this, every stray removal leaves a contact behind.
+  # and an avatar job, and a removal aimed at a reaction this sender never made has
+  # nothing to remove. Without this, every stray removal leaves a contact behind, which
+  # is why the lookup here is the non-creating one.
   def remove
-    return :ignored unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id)
+    known = payload.from_me ? nil : inbound::ContactLookup.contact(inbox: inbox, party: peer_party)
+    return :ignored if known.nil? && !payload.from_me
+    return :ignored unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id,
+                                                          sender: known, from_me: payload.from_me)
 
     store(sender_contact).remove ? :handled : :ignored
   end
@@ -80,6 +84,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   def chat_lock_ids
     return [payload.chat.id] if payload.chat.group?
 
-    [payload.chat.id, peer_party&.phone, peer_party&.lid]
+    # Every ninth-digit form as well: WhatsApp reports a Brazilian or Argentinian line
+    # with or without the extra digit, `ContactResolver` files both under one contact,
+    # and two keys differing by that digit would not serialize against each other.
+    [payload.chat.id, peer_party&.lid, *Whatsapp::Session::PhoneMatch.variants(peer_party&.phone)]
   end
 end

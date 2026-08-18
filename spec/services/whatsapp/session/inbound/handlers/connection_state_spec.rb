@@ -54,7 +54,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
       expect(channel.reload.provider_connection).to include(
         'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
       )
-      expect(backend.commands_of('session.logout').size).to eq(1)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
     end
   end
 
