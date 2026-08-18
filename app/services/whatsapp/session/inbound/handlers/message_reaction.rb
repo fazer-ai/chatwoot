@@ -35,30 +35,22 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     # would leave two reactions on the same bubble.
     return :handled if inbound::EchoMatcher.new(inbox: inbox, message_id: payload.id).perform
 
+    # The reaction belongs in the thread holding the message it annotates, and that is
+    # checked before anybody is resolved: resolving creates a Contact, a ContactInbox and
+    # an avatar job, and a reaction whose target was never stored has nothing to annotate.
+    # It is dropped rather than opening a thread of its own to hold it.
+    target = find_message(payload.target_id)
+    return :ignored if target.nil?
+
     contact_inbox = resolve_contact_inbox
     return :ignored if contact_inbox.nil?
 
-    conversation = conversation_for(contact_inbox)
-    return :ignored if conversation.nil?
-
-    store(payload.chat.group? ? sender_contact : contact_inbox.contact).write(conversation)
+    store(payload.chat.group? ? sender_contact : contact_inbox.contact).write(target.conversation)
     :handled
   end
 
   def store(sender)
     inbound::ReactionStore.new(inbox: inbox, reaction: payload, sender: sender)
-  end
-
-  # The reaction belongs in the thread holding the message it annotates. Without a
-  # stored target there is nothing to annotate, so the reaction is dropped rather than
-  # opening a thread of its own.
-  def conversation_for(contact_inbox)
-    target = find_message(payload.target_id)
-    return target.conversation if target
-
-    return nil if payload.chat.group?
-
-    inbound::ConversationFinder.new(inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox).perform
   end
 
   def resolve_contact_inbox

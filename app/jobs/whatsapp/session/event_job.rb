@@ -10,14 +10,20 @@
 # can execute before the `message.received` that stores its target, find nothing, and be
 # dropped for good. The guard belongs here, and what it can be depends on whether the
 # provider's webhook carries a sequence or a usable timestamp: that is captured from a
-# live instance in the Uazapi slice, and the mechanism is chosen then. Do not delete this
-# note without closing the issue.
+# live instance in the Uazapi slice, and the mechanism is chosen then.
+#
+# The same issue covers the other half, redelivery: nothing claims `Event#id` before the
+# dispatcher runs a handler, so a stream replay or a webhook retry writes a second
+# activity row for a group change and re-fires `PROVIDER_EVENT_RECEIVED`. One mechanism
+# (a per-session cursor, or an event-id claim) answers both, which is why they are
+# decided together. Do not delete this note without closing the issue.
 class Whatsapp::Session::EventJob < ApplicationJob
   queue_as :high
 
-  # Another worker holds the chat: retried rather than waited on, so a Sidekiq thread
-  # is never parked on Redis.
-  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 2.seconds, attempts: 5
+  # Another worker holds the chat or the message: retried rather than waited on, so a
+  # Sidekiq thread is never parked on Redis. The backoff has to outlast a marker left
+  # behind by a killed worker, which is why it grows instead of staying at two seconds.
+  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: :polynomially_longer, attempts: 6
 
   # `frame` is a decoded event frame (Model::Event#to_frame).
   def perform(channel, frame)

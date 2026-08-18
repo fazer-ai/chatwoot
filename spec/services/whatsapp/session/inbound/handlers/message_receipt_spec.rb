@@ -60,6 +60,34 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     end
   end
 
+  # Unread counts compare a message's creation time against these markers, so stamping
+  # the clock marks every incoming message that arrived since as seen: a receipt for an
+  # older message, delivered late, cleared the badge for messages nobody here opened.
+  context 'when a read receipt for an older message arrives after a newer one' do
+    let(:type) { 'read' }
+    let(:receipt) do
+      model::Events::MessageReceipt.new(chat: model::Address.phone('5541999990000'),
+                                        message_ids: [old_incoming.source_id], type: 'read',
+                                        timestamp: 1.hour.ago.to_i * 1000)
+    end
+    let!(:old_incoming) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, source_id: '3EB0OLD0001', created_at: 2.hours.ago)
+    end
+    let!(:newer_incoming) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, source_id: '3EB0NEW0001')
+    end
+
+    it 'does not mark the newer message as seen' do
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      dispatch
+
+      expect(conversation.reload.agent_last_seen_at).to be < newer_incoming.created_at
+    end
+  end
+
   context 'when the contact read it' do
     let(:type) { 'read' }
 

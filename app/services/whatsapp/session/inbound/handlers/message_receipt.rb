@@ -24,13 +24,27 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
     payload.type == 'read' && message.incoming?
   end
 
-  # Independent of whether the status moved: a chat marked read twice is still read, and
-  # the seen timestamps have to follow the second mark as well.
+  # The receipt says the chat was read *at that moment*, not now. Unread counts compare
+  # a message's creation time against these markers, so stamping `Time.current` marks
+  # every incoming message that arrived since as seen too: a read receipt delivered late,
+  # or an HTTP event job running out of order, would clear the badge for messages nobody
+  # here has opened. The markers only ever move forward.
   def mark_conversation_seen(message)
     conversation = message.conversation
-    attributes = { agent_last_seen_at: Time.current }
-    attributes[:assignee_last_seen_at] = Time.current if conversation.assignee_id.present?
+    seen_at = read_at(message)
+    return false if conversation.agent_last_seen_at.present? && conversation.agent_last_seen_at >= seen_at
+
+    attributes = { agent_last_seen_at: seen_at }
+    attributes[:assignee_last_seen_at] = seen_at if conversation.assignee_id.present?
     conversation.update_columns(attributes) # rubocop:disable Rails/SkipsModelValidations
     true
+  end
+
+  # The receipt's own time when the provider reports one, otherwise the message it names:
+  # reading a message cannot have happened before that message existed.
+  def read_at(message)
+    return Time.zone.at(payload.timestamp / 1000) if payload.timestamp.present?
+
+    message.created_at
   end
 end

@@ -10,19 +10,26 @@ module Whatsapp::Session::Inbound::Locks
   class Busy < StandardError; end
 
   CHAT_LOCK_TTL = 30.seconds
-  MESSAGE_LOCK_TTL = 1.day
+  # Long enough to cover one processing pass, short enough that a marker orphaned by a
+  # killed worker heals on its own within the job's retry budget.
+  MESSAGE_LOCK_TTL = 30.seconds
 
   module_function
 
-  # Marks a provider message id as being processed. A redelivery of the same id while
-  # the first pass is still running answers :duplicate instead of writing a second row.
-  # The marker is released at the end: what makes a *finished* message a duplicate is
-  # its stored source_id, not this key.
+  # Marks a provider message id as being processed, so a redelivery arriving while the
+  # first pass is still running retries instead of racing it into a second row.
+  #
+  # Holding the marker answers `Busy`, never :duplicate. What makes a *finished* message
+  # a duplicate is its stored source_id, and the caller checks that inside; a worker
+  # killed between taking the marker and writing the row would otherwise have its own
+  # retry answered ":duplicate", which acknowledges the event and loses the message.
   def with_message_lock(inbox, message_id)
     return yield if message_id.blank?
 
     key = message_key(inbox, message_id)
-    return :duplicate unless Redis::Alfred.set(key, true, nx: true, ex: MESSAGE_LOCK_TTL)
+    unless Redis::Alfred.set(key, true, nx: true, ex: MESSAGE_LOCK_TTL)
+      raise Busy, "message #{message_id} of inbox #{inbox.id} is already being processed"
+    end
 
     begin
       yield

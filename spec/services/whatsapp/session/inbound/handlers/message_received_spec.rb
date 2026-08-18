@@ -400,6 +400,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # A worker killed between taking the in-flight marker and writing the row leaves the
+  # marker behind. Answering ":duplicate" there acknowledges the event and loses the
+  # message for good, so a held marker has to be retryable instead.
+  context 'when a marker from a killed worker is still held' do
+    before { Whatsapp::Session::Inbound::Locks.with_message_lock(inbox, inbound.id) { nil } }
+
+    it 'asks for a retry rather than reporting the message as already stored' do
+      allow(Redis::Alfred).to receive(:set).and_return(false)
+
+      expect { dispatch }.to raise_error(Whatsapp::Session::Inbound::Locks::Busy)
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 

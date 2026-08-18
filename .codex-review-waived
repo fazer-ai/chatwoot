@@ -33,3 +33,8 @@ app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group
 # that shared job a freshness check, which is its own change. Removing this waiver does
 # not close the issue.
 app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
+# PR#372: the redelivery half of fazer-ai/chatwoot#373, deliberately not answered here.
+# No session provider has a backend until slices 5 and 6, so nothing can replay an event
+# yet, and the claim mechanism depends on what the provider payloads carry. The note in
+# event_job.rb sits where the fix belongs. Removing this waiver does not close the issue.
+app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372

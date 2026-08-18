@@ -90,13 +90,6 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     end
   end
 
-  it 'does not open a thread for a reaction whose target is unknown' do
-    event = model::Event.build(reaction.with(target_id: '3EB0MISSING', id: '3EB0REACTION2'))
-
-    expect(described_class.new(channel: channel, event: event).perform).to eq(:handled)
-    expect(inbox.messages.find_by(source_id: '3EB0REACTION2').conversation).to eq(inbox.conversations.last)
-  end
-
   context 'when the contact takes the reaction back' do
     let(:emoji) { nil }
 
@@ -120,6 +113,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
            .update_all(content: '') # rubocop:disable Rails/SkipsModelValidations
 
       expect(dispatch).to eq(:ignored)
+    end
+  end
+
+  # Resolving the peer creates a Contact, a ContactInbox and an avatar job, and a
+  # reaction whose target was never stored has nothing to annotate: it used to open a
+  # thread of its own to hold a reaction pointing at a message that does not exist.
+  context 'when the message it reacts to was never stored' do
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '3EB0REACTION', chat: model::Address.phone('5541999990000'), sender: sender,
+        from_me: false, target_id: '3EB0NEVERSEEN', emoji: emoji, timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'drops it instead of inventing a contact and a thread' do
+      expect { expect(dispatch).to eq(:ignored) }
+        .to not_change(Contact, :count).and not_change(inbox.conversations, :count)
     end
   end
 
