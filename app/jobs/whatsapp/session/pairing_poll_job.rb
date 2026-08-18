@@ -27,7 +27,13 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   rescue Whatsapp::Session::Errors::Error => e
     # The instance being unreachable mid-pairing is the operator's problem to see on the
     # screen, not something a retry storm fixes: the next connect starts a fresh poll.
+    # Said on the screen, though, and not only in the log: leaving the state untouched
+    # parks the dashboard on a QR that expired minutes ago, waiting for a rotation that
+    # is never coming.
     Rails.logger.warn("[WHATSAPP SESSION] pairing poll failed for ##{channel.id}: #{e.message}")
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: 'connect_failure')
+    )
   end
 
   private

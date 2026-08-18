@@ -121,14 +121,16 @@ class Whatsapp::Session::Outbound::MessageSender
 
     attributes = { source_id: result.message_id }
     attributes[:external_created_at] = result.timestamp / 1000 if result.timestamp.present?
-    already_assigned = Message.where(id: message.id).where.not(source_id: nil).exists?
-    message.update_under_lock!(**attributes)
-
     # Three writers can fill this column on one send: this response, the echo of the same
     # message coming back from WhatsApp, and the delete endpoint reading it. The revoke
     # job is not idempotent, so the rule is the same in all three: whoever moves the id
-    # from blank to set is the one that enqueues it.
-    Messages::DeleteOnChannelJob.perform_later(message.id) if !already_assigned && message.deleted?
+    # from blank to set is the one that enqueues it. Claimed with a conditional UPDATE
+    # rather than read-then-write, because between a read and the row lock the echo can
+    # slip in and both sides would believe they were first.
+    claimed = outbound::SourceIdReservation.claim_source_id(message, result.message_id)
+    message.update_under_lock!(**attributes)
+
+    Messages::DeleteOnChannelJob.perform_later(message.id) if claimed && message.deleted?
     result.message_id
   end
 

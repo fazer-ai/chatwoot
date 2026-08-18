@@ -24,6 +24,16 @@ module Whatsapp::Session::Outbound::SourceIdReservation
   # Written with update_columns: the reservation is bookkeeping for a send that has not
   # happened yet, so it must not fire message.updated (cable, webhooks, agent bots,
   # search reindex) nor bump updated_at.
+  # Whoever moves `source_id` from blank to set owns the revoke of a message deleted
+  # mid-send, and the send response, the echo and the delete endpoint all race for it.
+  # A conditional UPDATE decides that in one statement: exactly one caller sees a row
+  # affected, no matter how the three interleave. Returns whether this caller was it.
+  def claim_source_id(message, source_id)
+    return false if source_id.blank?
+
+    Message.where(id: message.id, source_id: nil).update_all(source_id: source_id).positive? # rubocop:disable Rails/SkipsModelValidations
+  end
+
   def reserve(message)
     message.with_lock do
       next message.pending_source_id if message.pending_source_id.present?

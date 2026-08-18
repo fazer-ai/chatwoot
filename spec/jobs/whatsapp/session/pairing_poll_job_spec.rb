@@ -74,9 +74,15 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(backend).not_to have_received(:fetch_connection_state)
   end
 
-  it 'gives up quietly when the instance is unreachable mid-pairing' do
+  # Quietly for the job, not for the operator: leaving the state untouched parks the
+  # dashboard on a QR that expired minutes ago, waiting for a rotation that never comes.
+  it 'says on the screen that the pairing failed instead of leaving a dead QR up' do
+    channel.update_provider_connection!({ 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,OLD' })
     allow(backend).to receive(:fetch_connection_state).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)
 
     expect { described_class.perform_now(channel) }.not_to raise_error
+
+    expect(channel.reload.provider_connection).to include('connection' => 'close', 'error_code' => 'connect_failure')
+    expect(channel.provider_connection).not_to have_key('qr_data_url')
   end
 end

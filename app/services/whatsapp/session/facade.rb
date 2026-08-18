@@ -100,13 +100,22 @@ class Whatsapp::Session::Facade
     )
   end
 
+  # One command per participant in a group. A receipt on WhatsApp is addressed by the
+  # message key, and in a group that key includes who sent it, so a single command
+  # covering several senders cannot be acknowledged. In a 1:1 chat the peer is the chat
+  # itself and the field stays empty.
   def read_messages(messages, recipient_id:, **)
     return unless capability?('read_receipts')
 
-    source_ids = Array(messages).filter_map(&:source_id)
-    return if source_ids.empty?
-
-    backend.mark_read(model::Commands::MessageMarkRead.new(chat: address(recipient_id), message_ids: source_ids))
+    chat = address(recipient_id)
+    readable = Array(messages).select { |message| message.source_id.present? }
+    readable.group_by { |message| chat.group? ? message.sender : nil }.each do |sender, group|
+      backend.mark_read(
+        model::Commands::MessageMarkRead.new(
+          chat: chat, message_ids: group.map(&:source_id), sender: participant_address(group.first, sender)
+        )
+      )
+    end
   end
 
   # Addressed from the conversation's contact rather than from `recipient_id`: the
@@ -200,6 +209,14 @@ class Whatsapp::Session::Facade
   # code is requested explicitly from the dashboard).
   def pairing_mode
     channel.provider_connection['phone_number'].present? ? 'resume' : 'qr'
+  end
+
+  # `sender_type` rather than a class check: the association can hold a User (an agent's
+  # own message), and a class comparison is what a reload breaks.
+  def participant_address(message, sender)
+    return if sender.nil? || message.sender_type != 'Contact'
+
+    model::Address.for_contact(sender)
   end
 
   # Recipient ids reach the channel as bare phone numbers or as JIDs, depending on the

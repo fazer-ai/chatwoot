@@ -140,6 +140,28 @@ RSpec.describe Whatsapp::Session::Facade do
     end
   end
 
+  # A receipt on WhatsApp is addressed by the message key, and in a group that key
+  # includes who sent it: one command covering several senders cannot be acknowledged.
+  it 'marks a group read one participant at a time' do
+    group = create(:contact, account: channel.account, identifier: '120363041234567890@g.us', group_type: :group)
+    group_inbox = create(:contact_inbox, contact: group, inbox: inbox, source_id: '120363041234567890')
+    group_conversation = create(:conversation, contact: group, contact_inbox: group_inbox, inbox: inbox, account: channel.account)
+    ana = create(:contact, account: channel.account, phone_number: '+5541999991111')
+    bruno = create(:contact, account: channel.account, phone_number: '+5541999992222')
+    messages = [
+      create(:message, conversation: group_conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, sender: ana, source_id: '3EB0AAAA'),
+      create(:message, conversation: group_conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, sender: bruno, source_id: '3EB0BBBB')
+    ]
+
+    channel.read_messages(messages, conversation: group_conversation)
+
+    commands = backend.commands_of('message.mark_read')
+    expect(commands.map { |command| command.sender&.id }).to contain_exactly('5541999991111', '5541999992222')
+    expect(commands.flat_map(&:message_ids)).to contain_exactly('3EB0AAAA', '3EB0BBBB')
+  end
+
   describe 'the group half' do
     let(:group_jid) { '120363041234567890@g.us' }
 

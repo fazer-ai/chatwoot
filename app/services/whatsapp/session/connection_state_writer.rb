@@ -48,13 +48,17 @@ class Whatsapp::Session::ConnectionStateWriter
   # `reset: true` means the operator asked for this connection: a quarantine from the
   # previous pairing does not carry over, because re-pairing is the way out of one.
   def apply(state, reset: false)
-    state = enforce_number_ownership(state, reset: reset)
+    written = nil
 
     result = channel.with_lock do
+      # Inside the lock, because `with_lock` is also what reloads the row. Deciding
+      # ownership against the caller's copy means a poll that started before a concurrent
+      # event quarantined the inbox reads the pre-quarantine record and clears it.
+      written = enforce_number_ownership(state, reset: reset)
       persisted = channel.provider_connection.presence || {}
-      next :stale if stale?(state, persisted)
+      next :stale if stale?(written, persisted)
 
-      payload = merge(state, persisted)
+      payload = merge(written, persisted)
       next :unchanged if payload == persisted
 
       channel.update_provider_connection!(payload)
@@ -65,7 +69,7 @@ class Whatsapp::Session::ConnectionStateWriter
     # of the same state is reported as unchanged and never gets here again: a logout that
     # failed once inline would never be attempted a second time, and the wrong WhatsApp
     # account would stay connected.
-    Whatsapp::Session::LogoutJob.perform_later(channel) if result == :written && state.error == WRONG_PHONE_ERROR
+    Whatsapp::Session::LogoutJob.perform_later(channel) if result == :written && written.error == WRONG_PHONE_ERROR
     result
   end
 

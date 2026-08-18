@@ -98,9 +98,9 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     # this column, the echo of our own send, which takes the row lock and enqueues the
     # revoke itself when it is the one that filled the id in; both of them seeing
     # `deleted` would ask the provider to revoke the same message twice.
-    already_assigned = Message.where(id: message.id).where.not(source_id: nil).exists?
+    claimed = Whatsapp::Session::Outbound::SourceIdReservation.claim_source_id(message, message_id)
     message.update_under_lock!(source_id: message_id)
-    return if already_assigned || !message.deleted?
+    return unless claimed && message.deleted?
 
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end
