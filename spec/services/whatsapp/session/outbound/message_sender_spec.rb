@@ -64,6 +64,22 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
       .to have_enqueued_job(Messages::DeleteOnChannelJob).once
   end
 
+  # Three writers can fill `source_id` on one send. Here the echo wins the race, so it is
+  # the one that owns the revoke, and neither the send response nor the outer service may
+  # ask the provider to revoke the same message again.
+  it 'does not revoke twice when the echo arrives before the send response' do
+    allow(backend).to receive(:send_message).and_wrap_original do |original, command|
+      message.update_under_lock!(deleted: true)
+      Whatsapp::Session::Inbound::EchoMatcher.new(
+        inbox: inbox, message_id: 'ECHOED-FIRST', client_ref: message.reload.pending_source_id
+      ).perform
+      original.call(command)
+    end
+
+    expect { Whatsapp::SendOnWhatsappService.new(message: message).perform }
+      .to have_enqueued_job(Messages::DeleteOnChannelJob).once
+  end
+
   it 'quotes the message the agent replied to' do
     quoted = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
                               message_type: :incoming, sender: contact, source_id: '3EB0QUOTED')

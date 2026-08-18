@@ -121,12 +121,14 @@ class Whatsapp::Session::Outbound::MessageSender
 
     attributes = { source_id: result.message_id }
     attributes[:external_created_at] = result.timestamp / 1000 if result.timestamp.present?
+    already_assigned = Message.where(id: message.id).where.not(source_id: nil).exists?
     message.update_under_lock!(**attributes)
 
-    # A message deleted while this send was in flight still has to be revoked on the
-    # provider, and SendOnWhatsappService already does that from the id this returns.
-    # Doing it here as well would revoke the same message twice, the second one failing
-    # against a provider that refuses an unknown revoke, with five retries behind it.
+    # Three writers can fill this column on one send: this response, the echo of the same
+    # message coming back from WhatsApp, and the delete endpoint reading it. The revoke
+    # job is not idempotent, so the rule is the same in all three: whoever moves the id
+    # from blank to set is the one that enqueues it.
+    Messages::DeleteOnChannelJob.perform_later(message.id) if !already_assigned && message.deleted?
     result.message_id
   end
 

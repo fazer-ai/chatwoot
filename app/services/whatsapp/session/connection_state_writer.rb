@@ -23,6 +23,15 @@ class Whatsapp::Session::ConnectionStateWriter
   # succeeds, so the three places that used to spell it out cannot drift apart.
   WRONG_PHONE_ERROR = 'wrong_phone_number'.freeze
 
+  # Which number this session is paired with is not part of the connection lifecycle: a
+  # close does not un-pair anything, and the provider still holds the credentials.
+  # Clearing these on every close is what would make the next connect ask for a QR rather
+  # than resume, so a transient disconnect would cost the operator a fresh scan.
+  PAIRING_KEYS = %w[phone_number lid].freeze
+
+  # The two ways a pairing really ends. Everything else is a connection that may come back.
+  PAIRING_ENDED = [WRONG_PHONE_ERROR, 'logged_out'].freeze
+
   # Quarantined: the connection belongs to somebody else's WhatsApp account.
   def self.disowned?(channel)
     channel.provider_connection.to_h['error_code'] == WRONG_PHONE_ERROR
@@ -103,6 +112,7 @@ class Whatsapp::Session::ConnectionStateWriter
     end
     payload['connection'] ||= persisted['connection']
     payload['epoch'] ||= persisted['epoch']
+    carry_pairing(payload, persisted)
     STICKY_KEYS.each do |key|
       payload[key] = persisted[key] if payload[key].nil? && persisted[key].present?
     end
@@ -117,6 +127,12 @@ class Whatsapp::Session::ConnectionStateWriter
   # it. This matches what the Baileys handler has always done.
   def translate(key)
     I18n.t("errors.inboxes.channel.provider_connection.#{key}", default: key.to_s.humanize)
+  end
+
+  def carry_pairing(payload, persisted)
+    return payload.except!(*PAIRING_KEYS) if PAIRING_ENDED.include?(payload['error_code'])
+
+    PAIRING_KEYS.each { |key| payload[key] = persisted[key] if payload[key].nil? && persisted[key].present? }
   end
 
   # Events without an epoch (Uazapi, which has no ownership model) are always accepted.

@@ -37,7 +37,7 @@ class Whatsapp::Session::Facade
     state = backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: capability?('calls')
+        groups: capability?('groups'), calls: call_policy
       )
     )
     # The connect answer is the first state the dashboard has to show (it carries the QR
@@ -52,7 +52,13 @@ class Whatsapp::Session::Facade
     backend.import_session(session: session, candidate_index: candidate_index)
   end
 
+  # The channel calls this when an inbox is destroyed or converted to another provider,
+  # so it is a teardown, not a pause: the Baileys service answers it with
+  # `DELETE /connections/<phone>`. Merely disconnecting would leave the pairing and its
+  # credentials alive on the provider under a session id Chatwoot no longer has.
   def disconnect_channel_provider
+    backend.delete_session
+  rescue Whatsapp::Session::Errors::NotSupported
     backend.disconnect
   end
 
@@ -142,10 +148,17 @@ class Whatsapp::Session::Facade
     backend.send_chat_presence(model::Commands::ChatPresence.new(chat: address(recipient_id), state: state))
   end
 
+  # `online`, `offline` and `busy` are Chatwoot availability; the contract knows only
+  # `available` and `unavailable`. The same mapping the Baileys service has.
+  PRESENCE_STATES = { 'online' => 'available', 'offline' => 'unavailable', 'busy' => 'unavailable' }.freeze
+
   def update_presence(status)
     return unless capability?('presence')
 
-    backend.update_presence(model::Commands::PresenceSet.new(state: status))
+    state = PRESENCE_STATES[status.to_s]
+    return if state.blank?
+
+    backend.update_presence(model::Commands::PresenceSet.new(state: state))
   end
 
   # The command's `party` field carries an Address, not a Party: `PresenceSubscribe`
@@ -174,6 +187,13 @@ class Whatsapp::Session::Facade
 
   def capability?(capability)
     channel.session_capabilities.include?(capability)
+  end
+
+  # An object in the contract, not a flag: the field says how calls are handled, and the
+  # only policy this layer has is to reject them. Omitted when the backend does not do
+  # calls at all, because `false` is not a value the schema accepts either.
+  def call_policy
+    { 'auto_reject' => true } if capability?('calls')
   end
 
   # A session that was already paired resumes; one that never was needs a QR (a pairing

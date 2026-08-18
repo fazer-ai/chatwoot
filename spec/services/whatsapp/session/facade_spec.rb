@@ -13,7 +13,10 @@ RSpec.describe Whatsapp::Session::Facade do
   before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
   it 'is what a session channel answers with' do
-    expect(facade).to be_a(described_class)
+    # Named rather than `described_class`, which RSpec captured when this file loaded: a
+    # reload replaces the class, the channel builds an instance of the new one, and the
+    # identity check fails on a facade that is perfectly correct.
+    expect(facade).to be_a(Whatsapp::Session::Facade) # rubocop:disable RSpec/DescribedClass
     expect(channel.session_backend).to eq(backend)
   end
 
@@ -184,6 +187,63 @@ RSpec.describe Whatsapp::Session::Facade do
         [{ 'jid' => '182736451928374@lid', 'phone_number' => '5541999990000', 'request_time' => 1_755_440_000 }]
       )
     end
+  end
+
+  # The schema types `calls` as an object, so a boolean makes the whole connect command
+  # invalid and the session never pairs. `false` is not a value it accepts either, which
+  # is why a backend without the capability sends nothing at all.
+  it 'describes the call policy the way the contract types it' do
+    channel.setup_channel_provider
+    expect(backend.last_command.calls).to be_nil
+
+    allow(channel).to receive(:session_capabilities).and_return(%w[calls])
+    channel.provider_service.setup_channel_provider
+
+    expect(backend.last_command.calls).to eq({ 'auto_reject' => true })
+  end
+
+  # The channel calls this from before_destroy and from convert_provider!, so it is a
+  # teardown: the Baileys service answers it with DELETE /connections/<phone>. Only
+  # disconnecting leaves the pairing alive on the provider under a session id Chatwoot
+  # has just thrown away.
+  it 'deletes the session when the inbox is torn down' do
+    channel.disconnect_channel_provider
+
+    expect(backend.commands_of('session.delete')).to be_present
+  end
+
+  # Chatwoot availability is online/offline/busy; the contract knows available and
+  # unavailable. The Baileys service maps them, and this used to forward them raw.
+  it 'maps account availability onto the two states the contract accepts' do
+    channel.update_presence('online')
+    expect(backend.last_command.state).to eq('available')
+
+    channel.update_presence('busy')
+    expect(backend.last_command.state).to eq('unavailable')
+  end
+
+  it 'subscribes to presence with an address, which is what the command carries' do
+    facade.presence_subscribe(['182736451928374@lid'])
+
+    expect(backend.last_command.party).to be_a(Whatsapp::Session::Model::Address)
+    expect(backend.last_command.party.id).to eq('182736451928374')
+  end
+
+  # A close does not un-pair anything: the provider still holds the credentials, so the
+  # next connect resumes. Losing the number to a transient disconnect cost a fresh scan.
+  it 'resumes after a transient close, and asks for a QR after a logout' do
+    channel.update_provider_connection!({ 'connection' => 'open', 'phone_number' => '5541988887777' })
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: 'connection_closed')
+    )
+    channel.reload.provider_service.setup_channel_provider
+    expect(backend.last_command.pairing).to eq('resume')
+
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: 'logged_out')
+    )
+    channel.reload.provider_service.setup_channel_provider
+    expect(backend.last_command.pairing).to eq('qr')
   end
 
   it 'connects with a QR when the session was never paired, and resumes afterwards' do
