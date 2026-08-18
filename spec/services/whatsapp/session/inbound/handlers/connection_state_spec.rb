@@ -102,4 +102,54 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
       )
     end
   end
+
+  # `session.state` only requires `state`, so a live session can report itself without
+  # naming whose account it is. Accepting one of those while the logout that removes the
+  # wrong account is still being retried would clear the quarantine and let the dispatcher
+  # file that account's chats here again.
+  context 'when a state names no number while the inbox is disowned' do
+    before do
+      channel.update_provider_connection!(
+        { 'connection' => 'close', 'error_code' => 'wrong_phone_number', 'epoch' => 5 }
+      )
+    end
+
+    it 'keeps the inbox closed on the wrong number' do
+      described_class.new(
+        channel: channel, event: model::Event.build(model::Events::SessionState.new(state: 'open'), epoch: 5)
+      ).perform
+
+      expect(channel.reload.provider_connection).to include(
+        'connection' => 'close', 'error_code' => 'wrong_phone_number'
+      )
+    end
+
+    it 'keeps refusing the wrong account\'s messages' do
+      described_class.new(
+        channel: channel, event: model::Event.build(model::Events::SessionState.new(state: 'open'), epoch: 5)
+      ).perform
+
+      message = model::Event.build(
+        model::Events::MessageReceived.new(
+          message: model::InboundMessage.new(
+            id: '3EB0AAA', chat: model::Address.new(kind: 'phone', id: '5541900001111'),
+            sender: model::Party.new(phone: '5541900001111'), from_me: false, timestamp: 1_755_440_000,
+            content: model::Content::Text.new(body: 'hi')
+          )
+        ), epoch: 5
+      )
+
+      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel.reload, message)).to eq(:ignored)
+    end
+
+    it 'lifts the quarantine once a state names the configured number' do
+      described_class.new(
+        channel: channel,
+        event: model::Event.build(model::Events::SessionState.new(state: 'open', phone: '5541988887777'), epoch: 5)
+      ).perform
+
+      expect(channel.reload.provider_connection).to include('connection' => 'open')
+      expect(channel.provider_connection).not_to have_key('error_code')
+    end
+  end
 end

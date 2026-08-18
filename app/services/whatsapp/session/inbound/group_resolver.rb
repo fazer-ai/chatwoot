@@ -22,7 +22,7 @@ class Whatsapp::Session::Inbound::GroupResolver
   def perform
     group_contact_inbox, group_contact = find_or_create_group_contact
     sender_contact = resolve_sender
-    add_group_member(group_contact, sender_contact) if sender_contact
+    track_membership(group_contact, sender_contact) if sender_contact
 
     Result.new(group_contact_inbox: group_contact_inbox, group_contact: group_contact, sender_contact: sender_contact)
   end
@@ -56,6 +56,20 @@ class Whatsapp::Session::Inbound::GroupResolver
   end
 
   private
+
+  # A message proves that whoever wrote it is in the group; it says nothing about what
+  # they are in it. `add_group_member` writes the role it is handed, so calling it here
+  # with the default would demote back to member, on every message they send, anyone a
+  # roster sync or a `promote` event recorded as an administrator, including our own
+  # number on the echo of our own sends. `inbox_admin?` reads exactly that row to decide
+  # whether this inbox may post in an announce-only group.
+  def track_membership(group_contact, contact)
+    member = GroupMember.find_by(group_contact: group_contact, contact: contact)
+    return add_group_member(group_contact, contact) if member.nil?
+
+    member.update!(is_active: true) unless member.is_active?
+    member
+  end
 
   def resolve_sender
     return if sender.blank?

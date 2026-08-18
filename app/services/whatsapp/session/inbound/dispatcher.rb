@@ -78,7 +78,7 @@ class Whatsapp::Session::Inbound::Dispatcher
   def allowed_while_disowned?(handler)
     return true if handler == 'ConnectionState'
 
-    channel.provider_connection['error_code'] != 'wrong_phone_number'
+    !Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
   end
 
   def skip(reason)

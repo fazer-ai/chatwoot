@@ -12,6 +12,16 @@
 class Whatsapp::Session::ConnectionStateWriter
   STICKY_KEYS = Whatsapp::Session::Model::ConnectionState::STICKY_KEYS
 
+  # The session was paired with a number this inbox is not configured for. Written here,
+  # read by everything that has to keep the wrong account's chats out until the logout
+  # succeeds, so the three places that used to spell it out cannot drift apart.
+  WRONG_PHONE_ERROR = 'wrong_phone_number'.freeze
+
+  # Quarantined: the connection belongs to somebody else's WhatsApp account.
+  def self.disowned?(channel)
+    channel.provider_connection.to_h['error_code'] == WRONG_PHONE_ERROR
+  end
+
   attr_reader :channel
 
   def initialize(channel)

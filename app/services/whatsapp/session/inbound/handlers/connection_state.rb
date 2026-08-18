@@ -46,16 +46,26 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # or one arriving because the logout below failed, would otherwise be accepted on its
   # own and put the inbox back to work on somebody else's WhatsApp account.
   def session_state
-    return closed('wrong_phone_number') if wrong_phone?
+    return closed(wrong_phone_error) if wrong_phone? || unidentified_while_disowned?
 
     state(payload.state, error: payload.reason, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end
 
   def pairing_success
-    return closed('wrong_phone_number') if wrong_phone?
+    return closed(wrong_phone_error) if wrong_phone?
 
     connecting(phone_number: payload.phone, lid: payload.lid)
+  end
+
+  # `session.state` only requires `state`: the contract's own `connecting` fixture carries
+  # nothing else, and an `open` can arrive the same way. Such a state says nothing about
+  # whose account is connected, and writing it would clear the quarantine below while the
+  # logout that removes the wrong account is still being retried, so the dispatcher would
+  # start filing that account's chats here again. The quarantine is lifted only by a state
+  # that names a number, and names the right one.
+  def unidentified_while_disowned?
+    payload.phone.blank? && Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
   end
 
   def closed(error, **attributes) = state('close', error: error, **attributes)
@@ -89,6 +99,8 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # logout that failed once inline would never be attempted a second time, and the wrong
   # WhatsApp account would stay connected.
   def after_write(state)
-    Whatsapp::Session::LogoutJob.perform_later(channel) if state.error == 'wrong_phone_number'
+    Whatsapp::Session::LogoutJob.perform_later(channel) if state.error == wrong_phone_error
   end
+
+  def wrong_phone_error = Whatsapp::Session::ConnectionStateWriter::WRONG_PHONE_ERROR
 end
