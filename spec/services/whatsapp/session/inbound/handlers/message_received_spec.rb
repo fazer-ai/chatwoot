@@ -178,6 +178,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
   # `Message#human_response?` reads this flag to count a reply typed in the WhatsApp app
   # as a real answer, which is what clears `waiting_since` and records a first response.
+  # WhatsApp already has it: the phone is reporting what it sent. Left at the default
+  # the agent sees a message stuck on one tick that no receipt will ever move.
+  it 'stores a message typed on the phone as delivered' do
+    echo = model::InboundMessage.new(
+      id: '3EB0DDDD0001', chat: chat, sender: nil, from_me: true,
+      timestamp: 1_755_440_000_123, content: content
+    )
+
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(
+      channel, model::Event.build(model::Events::MessageReceived.new(message: echo))
+    )
+
+    expect(inbox.messages.find_by(source_id: '3EB0DDDD0001').status).to eq('delivered')
+  end
+
   context 'with a reply typed on the connected phone' do
     let(:inbound) do
       model::InboundMessage.new(
@@ -217,6 +232,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       it 'still writes a message instead of an empty conversation' do
         expect(dispatch).to eq(:handled)
         expect(inbox.messages.last.content).to eq('Carlos Dias')
+      end
+    end
+
+    # Both named fields are optional on the wire, so a share can be nothing but the
+    # vCard, and dropping it left a conversation with no message in it.
+    context 'when the card carries only a vCard' do
+      let(:vcard) do
+        "BEGIN:VCARD\nVERSION:3.0\nFN:Carlos Dias\nTEL;type=CELL;waid=5541988881111:+55 41 98888-1111\nEND:VCARD"
+      end
+      let(:content) { model::Content::Contacts.new(contacts: [{ 'vcard' => vcard }]) }
+
+      it 'reads the name and the number out of it' do
+        expect(dispatch).to eq(:handled)
+
+        message = inbox.messages.last
+        expect(message.content).to include('Carlos Dias', '+55 41 98888-1111')
+        expect(message.attachments.first.file_type).to eq('contact')
       end
     end
   end

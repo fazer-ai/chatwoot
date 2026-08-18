@@ -19,6 +19,11 @@ class Whatsapp::Session::Inbound::Handlers::GroupJoined < Whatsapp::Session::Inb
     resolver.conversation_for(result.group_contact_inbox)
 
     Whatsapp::Session::Groups::Syncer.new(channel: channel, group_contact: result.group_contact, info: payload.info).perform
+    # The roster changed, and an ordinary contact update does not carry `group_members`,
+    # so without this an open dashboard keeps showing the members (and the admin rights)
+    # the group had before, until a reload or the next participant event.
+    result.group_contact.reload
+    Rails.configuration.dispatcher.dispatch(Events::Types::CONTACT_GROUP_SYNCED, Time.zone.now, contact: result.group_contact)
     :handled
   end
 end

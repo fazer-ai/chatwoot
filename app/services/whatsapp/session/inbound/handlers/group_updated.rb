@@ -22,7 +22,8 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
     @resolver = Inbound::GroupResolver.new(inbox: inbox, group: payload.group)
     result = @resolver.perform
     @group_contact = result.group_contact
-    @conversation = @resolver.conversation_for(result.group_contact_inbox)
+    @group_contact_inbox = result.group_contact_inbox
+    @conversation = @resolver.conversation_for(@group_contact_inbox)
     @activity = Inbound::GroupActivityWriter.new(conversation: @conversation, actor: payload.actor)
 
     apply_subject
@@ -107,9 +108,10 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
     return unless contacts.any? { |contact| session_owner?(contact) }
 
     merge_attributes('group_left' => true)
-    @group_contact.contact_inboxes.each do |contact_inbox|
-      contact_inbox.conversations.where(status: %i[open pending]).find_each { |thread| thread.update!(status: :resolved) }
-    end
+    # Only this inbox's threads. The group contact is shared by every inbox of the
+    # account that is in the same WhatsApp group, and closing their conversations
+    # because *this* session left would end a thread another number can still use.
+    @group_contact_inbox.conversations.where(status: %i[open pending]).find_each { |thread| thread.update!(status: :resolved) }
   end
 
   # WhatsApp may describe the session's own participant by LID alone, in which case the

@@ -24,6 +24,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
     attributes = { 'deleted' => true, 'pending_source_id' => target.pending_source_id }.compact
     target.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: attributes)
     target.attachments.destroy_all
+    Inbound::ChatList.refresh(target.conversation)
     :handled
   end
 
@@ -33,6 +34,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
     return :ignored if target.deleted_by_contact
 
     target.update!(deleted_by_contact: true)
+    Inbound::ChatList.refresh(target.conversation)
     :handled
   end
 end

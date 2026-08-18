@@ -55,7 +55,7 @@ class Whatsapp::Session::Inbound::ReactionStore
     return if existing.nil?
 
     existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
-    refresh_chat_list(existing.conversation)
+    Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
 
@@ -73,6 +73,7 @@ class Whatsapp::Session::Inbound::ReactionStore
         { 'external_created_at' => reaction.timestamp && (reaction.timestamp / 1000) }.compact
       )
     )
+    Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
 
@@ -96,13 +97,5 @@ class Whatsapp::Session::Inbound::ReactionStore
            .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
            .reorder(created_at: :desc)
            .first
-  end
-
-  # The MESSAGE_UPDATED cable only refreshes the open thread, so without this the chat
-  # list preview stays pointed at the reaction that was just removed. Touching
-  # updated_at also lets the frontend drop cables that arrive out of order.
-  def refresh_chat_list(conversation)
-    conversation.update_columns(updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-    conversation.dispatch_conversation_updated_event
   end
 end

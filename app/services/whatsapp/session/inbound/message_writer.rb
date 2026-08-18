@@ -39,6 +39,10 @@ class Whatsapp::Session::Inbound::MessageWriter
       source_id: inbound.id,
       sender: incoming? ? sender : nil,
       message_type: incoming? ? :incoming : :outgoing,
+      # WhatsApp already has an echo: it is the phone reporting what it sent. Leaving it
+      # at the default `sent` would show the agent a message stuck on one tick that no
+      # receipt is ever going to move.
+      status: incoming? ? :sent : :delivered,
       content_attributes: content_attributes
     }
   end
@@ -118,11 +122,13 @@ class Whatsapp::Session::Inbound::MessageWriter
 
   def build_contact_message(card)
     card = card.stringify_keys
-    phone = card['phone'].presence
     # `display_name` is what the contract calls it. Reading `name` found nothing, so a
     # card with a phone lost its name and a name-only card was dropped entirely, leaving
-    # the conversation that had just been opened with no message in it.
-    name = card['display_name'].presence
+    # the conversation that had just been opened with no message in it. Both fields are
+    # optional on the wire and a card may arrive as nothing but its vCard, which is why
+    # that is read too rather than dropping the share.
+    phone = card['phone'].presence || vcard_phone(card['vcard'])
+    name = card['display_name'].presence || vcard_name(card['vcard'])
     return if phone.blank? && name.blank?
 
     message = conversation.messages.build(content: contact_line(name, phone), **message_attributes)
@@ -132,6 +138,18 @@ class Whatsapp::Session::Inbound::MessageWriter
     )
     message.save!
     message
+  end
+
+  # The WhatsApp vCard TEL line is `...;waid=<digits>:<formatted phone>`, so the
+  # formatted number is preferred and the waid digits are the fallback. Same reading the
+  # Baileys layer does, kept here so a card with nothing else still lands.
+  def vcard_phone(vcard)
+    vcard = vcard.to_s
+    vcard[/waid=\d+:\s*([^\r\n]+)/, 1]&.strip.presence || vcard[/waid=(\d+)/, 1].presence
+  end
+
+  def vcard_name(vcard)
+    vcard.to_s[/^FN[^:]*:\s*([^\r\n]+)/, 1]&.strip.presence
   end
 
   def contact_line(name, phone)

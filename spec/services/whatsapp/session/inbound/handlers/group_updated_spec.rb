@@ -98,6 +98,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # The group contact is shared by every inbox of the account that is in the same
+  # WhatsApp group, so closing all of its threads would end a conversation another
+  # number can still use.
+  context 'when another inbox of the account is in the same group' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(leave: [model::Party.new(phone: '5541988887777')]) }
+    let(:other_inbox) do
+      create(:channel_whatsapp, account: channel.account, provider: 'native', phone_number: '+5541977776666',
+                                validate_provider_config: false, sync_templates: false).inbox
+    end
+
+    it 'closes only its own threads' do
+      dispatch
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      other_contact_inbox = create(:contact_inbox, inbox: other_inbox, contact: group_contact,
+                                                   source_id: '120363041234567890')
+      other_thread = create(:conversation, contact: group_contact, contact_inbox: other_contact_inbox,
+                                           inbox: other_inbox, account: channel.account, status: :open)
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+      end
+
+      expect(other_thread.reload.status).to eq('open')
+    end
+  end
+
   context 'when the description was removed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(description: '') }
 
