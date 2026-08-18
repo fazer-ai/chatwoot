@@ -28,12 +28,24 @@ RSpec.describe Whatsapp::Session::Outbound::SourceIdReservation do
       first = described_class.assign(message, { source_id: '3EB0FIRST' })
       second = described_class.assign(message.reload, { source_id: '3EB0FIRST' })
 
-      expect([first, second]).to eq([true, false])
+      expect([first, second]).to eq(%i[revoke written])
     end
 
     it 'owes nothing when the message is still alive' do
-      expect(described_class.assign(message, { source_id: '3EB0FIRST' })).to be(false)
+      expect(described_class.assign(message, { source_id: '3EB0FIRST' })).to eq(:written)
       expect(message.reload.source_id).to eq('3EB0FIRST')
+    end
+
+    # Toggling a reaction rewrites the same row and clears its reservation on purpose. A
+    # slow response from the emoji that was just replaced must not write its id back: the
+    # replacement send would then be skipped as something the provider already has.
+    it 'refuses a response whose reservation the row has moved on from' do
+      described_class.reserve(message)
+      stale = message.reload.pending_source_id
+      message.update_under_lock!(pending_source_id: nil)
+
+      expect(described_class.assign(message.reload, { source_id: '3EB0FIRST' }, reservation: stale)).to eq(:stale)
+      expect(message.reload.source_id).to be_nil
     end
 
     # `update_all` would have written the id without changing the record, leaving

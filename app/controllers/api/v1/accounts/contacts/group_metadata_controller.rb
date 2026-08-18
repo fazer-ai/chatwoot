@@ -5,7 +5,7 @@ class Api::V1::Accounts::Contacts::GroupMetadataController < Api::V1::Accounts::
     update_description if metadata_params[:description].present?
     update_picture if metadata_params[:avatar].present?
     render json: { id: @contact.id, name: @contact.name, additional_attributes: @contact.additional_attributes }
-  rescue Whatsapp::Session::Errors::ProviderUnavailable => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 

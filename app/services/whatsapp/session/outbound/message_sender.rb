@@ -121,9 +121,13 @@ class Whatsapp::Session::Outbound::MessageSender
 
     attributes = { source_id: result.message_id }
     attributes[:external_created_at] = result.timestamp / 1000 if result.timestamp.present?
-    # The write and the "do I owe a revoke?" answer come back together, decided inside the
-    # row lock. See SourceIdReservation.assign for why they cannot be separated.
-    Messages::DeleteOnChannelJob.perform_later(message.id) if outbound::SourceIdReservation.assign(message, attributes)
+    # The write, the "does this response still belong here?" check and the "do I owe a
+    # revoke?" answer all come back together, decided inside the row lock. See
+    # SourceIdReservation.assign for why they cannot be separated.
+    outcome = outbound::SourceIdReservation.assign(message, attributes, reservation: reserved_id)
+    return if outcome == :stale
+
+    Messages::DeleteOnChannelJob.perform_later(message.id) if outcome == :revoke
     result.message_id
   end
 

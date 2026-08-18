@@ -98,7 +98,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     # this column, the echo of our own send, and both of them seeing `deleted` would ask
     # the provider to revoke the same message twice. The assignment and that decision
     # share one row lock, which is what makes the answer unambiguous.
-    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(message, { source_id: message_id })
+    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(message, { source_id: message_id }) == :revoke
 
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end

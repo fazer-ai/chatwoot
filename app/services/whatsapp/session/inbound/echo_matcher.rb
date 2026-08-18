@@ -52,7 +52,7 @@ class Whatsapp::Session::Inbound::EchoMatcher
   # and return, while the other writer sees the id already set and enqueues nothing.
   def confirm_source_id(reserved)
     return if message_id.blank?
-    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(reserved, { source_id: message_id })
+    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(reserved, { source_id: message_id }) == :revoke
 
     Messages::DeleteOnChannelJob.perform_later(reserved.id)
   end
