@@ -9,12 +9,13 @@
 # its own phone and identifier, while a group participant is described partially and
 # may only fill in what is still blank.
 class Whatsapp::Session::Inbound::ContactResolver
-  attr_reader :inbox, :party, :overwrite
+  attr_reader :inbox, :party, :overwrite, :skip_avatar
 
-  def initialize(inbox:, party:, overwrite: false)
+  def initialize(inbox:, party:, overwrite: false, skip_avatar: false)
     @inbox = inbox
     @party = party
     @overwrite = overwrite
+    @skip_avatar = skip_avatar
   end
 
   def perform
@@ -121,6 +122,7 @@ class Whatsapp::Session::Inbound::ContactResolver
   end
 
   def enqueue_avatar(contact)
+    return if skip_avatar
     return if contact.avatar.attached?
     return unless inbox.channel.session_capabilities.include?('profile_picture')
 

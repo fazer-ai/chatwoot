@@ -69,6 +69,22 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # A promote can be the first thing seen about a participant: the roster sync may never
+  # have run, or the person joined before the inbox existed. `update_member_role` only
+  # touches a membership that already exists, so the roster kept omitting somebody the
+  # event had just confirmed is in the group.
+  context 'when a promotion is the first thing seen about the participant' do
+    let(:promoted) { model::Party.new(phone: '5541977776666', push_name: 'Bruno') }
+    let(:changes) { model::Events::GroupUpdated::Changes.new(promote: [promoted]) }
+
+    it 'files them as an admin instead of doing nothing' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.group_memberships.active.map(&:role)).to include('admin')
+    end
+  end
+
   context 'when a setting changed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(announce: true, locked: false) }
 

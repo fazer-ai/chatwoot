@@ -1,10 +1,10 @@
 class Contacts::SyncGroupService
-  pattr_initialize [:contact!, { soft: false }]
+  pattr_initialize [:contact!, { soft: false, channel: nil }]
 
   def perform
     validate_group_contact!
 
-    channel = contact.group_channel
+    channel = self.channel || contact.group_channel
     raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') if channel.blank? || !channel.respond_to?(:sync_group)
 
     conversation = find_or_create_sync_conversation

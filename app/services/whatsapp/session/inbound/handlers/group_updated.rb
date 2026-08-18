@@ -8,7 +8,7 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
     return :ignored unless capability?(:groups)
     return :ignored if changes.blank?
 
-    Inbound::Locks.with_chat_lock(inbox, payload.group.id) do
+    inbound::Locks.with_chat_lock(inbox, payload.group.id) do
       apply
       :handled
     end
@@ -19,12 +19,12 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
   def changes = payload.changes
 
   def apply
-    @resolver = Inbound::GroupResolver.new(inbox: inbox, group: payload.group)
+    @resolver = inbound::GroupResolver.new(inbox: inbox, group: payload.group)
     result = @resolver.perform
     @group_contact = result.group_contact
     @group_contact_inbox = result.group_contact_inbox
     @conversation = @resolver.conversation_for(@group_contact_inbox)
-    @activity = Inbound::GroupActivityWriter.new(conversation: @conversation, actor: payload.actor)
+    @activity = inbound::GroupActivityWriter.new(conversation: @conversation, actor: payload.actor)
 
     apply_subject
     apply_description
@@ -74,15 +74,21 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
   end
 
   def resolve_participant(party)
-    Inbound::ContactResolver.new(inbox: inbox, party: party)&.perform&.contact
+    inbound::ContactResolver.new(inbox: inbox, party: party)&.perform&.contact
   end
 
+  # A promote or a demote is the first thing seen about a participant often enough: the
+  # roster sync may never have run for this group, or the person joined before the inbox
+  # existed. `update_member_role` only updates a membership that is already there and
+  # says nothing otherwise, so the roster would keep omitting somebody the event just
+  # confirmed is in the group. Adding with the reported role writes the same row and
+  # creates it when it is missing.
   def apply_membership(action, contact)
     case action
     when 'join' then @resolver.add_member(@group_contact, contact)
     when 'leave' then @resolver.remove_member(@group_contact, contact)
-    when 'promote' then @resolver.update_member_role(@group_contact, contact, :admin)
-    when 'demote' then @resolver.update_member_role(@group_contact, contact, :member)
+    when 'promote' then @resolver.add_member(@group_contact, contact, role: :admin)
+    when 'demote' then @resolver.add_member(@group_contact, contact, role: :member)
     end
   end
 

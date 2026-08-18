@@ -108,8 +108,13 @@ class Whatsapp::Session::Groups::Syncer
     end
   end
 
+  # `skip_avatar` on a soft sync, exactly as the Baileys path passes `skip_avatars: soft`:
+  # an activity hint on a large group would otherwise enqueue one provider profile
+  # lookup per member without an avatar, which is the expensive half a hint does not
+  # justify paying for.
   def upsert_member(participant)
-    contact = Whatsapp::Session::Inbound::ContactResolver.new(inbox: inbox, party: participant.party)&.perform&.contact
+    contact = Whatsapp::Session::Inbound::ContactResolver
+              .new(inbox: inbox, party: participant.party, skip_avatar: soft)&.perform&.contact
     return if contact.blank?
 
     member = GroupMember.find_or_initialize_by(group_contact: group_contact, contact: contact)

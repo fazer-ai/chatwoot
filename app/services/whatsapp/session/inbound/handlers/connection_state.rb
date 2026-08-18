@@ -56,7 +56,7 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   def connecting(**attributes) = state('connecting', **attributes)
 
   def state(connection, **attributes)
-    Model::ConnectionState.new(connection: connection, epoch: epoch, **attributes)
+    model::ConnectionState.new(connection: connection, epoch: epoch, **attributes)
   end
 
   # Uazapi has no ownership model and sends no epoch; only the connector's epoch is a

@@ -4,12 +4,12 @@ class Whatsapp::Session::Inbound::Handlers::GroupPictureChanged < Whatsapp::Sess
   def perform
     return :ignored unless capability?(:groups)
 
-    Inbound::Locks.with_chat_lock(inbox, payload.group.id) do
-      resolver = Inbound::GroupResolver.new(inbox: inbox, group: payload.group)
+    inbound::Locks.with_chat_lock(inbox, payload.group.id) do
+      resolver = inbound::GroupResolver.new(inbox: inbox, group: payload.group)
       result = resolver.perform
       conversation = resolver.conversation_for(result.group_contact_inbox)
 
-      Inbound::GroupActivityWriter.new(conversation: conversation, actor: payload.actor).write('icon_changed')
+      inbound::GroupActivityWriter.new(conversation: conversation, actor: payload.actor).write('icon_changed')
       refresh_avatar(result.group_contact)
       :handled
     end

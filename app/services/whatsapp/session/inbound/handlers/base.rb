@@ -5,9 +5,6 @@
 #   :ignored   the event is not actionable here (disabled capability, unknown chat...)
 #   :duplicate the event had already been processed
 class Whatsapp::Session::Inbound::Handlers::Base
-  Model = Whatsapp::Session::Model
-  Inbound = Whatsapp::Session::Inbound
-
   attr_reader :channel, :event
 
   def initialize(channel:, event:)
@@ -20,6 +17,14 @@ class Whatsapp::Session::Inbound::Handlers::Base
   end
 
   private
+
+  # Resolved on every call, never held in a constant. Both are implicit namespaces (no
+  # `model.rb`, no `inbound.rb`), so a constant here captures a module object that a
+  # reload strips of its autoloads, and every handler inheriting it then raises
+  # `uninitialized constant` on the first lookup through it. Asking for the full path
+  # each time is what makes the tree survive a reload.
+  def model = Whatsapp::Session::Model
+  def inbound = Whatsapp::Session::Inbound
 
   def payload = event.payload
   def inbox = channel.inbox

@@ -27,3 +27,9 @@ app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatc
 # inbox means changing that contract in the frozen legacy layer as well, so it is its
 # own change, not a slice of this one. Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group-left state to the originating inbox  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#375, and not specific to this layer. The
+# window belongs to `Avatar::AvatarFromUrlJob`, which is handed a URL with no notion of
+# how fresh it is; the Baileys avatar paths have the same one. Closing it means giving
+# that shared job a freshness check, which is its own change. Removing this waiver does
+# not close the issue.
+app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372

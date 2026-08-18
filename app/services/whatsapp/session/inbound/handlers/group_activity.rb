@@ -14,12 +14,12 @@ class Whatsapp::Session::Inbound::Handlers::GroupActivity < Whatsapp::Session::I
   private
 
   def refresh(group)
-    Inbound::Locks.with_chat_lock(inbox, group.id) do
-      resolver = Inbound::GroupResolver.new(inbox: inbox, group: group)
+    inbound::Locks.with_chat_lock(inbox, group.id) do
+      resolver = inbound::GroupResolver.new(inbox: inbox, group: group)
       result = resolver.perform
       conversation = resolver.conversation_for(result.group_contact_inbox)
 
-      Contacts::SyncGroupJob.perform_later(result.group_contact, soft: true)
+      Contacts::SyncGroupJob.perform_later(result.group_contact, soft: true, channel: channel)
       conversation.update_columns(last_activity_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
       conversation.dispatch_conversation_updated_event
     end

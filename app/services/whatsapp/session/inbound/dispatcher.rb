@@ -4,36 +4,38 @@
 # by name. That is what lets an older Chatwoot keep running against a newer connector,
 # and what keeps the Uazapi translator honest about what it can actually produce.
 class Whatsapp::Session::Inbound::Dispatcher
-  Handlers = Whatsapp::Session::Inbound::Handlers
-
+  # Handler names, not handler classes. A class object stored here is captured from
+  # another file, and a reload leaves this table pointing at the previous generation,
+  # whose own namespace aliases are stale in turn. Resolving the name when the event
+  # arrives costs nothing and cannot go out of date.
   HANDLERS = {
-    'session.state' => Handlers::ConnectionState,
-    'session.logged_out' => Handlers::ConnectionState,
-    'session.stream_replaced' => Handlers::ConnectionState,
-    'session.temporary_ban' => Handlers::ConnectionState,
-    'session.client_outdated' => Handlers::ConnectionState,
-    'session.connect_failure' => Handlers::ConnectionState,
-    'pairing.qr' => Handlers::ConnectionState,
-    'pairing.code' => Handlers::ConnectionState,
-    'pairing.success' => Handlers::ConnectionState,
-    'pairing.error' => Handlers::ConnectionState,
-    'message.received' => Handlers::MessageReceived,
-    'message.receipt' => Handlers::MessageReceipt,
-    'message.edited' => Handlers::MessageEdited,
-    'message.revoked' => Handlers::MessageRevoked,
-    'message.reaction' => Handlers::MessageReaction,
-    'media.download_failed' => Handlers::MediaDownloadFailed,
-    'command.failed' => Handlers::CommandFailed,
-    'chat.presence' => Handlers::Presence,
-    'presence.update' => Handlers::Presence,
-    'contact.picture_changed' => Handlers::ContactPictureChanged,
-    'group.joined' => Handlers::GroupJoined,
-    'group.updated' => Handlers::GroupUpdated,
-    'group.picture_changed' => Handlers::GroupPictureChanged,
-    'group.activity' => Handlers::GroupActivity,
-    'account.reachout_timelock' => Handlers::AccountLimits,
-    'account.new_chat_cap' => Handlers::AccountLimits,
-    'raw' => Handlers::Raw
+    'session.state' => 'ConnectionState',
+    'session.logged_out' => 'ConnectionState',
+    'session.stream_replaced' => 'ConnectionState',
+    'session.temporary_ban' => 'ConnectionState',
+    'session.client_outdated' => 'ConnectionState',
+    'session.connect_failure' => 'ConnectionState',
+    'pairing.qr' => 'ConnectionState',
+    'pairing.code' => 'ConnectionState',
+    'pairing.success' => 'ConnectionState',
+    'pairing.error' => 'ConnectionState',
+    'message.received' => 'MessageReceived',
+    'message.receipt' => 'MessageReceipt',
+    'message.edited' => 'MessageEdited',
+    'message.revoked' => 'MessageRevoked',
+    'message.reaction' => 'MessageReaction',
+    'media.download_failed' => 'MediaDownloadFailed',
+    'command.failed' => 'CommandFailed',
+    'chat.presence' => 'Presence',
+    'presence.update' => 'Presence',
+    'contact.picture_changed' => 'ContactPictureChanged',
+    'group.joined' => 'GroupJoined',
+    'group.updated' => 'GroupUpdated',
+    'group.picture_changed' => 'GroupPictureChanged',
+    'group.activity' => 'GroupActivity',
+    'account.reachout_timelock' => 'AccountLimits',
+    'account.new_chat_cap' => 'AccountLimits',
+    'raw' => 'Raw'
   }.freeze
 
   # Types the catalog defines and this layer deliberately drops. Listed so that a type
@@ -62,7 +64,7 @@ class Whatsapp::Session::Inbound::Dispatcher
     handler = HANDLERS[event.type]
     return skip('no handler') if handler.nil?
 
-    handler.new(channel: channel, event: event).perform
+    "Whatsapp::Session::Inbound::Handlers::#{handler}".constantize.new(channel: channel, event: event).perform
   end
 
   private

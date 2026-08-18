@@ -4,7 +4,7 @@ class Whatsapp::Session::Inbound::Handlers::ContactPictureChanged < Whatsapp::Se
   def perform
     return :ignored unless capability?(:profile_picture)
 
-    contact = Inbound::ContactLookup.contact(inbox: inbox, party: payload.party)
+    contact = inbound::ContactLookup.contact(inbox: inbox, party: payload.party)
     return :ignored if contact.nil?
 
     payload.removed ? remove_avatar(contact) : refresh_avatar(contact)

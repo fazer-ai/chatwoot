@@ -8,7 +8,7 @@ class Whatsapp::Session::Inbound::Handlers::CommandFailed < Whatsapp::Session::I
     message = pending_message
     return :ignored if message.nil?
 
-    Inbound::StatusTransition.apply(message, 'failed', error: payload.error) ? :handled : :ignored
+    inbound::StatusTransition.apply(message, 'failed', error: payload.error) ? :handled : :ignored
   end
 
   private

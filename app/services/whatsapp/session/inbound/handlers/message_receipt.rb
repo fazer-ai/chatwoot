@@ -12,7 +12,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
 
   def apply(message)
     seen = mark_conversation_seen(message) if read_on_our_side?(message)
-    changed = Inbound::StatusTransition.apply(message, payload.type, error: payload.error)
+    changed = inbound::StatusTransition.apply(message, payload.type, error: payload.error)
     changed || seen.present?
   end
 

@@ -3,7 +3,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   def perform
     return :ignored unless actionable?
 
-    Inbound::Locks.with_chat_lock(inbox, payload.chat.id) do
+    inbound::Locks.with_chat_lock(inbox, payload.chat.id) do
       payload.removal? ? remove : add
     end
   end
@@ -21,7 +21,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   # and an avatar job, and a removal aimed at a message nobody here reacted to has
   # nothing to remove. Without this, every stray removal leaves a contact behind.
   def remove
-    return :ignored unless Inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id)
+    return :ignored unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id)
 
     store(sender_contact).remove ? :handled : :ignored
   end
@@ -33,7 +33,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     # response makes the echo arrive under an id we never stored. The reservation is
     # what identifies it, on its own and before any contact is resolved; writing again
     # would leave two reactions on the same bubble.
-    return :handled if Inbound::EchoMatcher.new(inbox: inbox, message_id: payload.id).perform
+    return :handled if inbound::EchoMatcher.new(inbox: inbox, message_id: payload.id).perform
 
     contact_inbox = resolve_contact_inbox
     return :ignored if contact_inbox.nil?
@@ -46,7 +46,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   end
 
   def store(sender)
-    Inbound::ReactionStore.new(inbox: inbox, reaction: payload, sender: sender)
+    inbound::ReactionStore.new(inbox: inbox, reaction: payload, sender: sender)
   end
 
   # The reaction belongs in the thread holding the message it annotates. Without a
@@ -58,13 +58,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
 
     return nil if payload.chat.group?
 
-    Inbound::ConversationFinder.new(inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox).perform
+    inbound::ConversationFinder.new(inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox).perform
   end
 
   def resolve_contact_inbox
     return group_result&.group_contact_inbox if payload.chat.group?
 
-    Inbound::ContactResolver.new(inbox: inbox, party: peer_party, overwrite: true).perform
+    inbound::ContactResolver.new(inbox: inbox, party: peer_party, overwrite: true).perform
   end
 
   def sender_contact
@@ -74,12 +74,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   end
 
   def group_result
-    @group_result ||= Inbound::GroupResolver.new(inbox: inbox, group: payload.chat, sender: payload.sender).perform
+    @group_result ||= inbound::GroupResolver.new(inbox: inbox, group: payload.chat, sender: payload.sender).perform
   end
 
   def peer_party
     return payload.sender if !payload.from_me && payload.sender.present?
 
-    Model::Party.from_address(payload.chat)
+    model::Party.from_address(payload.chat)
   end
 end

@@ -10,6 +10,16 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
     expect(model::Events::TYPES - routed).to be_empty
   end
 
+  # The table holds names rather than classes, so a typo would otherwise only surface
+  # the day that event arrives. This keeps it a load-time guarantee.
+  it 'names a handler that exists for every type it routes' do
+    missing = described_class::HANDLERS.values.uniq.reject do |name|
+      "Whatsapp::Session::Inbound::Handlers::#{name}".safe_constantize.present?
+    end
+
+    expect(missing).to be_empty
+  end
+
   # An added type is additive, so it ships on the same protocol major. A frame on a
   # major this build does not read is refused earlier, by the parser.
   it 'ignores a type this build does not know instead of failing the shard' do

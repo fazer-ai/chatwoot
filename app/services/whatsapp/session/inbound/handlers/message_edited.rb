@@ -15,7 +15,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
     # not overwrite the original.
     previous = target.is_edited ? target.previous_content : target.content
     target.update!(content: content, is_edited: true, previous_content: previous)
-    Inbound::ChatList.refresh(target.conversation)
+    inbound::ChatList.refresh(target.conversation)
     :handled
   end
 

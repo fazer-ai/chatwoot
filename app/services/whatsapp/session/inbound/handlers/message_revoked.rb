@@ -11,7 +11,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
     results = targets.map { |target| payload.by_self? ? revoke_by_self(target) : revoke_by_contact(target) }
     return :ignored unless results.include?(:handled)
 
-    Inbound::ChatList.refresh(targets.first.conversation)
+    inbound::ChatList.refresh(targets.first.conversation)
     :handled
   end
 

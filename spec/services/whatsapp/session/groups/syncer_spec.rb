@@ -118,6 +118,13 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     it 'skips the avatar, which is the half an activity ping does not pay for' do
       expect { soft_sync }.not_to have_enqueued_job(Avatar::AvatarFromUrlJob)
     end
+
+    # One provider profile lookup per member without a picture, on every activity hint,
+    # for groups that can hold hundreds of them. The Baileys path passes
+    # `skip_avatars: soft` for the same reason.
+    it 'does not ask the provider for a picture of every member' do
+      expect { soft_sync }.not_to have_enqueued_job(Whatsapp::Session::UpdateContactAvatarJob)
+    end
   end
 
   context 'when only admins may add people' do

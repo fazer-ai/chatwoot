@@ -4,10 +4,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def perform
     return :ignored unless actionable?
 
-    Inbound::Locks.with_message_lock(inbox, message.id) do
+    inbound::Locks.with_message_lock(inbox, message.id) do
       next :duplicate if find_message(message.id)
 
-      Inbound::Locks.with_chat_lock(inbox, message.chat.id) do
+      inbound::Locks.with_chat_lock(inbox, message.chat.id) do
         # Re-checked under the chat lock: an agent's send can be slow enough for the
         # echo to arrive before its source_id is stored.
         next :duplicate if find_message(message.id)
@@ -36,13 +36,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   end
 
   def handle_individual
-    contact_inbox = Inbound::ContactResolver.new(inbox: inbox, party: peer_party, overwrite: true).perform
+    contact_inbox = inbound::ContactResolver.new(inbox: inbox, party: peer_party, overwrite: true).perform
     return :ignored if contact_inbox.nil?
 
     contact = contact_inbox.contact
     return :ignored if silenced?(contact)
 
-    conversation = Inbound::ConversationFinder.new(
+    conversation = inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, attribution: attribution
     ).perform
 
@@ -52,7 +52,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   end
 
   def handle_group
-    resolver = Inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender)
+    resolver = inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender)
     group = resolver.perform
 
     write(resolver.conversation_for(group.group_contact_inbox), group.sender_contact)
@@ -60,7 +60,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   end
 
   def write(conversation, sender)
-    Inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender).perform
+    inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender).perform
   end
 
   # Only what the connected phone sent can be the echo of one of our own sends, and
@@ -69,7 +69,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def echo_matched?
     return false if message.incoming?
 
-    Inbound::EchoMatcher.new(inbox: inbox, message_id: message.id, client_ref: message.client_ref).perform.present?
+    inbound::EchoMatcher.new(inbox: inbox, message_id: message.id, client_ref: message.client_ref).perform.present?
   end
 
   # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is
@@ -78,7 +78,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def peer_party
     return message.sender if message.incoming? && message.sender.present?
 
-    Model::Party.from_address(message.chat)
+    model::Party.from_address(message.chat)
   end
 
   # The same rule the Cloud path applies (`IncomingMessageBaseService#contact_processable?`):

@@ -28,7 +28,7 @@ class Whatsapp::Session::Inbound::Handlers::Presence < Whatsapp::Session::Inboun
 
   private
 
-  def chat_presence? = payload.is_a?(Model::Events::ChatPresence)
+  def chat_presence? = payload.is_a?(model::Events::ChatPresence)
 
   def subscribed?
     channel.provider_config&.dig('presence_subscribe').present?
@@ -50,7 +50,7 @@ class Whatsapp::Session::Inbound::Handlers::Presence < Whatsapp::Session::Inboun
   # The party is addressed by LID in one event and by phone in the next, and only one
   # of them may have a contact_inbox yet.
   def find_contact_inbox
-    party = chat_presence? ? (payload.sender || Model::Party.from_address(payload.chat)) : payload.party
-    Inbound::ContactLookup.find(inbox: inbox, party: party)
+    party = chat_presence? ? (payload.sender || model::Party.from_address(payload.chat)) : payload.party
+    inbound::ContactLookup.find(inbox: inbox, party: party)
   end
 end
