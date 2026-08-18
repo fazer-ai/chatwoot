@@ -68,10 +68,14 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # The operator scanned the QR with a different number than the inbox is configured
   # for. Keeping that session would file the wrong contacts under this inbox, so it is
   # dropped and the inbox says why.
+  #
+  # Compared through the normalizers, never as raw digits: a Brazilian line is reported
+  # by WhatsApp with or without the ninth digit depending on when it was registered, so
+  # a textual comparison would reject the very number the operator configured.
   def wrong_phone?
-    configured = channel.phone_number.to_s.delete('+')
-    paired = payload.phone.to_s.delete('+')
-    configured.present? && paired.present? && configured != paired
+    configured = channel.phone_number.to_s
+    paired = payload.phone.to_s
+    configured.present? && paired.present? && !Whatsapp::Session::PhoneMatch.same_number?(configured, paired)
   end
 
   def after_write(state)

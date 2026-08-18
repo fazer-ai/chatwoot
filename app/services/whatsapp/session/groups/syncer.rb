@@ -12,6 +12,16 @@ class Whatsapp::Session::Groups::Syncer
   SETTINGS = { announce: 'announce', locked: 'restrict',
                join_approval: 'join_approval_mode', member_add_mode: 'member_add_mode' }.freeze
 
+  # Three of the four settings arrive as booleans and one as the wire enum, but the
+  # dashboard reads all four out of additional_attributes as booleans, and reads
+  # member_add_mode as "may every member add people". Storing `admin_add` raw would be
+  # read as true, showing the exact opposite of the setting the group has.
+  def self.setting_value(member, raw)
+    return raw unless member == :member_add_mode
+
+    raw.to_s == 'all_member_add'
+  end
+
   attr_reader :channel, :group_contact, :soft
 
   # `soft` skips the member list: it is the expensive half, and an activity ping only
@@ -56,17 +66,29 @@ class Whatsapp::Session::Groups::Syncer
     group_contact.update!(params) if params.present?
   end
 
+  # A snapshot describes the group as it is now, so a description the group removed has
+  # to overwrite the one stored: it arrives as an empty value, and dropping it would
+  # leave the old text on screen forever. An *absent* field is a different thing and is
+  # left alone, because `invite_code` is only readable by an admin and `owner` is not
+  # always reported, so treating either absence as a removal would throw away what we
+  # legitimately have.
   def synced_attributes(info)
     attributes = {
-      'description' => info.description.presence,
       'owner' => info.owner&.identifier || info.owner&.phone,
       'owner_pn' => info.owner&.phone,
       'invite_code' => info.invite_code.presence,
       'group_last_synced_at' => Time.current.to_i,
       'group_left' => false
     }.compact
-    SETTINGS.each { |member, key| attributes[key] = info.public_send(member) unless info.public_send(member).nil? }
-    attributes
+    attributes['description'] = info.description.presence unless info.description.nil?
+    attributes.merge(setting_attributes(info))
+  end
+
+  def setting_attributes(info)
+    SETTINGS.filter_map do |member, key|
+      raw = info.public_send(member)
+      [key, self.class.setting_value(member, raw)] unless raw.nil?
+    end.to_h
   end
 
   def sync_members(info)

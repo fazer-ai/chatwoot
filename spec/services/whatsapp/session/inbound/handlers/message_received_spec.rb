@@ -125,6 +125,28 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # A rich card's header image is the same downloadable reference a plain media message
+  # carries, and the bubble renders it: without the fetch the card arrives text-only.
+  context 'with a rich card carrying a media header' do
+    let(:content) do
+      model::Content::Rich.new(
+        kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega',
+        buttons: [{ 'text' => 'Acompanhar', 'url' => 'https://exemplo.test/4312' }],
+        media: model::Content::Media.new(
+          kind: 'image', mime: 'image/jpeg', ref: model::MediaRef.url('https://connector.test/media/xyz')
+        )
+      )
+    end
+
+    it 'hands the header download to a job' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+      expect(message.content_attributes['rich']).to include('title' => 'Pedido #4312')
+      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued.with(message, hash_including('kind' => 'image'))
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 

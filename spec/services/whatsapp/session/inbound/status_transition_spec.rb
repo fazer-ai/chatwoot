@@ -37,4 +37,22 @@ RSpec.describe Whatsapp::Session::Inbound::StatusTransition do
 
     expect(described_class.apply(message, 'delivered')).to be(false)
   end
+
+  # Receipts arrive out of order, so a failure can land after the read that followed a
+  # later retry. Letting it through would tell the agent a message the contact already
+  # read never arrived.
+  it 'does not fail a message the contact already read' do
+    message.update!(status: :read)
+
+    expect(described_class.apply(message, 'failed', error: 'boom')).to be(false)
+    expect(message.reload.status).to eq('read')
+    expect(message.external_error).to be_blank
+  end
+
+  it 'has nothing to say about a second failure' do
+    message.update!(status: :failed, external_error: 'first')
+
+    expect(described_class.apply(message, 'failed', error: 'second')).to be(false)
+    expect(message.reload.external_error).to eq('first')
+  end
 end

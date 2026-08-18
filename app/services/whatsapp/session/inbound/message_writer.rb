@@ -94,11 +94,15 @@ class Whatsapp::Session::Inbound::MessageWriter
     )
   end
 
+  # A rich card carries its header image, video or document in `media`, which is the
+  # same downloadable reference a plain media message has: without this the card is
+  # stored with its text and no attachment.
   def enqueue_media_fetch(message)
-    return unless content.is_a?(Content::Media)
-    return if content.ref.blank?
+    media = content if content.is_a?(Content::Media)
+    media ||= content.media if content.is_a?(Content::Rich)
+    return if media.blank? || media.ref.blank?
 
-    Whatsapp::Session::MediaFetchJob.perform_later(message, content.to_h)
+    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h)
   end
 
   # One message per shared contact, each with a native contact attachment, so the

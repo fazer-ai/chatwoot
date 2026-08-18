@@ -58,6 +58,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     end
   end
 
+  # The inbox is configured as +55 41 98888-7777 and WhatsApp reports the same line as
+  # 554188887777, because Brazilian numbers registered before the ninth digit are still
+  # addressed without it. Comparing the raw digits would log the operator out of the
+  # very number they configured.
+  context 'when the paired number is the configured one without its ninth digit' do
+    let(:event) { model::Event.build(model::Events::PairingSuccess.new(phone: '554188887777', lid: '99887766'), epoch: 1) }
+
+    it 'accepts the session' do
+      expect(dispatch).to eq(:handled)
+
+      expect(channel.reload.provider_connection['error']).to be_blank
+      expect(backend.commands_of('session.logout')).to be_empty
+    end
+  end
+
   it 'keeps the account limits a poll wrote while the state changes' do
     channel.update_provider_connection!({ 'connection' => 'open', 'reachout_time_lock' => { 'until' => 123 } })
     described_class.new(channel: channel, event: model::Event.build(model::Events::SessionState.new(state: 'connecting'))).perform

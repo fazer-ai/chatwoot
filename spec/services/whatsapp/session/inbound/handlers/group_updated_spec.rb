@@ -44,6 +44,45 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # The wire says `admin_add` or `all_member_add`; the dashboard reads the stored value
+  # as "may every member add people" and treats anything but `false` as yes. Storing the
+  # enum raw therefore shows the exact opposite of the setting the group has.
+  context 'when only admins may add people' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(member_add_mode: 'admin_add') }
+
+    it 'stores the setting as the boolean the dashboard reads' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.additional_attributes['member_add_mode']).to be(false)
+      expect(group_contact.conversations.last.messages.last.content).to include('only admins to add others')
+    end
+  end
+
+  context 'when every member may add people' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(member_add_mode: 'all_member_add') }
+
+    it 'stores it as enabled' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.additional_attributes['member_add_mode']).to be(true)
+    end
+  end
+
+  # WhatsApp reports the inbox's own line without its ninth digit, and it is the phone
+  # comparison that decides whether the threads get resolved.
+  context 'when the inbox number was removed under its other ninth-digit form' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(leave: [model::Party.new(phone: '554188887777')]) }
+
+    it 'still recognizes the group as left' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.additional_attributes['group_left']).to be(true)
+    end
+  end
+
   context 'when the description was removed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(description: '') }
 

@@ -49,9 +49,10 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
 
   def apply_settings
     SETTINGS.each do |member, key|
-      value = changes.public_send(member)
-      next if value.nil?
+      raw = changes.public_send(member)
+      next if raw.nil?
 
+      value = Whatsapp::Session::Groups::Syncer.setting_value(member, raw)
       merge_attributes(key => value)
       @activity.write("#{key}_#{value ? 'enabled' : 'disabled'}")
     end
@@ -103,7 +104,7 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
   # The session's own number left the group: nothing more will arrive in that thread.
   def resolve_conversations_if_left(action, contacts)
     return unless action == 'leave'
-    return unless contacts.any? { |contact| contact.phone_number&.delete('+') == channel.phone_number&.delete('+') }
+    return unless contacts.any? { |contact| Whatsapp::Session::PhoneMatch.same_number?(contact.phone_number, channel.phone_number) }
 
     merge_attributes('group_left' => true)
     @group_contact.contact_inboxes.each do |contact_inbox|

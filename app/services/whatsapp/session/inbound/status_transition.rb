@@ -8,6 +8,10 @@ module Whatsapp::Session::Inbound::StatusTransition
   # which always implies read.
   RECEIPTS = { 'delivered' => 'delivered', 'read' => 'read', 'played' => 'read', 'failed' => 'failed' }.freeze
   RANK = { 'sent' => 0, 'delivered' => 1, 'read' => 2 }.freeze
+  # Nothing moves a message out of these. A failure reported after the contact already
+  # read the message describes an earlier attempt, not the message coming undone, and a
+  # second failure has nothing left to say.
+  TERMINAL = %w[read failed].freeze
 
   module_function
 
@@ -15,15 +19,16 @@ module Whatsapp::Session::Inbound::StatusTransition
   def apply(message, receipt_type, error: nil)
     status = RECEIPTS[receipt_type.to_s]
     return false if status.blank?
-    return apply_failure(message, error) if status == 'failed'
     return false unless allowed?(message.status, status)
+    return apply_failure(message, error) if status == 'failed'
 
     message.update!(status: status)
     true
   end
 
   def allowed?(current, new_status)
-    return false if current == 'failed'
+    return false if current.in?(TERMINAL)
+    return true if new_status == 'failed'
 
     RANK.fetch(new_status, -1) > RANK.fetch(current, -1)
   end

@@ -11,17 +11,26 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   private
 
   def apply(message)
+    seen = mark_conversation_seen(message) if read_on_our_side?(message)
     changed = Inbound::StatusTransition.apply(message, payload.type, error: payload.error)
-    mark_conversation_seen(message) if changed && payload.type == 'read'
-    changed
+    changed || seen.present?
   end
 
-  # The contact read what the agent sent, so the unread badge on the agent's side has
-  # nothing left to report.
+  # A read receipt for an *incoming* message is one of this account's own devices
+  # marking the chat read, so somebody here saw it. A read receipt for an outgoing
+  # message is the contact reading us, which says nothing about what we have seen:
+  # counting it would clear the unread badge for incoming messages nobody here opened.
+  def read_on_our_side?(message)
+    payload.type == 'read' && message.incoming?
+  end
+
+  # Independent of whether the status moved: a chat marked read twice is still read, and
+  # the seen timestamps have to follow the second mark as well.
   def mark_conversation_seen(message)
     conversation = message.conversation
     attributes = { agent_last_seen_at: Time.current }
     attributes[:assignee_last_seen_at] = Time.current if conversation.assignee_id.present?
     conversation.update_columns(attributes) # rubocop:disable Rails/SkipsModelValidations
+    true
   end
 end

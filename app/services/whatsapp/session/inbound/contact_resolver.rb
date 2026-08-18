@@ -89,20 +89,7 @@ class Whatsapp::Session::Inbound::ContactResolver
     return false unless digits.match?(/\A\d+\z/)
     return true if digits.in?([party.phone, party.lid].compact)
 
-    party.phone.present? && same_whatsapp_number?(digits, party.phone)
-  end
-
-  def same_whatsapp_number?(left, right)
-    normalizer = phone_normalizer_for(left) || phone_normalizer_for(right)
-    return false unless normalizer
-
-    normalizer.normalize(left) == normalizer.normalize(right)
-  end
-
-  def phone_normalizer_for(value)
-    Whatsapp::PhoneNumberNormalizationService::NORMALIZERS
-      .map(&:new)
-      .find { |normalizer| normalizer.handles_country?(value) }
+    party.phone.present? && Whatsapp::Session::PhoneMatch.same_number?(digits, party.phone)
   end
 
   def enqueue_avatar(contact)

@@ -10,8 +10,19 @@ class Whatsapp::Session::Inbound::Handlers::GroupPictureChanged < Whatsapp::Sess
       conversation = resolver.conversation_for(result.group_contact_inbox)
 
       Inbound::GroupActivityWriter.new(conversation: conversation, actor: payload.actor).write('icon_changed')
-      Whatsapp::Session::UpdateGroupAvatarJob.perform_later(result.group_contact, force: true)
+      refresh_avatar(result.group_contact)
       :handled
     end
+  end
+
+  private
+
+  # A removal has nothing to refetch, and the job returns before purging when the group
+  # reports no photo, so asking it to refresh would leave the old image attached for
+  # good.
+  def refresh_avatar(group_contact)
+    return Whatsapp::Session::UpdateGroupAvatarJob.perform_later(group_contact, force: true) unless payload.removed
+
+    group_contact.avatar.purge if group_contact.avatar.attached?
   end
 end
