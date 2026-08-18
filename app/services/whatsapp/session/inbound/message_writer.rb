@@ -117,7 +117,20 @@ class Whatsapp::Session::Inbound::MessageWriter
   # dashboard renders them in the contact bubble instead of as plain text.
   def build_contact_messages
     messages = Array(content.contacts).filter_map { |card| build_contact_message(card) }
-    messages.last
+    return messages.last if messages.present?
+
+    unsupported_contact_message
+  end
+
+  # An empty share, or one whose cards carry no name, no phone and no vCard, leaves
+  # nothing to render, but the conversation has already been opened by the caller and
+  # nothing would hold the inbound source id: the thread would sit empty and every
+  # redelivery would walk the same path again. The unsupported bubble is what the agent
+  # should see anyway, and storing it is what closes the deduplication.
+  def unsupported_contact_message
+    attributes = message_attributes
+    attributes[:content_attributes] = attributes[:content_attributes].merge(is_unsupported: true)
+    conversation.messages.create!(content: nil, **attributes)
   end
 
   def build_contact_message(card)

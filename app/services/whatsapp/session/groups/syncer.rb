@@ -24,8 +24,12 @@ class Whatsapp::Session::Groups::Syncer
 
   attr_reader :channel, :group_contact, :soft
 
-  # `soft` skips the member list: it is the expensive half, and an activity ping only
-  # means "something happened in this group", not "the roster changed".
+  # `soft` is the activity ping: something happened in this group, but not what. The
+  # roster is read anyway, exactly as the Baileys path does, because `group_last_synced_at`
+  # is advanced either way and `Contacts::SyncGroupJob` reads it as a 15 minute cooldown
+  # for every sync that is not forced, the manual one from the dashboard included.
+  # Skipping the members while stamping the group as synced would leave a stale roster
+  # that nothing can refresh for the next quarter of an hour. Only the avatar is skipped.
   def initialize(channel:, group_contact:, info: nil, soft: false)
     @channel = channel
     @group_contact = group_contact
@@ -38,8 +42,8 @@ class Whatsapp::Session::Groups::Syncer
     return if info.blank?
 
     update_contact(info)
-    sync_members(info) unless soft
-    update_avatar(info)
+    sync_members(info)
+    update_avatar(info) unless soft
     group_contact
   end
 

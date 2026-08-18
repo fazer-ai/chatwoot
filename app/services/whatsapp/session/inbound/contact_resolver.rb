@@ -41,11 +41,16 @@ class Whatsapp::Session::Inbound::ContactResolver
     @source_id ||= existing_variant_source_id || party.source_id
   end
 
+  # The number as reported wins whenever it is already filed: an unordered `IN` over
+  # both ninth-digit forms can hand back the other row, which files the message under
+  # the wrong contact and then, with `overwrite`, tries to move the exact number onto a
+  # contact that does not own it and fails the uniqueness check, losing the message.
   def existing_variant_source_id
     return if party.lid.present? || party.phone.blank?
 
-    variants = Whatsapp::Session::PhoneMatch.variants(party.phone)
-    return if variants.size <= 1
+    variants = Whatsapp::Session::PhoneMatch.variants(party.phone) - [party.phone]
+    return if variants.blank?
+    return if inbox.contact_inboxes.exists?(source_id: party.phone)
 
     inbox.contact_inboxes.where(source_id: variants).pick(:source_id)
   end

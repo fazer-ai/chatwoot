@@ -34,6 +34,27 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
     end
   end
 
+  # An unordered `IN` over both forms can hand back either row. Picking the alternate
+  # one files the message under the wrong contact, and `overwrite` then tries to move
+  # the exact number onto a contact that does not own it, which the uniqueness check
+  # refuses: the message is lost rather than merely misfiled.
+  context 'when both ninth-digit forms are already filed' do
+    let(:party) { model::Party.new(phone: '5541988887777', push_name: 'Bruno') }
+    let!(:exact) do
+      contact = create(:contact, account: channel.account, name: 'Bruno Exato', phone_number: '+5541988887777')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5541988887777')
+    end
+
+    before do
+      contact = create(:contact, account: channel.account, name: 'Bruno Antigo', phone_number: '+554188887777')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '554188887777')
+    end
+
+    it 'files the message under the number as reported' do
+      expect(described_class.new(inbox: inbox, party: party, overwrite: true).perform.id).to eq(exact.id)
+    end
+  end
+
   it 'answers nil for a party with nothing to key on' do
     expect(described_class.new(inbox: inbox, party: model::Party.new(push_name: 'Ana')).perform).to be_nil
   end

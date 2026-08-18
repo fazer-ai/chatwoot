@@ -235,6 +235,28 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
+    # The conversation is opened before the cards are read, so a share with nothing to
+    # render used to leave an empty thread and no row holding the source id, which meant
+    # every redelivery walked the same path again.
+    context 'when nothing in the share can be read' do
+      let(:content) { model::Content::Contacts.new(contacts: [{ 'vcard' => 'BEGIN:VCARD\nEND:VCARD' }]) }
+
+      it 'stores an unsupported message instead of an empty conversation' do
+        expect(dispatch).to eq(:handled)
+
+        message = inbox.messages.last
+        expect(message.source_id).to eq(inbound.id)
+        expect(message.is_unsupported).to be(true)
+      end
+
+      it 'does not process the same event twice' do
+        dispatch
+
+        expect { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }
+          .not_to change(inbox.messages, :count)
+      end
+    end
+
     # Both named fields are optional on the wire, so a share can be nothing but the
     # vCard, and dropping it left a conversation with no message in it.
     context 'when the card carries only a vCard' do

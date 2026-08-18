@@ -91,6 +91,35 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     end
   end
 
+  # `group_last_synced_at` is advanced on every run, and `Contacts::SyncGroupJob` reads
+  # it as a 15 minute cooldown for every sync that is not forced, which includes the
+  # manual one from the dashboard. A soft sync that skipped the roster would therefore
+  # stamp the group as synced and leave a stale member list nothing could refresh.
+  context 'with a soft sync' do
+    subject(:soft_sync) do
+      described_class.new(channel: channel, group_contact: group_contact, info: info, soft: true).perform
+    end
+
+    let(:info) do
+      model::GroupInfo.new(
+        group: group, subject: 'Equipe de Vendas', picture_url: 'https://connector.test/group.jpg',
+        participants: [
+          model::GroupInfo::Participant.new(party: model::Party.new(phone: '5541999990000', push_name: 'Ana'), role: 'admin')
+        ]
+      )
+    end
+
+    it 'still reads the roster' do
+      soft_sync
+
+      expect(group_contact.reload.group_memberships.active.count).to eq(1)
+    end
+
+    it 'skips the avatar, which is the half an activity ping does not pay for' do
+      expect { soft_sync }.not_to have_enqueued_job(Avatar::AvatarFromUrlJob)
+    end
+  end
+
   context 'when only admins may add people' do
     let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe', member_add_mode: 'admin_add') }
 

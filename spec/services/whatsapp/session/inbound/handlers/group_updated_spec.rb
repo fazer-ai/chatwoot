@@ -32,6 +32,25 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     expect(activity.content).to include('Equipe de Vendas')
   end
 
+  # A group event may name its author by the other ninth-digit form of the same line.
+  # The exact lookup missed the contact and printed the raw number in an activity line
+  # that had the person's name available all along.
+  context 'when the actor is filed under the other ninth-digit form' do
+    let(:actor) { model::Party.new(phone: '5541999990000') }
+
+    before do
+      contact = create(:contact, account: channel.account, name: 'Ana Souza', phone_number: '+554199990000')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '554199990000')
+    end
+
+    it 'blames them by name' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.conversations.last.messages.last.content).to include('Ana Souza')
+    end
+  end
+
   context 'when a setting changed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(announce: true, locked: false) }
 
