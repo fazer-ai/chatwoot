@@ -27,14 +27,18 @@ module Whatsapp::Session::Inbound::Locks
     return yield if message_id.blank?
 
     key = message_key(inbox, message_id)
-    unless Redis::Alfred.set(key, true, nx: true, ex: MESSAGE_LOCK_TTL)
+    token = SecureRandom.uuid
+    unless Redis::Alfred.set(key, token, nx: true, ex: MESSAGE_LOCK_TTL)
       raise Busy, "message #{message_id} of inbox #{inbox.id} is already being processed"
     end
 
     begin
       yield
     ensure
-      Redis::Alfred.delete(key)
+      # By token, for the same reason the chat lock is: a pass that outran the TTL would
+      # otherwise delete the marker a redelivery had already taken, and a third delivery
+      # could then run alongside it and write a second row.
+      Redis::Alfred.delete_if_equals(key, token)
     end
   end
 

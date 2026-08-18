@@ -25,8 +25,7 @@ class Whatsapp::Session::Inbound::Handlers::ContactPictureChanged < Whatsapp::Se
   # duplicate too. The markers exist to stop the same picture being fetched over and
   # over, not to suppress the event announcing that the picture changed.
   def refresh_avatar(contact)
-    attributes = (contact.additional_attributes || {}).except('last_avatar_sync_at', 'avatar_url_hash')
-    contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
+    Whatsapp::Session::AvatarSync.reset(contact)
     Whatsapp::Session::UpdateContactAvatarJob.perform_later(contact, inbox, payload.party.to_h, force: true)
   end
 end

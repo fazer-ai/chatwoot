@@ -15,12 +15,20 @@ class Whatsapp::Session::Inbound::Handlers::GroupJoined < Whatsapp::Session::Inb
     resolver = inbound::GroupResolver.new(inbox: inbox, group: payload.info.group, subject: payload.info.subject)
     result = resolver.perform
     # Opened right away so the group shows up in the chat list with its history, the
-    # same as a group whose first message just arrived.
-    resolver.conversation_for(result.group_contact_inbox)
+    # same as a group whose first message just arrived. Reopened explicitly, because this
+    # event creates no message: an inbox that locks to a single conversation hands back
+    # the resolved thread of the group it was in before, and nothing else would move it
+    # off resolved until somebody happens to write there.
+    reopen(resolver.conversation_for(result.group_contact_inbox))
 
     Whatsapp::Session::Groups::Syncer.new(channel: channel, group_contact: result.group_contact, info: payload.info).perform
     broadcast_roster(result.group_contact)
     :handled
+  end
+
+  def reopen(conversation)
+    conversation.open! if conversation.resolved?
+    conversation
   end
 
   # The roster changed, and an ordinary contact update does not carry `group_members`,

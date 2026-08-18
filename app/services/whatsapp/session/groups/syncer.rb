@@ -123,8 +123,13 @@ class Whatsapp::Session::Groups::Syncer
     contact.id
   end
 
+  # An event that carried the group is a snapshot of it right now, so its picture wins
+  # over the stored one: nothing replays the picture-change events from while the session
+  # was out of the group, and the guard below would otherwise keep the old image for as
+  # long as the avatar stays attached, which is forever.
   def update_avatar(info)
     return if info.picture_url.blank?
+    return Whatsapp::Session::AvatarSync.refetch(group_contact, info.picture_url) if @info.present?
     return if group_contact.avatar.attached?
 
     ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url)

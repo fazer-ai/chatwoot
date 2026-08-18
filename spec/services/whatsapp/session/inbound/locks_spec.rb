@@ -50,6 +50,19 @@ RSpec.describe Whatsapp::Session::Inbound::Locks do
       expect { described_class.with_message_lock(inbox, message_id) { :ran } }.to raise_error(described_class::Busy)
     end
 
+    # Same failure the chat lock had: a pass that outran the TTL deleted the marker a
+    # redelivery had already taken, and a third delivery could then run alongside it.
+    it 'leaves a marker another worker took over in place' do
+      key = described_class.message_key(inbox, message_id)
+
+      described_class.with_message_lock(inbox, message_id) do
+        Redis::Alfred.delete(key)
+        Redis::Alfred.set(key, 'another-worker', ex: 30)
+      end
+
+      expect(Redis::Alfred.get(key)).to eq('another-worker')
+    end
+
     it 'runs unguarded when there is no id to key on' do
       expect(described_class.with_message_lock(inbox, nil) { :ran }).to eq(:ran)
     end

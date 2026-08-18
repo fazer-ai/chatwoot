@@ -3,6 +3,11 @@
 class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
   queue_as :low
 
+  # Same reason as the contact job: a forced refresh dropped because the session was
+  # momentarily down leaves the old picture, and nothing asks again while it is attached.
+  retry_on Whatsapp::Session::Errors::ProviderUnavailable, wait: :polynomially_longer, attempts: 4
+  retry_on Whatsapp::Session::Errors::RateLimited, wait: :polynomially_longer, attempts: 4
+
   # `channel` is the inbox the event came from. Falling back to `group_channel` picks
   # the group contact's first contact_inbox, which is an arbitrary choice as soon as the
   # same WhatsApp group is in two inboxes of one account: the picture could then be
@@ -16,7 +21,8 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
     info = fetch_info(channel, group_contact)
     return if info&.picture_url.blank?
 
-    reset_sync_markers(group_contact) if force
+    return Whatsapp::Session::AvatarSync.refetch(group_contact, info.picture_url) if force
+
     ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url)
   end
 
@@ -26,22 +32,15 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
     force || !group_contact.avatar.attached?
   end
 
-  # A group contact is a Contact, so `Avatar::AvatarFromUrlJob` applies its rate limit
-  # and its URL hash to it, skips a group synced in the last minute, and stamps both
-  # markers even on the run it skipped. Without this the forced refresh is dropped and
-  # the next attempt with the same URL is dropped as a duplicate. The stored avatar is
-  # not purged: the attach replaces it, and purging first loses the picture whenever the
-  # download does not happen. Same reset the Baileys path does before its own refetch.
-  def reset_sync_markers(group_contact)
-    attributes = (group_contact.additional_attributes || {}).except('last_avatar_sync_at', 'avatar_url_hash')
-    group_contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
-  end
-
   def fetch_info(channel, group_contact)
     address = Whatsapp::Session::Model::Address.parse(group_contact.identifier)
     return if address.blank?
 
     channel.provider_service.group_info(Whatsapp::Session::Model::Commands::GroupInfo.new(group: address))
+  rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
+    # Raised on, not swallowed: the job retries and the retry is what keeps a forced
+    # refresh from leaving the old picture attached for good.
+    raise
   rescue Whatsapp::Session::Errors::Error => e
     Rails.logger.warn("[WHATSAPP SESSION] group photo failed for contact #{group_contact.id}: #{e.message}")
     nil

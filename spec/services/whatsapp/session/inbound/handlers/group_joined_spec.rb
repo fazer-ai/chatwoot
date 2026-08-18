@@ -29,6 +29,38 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupJoined do
     expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:ignored)
   end
 
+  # Nothing replays the picture-change events from while the session was out of the
+  # group, so the snapshot this event carries is the only chance to notice the photo
+  # changed; the "already attached" guard kept the old one forever.
+  context 'when the group already has a stored avatar' do
+    let(:info) do
+      model::GroupInfo.new(group: group, subject: 'Equipe de Vendas',
+                           picture_url: 'https://connector.test/new.jpg')
+    end
+
+    before do
+      group_contact = create(:contact, account: channel.account, identifier: '120363041234567890@g.us',
+                                       group_type: :group,
+                                       additional_attributes: { 'avatar_url_hash' => 'old', 'last_avatar_sync_at' => Time.current.iso8601 })
+      create(:contact_inbox, inbox: inbox, contact: group_contact, source_id: '120363041234567890')
+      group_contact.avatar.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png',
+                                  content_type: 'image/png')
+    end
+
+    it 'asks for the picture the snapshot reports' do
+      dispatch
+
+      expect(Avatar::AvatarFromUrlJob).to have_been_enqueued.with(anything, 'https://connector.test/new.jpg')
+    end
+
+    it 'clears the markers that would suppress the download' do
+      dispatch
+
+      expect(inbox.contacts.find_by(identifier: '120363041234567890@g.us').additional_attributes)
+        .not_to include('avatar_url_hash', 'last_avatar_sync_at')
+    end
+  end
+
   it 'opens the group with its members and its metadata' do
     expect(dispatch).to eq(:handled)
 
@@ -37,6 +69,28 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupJoined do
     expect(group_contact.additional_attributes['description']).to eq('Combinados do time')
     expect(group_contact.group_memberships.active.count).to eq(2)
     expect(group_contact.conversations).to be_present
+  end
+
+  # This event creates no message, so nothing else moves the thread off resolved: an
+  # inbox that locks to a single conversation handed back the resolved thread of the
+  # group it was in before, and the rejoined group sat there looking closed.
+  context 'when the group was left and its only thread was resolved' do
+    let(:group_contact) do
+      create(:contact, account: channel.account, identifier: '120363041234567890@g.us', group_type: :group)
+    end
+    let!(:resolved) do
+      contact_inbox = create(:contact_inbox, inbox: inbox, contact: group_contact, source_id: '120363041234567890')
+      create(:conversation, inbox: inbox, account: channel.account, contact: group_contact,
+                            contact_inbox: contact_inbox, group_type: :group, status: :resolved)
+    end
+
+    before { inbox.update!(lock_to_single_conversation: true) }
+
+    it 'reopens it instead of reusing it resolved' do
+      expect(dispatch).to eq(:handled)
+
+      expect(resolved.reload.status).to eq('open')
+    end
   end
 
   # An ordinary contact update does not carry `group_members`, so without this an open
