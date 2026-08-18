@@ -24,6 +24,8 @@ pt_BR:
       limit_reached: Você pode fixar no máximo %{limit} conversas.
       conversation_resolved: Não é possível fixar uma conversa resolvida.
       conversation_not_visible: Esta conversa não está na sua lista, então não pode ser fixada.
+    whatsapp:
+      group_announcement_only: Somente administradores podem enviar mensagens neste grupo
     inboxes:
       channel:
         provider_unavailable: Este provedor de WhatsApp ainda não está disponível nesta instalação.

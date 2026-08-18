@@ -28,9 +28,16 @@ module Whatsapp::Session::ChannelExtension
     Whatsapp::Session::Registry.capabilities_for(self)
   end
 
+  # The channel talks to its provider in legacy provider terms, so it gets the facade;
+  # everything inside the session layer asks for `session_backend` instead and speaks
+  # the canonical command API.
   def provider_service
     return super unless session_provider?
 
+    Whatsapp::Session::Facade.new(self)
+  end
+
+  def session_backend
     Whatsapp::Session::Registry.backend_for(self)
   end
 

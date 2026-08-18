@@ -1,0 +1,143 @@
+require 'rails_helper'
+
+RSpec.describe Whatsapp::Session::Outbound::MessageSender do
+  subject(:send_message) { described_class.new(message).perform }
+
+  let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
+  let(:inbox) { channel.inbox }
+  let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+  let(:contact) { create(:contact, account: channel.account, phone_number: '+5541999990000', identifier: '182736451928374@lid') }
+  let(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: inbox, source_id: '182736451928374') }
+  let(:conversation) { create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox, account: channel.account) }
+  let(:message) do
+    create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                     message_type: :outgoing, content: 'olá!')
+  end
+
+  before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
+
+  it 'sends the text under an id reserved before the request' do
+    expect(send_message).to be_present
+
+    command = backend.last_command
+    expect(command.to.id).to eq('182736451928374')
+    expect(command.content.body).to eq('olá!')
+    expect(command.message_id).to eq(message.reload.pending_source_id)
+  end
+
+  # A provider that assigns its own message id ignores the reserved one and hands the
+  # correlation token back on the echo. EchoMatcher looks the send up by whatever is in
+  # `pending_source_id`, so sending anything else as the token means the echo of our own
+  # message lands as a second outgoing message written by nobody.
+  it 'sends the reservation as the correlation token an echo can be found by' do
+    send_message
+
+    command = backend.last_command
+    expect(command.client_ref).to eq(message.reload.pending_source_id)
+    expect(
+      Whatsapp::Session::Inbound::EchoMatcher.new(inbox: inbox, message_id: 'PROVIDER-ASSIGNED', client_ref: command.client_ref).perform
+    ).to eq(message)
+  end
+
+  it 'reuses the reservation when the job runs twice' do
+    send_message
+    reserved = message.pending_source_id
+
+    described_class.new(message).perform
+
+    expect(reserved).to be_present
+    expect(backend.commands_of('message.send').map(&:message_id).uniq).to eq([reserved])
+  end
+
+  it 'quotes the message the agent replied to' do
+    quoted = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                              message_type: :incoming, sender: contact, source_id: '3EB0QUOTED')
+    message.update!(content_attributes: message.content_attributes.merge('in_reply_to_external_id' => quoted.source_id))
+
+    send_message
+
+    expect(backend.last_command.quoted.id).to eq('3EB0QUOTED')
+    expect(backend.last_command.quoted.from_me).to be(false)
+  end
+
+  it 'flags a message with nothing to send instead of pretending it went out' do
+    message.update!(content: nil)
+
+    expect(send_message).to be_nil
+    expect(message.reload.is_unsupported).to be(true)
+    expect(backend.commands).to be_empty
+  end
+
+  context 'with an attachment' do
+    let(:message) do
+      create(:message, :with_attachment, conversation: conversation, inbox: inbox, account: channel.account,
+                                         message_type: :outgoing, content: 'segue a foto')
+    end
+
+    it 'sends media the provider fetches by URL, with the text as caption' do
+      send_message
+
+      content = backend.last_command.content
+      expect(content.kind).to eq('image')
+      expect(content.caption).to eq('segue a foto')
+      expect(content.ref.url).to be_present
+    end
+  end
+
+  context 'with a reaction' do
+    let(:target) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, sender: contact, source_id: '3EB0TARGET')
+    end
+    let(:message) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :outgoing, content: '👍',
+                       content_attributes: { is_reaction: true, in_reply_to: target.id })
+    end
+
+    it 'reacts to the target instead of sending a message' do
+      send_message
+
+      command = backend.last_command
+      expect(backend.commands_of('message.react').size).to eq(1)
+      expect(command.target_id).to eq('3EB0TARGET')
+      expect(command.emoji).to eq('👍')
+    end
+  end
+
+  context 'when the group only accepts messages from admins' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'native', phone_number: '+5541988887777',
+                                validate_provider_config: false, sync_templates: false)
+    end
+    let(:contact) do
+      create(:contact, account: channel.account, identifier: '120363041234567890@g.us',
+                       group_type: :group, additional_attributes: { 'announce' => true })
+    end
+
+    it 'fails the message with a reason the agent can read' do
+      expect { send_message }.to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+
+      expect(message.reload.status).to eq('failed')
+      expect(message.external_error).to include('administrators')
+      expect(backend.commands).to be_empty
+    end
+
+    it 'sends when this inbox is an admin recorded without the ninth digit' do
+      admin = create(:contact, account: channel.account, phone_number: '+554188887777')
+      create(:group_member, group_contact: contact, contact: admin, role: :admin)
+
+      expect { send_message }.not_to raise_error
+      expect(backend.commands_of('message.send')).to be_present
+    end
+
+    # The suffix comparison this replaced called these the same line, so the send went
+    # out and WhatsApp dropped it in silence while Chatwoot reported it as sent.
+    it 'does not mistake a foreign admin sharing the last eight digits for this inbox' do
+      admin = create(:contact, account: channel.account, phone_number: '+15588887777')
+      create(:group_member, group_contact: contact, contact: admin, role: :admin)
+
+      expect { send_message }.to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+    end
+  end
+end
