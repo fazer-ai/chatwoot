@@ -119,7 +119,10 @@ class Whatsapp::Session::Inbound::MessageWriter
   def build_contact_message(card)
     card = card.stringify_keys
     phone = card['phone'].presence
-    name = card['name'].presence
+    # `display_name` is what the contract calls it. Reading `name` found nothing, so a
+    # card with a phone lost its name and a name-only card was dropped entirely, leaving
+    # the conversation that had just been opened with no message in it.
+    name = card['display_name'].presence
     return if phone.blank? && name.blank?
 
     message = conversation.messages.build(content: contact_line(name, phone), **message_attributes)

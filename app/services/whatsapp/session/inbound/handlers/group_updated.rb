@@ -104,12 +104,23 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
   # The session's own number left the group: nothing more will arrive in that thread.
   def resolve_conversations_if_left(action, contacts)
     return unless action == 'leave'
-    return unless contacts.any? { |contact| Whatsapp::Session::PhoneMatch.same_number?(contact.phone_number, channel.phone_number) }
+    return unless contacts.any? { |contact| session_owner?(contact) }
 
     merge_attributes('group_left' => true)
     @group_contact.contact_inboxes.each do |contact_inbox|
       contact_inbox.conversations.where(status: %i[open pending]).find_each { |thread| thread.update!(status: :resolved) }
     end
+  end
+
+  # WhatsApp may describe the session's own participant by LID alone, in which case the
+  # resolved contact has no phone at all and comparing numbers can only answer no. The
+  # LID the session paired under is on the connection record, so both identities are
+  # checked.
+  def session_owner?(contact)
+    return true if Whatsapp::Session::PhoneMatch.same_number?(contact.phone_number, channel.phone_number)
+
+    lid = channel.provider_connection['lid'].presence
+    lid.present? && contact.identifier == "#{lid}@lid"
   end
 
   def merge_attributes(attributes)

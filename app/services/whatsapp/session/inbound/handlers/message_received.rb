@@ -38,7 +38,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # The echo of a message Chatwoot sent under a reserved id is already stored;
     # matching it before a conversation is picked keeps it from reopening (or opening)
     # a thread just to hold a message that is already there.
-    return :handled if Inbound::EchoMatcher.new(inbox: inbox, contact: contact, message_id: message.id).perform
+    return :handled if echo_matched?(contact)
 
     conversation = Inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, attribution: attribution
@@ -52,7 +52,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def handle_group
     resolver = Inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender)
     group = resolver.perform
-    return :handled if Inbound::EchoMatcher.new(inbox: inbox, contact: group.group_contact, message_id: message.id).perform
+    return :handled if echo_matched?(group.group_contact)
 
     write(resolver.conversation_for(group.group_contact_inbox), group.sender_contact)
     :handled
@@ -60,6 +60,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
 
   def write(conversation, sender)
     Inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender).perform
+  end
+
+  def echo_matched?(contact)
+    Inbound::EchoMatcher.new(
+      inbox: inbox, contact: contact, message_id: message.id, client_ref: message.client_ref
+    ).perform
   end
 
   # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is

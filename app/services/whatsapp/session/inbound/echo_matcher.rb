@@ -8,17 +8,21 @@
 # so the echo is matched on that reservation instead, and the id the response never
 # delivered is filled in here.
 class Whatsapp::Session::Inbound::EchoMatcher
-  attr_reader :inbox, :contact, :message_id
+  attr_reader :inbox, :contact, :message_id, :client_ref
 
-  def initialize(inbox:, contact:, message_id:)
+  # `client_ref` is the correlation token for a provider that assigns its own message
+  # id and cannot take ours: the echo then comes back under an id Chatwoot has never
+  # seen, and this token is the only thing tying it to the message that was sent.
+  def initialize(inbox:, contact:, message_id:, client_ref: nil)
     @inbox = inbox
     @contact = contact
     @message_id = message_id
+    @client_ref = client_ref
   end
 
   # Returns the already-stored message this echo belongs to, or nil.
   def perform
-    return if message_id.blank? || contact.blank?
+    return if contact.blank?
 
     reserved = reserved_message
     return if reserved.nil?
@@ -32,9 +36,12 @@ class Whatsapp::Session::Inbound::EchoMatcher
   # Spans every conversation the contact has in this inbox: the sent message can be in
   # any of them, and the answer is the conversation actually holding it.
   def reserved_message
+    references = [message_id, client_ref].compact_blank
+    return if references.empty?
+
     Message.where(conversation_id: contact.conversations.where(inbox_id: inbox.id).select(:id))
            .where(message_type: :outgoing)
-           .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", message_id)
+           .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' IN (?)", references)
            .first
   end
 
@@ -42,6 +49,8 @@ class Whatsapp::Session::Inbound::EchoMatcher
   # while that send was in flight can only be taken off the contact's phone once this
   # echo supplies it.
   def confirm_source_id(reserved)
+    return if message_id.blank?
+
     reserved.update_under_lock!(source_id: message_id)
     ::Messages::DeleteOnChannelJob.perform_later(reserved.id) if reserved.deleted?
   end

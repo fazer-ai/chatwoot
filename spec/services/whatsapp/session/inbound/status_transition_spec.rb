@@ -49,6 +49,15 @@ RSpec.describe Whatsapp::Session::Inbound::StatusTransition do
     expect(message.external_error).to be_blank
   end
 
+  # Delivery is proof the message arrived, so a failure reported afterwards belongs to
+  # an earlier attempt of the same send.
+  it 'does not fail a message already delivered' do
+    message.update!(status: :delivered)
+
+    expect(described_class.apply(message, 'failed', error: 'boom')).to be(false)
+    expect(message.reload.status).to eq('delivered')
+  end
+
   it 'has nothing to say about a second failure' do
     message.update!(status: :failed, external_error: 'first')
 

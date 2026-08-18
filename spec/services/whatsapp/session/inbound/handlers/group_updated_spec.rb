@@ -83,6 +83,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # WhatsApp may name the session's own participant by LID alone, and the contact
+  # resolved from that has no phone at all, so comparing numbers can only answer no.
+  context 'when the inbox itself is named only by its LID' do
+    let(:changes) { model::Events::GroupUpdated::Changes.new(leave: [model::Party.new(lid: '998877665544332')]) }
+
+    before { channel.update_provider_connection!('connection' => 'open', 'lid' => '998877665544332') }
+
+    it 'still recognizes the group as left' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.additional_attributes['group_left']).to be(true)
+    end
+  end
+
   context 'when the description was removed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(description: '') }
 

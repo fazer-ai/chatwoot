@@ -16,3 +16,8 @@ app/builders/contact_inbox_builder.rb: Route session providers through their num
 # method on the backend and returns. No session provider has a backend class before
 # slices 5 and 6, so no inbox can reach this. Delete this line once slice 4 is merged.
 app/services/whatsapp/session/groups/syncer.rb: Wire scheduled and manual syncs to the session syncer  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#373, and deliberately not answered here.
+# The mechanism depends on payloads captured from a live Uazapi instance in slice 6.
+# The note in event_job.rb sits where the fix belongs; this line only stops the review
+# from reporting it every round. Removing this waiver does not close the issue.
+app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatch  # PR#372

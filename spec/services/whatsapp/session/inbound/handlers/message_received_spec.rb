@@ -195,6 +195,59 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # The contract calls the field `display_name`. Reading `name` found nothing, so the
+  # card lost its name and a name-only card produced no message at all, leaving the
+  # conversation that had just been opened empty.
+  context 'with a shared contact card' do
+    let(:content) do
+      model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+55 41 98888-1111' }])
+    end
+
+    it 'stores the shared name alongside the number' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.last
+      expect(message.content).to include('Carlos Dias')
+      expect(message.attachments.first.meta['firstName']).to eq('Carlos Dias')
+    end
+
+    context 'when the card carries only a name' do
+      let(:content) { model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias' }]) }
+
+      it 'still writes a message instead of an empty conversation' do
+        expect(dispatch).to eq(:handled)
+        expect(inbox.messages.last.content).to eq('Carlos Dias')
+      end
+    end
+  end
+
+  # A provider that assigns its own id cannot take ours, so the echo comes back under an
+  # id Chatwoot has never seen and the correlation token is the only thing tying it to
+  # the message that was sent.
+  context 'with the echo of a send correlated by client_ref' do
+    let(:inbound) do
+      model::InboundMessage.new(
+        id: 'UAZAPI-XYZ', chat: chat, sender: nil, from_me: true,
+        timestamp: 1_755_440_000_123, content: content, client_ref: 'cw:4312'
+      )
+    end
+
+    it 'confirms the message that was sent instead of storing a second one' do
+      contact = create(:contact, account: channel.account, phone_number: '+5541999990000')
+      contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5541999990000')
+      conversation = create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox,
+                                           account: channel.account)
+      reserved = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                  message_type: :outgoing, source_id: nil,
+                                  content_attributes: { pending_source_id: 'cw:4312' })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(reserved.reload.source_id).to eq('UAZAPI-XYZ')
+      expect(conversation.messages.count).to eq(1)
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 

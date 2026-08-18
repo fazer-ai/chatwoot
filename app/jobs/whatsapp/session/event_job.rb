@@ -4,6 +4,14 @@
 # payload into canonical events and enqueues one job per event). The connector's own
 # events are dispatched inline by the stream consumer, which is what preserves their
 # order.
+#
+# UNORDERED, ON PURPOSE, FOR NOW (fazer-ai/chatwoot#373). One job per event means two
+# events of the same chat can run in either order, so a revoke, an edit or a reaction
+# can execute before the `message.received` that stores its target, find nothing, and be
+# dropped for good. The guard belongs here, and what it can be depends on whether the
+# provider's webhook carries a sequence or a usable timestamp: that is captured from a
+# live instance in the Uazapi slice, and the mechanism is chosen then. Do not delete this
+# note without closing the issue.
 class Whatsapp::Session::EventJob < ApplicationJob
   queue_as :high
 

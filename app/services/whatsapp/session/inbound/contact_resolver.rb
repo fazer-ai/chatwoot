@@ -22,7 +22,7 @@ class Whatsapp::Session::Inbound::ContactResolver
 
     consolidate
     contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: party.source_id, inbox: inbox, contact_attributes: contact_attributes
+      source_id: source_id, inbox: inbox, contact_attributes: contact_attributes
     ).perform
 
     update_contact(contact_inbox.contact)
@@ -31,6 +31,24 @@ class Whatsapp::Session::Inbound::ContactResolver
   end
 
   private
+
+  # The key the contact is already filed under, when that is one of this number's other
+  # ninth-digit forms. Consolidation cannot help here: it needs a phone *and* a LID, and
+  # a phone-only party has no LID to consolidate towards. Without this the builder does
+  # an exact match, misses the row, and files the same person twice, with a second
+  # conversation to go with it.
+  def source_id
+    @source_id ||= existing_variant_source_id || party.source_id
+  end
+
+  def existing_variant_source_id
+    return if party.lid.present? || party.phone.blank?
+
+    variants = Whatsapp::Session::PhoneMatch.variants(party.phone)
+    return if variants.size <= 1
+
+    inbox.contact_inboxes.where(source_id: variants).pick(:source_id)
+  end
 
   # A contact created from a phone-keyed message keeps its own contact_inbox; when the
   # LID for the same person shows up later, this merges the two before the builder can

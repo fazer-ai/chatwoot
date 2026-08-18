@@ -50,6 +50,29 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     )
   end
 
+  # The settings are optional on the wire. A snapshot that does not report one says
+  # nothing about it, and a sync must not read that silence as "off".
+  context 'when the snapshot reports no settings at all' do
+    let(:stored) { super().merge('announce' => true, 'restrict' => true) }
+
+    it 'leaves the stored ones alone' do
+      sync
+
+      expect(group_contact.reload.additional_attributes).to include('announce' => true, 'restrict' => true)
+    end
+  end
+
+  context 'when the snapshot reports a setting off' do
+    let(:stored) { super().merge('announce' => true) }
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe', announce: false) }
+
+    it 'turns it off' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['announce']).to be(false)
+    end
+  end
+
   context 'when only admins may add people' do
     let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe', member_add_mode: 'admin_add') }
 

@@ -15,6 +15,25 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
     )
   end
 
+  # Consolidation needs a phone *and* a LID, so it can do nothing for a phone-only
+  # party. Without a variant-aware lookup the builder matches exactly, misses the row
+  # the contact is already filed under, and files the same person a second time with a
+  # conversation of their own.
+  context 'when the contact is already filed under the other ninth-digit form' do
+    let(:party) { model::Party.new(phone: '5541988887777', push_name: 'Bruno') }
+    let!(:existing) do
+      contact = create(:contact, account: channel.account, phone_number: '+554188887777')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '554188887777')
+    end
+
+    it 'reuses it instead of creating a second contact' do
+      expect { described_class.new(inbox: inbox, party: party, overwrite: true).perform }
+        .not_to change(inbox.contact_inboxes, :count)
+
+      expect(described_class.new(inbox: inbox, party: party, overwrite: true).perform.id).to eq(existing.id)
+    end
+  end
+
   it 'answers nil for a party with nothing to key on' do
     expect(described_class.new(inbox: inbox, party: model::Party.new(push_name: 'Ana')).perform).to be_nil
   end
