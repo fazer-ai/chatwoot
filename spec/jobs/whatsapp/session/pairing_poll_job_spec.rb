@@ -78,6 +78,20 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(channel.reload.provider_connection).to eq({})
   end
 
+  # A rotated QR, a pairing code or a connecting state arrives without the token, and the
+  # writer replaces the whole hash: dropping it there retires the chain that is driving
+  # the very screen those events update, and the code stops rotating.
+  it 'keeps polling after an event about the same attempt lands' do
+    channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,ROTATED')
+    )
+    allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
+
+    expect { described_class.perform_now(channel.reload, pairing: 'qr', attempt: 'attempt-1') }
+      .to have_enqueued_job(described_class)
+  end
+
   # Connecting twice leaves two chains running. The older one keeps its earlier deadline,
   # and without knowing which attempt it belongs to it would time out over the QR the
   # operator is looking at right now.

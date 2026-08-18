@@ -23,16 +23,9 @@ class Whatsapp::Session::Outbound::AnnouncementGuard
   def contact = message.conversation.contact
   def channel = message.inbox.channel
 
-  # Compared through the normalizers rather than by a digit suffix: WhatsApp reports a
-  # Brazilian line with or without its ninth digit depending on when it was registered,
-  # so the raw digits of one line differ from themselves, while a plain suffix
-  # comparison calls two lines from different countries the same one and lets a send
-  # through that WhatsApp then drops in silence.
   def inbox_admin?
-    return false if channel.phone_number.blank?
-
     contact.group_memberships.active.where(role: :admin).includes(:contact).any? do |member|
-      Whatsapp::Session::PhoneMatch.same_number?(channel.phone_number, member.contact.phone_number)
+      Whatsapp::Session::Owner.owns?(channel, member.contact)
     end
   end
 end

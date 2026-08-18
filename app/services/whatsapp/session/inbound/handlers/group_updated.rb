@@ -134,12 +134,7 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
   # resolved contact has no phone at all and comparing numbers can only answer no. The
   # LID the session paired under is on the connection record, so both identities are
   # checked.
-  def session_owner?(contact)
-    return true if Whatsapp::Session::PhoneMatch.same_number?(contact.phone_number, channel.phone_number)
-
-    lid = channel.provider_connection['lid'].presence
-    lid.present? && contact.identifier == "#{lid}@lid"
-  end
+  def session_owner?(contact) = Whatsapp::Session::Owner.owns?(channel, contact)
 
   def merge_attributes(attributes)
     merged = (@group_contact.additional_attributes || {}).merge(attributes)

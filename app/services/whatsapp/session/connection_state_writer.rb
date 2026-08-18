@@ -134,9 +134,22 @@ class Whatsapp::Session::ConnectionStateWriter
   end
 
   def carry_pairing(payload, persisted)
+    carry_attempt(payload, persisted)
     return payload.except!(*PAIRING_KEYS) if PAIRING_ENDED.include?(payload['error_code'])
 
     PAIRING_KEYS.each { |key| payload[key] = persisted[key] if payload[key].nil? && persisted[key].present? }
+  end
+
+  # The token identifying the pairing attempt in progress. Only the connect answer and the
+  # poll carry one, and every other event about the same attempt (a rotated QR, a pairing
+  # code, a connecting state) arrives without it: dropping it there retires the polling
+  # chain that is driving the very screen those events are updating, and the code on it
+  # stops rotating. Kept while the attempt is still connecting, gone once it resolved.
+  def carry_attempt(payload, persisted)
+    return if payload['pairing_attempt'].present?
+    return unless payload['connection'].in?(%w[connecting reconnecting])
+
+    payload['pairing_attempt'] = persisted['pairing_attempt'] if persisted['pairing_attempt'].present?
   end
 
   # Events without an epoch (Uazapi, which has no ownership model) are always accepted.

@@ -162,6 +162,18 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
       expect(backend.commands_of('message.send')).to be_present
     end
 
+    # A roster can name the session's own participant by LID alone, and then the admin
+    # contact has no phone at all: comparing numbers answers no to "is this us?" and the
+    # inbox refuses to post in a group it administers.
+    it 'sends when this inbox is an admin the roster only knows by LID' do
+      channel.update_provider_connection!({ 'connection' => 'open', 'lid' => '112233445566778' })
+      admin = create(:contact, account: channel.account, identifier: '112233445566778@lid', phone_number: nil)
+      create(:group_member, group_contact: contact, contact: admin, role: :admin)
+
+      expect { send_message }.not_to raise_error
+      expect(backend.commands_of('message.send')).to be_present
+    end
+
     # The suffix comparison this replaced called these the same line, so the send went
     # out and WhatsApp dropped it in silence while Chatwoot reported it as sent.
     it 'does not mistake a foreign admin sharing the last eight digits for this inbox' do
