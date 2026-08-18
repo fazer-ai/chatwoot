@@ -31,12 +31,13 @@ class Whatsapp::Session::Inbound::Handlers::ContactPictureChanged < Whatsapp::Se
 
   # A contact inbox keyed by LID is invisible to a lookup holding only the phone, which
   # is what this event carries for a contact that was created before the inbox moved
-  # provider. Matched on the contact itself and never created: a photo changing is no
-  # reason to invent somebody.
+  # provider. Every ninth-digit form is tried, because the contact may well be stored
+  # under the other one. Matched on the contact itself and never created: a photo
+  # changing is no reason to invent somebody.
   def by_phone
-    phone = payload.party.phone_e164
-    return if phone.blank?
+    numbers = Whatsapp::Session::PhoneMatch.variants(payload.party.phone).map { |variant| "+#{variant}" }
+    return if numbers.empty?
 
-    inbox.contact_inboxes.joins(:contact).find_by(contact: { phone_number: phone })&.contact
+    inbox.contact_inboxes.joins(:contact).find_by(contact: { phone_number: numbers })&.contact
   end
 end

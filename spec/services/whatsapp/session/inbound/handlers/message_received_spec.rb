@@ -147,6 +147,54 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # Blocking has to actually stop the messages and the notifications they raise, which
+  # is the rule the Cloud path already applies.
+  context 'when the contact is blocked' do
+    before do
+      contact = create(:contact, account: channel.account, phone_number: '+5541999990000', identifier: '182736451928374@lid')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '182736451928374')
+      contact.update!(blocked: true)
+    end
+
+    it 'writes nothing' do
+      expect(dispatch).to eq(:ignored)
+      expect(inbox.messages).to be_empty
+    end
+
+    context 'when it is the echo of a reply typed on the phone' do
+      let(:inbound) do
+        model::InboundMessage.new(
+          id: '3EB0AAAA0002', chat: chat, sender: sender, from_me: true,
+          timestamp: 1_755_440_000_123, content: content
+        )
+      end
+
+      it 'is still stored, so the agent answer does not go missing' do
+        expect(dispatch).to eq(:handled)
+        expect(inbox.messages.find_by(source_id: '3EB0AAAA0002')).to be_outgoing
+      end
+    end
+  end
+
+  # `Message#human_response?` reads this flag to count a reply typed in the WhatsApp app
+  # as a real answer, which is what clears `waiting_since` and records a first response.
+  context 'with a reply typed on the connected phone' do
+    let(:inbound) do
+      model::InboundMessage.new(
+        id: '3EB0CCCC0001', chat: chat, sender: sender, from_me: true,
+        timestamp: 1_755_440_000_123, content: content
+      )
+    end
+
+    it 'marks the message as an external echo, so it counts as a reply' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.find_by(source_id: '3EB0CCCC0001')
+      expect(message.content_attributes['external_echo']).to be(true)
+      expect(message.send(:human_response?)).to be(true)
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 

@@ -20,6 +20,19 @@ module Whatsapp::Session::PhoneMatch
     normalizer.normalize(left) == normalizer.normalize(right)
   end
 
+  # Every form the number may be stored under, itself included. Used where a lookup has
+  # to reach a row written under the other ninth-digit form rather than merely decide
+  # whether two numbers match.
+  def variants(value)
+    number = digits(value)
+    return [] if number.blank?
+
+    normalizer = normalizer_for(number)
+    return [number] if normalizer.nil?
+
+    (normalizer.variants(number) + [number]).uniq
+  end
+
   def digits(value)
     value.to_s.gsub(/\D/, '')
   end

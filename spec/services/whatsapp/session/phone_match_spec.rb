@@ -20,6 +20,15 @@ RSpec.describe Whatsapp::Session::PhoneMatch do
     expect(described_class.same_number?('12025550100', '12025550101')).to be(false)
   end
 
+  it 'lists both ninth-digit forms of a Brazilian line' do
+    expect(described_class.variants('5541988887777')).to contain_exactly('5541988887777', '554188887777')
+  end
+
+  it 'lists a number no normalizer knows as itself' do
+    expect(described_class.variants('12025550100')).to eq(['12025550100'])
+    expect(described_class.variants(nil)).to eq([])
+  end
+
   it 'refuses to match anything against a blank' do
     expect(described_class.same_number?(nil, '5541988887777')).to be(false)
     expect(described_class.same_number?('', '')).to be(false)

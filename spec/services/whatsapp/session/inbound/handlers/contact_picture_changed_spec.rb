@@ -39,6 +39,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ContactPictureChanged do
     end
   end
 
+  # The event may carry the other ninth-digit form of the same line, and the contact is
+  # stored under whichever one first reached us.
+  context 'when the event carries the other ninth-digit form' do
+    let(:party) { model::Party.new(phone: '554199990000') }
+
+    it 'still finds the contact' do
+      expect(dispatch).to eq(:handled)
+      expect(Whatsapp::Session::UpdateContactAvatarJob).to have_been_enqueued
+    end
+  end
+
   context 'when nobody here knows the number' do
     let(:party) { model::Party.new(phone: '5541900001111') }
 

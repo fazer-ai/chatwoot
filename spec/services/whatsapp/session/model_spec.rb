@@ -5,7 +5,11 @@ require 'rails_helper'
 # accepted `:open` and then stored the symbol would make every predicate on it false and
 # put a non-canonical value on the wire, and it would do so silently.
 RSpec.describe Whatsapp::Session::Model do
-  let(:model) { described_class }
+  # Resolved inside the example, never captured from `described_class`. Model is an
+  # implicit namespace, so a reload between loading this file and running it leaves the
+  # module RSpec is holding without its autoloads, and every `model::Something` below
+  # raises `uninitialized constant`. Referencing the constant here re-resolves it.
+  let(:model) { Whatsapp::Session::Model } # rubocop:disable RSpec/DescribedClass
 
   it 'stores a symbol connection as the canonical string' do
     state = model::ConnectionState.new(connection: :open)

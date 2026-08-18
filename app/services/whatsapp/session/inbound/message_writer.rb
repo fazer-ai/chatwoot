@@ -55,7 +55,11 @@ class Whatsapp::Session::Inbound::MessageWriter
     {
       external_created_at: inbound.timestamp && (inbound.timestamp / 1000),
       # An outgoing message stored without a sender was written on the phone, not by an
-      # agent; the dashboard needs a name to show in the bubble.
+      # agent; the dashboard needs a name to show in the bubble, and `human_response?`
+      # needs the flag to count the reply as one, so it clears `waiting_since` and
+      # registers a first response like an agent's own message would. Anything Chatwoot
+      # itself sent was matched by its reserved id and never reaches this writer.
+      external_echo: (true unless incoming?),
       external_sender_name: ('WhatsApp' unless incoming?),
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,

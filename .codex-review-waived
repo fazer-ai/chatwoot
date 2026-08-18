@@ -10,3 +10,9 @@ app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide p
 # exact shape from `check_numbers`, before either backend exists. Delete this line once
 # slice 4 is merged.
 app/builders/contact_inbox_builder.rb: Route session providers through their number-check contract  # PR#370
+# PR#372: the same cross-slice gap as the number-check finding above. Slice 4 lands
+# `Facade::Groups#sync_group`, which calls this syncer, and `provider_service` only
+# becomes the facade there; until then `Channel::Whatsapp#sync_group` finds no such
+# method on the backend and returns. No session provider has a backend class before
+# slices 5 and 6, so no inbox can reach this. Delete this line once slice 4 is merged.
+app/services/whatsapp/session/groups/syncer.rb: Wire scheduled and manual syncs to the session syncer  # PR#372

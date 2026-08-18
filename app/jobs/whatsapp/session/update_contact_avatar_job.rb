@@ -11,8 +11,12 @@ class Whatsapp::Session::UpdateContactAvatarJob < ApplicationJob
     channel = inbox.channel
     return unless channel.session_capabilities.include?('profile_picture')
 
+    # The command declares an Address, and building it with `new` runs no coercion, so
+    # handing it a Party would put the wrong shape on the wire and break every backend
+    # that reads the address.
+    address = Whatsapp::Session::Model::Party.from_h(party).address
     url = channel.provider_service.profile_picture_url(
-      Whatsapp::Session::Model::Commands::ContactProfilePicture.new(party: Whatsapp::Session::Model::Party.from_h(party))
+      Whatsapp::Session::Model::Commands::ContactProfilePicture.new(party: address)
     )
     ::Avatar::AvatarFromUrlJob.perform_later(contact, url) if url.present?
   rescue Whatsapp::Session::Errors::Error => e

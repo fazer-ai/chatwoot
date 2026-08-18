@@ -33,6 +33,8 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     return :ignored if contact_inbox.nil?
 
     contact = contact_inbox.contact
+    return :ignored if silenced?(contact)
+
     # The echo of a message Chatwoot sent under a reserved id is already stored;
     # matching it before a conversation is picked keeps it from reopening (or opening)
     # a thread just to hold a message that is already there.
@@ -67,6 +69,14 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     return message.sender if message.incoming? && message.sender.present?
 
     Model::Party.from_address(message.chat)
+  end
+
+  # The same rule the Cloud path applies (`IncomingMessageBaseService#contact_processable?`):
+  # a blocked contact stops generating messages and notifications, but the echo of a
+  # reply typed on the connected phone is still stored, or the agent's own answer would
+  # go missing from the thread.
+  def silenced?(contact)
+    contact.blocked? && message.incoming?
   end
 
   def attribution
