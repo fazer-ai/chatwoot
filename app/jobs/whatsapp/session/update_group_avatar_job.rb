@@ -1,5 +1,5 @@
-# Refetches a group photo. `force` drops the stored one first, which is what a
-# picture-changed event needs: the avatar is attached, but it is the old one.
+# Refetches a group photo. `force` is what a picture-changed event needs: the avatar is
+# attached, but it is the old one.
 class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
   queue_as :low
 
@@ -16,7 +16,7 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
     info = fetch_info(channel, group_contact)
     return if info&.picture_url.blank?
 
-    group_contact.avatar.purge if group_contact.avatar.attached?
+    reset_sync_markers(group_contact) if force
     ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url)
   end
 
@@ -24,6 +24,17 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
 
   def refetch?(group_contact, force)
     force || !group_contact.avatar.attached?
+  end
+
+  # A group contact is a Contact, so `Avatar::AvatarFromUrlJob` applies its rate limit
+  # and its URL hash to it, skips a group synced in the last minute, and stamps both
+  # markers even on the run it skipped. Without this the forced refresh is dropped and
+  # the next attempt with the same URL is dropped as a duplicate. The stored avatar is
+  # not purged: the attach replaces it, and purging first loses the picture whenever the
+  # download does not happen. Same reset the Baileys path does before its own refetch.
+  def reset_sync_markers(group_contact)
+    attributes = (group_contact.additional_attributes || {}).except('last_avatar_sync_at', 'avatar_url_hash')
+    group_contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def fetch_info(channel, group_contact)

@@ -22,6 +22,18 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # The bubble is created before the bytes exist, and adding an attachment changes no
+  # column, so `Message#dispatch_update_event` saw an empty `previous_changes` and said
+  # nothing: the open dashboard kept showing the empty bubble until a reload.
+  it 'tells the open dashboards that the bubble now has its file' do
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+      .with(Events::Types::MESSAGE_UPDATED, anything, hash_including(message: message)).at_least(:once)
+  end
+
   it 'does nothing for a message that already has one' do
     described_class.perform_now(message, media.to_h)
 

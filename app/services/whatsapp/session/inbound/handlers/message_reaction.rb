@@ -29,15 +29,14 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   def add
     return :duplicate if find_message(payload.id)
 
-    contact_inbox = resolve_contact_inbox
-    return :ignored if contact_inbox.nil?
-
     # A reaction Chatwoot sent reserves its id like any other message, so a lost send
     # response makes the echo arrive under an id we never stored. The reservation is
-    # what identifies it; writing again would leave two reactions on the same bubble.
-    return :handled if Inbound::EchoMatcher.new(
-      inbox: inbox, contact: contact_inbox.contact, message_id: payload.id
-    ).perform
+    # what identifies it, on its own and before any contact is resolved; writing again
+    # would leave two reactions on the same bubble.
+    return :handled if Inbound::EchoMatcher.new(inbox: inbox, message_id: payload.id).perform
+
+    contact_inbox = resolve_contact_inbox
+    return :ignored if contact_inbox.nil?
 
     conversation = conversation_for(contact_inbox)
     return :ignored if conversation.nil?

@@ -12,6 +12,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
         # echo to arrive before its source_id is stored.
         next :duplicate if find_message(message.id)
 
+        # The echo of a message Chatwoot sent under a reserved id is already stored, and
+        # it is matched before anything is resolved: the echo may address the chat by a
+        # LID the peer has no contact under yet, and resolving that first would file the
+        # person a second time and then look for the reservation on the wrong contact,
+        # storing the echo again in a conversation of its own.
+        next :handled if echo_matched?
+
         message.group? ? handle_group : handle_individual
       end
     end
@@ -35,11 +42,6 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     contact = contact_inbox.contact
     return :ignored if silenced?(contact)
 
-    # The echo of a message Chatwoot sent under a reserved id is already stored;
-    # matching it before a conversation is picked keeps it from reopening (or opening)
-    # a thread just to hold a message that is already there.
-    return :handled if echo_matched?(contact)
-
     conversation = Inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, attribution: attribution
     ).perform
@@ -52,7 +54,6 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   def handle_group
     resolver = Inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender)
     group = resolver.perform
-    return :handled if echo_matched?(group.group_contact)
 
     write(resolver.conversation_for(group.group_contact_inbox), group.sender_contact)
     :handled
@@ -62,10 +63,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     Inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender).perform
   end
 
-  def echo_matched?(contact)
-    Inbound::EchoMatcher.new(
-      inbox: inbox, contact: contact, message_id: message.id, client_ref: message.client_ref
-    ).perform
+  # Only what the connected phone sent can be the echo of one of our own sends, and
+  # skipping the query for everything else keeps it off the path every inbound message
+  # takes.
+  def echo_matched?
+    return false if message.incoming?
+
+    Inbound::EchoMatcher.new(inbox: inbox, message_id: message.id, client_ref: message.client_ref).perform.present?
   end
 
   # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is

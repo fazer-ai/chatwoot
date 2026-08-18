@@ -369,6 +369,37 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # WhatsApp may address the 1:1 chat by a LID the peer has no contact_inbox under yet.
+  # Resolving the peer first filed that person a second time, and the reservation was
+  # then looked for on the wrong contact: the echo was stored again, in a thread of its
+  # own, as if an agent had typed it on the phone.
+  context 'with the echo of a send whose chat is addressed only by LID' do
+    let(:chat) { model::Address.lid('182736451928374') }
+    let(:inbound) do
+      model::InboundMessage.new(id: '3EB0AAAA0009', chat: chat, sender: nil, from_me: true,
+                                timestamp: 1_755_440_000_123, content: content)
+    end
+    let!(:reserved) do
+      contact = create(:contact, account: channel.account, phone_number: '+5541999990000')
+      contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5541999990000')
+      conversation = create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox,
+                                           account: channel.account)
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :outgoing, source_id: nil,
+                       content_attributes: { pending_source_id: '3EB0AAAA0009' })
+    end
+
+    it 'confirms the message that was sent' do
+      expect(dispatch).to eq(:handled)
+
+      expect(reserved.reload.source_id).to eq('3EB0AAAA0009')
+    end
+
+    it 'files no second contact and opens no second thread' do
+      expect { dispatch }.to not_change(inbox.contact_inboxes, :count).and not_change(inbox.messages, :count)
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 

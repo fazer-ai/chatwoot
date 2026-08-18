@@ -41,6 +41,13 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
       file: { io: payload.io, filename: filename(media, payload, message), content_type: payload.mime || media.mime }
     )
     attachment.meta = { is_recorded_audio: true } if media.voice_note
+    # Adding an attachment changes no column on the message, and
+    # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so
+    # nothing would tell the open dashboards that the bubble finally has its file: the
+    # agent would keep seeing the empty bubble until a reload. Stamping `updated_at` in
+    # the same save is what makes the row dirty enough to broadcast, once, with the
+    # attachment already committed.
+    message.updated_at = Time.current
     message.save!
   end
 

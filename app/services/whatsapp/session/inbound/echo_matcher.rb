@@ -8,22 +8,19 @@
 # so the echo is matched on that reservation instead, and the id the response never
 # delivered is filled in here.
 class Whatsapp::Session::Inbound::EchoMatcher
-  attr_reader :inbox, :contact, :message_id, :client_ref
+  attr_reader :inbox, :message_id, :client_ref
 
   # `client_ref` is the correlation token for a provider that assigns its own message
   # id and cannot take ours: the echo then comes back under an id Chatwoot has never
   # seen, and this token is the only thing tying it to the message that was sent.
-  def initialize(inbox:, contact:, message_id:, client_ref: nil)
+  def initialize(inbox:, message_id:, client_ref: nil)
     @inbox = inbox
-    @contact = contact
     @message_id = message_id
     @client_ref = client_ref
   end
 
   # Returns the already-stored message this echo belongs to, or nil.
   def perform
-    return if contact.blank?
-
     reserved = reserved_message
     return if reserved.nil?
 
@@ -33,16 +30,18 @@ class Whatsapp::Session::Inbound::EchoMatcher
 
   private
 
-  # Spans every conversation the contact has in this inbox: the sent message can be in
-  # any of them, and the answer is the conversation actually holding it.
+  # The whole inbox, not the peer's conversations. A reservation is a WhatsApp message
+  # id this session generated, so it identifies the message on its own, and scoping the
+  # lookup to a contact only means the echo of a chat addressed by a key that contact is
+  # not filed under yet misses its own reservation and is stored a second time.
   def reserved_message
     references = [message_id, client_ref].compact_blank
     return if references.empty?
 
-    Message.where(conversation_id: contact.conversations.where(inbox_id: inbox.id).select(:id))
-           .where(message_type: :outgoing)
-           .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' IN (?)", references)
-           .first
+    inbox.messages
+         .where(message_type: :outgoing)
+         .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' IN (?)", references)
+         .first
   end
 
   # The id the send never got to store is what a revoke needs, so a message deleted
