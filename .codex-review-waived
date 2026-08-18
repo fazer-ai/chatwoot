@@ -3,3 +3,10 @@ app/javascript/dashboard/store/modules/conversationPins.js: Prevent delayed pin 
 app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when a remote pin arrives  # PR#366
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
 app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
+# PR#370: unreachable given the merge order. The finding is that a session provider
+# would fall into the Baileys `on_whatsapp` response shape, but no session provider has
+# a backend class until slices 5 and 6, so `descriptor.available?` is false and the
+# inbox cannot be saved at all. Slice 4 lands `Facade#on_whatsapp`, which returns that
+# exact shape from `check_numbers`, before either backend exists. Delete this line once
+# slice 4 is merged.
+app/builders/contact_inbox_builder.rb: Route session providers through their number-check contract  # PR#370
