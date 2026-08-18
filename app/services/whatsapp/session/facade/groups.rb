@@ -46,12 +46,20 @@ module Whatsapp::Session::Facade::Groups
   end
 
   # Rendered straight to the dashboard, so the entries keep the keys it already reads.
+  #
+  # Approving people into a group is a capability of its own, and a provider can do groups
+  # without it: Uazapi is one. Asking its backend anyway raises NotSupported, which the
+  # controller does not answer for, so a routable endpoint turns into a 500.
   def group_join_requests(group_jid)
+    return [] unless capability?('group_join_requests')
+
     requests = backend.group_join_requests(model::Commands::GroupJoinRequestsList.new(group: group(group_jid)))
     Array(requests).map { |request| join_request_payload(request) }
   end
 
   def handle_group_join_requests(group_jid, participants, action)
+    raise Whatsapp::Session::Errors::NotSupported, 'this provider cannot approve join requests' unless capability?('group_join_requests')
+
     backend.handle_group_join_requests(
       model::Commands::GroupJoinRequestsUpdate.new(group: group(group_jid), participants: addresses(participants), action: action)
     )

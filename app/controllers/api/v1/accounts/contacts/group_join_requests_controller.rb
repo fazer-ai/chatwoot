@@ -3,7 +3,7 @@ class Api::V1::Accounts::Contacts::GroupJoinRequestsController < Api::V1::Accoun
     authorize @contact, :show?
     requests = channel.group_join_requests(@contact.identifier)
     render json: { payload: requests }
-  rescue Whatsapp::Session::Errors::ProviderUnavailable => e
+  rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::NotSupported => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -12,7 +12,7 @@ class Api::V1::Accounts::Contacts::GroupJoinRequestsController < Api::V1::Accoun
     channel.handle_group_join_requests(@contact.identifier, handle_params[:participants], handle_params[:request_action])
     remove_handled_requests(handle_params[:participants])
     head :ok
-  rescue Whatsapp::Session::Errors::ProviderUnavailable => e
+  rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::NotSupported => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 

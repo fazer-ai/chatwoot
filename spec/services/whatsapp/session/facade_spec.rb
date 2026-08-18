@@ -219,6 +219,17 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(backend.last_command.revoke).to be(true)
     end
 
+    # A provider can do groups without doing join requests: Uazapi is one. Asking its
+    # backend anyway raises NotSupported on a routable endpoint.
+    it 'answers join requests without the backend when the provider cannot approve them' do
+      allow(channel).to receive(:session_capabilities).and_return(%w[groups])
+
+      expect(channel.provider_service.group_join_requests(group_jid)).to eq([])
+      expect { channel.provider_service.handle_group_join_requests(group_jid, ['5541999990000@s.whatsapp.net'], 'approve') }
+        .to raise_error(Whatsapp::Session::Errors::NotSupported)
+      expect(backend.commands).to be_empty
+    end
+
     it 'renders a join request with the keys the dashboard already reads' do
       allow(backend).to receive(:group_join_requests).and_return(
         [{ 'party' => { 'phone' => '5541999990000', 'lid' => '182736451928374' }, 'requested_at' => 1_755_440_000 }]

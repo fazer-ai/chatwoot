@@ -11,6 +11,13 @@ class Whatsapp::Session::LogoutJob < ApplicationJob
   retry_on Whatsapp::Session::Errors::RateLimited, wait: :polynomially_longer, attempts: 6
 
   def perform(channel)
+    # Re-read, because a retry of this job can run minutes after the rejection that
+    # queued it: the administrator may have corrected the number and paired again, or
+    # converted the inbox altogether, and logging out then kills the session that
+    # replaced the one this was sent to remove. The quarantine is the whole reason this
+    # job exists, so its absence is reason enough not to run.
+    return unless Whatsapp::Session::ConnectionStateWriter.disowned?(channel.reload)
+
     channel.session_backend.logout
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     raise
