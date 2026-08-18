@@ -32,6 +32,20 @@ RSpec.describe Whatsapp::Session::Inbound::StatusTransition do
     expect(stale.reload.content_attributes).to include('deleted' => true, 'external_error' => 'recipient unreachable')
   end
 
+  # Two receipts for one message can be processed at the same time. Reading the status
+  # outside the lock let both pass the check against the same old value, and the slower
+  # `delivered` write then landed on top of `read`, which is the one thing the monotonic
+  # rule exists to prevent.
+  it 'does not walk a status backwards when two receipts race' do
+    first = Message.find(message.id)
+    second = Message.find(message.id)
+
+    expect(described_class.apply(first, 'read')).to be(true)
+    expect(described_class.apply(second, 'delivered')).to be(false)
+
+    expect(message.reload.status).to eq('read')
+  end
+
   it 'ignores a receipt type it does not know' do
     expect(described_class.apply(message, 'teleported')).to be(false)
   end

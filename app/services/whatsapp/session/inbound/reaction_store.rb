@@ -54,7 +54,11 @@ class Whatsapp::Session::Inbound::ReactionStore
     existing = find_existing
     return if existing.nil?
 
-    existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
+    # Merged under the row lock: the hash is read to be written back, so reading it off
+    # an instance loaded earlier drops whatever another worker put there in between.
+    existing.with_lock do
+      existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
+    end
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
@@ -66,13 +70,15 @@ class Whatsapp::Session::Inbound::ReactionStore
   # sender) is the invariant the removal path depends on: a second row would show both
   # emojis on the bubble and leave one of them behind when the reaction is taken back.
   def replace(existing)
-    existing.update!(
-      source_id: reaction.id,
-      content: reaction.emoji,
-      content_attributes: existing.content_attributes.merge(
-        { 'external_created_at' => reaction.timestamp && (reaction.timestamp / 1000) }.compact
+    existing.with_lock do
+      existing.update!(
+        source_id: reaction.id,
+        content: reaction.emoji,
+        content_attributes: existing.content_attributes.merge(
+          { 'external_created_at' => reaction.timestamp && (reaction.timestamp / 1000) }.compact
+        )
       )
-    )
+    end
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end

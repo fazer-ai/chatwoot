@@ -25,10 +25,18 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
   def revoke_by_self(target)
     return :ignored if target.deleted?
 
-    attributes = { 'deleted' => true, 'pending_source_id' => target.pending_source_id }.compact
-    target.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: attributes)
-    target.attachments.destroy_all
-    :handled
+    # Under the row lock: the reserved id is read out of the hash that is about to be
+    # replaced, so an echo confirming a send in between would otherwise be thrown away
+    # and the message could never be taken off the contact's phone.
+    target.with_lock do
+      next :ignored if target.deleted?
+
+      attributes = { 'deleted' => true, 'pending_source_id' => target.pending_source_id }.compact
+      target.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text,
+                     content_attributes: attributes)
+      target.attachments.destroy_all
+      :handled
+    end
   end
 
   # The contact deleted it: keep the stored content and only flag it, so the agent can
@@ -36,7 +44,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
   def revoke_by_contact(target)
     return :ignored if target.deleted_by_contact
 
-    target.update!(deleted_by_contact: true)
+    # `deleted_by_contact` lives in the content_attributes JSON, so writing it off a
+    # stale instance rewrites the whole hash.
+    target.update_under_lock!(deleted_by_contact: true)
     :handled
   end
 end

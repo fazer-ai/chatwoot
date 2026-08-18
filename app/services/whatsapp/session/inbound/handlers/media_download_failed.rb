@@ -7,7 +7,10 @@ class Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed < Whatsapp::Sess
     return :ignored if message.nil?
     return :ignored if message.attachments.any?
 
-    message.update!(is_unsupported: true)
+    # `is_unsupported` lives in the content_attributes JSON, so writing it off the
+    # instance loaded before a revoke landed would rewrite the whole hash and undelete
+    # the message.
+    message.update_under_lock!(is_unsupported: true)
     Rails.logger.warn("[WHATSAPP SESSION] media download failed for #{payload.message_id}: #{payload.reason}")
     :handled
   end

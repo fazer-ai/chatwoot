@@ -16,14 +16,27 @@ module Whatsapp::Session::Inbound::StatusTransition
   module_function
 
   # Returns true when the message was updated.
+  #
+  # Checked and written under the row lock. Two receipts for the same message can be
+  # processed at once, and reading the status outside the lock lets both pass the check
+  # against the same old value: the slower `delivered` write then lands on top of `read`
+  # and walks the message backwards, which is exactly what this rule exists to prevent.
   def apply(message, receipt_type, error: nil)
     status = RECEIPTS[receipt_type.to_s]
     return false if status.blank?
-    return false unless allowed?(message.status, status)
-    return apply_failure(message, error) if status == 'failed'
 
-    message.update!(status: status)
-    true
+    message.with_lock do
+      next false unless allowed?(message.status, status)
+
+      message.update!(failure_attributes(status, error))
+      true
+    end
+  end
+
+  def failure_attributes(status, error)
+    return { status: status } unless status == 'failed'
+
+    { status: :failed, external_error: error_message(error) }
   end
 
   def allowed?(current, new_status)
@@ -32,15 +45,6 @@ module Whatsapp::Session::Inbound::StatusTransition
     return true if new_status == 'failed'
 
     RANK.fetch(new_status, -1) > RANK.fetch(current, -1)
-  end
-
-  # `external_error` lives in the content_attributes JSON, so writing it through a stale
-  # instance rewrites the whole hash and drops whatever a concurrent writer put there,
-  # `deleted` and `pending_source_id` included. Same reason the legacy providers use
-  # this path for the same two flags.
-  def apply_failure(message, error)
-    message.update_under_lock!(status: :failed, external_error: error_message(error))
-    true
   end
 
   def error_message(error)
