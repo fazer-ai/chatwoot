@@ -44,3 +44,9 @@ app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before i
 # field the snapshot did not mention. Fixing it is a contract change, decided with the
 # payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
 app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372
+# PR#377: real, tracked in fazer-ai/chatwoot#378, and not this stack's to fix. Removing a
+# reaction never reaches any provider, legacy included: the reactions controller marks the
+# reused row deleted and Base::SendOnChannelService refuses to send a deleted message. The
+# guard is ours, from #353, and it is shared by every channel, so the fix goes to main
+# rather than to a branch that merges in weeks. Removing this waiver does not close the issue.
+app/services/whatsapp/session/outbound/message_sender.rb: Allow deleted reaction rows to send removals  # PR#377
