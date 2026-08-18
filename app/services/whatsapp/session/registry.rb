@@ -80,6 +80,13 @@ module Whatsapp::Session::Registry
       Whatsapp::Session::PROVIDERS.include?(provider.to_s)
     end
 
+    # The QR/pairing family, legacy providers included. What sets it apart from the cloud
+    # family is behavioral: a paired session is a real WhatsApp client, so there is no
+    # 24-hour messaging window and no template requirement.
+    def session_family?(provider)
+      descriptor(provider)&.session? || false
+    end
+
     def backend_for(channel)
       descriptor = descriptor(channel.provider)
       raise Whatsapp::Session::Errors::InvalidConfig, "#{channel.provider} is not served by the session layer" unless descriptor&.served?

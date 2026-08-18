@@ -60,6 +60,7 @@ class Account < ApplicationRecord
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :captain_auto_resolve_mode, :captain_false_promise_harness_enabled
   include AccountAgentRestrictions
+  include AccountWhatsappProviders
   include AccountCaptainAutoResolve
 
   has_many :account_users, dependent: :destroy_async

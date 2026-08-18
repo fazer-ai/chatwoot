@@ -76,6 +76,29 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
 
       expect(channel).to be_valid
     end
+
+    it 'refuses a session provider the account has not opted into' do
+      channel = build(:channel_whatsapp, account: account, provider: 'uazapi', session_provider_enabled: false)
+
+      expect(channel).not_to be_valid
+      expect(channel.errors[:provider]).to include(I18n.t('errors.inboxes.channel.provider_not_enabled_for_account'))
+    end
+
+    it 'refuses converting an existing inbox to a provider the account has not opted into' do
+      channel = build_channel('whatsapp_cloud')
+
+      expect do
+        channel.convert_provider!(new_provider: 'uazapi', new_provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      end.to raise_error(ActiveRecord::RecordInvalid)
+      expect(channel.reload.provider).to eq('whatsapp_cloud')
+    end
+
+    it 'keeps an existing session inbox saveable after the toggle is turned back off' do
+      channel = build_channel('uazapi')
+      account.update!(whatsapp_uazapi_enabled: false)
+
+      expect(channel.reload.update(provider_config: channel.provider_config.merge('mark_as_read' => false))).to be(true)
+    end
   end
 
   describe 'connection payload' do

@@ -28,6 +28,7 @@ es:
       channel:
         provider_unavailable: Este proveedor de WhatsApp aún no está disponible en esta instalación.
         invalid_provider_config: 'Configuración inválida en: %{keys}'
+        provider_not_enabled_for_account: Este proveedor de WhatsApp aún no está habilitado para esta cuenta.
         provider_connection:
           wrong_phone_number: El número de teléfono que intenta vincular no es el mismo que tiene configurado. Verifique que el número sea correcto antes de escanear el código QR.
           reconnect_loop_detected: No se pudo restablecer la conexión después de varios intentos. Los reintentos automáticos continúan a intervalos cada vez mayores. Si el problema persiste, desconecte la bandeja de entrada y vuelva a vincularla escaneando un código QR nuevo.

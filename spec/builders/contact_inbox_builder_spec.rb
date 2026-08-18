@@ -349,7 +349,7 @@ describe ContactInboxBuilder do
         contact_inbox = described_class.new(
           contact: contact,
           inbox: baileys_inbox,
-          validate_baileys_phone: true
+          validate_whatsapp_phone: true
         ).perform
 
         expect(contact.reload.phone_number).to eq(canonical_phone)
@@ -364,7 +364,7 @@ describe ContactInboxBuilder do
           contact: contact,
           inbox: baileys_inbox,
           source_id: '5511912345678',
-          validate_baileys_phone: true
+          validate_whatsapp_phone: true
         ).perform
 
         expect(contact_inbox.source_id).to eq(canonical_phone.delete('+'))
@@ -378,7 +378,7 @@ describe ContactInboxBuilder do
         contact_inbox = described_class.new(
           contact: contact,
           inbox: baileys_inbox,
-          validate_baileys_phone: true
+          validate_whatsapp_phone: true
         ).perform
 
         expect(contact_inbox.contact_id).to eq(existing_contact.id)
@@ -391,7 +391,7 @@ describe ContactInboxBuilder do
           .and_return({ 'jid' => "#{contact.phone_number.delete('+')}@s.whatsapp.net", 'exists' => true })
 
         expect do
-          described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+          described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
         end.not_to(change { contact.reload.phone_number })
       end
 
@@ -400,7 +400,7 @@ describe ContactInboxBuilder do
           .and_return({ 'jid' => canonical_jid, 'exists' => false })
 
         expect do
-          described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+          described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
         end.not_to(change { contact.reload.phone_number })
       end
 
@@ -410,13 +410,13 @@ describe ContactInboxBuilder do
 
         contact_inbox = nil
         expect do
-          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_baileys_phone: true).perform
+          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
         end.not_to(change { contact.reload.phone_number })
 
         expect(contact_inbox.source_id).to eq(contact.phone_number.delete('+'))
       end
 
-      it 'does not call on_whatsapp when validate_baileys_phone is not requested' do
+      it 'does not call on_whatsapp when validate_whatsapp_phone is not requested' do
         expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
 
         described_class.new(contact: contact, inbox: baileys_inbox).perform
@@ -426,7 +426,7 @@ describe ContactInboxBuilder do
         non_baileys_inbox = create(:channel_whatsapp, account: account, sync_templates: false, validate_provider_config: false).inbox
         expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
 
-        described_class.new(contact: contact, inbox: non_baileys_inbox, validate_baileys_phone: true).perform
+        described_class.new(contact: contact, inbox: non_baileys_inbox, validate_whatsapp_phone: true).perform
       end
     end
 
