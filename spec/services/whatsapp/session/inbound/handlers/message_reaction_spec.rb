@@ -33,6 +33,63 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     expect(stored.content_attributes['in_reply_to_external_id']).to eq('3EB0TARGET')
   end
 
+  # WhatsApp gives a changed reaction a new id, so swapping one emoji for another is a
+  # fresh event, not an edit. A second row would show both emojis on the bubble and
+  # leave one behind when the reaction is taken back.
+  it 'replaces a reaction the same sender already left' do
+    target
+    dispatch
+
+    changed = model::Events::MessageReaction.new(
+      id: '3EB0REACTION2', chat: model::Address.phone('5541999990000'), sender: sender,
+      from_me: false, target_id: target.source_id, emoji: '❤️', timestamp: 1_755_440_000_456
+    )
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.build(changed))
+
+    rows = conversation.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
+    expect(rows.count).to eq(1)
+    expect(rows.first).to have_attributes(content: '❤️', source_id: '3EB0REACTION2')
+  end
+
+  # The reaction Chatwoot sent reserved its id, and a lost send response makes the echo
+  # arrive under an id we never stored.
+  context 'with the echo of a reaction Chatwoot sent' do
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '3EB0RESERVED', chat: model::Address.phone('5541999990000'), sender: nil,
+        from_me: true, target_id: target.source_id, emoji: emoji, timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'confirms the reserved row instead of adding a second reaction' do
+      reserved = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                  message_type: :outgoing, source_id: nil,
+                                  content_attributes: { is_reaction: true, pending_source_id: '3EB0RESERVED' })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(reserved.reload.source_id).to eq('3EB0RESERVED')
+      expect(conversation.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").count).to eq(1)
+    end
+  end
+
+  # Resolving a sender creates a Contact, a ContactInbox and an avatar job, and a
+  # removal aimed at a message nobody reacted to has nothing to remove.
+  context 'with a removal that matches nothing' do
+    let(:emoji) { '' }
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '3EB0REMOVE', chat: model::Address.phone('5541900001111'),
+        sender: model::Party.new(phone: '5541900001111'), from_me: false,
+        target_id: '3EB0UNKNOWN', emoji: '', timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'leaves no contact behind' do
+      expect { expect(dispatch).to eq(:ignored) }.not_to change(Contact, :count)
+    end
+  end
+
   it 'does not open a thread for a reaction whose target is unknown' do
     event = model::Event.build(reaction.with(target_id: '3EB0MISSING', id: '3EB0REACTION2'))
 

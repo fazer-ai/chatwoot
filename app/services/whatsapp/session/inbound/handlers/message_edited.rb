@@ -7,7 +7,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
     return :ignored if target.nil?
 
     content = edited_content
-    return :ignored if content.blank?
+    # nil is a content type this layer cannot render as text; an empty string is a real
+    # edit that removed the caption, and dropping it would leave the old one on screen.
+    return :ignored if content.nil?
 
     # The first edit is what the reader wants to compare against, so a second edit does
     # not overwrite the original.
@@ -20,9 +22,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
 
   def edited_content
     case payload.content
-    when Content::Text then payload.content.body
-    when Content::Media then payload.content.caption
-    when Content::Rich then payload.content.preview_text
+    when Content::Text then payload.content.body.to_s
+    when Content::Media then payload.content.caption.to_s
+    when Content::Rich then payload.content.preview_text.to_s
     end
   end
 end

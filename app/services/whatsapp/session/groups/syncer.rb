@@ -78,7 +78,11 @@ class Whatsapp::Session::Groups::Syncer
       'owner_pn' => info.owner&.phone,
       'invite_code' => info.invite_code.presence,
       'group_last_synced_at' => Time.current.to_i,
-      'group_left' => false
+      # Only rejoining clears this, and only `group.joined` knows that happened. A
+      # scheduled sync can still read cached metadata for a group the session left, and
+      # clearing the flag there would put the group actions back in the dashboard for a
+      # thread that can no longer send anything.
+      'group_left' => (false if @info.present?)
     }.compact
     attributes['description'] = info.description.presence unless info.description.nil?
     attributes.merge(setting_attributes(info))

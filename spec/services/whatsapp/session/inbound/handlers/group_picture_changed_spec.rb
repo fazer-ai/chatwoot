@@ -29,7 +29,9 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupPictureChanged do
 
     group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
     expect(group_contact.conversations.last.messages.last.content).to include('changed the group image')
-    expect(Whatsapp::Session::UpdateGroupAvatarJob).to have_been_enqueued.with(group_contact, force: true)
+    # The inbox the event came from, not whichever contact_inbox happens to be first:
+    # the same group can be in two inboxes of one account.
+    expect(Whatsapp::Session::UpdateGroupAvatarJob).to have_been_enqueued.with(group_contact, force: true, channel: channel)
   end
 
   # The job returns before purging when the group reports no photo, so asking it to

@@ -21,7 +21,7 @@ class Whatsapp::Session::Inbound::Handlers::GroupPictureChanged < Whatsapp::Sess
   # reports no photo, so asking it to refresh would leave the old image attached for
   # good.
   def refresh_avatar(group_contact)
-    return Whatsapp::Session::UpdateGroupAvatarJob.perform_later(group_contact, force: true) unless payload.removed
+    return Whatsapp::Session::UpdateGroupAvatarJob.perform_later(group_contact, force: true, channel: channel) unless payload.removed
 
     group_contact.avatar.purge if group_contact.avatar.attached?
   end

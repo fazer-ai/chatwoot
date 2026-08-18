@@ -33,7 +33,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
       expect(dispatch).to eq(:handled)
 
       expect(message.reload).to be_deleted
-      expect(message.content).to eq('')
+      expect(message.content).to eq(I18n.t('conversations.messages.deleted'))
+    end
+
+    # The messages controller destroys them, and leaving them behind would keep the
+    # deleted media readable through the API and in storage.
+    it 'takes the attachments with it' do
+      message.attachments.create!(account_id: message.account_id, file_type: :image)
+
+      expect(dispatch).to eq(:handled)
+      expect(message.reload.attachments).to be_empty
     end
 
     it 'ignores the echo of a deletion Chatwoot already applied' do

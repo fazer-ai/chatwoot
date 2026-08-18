@@ -52,4 +52,22 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageEdited do
 
     expect(described_class.new(channel: channel, event: event).perform).to eq(:ignored)
   end
+
+  # Removing a caption is a real edit, and dropping it left the old caption on screen
+  # with no way to clear it.
+  context 'when the edit clears a media caption' do
+    let(:event) do
+      model::Event.build(
+        model::Events::MessageEdited.new(
+          chat: model::Address.phone('5541999990000'), message_id: message.source_id,
+          content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', caption: '')
+        )
+      )
+    end
+
+    it 'clears the stored caption' do
+      expect(dispatch).to eq(:handled)
+      expect(message.reload.content).to eq('')
+    end
+  end
 end

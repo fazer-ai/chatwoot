@@ -73,6 +73,24 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     end
   end
 
+  # Only rejoining clears the flag, and only `group.joined` knows that happened. A
+  # scheduled sync can still read cached metadata for a group the session left, and
+  # clearing it there would put the group actions back for a thread that cannot send.
+  context 'when the group was already left and the sync fetched its metadata' do
+    subject(:fetched_sync) { described_class.new(channel: channel, group_contact: group_contact).perform }
+
+    let(:stored) { super().merge('group_left' => true) }
+    let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+
+    before { allow(channel).to receive(:provider_service).and_return(backend) }
+
+    it 'keeps the group marked as left' do
+      fetched_sync
+
+      expect(group_contact.reload.additional_attributes['group_left']).to be(true)
+    end
+  end
+
   context 'when only admins may add people' do
     let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe', member_add_mode: 'admin_add') }
 

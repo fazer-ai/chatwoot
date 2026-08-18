@@ -11,21 +11,36 @@ class Whatsapp::Session::Inbound::ReactionStore
     @sender = sender
   end
 
+  # True when anything is still reacting to this target, from anyone. Cheap enough to ask
+  # before resolving a sender, which is what keeps a removal aimed at nothing from
+  # creating a contact on its way to doing nothing.
+  def self.active?(inbox:, target_id:)
+    json = "(content_attributes#>>'{}')::jsonb"
+    Message.where(inbox_id: inbox.id)
+           .where("#{json}->>'is_reaction' = 'true'")
+           .where("#{json}->>'in_reply_to_external_id' = ?", target_id)
+           .where.not(content: '')
+           .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
+           .exists?
+  end
+
   def write(conversation)
-    conversation.messages.create!(
-      account_id: inbox.account_id,
-      inbox_id: inbox.id,
-      source_id: reaction.id,
-      sender: reaction.from_me ? nil : sender,
-      message_type: reaction.from_me ? :outgoing : :incoming,
-      content: reaction.emoji,
-      content_attributes: {
-        is_reaction: true,
-        in_reply_to_external_id: reaction.target_id,
-        external_created_at: reaction.timestamp && (reaction.timestamp / 1000),
-        external_sender_name: ('WhatsApp' if reaction.from_me)
-      }.compact
-    )
+    existing = find_existing
+    return replace(existing) if existing
+
+    conversation.messages.create!(account_id: inbox.account_id, inbox_id: inbox.id, source_id: reaction.id,
+                                  sender: reaction.from_me ? nil : sender,
+                                  message_type: reaction.from_me ? :outgoing : :incoming,
+                                  content: reaction.emoji, content_attributes: new_content_attributes)
+  end
+
+  def new_content_attributes
+    {
+      is_reaction: true,
+      in_reply_to_external_id: reaction.target_id,
+      external_created_at: reaction.timestamp && (reaction.timestamp / 1000),
+      external_sender_name: ('WhatsApp' if reaction.from_me)
+    }.compact
   end
 
   # WhatsApp delivers a removal as a reaction with an empty emoji. The stored row is
@@ -45,6 +60,21 @@ class Whatsapp::Session::Inbound::ReactionStore
   end
 
   private
+
+  # WhatsApp gives a changed reaction a new id, so the same sender swapping one emoji
+  # for another arrives as a fresh event rather than as an edit. One row per (target,
+  # sender) is the invariant the removal path depends on: a second row would show both
+  # emojis on the bubble and leave one of them behind when the reaction is taken back.
+  def replace(existing)
+    existing.update!(
+      source_id: reaction.id,
+      content: reaction.emoji,
+      content_attributes: existing.content_attributes.merge(
+        { 'external_created_at' => reaction.timestamp && (reaction.timestamp / 1000) }.compact
+      )
+    )
+    existing
+  end
 
   # Deliberately not scoped to any conversation: the original reaction may live in an
   # older or resolved thread while the inbound flow picked a different one.

@@ -14,11 +14,16 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
   private
 
   # Deleted from the connected phone: same outcome as deleting it from Chatwoot, which
-  # is also what the echo of a Chatwoot deletion looks like (hence the guard).
+  # is also what the echo of a Chatwoot deletion looks like (hence the guard). Same
+  # outcome means the same as the messages controller produces, attachments included:
+  # leaving the files behind would keep the deleted media readable through the API and
+  # in storage. The reserved id survives, so a send still in flight stays matchable.
   def revoke_by_self(target)
     return :ignored if target.deleted?
 
-    target.update!(content: '', content_attributes: target.content_attributes.merge('deleted' => true))
+    attributes = { 'deleted' => true, 'pending_source_id' => target.pending_source_id }.compact
+    target.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: attributes)
+    target.attachments.destroy_all
     :handled
   end
 

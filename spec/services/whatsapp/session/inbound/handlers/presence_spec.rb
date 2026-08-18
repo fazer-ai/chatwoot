@@ -29,6 +29,28 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::Presence do
     expect(dispatch).to eq(:handled)
   end
 
+  # The event carries whichever ninth-digit form WhatsApp uses, and the contact is
+  # stored under whichever one reached us first. An exact match drops the indicator.
+  context 'when the event carries the other ninth-digit form' do
+    let(:contact) { create(:contact, account: channel.account, phone_number: '+554188887777') }
+    let(:event) do
+      model::Event.build(
+        model::Events::ChatPresence.new(
+          chat: model::Address.phone('5541988887777'),
+          sender: model::Party.new(phone: '5541988887777'), state: 'composing'
+        )
+      )
+    end
+
+    it 'still reaches the contact' do
+      expect(Rails.configuration.dispatcher).to receive(:dispatch).with(
+        Events::Types::CONVERSATION_TYPING_ON, anything, hash_including(conversation: conversation, user: contact)
+      )
+
+      expect(dispatch).to eq(:handled)
+    end
+  end
+
   it 'maps a recording indicator to its own event' do
     event = model::Event.build(
       model::Events::ChatPresence.new(chat: model::Address.phone('5541999990000'), sender: sender, state: 'recording')

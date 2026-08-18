@@ -3,10 +3,15 @@
 class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
   queue_as :low
 
-  def perform(group_contact, force: false)
-    channel = group_contact.group_channel
+  # `channel` is the inbox the event came from. Falling back to `group_channel` picks
+  # the group contact's first contact_inbox, which is an arbitrary choice as soon as the
+  # same WhatsApp group is in two inboxes of one account: the picture could then be
+  # asked of a provider that is not even connected.
+  def perform(group_contact, force: false, channel: nil)
+    return unless refetch?(group_contact, force)
+
+    channel ||= group_contact.group_channel
     return if channel.blank?
-    return if group_contact.avatar.attached? && !force
 
     info = fetch_info(channel, group_contact)
     return if info&.picture_url.blank?
@@ -16,6 +21,10 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
   end
 
   private
+
+  def refetch?(group_contact, force)
+    force || !group_contact.avatar.attached?
+  end
 
   def fetch_info(channel, group_contact)
     address = Whatsapp::Session::Model::Address.parse(group_contact.identifier)

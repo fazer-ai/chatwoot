@@ -57,10 +57,14 @@ class Whatsapp::Session::Inbound::Handlers::Presence < Whatsapp::Session::Inboun
     contact_inbox || find_by_phone(party)
   end
 
+  # Every ninth-digit form, for the same reason the contact and picture resolvers try
+  # them: the event carries whichever form WhatsApp uses and the contact is stored under
+  # whichever one reached us first. An exact match drops the typing indicator silently.
   def find_by_phone(party)
-    return if party.phone.blank?
+    numbers = Whatsapp::Session::PhoneMatch.variants(party.phone).map { |variant| "+#{variant}" }
+    return if numbers.empty?
 
-    contact = inbox.contacts.find_by(phone_number: party.phone_e164)
+    contact = inbox.contacts.find_by(phone_number: numbers)
     inbox.contact_inboxes.find_by(contact_id: contact.id) if contact
   end
 end

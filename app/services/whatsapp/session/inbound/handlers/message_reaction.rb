@@ -17,7 +17,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     true
   end
 
+  # Checked before the sender is resolved: resolving creates a Contact, a ContactInbox
+  # and an avatar job, and a removal aimed at a message nobody here reacted to has
+  # nothing to remove. Without this, every stray removal leaves a contact behind.
   def remove
+    return :ignored unless Inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id)
+
     store(sender_contact).remove ? :handled : :ignored
   end
 
@@ -26,6 +31,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
 
     contact_inbox = resolve_contact_inbox
     return :ignored if contact_inbox.nil?
+
+    # A reaction Chatwoot sent reserves its id like any other message, so a lost send
+    # response makes the echo arrive under an id we never stored. The reservation is
+    # what identifies it; writing again would leave two reactions on the same bubble.
+    return :handled if Inbound::EchoMatcher.new(
+      inbox: inbox, contact: contact_inbox.contact, message_id: payload.id
+    ).perform
 
     conversation = conversation_for(contact_inbox)
     return :ignored if conversation.nil?
