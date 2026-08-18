@@ -95,6 +95,8 @@ class Whatsapp::Session::Facade
   end
 
   def read_messages(messages, recipient_id:, **)
+    return unless capability?('read_receipts')
+
     source_ids = Array(messages).filter_map(&:source_id)
     return if source_ids.empty?
 
@@ -102,6 +104,8 @@ class Whatsapp::Session::Facade
   end
 
   def unread_message(recipient_id, message)
+    return unless capability?('mark_unread')
+
     backend.mark_unread(
       model::Commands::MessageMarkUnread.new(
         chat: address(recipient_id), last_message_id: message.source_id, from_me: message.outgoing?
@@ -116,19 +120,31 @@ class Whatsapp::Session::Facade
   end
 
   # --- presence and contacts -----------------------------------------------------
+  #
+  # These four are background synchronization the dashboard triggers as a side effect of
+  # something else: a listener firing on a typing event, a conversation being marked
+  # unread. `Channel::Whatsapp` used to skip them by asking `respond_to?`, which was true
+  # of the legacy service and false of anything it did not implement; a facade that
+  # answers every message makes that test useless, so the capability is what decides now.
+  # Nothing here is an action the agent waits on, so an unsupported one is skipped rather
+  # than raised: a listener that raises takes the whole event down with it.
 
   def toggle_typing_status(typing_status, recipient_id:, **)
     state = TYPING_STATES[typing_status]
-    return if state.blank?
+    return if state.blank? || !capability?('typing')
 
     backend.send_chat_presence(model::Commands::ChatPresence.new(chat: address(recipient_id), state: state))
   end
 
   def update_presence(status)
+    return unless capability?('presence')
+
     backend.update_presence(model::Commands::PresenceSet.new(state: status))
   end
 
   def presence_subscribe(jids)
+    return unless capability?('presence_subscribe')
+
     Array(jids).each do |jid|
       party = model::Party.from_address(model::Address.parse(jid))
       next if party.blank?

@@ -49,6 +49,21 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
     expect(backend.commands_of('message.send').map(&:message_id).uniq).to eq([reserved])
   end
 
+  # Both layers used to enqueue it: this one from the id it just wrote, and
+  # SendOnWhatsappService from the same id returned to it. The second revoke hits a
+  # provider that no longer knows the message, and fails five times retrying.
+  it 'leaves the revoke of a message deleted mid-send to a single owner' do
+    # Deleted after the send started: one deleted beforehand never reaches the provider
+    # at all, and the revoke only matters once an id exists to revoke.
+    allow(backend).to receive(:send_message).and_wrap_original do |original, command|
+      message.update_under_lock!(deleted: true)
+      original.call(command)
+    end
+
+    expect { Whatsapp::SendOnWhatsappService.new(message: message).perform }
+      .to have_enqueued_job(Messages::DeleteOnChannelJob).once
+  end
+
   it 'quotes the message the agent replied to' do
     quoted = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
                               message_type: :incoming, sender: contact, source_id: '3EB0QUOTED')

@@ -82,7 +82,7 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     let(:stored) { super().merge('group_left' => true) }
     let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
-    before { allow(channel).to receive(:provider_service).and_return(backend) }
+    before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
     it 'keeps the group marked as left' do
       fetched_sync
@@ -135,7 +135,7 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
 
     let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
-    before { allow(channel).to receive(:provider_service).and_return(backend) }
+    before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
     it 'says so instead of reporting an empty sync' do
       allow(backend).to receive(:group_info).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)

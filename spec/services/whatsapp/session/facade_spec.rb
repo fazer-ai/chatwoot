@@ -111,6 +111,32 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(channel.provider_connection).not_to have_key('error_code')
   end
 
+  # `Channel::Whatsapp` used to skip these by asking `respond_to?`, which the facade
+  # makes true for every provider. The capability is what decides now, and an
+  # unsupported one is skipped rather than raised: these run inside listeners, and a
+  # listener that raises takes the event it was handling down with it.
+  describe 'background synchronization a backend may not support' do
+    before { allow(channel).to receive(:session_capabilities).and_return(%w[groups revoke]) }
+
+    it 'skips marking a conversation unread' do
+      message = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA')
+
+      expect { channel.unread_conversation(conversation.reload) }.not_to raise_error
+      expect(backend.commands).to be_empty
+      expect(message).to be_present
+    end
+
+    it 'skips read receipts, typing and presence' do
+      message = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA')
+
+      channel.read_messages([message], conversation: conversation)
+      channel.toggle_typing_status(Events::Types::CONVERSATION_TYPING_ON, conversation: conversation)
+      channel.update_presence('available')
+
+      expect(backend.commands).to be_empty
+    end
+  end
+
   describe 'the group half' do
     let(:group_jid) { '120363041234567890@g.us' }
 
@@ -139,11 +165,13 @@ RSpec.describe Whatsapp::Session::Facade do
         .to raise_error(Whatsapp::Session::Errors::InvalidPayload, /unknown group setting/)
     end
 
-    it 'asks for a fresh invite link when revoking the current one' do
-      facade.group_invite_code(group_jid)
+    # The dashboard endpoint builds the URL from what comes back, so anything but the
+    # bare code renders a link with the host in it twice.
+    it 'answers an invite with the code alone, and asks for a fresh one when revoking' do
+      expect(facade.group_invite_code(group_jid)).to eq('FAKEINVITE0001')
       expect(backend.last_command.revoke).to be(false)
 
-      facade.revoke_group_invite(group_jid)
+      expect(facade.revoke_group_invite(group_jid)).to eq('FAKEINVITE0001')
       expect(backend.last_command.revoke).to be(true)
     end
 

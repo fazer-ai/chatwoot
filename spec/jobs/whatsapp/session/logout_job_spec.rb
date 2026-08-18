@@ -4,7 +4,7 @@ RSpec.describe Whatsapp::Session::LogoutJob do
   let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
   let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
-  before { allow(channel).to receive(:provider_service).and_return(backend) }
+  before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
   it 'asks the session to end' do
     described_class.perform_now(channel)

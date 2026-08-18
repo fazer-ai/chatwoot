@@ -22,6 +22,15 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(channel.reload.provider_connection['qr_data_url']).to eq('data:image/png;base64,ROTATED')
   end
 
+  # `reconnecting` is the provider still working on it, which is when the poll is most
+  # needed: the code keeps rotating and the push that would carry it is exactly what
+  # this job stands in for.
+  it 'keeps polling while the provider reports it is reconnecting' do
+    allow(backend).to receive(:fetch_connection_state).and_return(state('reconnecting'))
+
+    expect { described_class.perform_now(channel) }.to have_enqueued_job(described_class)
+  end
+
   it 'stops as soon as the session is paired' do
     allow(backend).to receive(:fetch_connection_state).and_return(state('open', phone_number: '5541988887777'))
 

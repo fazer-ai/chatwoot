@@ -80,6 +80,9 @@ class Whatsapp::Session::Backend
   def update_group_description(_command) = not_supported!(:update_group_description)
   def update_group_photo(_command) = not_supported!(:update_group_photo)
   def update_group_setting(_command) = not_supported!(:update_group_setting)
+  # Returns the invite code alone, never the chat.whatsapp.com link: the dashboard
+  # endpoint builds the URL from it, so a backend handing back a full link produces one
+  # with the host in it twice.
   def group_invite_code(_command) = not_supported!(:group_invite_code)
   def group_join_requests(_command) = not_supported!(:group_join_requests)
   def handle_group_join_requests(_command) = not_supported!(:handle_group_join_requests)

@@ -11,7 +11,7 @@ class Whatsapp::Session::LogoutJob < ApplicationJob
   retry_on Whatsapp::Session::Errors::RateLimited, wait: :polynomially_longer, attempts: 6
 
   def perform(channel)
-    channel.provider_service.logout
+    channel.session_backend.logout
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     raise
   rescue Whatsapp::Session::Errors::Error => e

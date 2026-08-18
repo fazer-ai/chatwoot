@@ -176,7 +176,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def group_invite_code(command)
     record(command)
-    'https://chat.whatsapp.com/FAKEINVITE0001'
+    'FAKEINVITE0001'
   end
 
   def group_join_requests(command)

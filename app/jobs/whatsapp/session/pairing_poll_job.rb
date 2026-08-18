@@ -33,8 +33,11 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   private
 
   # Anything that is not still trying to connect ends the poll: `open` means paired, and
-  # a closed connection means the attempt was abandoned or refused.
+  # a closed connection means the attempt was abandoned or refused. `reconnecting` is
+  # the provider still working on it, which is exactly when the poll is needed: the QR
+  # keeps rotating and the push that would carry it is the thing this job exists to
+  # replace, so treating it as settled leaves the operator on a dead code.
   def settled?(state)
-    state.connection != 'connecting'
+    !state.connecting?
   end
 end

@@ -123,9 +123,10 @@ class Whatsapp::Session::Outbound::MessageSender
     attributes[:external_created_at] = result.timestamp / 1000 if result.timestamp.present?
     message.update_under_lock!(**attributes)
 
-    # The agent deleted the message while this send was in flight: the delete endpoint
-    # found no source_id to revoke and left it to whoever wrote one.
-    ::Messages::DeleteOnChannelJob.perform_later(message.id) if message.deleted?
+    # A message deleted while this send was in flight still has to be revoked on the
+    # provider, and SendOnWhatsappService already does that from the id this returns.
+    # Doing it here as well would revoke the same message twice, the second one failing
+    # against a provider that refuses an unknown revoke, with five retries behind it.
     result.message_id
   end
 

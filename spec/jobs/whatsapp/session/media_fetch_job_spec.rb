@@ -14,7 +14,7 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
                               ref: model::MediaRef.url('https://connector.test/media/abc'))
   end
 
-  before { allow(inbox.channel).to receive(:provider_service).and_return(backend) }
+  before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
   it 'attaches the bytes it downloaded' do
     described_class.perform_now(message, media.to_h)

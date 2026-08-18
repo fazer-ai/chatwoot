@@ -71,7 +71,7 @@ class Whatsapp::Session::Groups::Syncer
     address = group_address
     return if address.blank?
 
-    channel.provider_service.group_info(Model::Commands::GroupInfo.new(group: address))
+    channel.session_backend.group_info(Model::Commands::GroupInfo.new(group: address))
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     # Raised on. Swallowing it here returns nil, and the caller reads that as "nothing to
     # apply" and goes on to dispatch CONTACT_GROUP_SYNCED and hand back the untouched
