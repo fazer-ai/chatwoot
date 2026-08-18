@@ -16,7 +16,33 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ContactPictureChanged do
   it 'drops the stored avatar and asks for the new one' do
     dispatch
 
-    expect(Whatsapp::Session::UpdateContactAvatarJob).to have_been_enqueued.with(contact, inbox, hash_including('phone' => '5541999990000'))
+    expect(Whatsapp::Session::UpdateContactAvatarJob)
+      .to have_been_enqueued.with(contact, inbox, hash_including('phone' => '5541999990000'), force: true)
+  end
+
+  # `Avatar::AvatarFromUrlJob` skips a contact synced in the last minute or handed a URL
+  # it already fetched, and stamps both markers even on the run it skipped. Purging the
+  # avatar up front and then having the download skipped left the contact with no
+  # picture and no attempt that would ever fire again.
+  context 'when the contact already has an avatar' do
+    before do
+      contact.avatar.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png',
+                            content_type: 'image/png')
+      contact.update!(additional_attributes: { 'last_avatar_sync_at' => Time.current.iso8601,
+                                               'avatar_url_hash' => 'abc123' })
+    end
+
+    it 'keeps it until the replacement can be attached' do
+      dispatch
+
+      expect(contact.reload.avatar).to be_attached
+    end
+
+    it 'clears the markers that would suppress the download' do
+      dispatch
+
+      expect(contact.reload.additional_attributes).not_to include('last_avatar_sync_at', 'avatar_url_hash')
+    end
   end
 
   context 'when the photo was removed' do
@@ -35,7 +61,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ContactPictureChanged do
 
     it 'still finds the contact behind the LID' do
       expect(dispatch).to eq(:handled)
-      expect(Whatsapp::Session::UpdateContactAvatarJob).to have_been_enqueued.with(contact, inbox, hash_including('phone' => '5541999990000'))
+      expect(Whatsapp::Session::UpdateContactAvatarJob)
+        .to have_been_enqueued.with(contact, inbox, hash_including('phone' => '5541999990000'), force: true)
     end
   end
 

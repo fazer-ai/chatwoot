@@ -35,9 +35,15 @@ class Whatsapp::Session::Inbound::Handlers::Base
     address.blank? || address.ignorable?
   end
 
-  def find_message(source_id)
-    return if source_id.blank?
+  def find_message(source_id) = find_messages(source_id).first
 
-    inbox.messages.find_by(source_id: source_id)
+  # A shared-contact payload is stored as one row per card, all carrying the provider's
+  # single id, which is how the Baileys layer and the Cloud provider store it too.
+  # Anything mutating a message by that id therefore has to reach every row, or a revoke
+  # takes one card off the screen and leaves the rest of the share behind.
+  def find_messages(source_id)
+    return Message.none if source_id.blank?
+
+    inbox.messages.where(source_id: source_id).order(:id)
   end
 end

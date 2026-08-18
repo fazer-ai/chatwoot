@@ -51,20 +51,6 @@ class Whatsapp::Session::Inbound::Handlers::Presence < Whatsapp::Session::Inboun
   # of them may have a contact_inbox yet.
   def find_contact_inbox
     party = chat_presence? ? (payload.sender || Model::Party.from_address(payload.chat)) : payload.party
-    return if party.blank?
-
-    contact_inbox = inbox.contact_inboxes.find_by(source_id: [party.lid, party.phone].compact)
-    contact_inbox || find_by_phone(party)
-  end
-
-  # Every ninth-digit form, for the same reason the contact and picture resolvers try
-  # them: the event carries whichever form WhatsApp uses and the contact is stored under
-  # whichever one reached us first. An exact match drops the typing indicator silently.
-  def find_by_phone(party)
-    numbers = Whatsapp::Session::PhoneMatch.variants(party.phone).map { |variant| "+#{variant}" }
-    return if numbers.empty?
-
-    contact = inbox.contacts.find_by(phone_number: numbers)
-    inbox.contact_inboxes.find_by(contact_id: contact.id) if contact
+    Inbound::ContactLookup.find(inbox: inbox, party: party)
   end
 end

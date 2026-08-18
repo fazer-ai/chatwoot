@@ -4,9 +4,10 @@
 class Whatsapp::Session::UpdateContactAvatarJob < ApplicationJob
   queue_as :low
 
-  # `party` is a serialized Model::Party.
-  def perform(contact, inbox, party)
-    return if contact.avatar.attached?
+  # `party` is a serialized Model::Party. `force` is the picture-changed event, which
+  # knows the stored avatar is out of date and must refetch over it.
+  def perform(contact, inbox, party, force: false)
+    return if contact.avatar.attached? && !force
 
     channel = inbox.channel
     return unless channel.session_capabilities.include?('profile_picture')

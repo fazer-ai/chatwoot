@@ -46,4 +46,17 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
 
     expect(message.reload.is_unsupported).to be(true)
   end
+
+  # `is_unsupported` is a content_attributes flag, so writing it off the stale instance
+  # this job is holding rewrote the whole hash and undeleted the message.
+  it 'does not undelete a message revoked while the download was running' do
+    allow(backend).to receive(:download_media) do
+      Message.find(message.id).update!(content_attributes: { 'deleted' => true })
+      raise Whatsapp::Session::Errors::MediaUnavailable
+    end
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes).to include('deleted' => true, 'is_unsupported' => true)
+  end
 end

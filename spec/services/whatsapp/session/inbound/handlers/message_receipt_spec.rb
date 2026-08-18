@@ -23,6 +23,43 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     expect(message.reload.status).to eq('delivered')
   end
 
+  context 'when the id covers every card of a shared-contact message' do
+    let!(:second_card) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :outgoing, status: :sent, source_id: message.source_id)
+    end
+
+    it 'moves all of them forward' do
+      expect(dispatch).to eq(:handled)
+
+      expect(message.reload.status).to eq('delivered')
+      expect(second_card.reload.status).to eq('delivered')
+    end
+  end
+
+  # The race that motivates the locked write is covered where it happens, in the
+  # StatusTransition unit; this only checks the failure reaches the row it names.
+  context 'when the send failed for a message already deleted' do
+    let(:type) { 'failed' }
+    let(:receipt) do
+      model::Events::MessageReceipt.new(chat: model::Address.phone('5541999990000'),
+                                        message_ids: [message.source_id], type: 'failed',
+                                        error: 'recipient unreachable')
+    end
+
+    before do
+      message
+      Message.find(message.id).update!(content_attributes: { 'deleted' => true })
+    end
+
+    it 'records the error without undeleting the message' do
+      expect(dispatch).to eq(:handled)
+
+      expect(message.reload).to have_attributes(status: 'failed', external_error: 'recipient unreachable')
+      expect(message.content_attributes['deleted']).to be(true)
+    end
+  end
+
   context 'when the contact read it' do
     let(:type) { 'read' }
 

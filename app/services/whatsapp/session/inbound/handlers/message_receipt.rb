@@ -1,7 +1,7 @@
 # Delivery receipts for messages this session sent, and read marks the contact made.
 class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::Inbound::Handlers::Base
   def perform
-    messages = Array(payload.message_ids).filter_map { |id| find_message(id) }
+    messages = Array(payload.message_ids).flat_map { |id| find_messages(id).to_a }
     return :ignored if messages.empty?
 
     updated = messages.count { |message| apply(message) }

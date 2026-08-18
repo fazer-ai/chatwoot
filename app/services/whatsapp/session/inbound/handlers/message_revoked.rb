@@ -5,10 +5,14 @@
 # rare and accepted; persisting pending revokes would need its own state.
 class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::Inbound::Handlers::Base
   def perform
-    target = find_message(payload.message_id)
-    return :ignored if target.nil?
+    targets = find_messages(payload.message_id).to_a
+    return :ignored if targets.empty?
 
-    payload.by_self? ? revoke_by_self(target) : revoke_by_contact(target)
+    results = targets.map { |target| payload.by_self? ? revoke_by_self(target) : revoke_by_contact(target) }
+    return :ignored unless results.include?(:handled)
+
+    Inbound::ChatList.refresh(targets.first.conversation)
+    :handled
   end
 
   private
@@ -24,7 +28,6 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
     attributes = { 'deleted' => true, 'pending_source_id' => target.pending_source_id }.compact
     target.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: attributes)
     target.attachments.destroy_all
-    Inbound::ChatList.refresh(target.conversation)
     :handled
   end
 
@@ -34,7 +37,6 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
     return :ignored if target.deleted_by_contact
 
     target.update!(deleted_by_contact: true)
-    Inbound::ChatList.refresh(target.conversation)
     :handled
   end
 end

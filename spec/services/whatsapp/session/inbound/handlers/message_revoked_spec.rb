@@ -19,6 +19,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
     )
   end
 
+  # A shared-contact payload is stored as one row per card, all under the provider's
+  # single id. Revoking only the row `find_by` happened to return left the other cards
+  # on screen after the contact deleted the share.
+  context 'when the id covers every card of a shared-contact message' do
+    let!(:second_card) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       content: 'Bruno Lima', source_id: message.source_id)
+    end
+
+    it 'revokes all of them' do
+      expect(dispatch).to eq(:handled)
+
+      expect(message.reload.deleted_by_contact).to be(true)
+      expect(second_card.reload.deleted_by_contact).to be(true)
+    end
+  end
+
   it 'flags a contact revoke without losing the content' do
     expect(dispatch).to eq(:handled)
 

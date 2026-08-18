@@ -1,43 +1,32 @@
-# The contact changed their profile photo. The bytes are not in the event, so the
-# stored avatar is dropped and refetched.
+# The contact changed their profile photo. The bytes are not in the event, so the stored
+# avatar is refetched.
 class Whatsapp::Session::Inbound::Handlers::ContactPictureChanged < Whatsapp::Session::Inbound::Handlers::Base
   def perform
     return :ignored unless capability?(:profile_picture)
 
-    contact = find_contact
+    contact = Inbound::ContactLookup.contact(inbox: inbox, party: payload.party)
     return :ignored if contact.nil?
 
-    contact.avatar.purge if contact.avatar.attached?
-    return :handled if payload.removed
-
-    Whatsapp::Session::UpdateContactAvatarJob.perform_later(contact, inbox, payload.party.to_h)
+    payload.removed ? remove_avatar(contact) : refresh_avatar(contact)
     :handled
   end
 
   private
 
-  def find_contact
-    return if payload.party.blank?
-
-    by_source_id || by_phone
+  def remove_avatar(contact)
+    contact.avatar.purge if contact.avatar.attached?
   end
 
-  def by_source_id
-    source_ids = [payload.party.lid, payload.party.phone].compact_blank
-    return if source_ids.empty?
-
-    inbox.contact_inboxes.find_by(source_id: source_ids)&.contact
-  end
-
-  # A contact inbox keyed by LID is invisible to a lookup holding only the phone, which
-  # is what this event carries for a contact that was created before the inbox moved
-  # provider. Every ninth-digit form is tried, because the contact may well be stored
-  # under the other one. Matched on the contact itself and never created: a photo
-  # changing is no reason to invent somebody.
-  def by_phone
-    numbers = Whatsapp::Session::PhoneMatch.variants(payload.party.phone).map { |variant| "+#{variant}" }
-    return if numbers.empty?
-
-    inbox.contact_inboxes.joins(:contact).find_by(contact: { phone_number: numbers })&.contact
+  # The stored avatar stays until its replacement is attached, and the two sync markers
+  # are cleared first. Purging up front loses the picture for good whenever the download
+  # does not happen, which is common: `Avatar::AvatarFromUrlJob` skips a contact synced
+  # in the last minute or handed a URL it already fetched, and its `ensure` stamps both
+  # markers even on the skipped run, so the next attempt with that URL is skipped as a
+  # duplicate too. The markers exist to stop the same picture being fetched over and
+  # over, not to suppress the event announcing that the picture changed.
+  def refresh_avatar(contact)
+    attributes = (contact.additional_attributes || {}).except('last_avatar_sync_at', 'avatar_url_hash')
+    contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
+    Whatsapp::Session::UpdateContactAvatarJob.perform_later(contact, inbox, payload.party.to_h, force: true)
   end
 end

@@ -51,6 +51,24 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
     end
   end
 
+  # Consolidation re-keys the contact_inbox to the LID, so an actor named only by phone
+  # matches no source_id at all and the activity line printed the raw number.
+  context 'when the actor is filed under a LID and the event carries only the phone' do
+    let(:actor) { model::Party.new(phone: '5541999990000') }
+
+    before do
+      contact = create(:contact, account: channel.account, name: 'Ana Souza', phone_number: '+5541999990000')
+      create(:contact_inbox, inbox: inbox, contact: contact, source_id: '182736451928374')
+    end
+
+    it 'blames them by name' do
+      expect(dispatch).to eq(:handled)
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact.conversations.last.messages.last.content).to include('Ana Souza')
+    end
+  end
+
   context 'when a setting changed' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(announce: true, locked: false) }
 

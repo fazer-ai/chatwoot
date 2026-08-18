@@ -21,3 +21,9 @@ app/services/whatsapp/session/groups/syncer.rb: Wire scheduled and manual syncs 
 # The note in event_job.rb sits where the fix belongs; this line only stops the review
 # from reporting it every round. Removing this waiver does not close the issue.
 app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatch  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
+# `group_left` is stored on the account-level group Contact, which is exactly where the
+# Baileys layer writes it and where three dashboard components read it. Scoping it per
+# inbox means changing that contract in the frozen legacy layer as well, so it is its
+# own change, not a slice of this one. Removing this waiver does not close the issue.
+app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group-left state to the originating inbox  # PR#372

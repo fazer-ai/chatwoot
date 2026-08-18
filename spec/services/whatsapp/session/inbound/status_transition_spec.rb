@@ -20,6 +20,18 @@ RSpec.describe Whatsapp::Session::Inbound::StatusTransition do
     expect(message.reload.status).to eq('read')
   end
 
+  # `external_error` lives in the content_attributes JSON, so writing it through the
+  # instance this held before the delete endpoint ran rewrites the whole hash and
+  # undeletes the message.
+  it 'keeps a flag a concurrent writer added while it held the message' do
+    stale = Message.find(message.id)
+    Message.find(message.id).update!(content_attributes: { 'deleted' => true })
+
+    expect(described_class.apply(stale, 'failed', error: 'recipient unreachable')).to be(true)
+
+    expect(stale.reload.content_attributes).to include('deleted' => true, 'external_error' => 'recipient unreachable')
+  end
+
   it 'ignores a receipt type it does not know' do
     expect(described_class.apply(message, 'teleported')).to be(false)
   end

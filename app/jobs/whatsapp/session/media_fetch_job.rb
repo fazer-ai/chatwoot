@@ -27,7 +27,9 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     # The provider no longer has the bytes: nothing to retry, and the agent needs to
     # see that the attachment is gone rather than perpetually loading.
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{e.message}")
-    message.update!(is_unsupported: true)
+    # Under lock and off a reloaded row: `is_unsupported` is a content_attributes flag,
+    # and a revoke that landed during the download would be rewritten away by this.
+    message.update_under_lock!(is_unsupported: true)
   end
 
   private

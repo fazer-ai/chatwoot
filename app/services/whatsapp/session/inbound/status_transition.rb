@@ -34,8 +34,12 @@ module Whatsapp::Session::Inbound::StatusTransition
     RANK.fetch(new_status, -1) > RANK.fetch(current, -1)
   end
 
+  # `external_error` lives in the content_attributes JSON, so writing it through a stale
+  # instance rewrites the whole hash and drops whatever a concurrent writer put there,
+  # `deleted` and `pending_source_id` included. Same reason the legacy providers use
+  # this path for the same two flags.
   def apply_failure(message, error)
-    message.update!(status: :failed, external_error: error_message(error))
+    message.update_under_lock!(status: :failed, external_error: error_message(error))
     true
   end
 

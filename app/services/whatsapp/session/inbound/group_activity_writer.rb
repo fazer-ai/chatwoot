@@ -42,21 +42,11 @@ class Whatsapp::Session::Inbound::GroupActivityWriter
 
   def inbox = conversation.inbox
 
-  # Same lookup order the rest of the inbound path uses: what the event reported first,
-  # then the other ninth-digit form. A group event that names its author only by the
-  # alternate form would otherwise miss the contact and print the raw number in an
-  # activity line that has the person's name available.
+  # A group event names its author by whichever key WhatsApp felt like using, which is
+  # often not the one the contact_inbox is filed under: an exact match prints the raw
+  # number in an activity line that has the person's name available.
   def actor_contact
-    keys = [actor.lid, actor.phone].compact_blank
-    contact = inbox.contact_inboxes.find_by(source_id: keys)&.contact if keys.present?
-    contact || variant_actor_contact
-  end
-
-  def variant_actor_contact
-    variants = Whatsapp::Session::PhoneMatch.variants(actor.phone) - [actor.phone]
-    return if variants.blank?
-
-    inbox.contact_inboxes.find_by(source_id: variants)&.contact
+    Whatsapp::Session::Inbound::ContactLookup.contact(inbox: inbox, party: actor)
   end
 
   def participant_content(action, names)
