@@ -79,4 +79,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
 
     expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'reachout_time_lock' => { 'until' => 123 })
   end
+
+  # `pairing.success` is not the only event that names the paired number. One already
+  # queued behind it, or one arriving because the logout failed, used to be accepted on
+  # its own and put the inbox back to work on somebody else's WhatsApp account.
+  context 'when a session state reports a number the inbox is not configured for' do
+    let(:event) do
+      model::Event.build(
+        model::Events::SessionState.new(state: 'open', phone: '5541900001111'), epoch: 5
+      )
+    end
+
+    it 'closes the inbox instead of opening it' do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+
+      expect(channel.reload.provider_connection).to include(
+        'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.wrong_phone_number')
+      )
+    end
+  end
 end

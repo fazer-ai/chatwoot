@@ -22,10 +22,16 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
       next if message.reload.deleted? || message.attachments.any?
 
       attach(message, media, payload)
+      # `MESSAGE_UPDATED` only reaches the open thread, so the conversation card in the
+      # list keeps its "no content" preview for a media-only message until something else
+      # touches that conversation.
+      Whatsapp::Session::Inbound::ChatList.refresh(message.conversation)
     end
-  rescue Whatsapp::Session::Errors::MediaUnavailable, Whatsapp::Session::Errors::NotSupported => e
-    # The provider no longer has the bytes: nothing to retry, and the agent needs to
-    # see that the attachment is gone rather than perpetually loading.
+  rescue Whatsapp::Session::Errors::MediaUnavailable, Whatsapp::Session::Errors::NotSupported,
+         Whatsapp::Session::Errors::MediaTooLarge => e
+    # The provider will not hand over these bytes, now or on a retry: it no longer has
+    # them, it cannot serve them, or the file is past its size cap. The agent needs to
+    # see that the attachment is not coming rather than an bubble that loads forever.
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{e.message}")
     # Under lock and off a reloaded row: `is_unsupported` is a content_attributes flag,
     # and a revoke that landed during the download would be rewritten away by this.

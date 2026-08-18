@@ -40,17 +40,22 @@ module Whatsapp::Session::Inbound::Locks
 
   # Serializes everything that resolves a contact or picks a conversation for one chat,
   # so two messages of the same chat cannot each create their own conversation.
+  #
+  # Released by token, not by key. `Redis::LockManager#unlock` deletes unconditionally,
+  # so an operation that outran the TTL (syncing a large group roster is the realistic
+  # one) would delete the lock a second worker had already taken, and from there the two
+  # interleave their conversation, membership and activity writes.
   def with_chat_lock(inbox, chat)
     return yield if chat.blank?
 
     key = chat_key(inbox, chat)
-    lock_manager = Redis::LockManager.new
-    raise Busy, "chat #{chat} of inbox #{inbox.id} is locked" unless lock_manager.lock(key, CHAT_LOCK_TTL)
+    token = SecureRandom.uuid
+    raise Busy, "chat #{chat} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: CHAT_LOCK_TTL)
 
     begin
       yield
     ensure
-      lock_manager.unlock(key)
+      Redis::Alfred.delete_if_equals(key, token)
     end
   end
 

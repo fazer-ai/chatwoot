@@ -32,12 +32,19 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   def mark_conversation_seen(message)
     conversation = message.conversation
     seen_at = read_at(message)
-    return false if conversation.agent_last_seen_at.present? && conversation.agent_last_seen_at >= seen_at
 
-    attributes = { agent_last_seen_at: seen_at }
-    attributes[:assignee_last_seen_at] = seen_at if conversation.assignee_id.present?
-    conversation.update_columns(attributes) # rubocop:disable Rails/SkipsModelValidations
-    true
+    # Compared and written under the row lock. Two read receipts for one conversation can
+    # be processed at once, and comparing outside the lock lets both pass against the old
+    # value, after which the older receipt can land last and walk the marker backwards,
+    # making messages that were already seen show up unread again.
+    conversation.with_lock do
+      next false if conversation.agent_last_seen_at.present? && conversation.agent_last_seen_at >= seen_at
+
+      attributes = { agent_last_seen_at: seen_at }
+      attributes[:assignee_last_seen_at] = seen_at if conversation.assignee_id.present?
+      conversation.update_columns(attributes) # rubocop:disable Rails/SkipsModelValidations
+      true
+    end
   end
 
   # The receipt's own time when the provider reports one, otherwise the message it names:

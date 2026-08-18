@@ -51,6 +51,26 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments).to be_empty
   end
 
+  # `MESSAGE_UPDATED` only reaches the open thread, so a media-only message left the
+  # conversation card in the list showing "no content" until something else touched it.
+  it 'refreshes the conversation card so the preview stops being empty' do
+    allow(Whatsapp::Session::Inbound::ChatList).to receive(:refresh).and_call_original
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(Whatsapp::Session::Inbound::ChatList).to have_received(:refresh).with(conversation)
+  end
+
+  # The file is past the provider's cap, so no retry changes the answer: the agent needs
+  # to see the attachment is not coming rather than a bubble that loads forever.
+  it 'flags the message when the media is larger than the provider allows' do
+    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::MediaTooLarge)
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.is_unsupported).to be(true)
+  end
+
   it 'flags the message when the provider no longer has the bytes' do
     allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::MediaUnavailable)
 

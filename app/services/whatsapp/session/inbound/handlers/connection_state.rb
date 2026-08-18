@@ -41,7 +41,13 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     end
   end
 
+  # The same check pairing does, and for the same reason. `pairing.success` is not the
+  # only event that names the paired number: a `session.state` already queued behind it,
+  # or one arriving because the logout below failed, would otherwise be accepted on its
+  # own and put the inbox back to work on somebody else's WhatsApp account.
   def session_state
+    return closed('wrong_phone_number') if wrong_phone?
+
     state(payload.state, error: payload.reason, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end
