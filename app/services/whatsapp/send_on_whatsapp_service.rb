@@ -94,13 +94,11 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   def persist_source_id(message_id)
     return if message_id.blank?
 
-    # Only whoever assigns the id owns the revoke. A session inbox has a second writer of
-    # this column, the echo of our own send, which takes the row lock and enqueues the
-    # revoke itself when it is the one that filled the id in; both of them seeing
-    # `deleted` would ask the provider to revoke the same message twice.
-    claimed = Whatsapp::Session::Outbound::SourceIdReservation.claim_source_id(message, message_id)
-    message.update_under_lock!(source_id: message_id)
-    return unless claimed && message.deleted?
+    # Only whoever assigns the id owns the revoke: a session inbox has a second writer of
+    # this column, the echo of our own send, and both of them seeing `deleted` would ask
+    # the provider to revoke the same message twice. The assignment and that decision
+    # share one row lock, which is what makes the answer unambiguous.
+    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(message, { source_id: message_id })
 
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end

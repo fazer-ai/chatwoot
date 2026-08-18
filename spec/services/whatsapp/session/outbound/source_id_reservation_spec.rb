@@ -20,20 +20,29 @@ RSpec.describe Whatsapp::Session::Outbound::SourceIdReservation do
   end
 
   # Whoever moves `source_id` from blank to set owns the revoke of a message deleted
-  # mid-send, and three writers race for it. A conditional UPDATE is what makes the
-  # answer unambiguous no matter how they interleave.
-  describe '.claim_source_id' do
-    it 'is won by exactly one caller' do
-      first = described_class.claim_source_id(message, '3EB0FIRST')
-      second = described_class.claim_source_id(message.reload, '3EB0SECOND')
+  # mid-send, and three writers race for it.
+  describe '.assign' do
+    it 'owes the revoke only to the caller that assigned the id of a deleted message' do
+      message.update_under_lock!(deleted: true)
+
+      first = described_class.assign(message, { source_id: '3EB0FIRST' })
+      second = described_class.assign(message.reload, { source_id: '3EB0FIRST' })
 
       expect([first, second]).to eq([true, false])
+    end
+
+    it 'owes nothing when the message is still alive' do
+      expect(described_class.assign(message, { source_id: '3EB0FIRST' })).to be(false)
       expect(message.reload.source_id).to eq('3EB0FIRST')
     end
 
-    it 'claims nothing without an id to write' do
-      expect(described_class.claim_source_id(message, nil)).to be(false)
-      expect(message.reload.source_id).to be_nil
+    # `update_all` would have written the id without changing the record, leaving
+    # `previous_changes` empty: dashboards and webhooks never learn the provider id, and
+    # the reaction toolbar stays hidden until something else touches the message.
+    it 'writes through the model so the update is broadcast' do
+      described_class.assign(message, { source_id: '3EB0FIRST' })
+
+      expect(message.saved_changes).to include('source_id')
     end
   end
 end

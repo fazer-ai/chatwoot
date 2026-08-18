@@ -43,6 +43,7 @@ es:
           connector_unavailable: El conector de WhatsApp no responde. Los mensajes volverán a enviarse cuando esté disponible.
           connector_incompatible: La versión del conector de WhatsApp es incompatible con esta versión de Chatwoot. Actualice el conector.
           connect_failure: WhatsApp rechazó la conexión. Los nuevos intentos continúan automáticamente.
+          pairing_timed_out: El código expiró antes de que el teléfono completara la vinculación. Inicie la conexión de nuevo para obtener uno nuevo.
   notifications:
     notification_title:
       internal_chat_mention: Le mencionaron en %{name}

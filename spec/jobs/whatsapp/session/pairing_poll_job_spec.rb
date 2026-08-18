@@ -59,6 +59,23 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect do
       described_class.perform_now(channel, pairing: 'qr', deadline_at: 10.seconds.from_now)
     end.not_to have_enqueued_job(described_class)
+
+    # And says so, rather than leaving the dashboard on the code that just expired.
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'close', 'error_code' => 'pairing_timed_out'
+    )
+  end
+
+  # A poll sits in the queue for fifteen seconds at a time. An inbox converted in that
+  # window is a different provider by the time the job runs, and polling it would write
+  # this pairing's outcome onto a session that has nothing to do with it.
+  it 'does nothing once the inbox has been converted to another provider' do
+    allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
+
+    described_class.perform_now(channel, pairing: 'qr', provider: 'native')
+
+    expect(backend).not_to have_received(:fetch_connection_state)
+    expect(channel.reload.provider_connection).to eq({})
   end
 
   it 'gives a pairing code longer than a QR, since the operator has to type it' do

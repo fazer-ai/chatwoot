@@ -24,14 +24,31 @@ module Whatsapp::Session::Outbound::SourceIdReservation
   # Written with update_columns: the reservation is bookkeeping for a send that has not
   # happened yet, so it must not fire message.updated (cable, webhooks, agent bots,
   # search reindex) nor bump updated_at.
-  # Whoever moves `source_id` from blank to set owns the revoke of a message deleted
-  # mid-send, and the send response, the echo and the delete endpoint all race for it.
-  # A conditional UPDATE decides that in one statement: exactly one caller sees a row
-  # affected, no matter how the three interleave. Returns whether this caller was it.
-  def claim_source_id(message, source_id)
-    return false if source_id.blank?
+  # Writes what a send came back with, and answers whether this caller has to revoke the
+  # message afterwards.
+  #
+  # Three writers can fill `source_id` on one send: the send response, the echo of the
+  # same message arriving from WhatsApp, and the delete endpoint reading it. Provider
+  # revocation is not idempotent, so exactly one of them may enqueue it, and the rule is
+  # that it belongs to whoever moves the column from blank to set while the message is
+  # deleted. Both halves of that answer are read inside the row lock: deciding before it,
+  # or re-reading `deleted` after it, is what lets the delete endpoint slip into the gap
+  # and revoke the same message twice.
+  #
+  # The two lines before the lock are what `Message#update_under_lock!` does for the same
+  # reason: `lock!` refuses a record with unsaved changes, and the stale content_attributes
+  # hash must never be the thing that gets written back.
+  def assign(message, attributes)
+    message.restore_attributes(['content_attributes']) if message.content_attributes_changed?
+    message.save! if message.changed?
 
-    Message.where(id: message.id, source_id: nil).update_all(source_id: source_id).positive? # rubocop:disable Rails/SkipsModelValidations
+    owns_revoke = false
+    message.with_lock do
+      assigned_here = message.source_id.blank? && attributes[:source_id].present?
+      message.update!(attributes)
+      owns_revoke = assigned_here && message.deleted?
+    end
+    owns_revoke
   end
 
   def reserve(message)
