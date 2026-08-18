@@ -38,3 +38,9 @@ app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar job
 # yet, and the claim mechanism depends on what the provider payloads carry. The note in
 # event_job.rb sits where the fix belongs. Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
+# snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
+# key and an explicit null the same way, so the syncer cannot tell a removal from a
+# field the snapshot did not mention. Fixing it is a contract change, decided with the
+# payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
+app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372

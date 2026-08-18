@@ -127,6 +127,29 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     end
   end
 
+  # Swallowing this returns nil, and `Contacts::SyncGroupService` reads that as nothing
+  # to apply: it goes on to dispatch CONTACT_GROUP_SYNCED and hand back the untouched
+  # contact, reporting a sync that never happened.
+  context 'when the provider cannot be reached for the metadata' do
+    subject(:fetched_sync) { described_class.new(channel: channel, group_contact: group_contact).perform }
+
+    let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+
+    before { allow(channel).to receive(:provider_service).and_return(backend) }
+
+    it 'says so instead of reporting an empty sync' do
+      allow(backend).to receive(:group_info).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)
+
+      expect { fetched_sync }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+    end
+
+    it 'gives up quietly on a failure no retry can fix' do
+      allow(backend).to receive(:group_info).and_raise(Whatsapp::Session::Errors::NotSupported)
+
+      expect { fetched_sync }.not_to raise_error
+    end
+  end
+
   context 'when only admins may add people' do
     let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe', member_add_mode: 'admin_add') }
 

@@ -72,7 +72,13 @@ class Whatsapp::Session::Groups::Syncer
     return if address.blank?
 
     channel.provider_service.group_info(Model::Commands::GroupInfo.new(group: address))
+  rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
+    # Raised on. Swallowing it here returns nil, and the caller reads that as "nothing to
+    # apply" and goes on to dispatch CONTACT_GROUP_SYNCED and hand back the untouched
+    # contact: a sync that never happened, reported as one that did.
+    raise
   rescue Whatsapp::Session::Errors::Error => e
+    # What is left says the group cannot be read at all, which no retry changes.
     Rails.logger.error("[WHATSAPP SESSION] group info failed for #{group_contact.identifier}: #{e.message}")
     nil
   end
@@ -144,6 +150,11 @@ class Whatsapp::Session::Groups::Syncer
   # was out of the group, and the guard below would otherwise keep the old image for as
   # long as the avatar stays attached, which is forever.
   def update_avatar(info)
+    # A NULL PICTURE IS AMBIGUOUS, TRACKED (fazer-ai/chatwoot#376). A snapshot reporting
+    # no picture reads exactly like one that does not mention the picture, so a photo
+    # removed while the session was out of the group keeps the stored avatar. Telling the
+    # two apart is a contract change, decided with the Uazapi payloads. Do not delete
+    # this note without closing the issue.
     return if info.picture_url.blank?
     return Whatsapp::Session::AvatarSync.refetch(group_contact, info.picture_url) if @info.present?
     return if group_contact.avatar.attached?
