@@ -1,0 +1,158 @@
+require 'rails_helper'
+
+RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
+  subject(:dispatch) { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }
+
+  let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
+  let(:inbox) { channel.inbox }
+  let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+
+  let(:model) { Whatsapp::Session::Model }
+  let(:sender) { model::Party.new(phone: '5541999990000', lid: '182736451928374', push_name: 'Ana Souza') }
+  let(:chat) { model::Address.phone('5541999990000') }
+  let(:content) { model::Content::Text.new(body: 'oi, tudo bem?') }
+  let(:inbound) do
+    model::InboundMessage.new(
+      id: '3EB0AAAA0001', chat: chat, sender: sender, from_me: false,
+      timestamp: 1_755_440_000_123, content: content
+    )
+  end
+  let(:event) { model::Event.build(model::Events::MessageReceived.new(message: inbound), epoch: 1, seq: 1) }
+
+  before { allow(channel).to receive(:provider_service).and_return(backend) }
+
+  it 'creates the conversation and the message' do
+    expect(dispatch).to eq(:handled)
+
+    message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+    expect(message.content).to eq('oi, tudo bem?')
+    expect(message.message_type).to eq('incoming')
+    expect(message.content_attributes['external_created_at']).to eq(1_755_440_000)
+    expect(message.conversation).to eq(inbox.conversations.last)
+  end
+
+  it 'creates the contact behind the message' do
+    dispatch
+
+    contact = inbox.messages.find_by(source_id: '3EB0AAAA0001').sender
+    expect(contact.name).to eq('Ana Souza')
+    expect(contact.phone_number).to eq('+5541999990000')
+    expect(contact.identifier).to eq('182736451928374@lid')
+    # The LID is what WhatsApp echoes back, so it is what the contact_inbox is keyed by.
+    expect(inbox.contact_inboxes.pluck(:source_id)).to contain_exactly('182736451928374')
+  end
+
+  it 'reuses the open conversation of the contact' do
+    dispatch
+    conversation = inbox.conversations.last
+
+    second = inbound.with(id: '3EB0AAAA0002')
+    described_class.new(channel: channel, event: model::Event.build(model::Events::MessageReceived.new(message: second))).perform
+
+    expect(inbox.conversations.count).to eq(1)
+    expect(conversation.messages.pluck(:source_id)).to include('3EB0AAAA0001', '3EB0AAAA0002')
+  end
+
+  it 'answers :duplicate when the message is already stored' do
+    expect(dispatch).to eq(:handled)
+
+    expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
+    expect(inbox.messages.where(source_id: '3EB0AAAA0001').count).to eq(1)
+  end
+
+  it 'links the quoted message and backfills the referral on the conversation it reuses' do
+    dispatch
+    quoted = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+
+    quoting = inbound.with(id: '3EB0AAAA0003', quoted_id: '3EB0AAAA0001',
+                           referral: { 'source_type' => 'ad', 'title' => 'Promo' })
+    described_class.new(channel: channel, event: model::Event.build(model::Events::MessageReceived.new(message: quoting))).perform
+
+    message = inbox.messages.find_by(source_id: '3EB0AAAA0003')
+    expect(message.content_attributes['in_reply_to_external_id']).to eq('3EB0AAAA0001')
+    expect(message.content_attributes['in_reply_to']).to eq(quoted.id)
+    expect(inbox.conversations.last.additional_attributes['referral']).to include('title' => 'Promo')
+  end
+
+  context 'when the message came from the connected phone' do
+    let(:inbound) do
+      model::InboundMessage.new(
+        id: '3EB0BBBB0001', chat: chat, sender: nil, from_me: true,
+        timestamp: 1_755_440_000_123, content: content
+      )
+    end
+
+    it 'stores it as an outgoing message without an agent' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.find_by(source_id: '3EB0BBBB0001')
+      expect(message.message_type).to eq('outgoing')
+      expect(message.sender).to be_nil
+      expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
+      expect(inbox.contacts.first.phone_number).to eq('+5541999990000')
+    end
+
+    it 'confirms the message Chatwoot had already reserved instead of storing a second one' do
+      contact = create(:contact, account: channel.account, phone_number: '+5541999990000')
+      contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5541999990000')
+      conversation = create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox,
+                                           account: channel.account)
+      reserved = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                  message_type: :outgoing, source_id: nil,
+                                  content_attributes: { pending_source_id: '3EB0BBBB0001' })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(reserved.reload.source_id).to eq('3EB0BBBB0001')
+      expect(conversation.messages.count).to eq(1)
+    end
+  end
+
+  context 'with media' do
+    let(:content) do
+      model::Content::Media.new(
+        kind: 'image', mime: 'image/jpeg', caption: 'olha isso', filename: 'foto.jpg',
+        ref: model::MediaRef.url('https://connector.test/media/abc')
+      )
+    end
+
+    it 'stores the caption and hands the download to a job' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+      expect(message.content).to eq('olha isso')
+      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued.with(message, hash_including('kind' => 'image'))
+    end
+  end
+
+  context 'with a chat Chatwoot has no place for' do
+    let(:chat) { model::Address.new(kind: 'status', id: 'status') }
+
+    it 'ignores it' do
+      expect(dispatch).to eq(:ignored)
+      expect(inbox.messages).to be_empty
+    end
+  end
+
+  context 'with a group message' do
+    let(:chat) { model::Address.group('120363041234567890') }
+
+    it 'is ignored while the group capability is off' do
+      expect(dispatch).to eq(:ignored)
+      expect(inbox.messages).to be_empty
+    end
+
+    it 'opens the group conversation and files the sender as a member' do
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect(dispatch).to eq(:handled)
+      end
+
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      expect(group_contact).to be_group_type_group
+      conversation = group_contact.conversations.last
+      expect(conversation.messages.last.content).to eq('oi, tudo bem?')
+      expect(conversation.messages.last.sender.identifier).to eq('182736451928374@lid')
+      expect(group_contact.group_memberships.active.count).to eq(1)
+    end
+  end
+end
