@@ -1,13 +1,13 @@
 class Contacts::SyncGroupService
-  pattr_initialize [:contact!, { soft: false }]
+  pattr_initialize [:contact!, { soft: false, channel: nil }]
 
   def perform
     validate_group_contact!
 
-    channel = contact.group_channel
+    channel = self.channel || contact.group_channel
     raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') if channel.blank? || !channel.respond_to?(:sync_group)
 
-    conversation = find_or_create_sync_conversation
+    conversation = find_or_create_sync_conversation(channel)
     raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') if conversation.blank?
 
     channel.sync_group(conversation, soft: soft)
@@ -19,13 +19,23 @@ class Contacts::SyncGroupService
 
   private
 
-  def find_or_create_sync_conversation
-    contact_inbox = contact.contact_inboxes.first
+  def find_or_create_sync_conversation(channel)
+    contact_inbox = sync_contact_inbox(channel)
     return nil if contact_inbox.blank?
 
     contact_inbox.conversations.where(status: %i[open pending]).last ||
       contact_inbox.conversations.order(created_at: :desc).first ||
       create_group_conversation(contact_inbox)
+  end
+
+  # A caller that supplied a channel means "sync this group as that inbox sees it", so
+  # the thread has to come from that inbox too. Taking the contact's first contact_inbox
+  # would drive the supplied channel with a conversation belonging to another one, and
+  # write the result into whichever inbox happened to be first.
+  def sync_contact_inbox(channel)
+    return contact.contact_inboxes.first if self.channel.blank?
+
+    contact.contact_inboxes.find_by(inbox: channel.inbox)
   end
 
   def create_group_conversation(contact_inbox)

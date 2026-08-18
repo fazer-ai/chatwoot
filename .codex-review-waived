@@ -10,3 +10,37 @@ app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide p
 # exact shape from `check_numbers`, before either backend exists. Delete this line once
 # slice 4 is merged.
 app/builders/contact_inbox_builder.rb: Route session providers through their number-check contract  # PR#370
+# PR#372: the same cross-slice gap as the number-check finding above. Slice 4 lands
+# `Facade::Groups#sync_group`, which calls this syncer, and `provider_service` only
+# becomes the facade there; until then `Channel::Whatsapp#sync_group` finds no such
+# method on the backend and returns. No session provider has a backend class before
+# slices 5 and 6, so no inbox can reach this. Delete this line once slice 4 is merged.
+app/services/whatsapp/session/groups/syncer.rb: Wire scheduled and manual syncs to the session syncer  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#373, and deliberately not answered here.
+# The mechanism depends on payloads captured from a live Uazapi instance in slice 6.
+# The note in event_job.rb sits where the fix belongs; this line only stops the review
+# from reporting it every round. Removing this waiver does not close the issue.
+app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatch  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
+# `group_left` is stored on the account-level group Contact, which is exactly where the
+# Baileys layer writes it and where three dashboard components read it. Scoping it per
+# inbox means changing that contract in the frozen legacy layer as well, so it is its
+# own change, not a slice of this one. Removing this waiver does not close the issue.
+app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group-left state to the originating inbox  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#375, and not specific to this layer. The
+# window belongs to `Avatar::AvatarFromUrlJob`, which is handed a URL with no notion of
+# how fresh it is; the Baileys avatar paths have the same one. Closing it means giving
+# that shared job a freshness check, which is its own change. Removing this waiver does
+# not close the issue.
+app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
+# PR#372: the redelivery half of fazer-ai/chatwoot#373, deliberately not answered here.
+# No session provider has a backend until slices 5 and 6, so nothing can replay an event
+# yet, and the claim mechanism depends on what the provider payloads carry. The note in
+# event_job.rb sits where the fix belongs. Removing this waiver does not close the issue.
+app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
+# PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
+# snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
+# key and an explicit null the same way, so the syncer cannot tell a removal from a
+# field the snapshot did not mention. Fixing it is a contract change, decided with the
+# payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
+app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372

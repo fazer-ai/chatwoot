@@ -167,6 +167,16 @@ module Whatsapp::Session::Model::Events
       include Serializable
       coerce join: [Party], leave: [Party], promote: [Party], demote: [Party]
 
+      # A `Data` instance is never blank, so a payload whose changes are all nil, or that
+      # carries nothing but a member a newer connector added, would otherwise read as a
+      # real change and open a group for a no-op event.
+      def any?
+        # `nil` is "not reported", which is the only thing that means no change. An empty
+        # string is a description or a subject the group removed, and `false` is a
+        # setting turned off: both are changes, and `present?` would read them as none.
+        to_h.values.any? { |value| value.is_a?(Array) ? value.present? : !value.nil? }
+      end
+
       def participant_changes?
         [join, leave, promote, demote].any?(&:present?)
       end

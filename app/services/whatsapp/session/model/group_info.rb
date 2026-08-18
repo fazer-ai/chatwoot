@@ -22,7 +22,10 @@ class Whatsapp::Session::Model::GroupInfo < Data.define(
   coerce group: Whatsapp::Session::Model::Address,
          owner: Whatsapp::Session::Model::Party,
          participants: [Participant]
-  defaults announce: false, locked: false, join_approval: false, participants: []
+  # No default for the settings: they are optional on the wire, and defaulting them to
+  # false makes a snapshot that simply did not report one indistinguishable from one
+  # reporting it off, which is enough for a sync to silently disable it.
+  defaults participants: []
 
   def admins
     Array(participants).select(&:admin?)

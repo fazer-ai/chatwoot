@@ -75,6 +75,7 @@ es:
         join_approval_mode_enabled: "%{author_name} activó la aprobación del administrador para unirse a este grupo"
         join_approval_mode_disabled: "%{author_name} desactivó la aprobación del administrador para unirse a este grupo"
         invite_link_reset: "%{author_name} restableció el enlace de invitación de este grupo"
+        unknown_author: Alguien
         membership_request_created: "%{contact_name} quiere unirse al grupo"
         membership_request_revoked: "%{contact_name} ya no quiere unirse al grupo"
         icon_changed: "%{author_name} cambió la imagen del grupo"

@@ -75,6 +75,7 @@ pt_BR:
         join_approval_mode_enabled: "%{author_name} ativou a autorização de admins para entrar neste grupo"
         join_approval_mode_disabled: "%{author_name} desativou a autorização de admins para entrar neste grupo"
         invite_link_reset: "%{author_name} redefiniu o link do grupo para convidar outras pessoas"
+        unknown_author: Alguém
         membership_request_created: "%{contact_name} deseja entrar no grupo"
         membership_request_revoked: "%{contact_name} não deseja mais fazer parte do grupo"
         icon_changed: "%{author_name} alterou a imagem do grupo"

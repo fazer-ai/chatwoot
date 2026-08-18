@@ -12,6 +12,16 @@
 class Whatsapp::Session::ConnectionStateWriter
   STICKY_KEYS = Whatsapp::Session::Model::ConnectionState::STICKY_KEYS
 
+  # The session was paired with a number this inbox is not configured for. Written here,
+  # read by everything that has to keep the wrong account's chats out until the logout
+  # succeeds, so the three places that used to spell it out cannot drift apart.
+  WRONG_PHONE_ERROR = 'wrong_phone_number'.freeze
+
+  # Quarantined: the connection belongs to somebody else's WhatsApp account.
+  def self.disowned?(channel)
+    channel.provider_connection.to_h['error_code'] == WRONG_PHONE_ERROR
+  end
+
   attr_reader :channel
 
   def initialize(channel)
@@ -36,7 +46,14 @@ class Whatsapp::Session::ConnectionStateWriter
 
   def merge(state, persisted)
     payload = state.to_h
-    payload['error'] = translate(payload['error']) if payload['error'].present?
+    # The sentence is what the dashboard renders, and the key is what code compares
+    # against: the sentence depends on the locale in force when it was written and on
+    # the translation not having been reworded since, so a guard reading it would fail
+    # open without anybody noticing.
+    if payload['error'].present?
+      payload['error_code'] = payload['error']
+      payload['error'] = translate(payload['error'])
+    end
     payload['connection'] ||= persisted['connection']
     payload['epoch'] ||= persisted['epoch']
     STICKY_KEYS.each do |key|
