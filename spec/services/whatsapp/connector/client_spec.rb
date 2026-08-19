@@ -147,6 +147,16 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       expect(redis.smembers("#{prefix}instances")).to eq(['flapping'])
     end
 
+    # http://wa-1 is a prefix of http://wa-10, and taking the shorter one's token for the
+    # longer one's blob is a 401 that the media path then reads as bytes that are gone.
+    it 'matches the serving instance at a path boundary' do
+      redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
+      redis.hset("#{prefix}instance:ten", 'advertise_url', 'http://wa-1:8080/connector/10', 'media_token', 'token-ten')
+      redis.sadd("#{prefix}instances", %w[one ten])
+
+      expect(client.media_token('http://wa-1:8080/connector/10/media/abc')).to eq('token-ten')
+    end
+
     it 'falls back to a published token for a URL no instance advertises' do
       redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
       redis.sadd("#{prefix}instances", 'one')

@@ -15,10 +15,6 @@ class Whatsapp::Connector::Consumer::ShardWorker
   CLAIM_IDLE_MS = 0
   BLOCK_MS = 5_000
   BATCH = 10
-  # How long a cursor outlives the session it belongs to. It only has to outlast what a
-  # stream can redeliver, which is bounded by its MAXLEN; the TTL is there so a deleted
-  # inbox does not leave a key behind forever.
-  CURSOR_TTL = 30.days.to_i
 
   # Waits between attempts at one entry. A handler that failed on a deadlock or on a
   # connection reset gets a few more passes before the event is parked.
@@ -108,13 +104,13 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # stop holding them. Walked to the end of the pending list rather than one batch at a
   # time: a backlog longer than BATCH would otherwise be overtaken by `read_new`.
   def claim_orphans
-    cursor = '0-0'
+    position = '0-0'
     processed = 0
     loop do
-      claimed = redis.xautoclaim(stream, Consumer::GROUP, consumer_id, CLAIM_IDLE_MS, cursor, count: BATCH)
+      claimed = redis.xautoclaim(stream, Consumer::GROUP, consumer_id, CLAIM_IDLE_MS, position, count: BATCH)
       processed += process(claimed['entries'])
-      cursor = claimed['next']
-      break if cursor.blank? || cursor == '0-0' || stopped? || @stalled
+      position = claimed['next']
+      break if position.blank? || position == '0-0' || stopped? || @stalled
     end
     processed
   rescue Redis::CommandError => e
@@ -220,7 +216,7 @@ class Whatsapp::Connector::Consumer::ShardWorker
   def dispatch(event)
     channel = channel_for(event.sid)
     return if channel.nil?
-    return unless fresh?(event)
+    return unless cursor.behind?(event)
 
     Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
     mark_processed(event)
@@ -238,21 +234,8 @@ class Whatsapp::Connector::Consumer::ShardWorker
     channel
   end
 
-  # A redelivery (this consumer took over a shard mid-flight) must not replay what the
-  # previous owner already wrote. Message-level deduplication would catch most of it,
-  # but not the events that carry no message.
-  #
-  # Delivery is at least once and the cursor does not change that: it sits between a
-  # database commit and a Redis write, and no ordering of the two makes them one. What
-  # makes a replay harmless is the handlers themselves, which dedupe a message by its
-  # source id, move a status only forwards, and write group and connection state last
-  # write wins.
-  def fresh?(event)
-    cursor = redis.get(Consumer.cursor_key(event.sid))
-    return true if cursor.blank?
-
-    epoch, seq = cursor.split(':').map(&:to_i)
-    event.newer_than?([epoch, seq])
+  def cursor
+    @cursor ||= Whatsapp::Connector::Consumer::SessionCursor.new(redis)
   end
 
   # A cursor that cannot be written must not undo the dispatch that just succeeded:
@@ -260,7 +243,7 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # second time for certain, where losing the cursor only risks a replay in the case where
   # the entry is redelivered at all.
   def mark_processed(event)
-    redis.set(Consumer.cursor_key(event.sid), event.cursor.join(':'), ex: CURSOR_TTL)
+    cursor.advance(event)
   rescue Redis::BaseError => e
     Rails.logger.warn("[WHATSAPP CONNECTOR] cursor for session #{event.sid} not written: #{e.message}")
   end

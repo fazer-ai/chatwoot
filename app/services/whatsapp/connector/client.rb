@@ -130,10 +130,10 @@ class Whatsapp::Connector::Client
   # first. Falling back to any of them covers a URL served from somewhere else entirely.
   def media_token(url)
     live = instances
-    owner = live.find do |instance|
-      advertised = instance['advertise_url'].presence
-      advertised && url.to_s.start_with?(advertised)
-    end
+    # The longest base wins where several match, the way any prefix route resolves: one
+    # instance can be advertised under another's host with a path of its own.
+    owner = live.select { |instance| serves?(instance['advertise_url'], url) }
+                .max_by { |instance| instance['advertise_url'].to_s.length }
     (owner || live.first)&.dig('media_token').presence
   end
 
@@ -187,6 +187,17 @@ class Whatsapp::Connector::Client
       redis.eval(FORGET_INSTANCE,
                  keys: [Whatsapp::Connector.key('instance', id), Whatsapp::Connector.key('instances')], argv: [id])
     end
+  end
+
+  # At a path boundary, not by bare prefix: http://wa-1 is a prefix of http://wa-10, and
+  # taking the shorter one's token for the longer one's blob is a 401 the media path then
+  # reads as bytes that are gone.
+  def serves?(advertised, url)
+    base = advertised.presence&.chomp('/')
+    return false if base.nil?
+
+    url = url.to_s
+    url == base || url.start_with?("#{base}/")
   end
 
   def speaks_our_protocol?(instance)
