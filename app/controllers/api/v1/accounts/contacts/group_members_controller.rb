@@ -124,8 +124,16 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     Array(phone_numbers).map { |phone| "#{phone.to_s.delete('+')}@s.whatsapp.net" }
   end
 
+  # A group roster can name a participant WhatsApp only ever gave a LID for, and those
+  # contacts have no phone number at all: building a phone JID from one produced
+  # `@s.whatsapp.net`, which no provider accepts, so the member could not be promoted,
+  # demoted or removed. Address is where the rule for which id a contact is reachable by
+  # already lives.
   def jid_for_member(member)
-    "#{member.contact.phone_number.to_s.delete('+')}@s.whatsapp.net"
+    address = Whatsapp::Session::Model::Address.for_contact(member.contact)
+    raise Whatsapp::Session::Errors::InvalidPayload, 'group member has no WhatsApp address' if address.nil?
+
+    address.to_jid
   end
 
   def add_group_members(phone_numbers)

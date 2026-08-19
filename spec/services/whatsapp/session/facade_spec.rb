@@ -132,6 +132,21 @@ RSpec.describe Whatsapp::Session::Facade do
     )
   end
 
+  # A resume answers `open` when the pairing is still good. There is nothing left to poll
+  # then, and a chain started over it would look current forever: the first request that
+  # failed would write `connect_failure` over a healthy connection.
+  it 'starts no poll for a connect that came back already paired' do
+    allow(backend.class).to receive(:state_polling?).and_return(true)
+    allow(backend).to receive(:connect).and_return(
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'open', phone_number: channel.phone_number.delete('+'))
+    )
+
+    expect { channel.setup_channel_provider }.not_to have_enqueued_job(Whatsapp::Session::PairingPollJob)
+
+    expect(channel.reload.provider_connection).to include('connection' => 'open')
+    expect(channel.provider_connection).not_to have_key('pairing_attempt')
+  end
+
   # The inbound layer keeps an inbox paired with the wrong number quarantined, and no
   # event lifts that on its own: a state that names no number is refused precisely so a
   # pending logout cannot clear it. Connecting again is the operator's way out, so it

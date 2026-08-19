@@ -47,9 +47,11 @@ class Whatsapp::Session::Facade
     state = connect(mode, attempt)
     # The connect answer is the first state the dashboard has to show (it carries the QR
     # for a provider that returns one), and for a polled backend it is also what starts
-    # the pairing poll: nothing else would refresh the code as it rotates.
-    writer.apply(state.with(pairing_attempt: attempt), reset: true, attempt: attempt, provider: provider)
-    start_pairing_poll(mode, attempt) if backend.class.state_polling?
+    # the pairing poll: nothing else would refresh the code as it rotates. A resume that
+    # answers `open` has nothing left to poll, and a chain started over one would write
+    # `connect_failure` over a healthy connection the first time a request failed.
+    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider)
+    start_pairing_poll(mode, attempt) if state.connecting? && backend.class.state_polling?
     state
   end
 
