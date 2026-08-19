@@ -1,16 +1,22 @@
 # Which event streams this consumer should be reading right now.
 #
-# Normally that is simply the range the running connector publishes. It stops being
-# simple when that count changes: the connector re-maps sessions across the streams, so
-# a session's older events sit on the stream it used to hash to while its newer ones
-# arrive on the one it hashes to now.
+# The count comes from the running connector, and is then fixed for the life of this
+# process. It has to be: the connector re-maps sessions across the streams when it
+# changes, so a session's older events sit on the stream it used to hash to while its
+# newer ones arrive on the one it hashes to now, and whichever worker gets ahead pushes
+# the session cursor past what the other has not reached yet.
 #
-# Reading both at once would hand one session's events to two workers, and the newer one
-# would push the session cursor past events the older one has not reached yet, which the
-# cursor then discards. Ordering is the one thing this design cannot trade, so the
-# answer here is a phase: while anything the connector has stopped writing to still has
-# work on it, that is all this consumer reads, and the new range waits. The pause is
-# bounded, because a retired stream is not being written to any more.
+# There is no way to follow that safely while running. Waiting for the old mapping to
+# finish only works when the streams it used stop being written to, and they generally
+# do not: 2 to 4 leaves the old events on 0 and 1, which keep receiving new ones, and
+# even 8 to 6 moves sessions between streams that both survive. Changing the count is a
+# planned operation, so this reads the mapping it started with and says loudly when the
+# connector has moved on.
+#
+# What is still followed is the tail of a previous topology: streams above the current
+# range that a restart inherited. Those really have stopped being written to, so they
+# drain, and while they still hold work they are all this consumer reads, in case a
+# session moved off them.
 class Whatsapp::Connector::Consumer::ShardMap
   Consumer = Whatsapp::Connector::Consumer
 
@@ -21,15 +27,33 @@ class Whatsapp::Connector::Consumer::ShardMap
   end
 
   def shards
-    advertised = Whatsapp::Connector.advertised_shards(@redis)
-    retired = retired_with_work(advertised)
-    return (0...advertised).to_a if retired.empty?
+    count = mapping_size
+    retired = retired_with_work(count)
+    return (0...count).to_a if retired.empty?
 
     Rails.logger.warn("[WHATSAPP CONNECTOR] draining retired shards #{retired.join(', ')} before reading the rest")
     retired
   end
 
   private
+
+  def mapping_size
+    advertised = Whatsapp::Connector.advertised_shards(@redis)
+    @mapping_size ||= advertised
+    refuse_hot_change(advertised) unless advertised == @mapping_size
+    @mapping_size
+  end
+
+  # Loud, because it needs a person: the connector has to stop, the consumers have to
+  # finish what is on the streams, and then everything restarts on the new count.
+  # Following it here instead would quietly reorder the sessions that moved.
+  def refuse_hot_change(advertised)
+    Rails.logger.error(
+      "[WHATSAPP CONNECTOR] the connector now publishes #{advertised} event shards and this consumer is reading " \
+      "#{@mapping_size}. Re-sharding while running would reorder the sessions that moved, so it keeps the mapping " \
+      'it started with: stop the connector, let the consumers drain, and restart them on the new count.'
+    )
+  end
 
   def retired_with_work(advertised)
     existing.select { |shard| shard >= advertised && backlog?(shard) }.sort

@@ -86,18 +86,3 @@ app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion befor
 # a commit and a SET, and a processed-events table to prevent it would cost a write per
 # event on the ordering-critical path.
 app/services/whatsapp/connector/consumer/shard_worker.rb: Commit event progress atomically with handler effects  # PR#379
-# PR#379: real, and answered as far as it can be. The remedy asked for, draining the
-# previous mapping before reading the new shards, is possible when the count goes down
-# and impossible when it goes up. Going down, the streams above the new range stop being
-# written to, so they drain and the code waits for them: that is implemented. Going up,
-# the old mapping lives on the streams the new range also uses (2 to 4 shards leaves the
-# old events on 0 and 1, which keep receiving new ones), so there is no point at which
-# the old mapping is finished and nothing to wait for. A shard count is topology: the
-# safe way to change it is to stop the connector, let the consumers finish, and restart.
-# What the code does instead of pretending otherwise is bound the damage. Events are
-# never lost, because every stream that still holds work is read. The cursor cannot be
-# put back, because it advances through a compare in Lua rather than a SET, so an event
-# already processed is never handed to a handler twice. What is left is that a session
-# which moved streams mid-conversation can have an older event dropped as superseded,
-# which is what fresh? does by design.
-app/services/whatsapp/connector/consumer/shard_map.rb: Drain old mappings before increasing the shard count  # PR#379

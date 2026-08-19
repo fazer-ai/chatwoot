@@ -125,7 +125,13 @@ class Whatsapp::Connector::Consumer::Supervisor
   # Memoized for the tick: every share and both loops below ask for it, and answering
   # walks the keyspace.
   def shards
-    @shards ||= Whatsapp::Connector::Consumer::ShardMap.new(redis).shards
+    @shards ||= shard_map.shards
+  end
+
+  # One for the life of the supervisor, not one per tick: it is what holds the mapping
+  # this process started on.
+  def shard_map
+    @shard_map ||= Whatsapp::Connector::Consumer::ShardMap.new(redis)
   end
 
   # The most a consumer may hold. Every consumer computes the same number from the same

@@ -106,19 +106,21 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     stuck.queue << :stop # let it out, so the shutdown in the around hook is not a wait
   end
 
-  # Shards outside the advertised range carry nothing, but they still count towards the
-  # share, so a consumer left holding them stays full of dead streams and never claims
-  # the live ones.
-  it 'gives up shards the connector has stopped publishing' do
-    redis.set("#{prefix}events:0:lease", 'consumer-2', ex: 30)
-    redis.set("#{prefix}events:1:lease", 'consumer-2', ex: 30)
-    supervisor.tick
-    expect(supervisor.workers.keys).to eq([2, 3])
-
+  # The state a restart inherits after a planned re-shard: the streams of the old topology
+  # are still there and empty. They carry nothing but would still count towards the
+  # share, so a consumer holding them would stay full of dead streams and never claim the
+  # live ones.
+  it 'takes nothing from a previous topology that has been drained' do
     redis.hset("#{prefix}meta", 'event_shards', '2')
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
+    redis.xreadgroup(described_class::Consumer::GROUP, 'gone', "#{prefix}events:3", '>')
+    redis.xack("#{prefix}events:3", described_class::Consumer::GROUP,
+               redis.xrange("#{prefix}events:3").map(&:first))
+
     supervisor.tick
 
-    expect(supervisor.workers).to be_empty
+    expect(supervisor.workers.keys).to eq([0, 1])
   end
 
   # The ceiling alone does not spread a scale-out: with four shards and two consumers
@@ -186,6 +188,29 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     supervisor.tick
 
     expect(supervisor.workers.keys).to eq([0, 1])
+  end
+
+  # Re-sharding while running reorders the sessions that moved, and no amount of draining
+  # avoids it: 8 to 6 moves a session between two streams that both survive. The mapping
+  # this process started on is the one it keeps until it restarts.
+  it 'refuses to follow a shard count that changes while it runs' do
+    supervisor.tick
+    expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
+
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
+  end
+
+  it 'says loudly that the connector has moved on' do
+    allow(Rails.logger).to receive(:error)
+    supervisor.tick
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(Rails.logger).to have_received(:error).with(/now publishes 2 event shards and this consumer is reading 4/)
   end
 
   it 'reads as many shards as the connector says it publishes' do
