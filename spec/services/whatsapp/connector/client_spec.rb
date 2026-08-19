@@ -32,6 +32,24 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       # Fire and forget: nothing is waiting for an answer.
       expect(frame).not_to have_key('reply_to')
     end
+
+    # An empty registry is fine: the stream holds the frame until a connector comes up
+    # and reads it, which is the whole point of not waiting for an answer.
+    it 'queues the command with nobody listening yet' do
+      expect { client.publish(model::Commands::SessionDisconnect.new) }.not_to raise_error
+    end
+
+    # A connector that is up and speaks another protocol is not the same thing: it reads
+    # the frame and drops it, while the caller is told the command was queued. A logout
+    # or a delete discarded that way leaves the session paired, and the conversion or the
+    # destruction that asked for it reports success.
+    it 'refuses to queue for a connector that speaks another protocol' do
+      redis.hset("#{prefix}instance:one", 'protocol_min', '2', 'protocol_max', '3')
+      redis.sadd("#{prefix}instances", 'one')
+
+      expect { client.publish(model::Commands::SessionDisconnect.new) }
+        .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /speaks protocol 1/)
+    end
   end
 
   describe '#call' do

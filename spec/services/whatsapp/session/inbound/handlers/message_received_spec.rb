@@ -149,6 +149,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
         .with(message, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
     end
+
+    # The row is committed before the job is queued, so an attempt that failed in
+    # between (the job transport is its own Redis) leaves a message whose media would
+    # never be asked for again: every retry finds the stored source_id and reports a
+    # duplicate. The duplicate has to carry the unfinished work.
+    it 'queues the download again when a retry finds the message already stored' do
+      dispatch
+      message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+      ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+
+      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
+
+      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
+        .with(message, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
+    end
+
+    it 'leaves the download alone once the bytes are attached' do
+      dispatch
+      message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+      message.attachments.create!(account_id: inbox.account_id, file_type: :image)
+      ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+
+      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
+
+      expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+    end
   end
 
   # A rich card's header image is the same downloadable reference a plain media message

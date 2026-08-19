@@ -88,4 +88,19 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
 
     expect(writer.apply(state.new(connection: 'open', epoch: 1))).to eq(:unchanged)
   end
+
+  # The quarantine is written before the logout is queued, so an attempt that failed in
+  # between leaves every repeat of the state reported as unchanged, and the account
+  # Chatwoot refuses to keep would stay connected with nobody asking it to stop. The job
+  # re-reads the quarantine and stands down when it is gone, so asking twice costs
+  # nothing and never asking is unrecoverable.
+  it 'asks for the logout again when the wrong number is reported a second time' do
+    wrong = state.new(connection: 'open', phone_number: '5541988887777', epoch: 1)
+    expect(writer.apply(wrong)).to eq(:written)
+    ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+
+    expect(writer.apply(wrong)).to eq(:unchanged)
+
+    expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+  end
 end

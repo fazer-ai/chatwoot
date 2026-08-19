@@ -70,15 +70,25 @@ class Whatsapp::Session::ConnectionStateWriter
       :written
     end
 
-    # Through a job, not inline. The state is already written when this runs, so a repeat
-    # of the same state is reported as unchanged and never gets here again: a logout that
-    # failed once inline would never be attempted a second time, and the wrong WhatsApp
-    # account would stay connected.
-    Whatsapp::Session::LogoutJob.perform_later(channel) if result == :written && written.error == WRONG_PHONE_ERROR
+    # Through a job, not inline: a logout that failed once inline would never be attempted
+    # a second time, and the wrong WhatsApp account would stay connected.
+    #
+    # Queued on an unchanged state as well as a written one, because queueing happens
+    # after the commit. An attempt that wrote the quarantine and then failed to reach the
+    # job transport leaves the state in place, so every repeat of it is reported as
+    # unchanged and the logout is never asked for again. The job re-reads the quarantine
+    # and stands down when it is gone, so asking twice costs nothing.
+    ensure_logout(written) if %i[written unchanged].include?(result)
     result
   end
 
   private
+
+  def ensure_logout(written)
+    return unless written.error == WRONG_PHONE_ERROR
+
+    Whatsapp::Session::LogoutJob.perform_later(channel)
+  end
 
   # Two ways a state can belong to the wrong account. It can name the wrong number, which
   # is the operator having scanned with a different phone. Or it can name no number at all

@@ -70,6 +70,7 @@ class Whatsapp::Connector::Client
   # Fire and forget: the command is queued for the session's owner. Failures come back
   # later as a command.failed event.
   def publish(payload, idempotency_key: nil)
+    ensure_readable!
     command = build(payload, idempotency_key: idempotency_key)
     write(command_stream, command)
     command.id
@@ -215,9 +216,19 @@ class Whatsapp::Connector::Client
   # between: it reads the frame, does not recognize the version, and drops it. Refusing
   # here is what turns both into an error the agent can see.
   def ensure_available!
+    raise errors::ProviderUnavailable, 'no whatsapp connector is running' if instances.empty?
+
+    ensure_readable!
+  end
+
+  # What a fire-and-forget command needs, which is less than an answer needs: nobody has
+  # to be listening right now, because the stream holds the frame until a connector comes
+  # up and reads it. What must not happen is a connector that is up and speaks another
+  # protocol, because it consumes the frame and drops it while the caller is told it was
+  # queued. A logout or a delete that is quietly discarded leaves the session paired.
+  def ensure_readable!
     live = instances
-    raise errors::ProviderUnavailable, 'no whatsapp connector is running' if live.empty?
-    return if live.any? { |instance| speaks_our_protocol?(instance) }
+    return if live.empty? || live.any? { |instance| speaks_our_protocol?(instance) }
 
     raise errors::ProviderUnavailable, "no whatsapp connector speaks protocol #{Whatsapp::Session::PROTOCOL_VERSION}"
   end
