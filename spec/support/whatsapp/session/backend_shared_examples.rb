@@ -27,7 +27,10 @@ RSpec.shared_examples 'a whatsapp session backend' do
       check_numbers: [commands::ContactCheck.new(phones: ['5541999990000'])],
       profile_picture_url: [commands::ContactProfilePicture.new(party: phone_address)],
       fetch_account_limits: [],
-      download_media: [model::MediaRef.new(kind: 'url', url: 'https://example.test/file.jpg')],
+      download_media: [
+        commands::MessageDownloadMedia.new(chat: phone_address, message_id: '3EB0AAAA',
+                                           ref: model::MediaRef.new(kind: 'url', url: 'https://example.test/file.jpg'))
+      ],
       group_info: [commands::GroupInfo.new(group: group_address)],
       update_group_participants: [
         commands::GroupParticipantsUpdate.new(group: group_address, participants: [phone_address], action: 'add')

@@ -17,7 +17,14 @@ class Whatsapp::Session::Model::MediaRef < Data.define(:kind, :id, :url, :header
     super(**attributes, kind: kind)
   end
 
+  # A URL that has already lapsed is not something to try: the connector serves its blobs
+  # for a bounded time and answers 404 afterwards, and the answer to that is to ask it for
+  # the bytes again, not to tell the agent the media is gone.
   def fetchable?
-    url.present?
+    url.present? && !expired?
+  end
+
+  def expired?
+    expires_at.present? && Time.zone.at(expires_at / 1000.0) <= Time.current
   end
 end

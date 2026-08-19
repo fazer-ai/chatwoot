@@ -14,6 +14,28 @@ class Whatsapp::Session::Inbound::MessageWriter
     @sender = sender
   end
 
+  # The media an inbound message carries, whichever shape holds it, or nil.
+  def self.media_in(inbound)
+    content = inbound.content
+    media = content if content&.wire_type == 'media'
+    media ||= content.media if content&.wire_type == 'rich'
+    media if media.present? && media.ref.present?
+  end
+
+  # Queues the fetch for a message that is already stored.
+  #
+  # The row is committed before the job is queued, so an attempt that failed in between
+  # (the job transport is its own Redis, and it goes down on its own schedule) leaves a
+  # message that will never be asked for again: every retry finds the stored source_id
+  # and reports a duplicate. So the duplicate path comes back through here, and this
+  # stands down when the bytes are already attached or the fetch has given up.
+  def self.fetch_media_for(message, inbound)
+    media = media_in(inbound)
+    return if media.nil? || message.attachments.any? || message.content_attributes['is_unsupported']
+
+    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
+  end
+
   def perform
     return build_contact_messages if content_type == 'contacts'
 
@@ -110,11 +132,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   # same downloadable reference a plain media message has: without this the card is
   # stored with its text and no attachment.
   def enqueue_media_fetch(message)
-    media = content if content_type == 'media'
-    media ||= content.media if content_type == 'rich'
-    return if media.blank? || media.ref.blank?
-
-    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h)
+    self.class.fetch_media_for(message, inbound)
   end
 
   # One message per shared contact, each with a native contact attachment, so the

@@ -72,3 +72,17 @@ app/services/whatsapp/session/facade.rb: Fence the provider call against superse
 # Messages::DeleteOnChannelJob after the lock commits. A second deletion check could not
 # close that window either, since deletion can always commit after the last check.
 app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion before sending the command  # PR#377
+# PR#379: half fixed, half refused. The half that was a real defect is fixed: a cursor
+# write that failed used to send the entry back through the retry ladder and re-run a
+# handler that had already committed, which turned a Redis hiccup into a certain
+# duplicate rather than a possible one. Making the cursor atomic with the handler is the
+# refused half. It cannot be done: the acknowledgement is a Redis call either way, so a
+# database transaction cannot contain it, and the handler this finding names as the
+# victim, Raw, writes nothing to the database at all, so there is no transaction for a
+# cursor to join. Delivery over a stream is at least once, and this layer answers that
+# where the answer belongs, in the handlers: a message is deduped by its source id, a
+# status only moves forwards, and group and connection state is last write wins. What is
+# left is a repeated PROVIDER_EVENT_RECEIVED webhook after a crash in the window between
+# a commit and a SET, and a processed-events table to prevent it would cost a write per
+# event on the ordering-critical path.
+app/services/whatsapp/connector/consumer/shard_worker.rb: Commit event progress atomically with handler effects  # PR#379

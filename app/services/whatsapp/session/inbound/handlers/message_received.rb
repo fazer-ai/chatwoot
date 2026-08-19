@@ -5,12 +5,14 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     return :ignored unless actionable?
 
     inbound::Locks.with_message_lock(inbox, message.id) do
-      next :duplicate if find_message(message.id)
+      stored = find_message(message.id)
+      next duplicate_of(stored) if stored
 
       inbound::Locks.with_chat_lock(inbox, chat_lock_ids) do
         # Re-checked under the chat lock: an agent's send can be slow enough for the
         # echo to arrive before its source_id is stored.
-        next :duplicate if find_message(message.id)
+        stored = find_message(message.id)
+        next duplicate_of(stored) if stored
 
         # The echo of a message Chatwoot sent under a reserved id is already stored, and
         # it is matched before anything is resolved: the echo may address the chat by a
@@ -27,6 +29,16 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   private
 
   def message = payload.message
+
+  # A message that is already stored is normally nothing to do again. The exception is
+  # the work that was queued after it was saved: an attempt that committed the row and
+  # then failed, most often on the job transport, is retried and lands here, and the
+  # media it meant to fetch would never be asked for again. The writer decides whether
+  # there is anything left to queue.
+  def duplicate_of(stored)
+    inbound::MessageWriter.fetch_media_for(stored, message)
+    :duplicate
+  end
 
   def actionable?
     return false if message.blank? || ignorable_chat?(message.chat)

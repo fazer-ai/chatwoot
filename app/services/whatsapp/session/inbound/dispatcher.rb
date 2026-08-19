@@ -63,6 +63,7 @@ class Whatsapp::Session::Inbound::Dispatcher
 
     handler = HANDLERS[event.type]
     return skip('no handler') if handler.nil?
+    return skip('inbox changed provider') if converted?
     return skip('inbox disowned its session') unless allowed_while_disowned?(handler)
 
     "Whatsapp::Session::Inbound::Handlers::#{handler}".constantize.new(channel: channel, event: event).perform
@@ -79,6 +80,20 @@ class Whatsapp::Session::Inbound::Dispatcher
     return true if handler == 'ConnectionState'
 
     !Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
+  end
+
+  # A check, not a fence: a conversion can land the moment after this reads, and closing
+  # that window properly would mean every handler writing under the channel lock and
+  # re-reading the provider there. What it does buy is that a backlog delivered after the
+  # conversion, which is where the window is wide (a stream replay, a job that waited in
+  # a queue, a retry that waited out a lock), stops filing the old provider's chats into
+  # an inbox that has moved on.
+  def converted?
+    current = Channel::Whatsapp.where(id: channel.id).pick(:provider)
+    return false if current == channel.provider
+
+    Rails.logger.warn("[WHATSAPP SESSION] #{channel.provider} event dropped on ##{channel.id}, now #{current.inspect}")
+    true
   end
 
   def skip(reason)
