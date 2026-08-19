@@ -3,19 +3,6 @@ app/javascript/dashboard/store/modules/conversationPins.js: Prevent delayed pin 
 app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when a remote pin arrives  # PR#366
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
 app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
-# PR#370: unreachable given the merge order. The finding is that a session provider
-# would fall into the Baileys `on_whatsapp` response shape, but no session provider has
-# a backend class until slices 5 and 6, so `descriptor.available?` is false and the
-# inbox cannot be saved at all. Slice 4 lands `Facade#on_whatsapp`, which returns that
-# exact shape from `check_numbers`, before either backend exists. Delete this line once
-# slice 4 is merged.
-app/builders/contact_inbox_builder.rb: Route session providers through their number-check contract  # PR#370
-# PR#372: the same cross-slice gap as the number-check finding above. Slice 4 lands
-# `Facade::Groups#sync_group`, which calls this syncer, and `provider_service` only
-# becomes the facade there; until then `Channel::Whatsapp#sync_group` finds no such
-# method on the backend and returns. No session provider has a backend class before
-# slices 5 and 6, so no inbox can reach this. Delete this line once slice 4 is merged.
-app/services/whatsapp/session/groups/syncer.rb: Wire scheduled and manual syncs to the session syncer  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#373, and deliberately not answered here.
 # The mechanism depends on payloads captured from a live Uazapi instance in slice 6.
 # The note in event_job.rb sits where the fix belongs; this line only stops the review
