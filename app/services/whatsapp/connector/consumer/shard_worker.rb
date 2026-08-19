@@ -37,10 +37,16 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # Named at the branch rather than the leaf: a connection dropped mid-query raises
   # ConnectionFailed, which hangs off QueryAborted and not off ConnectionNotEstablished,
   # so a list of leaves missed the most ordinary shape a failover takes.
+  #
+  # Enqueueing a job is Redis too, and not through the same client: Sidekiq talks
+  # redis-client behind a connection pool, so its outages arrive as RedisClient errors or
+  # as a pool that ran out, and match nothing the gem this worker uses raises. A handler
+  # that only failed to enqueue its own follow-up work is the most ordinary shape of all.
   INFRASTRUCTURE_ERRORS = %w[
     ActiveRecord::ConnectionNotEstablished ActiveRecord::QueryAborted
     PG::ConnectionBad PG::UnableToSend
     Redis::BaseConnectionError Redis::TimeoutError
+    RedisClient::ConnectionError ConnectionPool::TimeoutError
   ].freeze
 
   attr_reader :shard, :consumer_id, :lease

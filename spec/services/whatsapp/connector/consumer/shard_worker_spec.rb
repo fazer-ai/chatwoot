@@ -198,6 +198,24 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(redis.llen("#{prefix}dlq:events")).to eq(0)
   end
 
+  # The job transport is Redis as well, and a different client from this worker's own:
+  # Sidekiq goes through redis-client behind a pool, so a blip there arrives under names
+  # the gem this worker uses never raises. Parking those would drop inbound events for
+  # good every time Sidekiq's connections ran short.
+  [ConnectionPool::TimeoutError, RedisClient::ConnectionError].each do |failure|
+    it "leaves an entry pending when the job transport fails with #{failure}" do
+      stub_const("#{described_class}::RETRY_WAITS", [0])
+      stub_const("#{described_class}::STALL_WAIT", 0)
+      allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch).and_raise(failure, 'no connection')
+      redis.xadd(stream, frame)
+
+      expect(worker.poll).to eq(0)
+
+      expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(1)
+      expect(redis.llen("#{prefix}dlq:events")).to eq(0)
+    end
+  end
+
   # A failover longer than the retry ladder used to empty the stream into the dead letter
   # list and acknowledge every entry, so an ordinary database outage lost inbound messages
   # for good. The DLQ is capped and nothing replays it.
