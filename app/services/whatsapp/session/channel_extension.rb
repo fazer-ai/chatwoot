@@ -95,11 +95,17 @@ module Whatsapp::Session::ChannelExtension
     errors.add(:provider_config, I18n.t('errors.inboxes.channel.invalid_provider_config', keys: invalid_keys.join(', ')))
   end
 
-  # Session providers that receive webhooks (uazapi) get a per-channel secret, which is
-  # what authenticates the callback: the URL carries it and the controller compares it.
+  # Two identifiers every session inbox needs, both generated once and never shown: the
+  # webhook secret that authenticates a provider callback (the URL carries it and the
+  # controller compares it), and the session id the provider holds the session under.
+  #
+  # Deliberately not the phone number: the connector keys its whatsmeow store by this id,
+  # and a re-pairing under a different number would otherwise land on top of the previous
+  # session's device keys.
   def ensure_webhook_verify_token
     return super unless session_provider?
 
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16)
+    provider_config['session_id'] ||= SecureRandom.uuid
   end
 end

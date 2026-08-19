@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_17_200000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_17_210000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -699,6 +699,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_200000) do
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
     t.index "((provider_connection ->> 'connection'::text))", name: "index_channel_whatsapp_connection_state", where: "((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))"
     t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[]))", using: :gin
+    t.index "((provider_config ->> 'session_id'::text))", name: "index_channel_whatsapp_session_id", where: "((provider)::text = ANY ((ARRAY['native'::character varying, 'uazapi'::character varying])::text[]))"
   end
 
   create_table "companies", force: :cascade do |t|

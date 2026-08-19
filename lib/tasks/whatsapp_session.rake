@@ -36,6 +36,27 @@ namespace :whatsapp do
     end
   end
 
+  # The consumer normally rides inside Sidekiq, which is the process that is already
+  # there and already quiesced before a deploy. This is the WHATSAPP_CONNECTOR_CONSUMER=
+  # standalone escape hatch: an installation that runs its Sidekiq somewhere the
+  # connector's Redis is not, or that wants the event thread's failures on their own pager.
+  desc 'Run the WhatsApp connector event consumer in the foreground'
+  task consumer: :environment do
+    abort 'WHATSAPP_CONNECTOR_ENABLED is not true; nothing to consume.' unless Whatsapp::Connector.enabled?
+
+    supervisor = Whatsapp::Connector::Consumer::Supervisor.new
+    stopping = Queue.new
+    # Trap context allows very little, so it only wakes the main thread up: releasing the
+    # shards talks to Redis, which a handler must not do.
+    %w[INT TERM].each { |signal| Signal.trap(signal) { stopping << signal } }
+
+    supervisor.start
+    Rails.logger.info("[WHATSAPP CONNECTOR] standalone consumer #{supervisor.consumer_id} started")
+    stopping.pop
+    supervisor.stop
+    Rails.logger.info('[WHATSAPP CONNECTOR] standalone consumer stopped')
+  end
+
   namespace :providers do
     desc 'Report WhatsApp inboxes grouped by provider and connection state'
     task report: :environment do
