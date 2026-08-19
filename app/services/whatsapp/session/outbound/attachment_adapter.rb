@@ -8,6 +8,9 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   # Chatwoot's file_type enum, in the terms the WhatsApp protocol uses.
   KINDS = { 'image' => 'image', 'audio' => 'audio', 'video' => 'video', 'file' => 'document' }.freeze
 
+  SCHEME = %r{\A[a-z][a-z0-9+.-]*://}i
+  AUTHORITY = %r{\A[a-z][a-z0-9+.-]*://[^/]+}i
+
   attr_reader :attachment, :caption, :channel
 
   def initialize(attachment, caption: nil, channel: nil)
@@ -26,12 +29,18 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   # FRONTEND_URL. That is the right address for a provider reaching Rails over the
   # internet and the wrong one for a connector sitting next to it on a private network,
   # so the host is swapped for the internal one where the inbox says to use it.
+  #
+  # Only for a URL this app serves, which is not every blob: with a cloud storage service
+  # `download_url` is a presigned URL answered by S3 or GCS, whose path means nothing to
+  # Rails and whose signature is bound to the host it was made for. Moving that one to the
+  # internal host turns every outbound attachment into a 404, so it is left alone: a
+  # storage service reachable over the internet needs no internal address anyway.
   def media_url
     url = attachment.download_url
     internal = ENV.fetch('INTERNAL_HOST_URL', nil)
-    return url unless channel&.use_internal_host? && internal.present?
+    return url unless channel&.use_internal_host? && internal.present? && app_hosted?(url)
 
-    url.sub(%r{\A[a-z]+://[^/]+}, internal.chomp('/'))
+    url.sub(AUTHORITY, internal.chomp('/'))
   end
 
   def perform
@@ -46,6 +55,18 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   end
 
   private
+
+  # Compared against the same default url options `download_url` builds app-hosted URLs
+  # from (it seeds ActiveStorage::Current.url_options with them), so the two can never
+  # disagree about what "this app" is.
+  def app_hosted?(url)
+    host = authority(url)
+    host.present? && host == authority(Rails.application.routes.default_url_options[:host])
+  end
+
+  def authority(value)
+    value.to_s.sub(SCHEME, '').split('/').first
+  end
 
   # A sticker is stored as an image with a webp body; WhatsApp needs the distinction.
   def kind

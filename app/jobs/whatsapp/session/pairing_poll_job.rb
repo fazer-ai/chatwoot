@@ -9,8 +9,17 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
 
   INTERVAL = 15.seconds
   # A QR expires far sooner than a pairing code, which the operator has to type on the
-  # phone. Both are ceilings on the whole attempt, not on a single code.
-  DEADLINES = { 'qr' => 2.minutes, 'code' => 5.minutes }.freeze
+  # phone. A resume has neither in front of it: nothing on screen is going stale and the
+  # provider is bringing an existing pairing back up, which takes as long as the network
+  # makes it take, so it gets the longer of the two. All three are ceilings on the whole
+  # attempt, not on a single code.
+  DEADLINES = { 'qr' => 2.minutes, 'code' => 5.minutes, 'resume' => 5.minutes }.freeze
+
+  # What the operator reads when the ceiling is reached. A resume never showed a code, so
+  # reporting an expired one sends them looking for a screen that was never there: what
+  # happened is that the session did not come back, and the provider keeps trying on its
+  # own.
+  TIMEOUT_ERRORS = { 'resume' => 'connect_failure' }.freeze
 
   # `pairing` is the mode the connect command asked for; `deadline_at` is set on the first
   # run and carried forward so re-enqueueing never extends the ceiling. `provider` and
@@ -55,7 +64,7 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
 
     Whatsapp::Session::ConnectionStateWriter.new(channel).apply(stamped(state))
     return if settled?(state)
-    return give_up('pairing_timed_out') if Time.current + INTERVAL >= deadline_at
+    return give_up(TIMEOUT_ERRORS.fetch(pairing, 'pairing_timed_out')) if Time.current + INTERVAL >= deadline_at
 
     self.class.set(wait: INTERVAL).perform_later(
       channel, pairing: pairing, deadline_at: deadline_at, provider: provider, attempt: attempt

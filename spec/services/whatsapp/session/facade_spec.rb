@@ -92,6 +92,38 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(channel.provider_connection).not_to have_key('error_code')
   end
 
+  # Lifting that marker is what lets the inbound layer file chats again, and the account
+  # that was rejected is still on the provider until its logout lands: pairing first and
+  # lifting second would file somebody else's messages here for as long as the new QR is
+  # on screen. It also stands the asynchronous logout retry down before there is a new
+  # session for it to kill.
+  it 'ends the wrong account before it lifts the quarantine keeping that account out' do
+    channel.update_provider_connection!({ 'connection' => 'close', 'error_code' => 'wrong_phone_number' })
+
+    channel.provider_service.setup_channel_provider
+
+    expect(backend.commands.map { |command| command.class.wire_type }).to eq(%w[session.logout session.connect])
+  end
+
+  # The quarantine is the only reason to end a session here. Doing it on every connect
+  # would throw away a perfectly good pairing and cost the operator a fresh scan.
+  it 'ends nothing when the inbox is not quarantined' do
+    channel.setup_channel_provider
+
+    expect(backend.commands_of('session.logout')).to be_empty
+  end
+
+  it 'leaves the inbox quarantined when the wrong account cannot be ended' do
+    channel.update_provider_connection!({ 'connection' => 'close', 'error_code' => 'wrong_phone_number' })
+    allow(backend).to receive(:logout).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)
+
+    expect { channel.provider_service.setup_channel_provider }
+      .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+
+    expect(channel.reload.provider_connection).to include('error_code' => 'wrong_phone_number')
+    expect(backend.commands_of('session.connect')).to be_empty
+  end
+
   # `Channel::Whatsapp` used to skip these by asking `respond_to?`, which the facade
   # makes true for every provider. The capability is what decides now, and an
   # unsupported one is skipped rather than raised: these run inside listeners, and a

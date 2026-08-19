@@ -33,6 +33,7 @@ class Whatsapp::Session::Facade
 
   # "Make sure this session is up": resumes an existing pairing, or starts a new one.
   def setup_channel_provider
+    end_disowned_session
     mode = pairing_mode
     # Identifies this attempt. Two connects for the same provider produce two polling
     # chains, and without a token the older one cannot tell that the QR on screen is no
@@ -211,6 +212,25 @@ class Whatsapp::Session::Facade
   # calls at all, because `false` is not a value the schema accepts either.
   def call_policy
     { 'auto_reject' => true } if capability?('calls')
+  end
+
+  # Connecting again is the way out of a wrong-number quarantine, and the connect below
+  # is what lifts it. The rejected account is still on the provider until its logout
+  # lands, though, and that marker is the only thing keeping its chats out of this inbox:
+  # lifting it first and pairing second would file somebody else's messages here for as
+  # long as the new QR is on screen. So the wrong account goes before the marker does,
+  # which also stands the asynchronous retry down before there is a new session for it to
+  # kill. A provider that cannot be reached raises, and nothing was cleared or connected.
+  def end_disowned_session
+    writer = Whatsapp::Session::ConnectionStateWriter
+    return unless writer.disowned?(channel)
+
+    backend.logout
+    writer.new(channel).apply(model::ConnectionState.new(connection: 'close'), reset: true)
+  rescue Whatsapp::Session::Errors::NotSupported
+    # A backend with no logout cannot be held in quarantine either: pairing again is the
+    # only exit it has, and refusing that would leave the inbox with none at all.
+    nil
   end
 
   # A session that was already paired resumes; one that never was needs a QR (a pairing

@@ -125,6 +125,21 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(described_class::DEADLINES['code']).to be > described_class::DEADLINES['qr']
   end
 
+  # A resume never put a code on screen. Holding it to the QR ceiling cuts the poll two
+  # minutes into a reconnection the provider is still working on, and then tells the
+  # operator that a code they never saw expired.
+  it 'holds a resume to its own ceiling and reports it for what it is' do
+    expect(described_class::DEADLINES['resume']).to be > described_class::DEADLINES['qr']
+
+    allow(backend).to receive(:fetch_connection_state).and_return(state('reconnecting'))
+
+    expect do
+      described_class.perform_now(channel, pairing: 'resume', deadline_at: 10.seconds.from_now)
+    end.not_to have_enqueued_job(described_class)
+
+    expect(channel.reload.provider_connection).to include('connection' => 'close', 'error_code' => 'connect_failure')
+  end
+
   it 'does not poll a backend that pushes its own state' do
     allow(backend.class).to receive(:state_polling?).and_return(false)
     allow(backend).to receive(:fetch_connection_state)
