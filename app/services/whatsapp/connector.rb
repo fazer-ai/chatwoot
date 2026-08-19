@@ -19,10 +19,33 @@ module Whatsapp::Connector
     ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true'
   end
 
-  # How many event streams the connector fans sessions across. Both sides must agree,
-  # which is why the connector publishes its own value in `wa:meta` and refuses to start
-  # when they differ.
+  # How many event streams the connector fans sessions across, as this installation is
+  # configured. Only the answer until a connector has run: it publishes the count it is
+  # actually using, and that one wins.
   def self.event_shards
     ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', '8').to_i
+  end
+
+  # The count the running connector publishes, which is what decides where a session's
+  # events land. Reading fewer than it publishes would leave whole streams unconsumed and
+  # the inboxes sharded onto them silently deaf.
+  def self.advertised_shards(redis)
+    configured = event_shards
+    advertised = redis.hget(key('meta'), 'event_shards').to_i
+    return configured unless advertised.positive?
+
+    warn_on_shard_drift(advertised, configured) unless advertised == configured
+    advertised
+  end
+
+  # Following the connector is right either way. Above the configured number it also
+  # means the database pool, sized from that number, has no connections reserved for the
+  # extra threads.
+  def self.warn_on_shard_drift(advertised, configured)
+    room = advertised > configured ? ', raise WHATSAPP_CONNECTOR_EVENT_SHARDS to match so the database pool has room' : ''
+    Rails.logger.warn(
+      "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
+      "#{configured}; following the connector#{room}"
+    )
   end
 end

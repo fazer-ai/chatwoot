@@ -14,8 +14,15 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   def perform(message, content, chat = nil)
     return if message.attachments.any?
 
+    channel = message.inbox.channel
+    # Converted while this waited in the queue: the inbox belongs to a provider this
+    # layer does not serve, and the bytes are never coming. Asked here rather than caught
+    # from the backend, so that a native inbox which is simply misconfigured still fails
+    # loudly instead of quietly marking its media unsupported.
+    return give_up(message, "inbox ##{message.inbox_id} left the session layer") unless channel.session_provider?
+
     media = Whatsapp::Session::Model::Content.from_h(content)
-    payload = message.inbox.channel.session_backend.download_media(download_command(message, media, chat))
+    payload = channel.session_backend.download_media(download_command(message, media, chat))
     # Re-read under lock, after the download: a deletion that landed while this job was
     # queued or running destroyed the attachments, and attaching now would put the
     # supposedly deleted media back into storage and back on the API.
@@ -29,19 +36,22 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
       Whatsapp::Session::Inbound::ChatList.refresh(message.conversation)
     end
   rescue Whatsapp::Session::Errors::MediaUnavailable, Whatsapp::Session::Errors::NotSupported,
-         Whatsapp::Session::Errors::MediaTooLarge, Whatsapp::Session::Errors::InvalidConfig => e
+         Whatsapp::Session::Errors::MediaTooLarge => e
     # The provider will not hand over these bytes, now or on a retry: it no longer has
-    # them, it cannot serve them, the file is past its size cap, or the inbox was
-    # converted while this sat in the queue and its new provider is not served by this
-    # layer at all. The agent needs to see that the attachment is not coming rather than
-    # a bubble that loads forever.
-    Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{e.message}")
-    # Under lock and off a reloaded row: `is_unsupported` is a content_attributes flag,
-    # and a revoke that landed during the download would be rewritten away by this.
-    message.update_under_lock!(is_unsupported: true)
+    # them, it cannot serve them, or the file is past its size cap.
+    give_up(message, e.message)
   end
 
   private
+
+  # The agent needs to see that the attachment is not coming rather than a bubble that
+  # loads forever. Under lock and off a reloaded row: `is_unsupported` is a
+  # content_attributes flag, and a revoke that landed during the download would be
+  # rewritten away by this.
+  def give_up(message, reason)
+    Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
+    message.update_under_lock!(is_unsupported: true)
+  end
 
   # The ref alone is not enough to ask for a second time: a blob the provider has already
   # dropped is fetched again from the message it came from, so the command carries the

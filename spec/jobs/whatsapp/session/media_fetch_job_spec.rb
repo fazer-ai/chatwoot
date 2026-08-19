@@ -40,12 +40,22 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
   # channel answers with a backend the session layer does not serve, and the bubble used
   # to sit empty forever with the job in the dead set.
   it 'gives up on media for an inbox that has left the session layer' do
-    allow(Whatsapp::Session::Registry).to receive(:backend_for)
-      .and_raise(Whatsapp::Session::Errors::InvalidConfig, 'whatsapp_cloud is not served by the session layer')
+    channel.update_columns(provider: 'whatsapp_cloud') # rubocop:disable Rails/SkipsModelValidations
 
     expect { described_class.perform_now(message, media.to_h) }.not_to raise_error
 
     expect(message.reload.content_attributes['is_unsupported']).to be(true)
+  end
+
+  # A native inbox whose config is broken is a deployment bug, not media that is gone:
+  # marking the bubble unsupported would hide it.
+  it 'lets a genuine misconfiguration fail loudly' do
+    allow(Whatsapp::Session::Registry).to receive(:backend_for)
+      .and_raise(Whatsapp::Session::Errors::InvalidConfig, 'inbox has no session id')
+
+    expect { described_class.perform_now(message, media.to_h) }
+      .to raise_error(Whatsapp::Session::Errors::InvalidConfig)
+    expect(message.reload.content_attributes['is_unsupported']).to be_nil
   end
 
   it 'asks without a chat when the event carried none' do

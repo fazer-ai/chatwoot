@@ -1,8 +1,6 @@
 # Decides which event shards this process reads, and keeps a thread on each of them.
-#
-# Shards are claimed with a Redis lease, so several Chatwoot processes can run the
-# consumer without ever reading the same shard twice. A process that dies stops
-# renewing, its leases expire, and the survivors pick the shards up on their next tick.
+# ShardLease is what makes a shard single-reader; Registry is how the consumers count
+# each other. This is the loop that uses both.
 #
 # The lease outlives the worker, never the other way round: a shard is only given back
 # once the thread that was reading it has actually exited. Releasing it while a dispatch
@@ -105,36 +103,6 @@ class Whatsapp::Connector::Consumer::Supervisor
     @redis ||= Redis.new(Redis::Config.app)
   end
 
-  # The connector owns the fan-out: it is what decides which stream a session's events go
-  # on, and it publishes the count it is using. Reading fewer than it publishes would
-  # leave whole streams unconsumed, and the inboxes on them silently deaf, so the local
-  # setting is only the answer for an installation whose connector has never run.
-  def shards
-    (0...advertised_shards).to_a
-  end
-
-  def advertised_shards
-    configured = Whatsapp::Connector.event_shards
-    advertised = redis.hget(Whatsapp::Connector.key('meta'), 'event_shards').to_i
-    return configured unless advertised.positive?
-
-    if advertised > configured
-      # Following it is still right, but the database pool was sized from the configured
-      # number, so the extra threads are reading without connections reserved for them.
-      Rails.logger.warn(
-        "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
-        "#{configured}; following the connector, raise WHATSAPP_CONNECTOR_EVENT_SHARDS to match so the " \
-        'database pool has room for them'
-      )
-    elsif advertised < configured
-      Rails.logger.warn(
-        "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
-        "#{configured}; following the connector"
-      )
-    end
-    advertised
-  end
-
   def registry
     @registry ||= Whatsapp::Connector::Consumer::Registry.new(redis, consumer_id)
   end
@@ -153,8 +121,11 @@ class Whatsapp::Connector::Consumer::Supervisor
     @draining ? registry.withdraw : registry.announce(workers.keys)
   end
 
-  # How many shards this process may hold. Every consumer computes the same number from
-  # the same registry, so the shards spread out without anyone coordinating.
+  # The shards there are to read, which the running connector decides.
+  def shards
+    (0...Whatsapp::Connector.advertised_shards(redis)).to_a
+  end
+
   # The most a consumer may hold. Every consumer computes the same number from the same
   # registry, so the shards spread out without anyone coordinating.
   def fair_share
@@ -252,7 +223,7 @@ class Whatsapp::Connector::Consumer::Supervisor
       Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} worker stopped; releasing it") if workers.key?(shard)
       @threads.delete(shard)
       workers.delete(shard)
-      lease.release(shard)
+      release(shard)
     end
   end
 
@@ -292,5 +263,14 @@ class Whatsapp::Connector::Consumer::Supervisor
 
   def lease
     @lease ||= Whatsapp::Connector::Consumer::ShardLease.new(redis, consumer_id)
+  end
+
+  # The lease lapses on its own within its TTL, so a Redis that is not there costs a
+  # shard sitting idle for that long and nothing more. Raising here would abort the drain
+  # around it and leave the other workers reading with their leases running out.
+  def release(shard)
+    lease.release(shard)
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP CONNECTOR] could not release shard #{shard}: #{e.class}: #{e.message}")
   end
 end

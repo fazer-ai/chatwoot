@@ -35,6 +35,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # --- session lifecycle ---------------------------------------------------------
 
   def connect(command)
+    # Nobody owns a session that has never paired, so nobody is reading its command
+    # stream and a connect written straight to it would sit there until its deadline.
+    # The wake goes on the control stream, which every instance reads, and asks whichever
+    # answers to take the session before the connect lands on it.
+    client.control(Commands::SessionWake.new(desired: 'connected'))
     Model::ConnectionState.from_h(client.call(command))
   end
 

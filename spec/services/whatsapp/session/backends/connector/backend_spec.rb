@@ -33,6 +33,7 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   before do
     allow(Whatsapp::Connector::Client).to receive(:new).with(session_id).and_return(client)
     allow(client).to receive(:publish).and_return('cmd-0001')
+    allow(client).to receive(:control).and_return('cmd-0002')
     # A real connector echoes back the id the caller reserved, which is what makes the
     # provider echo of the message recognizable.
     allow(client).to receive(:call) do |command, **|
@@ -58,6 +59,15 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     channel.update_columns(provider_config: {}) # rubocop:disable Rails/SkipsModelValidations
 
     expect { described_class.new(channel).logout }.to raise_error(Whatsapp::Session::Errors::InvalidConfig)
+  end
+
+  # Nobody owns a session that has never paired, so nobody is reading its command stream
+  # and the connect would sit there until its deadline.
+  it 'wakes the session on the control stream before it connects' do
+    backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
+
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionWake)).ordered
+    expect(client).to have_received(:call).ordered
   end
 
   it 'turns the connect reply into the connection state the inbox stores' do

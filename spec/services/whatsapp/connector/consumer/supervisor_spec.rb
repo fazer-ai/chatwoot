@@ -210,6 +210,20 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers).to be_empty
   end
 
+  # The sibling of the registry withdrawal above: a worker that has already exited (which
+  # is what they do when their own Redis polling fails) takes the drain through a lease
+  # release, and raising there would abort the shutdown just the same.
+  it 'still finishes the drain when it cannot give a lease back' do
+    finished = Class.new(worker_class) { def run = nil }
+    supervisor = described_class.new(consumer_id: 'consumer-1', worker_class: finished)
+    supervisor.tick
+    allow_any_instance_of(Redis).to receive(:eval).and_raise(Redis::CannotConnectError, 'gone') # rubocop:disable RSpec/AnyInstance
+
+    expect { supervisor.quiet }.not_to raise_error
+
+    expect(supervisor.workers).to be_empty
+  end
+
   it 'claims nothing more once it is draining' do
     supervisor.quiet
 
