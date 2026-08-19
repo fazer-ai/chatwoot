@@ -29,6 +29,18 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
     expect(channel.provider_connection['new_chat_cap']).to include('total_quota' => 0)
   end
 
+  # The banner is replaced wholesale by the frontend and each write is its own cable job,
+  # with no order between them: two writes for one poll means the first, still carrying the
+  # cap from before it, can arrive last and put a stale banner back. Twice is the floor
+  # here, one for the connection and one for both limits together.
+  it 'publishes both limits in a single write' do
+    allow(channel).to receive(:update_provider_connection!).and_call_original
+
+    described_class.perform_now(channel)
+
+    expect(channel).to have_received(:update_provider_connection!).twice
+  end
+
   # A provider that cannot be reached is not a session that closed, and writing `close`
   # over a healthy connection would show the operator an outage that is not there.
   it 'leaves the last known state alone when the provider does not answer' do

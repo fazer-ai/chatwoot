@@ -56,6 +56,12 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       end
     end
 
+    # A literal with no dot in it is not a single-label name: every IPv6 address looks
+    # like one, and refusing them would turn a perfectly public address into a bad config.
+    it 'takes a public address written as an IPv6 literal' do
+      expect(described_class.validate_config('base_url' => 'https://[2606:4700:4700::1111]', 'token' => 'x')).to be_empty
+    end
+
     # An instance the operator self-hosts next to Chatwoot is the legitimate case, and it
     # is the same switch the media fetch already reads.
     it 'takes one where the operator has opened the private network' do

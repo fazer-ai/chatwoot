@@ -46,8 +46,7 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
     channel.with_lock do
       next if channel.provider != provider
 
-      channel.update_reachout_time_lock!(limits['reachout_time_lock'])
-      channel.update_new_chat_cap!(limits['new_chat_cap'])
+      channel.update_account_limits!(limits)
     end
   rescue Whatsapp::Session::Errors::Error => e
     Rails.logger.warn("[WHATSAPP SESSION] account limits refresh failed for inbox ##{channel.inbox&.id}: #{e.message}")

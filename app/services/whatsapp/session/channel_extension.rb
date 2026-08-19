@@ -56,6 +56,24 @@ module Whatsapp::Session::ChannelExtension
     ENV['INTERNAL_HOST_URL'].present? && !Whatsapp::Session::Registry.hosted?(self)
   end
 
+  # Both account limits in one write, which is one broadcast. The model has a setter per
+  # limit and each of them persists and broadcasts the whole provider_connection; the two
+  # cable payloads are separate jobs with no order between them, so the first, still
+  # carrying the cap from before this poll, can arrive last and put a stale banner back on
+  # a record that is already right. The normalization mirrors those setters, nil meaning
+  # "not reported this time" in both.
+  def update_account_limits!(limits)
+    limits = (limits || {}).with_indifferent_access
+    updates = {}
+    updates['reachout_time_lock'] = limits[:reachout_time_lock].deep_stringify_keys unless limits[:reachout_time_lock].nil?
+    unless limits[:new_chat_cap].nil?
+      updates['new_chat_cap'] = limits[:new_chat_cap].to_h.deep_stringify_keys.slice(*Channel::Whatsapp::NEW_CHAT_CAP_KEYS)
+    end
+    return if updates.empty?
+
+    with_lock { update_provider_connection!(provider_connection.merge(updates)) }
+  end
+
   def supports_reactions?
     return super unless session_provider?
 

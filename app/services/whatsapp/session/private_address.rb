@@ -22,23 +22,31 @@ module Whatsapp::Session::PrivateAddress
 
     def host?(host)
       host = host.delete_prefix('[').delete_suffix(']').delete_suffix('.').downcase
-      host.present? && (name?(host) || address?(host))
+      return false if host.blank?
+
+      # An address answers to the address rules only. Asking the name rules about one
+      # would call every IPv6 literal private, since it has no dot in it.
+      address = ip(host)
+      address ? private_address?(address) : private_name?(host)
     end
 
     private
 
+    def ip(host)
+      IPAddr.new(host)
+    rescue IPAddr::Error
+      nil
+    end
+
+    def private_address?(address)
+      address.loopback? || address.private? || address.link_local? || address.to_s == '0.0.0.0'
+    end
+
     # The trailing dot stripped above is the root label, so `localhost.` is still
     # localhost. A name with no dot at all cannot be public either, and is how a service
     # next door is addressed on a compose network.
-    def name?(host)
+    def private_name?(host)
       host == 'localhost' || host.end_with?('.localhost') || host.exclude?('.')
-    end
-
-    def address?(host)
-      address = IPAddr.new(host)
-      address.loopback? || address.private? || address.link_local? || address.to_s == '0.0.0.0'
-    rescue IPAddr::Error
-      false
     end
   end
 end
