@@ -137,6 +137,32 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers.keys).to eq([2])
   end
 
+  # A stream the connector stopped writing to still holds what it wrote before the count
+  # changed. Retiring it at once left those messages unread for good.
+  it 'keeps reading a retired shard until its stream is empty' do
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    # 2 was retired empty and is gone; 3 stays until what is on it has been read.
+    expect(supervisor.workers.keys).to contain_exactly(0, 1, 3)
+  end
+
+  it 'lets a drained retired shard go' do
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
+    redis.xreadgroup(described_class::Consumer::GROUP, 'someone', "#{prefix}events:3", '>')
+    redis.xack("#{prefix}events:3", described_class::Consumer::GROUP,
+               redis.xrange("#{prefix}events:3").map(&:first))
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([0, 1])
+  end
+
   it 'reads as many shards as the connector says it publishes' do
     redis.hset("#{prefix}meta", 'event_shards', '2')
 

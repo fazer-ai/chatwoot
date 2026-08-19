@@ -121,9 +121,35 @@ class Whatsapp::Connector::Consumer::Supervisor
     @draining ? registry.withdraw : registry.announce(workers.keys)
   end
 
-  # The shards there are to read, which the running connector decides.
+  # The shards there are to read: the range the running connector publishes, plus any
+  # stream above it that has not been emptied yet.
   def shards
-    (0...Whatsapp::Connector.advertised_shards(redis)).to_a
+    advertised = Whatsapp::Connector.advertised_shards(redis)
+    (0...advertised).to_a + draining(advertised)
+  end
+
+  # A stream the connector has stopped writing to still holds whatever it wrote before
+  # the count changed. Dropping it the moment it falls out of range would leave those
+  # messages unread for good, so it stays in the set until it has actually been emptied
+  # and leaves on its own once it has.
+  def draining(advertised)
+    left = (advertised...Whatsapp::Connector.event_shards).select { |shard| backlog?(shard) }
+    Rails.logger.warn("[WHATSAPP CONNECTOR] still draining retired shards #{left.join(', ')}") if left.any?
+    left
+  end
+
+  # Pending entries, or entries the group has never been handed. Asked this way rather
+  # than through the group's lag, which Redis only reports from 7 on.
+  def backlog?(shard)
+    stream = Consumer.shard_key(shard)
+    group = redis.xinfo(:groups, stream).find { |entry| entry['name'] == Consumer::GROUP }
+    return false if group.nil?
+    return true if group['pending'].to_i.positive?
+
+    group['last-delivered-id'] != redis.xinfo(:stream, stream)['last-generated-id']
+  rescue Redis::CommandError
+    # No such key: a stream that was never written to has nothing to drain.
+    false
   end
 
   # The most a consumer may hold. Every consumer computes the same number from the same
