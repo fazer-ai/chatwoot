@@ -1,10 +1,15 @@
 require 'rails_helper'
 
 RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
-  subject(:worker) { described_class.new(0, 'consumer-1') }
+  subject(:worker) { described_class.new(0, 'consumer-1', lease) }
 
   let(:prefix) { "watest#{SecureRandom.hex(4)}:" }
   let(:redis) { Redis.new(Redis::Config.app) }
+  # A real lease, taken before the worker reads anything: freshness is what fences a
+  # dispatch, so a stub here would be testing the worker against a rule it does not have.
+  let(:lease) do
+    Whatsapp::Connector::Consumer::ShardLease.new(redis, 'consumer-1').tap { |held| held.take(0) }
+  end
   let(:channel) do
     create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false)
   end
@@ -164,9 +169,26 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(Rails.application.executor).to have_received(:wrap).twice
   end
 
+  # A lease can lapse while this thread is inside the shard: one long stall, or a Redis
+  # that went away for half a minute. A peer takes the shard the moment it does, so the
+  # only safe thing left is to touch nothing. The entry stays pending for whoever holds
+  # the shard now, and this worker stops rather than reading on.
+  it 'stops without dispatching once its lease is no longer fresh' do
+    lease
+    stub_const("#{Whatsapp::Connector::Consumer::ShardLease}::TTL", 0)
+    redis.xadd(stream, frame)
+
+    expect(worker.poll).to eq(0)
+
+    expect(inbox.messages).to be_empty
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(1)
+    expect(worker).to be_stopped
+  end
+
   # Retrying here would re-run a handler that had already committed, turning a Redis
   # hiccup into a guaranteed duplicate rather than a possible one.
   it 'does not dispatch again when the cursor cannot be written' do
+    lease # taken while Redis#set still works: the fence is not what this example is about
     allow_any_instance_of(Redis).to receive(:set).and_raise(Redis::TimeoutError, 'timed out') # rubocop:disable RSpec/AnyInstance
     redis.xadd(stream, frame)
 

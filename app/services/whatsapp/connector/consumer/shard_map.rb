@@ -34,8 +34,9 @@ class Whatsapp::Connector::Consumer::ShardMap
   def shards
     return nothing if moved_under_us?
 
-    retired = retired_with_work(@mapping_size)
-    return (0...@mapping_size).to_a if retired.empty?
+    count = @mapping_size || Whatsapp::Connector.event_shards
+    retired = retired_with_work(count)
+    return (0...count).to_a if retired.empty?
 
     Rails.logger.warn("[WHATSAPP CONNECTOR] draining retired shards #{retired.join(', ')} before reading the rest")
     retired
@@ -49,12 +50,18 @@ class Whatsapp::Connector::Consumer::ShardMap
   def moved_under_us?
     return true if @halted
 
-    advertised = Whatsapp::Connector.advertised_shards(@redis)
-    @mapping_size ||= advertised
-    return false if advertised == @mapping_size
+    published = Whatsapp::Connector.published_shards(@redis)
+    # Nothing published yet: the connector has not started, or is between restarts. The
+    # local setting stands in meanwhile but is not frozen, because freezing on a guess
+    # and then meeting the connector's real count reads exactly like a hot re-shard, and
+    # would stop a consumer whose only mistake was booting first.
+    return false if published.nil?
+
+    @mapping_size ||= published
+    return false if published == @mapping_size
 
     @halted = true
-    refuse_hot_change(advertised)
+    refuse_hot_change(published)
     true
   end
 

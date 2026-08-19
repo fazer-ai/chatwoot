@@ -29,13 +29,21 @@ module Whatsapp::Connector
   # The count the running connector publishes, which is what decides where a session's
   # events land. Reading fewer than it publishes would leave whole streams unconsumed and
   # the inboxes sharded onto them silently deaf.
-  def self.advertised_shards(redis)
-    configured = event_shards
+  # What the running connector says it publishes, or nil when it has not said anything
+  # yet. The difference matters to anyone deciding whether the count has changed: the
+  # local setting is a guess made before the connector was reachable, and taking it for
+  # an announcement makes the connector's first real one look like a re-shard.
+  def self.published_shards(redis)
     advertised = redis.hget(key('meta'), 'event_shards').to_i
-    return configured unless advertised.positive?
+    return nil unless advertised.positive?
 
+    configured = event_shards
     warn_on_shard_drift(advertised, configured) unless advertised == configured
     advertised
+  end
+
+  def self.advertised_shards(redis)
+    published_shards(redis) || event_shards
   end
 
   # Following the connector is right either way. Above the configured number it also

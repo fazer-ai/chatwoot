@@ -10,7 +10,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     Class.new do
       attr_reader :shard, :queue
 
-      def initialize(shard, _consumer_id)
+      def initialize(shard, _consumer_id, _lease)
         @shard = shard
         @queue = Queue.new
       end
@@ -209,11 +209,27 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers.keys).to eq([0, 1])
   end
 
+  # Consumers and the connector start in whatever order the container manager feels like.
+  # A consumer that boots first has nothing but its local setting to go on, and taking
+  # that for the connector's word would make the connector's first real announcement look
+  # like a re-shard and stop the consumer for good, on an ordinary deploy.
+  it 'does not mistake the connector\'s first word for a re-shard' do
+    supervisor.tick
+    expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
+
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+    supervisor.tick
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([0, 1])
+  end
+
   # Re-sharding while running reorders the sessions that moved, and no amount of draining
   # avoids it: 8 to 6 moves a session between two streams that both survive. Nor is the
   # old range safe to keep reading, because both the stream a session left and the one it
   # arrived on are inside it. So the consumer stops, and waits for the restart.
   it 'stops reading altogether when the shard count changes while it runs' do
+    redis.hset("#{prefix}meta", 'event_shards', '4')
     supervisor.tick
     expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
 
@@ -226,6 +242,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # Stopping is only half of it: the leases have to go back, or the shards stay
   # unreadable by the consumers that restart on the new count.
   it 'gives its shards back when it stops' do
+    redis.hset("#{prefix}meta", 'event_shards', '4')
     supervisor.tick
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
@@ -238,6 +255,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
 
   it 'says loudly that the connector has moved on' do
     allow(Rails.logger).to receive(:error)
+    redis.hset("#{prefix}meta", 'event_shards', '4')
     supervisor.tick
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
@@ -250,6 +268,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # nothing to do. It has to keep saying so, because only a person can clear the state.
   it 'keeps saying so while it stays stopped' do
     stub_const('Whatsapp::Connector::Consumer::ShardMap::REMINDER_TICKS', 1)
+    redis.hset("#{prefix}meta", 'event_shards', '4')
     supervisor.tick
     redis.hset("#{prefix}meta", 'event_shards', '2')
     supervisor.tick

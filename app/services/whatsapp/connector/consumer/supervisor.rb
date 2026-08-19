@@ -236,7 +236,7 @@ class Whatsapp::Connector::Consumer::Supervisor
   end
 
   def spawn_worker(shard)
-    worker = @worker_class.new(shard, consumer_id)
+    worker = @worker_class.new(shard, consumer_id, lease)
     workers[shard] = worker
     @threads[shard] = Thread.new { worker.run }
     Rails.logger.info("[WHATSAPP CONNECTOR] #{consumer_id} reading shard #{shard}")

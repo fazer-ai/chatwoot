@@ -43,11 +43,12 @@ class Whatsapp::Connector::Consumer::ShardWorker
     Redis::BaseConnectionError Redis::TimeoutError
   ].freeze
 
-  attr_reader :shard, :consumer_id
+  attr_reader :shard, :consumer_id, :lease
 
-  def initialize(shard, consumer_id)
+  def initialize(shard, consumer_id, lease)
     @shard = shard
     @consumer_id = consumer_id
+    @lease = lease
     @stopped = false
   end
 
@@ -157,6 +158,8 @@ class Whatsapp::Connector::Consumer::ShardWorker
     attempt = 0
     begin
       attempt += 1
+      return :abandoned unless owned?
+
       Rails.application.executor.wrap { dispatch(model::Event.from_frame(decode(fields))) }
       :handled
     rescue Whatsapp::Session::Errors::InvalidEvent, Whatsapp::Session::Errors::InvalidPayload, JSON::ParserError => e
@@ -223,6 +226,21 @@ class Whatsapp::Connector::Consumer::ShardWorker
 
     Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
     mark_processed(event)
+  end
+
+  # The lease can lapse while this thread is inside an entry: one long stall, or a Redis
+  # that went away for half a minute. A peer takes the shard the moment it does, claims
+  # what is pending, and starts reading alongside this thread. The supervisor notices on
+  # its next tick, but a tick is seconds away and a dispatch commits sooner than that, so
+  # the check belongs here, before every attempt, and the shard is left alone afterwards.
+  #
+  # The entry stays pending: whoever holds the shard now is the one that should handle it.
+  def owned?
+    return true if lease.fresh?(shard)
+
+    Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} is no longer ours to read; stopping")
+    stop
+    false
   end
 
   def channel_for(session_id)
