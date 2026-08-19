@@ -46,11 +46,15 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
   def perform
     return if attachment.blank? || !attachment.file.attached?
 
+    # Resolved first, because `download_url` also rewrites the blob of an `.ogg` recorded
+    # as `audio/opus` to `audio/ogg`. Reading the type before it leaves the command
+    # advertising two different ones, and WhatsApp classifies a voice note by that type.
+    url = media_url
     file = attachment.file
     content::Media.new(
       kind: kind, mime: file.content_type, filename: file.filename.to_s, caption: caption.presence,
       voice_note: voice_note?, size: file.byte_size,
-      ref: media_ref.url(media_url, mime: file.content_type, size: file.byte_size)
+      ref: media_ref.url(url, mime: file.content_type, size: file.byte_size)
     )
   end
 

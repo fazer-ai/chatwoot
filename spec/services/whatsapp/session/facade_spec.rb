@@ -107,6 +107,19 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(channel.reload.provider_connection).to include('connection' => 'close', 'error_code' => 'connect_failure')
   end
 
+  # Two operators, or two tabs: one converts the inbox while the other clicks connect.
+  # The facade holds the backend of the provider it was built for, and the record now
+  # belongs to another one, so connecting would leave a session behind that no inbox owns
+  # and no operator can see.
+  it 'does not connect an inbox that was converted while the request was running' do
+    facade = channel.provider_service
+    channel.update_columns(provider: 'uazapi') # rubocop:disable Rails/SkipsModelValidations
+
+    expect(facade.setup_channel_provider).to be_nil
+    expect(backend.commands).to be_empty
+    expect(channel.reload.provider_connection).to eq({})
+  end
+
   # The ceiling belongs to the attempt, not to the worker: a QR lives two minutes from
   # the moment the provider issued it, and a queue running ten minutes late would give
   # that dead code two more minutes of polling.

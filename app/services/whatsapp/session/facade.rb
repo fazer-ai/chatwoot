@@ -40,6 +40,10 @@ class Whatsapp::Session::Facade
     end_disowned_session
     mode = pairing_mode
     attempt = claim_pairing_attempt
+    # The inbox was converted while this was running, so it is not this backend's to
+    # connect: asking the old provider anyway leaves a session behind that no inbox owns.
+    return if attempt.nil?
+
     state = connect(mode, attempt)
     # The connect answer is the first state the dashboard has to show (it carries the QR
     # for a provider that returns one), and for a polled backend it is also what starts
@@ -218,10 +222,10 @@ class Whatsapp::Session::Facade
   # the fence in the writer then enforces: the older answer, and its dead QR, is refused.
   def claim_pairing_attempt
     attempt = SecureRandom.uuid
-    writer.apply(
+    result = writer.apply(
       model::ConnectionState.new(connection: 'connecting', pairing_attempt: attempt), reset: true, provider: provider
     )
-    attempt
+    attempt if result == :written
   end
 
   # The claim above already moved the dashboard to "connecting". Leaving it there when the

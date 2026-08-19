@@ -13,6 +13,21 @@ RSpec.describe Whatsapp::Session::Outbound::AttachmentAdapter do
     expect(media.ref.url).to be_present
   end
 
+  # `download_url` rewrites the blob of an `.ogg` recorded as `audio/opus`, which is the
+  # shape the fork's own transcode pipeline produces. Reading the type before that runs
+  # leaves the media and its ref advertising different ones, and the type is what decides
+  # whether WhatsApp plays it as a voice note.
+  it 'advertises one MIME type for a voice note whose blob is normalized on the way out' do
+    attachment.file.blob.update!(content_type: 'audio/opus', filename: 'gravacao.ogg')
+    attachment.update!(file_type: :audio, meta: { 'is_voice_message' => true })
+
+    media = described_class.new(attachment.reload, channel: channel).perform
+
+    expect(media.mime).to eq('audio/ogg')
+    expect(media.ref.mime).to eq(media.mime)
+    expect(media.voice_note).to be(true)
+  end
+
   describe 'the address the provider is told to fetch from' do
     let(:disk_url) { 'http://localhost:3000/rails/active_storage/disk/TOKEN/avatar.png' }
 

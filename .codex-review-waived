@@ -67,3 +67,19 @@ app/services/whatsapp/session/outbound/message_sender.rb: Resolve phone-originat
 # ends the wrong account inline before connecting and the retry then stands down. Revisit
 # with the session-scoped logout in the connector slice.
 app/jobs/whatsapp/session/logout_job.rb: Serialize stale logout checks with reconnects  # PR#377
+# PR#377: half fixed, half refused. The claim being refused after a conversion is fixed:
+# setup returns without asking the old provider, so no session is left behind. Serializing
+# the provider call itself against a second connect is not, and it is the same question as
+# the logout above: it needs a lock held across the connect. A provider answering two
+# overlapping connects converges on one pairing (both `POST /instance/connect` and
+# `session.connect` return the pairing in progress), and where it does not, the next QR
+# rotation arrives as an event and corrects the screen within ~20s.
+app/services/whatsapp/session/facade.rb: Fence the provider call against superseded setup attempts  # PR#377
+# PR#377: not a defect. The window named is between two lines of one synchronous call
+# chain: SendReplyJob -> SendOnChannelService#invalid_message? -> channel.send_message ->
+# this sender, with no I/O in between. The window that is actually open is the provider
+# call itself, and that one is already covered: `SourceIdReservation.assign` returns
+# `:revoke` when it fills source_id on a message deleted meanwhile, and the sender enqueues
+# Messages::DeleteOnChannelJob after the lock commits. A second deletion check could not
+# close that window either, since deletion can always commit after the last check.
+app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion before sending the command  # PR#377
