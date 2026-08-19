@@ -22,6 +22,26 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # ContactResolver stores the sender's LID as the contact identifier whenever it has
+  # one, so a chat rebuilt from the contact addresses a refresh to a chat the message
+  # does not live in, and the provider answers that it cannot find it.
+  it 'asks with the chat the event carried, not one rebuilt from the contact' do
+    conversation.contact.update!(identifier: '167392323834034@lid')
+    chat = model::Address.phone('553499503261')
+
+    described_class.perform_now(message, media.to_h, chat.to_h)
+
+    command = backend.commands.last
+    expect(command.chat.to_jid).to eq('553499503261@s.whatsapp.net')
+    expect(command.message_id).to eq('3EB0AAAA0001')
+  end
+
+  it 'asks without a chat when the event carried none' do
+    described_class.perform_now(message, media.to_h)
+
+    expect(backend.commands.last.chat).to be_nil
+  end
+
   # The bubble is created before the bytes exist, and adding an attachment changes no
   # column, so `Message#dispatch_update_event` saw an empty `previous_changes` and said
   # nothing: the open dashboard kept showing the empty bubble until a reload.

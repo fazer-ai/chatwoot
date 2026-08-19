@@ -114,7 +114,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     media ||= content.media if content_type == 'rich'
     return if media.blank? || media.ref.blank?
 
-    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h)
+    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end
 
   # One message per shared contact, each with a native contact attachment, so the

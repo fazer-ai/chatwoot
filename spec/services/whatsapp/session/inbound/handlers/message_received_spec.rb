@@ -146,7 +146,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
       message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
       expect(message.content).to eq('olha isso')
-      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued.with(message, hash_including('kind' => 'image'))
+      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
+        .with(message, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
     end
   end
 
@@ -168,7 +169,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
       message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
       expect(message.content_attributes['rich']).to include('title' => 'Pedido #4312')
-      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued.with(message, hash_including('kind' => 'image'))
+      expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
+        .with(message, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
     end
   end
 

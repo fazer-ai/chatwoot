@@ -9,12 +9,13 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   retry_on Down::Error, wait: :polynomially_longer, attempts: 3
   retry_on Whatsapp::Session::Errors::ProviderUnavailable, wait: :polynomially_longer, attempts: 3
 
-  # `content` is a serialized Model::Content::Media.
-  def perform(message, content)
+  # `content` is a serialized Model::Content::Media, `chat` the serialized Address the
+  # event carried.
+  def perform(message, content, chat = nil)
     return if message.attachments.any?
 
     media = Whatsapp::Session::Model::Content.from_h(content)
-    payload = message.inbox.channel.session_backend.download_media(download_command(message, media))
+    payload = message.inbox.channel.session_backend.download_media(download_command(message, media, chat))
     # Re-read under lock, after the download: a deletion that landed while this job was
     # queued or running destroyed the attachments, and attaching now would put the
     # supposedly deleted media back into storage and back on the API.
@@ -40,12 +41,17 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
 
   private
 
-  # The ref alone is not enough to ask for a second time: a blob the connector has already
+  # The ref alone is not enough to ask for a second time: a blob the provider has already
   # dropped is fetched again from the message it came from, so the command carries the
   # message the ref belongs to as well as the ref itself.
-  def download_command(message, media)
+  #
+  # The chat is the one the event carried, never one rebuilt from the contact.
+  # ContactResolver stores the sender's LID as the contact identifier whenever it has
+  # one, so rebuilding addresses the refresh to a chat the message does not live in, and
+  # the provider answers that it cannot find the message.
+  def download_command(message, media, chat)
     Whatsapp::Session::Model::Commands::MessageDownloadMedia.new(
-      chat: Whatsapp::Session::Model::Address.for_contact(message.conversation.contact),
+      chat: chat.presence && Whatsapp::Session::Model::Address.from_h(chat),
       message_id: message.source_id, ref: media.ref
     )
   end

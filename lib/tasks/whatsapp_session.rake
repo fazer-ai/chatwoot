@@ -42,7 +42,10 @@ namespace :whatsapp do
   # connector's Redis is not, or that wants the event thread's failures on their own pager.
   desc 'Run the WhatsApp connector event consumer in the foreground'
   task consumer: :environment do
-    abort 'WHATSAPP_CONNECTOR_ENABLED is not true; nothing to consume.' unless Whatsapp::Connector.enabled?
+    # Consumer.enabled?, not Connector.enabled?: WHATSAPP_CONNECTOR_CONSUMER=off means
+    # this installation does not read the streams at all, and a dedicated process that
+    # started anyway would read them with no database pool reserved for its threads.
+    abort 'the WhatsApp connector consumer is not enabled here; nothing to consume.' unless Whatsapp::Connector::Consumer.enabled?
 
     supervisor = Whatsapp::Connector::Consumer::Supervisor.new
     stopping = Queue.new
