@@ -105,10 +105,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
     begin
       fetch_blob(ref)
-    rescue Whatsapp::Session::Errors::MediaUnavailable
+    rescue Whatsapp::Session::Errors::MediaUnavailable, Whatsapp::Session::Errors::ProviderUnavailable
       # Dropped between the event and this job, which the quota makes ordinary rather than
-      # exceptional. Asking again is what makes the connector pull it from WhatsApp a
-      # second time; if that copy is gone as well, it is gone.
+      # exceptional, or served by an instance that is no longer there: a blob URL names
+      # the instance that downloaded it, and that one can be replaced before the job runs.
+      # Asking again reaches whoever holds the session now; if that copy is gone as well,
+      # it is gone.
       fetch_blob(refresh(command))
     end
   end

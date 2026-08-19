@@ -14,15 +14,25 @@ class Whatsapp::Connector::Client
   # little shorter, so the connector stops working on it before the caller stops caring.
   RPC_TIMEOUT = 20
   DEADLINE_MARGIN = 2
+  CHECKOUT_TIMEOUT = 5
   REPLY_TTL = 60
   # A connector heartbeat older than this means nobody is holding the sessions.
   INSTANCE_TTL = 60
 
   class << self
     def pool
-      @pool ||= ConnectionPool.new(size: ENV.fetch('WHATSAPP_CONNECTOR_REDIS_POOL', 5).to_i, timeout: 2) do
+      @pool ||= ConnectionPool.new(size: pool_size, timeout: CHECKOUT_TIMEOUT) do
         Redis.new(Redis::Config.app.merge(timeout: RPC_TIMEOUT + 5))
       end
+    end
+
+    # One connection per thread that can be sending: an RPC holds its connection in BLPOP
+    # for as long as the connector takes to answer, so a pool smaller than the process's
+    # own concurrency turns a slow connector into checkout timeouts on unrelated sends.
+    def pool_size
+      ENV.fetch('WHATSAPP_CONNECTOR_REDIS_POOL') do
+        Sidekiq.server? ? ENV.fetch('SIDEKIQ_CONCURRENCY', 10) : ENV.fetch('RAILS_MAX_THREADS', 5)
+      end.to_i
     end
 
     # Specs and the consumer's shard workers need their own connections.
@@ -32,6 +42,11 @@ class Whatsapp::Connector::Client
 
     def with_redis(&)
       pool.with(&)
+    rescue ConnectionPool::TimeoutError => e
+      # Raw, this reaches the controllers and the send path as a 500: everything above
+      # this layer rescues Whatsapp::Session::Errors, and a connection it could not get
+      # is the same thing to them as a connector it could not reach.
+      raise Errors::ProviderUnavailable, "no connector connection available: #{e.message}"
     end
   end
 

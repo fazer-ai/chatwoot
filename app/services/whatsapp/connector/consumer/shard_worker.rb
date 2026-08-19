@@ -30,6 +30,20 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # no way to put one back.
   BUSY_WAITS = [5, 15, 30, 60, 60].freeze
   PAUSE_SLICE = 0.5
+  # How long the shard waits out an outage before it tries its backlog again.
+  STALL_WAIT = 30
+
+  # Failures that say nothing about the event: the database is gone, its pool is
+  # exhausted, Redis went away. Dead-lettering one of these would empty a stream into a
+  # capped list during a failover and record it as processed, so they leave the entry
+  # pending instead and the shard waits. Matched by name through the ancestors, because a
+  # constant holding another file's class survives a reload and stops matching.
+  INFRASTRUCTURE_ERRORS = %w[
+    ActiveRecord::ConnectionNotEstablished ActiveRecord::ConnectionTimeoutError
+    ActiveRecord::StatementTimeout ActiveRecord::QueryCanceled
+    PG::ConnectionBad PG::UnableToSend
+    Redis::BaseConnectionError Redis::TimeoutError
+  ].freeze
 
   attr_reader :shard, :consumer_id
 
@@ -62,7 +76,11 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # which is what makes the loop testable without threads.
   def poll
     ensure_group
-    claim_orphans + read_new
+    @stalled = false
+    handled = claim_orphans + read_new
+    # Nothing to spin on: the entries are still pending and the next pass finds them.
+    pause(STALL_WAIT) if @stalled
+    handled
   end
 
   private
@@ -93,7 +111,7 @@ class Whatsapp::Connector::Consumer::ShardWorker
       claimed = redis.xautoclaim(stream, Consumer::GROUP, consumer_id, CLAIM_IDLE_MS, cursor, count: BATCH)
       processed += process(claimed['entries'])
       cursor = claimed['next']
-      break if cursor.blank? || cursor == '0-0' || stopped?
+      break if cursor.blank? || cursor == '0-0' || stopped? || @stalled
     end
     processed
   rescue Redis::CommandError => e
@@ -114,7 +132,7 @@ class Whatsapp::Connector::Consumer::ShardWorker
       # A worker whose process is going away leaves the rest of the batch alone: the
       # entries stay pending and whoever takes the shard next drains them before reading
       # anything new. Acknowledging them unprocessed here would drop the events instead.
-      break if stopped?
+      break if stopped? || @stalled
 
       handled += 1 if handle(entry_id, fields)
     end
@@ -160,6 +178,8 @@ class Whatsapp::Connector::Consumer::ShardWorker
     return :abandoned if stopped?
 
     if wait.nil?
+      return stall(error) if infrastructure?(error)
+
       dead_letter(entry_id, fields, error)
       return :parked
     end
@@ -167,6 +187,16 @@ class Whatsapp::Connector::Consumer::ShardWorker
     Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} retrying in #{wait}s: #{error.class}: #{error.message}")
     pause(wait)
     stopped? ? :abandoned : :retry
+  end
+
+  def stall(error)
+    Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} waiting: #{error.class}: #{error.message}")
+    @stalled = true
+    :abandoned
+  end
+
+  def infrastructure?(error)
+    error.class.ancestors.any? { |klass| INFRASTRUCTURE_ERRORS.include?(klass.name) }
   end
 
   # Sliced so that a shutdown does not have to wait out the whole backoff.

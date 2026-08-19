@@ -76,6 +76,16 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
     end
   end
 
+  # Raw, a checkout timeout reaches the send path as a 500: everything above this layer
+  # rescues Whatsapp::Session::Errors, and a connection it could not get means the same
+  # to them as a connector it could not reach.
+  it 'answers a pool that has nothing free in the layer own errors' do
+    allow(described_class).to receive(:pool).and_raise(ConnectionPool::TimeoutError, 'waited 5 seconds')
+
+    expect { client.publish(model::Commands::SessionDisconnect.new) }
+      .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /no connector connection available/)
+  end
+
   describe 'the instance registry' do
     it 'reports nobody home when no instance is registered' do
       expect(client).not_to be_available

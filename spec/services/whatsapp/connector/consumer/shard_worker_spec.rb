@@ -175,6 +175,37 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(redis.llen("#{prefix}dlq:events")).to eq(0)
   end
 
+  # A failover longer than the retry ladder used to empty the stream into the dead letter
+  # list and acknowledge every entry, so an ordinary database outage lost inbound messages
+  # for good. The DLQ is capped and nothing replays it.
+  it 'leaves an entry pending while the database is down rather than parking it' do
+    stub_const("#{described_class}::RETRY_WAITS", [0])
+    stub_const("#{described_class}::STALL_WAIT", 0)
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch)
+      .and_raise(ActiveRecord::ConnectionNotEstablished, 'no connection')
+    redis.xadd(stream, frame)
+
+    expect(worker.poll).to eq(0)
+
+    expect(redis.llen("#{prefix}dlq:events")).to eq(0)
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(1)
+  end
+
+  it 'stops working the batch once it is waiting on the database' do
+    stub_const("#{described_class}::RETRY_WAITS", [])
+    stub_const("#{described_class}::STALL_WAIT", 0)
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch)
+      .and_raise(ActiveRecord::ConnectionTimeoutError, 'could not obtain a connection')
+    3.times { |n| redis.xadd(stream, frame.merge('id' => "evt-#{n}")) }
+
+    worker.poll
+
+    # One attempt, not one per entry: they all fail the same way and they are all still
+    # there to try again.
+    expect(Whatsapp::Session::Inbound::Dispatcher).to have_received(:dispatch).once
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(3)
+  end
+
   it 'takes over what a dead consumer left unacknowledged' do
     redis.xadd(stream, frame)
     redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0', mkstream: true)

@@ -123,6 +123,18 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       .to raise_error(Whatsapp::Session::Errors::Unauthorized)
   end
 
+  # A blob URL names the instance that downloaded it, and that instance can be replaced
+  # before the download job runs. Retrying the dead URL forever left the message without
+  # its attachment; asking again reaches whoever holds the session now.
+  it 'asks again when the instance serving the blob is no longer there' do
+    allow(Down).to receive(:download).with('https://connector.test/media/dead', anything)
+                                     .and_raise(Down::ConnectionError, 'connection refused')
+
+    backend.download_media(download_command(model::MediaRef.url('https://connector.test/media/dead')))
+
+    expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
   it 'asks again when the blob turns out to be gone mid-flight' do
     allow(Down).to receive(:download).with('https://connector.test/media/stale', anything).and_raise(Down::NotFound, 'gone')
     fresh = model::MediaRef.url('https://connector.test/media/stale', mime: 'image/jpeg').with(expires_at: 1.hour.from_now.to_i * 1000)

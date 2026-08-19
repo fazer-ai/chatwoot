@@ -133,7 +133,15 @@ class Whatsapp::Connector::Consumer::Supervisor
     advertised = redis.hget(Whatsapp::Connector.key('meta'), 'event_shards').to_i
     return configured unless advertised.positive?
 
-    if advertised != configured
+    if advertised > configured
+      # Following it is still right, but the database pool was sized from the configured
+      # number, so the extra threads are reading without connections reserved for them.
+      Rails.logger.warn(
+        "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
+        "#{configured}; following the connector, raise WHATSAPP_CONNECTOR_EVENT_SHARDS to match so the " \
+        'database pool has room for them'
+      )
+    elsif advertised < configured
       Rails.logger.warn(
         "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
         "#{configured}; following the connector"
