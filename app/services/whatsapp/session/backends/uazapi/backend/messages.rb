@@ -58,11 +58,18 @@ module Whatsapp::Session::Backends::Uazapi::Backend::Messages
 
   private
 
+  # A 404 here is the media, not the instance. The provider keeps a decrypted copy for a
+  # while and answers 404 once it is gone, which the client maps to `session_not_found`
+  # like every other 404 it sees. Left as that it is a retryable provider outage, so the
+  # fetch job spends its whole ladder on a file that will never come back and then dies
+  # without marking the bubble: the agent is left with an empty attachment and no reason.
   def decrypted(message_id)
     link = client.post('/message/download', { id: message_id, return_link: true }).to_h
     raise Whatsapp::Session::Errors::MediaUnavailable, 'uazapi returned no file url' if link['fileURL'].blank?
 
     link
+  rescue Whatsapp::Session::Errors::SessionNotFound => e
+    raise Whatsapp::Session::Errors::MediaUnavailable, e.message
   end
 
   # `track_id` is how an echo is recognized: this provider assigns its own message ids, so

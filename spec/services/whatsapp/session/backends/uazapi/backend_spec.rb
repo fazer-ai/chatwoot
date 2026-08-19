@@ -232,6 +232,16 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
 
       expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::MediaUnavailable)
     end
+
+    # The provider keeps the decrypted copy for a while and answers 404 once it is gone.
+    # Read as the instance being missing it is a retryable outage, and the fetch job would
+    # spend its whole ladder on a file that is never coming back and then die without
+    # marking the bubble: an empty attachment, and nothing saying why.
+    it 'treats a missing file as gone rather than as the instance being down' do
+      stub_uazapi(:post, '/message/download', { 'error' => 'message not found' }, status: 404)
+
+      expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::MediaUnavailable)
+    end
   end
 
   describe 'the account limits' do

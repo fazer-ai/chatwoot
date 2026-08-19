@@ -98,6 +98,14 @@ module Whatsapp::Session::Registry
       descriptor(channel.provider)&.backend_class&.translator
     end
 
+    # Whether the provider runs outside this deployment's network. Unknown counts as
+    # hosted: the public address is the one that works everywhere an internal one is not
+    # strictly needed.
+    def hosted?(provider)
+      backend = descriptor(provider)&.backend_class
+      backend.nil? || backend.hosted?
+    end
+
     def backend_for(channel)
       descriptor = descriptor(channel.provider)
       raise Whatsapp::Session::Errors::InvalidConfig, "#{channel.provider} is not served by the session layer" unless descriptor&.served?

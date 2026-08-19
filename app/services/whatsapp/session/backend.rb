@@ -33,6 +33,18 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # Whether the provider runs outside this deployment's network. What it decides is the
+    # address outbound media is offered at: a hosted service fetches the attachment over
+    # the internet and can never resolve INTERNAL_HOST_URL, while the connector sits next
+    # to Rails and on a closed installation can resolve nothing else.
+    #
+    # A self-hosted instance of a hosted provider is the one case this gets wrong, and it
+    # gets it wrong in the harmless direction: it is offered the public URL, which works
+    # wherever that URL is reachable at all.
+    def hosted?
+      false
+    end
+
     # The webhook translator for a provider that pushes over HTTP. nil means there is
     # nothing to translate: the connector publishes canonical events already.
     def translator

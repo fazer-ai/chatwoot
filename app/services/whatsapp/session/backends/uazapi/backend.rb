@@ -59,6 +59,12 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       true
     end
 
+    # The instance answers at a `base_url` this deployment does not own, so outbound media
+    # has to be offered at an address the internet can reach.
+    def hosted?
+      true
+    end
+
     # Resolved on every call rather than held in a constant: a constant captured when this
     # file loads keeps the class from before the last reload.
     def translator

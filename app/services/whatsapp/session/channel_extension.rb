@@ -45,10 +45,15 @@ module Whatsapp::Session::ChannelExtension
   # where it cannot reach the public frontend URL (local Active Storage behind a private
   # network) the operator points INTERNAL_HOST_URL at something it can. Setting it is the
   # whole opt-in: unlike the Baileys flag this replaces, there is nothing else to turn on.
+  #
+  # Never for a hosted provider, though. The variable is a deployment-wide address, and an
+  # installation that runs a connector alongside a hosted inbox would otherwise hand that
+  # inbox a host on the other side of its own firewall: every outbound attachment on it
+  # would fail, and nothing about the failure would point at this setting.
   def use_internal_host?
     return super unless session_provider?
 
-    ENV['INTERNAL_HOST_URL'].present?
+    ENV['INTERNAL_HOST_URL'].present? && !Whatsapp::Session::Registry.hosted?(provider)
   end
 
   def supports_reactions?
