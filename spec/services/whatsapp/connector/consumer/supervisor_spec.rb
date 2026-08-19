@@ -157,6 +157,17 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(redis.get("#{prefix}consumer:consumer-1")).to be_nil
   end
 
+  # A shutdown that follows quiet straight on (the standalone consumer answering TERM)
+  # ends the tick loop before another one runs, so the key has to go here rather than on
+  # a tick that will not happen.
+  it 'leaves the registry the moment it is told to go quiet' do
+    supervisor.tick
+
+    supervisor.quiet
+
+    expect(redis.get("#{prefix}consumer:consumer-1")).to be_nil
+  end
+
   it 'claims nothing more once it is draining' do
     supervisor.quiet
 

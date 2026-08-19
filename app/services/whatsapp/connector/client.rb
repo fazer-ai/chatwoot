@@ -40,13 +40,16 @@ class Whatsapp::Connector::Client
       @pool = nil
     end
 
+    # Everything above this layer rescues Whatsapp::Session::Errors and nothing else, and
+    # the jobs that retry do it on ProviderUnavailable, so a Redis that is down or a pool
+    # with nothing free has to arrive as one of ours. Raw, both reach a group controller
+    # or a send as a 500 and skip the retry that was meant for exactly this.
     def with_redis(&)
       pool.with(&)
     rescue ConnectionPool::TimeoutError => e
-      # Raw, this reaches the controllers and the send path as a 500: everything above
-      # this layer rescues Whatsapp::Session::Errors, and a connection it could not get
-      # is the same thing to them as a connector it could not reach.
       raise Errors::ProviderUnavailable, "no connector connection available: #{e.message}"
+    rescue Redis::BaseError => e
+      raise Errors::ProviderUnavailable, "the connector transport failed: #{e.class}: #{e.message}"
     end
   end
 

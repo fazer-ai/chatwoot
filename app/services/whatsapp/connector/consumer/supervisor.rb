@@ -80,7 +80,13 @@ class Whatsapp::Connector::Consumer::Supervisor
   # are still inside an entry and giving each one back as it exits.
   def quiet
     @draining = true
-    @mutex.synchronize { stop_all }
+    @mutex.synchronize do
+      # Taken out here rather than on the next tick: a shutdown that follows straight on
+      # (the standalone consumer answering TERM) ends the loop before another one runs,
+      # and the replacement would count this process as a peer until the key lapsed.
+      redis.del(Consumer.consumer_key(consumer_id))
+      stop_all
+    end
   end
 
   def stop

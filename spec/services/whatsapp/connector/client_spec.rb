@@ -86,6 +86,16 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /no connector connection available/)
   end
 
+  # Everything above this layer rescues Whatsapp::Session::Errors and nothing else, and
+  # the jobs that retry do it on ProviderUnavailable, so a Redis outage that arrived raw
+  # reached a group controller or a send as a 500 and skipped the retry meant for it.
+  it 'answers a Redis that is not there in the layer own errors' do
+    allow_any_instance_of(Redis).to receive(:xadd).and_raise(Redis::CannotConnectError, 'connection refused') # rubocop:disable RSpec/AnyInstance
+
+    expect { client.publish(model::Commands::SessionDisconnect.new) }
+      .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /transport failed/)
+  end
+
   describe 'the instance registry' do
     it 'reports nobody home when no instance is registered' do
       expect(client).not_to be_available

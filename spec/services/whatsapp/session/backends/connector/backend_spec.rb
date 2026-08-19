@@ -4,10 +4,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   subject(:backend) { described_class.new(channel) }
 
   let(:channel) do
-    create(:channel_whatsapp, provider: 'native', provider_config: { 'session_id' => session_id },
-                              validate_provider_config: false, sync_templates: false)
+    create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false)
   end
-  let(:session_id) { '9f1c0f4e-6a2b-4c8e-9d1a-2b3c4d5e6f70' }
+  let(:session_id) { channel.provider_config['session_id'] }
   let(:client) { instance_double(Whatsapp::Connector::Client) }
   let(:model) { Whatsapp::Session::Model }
 

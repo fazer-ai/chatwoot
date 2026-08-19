@@ -160,6 +160,43 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  # The connector keys its whatsmeow store by this id, and provider_config is permitted
+  # wholesale by the inbox API, so an update that left the key out used to mint a new one
+  # and orphan the session the connector was still holding under the old one.
+  describe 'session id' do
+    it 'generates one for a session provider and none for the others' do
+      expect(build_channel('native').provider_config['session_id']).to be_present
+      expect(build_channel('baileys').provider_config['session_id']).to be_nil
+    end
+
+    it 'keeps the stored one when an update leaves the key out' do
+      channel = build_channel('native')
+      original = channel.provider_config['session_id']
+
+      channel.update!(provider_config: { 'mark_as_read' => true })
+
+      expect(channel.reload.provider_config['session_id']).to eq(original)
+    end
+
+    it 'refuses one handed to it by a caller' do
+      channel = build_channel('native', { 'session_id' => 'a-session-that-belongs-to-someone-else' })
+
+      expect(channel.provider_config['session_id']).not_to eq('a-session-that-belongs-to-someone-else')
+
+      stored = channel.provider_config['session_id']
+      channel.update!(provider_config: { 'session_id' => 'another-inbox-session' })
+      expect(channel.reload.provider_config['session_id']).to eq(stored)
+    end
+
+    it 'refuses to store the same one on two inboxes' do
+      taken = build_channel('native').provider_config['session_id']
+      other = build_channel('native')
+
+      expect { other.update_columns(provider_config: { 'session_id' => taken }) } # rubocop:disable Rails/SkipsModelValidations
+        .to raise_error(ActiveRecord::RecordNotUnique)
+    end
+  end
+
   describe '#provider_connection_data' do
     let(:channel) { build_channel('native') }
 

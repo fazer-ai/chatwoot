@@ -106,6 +106,15 @@ module Whatsapp::Session::ChannelExtension
     return super unless session_provider?
 
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16)
-    provider_config['session_id'] ||= SecureRandom.uuid
+    provider_config['session_id'] = own_session_id
+  end
+
+  # Written from the stored value rather than from whatever came in, because
+  # provider_config is permitted wholesale by the inbox API: an update that left this key
+  # out used to mint a new id and orphan the session the connector is still holding under
+  # the old one, and one supplied by a caller could name another inbox's session.
+  def own_session_id
+    stored = persisted? ? (provider_config_was || {})['session_id'] : nil
+    stored.presence || SecureRandom.uuid
   end
 end

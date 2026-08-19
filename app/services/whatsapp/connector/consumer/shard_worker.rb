@@ -258,13 +258,20 @@ class Whatsapp::Connector::Consumer::ShardWorker
     Rails.logger.warn("[WHATSAPP CONNECTOR] cursor for session #{event.sid} not written: #{e.message}")
   end
 
-  # Nothing here is worth retrying forever: a payload this build cannot read will not
-  # become readable, and blocking the shard on it would stop every session that shares
-  # it. The entry is parked where a super admin can look at it and re-run it.
+  # Nothing that gets here is worth retrying forever: a payload this build cannot read
+  # will not become readable, and blocking the shard on it would stop every session that
+  # shares it.
+  #
+  # A record, not a queue. Putting one of these back on the stream would not work and
+  # should not: the session has moved on, its cursor is past this event, and handing a
+  # handler an event from before the state it already wrote is what the ordering in this
+  # whole design exists to prevent. What the list is for is seeing what could not be read
+  # and fixing the cause, so it carries the session and the position the event held.
   def dead_letter(entry_id, fields, error)
     Rails.logger.error("[WHATSAPP CONNECTOR] shard #{shard} dropped #{entry_id}: #{error.class}: #{error.message}")
     ChatwootExceptionTracker.new(error).capture_exception
-    redis.lpush(Consumer.dlq_key, { 'shard' => shard, 'entry_id' => entry_id, 'fields' => fields,
+    redis.lpush(Consumer.dlq_key, { 'shard' => shard, 'entry_id' => entry_id, 'sid' => fields['sid'],
+                                    'cursor' => "#{fields['epoch']}:#{fields['seq']}", 'fields' => fields,
                                     'error' => "#{error.class}: #{error.message}" }.to_json)
     redis.ltrim(Consumer.dlq_key, 0, 999)
   end
