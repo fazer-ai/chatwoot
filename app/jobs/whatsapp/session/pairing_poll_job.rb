@@ -53,13 +53,21 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     state = backend.fetch_connection_state
     return unless current?
 
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with(pairing_attempt: attempt))
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(stamped(state))
     return if settled?(state)
     return give_up('pairing_timed_out') if Time.current + INTERVAL >= deadline_at
 
     self.class.set(wait: INTERVAL).perform_later(
       channel, pairing: pairing, deadline_at: deadline_at, provider: provider, attempt: attempt
     )
+  end
+
+  # The token rides along only while the attempt is still running. Stamping it onto a
+  # settled state keeps it on the record, and then a duplicate or late delivery of this
+  # job still passes `current?`: it would poll a session that has already opened and, if
+  # that request fails, write `connect_failure` over it.
+  def stamped(state)
+    state.connecting? ? state.with(pairing_attempt: attempt) : state
   end
 
   # Both ways a pairing ends without succeeding write the reason to the connection record.

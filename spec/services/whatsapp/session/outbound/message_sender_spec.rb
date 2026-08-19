@@ -80,6 +80,26 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
       .to have_enqueued_job(Messages::DeleteOnChannelJob).once
   end
 
+  # A reaction that arrived from the connected phone is stored knowing its target only by
+  # the target's WhatsApp id. `Message#ensure_in_reply_to` fills the row id in from it on
+  # save, which is what this send relies on: the coverage is here so that a change to that
+  # callback shows up as a WhatsApp reaction that stops being sent.
+  it 'reacts to a target a phone-originated reaction knows only by its WhatsApp id' do
+    target = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                              message_type: :incoming, sender: contact, source_id: '3EB0TARGET')
+    message.update!(
+      content: '🎉',
+      content_attributes: { 'is_reaction' => true, 'in_reply_to_external_id' => target.source_id }
+    )
+
+    send_message
+
+    command = backend.last_command
+    expect(command.target_id).to eq('3EB0TARGET')
+    expect(command.emoji).to eq('🎉')
+    expect(message.reload.is_unsupported).to be_falsey
+  end
+
   it 'quotes the message the agent replied to' do
     quoted = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
                               message_type: :incoming, sender: contact, source_id: '3EB0QUOTED')

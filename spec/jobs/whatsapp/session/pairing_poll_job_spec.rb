@@ -39,6 +39,18 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     expect(channel.reload.provider_connection['connection']).to eq('open')
   end
 
+  # Keeping the token on a settled state leaves this chain looking current: a duplicate
+  # delivery of the job would poll a session that already opened, and write
+  # `connect_failure` over it if that request happened to fail.
+  it 'retires its token once the pairing has settled' do
+    channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
+    allow(backend).to receive(:fetch_connection_state).and_return(state('open', phone_number: '5541988887777'))
+
+    described_class.perform_now(channel, pairing: 'qr', attempt: 'attempt-1')
+
+    expect(channel.reload.provider_connection).not_to have_key('pairing_attempt')
+  end
+
   # The poll writes state without ever passing through an event handler, so it used to be
   # a way around the ownership check: a missed webhook and a polled `open` was enough to
   # put the inbox back to work on the account the operator scanned by mistake.
