@@ -4,9 +4,6 @@
 # One client is one session. It uses its own connection pool rather than $alfred: that
 # pool is namespaced under `alfred:`, and these keys belong to another process.
 class Whatsapp::Connector::Client
-  Model = Whatsapp::Session::Model
-  Errors = Whatsapp::Session::Errors
-
   # A command stream is drained by its owner as fast as the session can execute; the cap
   # is a backstop against an owner that disappeared, not a working size.
   COMMAND_STREAM_MAXLEN = 1_000
@@ -58,9 +55,9 @@ class Whatsapp::Connector::Client
     def with_redis(&)
       pool.with(&)
     rescue ConnectionPool::TimeoutError => e
-      raise Errors::ProviderUnavailable, "no connector connection available: #{e.message}"
+      raise Whatsapp::Session::Errors::ProviderUnavailable, "no connector connection available: #{e.message}"
     rescue Redis::BaseError => e
-      raise Errors::ProviderUnavailable, "the connector transport failed: #{e.class}: #{e.message}"
+      raise Whatsapp::Session::Errors::ProviderUnavailable, "the connector transport failed: #{e.class}: #{e.message}"
     end
   end
 
@@ -88,7 +85,7 @@ class Whatsapp::Connector::Client
 
   # Session-agnostic commands (wake, ping): any live instance answers.
   def control(payload, timeout: RPC_TIMEOUT)
-    command = build(payload, reply_to: Model::Commands.rpc?(payload.class.wire_type), timeout: timeout)
+    command = build(payload, reply_to: model::Commands.rpc?(payload.class.wire_type), timeout: timeout)
     write(Whatsapp::Connector.key('control'), command)
     return command.id unless command.reply_to
 
@@ -139,6 +136,12 @@ class Whatsapp::Connector::Client
 
   private
 
+  # Resolved when they are called, never held in a constant: a constant captured at load
+  # time keeps the namespace from before the last reload, and its autoloaded children are
+  # gone from it by then.
+  def model = Whatsapp::Session::Model
+  def errors = Whatsapp::Session::Errors
+
   def command_stream
     Whatsapp::Connector.key('cmd', session_id)
   end
@@ -151,7 +154,7 @@ class Whatsapp::Connector::Client
       attributes[:reply_to] = reply_key(id)
       attributes[:deadline] = now + ((timeout - DEADLINE_MARGIN) * 1000)
     end
-    Model::Command.build(payload, **attributes)
+    model::Command.build(payload, **attributes)
   end
 
   def reply_key(command_id)
@@ -167,19 +170,19 @@ class Whatsapp::Connector::Client
 
   def await(command, timeout)
     raw = self.class.with_redis { |redis| redis.blpop(command.reply_to, timeout: timeout) }
-    raise Errors::Timeout, "no answer to #{command.type} within #{timeout}s" if raw.nil?
+    raise errors::Timeout, "no answer to #{command.type} within #{timeout}s" if raw.nil?
 
     reply = JSON.parse(raw.last)
     raise error_for(reply) unless reply['ok']
 
     reply['result']
   rescue JSON::ParserError => e
-    raise Errors::Internal, "malformed reply to #{command.type}: #{e.message}"
+    raise errors::Internal, "malformed reply to #{command.type}: #{e.message}"
   end
 
   def error_for(reply)
     error = reply['error'] || {}
-    Errors.build(error['code'], error['message'])
+    errors.build(error['code'], error['message'])
   end
 
   def forget(redis, ids)
@@ -213,9 +216,9 @@ class Whatsapp::Connector::Client
   # here is what turns both into an error the agent can see.
   def ensure_available!
     live = instances
-    raise Errors::ProviderUnavailable, 'no whatsapp connector is running' if live.empty?
+    raise errors::ProviderUnavailable, 'no whatsapp connector is running' if live.empty?
     return if live.any? { |instance| speaks_our_protocol?(instance) }
 
-    raise Errors::ProviderUnavailable, "no whatsapp connector speaks protocol #{Whatsapp::Session::PROTOCOL_VERSION}"
+    raise errors::ProviderUnavailable, "no whatsapp connector speaks protocol #{Whatsapp::Session::PROTOCOL_VERSION}"
   end
 end

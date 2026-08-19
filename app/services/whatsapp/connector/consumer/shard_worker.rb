@@ -6,7 +6,6 @@
 # the time it gets here, so the thread only ever does bookkeeping and database writes.
 class Whatsapp::Connector::Consumer::ShardWorker
   Consumer = Whatsapp::Connector::Consumer
-  Model = Whatsapp::Session::Model
 
   # Pending entries are taken with no idle time at all. The shard lease is what
   # guarantees a single reader, so anything still pending here was left by an owner that
@@ -86,6 +85,10 @@ class Whatsapp::Connector::Consumer::ShardWorker
 
   def stream = Consumer.shard_key(shard)
 
+  # Resolved when called: a constant captured at load time keeps the namespace from
+  # before the last reload, whose autoloaded children have been removed from it.
+  def model = Whatsapp::Session::Model
+
   def redis
     @redis ||= Redis.new(Redis::Config.app.merge(timeout: (BLOCK_MS / 1000) + 5))
   end
@@ -154,7 +157,7 @@ class Whatsapp::Connector::Consumer::ShardWorker
     attempt = 0
     begin
       attempt += 1
-      Rails.application.executor.wrap { dispatch(Model::Event.from_frame(decode(fields))) }
+      Rails.application.executor.wrap { dispatch(model::Event.from_frame(decode(fields))) }
       :handled
     rescue Whatsapp::Session::Errors::InvalidEvent, Whatsapp::Session::Errors::InvalidPayload, JSON::ParserError => e
       # A frame this build cannot read does not become readable by being read again.

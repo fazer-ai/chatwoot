@@ -5,9 +5,6 @@
 # forget on the wire is fire and forget here too, and its failures come back later as a
 # command.failed event rather than as a return value.
 class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backend
-  Model = Whatsapp::Session::Model
-  Commands = Whatsapp::Session::Model::Commands
-
   # A cap on what a single media download may pull into the Rails process. WhatsApp
   # itself stops well below this; the limit is there so a wrong URL cannot fill a disk.
   MAX_MEDIA_BYTES = 100.megabytes
@@ -28,6 +25,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     end
   end
 
+  # Resolved when they are called, never held in a constant: a constant captured at load
+  # time keeps the namespace from before the last reload, and its autoloaded children are
+  # gone from it by then.
+  def model = Whatsapp::Session::Model
+  def commands = Whatsapp::Session::Model::Commands
+
   def client
     @client ||= Whatsapp::Connector::Client.new(session_id)
   end
@@ -39,24 +42,24 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     # stream and a connect written straight to it would sit there until its deadline.
     # The wake goes on the control stream, which every instance reads, and asks whichever
     # answers to take the session before the connect lands on it.
-    client.control(Commands::SessionWake.new(desired: 'connected'))
-    Model::ConnectionState.from_h(client.call(command))
+    client.control(commands::SessionWake.new(desired: 'connected'))
+    model::ConnectionState.from_h(client.call(command))
   end
 
   def disconnect
-    client.publish(Commands::SessionDisconnect.new)
+    client.publish(commands::SessionDisconnect.new)
   end
 
   def logout
-    client.publish(Commands::SessionLogout.new)
+    client.publish(commands::SessionLogout.new)
   end
 
   def delete_session
-    client.publish(Commands::SessionDelete.new)
+    client.publish(commands::SessionDelete.new)
   end
 
   def fetch_connection_state
-    Model::ConnectionState.from_h(client.call(Commands::SessionStatus.new))
+    model::ConnectionState.from_h(client.call(commands::SessionStatus.new))
   end
 
   # The code itself arrives as a pairing.code event: WhatsApp takes its time issuing it,
@@ -69,18 +72,18 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # The limits ride along with the session status, which is the only thing that knows
   # them: they are pushed as events the rest of the time.
   def fetch_account_limits
-    status = client.call(Commands::SessionStatus.new) || {}
+    status = client.call(commands::SessionStatus.new) || {}
     status.slice('reachout_time_lock', 'new_chat_cap')
   end
 
   # --- messages ------------------------------------------------------------------
 
   def send_message(command)
-    Model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+    model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
   end
 
   def edit_message(command)
-    Model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+    model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
   end
 
   def revoke_message(command)
@@ -89,7 +92,7 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   def react_message(command)
-    Model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+    model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
   end
 
   def mark_read(command)
@@ -135,7 +138,7 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   def check_numbers(command)
-    Array(client.call(command)).map { |check| Model::NumberCheck.from_h(check) }
+    Array(client.call(command)).map { |check| model::NumberCheck.from_h(check) }
   end
 
   def profile_picture_url(command)
@@ -146,15 +149,15 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # --- groups --------------------------------------------------------------------
 
   def create_group(command)
-    Model::GroupInfo.from_h(client.call(command))
+    model::GroupInfo.from_h(client.call(command))
   end
 
   def group_info(command)
-    Model::GroupInfo.from_h(client.call(command))
+    model::GroupInfo.from_h(client.call(command))
   end
 
   def list_groups(command)
-    Array(client.call(command)).map { |info| Model::GroupInfo.from_h(info) }
+    Array(client.call(command)).map { |info| model::GroupInfo.from_h(info) }
   end
 
   def leave_group(command)
@@ -202,7 +205,7 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   private
 
   def refresh(command)
-    Model::MediaRef.from_h(client.call(command))
+    model::MediaRef.from_h(client.call(command))
   end
 
   def session_id
@@ -218,7 +221,7 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   def fetch_blob(ref)
     headers = (ref.headers || {}).merge('Authorization' => "Bearer #{client.media_token(ref.url)}")
     file = Down.download(ref.url, headers: headers, max_size: MAX_MEDIA_BYTES)
-    Model::MediaPayload.new(io: file, mime: ref.mime || file.content_type, filename: file.original_filename, size: file.size)
+    model::MediaPayload.new(io: file, mime: ref.mime || file.content_type, filename: file.original_filename, size: file.size)
   rescue Down::NotFound => e
     raise Whatsapp::Session::Errors::MediaUnavailable, "media is gone: #{e.message}"
   rescue Down::ClientError => e
