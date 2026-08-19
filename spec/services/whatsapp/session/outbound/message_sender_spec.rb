@@ -156,6 +156,39 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
     end
   end
 
+  # The provider refusing for a reason that will not change: the bubble used to stay on
+  # "sent" while Sidekiq retried a send that could never work.
+  it 'fails the message when the provider refuses for good' do
+    allow(backend).to receive(:send_message).and_raise(
+      Whatsapp::Session::Errors::RecipientNotOnWhatsapp, 'number is not on whatsapp'
+    )
+
+    expect { send_message }.not_to raise_error
+
+    expect(message.reload.status).to eq('failed')
+    expect(message.external_error).to eq('number is not on whatsapp')
+  end
+
+  # The other half: a provider that is down answers differently once it is back, so the
+  # job has to fail and be retried rather than bury a message the agent could still send.
+  it 'lets a provider that may answer differently take the job down with it' do
+    allow(backend).to receive(:send_message).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)
+
+    expect { send_message }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+    expect(message.reload.status).not_to eq('failed')
+  end
+
+  # `identifier` is account-wide and another channel may own it: an API inbox writes the
+  # customer's id there, often an e-mail. Reading that as an address made the contact
+  # unreachable on WhatsApp, number and all.
+  it 'addresses a contact by its number when the identifier belongs to another channel' do
+    contact.update!(identifier: 'cliente@example.com')
+
+    send_message
+
+    expect(backend.last_command.to.to_jid).to eq('5541999990000@s.whatsapp.net')
+  end
+
   context 'when the group only accepts messages from admins' do
     let(:channel) do
       create(:channel_whatsapp, provider: 'native', phone_number: '+5541988887777',
@@ -166,8 +199,10 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
                        group_type: :group, additional_attributes: { 'announce' => true })
     end
 
+    # Failed, and not raised: the refusal is the same on every retry, and a job dying over
+    # it only leaves the bubble reading "sent" until Sidekiq gives up.
     it 'fails the message with a reason the agent can read' do
-      expect { send_message }.to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+      expect { send_message }.not_to raise_error
 
       expect(message.reload.status).to eq('failed')
       expect(message.external_error).to include('administrators')
@@ -200,7 +235,10 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
       admin = create(:contact, account: channel.account, phone_number: '+15588887777')
       create(:group_member, group_contact: contact, contact: admin, role: :admin)
 
-      expect { send_message }.to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+      send_message
+
+      expect(message.reload.status).to eq('failed')
+      expect(backend.commands).to be_empty
     end
   end
 end

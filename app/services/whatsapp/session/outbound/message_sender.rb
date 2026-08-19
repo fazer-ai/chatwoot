@@ -26,6 +26,15 @@ class Whatsapp::Session::Outbound::MessageSender
       )
     )
     persist(result)
+  rescue Whatsapp::Session::Errors::Error => e
+    # A refusal the provider will repeat: the number is not on WhatsApp, the file is too
+    # large, the group takes messages from admins only. Letting it escape leaves the
+    # bubble reading "sent" while the job retries something that cannot work, so the
+    # reason goes on the message instead. Only a provider that might answer differently
+    # next time is worth raising for.
+    raise if e.retryable?
+
+    fail_message(e)
   end
 
   private
@@ -129,6 +138,17 @@ class Whatsapp::Session::Outbound::MessageSender
 
     Messages::DeleteOnChannelJob.perform_later(message.id) if outcome == :revoke
     result.message_id
+  end
+
+  # Never over a reason that is already there: the announcement guard writes a translated
+  # sentence before it raises, and the exception's own message would replace it with the
+  # English one meant for the log.
+  def fail_message(error)
+    message.reload
+    return if message.status == 'failed' && message.external_error.present?
+
+    message.update_under_lock!(status: :failed, external_error: error.message)
+    nil
   end
 
   def mark_unsupported
