@@ -47,6 +47,28 @@ RSpec.describe Webhooks::WhatsappSessionEventsJob do
     end
   end
 
+  # A bulk deletion is one event per message id. Stopping at the first one whose message
+  # is not stored would leave the rest undispatched, and every retry would stop at the
+  # same id: the messages after it would never be deleted at all.
+  describe 'when only part of a batch has to wait' do
+    let(:deletion) do
+      JSON.parse(Rails.root.join('spec/fixtures/whatsapp/session/uazapi/webhook/update_deleted.json').read)
+          .tap { |raw| raw['event']['MessageIDs'] = %w[3EB0MISSING 3EB0STORED] }
+    end
+
+    before do
+      allow(dispatcher).to receive(:dispatch) do |_channel, event|
+        event.payload.message_id == '3EB0MISSING' ? :deferred : :handled
+      end
+    end
+
+    it 'dispatches every event before asking to come back' do
+      expect { job.perform_now(channel, deletion) }.to have_enqueued_job(described_class)
+
+      expect(dispatcher).to have_received(:dispatch).twice
+    end
+  end
+
   # A shape this build cannot parse is a provider or contract problem, and running it
   # again produces the same nothing.
   it 'drops a payload it cannot read rather than retrying it' do

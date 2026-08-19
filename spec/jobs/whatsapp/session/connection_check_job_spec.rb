@@ -48,6 +48,20 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
     expect(channel.reload.provider_connection['connection']).to eq('open')
   end
 
+  # The limits are sticky: they survive every state update the new provider sends, so one
+  # written after a conversion shows the agent the old provider's restrictions until the
+  # new one happens to report its own.
+  it 'does not write the limits onto an inbox that was converted while it was asking' do
+    stub_request(:get, "#{base}/instance/wa_messages_limits").to_return(
+      status: 200, body: fixture('instance_wa_messages_limits').deep_merge('reachout_timelock' => { 'active' => true }).to_json,
+      headers: { 'Content-Type' => 'application/json' }
+    ).with { Channel::Whatsapp.where(id: channel.id).update_all(provider: 'whatsapp_cloud') || true } # rubocop:disable Rails/SkipsModelValidations
+
+    described_class.perform_now(channel)
+
+    expect(channel.reload.provider_connection['reachout_time_lock']).to be_nil
+  end
+
   it 'does nothing for an inbox that has left the session layer' do
     channel.update_column(:provider, 'whatsapp_cloud') # rubocop:disable Rails/SkipsModelValidations
 

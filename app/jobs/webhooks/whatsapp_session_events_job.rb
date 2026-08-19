@@ -13,9 +13,9 @@
 # bounded delay. A revoke or an edit for a message Chatwoot never had (one from before
 # the inbox was connected) costs that ladder and is then dropped.
 #
-# Which is also why a translator answers with at most one event per body: the retry
-# replays the whole job, so an event dispatched before the one that deferred would run
-# twice. Every shape in the capture is one event, and a spec holds the translator to it.
+# The retry replays the whole body, so anything a translator emits alongside a deferrable
+# event has to survive running twice. Only a bulk revoke does that today, and its handler
+# is a no-op on a message it has already flagged.
 class Webhooks::WhatsappSessionEventsJob < ApplicationJob
   queue_as :high
 
@@ -35,19 +35,18 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
     translator = Whatsapp::Session::Registry.translator_for(channel)
     return if translator.nil?
 
-    translator.new(channel, payload).perform.each { |event| dispatch(channel, event) }
+    events = translator.new(channel, payload).perform
+    # Every event first, and only then the wait. Raising on the first one that has to wait
+    # would leave the rest of a bulk deletion undispatched, and every retry would stop at
+    # the same missing message: the ids after it would never be deleted at all.
+    deferred = events.select { |event| Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred }
+    return if deferred.empty?
+
+    raise Whatsapp::Session::Errors::EventOutOfOrder,
+          "#{deferred.map(&:type).uniq.join(', ')} arrived before the messages they refer to"
   rescue Whatsapp::Session::Errors::InvalidEvent, Whatsapp::Session::Errors::InvalidPayload => e
     # A body this version cannot read is a provider or contract problem, not something a
     # retry fixes.
     Rails.logger.error("[WHATSAPP SESSION] invalid webhook on inbox ##{channel.inbox&.id}: #{e.message}")
-  end
-
-  private
-
-  def dispatch(channel, event)
-    result = Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
-    return unless result == :deferred
-
-    raise Whatsapp::Session::Errors::EventOutOfOrder, "#{event.type} arrived before the message it refers to"
   end
 end

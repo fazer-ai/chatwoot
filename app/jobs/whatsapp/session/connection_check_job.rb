@@ -14,16 +14,18 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
     backend = channel.session_backend
     return unless backend.class.state_polling?
 
-    refresh_state(channel, backend)
-    refresh_limits(channel, backend)
+    # Both writes are fenced to the provider this backend was built for. A conversion can
+    # land while a request is in flight, and either write would then go into the empty
+    # connection record the new provider just started with.
+    provider = channel.provider
+    refresh_state(channel, backend, provider)
+    refresh_limits(channel, backend, provider)
   end
 
   private
 
-  # Fenced to the provider this job was scheduled for: an inbox converted while the job
-  # sat in the queue has an empty connection record belonging to somebody else.
-  def refresh_state(channel, backend)
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(backend.fetch_connection_state, provider: channel.provider)
+  def refresh_state(channel, backend, provider)
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(backend.fetch_connection_state, provider: provider)
   rescue Whatsapp::Session::Errors::Error => e
     # A provider that cannot be reached is not the same as a session that closed, and
     # writing `close` over a healthy connection because of one failed request would show
@@ -34,10 +36,19 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
   # Best effort, and separately rescued: a provider that answers the status but not the
   # limits must not cost the status read. A missing value means "unknown" and leaves the
   # last one in place, so a blip never clears a banner that is legitimately up.
-  def refresh_limits(channel, backend)
+  #
+  # The fence is inside the lock, which is the only place it means anything: these are
+  # sticky fields, so a limit written onto an inbox that has just been converted survives
+  # every state update the new provider sends and shows the agent the old provider's
+  # restrictions until the new one happens to report its own.
+  def refresh_limits(channel, backend, provider)
     limits = backend.fetch_account_limits || {}
-    channel.update_reachout_time_lock!(limits['reachout_time_lock'])
-    channel.update_new_chat_cap!(limits['new_chat_cap'])
+    channel.with_lock do
+      next if channel.provider != provider
+
+      channel.update_reachout_time_lock!(limits['reachout_time_lock'])
+      channel.update_new_chat_cap!(limits['new_chat_cap'])
+    end
   rescue Whatsapp::Session::Errors::Error => e
     Rails.logger.warn("[WHATSAPP SESSION] account limits refresh failed for inbox ##{channel.inbox&.id}: #{e.message}")
   end

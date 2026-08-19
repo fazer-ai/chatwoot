@@ -3,11 +3,6 @@ app/javascript/dashboard/store/modules/conversationPins.js: Prevent delayed pin 
 app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when a remote pin arrives  # PR#366
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
 app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
-# PR#372: real, tracked in fazer-ai/chatwoot#373, and deliberately not answered here.
-# The mechanism depends on payloads captured from a live Uazapi instance in slice 6.
-# The note in event_job.rb sits where the fix belongs; this line only stops the review
-# from reporting it every round. Removing this waiver does not close the issue.
-app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatch  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
 # `group_left` is stored on the account-level group Contact, which is exactly where the
 # Baileys layer writes it and where three dashboard components read it. Scoping it per
@@ -20,10 +15,12 @@ app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group
 # that shared job a freshness check, which is its own change. Removing this waiver does
 # not close the issue.
 app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
-# PR#372: the redelivery half of fazer-ai/chatwoot#373, deliberately not answered here.
-# No session provider has a backend until slices 5 and 6, so nothing can replay an event
-# yet, and the claim mechanism depends on what the provider payloads carry. The note in
-# event_job.rb sits where the fix belongs. Removing this waiver does not close the issue.
+# PR#372: the redelivery half of fazer-ai/chatwoot#373, still deliberately not answered.
+# Slice 6 settled the ordering half and left this one open: nothing claims an event id
+# before a handler runs, so a webhook the provider redelivers (a timeout on our 200, a
+# retry of its own) writes a second activity row for a group change. A claim needs a key,
+# and the capture showed the only id this provider sends rides on `connection` events.
+# Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
 # snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
