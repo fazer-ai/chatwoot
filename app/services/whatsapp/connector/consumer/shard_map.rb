@@ -6,12 +6,12 @@
 # newer ones arrive on the one it hashes to now, and whichever worker gets ahead pushes
 # the session cursor past what the other has not reached yet.
 #
-# There is no way to follow that safely while running. Waiting for the old mapping to
-# finish only works when the streams it used stop being written to, and they generally
-# do not: 2 to 4 leaves the old events on 0 and 1, which keep receiving new ones, and
-# even 8 to 6 moves sessions between streams that both survive. Changing the count is a
-# planned operation, so this reads the mapping it started with and says loudly when the
-# connector has moved on.
+# There is no way to follow that safely while running, and no subset of the streams that
+# is safe to keep reading either. Waiting for the old mapping to finish only works when
+# the streams it used stop being written to, and they generally do not: 2 to 4 leaves the
+# old events on 0 and 1, which keep receiving new ones, and 8 to 6 moves sessions between
+# streams that both survive. So a count that changes underneath stops this consumer
+# instead of steering it, and it stays stopped until someone restarts it.
 #
 # What is still followed is the tail of a previous topology: streams above the current
 # range that a restart inherited. Those really have stopped being written to, so they
@@ -21,15 +21,21 @@ class Whatsapp::Connector::Consumer::ShardMap
   Consumer = Whatsapp::Connector::Consumer
 
   SCAN_BATCH = 100
+  # How often a stopped consumer repeats itself, in supervisor ticks. A process that has
+  # stopped reading must not also go quiet, and the state only clears on a restart.
+  REMINDER_TICKS = 60
 
   def initialize(redis)
     @redis = redis
+    @halted = false
+    @ticks_while_halted = 0
   end
 
   def shards
-    count = mapping_size
-    retired = retired_with_work(count)
-    return (0...count).to_a if retired.empty?
+    return nothing if moved_under_us?
+
+    retired = retired_with_work(@mapping_size)
+    return (0...@mapping_size).to_a if retired.empty?
 
     Rails.logger.warn("[WHATSAPP CONNECTOR] draining retired shards #{retired.join(', ')} before reading the rest")
     retired
@@ -37,21 +43,46 @@ class Whatsapp::Connector::Consumer::ShardMap
 
   private
 
-  def mapping_size
+  # True once the connector has published a count other than the one this process started
+  # on. It never goes back: by then the streams have already been re-mapped, and only a
+  # restart on the new count can read them in order again.
+  def moved_under_us?
+    return true if @halted
+
     advertised = Whatsapp::Connector.advertised_shards(@redis)
     @mapping_size ||= advertised
-    refuse_hot_change(advertised) unless advertised == @mapping_size
-    @mapping_size
+    return false if advertised == @mapping_size
+
+    @halted = true
+    refuse_hot_change(advertised)
+    true
+  end
+
+  # Nothing at all, rather than the range this process started with. Keeping the old
+  # numeric range does not keep the old mapping: after 8 to 6, a session's older events
+  # sit on 7 while its newer ones arrive on 2, both inside the old range, and the worker
+  # on 2 would push the session cursor past what the worker on 7 has not reached.
+  def nothing
+    @ticks_while_halted += 1
+    remind if (@ticks_while_halted % REMINDER_TICKS).zero?
+    []
   end
 
   # Loud, because it needs a person: the connector has to stop, the consumers have to
   # finish what is on the streams, and then everything restarts on the new count.
-  # Following it here instead would quietly reorder the sessions that moved.
   def refuse_hot_change(advertised)
+    @ticks_while_halted = 0
     Rails.logger.error(
-      "[WHATSAPP CONNECTOR] the connector now publishes #{advertised} event shards and this consumer is reading " \
-      "#{@mapping_size}. Re-sharding while running would reorder the sessions that moved, so it keeps the mapping " \
-      'it started with: stop the connector, let the consumers drain, and restart them on the new count.'
+      "[WHATSAPP CONNECTOR] the connector now publishes #{advertised} event shards and this consumer was reading " \
+      "#{@mapping_size}. Re-sharding while running reorders the sessions that moved, so this consumer has stopped " \
+      'reading: stop the connector, let the consumers drain, and restart them on the new count.'
+    )
+  end
+
+  def remind
+    Rails.logger.error(
+      '[WHATSAPP CONNECTOR] this consumer is still stopped after the connector changed its event shard count. ' \
+      'Nothing is being read until it is restarted.'
     )
   end
 
@@ -74,8 +105,7 @@ class Whatsapp::Connector::Consumer::ShardMap
     found.filter_map { |key| key[/:(\d+)\z/, 1]&.to_i }
   end
 
-  # Pending entries, or entries the group has never been handed. Asked this way rather
-  # than through the group's lag, which Redis only reports from 7 on.
+  # Pending entries, or entries still sitting past where the group stopped.
   def backlog?(shard)
     stream = Consumer.shard_key(shard)
     group = @redis.xinfo(:groups, stream).find { |entry| entry['name'] == Consumer::GROUP }
@@ -85,7 +115,11 @@ class Whatsapp::Connector::Consumer::ShardMap
     return @redis.xlen(stream).positive? if group.nil?
     return true if group['pending'].to_i.positive?
 
-    group['last-delivered-id'] != @redis.xinfo(:stream, stream)['last-generated-id']
+    # Asked as "is anything still there", not as "did the group reach the last id the
+    # stream ever generated". MAXLEN trimming and XDEL take away entries the group was
+    # never handed, and comparing the two ids would then report work that can never be
+    # read again, for good, keeping this consumer on a dead stream and off the live ones.
+    @redis.xrange(stream, "(#{group['last-delivered-id']}", '+', count: 1).any?
   rescue Redis::CommandError
     # No such key: a stream that was never written to has nothing to drain.
     false

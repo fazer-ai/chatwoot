@@ -177,6 +177,25 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers.keys).to eq([3])
   end
 
+  # MAXLEN trimming and XDEL take away entries the group was never handed, so its cursor
+  # stays behind the last id the stream ever generated while there is nothing left to
+  # read. Comparing those two ids reports work forever, and since the retired shards are
+  # read first and alone, the live ones would never be read again.
+  it 'lets go of a retired stream whose remaining entries were trimmed away' do
+    stream = "#{prefix}events:3"
+    handed = redis.xadd(stream, { 'v' => '1' })
+    trimmed = redis.xadd(stream, { 'v' => '2' })
+    redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0')
+    redis.xreadgroup(described_class::Consumer::GROUP, 'someone', stream, '>', count: 1)
+    redis.xack(stream, described_class::Consumer::GROUP, handed)
+    redis.xdel(stream, trimmed)
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([0, 1])
+  end
+
   it 'lets a drained retired shard go' do
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
@@ -191,16 +210,30 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   # Re-sharding while running reorders the sessions that moved, and no amount of draining
-  # avoids it: 8 to 6 moves a session between two streams that both survive. The mapping
-  # this process started on is the one it keeps until it restarts.
-  it 'refuses to follow a shard count that changes while it runs' do
+  # avoids it: 8 to 6 moves a session between two streams that both survive. Nor is the
+  # old range safe to keep reading, because both the stream a session left and the one it
+  # arrived on are inside it. So the consumer stops, and waits for the restart.
+  it 'stops reading altogether when the shard count changes while it runs' do
     supervisor.tick
     expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
 
     redis.hset("#{prefix}meta", 'event_shards', '2')
     supervisor.tick
 
-    expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
+    expect(supervisor.workers).to be_empty
+  end
+
+  # Stopping is only half of it: the leases have to go back, or the shards stay
+  # unreadable by the consumers that restart on the new count.
+  it 'gives its shards back when it stops' do
+    supervisor.tick
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+    # The lease follows the thread out, on the tick after it exits.
+    supervisor.tick
+
+    expect(redis.get("#{prefix}events:0:lease")).to be_nil
   end
 
   it 'says loudly that the connector has moved on' do
@@ -210,7 +243,21 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
 
     supervisor.tick
 
-    expect(Rails.logger).to have_received(:error).with(/now publishes 2 event shards and this consumer is reading 4/)
+    expect(Rails.logger).to have_received(:error).with(/now publishes 2 event shards and this consumer was reading 4/)
+  end
+
+  # A consumer that has stopped reading and then goes quiet looks exactly like one with
+  # nothing to do. It has to keep saying so, because only a person can clear the state.
+  it 'keeps saying so while it stays stopped' do
+    stub_const('Whatsapp::Connector::Consumer::ShardMap::REMINDER_TICKS', 1)
+    supervisor.tick
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+    supervisor.tick
+    allow(Rails.logger).to receive(:error)
+
+    supervisor.tick
+
+    expect(Rails.logger).to have_received(:error).with(/still stopped after the connector changed/)
   end
 
   it 'reads as many shards as the connector says it publishes' do
