@@ -17,7 +17,7 @@ RSpec.describe Whatsapp::Session::UpdateGroupAvatarJob do
 
   before do
     create(:contact_inbox, inbox: inbox, contact: group_contact, source_id: '120363041234567890')
-    allow(channel).to receive(:provider_service).and_return(backend)
+    allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
     allow(backend).to receive(:group_info).and_return(info)
   end
 

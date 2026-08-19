@@ -22,7 +22,7 @@ class Whatsapp::Session::UpdateContactAvatarJob < ApplicationJob
     # handing it a Party would put the wrong shape on the wire and break every backend
     # that reads the address.
     address = Whatsapp::Session::Model::Party.from_h(party).address
-    url = channel.provider_service.profile_picture_url(
+    url = channel.session_backend.profile_picture_url(
       Whatsapp::Session::Model::Commands::ContactProfilePicture.new(party: address)
     )
     # RACE, TRACKED (fazer-ai/chatwoot#375). A picture-removed event that purges the

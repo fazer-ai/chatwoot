@@ -184,6 +184,22 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
     end
 
     context 'when user is logged in' do
+      # A roster can name a participant WhatsApp only ever gave a LID for, and that contact
+      # has no phone number: the request used to build `@s.whatsapp.net` and come back 422
+      # with the member still a member.
+      it 'promotes a member the roster only knows by LID' do
+        member_contact.update!(phone_number: nil, identifier: '112233445566778@lid')
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members/#{member.id}",
+              params: { role: 'admin' },
+              headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(baileys_service).to have_received(:update_group_participants)
+          .with('group@g.us', ['112233445566778@lid'], 'promote')
+        expect(member.reload.role).to eq('admin')
+      end
+
       it 'promotes member to admin' do
         patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members/#{member.id}",
               params: { role: 'admin' },

@@ -36,7 +36,7 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
     address = Whatsapp::Session::Model::Address.parse(group_contact.identifier)
     return if address.blank?
 
-    channel.provider_service.group_info(Whatsapp::Session::Model::Commands::GroupInfo.new(group: address))
+    channel.session_backend.group_info(Whatsapp::Session::Model::Commands::GroupInfo.new(group: address))
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     # Raised on, not swallowed: the job retries and the retry is what keeps a forced
     # refresh from leaving the old picture attached for good.

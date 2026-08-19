@@ -57,6 +57,21 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_metadata', type
         expect(group_contact.additional_attributes['description']).to eq('Updated Desc')
       end
 
+      # Turning groups off strips the capability and hides the panel, but this endpoint
+      # stays routable, and the refusal it now raises has to render as the same JSON
+      # error the rest of the group API returns rather than as a 500.
+      it 'returns 422 when the provider cannot do what was asked' do
+        allow(baileys_service).to receive(:update_group_subject)
+          .and_raise(Whatsapp::Session::Errors::NotSupported, 'groups are disabled on this installation')
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+              params: { subject: 'New Name' },
+              headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('groups are disabled')
+      end
+
       it 'returns 422 when provider is unavailable' do
         allow(baileys_service).to receive(:update_group_subject)
           .and_raise(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError, 'Offline')

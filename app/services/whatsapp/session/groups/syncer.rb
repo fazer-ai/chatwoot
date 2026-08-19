@@ -5,10 +5,12 @@
 # already carries the group (group.joined) supplies it directly, while a scheduled or
 # manual sync fetches it through the backend.
 class Whatsapp::Session::Groups::Syncer
-  Model = Whatsapp::Session::Model
-
   # Group settings, as WhatsApp names them on the wire and as the dashboard reads them
   # from additional_attributes (the keys the Baileys layer already writes).
+  # Same reason as everywhere else in this layer: an implicit namespace captured in a
+  # constant is the module object from before the last reload.
+  def model = Whatsapp::Session::Model
+
   SETTINGS = { announce: 'announce', locked: 'restrict',
                join_approval: 'join_approval_mode', member_add_mode: 'member_add_mode' }.freeze
 
@@ -63,7 +65,7 @@ class Whatsapp::Session::Groups::Syncer
   end
 
   def group_address
-    address = Model::Address.parse(group_contact.identifier)
+    address = model::Address.parse(group_contact.identifier)
     address if address.present? && address.group?
   end
 
@@ -71,7 +73,7 @@ class Whatsapp::Session::Groups::Syncer
     address = group_address
     return if address.blank?
 
-    channel.provider_service.group_info(Model::Commands::GroupInfo.new(group: address))
+    channel.session_backend.group_info(model::Commands::GroupInfo.new(group: address))
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     # Raised on. Swallowing it here returns nil, and the caller reads that as "nothing to
     # apply" and goes on to dispatch CONTACT_GROUP_SYNCED and hand back the untouched

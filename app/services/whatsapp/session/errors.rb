@@ -14,6 +14,14 @@ module Whatsapp::Session::Errors
     def code
       self.class::CODE
     end
+
+    # Whether running the same command again could produce a different answer. Asked of
+    # the exception rather than tested against a list of classes, because a constant
+    # holding another file's class keeps the object from before the last reload and
+    # `is_a?` against it then answers false without saying why.
+    def retryable?
+      false
+    end
   end
 
   # The provider could not be reached, or answered with something we cannot act on.
@@ -21,6 +29,11 @@ module Whatsapp::Session::Errors
   # lives under this class.
   class ProviderUnavailable < Error
     CODE = 'wa_error'.freeze
+
+    # The provider, not the command: the same thing asked again once it is back can work.
+    def retryable?
+      true
+    end
   end
 
   class Internal < ProviderUnavailable
@@ -83,6 +96,10 @@ module Whatsapp::Session::Errors
 
   class RateLimited < Error
     CODE = 'rate_limited'.freeze
+
+    def retryable?
+      true
+    end
   end
 
   class MediaTooLarge < Error

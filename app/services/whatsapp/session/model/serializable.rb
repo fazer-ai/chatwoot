@@ -67,6 +67,13 @@ module Whatsapp::Session::Model::Serializable
     end
   end
 
+  # What this payload is, as a string rather than as a class. Comparing classes is what
+  # a reload breaks: an alias or a `described_class` captured before it holds the
+  # previous generation, `case payload when Text` stops matching, and the branch falls
+  # through in silence rather than raising. The wire type is the same string on both
+  # sides of a reload, and it is the same string the contract uses.
+  def wire_type = self.class.wire_type
+
   # A nil always means "not provided", so a payload that omits a member and one that
   # sends it as null behave the same and both fall back to the declared default.
   def initialize(**attributes)

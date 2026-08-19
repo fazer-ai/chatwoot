@@ -7,7 +7,7 @@
 # before persisting, so what the dashboard reads is already a sentence.
 class Whatsapp::Session::Model::ConnectionState < Data.define(
   :connection, :qr_data_url, :pairing_code, :error, :epoch, :phone_number, :lid,
-  :quarantine, :ban, :reachout_time_lock, :new_chat_cap
+  :quarantine, :ban, :reachout_time_lock, :new_chat_cap, :pairing_attempt
 )
   include Whatsapp::Session::Model::Serializable
 
@@ -37,5 +37,15 @@ class Whatsapp::Session::Model::ConnectionState < Data.define(
 
   def connecting?
     connection.in?(%w[connecting reconnecting])
+  end
+
+  # The pairing attempt token rides along only while the attempt is still running. Stamped
+  # onto a state that ended it, the token stays on the record and the polling chain looks
+  # current forever: it would poll a session that has already opened and, if that request
+  # failed, write `connect_failure` over a healthy connection.
+  def with_attempt(attempt)
+    return self if attempt.blank? || !connecting?
+
+    with(pairing_attempt: attempt)
   end
 end

@@ -8,7 +8,7 @@ RSpec.describe Whatsapp::Session::UpdateContactAvatarJob do
   let(:contact) { create(:contact, account: channel.account, phone_number: '+5541999990000') }
   let(:party) { model::Party.new(phone: '5541999990000', lid: '182736451928374') }
 
-  before { allow(inbox.channel).to receive(:provider_service).and_return(backend) }
+  before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
   # The command declares an Address and is built with `new`, which runs no coercion, so
   # handing it a Party would put the wrong shape on the wire and every backend reading

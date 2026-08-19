@@ -25,6 +25,14 @@ class Whatsapp::Session::Backend
       capabilities.include?(capability.to_s)
     end
 
+    # Whether this backend's connection state has to be pulled. A backend that pushes
+    # every transition answers false and is never polled; one whose provider pushes only
+    # some of them answers true. Uazapi's webhook, for one, does not carry the QR as it
+    # rotates nor the account limits, so its inboxes would sit on a stale QR forever.
+    def state_polling?
+      false
+    end
+
     # Schema-only validation: returns the list of invalid/missing config keys. Must not
     # touch the network, so saving an inbox never depends on a provider being up.
     def validate_config(_provider_config)
@@ -72,6 +80,9 @@ class Whatsapp::Session::Backend
   def update_group_description(_command) = not_supported!(:update_group_description)
   def update_group_photo(_command) = not_supported!(:update_group_photo)
   def update_group_setting(_command) = not_supported!(:update_group_setting)
+  # Returns the invite code alone, never the chat.whatsapp.com link: the dashboard
+  # endpoint builds the URL from it, so a backend handing back a full link produces one
+  # with the host in it twice.
   def group_invite_code(_command) = not_supported!(:group_invite_code)
   def group_join_requests(_command) = not_supported!(:group_join_requests)
   def handle_group_join_requests(_command) = not_supported!(:handle_group_join_requests)

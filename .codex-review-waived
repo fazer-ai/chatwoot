@@ -44,3 +44,44 @@ app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before i
 # field the snapshot did not mention. Fixing it is a contract change, decided with the
 # payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
 app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372
+# PR#377: real, tracked in fazer-ai/chatwoot#378, and not this stack's to fix. Removing a
+# reaction never reaches any provider, legacy included: the reactions controller marks the
+# reused row deleted and Base::SendOnChannelService refuses to send a deleted message. The
+# guard is ours, from #353, and it is shared by every channel, so the fix goes to main
+# rather than to a branch that merges in weeks. Removing this waiver does not close the issue.
+app/services/whatsapp/session/outbound/message_sender.rb: Allow deleted reaction rows to send removals  # PR#377
+# Same defect under the reviewer's other name for it.
+app/services/whatsapp/session/outbound/message_sender.rb: Allow removed reactions to reach the sender  # PR#377
+# PR#377: not a defect. A reaction stored with only `in_reply_to_external_id` gets its
+# `in_reply_to` filled in by Message's own `before_save :ensure_in_reply_to`, which runs
+# InReplyToMessageBuilder and resolves the target by source_id within the conversation. The
+# row id is therefore always there by the time a send reads it, and resolving it again here
+# would duplicate the model's guarantee. Covered by "reacts to a target a phone-originated
+# reaction knows only by its WhatsApp id" in message_sender_spec.
+app/services/whatsapp/session/outbound/message_sender.rb: Resolve phone-originated reactions by external target ID  # PR#377
+# PR#377: real, and deliberately left open. A logout retry that passes the quarantine
+# check and is still inside its provider call when the operator connects again can end the
+# replacement session. Closing it needs the logout to name the session it is meant to end,
+# which the contract does not have: `session.logout` addresses whatever session the inbox
+# holds now. The alternative, a distributed lock held across both provider calls, buys a
+# very rare and self-healing case (the operator scans again) at the price of a lock on the
+# connect path. The operator-driven sequence is already covered: `Facade#setup_channel_provider`
+# ends the wrong account inline before connecting and the retry then stands down. Revisit
+# with the session-scoped logout in the connector slice.
+app/jobs/whatsapp/session/logout_job.rb: Serialize stale logout checks with reconnects  # PR#377
+# PR#377: half fixed, half refused. The claim being refused after a conversion is fixed:
+# setup returns without asking the old provider, so no session is left behind. Serializing
+# the provider call itself against a second connect is not, and it is the same question as
+# the logout above: it needs a lock held across the connect. A provider answering two
+# overlapping connects converges on one pairing (both `POST /instance/connect` and
+# `session.connect` return the pairing in progress), and where it does not, the next QR
+# rotation arrives as an event and corrects the screen within ~20s.
+app/services/whatsapp/session/facade.rb: Fence the provider call against superseded setup attempts  # PR#377
+# PR#377: not a defect. The window named is between two lines of one synchronous call
+# chain: SendReplyJob -> SendOnChannelService#invalid_message? -> channel.send_message ->
+# this sender, with no I/O in between. The window that is actually open is the provider
+# call itself, and that one is already covered: `SourceIdReservation.assign` returns
+# `:revoke` when it fills source_id on a message deleted meanwhile, and the sender enqueues
+# Messages::DeleteOnChannelJob after the lock commits. A second deletion check could not
+# close that window either, since deletion can always commit after the last check.
+app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion before sending the command  # PR#377

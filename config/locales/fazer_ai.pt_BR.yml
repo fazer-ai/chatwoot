@@ -24,6 +24,8 @@ pt_BR:
       limit_reached: Você pode fixar no máximo %{limit} conversas.
       conversation_resolved: Não é possível fixar uma conversa resolvida.
       conversation_not_visible: Esta conversa não está na sua lista, então não pode ser fixada.
+    whatsapp:
+      group_announcement_only: Somente administradores podem enviar mensagens neste grupo
     inboxes:
       channel:
         provider_unavailable: Este provedor de WhatsApp ainda não está disponível nesta instalação.
@@ -41,6 +43,7 @@ pt_BR:
           connector_unavailable: O conector do WhatsApp não está respondendo. As mensagens só voltarão a ser enviadas quando ele retornar.
           connector_incompatible: A versão do conector do WhatsApp é incompatível com esta versão do Chatwoot. Atualize o conector.
           connect_failure: O WhatsApp recusou a conexão. Novas tentativas continuam automaticamente.
+          pairing_timed_out: O código expirou antes de o telefone concluir o pareamento. Inicie a conexão novamente para obter um novo.
   notifications:
     notification_title:
       internal_chat_mention: Você foi mencionado em %{name}

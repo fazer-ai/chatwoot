@@ -1,7 +1,5 @@
 # The contact (or the connected phone) edited a message that is already stored.
 class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::Inbound::Handlers::Base
-  Content = Whatsapp::Session::Model::Content
-
   def perform
     target = find_message(payload.message_id)
     return :ignored if target.nil?
@@ -32,11 +30,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
     end
   end
 
+  # By wire type, not by class: a class captured before a reload stops matching and the
+  # edit is dropped without a word.
   def edited_content
-    case payload.content
-    when Content::Text then payload.content.body.to_s
-    when Content::Media then payload.content.caption.to_s
-    when Content::Rich then payload.content.preview_text.to_s
+    case payload.content&.wire_type
+    when 'text' then payload.content.body.to_s
+    when 'media' then payload.content.caption.to_s
+    when 'rich' then payload.content.preview_text.to_s
     end
   end
 end

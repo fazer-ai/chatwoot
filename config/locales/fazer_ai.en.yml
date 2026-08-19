@@ -24,6 +24,8 @@ en:
       limit_reached: You can pin up to %{limit} conversations.
       conversation_resolved: A resolved conversation cannot be pinned.
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
+    whatsapp:
+      group_announcement_only: Only administrators are allowed to send messages in this group
     inboxes:
       channel:
         provider_unavailable: This WhatsApp provider is not available on this installation yet.
@@ -41,6 +43,7 @@ en:
           connector_unavailable: The WhatsApp connector is not responding. Messages will only be sent again once it is back.
           connector_incompatible: The WhatsApp connector version is incompatible with this Chatwoot version. Update the connector.
           connect_failure: WhatsApp refused the connection. New attempts continue automatically.
+          pairing_timed_out: The code expired before the phone finished pairing. Start the connection again to get a new one.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}

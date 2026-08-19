@@ -14,7 +14,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     return if message.attachments.any?
 
     media = Whatsapp::Session::Model::Content.from_h(content)
-    payload = message.inbox.channel.provider_service.download_media(media.ref)
+    payload = message.inbox.channel.session_backend.download_media(media.ref)
     # Re-read under lock, after the download: a deletion that landed while this job was
     # queued or running destroyed the attachments, and attaching now would put the
     # supposedly deleted media back into storage and back on the API.

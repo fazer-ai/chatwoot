@@ -5,7 +5,9 @@
 # Commands are kept in `commands` for assertions; `emit` builds canonical events with a
 # monotonic cursor, the way a real backend would.
 class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
-  Model = Whatsapp::Session::Model
+  # Per call, never aliased: a constant would hold the pre-reload module. See Handlers::Base.
+  def model = Whatsapp::Session::Model
+
   QR_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='.freeze
 
   class << self
@@ -24,12 +26,12 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     super
     @commands = []
     @seq = 0
-    @connection_state = Model::ConnectionState.new(connection: 'close')
+    @connection_state = model::ConnectionState.new(connection: 'close')
   end
 
   def connect(command)
     record(command)
-    @connection_state = Model::ConnectionState.new(
+    @connection_state = model::ConnectionState.new(
       connection: 'connecting',
       qr_data_url: (QR_DATA_URL if command.pairing == 'qr'),
       epoch: (connection_state.epoch || 0) + 1
@@ -37,17 +39,17 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
   end
 
   def disconnect
-    @connection_state = Model::ConnectionState.new(connection: 'close', epoch: connection_state.epoch)
-    record(Model::Commands::SessionDisconnect.new)
+    @connection_state = model::ConnectionState.new(connection: 'close', epoch: connection_state.epoch)
+    record(model::Commands::SessionDisconnect.new)
   end
 
   def logout
-    @connection_state = Model::ConnectionState.new(connection: 'close', epoch: connection_state.epoch)
-    record(Model::Commands::SessionLogout.new)
+    @connection_state = model::ConnectionState.new(connection: 'close', epoch: connection_state.epoch)
+    record(model::Commands::SessionLogout.new)
   end
 
   def delete_session
-    record(Model::Commands::SessionDelete.new)
+    record(model::Commands::SessionDelete.new)
   end
 
   def fetch_connection_state
@@ -56,12 +58,12 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def request_pairing_code(command)
     record(command)
-    Model::Events::PairingCode.new(code: 'K7QP-2M4X', phone: command.phone)
+    model::Events::PairingCode.new(code: 'K7QP-2M4X', phone: command.phone)
   end
 
   def import_session(payload)
     record(payload)
-    @connection_state = Model::ConnectionState.new(connection: 'connecting', epoch: (connection_state.epoch || 0) + 1)
+    @connection_state = model::ConnectionState.new(connection: 'connecting', epoch: (connection_state.epoch || 0) + 1)
   end
 
   def fetch_account_limits
@@ -70,12 +72,12 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def send_message(command)
     record(command)
-    Model::SendResult.new(message_id: command.message_id, timestamp: now_ms, client_ref: command.client_ref)
+    model::SendResult.new(message_id: command.message_id, timestamp: now_ms, client_ref: command.client_ref)
   end
 
   def edit_message(command)
     record(command)
-    Model::SendResult.new(message_id: command.message_id || generated_id, timestamp: now_ms)
+    model::SendResult.new(message_id: command.message_id || generated_id, timestamp: now_ms)
   end
 
   def revoke_message(command)
@@ -85,7 +87,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def react_message(command)
     record(command)
-    Model::SendResult.new(message_id: command.message_id || generated_id, timestamp: now_ms)
+    model::SendResult.new(message_id: command.message_id || generated_id, timestamp: now_ms)
   end
 
   def mark_read(command)
@@ -100,7 +102,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def download_media(ref)
     record(ref)
-    Model::MediaPayload.new(io: StringIO.new('fake-media'), mime: ref.mime || 'application/octet-stream',
+    model::MediaPayload.new(io: StringIO.new('fake-media'), mime: ref.mime || 'application/octet-stream',
                             filename: 'fake-media', size: 10)
   end
 
@@ -121,7 +123,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def check_numbers(command)
     record(command)
-    command.phones.map { |phone| Model::NumberCheck.new(phone: phone, exists: true, address: Model::Address.phone(phone)) }
+    command.phones.map { |phone| model::NumberCheck.new(phone: phone, exists: true, address: model::Address.phone(phone)) }
   end
 
   def profile_picture_url(command)
@@ -131,7 +133,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def create_group(command)
     record(command)
-    group_info_for(Model::Address.group('120363040000000001'), subject: command.subject)
+    group_info_for(model::Address.group('120363040000000001'), subject: command.subject)
   end
 
   def group_info(command)
@@ -141,13 +143,10 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def list_groups(command)
     record(command)
-    [group_info_for(Model::Address.group('120363040000000001'))]
+    [group_info_for(model::Address.group('120363040000000001'))]
   end
 
-  def leave_group(command)
-    record(command)
-    true
-  end
+  def leave_group(command) = record(command) && true
 
   def update_group_participants(command)
     record(command)
@@ -176,7 +175,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def group_invite_code(command)
     record(command)
-    'https://chat.whatsapp.com/FAKEINVITE0001'
+    'FAKEINVITE0001'
   end
 
   def group_join_requests(command)
@@ -194,7 +193,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
   # Builds an event as the connector would, with the session id and a monotonic cursor.
   def emit(payload, epoch: connection_state.epoch || 1)
     @seq += 1
-    Model::Event.build(payload, id: SecureRandom.uuid, sid: channel.id.to_s, epoch: epoch, seq: @seq,
+    model::Event.build(payload, id: SecureRandom.uuid, sid: channel.id.to_s, epoch: epoch, seq: @seq,
                                 ts: now_ms, inst: 'fake')
   end
 
@@ -222,9 +221,9 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
   end
 
   def group_info_for(group, subject: 'Grupo de teste')
-    Model::GroupInfo.new(
+    model::GroupInfo.new(
       group: group, subject: subject, size: 1,
-      participants: [Model::GroupInfo::Participant.new(party: Model::Party.new(phone: '5541999990000'), role: 'superadmin')]
+      participants: [model::GroupInfo::Participant.new(party: model::Party.new(phone: '5541999990000'), role: 'superadmin')]
     )
   end
 end

@@ -28,10 +28,27 @@ module Whatsapp::Session::ChannelExtension
     Whatsapp::Session::Registry.capabilities_for(self)
   end
 
+  # The channel talks to its provider in legacy provider terms, so it gets the facade;
+  # everything inside the session layer asks for `session_backend` instead and speaks
+  # the canonical command API.
   def provider_service
     return super unless session_provider?
 
+    Whatsapp::Session::Facade.new(self)
+  end
+
+  def session_backend
     Whatsapp::Session::Registry.backend_for(self)
+  end
+
+  # A session provider fetches outbound media from Rails itself, so on an installation
+  # where it cannot reach the public frontend URL (local Active Storage behind a private
+  # network) the operator points INTERNAL_HOST_URL at something it can. Setting it is the
+  # whole opt-in: unlike the Baileys flag this replaces, there is nothing else to turn on.
+  def use_internal_host?
+    return super unless session_provider?
+
+    ENV['INTERNAL_HOST_URL'].present?
   end
 
   def supports_reactions?

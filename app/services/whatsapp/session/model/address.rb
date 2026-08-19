@@ -58,9 +58,17 @@ class Whatsapp::Session::Model::Address < Data.define(:kind, :id)
     # present, because that is what the provider echoes back.
     def for_contact(contact)
       identifier = contact.identifier.presence
-      return parse(identifier) if identifier&.include?('@')
+      return parse(identifier) if whatsapp_jid?(identifier)
 
       phone(contact.phone_number)
+    end
+
+    # `identifier` is account-wide, not per-inbox, and another channel may own it: an API
+    # inbox writes the customer's id there, and that id is often an e-mail. Reading one of
+    # those as an address makes the contact unreachable on WhatsApp, number and all, so
+    # only a JID this layer knows the server of counts.
+    def whatsapp_jid?(value)
+      SERVER_KINDS.key?(value.to_s.split('@', 2).last)
     end
   end
 

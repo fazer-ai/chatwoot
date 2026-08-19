@@ -2,12 +2,10 @@
 # start new conversations, and how many it may start. They arrive out of band and stay
 # on the connection record until the provider says otherwise.
 class Whatsapp::Session::Inbound::Handlers::AccountLimits < Whatsapp::Session::Inbound::Handlers::Base
-  Events = Whatsapp::Session::Model::Events
-
   def perform
-    case payload
-    when Events::AccountReachoutTimelock then write('reachout_time_lock', payload.reachout_time_lock)
-    when Events::AccountNewChatCap then write('new_chat_cap', payload.new_chat_cap)
+    case payload&.wire_type
+    when 'account.reachout_timelock' then write('reachout_time_lock', payload.reachout_time_lock)
+    when 'account.new_chat_cap' then write('new_chat_cap', payload.new_chat_cap)
     else :ignored
     end
   end
