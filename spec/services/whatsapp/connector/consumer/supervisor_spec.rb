@@ -106,6 +106,21 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     stuck.queue << :stop # let it out, so the shutdown in the around hook is not a wait
   end
 
+  # Shards outside the advertised range carry nothing, but they still count towards the
+  # share, so a consumer left holding them stays full of dead streams and never claims
+  # the live ones.
+  it 'gives up shards the connector has stopped publishing' do
+    redis.set("#{prefix}events:0:lease", 'consumer-2', ex: 30)
+    redis.set("#{prefix}events:1:lease", 'consumer-2', ex: 30)
+    supervisor.tick
+    expect(supervisor.workers.keys).to eq([2, 3])
+
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+    supervisor.tick
+
+    expect(supervisor.workers).to be_empty
+  end
+
   it 'reads as many shards as the connector says it publishes' do
     redis.hset("#{prefix}meta", 'event_shards', '2')
 

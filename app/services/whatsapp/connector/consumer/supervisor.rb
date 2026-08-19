@@ -11,9 +11,6 @@ class Whatsapp::Connector::Consumer::Supervisor
   Consumer = Whatsapp::Connector::Consumer
   ShardWorker = Whatsapp::Connector::Consumer::ShardWorker
 
-  # Long enough to survive a slow tick, short enough that a crashed process's shards
-  # move within seconds.
-  LEASE_TTL = 30
   HEARTBEAT_TTL = 15
   TICK = 5
   # How many consumer heartbeats one SCAN pass walks over. The registry is one key per
@@ -26,24 +23,6 @@ class Whatsapp::Connector::Consumer::Supervisor
   # looks at its stop flag, and stay inside the grace period a container manager gives a
   # process before it kills it.
   DRAIN_TIMEOUT = 10
-
-  # Extending a lease this process no longer holds would push another consumer off a
-  # shard it is already reading, and deleting one would hand a live shard to a third.
-  # Both compare the holder and act in the same round trip so the check cannot go stale
-  # between them.
-  RENEW_SCRIPT = <<~LUA.freeze
-    if redis.call('get', KEYS[1]) == ARGV[1] then
-      return redis.call('expire', KEYS[1], ARGV[2])
-    end
-    return 0
-  LUA
-
-  RELEASE_SCRIPT = <<~LUA.freeze
-    if redis.call('get', KEYS[1]) == ARGV[1] then
-      return redis.call('del', KEYS[1])
-    end
-    return 0
-  LUA
 
   attr_reader :consumer_id, :workers
 
@@ -197,7 +176,7 @@ class Whatsapp::Connector::Consumer::Supervisor
     shards.each do |shard|
       break if @threads.size >= share
       next if @threads.key?(shard)
-      next unless redis.set(Consumer.lease_key(shard), consumer_id, nx: true, ex: LEASE_TTL)
+      next unless lease.take(shard)
 
       spawn_worker(shard)
     end
@@ -208,6 +187,13 @@ class Whatsapp::Connector::Consumer::Supervisor
   # makes a rolling restart converge instead of leaving one process reading everything.
   def rebalance
     return if @draining
+
+    # A shard the connector no longer publishes carries nothing, and giving it up is not
+    # optional: it counts towards this consumer's share, so holding one keeps the share
+    # full of streams nobody writes to while the live shards go unread. Dropping only the
+    # numerically largest few leaves exactly that.
+    retired = workers.keys - shards
+    retired.each { |shard| stop_worker(shard) }
 
     # Counted over the shards being read, not the leases still held: a worker that was
     # already told to stop is on its way out, and counting it again on the next tick
@@ -231,7 +217,7 @@ class Whatsapp::Connector::Consumer::Supervisor
     # A snapshot: stop_worker deletes from the table this is walking.
     held = @threads.keys
     held.each do |shard|
-      next if redis.eval(RENEW_SCRIPT, keys: [Consumer.lease_key(shard)], argv: [consumer_id, LEASE_TTL]) == 1
+      next if lease.renew(shard)
 
       Rails.logger.warn("[WHATSAPP CONNECTOR] lost the lease on shard #{shard}")
       workers.delete(shard)&.stop
@@ -248,7 +234,7 @@ class Whatsapp::Connector::Consumer::Supervisor
       Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} worker stopped; releasing it") if workers.key?(shard)
       @threads.delete(shard)
       workers.delete(shard)
-      release(shard)
+      lease.release(shard)
     end
   end
 
@@ -274,7 +260,7 @@ class Whatsapp::Connector::Consumer::Supervisor
 
   # The last wait before the process goes. Whatever is still running after it keeps its
   # lease until that expires: a thread stuck inside one entry is worse to take a shard
-  # away from than to leave the shard idle for LEASE_TTL.
+  # away from than to leave the shard idle until the lease lapses.
   def drain
     held = @threads.keys
     # They were all told to stop together, so one deadline covers all of them.
@@ -286,8 +272,7 @@ class Whatsapp::Connector::Consumer::Supervisor
     reap
   end
 
-  # Only the holder releases: a lease that already expired belongs to whoever took it.
-  def release(shard)
-    redis.eval(RELEASE_SCRIPT, keys: [Consumer.lease_key(shard)], argv: [consumer_id])
+  def lease
+    @lease ||= Whatsapp::Connector::Consumer::ShardLease.new(redis, consumer_id)
   end
 end
