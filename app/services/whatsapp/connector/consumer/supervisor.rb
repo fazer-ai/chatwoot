@@ -118,8 +118,15 @@ class Whatsapp::Connector::Consumer::Supervisor
 
   # Published so the super admin screen can tell whether anyone is reading, and so the
   # shares below know how many of us there are.
+  #
+  # A consumer that has halted takes itself out for the same reason a draining one does:
+  # it reads nothing, and a peer that counts it still divides the shards by one more than
+  # there are readers, leaving that share unclaimed by anyone for as long as the halted
+  # process keeps announcing itself.
   def heartbeat
-    @draining ? registry.withdraw : registry.announce(workers.keys)
+    return registry.withdraw if @draining || shard_map.halted?
+
+    registry.announce(workers.keys)
   end
 
   # Memoized for the tick: every share and both loops below ask for it, and answering

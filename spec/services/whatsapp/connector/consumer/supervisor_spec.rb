@@ -253,6 +253,19 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(redis.get("#{prefix}events:0:lease")).to be_nil
   end
 
+  # A halted consumer that keeps announcing itself is counted as a peer by everyone else,
+  # and the share it is credited with is then claimed by nobody. It reads nothing, so it
+  # has no business being in the count.
+  it 'takes itself out of the registry once it has stopped' do
+    redis.hset("#{prefix}meta", 'event_shards', '4')
+    supervisor.tick
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(redis.get("#{prefix}consumer:consumer-1")).to be_nil
+  end
+
   it 'says loudly that the connector has moved on' do
     allow(Rails.logger).to receive(:error)
     redis.hset("#{prefix}meta", 'event_shards', '4')

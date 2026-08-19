@@ -31,6 +31,12 @@ class Whatsapp::Connector::Consumer::ShardMap
     @ticks_while_halted = 0
   end
 
+  # Whether this consumer has given up on the mapping it started with. Nothing clears it
+  # but a restart, and while it is set the consumer reads nothing at all.
+  def halted?
+    @halted
+  end
+
   def shards
     return nothing if moved_under_us?
 
