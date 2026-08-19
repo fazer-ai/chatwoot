@@ -97,6 +97,23 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       end)
     end
 
+    # An instance the operator runs next to Chatwoot cannot resolve the public address, so
+    # an inbox would pair and then never receive an event.
+    it 'points a neighbouring instance at the internal host' do
+      neighbour = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
+                                            provider_config: { 'base_url' => 'http://uazapi:3333', 'token' => 'x',
+                                                               'webhook_verify_token' => 'secret' })
+      stub_request(:any, %r{http://uazapi:3333}).to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+
+      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000', SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+        described_class.new(neighbour).connect(commands::SessionConnect.new(pairing: 'qr'))
+      end
+
+      expect(WebMock).to(have_requested(:post, 'http://uazapi:3333/webhook').with do |request|
+        JSON.parse(request.body)['url'].start_with?('http://rails:3000/webhooks/whatsapp/session/uazapi/')
+      end)
+    end
+
     it 'answers with the QR the operator has to scan' do
       state = backend.connect(commands::SessionConnect.new(pairing: 'qr'))
 
@@ -161,11 +178,21 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(WebMock).to have_requested(:post, "#{base}/instance/disconnect")
     end
 
-    it 'withdraws the webhook before disconnecting when the inbox is torn down' do
+    it 'withdraws the webhook when the inbox is torn down' do
       backend.delete_session
 
       expect(WebMock).to have_requested(:post, "#{base}/webhook").with(body: hash_including('enabled' => false))
       expect(WebMock).to have_requested(:post, "#{base}/instance/disconnect")
+    end
+
+    # A conversion that fails on the disconnect is rolled back and the inbox stays on this
+    # provider. A webhook withdrawn before finding that out cannot be put back by the
+    # rollback: the inbox would go on serving uazapi and silently receive nothing.
+    it 'leaves the webhook alone when the disconnect fails' do
+      stub_uazapi(:post, '/instance/disconnect', {}, status: 500)
+
+      expect { backend.delete_session }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+      expect(WebMock).not_to have_requested(:post, "#{base}/webhook").with(body: hash_including('enabled' => false))
     end
 
     # The inbox is going away either way, and a provider that cannot be reached must not

@@ -16,8 +16,9 @@ class Whatsapp::Session::Inbound::ReactionStore
   # on its way to doing nothing: scoped to the target alone, somebody else's reaction
   # would answer yes and the contact would be created anyway.
   #
-  # `sender` is the Contact, or nil for a reaction written from the connected phone, and
-  # the caller finds it without creating one.
+  # `sender` is the Contact, or nil for a reaction from the connected number, which has
+  # one author on the WhatsApp side whether an agent or the phone wrote it. The caller
+  # finds the Contact without creating one.
   def self.active?(inbox:, target_id:, sender:, from_me: false)
     json = "(content_attributes#>>'{}')::jsonb"
     scope = Message.where(inbox_id: inbox.id)
@@ -26,7 +27,7 @@ class Whatsapp::Session::Inbound::ReactionStore
                    .where.not(content: '')
                    .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
     scope = if from_me
-              scope.where(sender_id: nil, sender_type: nil).where(message_type: Message.message_types[:outgoing])
+              scope.where(message_type: Message.message_types[:outgoing])
             else
               scope.where(sender: sender)
             end
@@ -100,8 +101,13 @@ class Whatsapp::Session::Inbound::ReactionStore
                   .where("#{json}->>'is_reaction' = 'true'")
                   .where("#{json}->>'in_reply_to_external_id' = ?", reaction.target_id)
     matches = if reaction.from_me
-                # Written from the phone: no agent on the row, stored outgoing.
-                base.where(sender_id: nil, sender_type: nil).where(message_type: Message.message_types[:outgoing])
+                # Outgoing is the whole test. On the WhatsApp side there is one author of
+                # a `from_me` reaction, the connected number, whether it was written on the
+                # phone (no agent on the row) or by an agent here (the agent on the row).
+                # Asking for a sender-less row instead would miss the agent's, and the echo
+                # of what the agent just sent would become a second emoji on the bubble
+                # that no removal can take back.
+                base.where(message_type: Message.message_types[:outgoing])
               else
                 base.where(sender: sender)
               end

@@ -138,13 +138,17 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     disconnect
   end
 
-  # A teardown, not a pause: the inbox is being destroyed or converted. The webhook is
-  # withdrawn first so a message that arrives afterwards is not delivered to an inbox that
-  # no longer serves this provider; the instance itself belongs to the customer and is
-  # never deleted from here.
+  # A teardown, not a pause: the inbox is being destroyed or converted. The instance itself
+  # belongs to the customer and is never deleted from here.
+  #
+  # The disconnect goes first because it is the fallible half. A conversion that fails on
+  # it is rolled back and the inbox stays on this provider, and withdrawing the webhook
+  # before finding that out cannot be undone: the inbox would go on serving uazapi while
+  # silently receiving nothing until somebody reconnected it. The other order costs
+  # nothing, since the webhook is withdrawn best effort anyway.
   def delete_session
-    withdraw_webhook
     disconnect
+    withdraw_webhook
   end
 
   def fetch_connection_state
@@ -243,17 +247,19 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     }
   end
 
-  # The public address, never INTERNAL_HOST_URL: this provider is a hosted service the
-  # operator reaches over the internet, and the internal host exists for a connector
-  # sitting on our own network.
+  # The address this instance can reach us at, which for a hosted one is the public
+  # FRONTEND_URL and for a self-hosted neighbour is INTERNAL_HOST_URL: on a closed
+  # installation the public address does not resolve there, and an inbox would pair and
+  # then never receive an event.
   #
   # The path carries a secret of its own, generated per inbox and never shown. It is not
   # the only check: the body carries the instance token, which the controller compares
   # too, so a URL leaked through a proxy log is not on its own enough to post events into
   # an inbox.
   def webhook_url
-    host = ENV.fetch('FRONTEND_URL', nil).to_s.chomp('/')
-    "#{host}/webhooks/whatsapp/session/uazapi/#{channel.id}/#{provider_config['webhook_verify_token']}"
+    host = ENV.fetch('INTERNAL_HOST_URL', nil) if channel.use_internal_host?
+    host = ENV.fetch('FRONTEND_URL', nil) if host.blank?
+    "#{host.to_s.chomp('/')}/webhooks/whatsapp/session/uazapi/#{channel.id}/#{provider_config['webhook_verify_token']}"
   end
 
   # --- limits ------------------------------------------------------------------------
