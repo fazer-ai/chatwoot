@@ -192,6 +192,22 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(1)
   end
 
+  # The shape a failover most often takes: the connection is dropped while a query is in
+  # flight, which raises ConnectionFailed. It hangs off QueryAborted rather than off
+  # ConnectionNotEstablished, so a list of leaf classes let exactly this one through.
+  it 'treats a connection dropped mid-query as an outage too' do
+    stub_const("#{described_class}::RETRY_WAITS", [0])
+    stub_const("#{described_class}::STALL_WAIT", 0)
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch)
+      .and_raise(ActiveRecord::ConnectionFailed, 'the connection was closed')
+    redis.xadd(stream, frame)
+
+    expect(worker.poll).to eq(0)
+
+    expect(redis.llen("#{prefix}dlq:events")).to eq(0)
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(1)
+  end
+
   it 'stops working the batch once it is waiting on the database' do
     stub_const("#{described_class}::RETRY_WAITS", [])
     stub_const("#{described_class}::STALL_WAIT", 0)

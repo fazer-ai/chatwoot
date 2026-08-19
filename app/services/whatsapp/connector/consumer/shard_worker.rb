@@ -38,9 +38,12 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # capped list during a failover and record it as processed, so they leave the entry
   # pending instead and the shard waits. Matched by name through the ancestors, because a
   # constant holding another file's class survives a reload and stops matching.
+  #
+  # Named at the branch rather than the leaf: a connection dropped mid-query raises
+  # ConnectionFailed, which hangs off QueryAborted and not off ConnectionNotEstablished,
+  # so a list of leaves missed the most ordinary shape a failover takes.
   INFRASTRUCTURE_ERRORS = %w[
-    ActiveRecord::ConnectionNotEstablished ActiveRecord::ConnectionTimeoutError
-    ActiveRecord::StatementTimeout ActiveRecord::QueryCanceled
+    ActiveRecord::ConnectionNotEstablished ActiveRecord::QueryAborted
     PG::ConnectionBad PG::UnableToSend
     Redis::BaseConnectionError Redis::TimeoutError
   ].freeze
