@@ -209,14 +209,26 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # registry, so an operator has nothing to configure: whoever can read the Redis can
   # read the media.
   def fetch_blob(ref)
-    headers = (ref.headers || {}).merge('Authorization' => "Bearer #{client.media_token}")
+    headers = (ref.headers || {}).merge('Authorization' => "Bearer #{client.media_token(ref.url)}")
     file = Down.download(ref.url, headers: headers, max_size: MAX_MEDIA_BYTES)
     Model::MediaPayload.new(io: file, mime: ref.mime || file.content_type, filename: file.original_filename, size: file.size)
-  rescue Down::NotFound, Down::ClientError => e
+  rescue Down::NotFound => e
+    raise Whatsapp::Session::Errors::MediaUnavailable, "media is gone: #{e.message}"
+  rescue Down::ClientError => e
+    # A refused request is not a missing file, and the difference decides what the agent
+    # sees: media that is gone marks the message unsupported for good, while a connector
+    # that will not accept our token is an operational problem the job should retry and
+    # then surface as a failed job.
+    raise Whatsapp::Session::Errors::Unauthorized, "connector refused the media request: #{e.message}" if refused?(e)
+
     raise Whatsapp::Session::Errors::MediaUnavailable, "media is gone: #{e.message}"
   rescue Down::TooLarge => e
     raise Whatsapp::Session::Errors::MediaTooLarge, e.message
   rescue Down::Error => e
     raise Whatsapp::Session::Errors::ProviderUnavailable, "media fetch failed: #{e.message}"
+  end
+
+  def refused?(error)
+    [401, 403].include?(error.response&.code.to_i)
   end
 end

@@ -128,6 +128,35 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(redis.get("#{prefix}events:0:lease")).to be_nil
   end
 
+  # Rebalancing counted the leases it still held rather than the shards it was reading,
+  # so a worker that had not exited yet was counted again on the next tick and took
+  # another one down with it, until nothing was reading at all.
+  it 'stops giving shards up once it is down to its share' do
+    supervisor.tick
+    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [] }.to_json, ex: 15)
+    stuck = supervisor.workers[3]
+    allow(stuck).to receive(:stop) # its thread outlives the rebalance that dropped it
+
+    supervisor.tick
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([0, 1])
+
+    stuck.queue << :stop
+  end
+
+  # A process on its way out is not a peer. Counting it made the replacement claim half
+  # the shards and leave the rest unread until the heartbeat lapsed.
+  it 'takes itself out of the registry while it drains' do
+    supervisor.tick
+    expect(redis.get("#{prefix}consumer:consumer-1")).to be_present
+
+    supervisor.quiet
+    supervisor.tick
+
+    expect(redis.get("#{prefix}consumer:consumer-1")).to be_nil
+  end
+
   it 'claims nothing more once it is draining' do
     supervisor.quiet
 

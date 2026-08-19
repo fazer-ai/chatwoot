@@ -204,6 +204,12 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # A redelivery (this consumer took over a shard mid-flight) must not replay what the
   # previous owner already wrote. Message-level deduplication would catch most of it,
   # but not the events that carry no message.
+  #
+  # Delivery is at least once and the cursor does not change that: it sits between a
+  # database commit and a Redis write, and no ordering of the two makes them one. What
+  # makes a replay harmless is the handlers themselves, which dedupe a message by its
+  # source id, move a status only forwards, and write group and connection state last
+  # write wins.
   def fresh?(event)
     cursor = redis.get(Consumer.cursor_key(event.sid))
     return true if cursor.blank?
@@ -212,8 +218,14 @@ class Whatsapp::Connector::Consumer::ShardWorker
     event.newer_than?([epoch, seq])
   end
 
+  # A cursor that cannot be written must not undo the dispatch that just succeeded:
+  # raising here would send the entry back through the retry ladder and run the handler a
+  # second time for certain, where losing the cursor only risks a replay in the case where
+  # the entry is redelivered at all.
   def mark_processed(event)
     redis.set(Consumer.cursor_key(event.sid), event.cursor.join(':'), ex: CURSOR_TTL)
+  rescue Redis::BaseError => e
+    Rails.logger.warn("[WHATSAPP CONNECTOR] cursor for session #{event.sid} not written: #{e.message}")
   end
 
   # Nothing here is worth retrying forever: a payload this build cannot read will not

@@ -163,6 +163,18 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(Rails.application.executor).to have_received(:wrap).twice
   end
 
+  # Retrying here would re-run a handler that had already committed, turning a Redis
+  # hiccup into a guaranteed duplicate rather than a possible one.
+  it 'does not dispatch again when the cursor cannot be written' do
+    allow_any_instance_of(Redis).to receive(:set).and_raise(Redis::TimeoutError, 'timed out') # rubocop:disable RSpec/AnyInstance
+    redis.xadd(stream, frame)
+
+    expect(worker.poll).to eq(1)
+
+    expect(inbox.messages.pluck(:source_id)).to eq(['3EB0AAAA0001'])
+    expect(redis.llen("#{prefix}dlq:events")).to eq(0)
+  end
+
   it 'takes over what a dead consumer left unacknowledged' do
     redis.xadd(stream, frame)
     redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0', mkstream: true)

@@ -86,10 +86,17 @@ class Whatsapp::Connector::Client
     instances.any? { |instance| speaks_our_protocol?(instance) }
   end
 
-  # The bearer token the connector serves its media blobs with, published by whichever
-  # instance is holding them.
-  def media_token
-    instances.filter_map { |instance| instance['media_token'].presence }.first
+  # The bearer token a blob URL is served with. Each instance publishes its own and only
+  # accepts that one, and a blob lives on the instance that downloaded it, so the token
+  # has to be picked by the URL rather than by whichever instance the registry lists
+  # first. Falling back to any of them covers a URL served from somewhere else entirely.
+  def media_token(url)
+    live = instances
+    owner = live.find do |instance|
+      advertised = instance['advertise_url'].presence
+      advertised && url.to_s.start_with?(advertised)
+    end
+    (owner || live.first)&.dig('media_token').presence
   end
 
   private

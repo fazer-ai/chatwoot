@@ -88,7 +88,25 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       expect(client).to be_available
       expect(client).to be_compatible
-      expect(client.media_token).to eq('secret')
+    end
+
+    # A blob lives on the instance that downloaded it, and each instance only accepts the
+    # token it published, so picking whichever the registry listed first got a 401 on
+    # every blob that happened to belong to another one.
+    it 'answers with the media token of the instance serving the URL' do
+      redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
+      redis.hset("#{prefix}instance:two", 'advertise_url', 'http://wa-2:8080', 'media_token', 'token-two')
+      redis.sadd("#{prefix}instances", %w[one two])
+
+      expect(client.media_token('http://wa-2:8080/media/abc')).to eq('token-two')
+      expect(client.media_token('http://wa-1:8080/media/abc')).to eq('token-one')
+    end
+
+    it 'falls back to a published token for a URL no instance advertises' do
+      redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
+      redis.sadd("#{prefix}instances", 'one')
+
+      expect(client.media_token('https://cdn.example.test/media/abc')).to eq('token-one')
     end
 
     it 'is incompatible when the connector moved past this protocol' do

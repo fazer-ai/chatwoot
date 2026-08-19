@@ -12,6 +12,6 @@ class IndexWhatsappSessionId < ActiveRecord::Migration[7.1]
   end
 
   def down
-    remove_index :channel_whatsapp, name: 'index_channel_whatsapp_session_id', if_exists: true
+    remove_index :channel_whatsapp, name: 'index_channel_whatsapp_session_id', if_exists: true, algorithm: :concurrently
   end
 end

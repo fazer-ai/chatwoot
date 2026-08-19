@@ -40,7 +40,7 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       result = results[command.class.wire_type]
       result.is_a?(Hash) && result.key?('message_id') ? result.merge('message_id' => command.message_id) : result
     end
-    allow(client).to receive(:media_token).and_return('media-token')
+    allow(client).to receive(:media_token).with(anything).and_return('media-token')
     allow(Down).to receive(:download).and_return(
       StringIO.new('bytes').tap do |io|
         io.define_singleton_method(:content_type) { 'image/jpeg' }
@@ -110,6 +110,17 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
     expect(Down).not_to have_received(:download).with('https://connector.test/media/stale', anything)
     expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
+  # A refused request is an operational problem, not a missing file, and the two lead to
+  # opposite outcomes: the job retries a refusal, while media that is gone marks the
+  # message unsupported and never comes back.
+  it 'tells a refused media request apart from media that is gone' do
+    response = instance_double(Net::HTTPForbidden, code: '403')
+    allow(Down).to receive(:download).and_raise(Down::ClientError.new('forbidden', response))
+
+    expect { backend.download_media(download_command(model::MediaRef.url('https://connector.test/media/abc'))) }
+      .to raise_error(Whatsapp::Session::Errors::Unauthorized)
   end
 
   it 'asks again when the blob turns out to be gone mid-flight' do

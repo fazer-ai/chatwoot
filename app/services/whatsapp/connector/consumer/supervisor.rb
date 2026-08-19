@@ -144,7 +144,14 @@ class Whatsapp::Connector::Consumer::Supervisor
 
   # Published so the super admin screen can tell whether anyone is reading, and so the
   # fair share below knows how many of us there are.
+  #
+  # A draining process takes itself out of the registry at once rather than waiting for
+  # the key to lapse: it is not going to read anything again, and a replacement that
+  # counted it would claim half the shards and leave the rest unread for the whole
+  # shutdown grace period.
   def heartbeat
+    return redis.del(Consumer.consumer_key(consumer_id)) if @draining
+
     redis.set(Consumer.consumer_key(consumer_id), { 'shards' => workers.keys.sort, 'at' => Time.current.to_i }.to_json,
               ex: HEARTBEAT_TTL)
   end
@@ -188,8 +195,10 @@ class Whatsapp::Connector::Consumer::Supervisor
   def rebalance
     return if @draining
 
-    # Draining shards count: their leases are still ours, so a peer cannot take them yet.
-    excess = @threads.size - fair_share
+    # Counted over the shards being read, not the leases still held: a worker that was
+    # already told to stop is on its way out, and counting it again on the next tick
+    # would stop another one, and another, until nothing was reading at all.
+    excess = workers.size - fair_share
     return if excess <= 0
 
     workers.keys.sort.last(excess).each do |shard|
