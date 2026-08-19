@@ -53,7 +53,7 @@ module Whatsapp::Session::ChannelExtension
   def use_internal_host?
     return super unless session_provider?
 
-    ENV['INTERNAL_HOST_URL'].present? && !Whatsapp::Session::Registry.hosted?(provider)
+    ENV['INTERNAL_HOST_URL'].present? && !Whatsapp::Session::Registry.hosted?(self)
   end
 
   def supports_reactions?

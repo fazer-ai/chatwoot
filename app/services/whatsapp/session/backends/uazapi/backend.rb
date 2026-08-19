@@ -27,10 +27,16 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # these five.
   WEBHOOK_EVENTS = %w[connection messages messages_update presence groups].freeze
 
-  # Our own sends come back as an echo, and the echo is redundant: `/send/*` answers
-  # synchronously with the message id, so the row already carries it. Excluding them
-  # keeps a message from being written twice on the same second.
-  WEBHOOK_EXCLUDES = %w[wasSentByApi].freeze
+  # Our own sends come back as an echo, and nothing is excluded from the subscription:
+  # the echo is the only way to learn that a send whose answer never arrived actually
+  # landed. `/send/*` can accept a message and then time out on the way back, and the
+  # sender treats that as retryable, so without the echo the retry posts a second copy
+  # and the contact reads the same message twice. The echo carries the `track_id` this
+  # inbox generated, `EchoMatcher` fills the row's source_id from it, and
+  # `Base::SendOnChannelService` then declines to send a message that already has one.
+  # A second row is not the risk it looks like either: the same matcher recognizes the
+  # echo of a message already stored.
+  WEBHOOK_EXCLUDES = [].freeze
 
   # `instance.status` -> canonical connection. `hibernated` is a paused instance on the
   # provider's side, which for an inbox is the same as being closed.
@@ -59,10 +65,12 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       true
     end
 
-    # The instance answers at a `base_url` this deployment does not own, so outbound media
-    # has to be offered at an address the internet can reach.
-    def hosted?
-      true
+    # The instance is somebody else's host unless the inbox says otherwise: an address on
+    # this deployment's own network is a neighbour, and a neighbour on a closed
+    # installation is exactly who INTERNAL_HOST_URL exists for. Everyone else has to be
+    # offered an address the internet can reach.
+    def hosted?(channel)
+      !Whatsapp::Session::PrivateAddress.url?(channel.provider_config['base_url'])
     end
 
     # Resolved on every call rather than held in a constant: a constant captured when this
@@ -88,31 +96,13 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     # dashboard. An address inside the deployment's own network would turn the inbox form
     # into a way of reading services that were never meant to be reachable from it, so one
     # is refused unless the operator has said the private network is fair game.
-    #
-    # Literal addresses only, on purpose: this runs on every save of an inbox and must not
-    # depend on a name server being up, or on what it answers this second. A name that
-    # resolves inward is still refused where it counts, which is the media fetch: that is
-    # the one place a provider's own answer is followed, and it goes through SafeFetch.
     def reachable_http_url?(value)
-      uri = URI.parse(value.to_s)
-      return false unless uri.is_a?(URI::HTTP) && uri.host.present?
+      return false unless address.http_url?(value)
 
-      SafeFetch.allow_private_network? || !private_host?(uri.host)
-    rescue URI::InvalidURIError
-      false
+      SafeFetch.allow_private_network? || !address.url?(value)
     end
 
-    def private_host?(host)
-      host = host.delete_prefix('[').delete_suffix(']').downcase
-      return true if host == 'localhost' || host.end_with?('.localhost')
-
-      address = IPAddr.new(host)
-      address.loopback? || address.private? || address.link_local? || address.to_s == '0.0.0.0'
-    rescue IPAddr::Error
-      # A name, not an address. Resolving it here is the network call this method promises
-      # not to make.
-      false
-    end
+    def address = Whatsapp::Session::PrivateAddress
   end
 
   # Resolved when called, never held in a constant, for the same reason as above.

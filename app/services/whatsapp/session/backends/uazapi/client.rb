@@ -14,6 +14,7 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # ceiling: `/send/media` fetches the file from us before it answers.
   TIMEOUT = 20
   UPLOAD_TIMEOUT = 60
+  OPEN_TIMEOUT = 5
 
   # HTTP status -> contract error code, resolved to a class at raise time by
   # `Errors.build`. Codes rather than classes on purpose: a frozen hash of class objects
@@ -38,7 +39,8 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # answered, so ask again later.
   TRANSPORT_ERRORS = [
     Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH,
-    Errno::ETIMEDOUT, SocketError, OpenSSL::SSL::SSLError, HTTParty::Error
+    Errno::ETIMEDOUT, SocketError, OpenSSL::SSL::SSLError, HTTParty::Error, SsrfFilter::UnresolvedHostname,
+    SsrfFilter::TooManyRedirects
   ].freeze
 
   attr_reader :base_url, :token
@@ -60,18 +62,49 @@ class Whatsapp::Session::Backends::Uazapi::Client
   private
 
   def request(method, path, query: nil, body: nil, timeout: TIMEOUT)
-    # `format: :json` rather than trusting the response's own content type: the answer is
-    # always JSON, and a gateway that drops the header would otherwise hand every caller a
-    # String where the shape it was written against is a Hash.
-    options = { headers: headers, timeout: timeout, format: :json }
-    options[:query] = query if query.present?
-    options[:body] = body.to_json if body.present?
-
-    parse(HTTParty.public_send(method, url(path), **options), path)
+    payload = body.to_json if body.present?
+    status, answer = if SafeFetch.allow_private_network?
+                       direct(method, path, query, payload, timeout)
+                     else
+                       filtered(method, path, query, payload, timeout)
+                     end
+    parse(status, answer, path)
   rescue *TRANSPORT_ERRORS => e
     # The class name, never the message: an error raised over a URL is free to quote it,
     # and a quoted URL is one query string away from carrying the token.
     raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi #{path} did not answer (#{e.class})"
+  rescue SsrfFilter::Error => e
+    # The address this inbox is pointed at is inside the deployment, or is not an address
+    # at all. Not retryable and not the provider's fault: somebody has to change the
+    # inbox, so it is reported as the configuration error it is.
+    raise Whatsapp::Session::Errors::InvalidConfig, "uazapi #{path} is not an address this deployment will call (#{e.class})"
+  end
+
+  # The ordinary path. Every address is resolved here and refused unless it is public: the
+  # base URL is typed by whoever administers the account, and this method sends that
+  # account's credentials to it and hands the answer back to the dashboard. A validation
+  # on the literal address cannot cover a name that resolves inward, and it cannot cover a
+  # redirect at all, so the filtering belongs at the moment of the call.
+  #
+  # The token is named as sensitive, which is what keeps a redirect to another origin from
+  # carrying it there.
+  def filtered(method, path, query, payload, timeout)
+    response = SsrfFilter.public_send(
+      method, url(path), headers: headers, body: payload, params: query.presence,
+                         sensitive_headers: [TOKEN_HEADER], http_options: { open_timeout: OPEN_TIMEOUT, read_timeout: timeout }
+    )
+    [response.code.to_i, response.body]
+  end
+
+  # An operator who has opened the private network is running the instance next to
+  # Chatwoot, which is the one case the filter above cannot be asked about: it has no way
+  # to be told that this particular private address is the intended one.
+  def direct(method, path, query, payload, timeout)
+    options = { headers: headers, timeout: timeout }
+    options[:query] = query if query.present?
+    options[:body] = payload if payload.present?
+    response = HTTParty.public_send(method, url(path), **options)
+    [response.code, response.body]
   end
 
   def url(path)
@@ -82,26 +115,28 @@ class Whatsapp::Session::Backends::Uazapi::Client
     { TOKEN_HEADER => token, 'Content-Type' => 'application/json' }
   end
 
-  # `parsed_response` is whatever HTTParty made of the body: nil for an empty 200, an
-  # Array for the endpoints that answer a list. Handed back as it came, since the backend
-  # is what knows the shape of each answer.
-  def parse(response, path)
-    body = response.parsed_response
-    return body if response.success?
+  # Parsed here rather than left to the client library: the answer is always JSON, and a
+  # gateway that drops the content type would otherwise hand a caller a String where the
+  # shape it was written against is a Hash. nil for an empty 200, an Array for the
+  # endpoints that answer a list; handed back as it came, since the backend is what knows
+  # the shape of each answer.
+  def parse(status, answer, path)
+    body = answer.presence && JSON.parse(answer)
+    return body if status.between?(200, 299)
 
-    raise Whatsapp::Session::Errors.build(code_for(response), "uazapi #{path} answered #{response.code}#{detail(body)}")
+    raise Whatsapp::Session::Errors.build(code_for(status), "uazapi #{path} answered #{status}#{detail(body)}")
   rescue JSON::ParserError
     # A gateway in front of the provider answering with an HTML page, which is what a
     # 502 looks like from most hosts. It is the provider being unreachable, and it must
     # leave this class as one of ours like every other failure does.
-    raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi #{path} answered #{response.code} with a body that is not json"
+    raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi #{path} answered #{status} with a body that is not json"
   end
 
   # 5xx is the provider being unwell, which is worth another attempt; an unmapped 4xx is
   # this request being wrong, which is not, and the difference is what decides whether an
   # outbound message is retried or marked failed in front of the agent.
-  def code_for(response)
-    STATUS_CODES[response.code] || (response.code >= 500 ? 'wa_error' : 'invalid_payload')
+  def code_for(status)
+    STATUS_CODES[status] || (status >= 500 ? 'wa_error' : 'invalid_payload')
   end
 
   # The provider's own message, when it sends one, and only that field. The rest of an

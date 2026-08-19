@@ -20,6 +20,11 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
   end
 
   before do
+    # Every call resolves its host before it connects, so the test address is answered
+    # here rather than left to a name server.
+    allow(Resolv).to receive(:getaddresses).and_call_original
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+
     # The contract examples call one method per declared capability, so every endpoint has
     # to answer something. Each example below overrides the one it is actually about.
     stub_request(:any, /uazapi\.test/).to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
@@ -45,7 +50,8 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
     # deployment's own network would make the inbox form a way of reading services that
     # were never meant to be reachable from it.
     it 'refuses an address inside the deployment' do
-      %w[http://localhost:3000 http://127.0.0.1 http://10.0.0.5:8080 http://169.254.169.254 http://[::1]:3000].each do |url|
+      %w[http://localhost:3000 http://localhost.:3000 http://127.0.0.1 http://10.0.0.5:8080
+         http://169.254.169.254 http://[::1]:3000 http://uazapi:3333].each do |url|
         expect(described_class.validate_config('base_url' => url, 'token' => 'x')).to eq(['base_url'])
       end
     end
@@ -68,7 +74,20 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(WebMock).to(have_requested(:post, "#{base}/webhook").with do |request|
         body = JSON.parse(request.body)
         body['url'].end_with?("/webhooks/whatsapp/session/uazapi/#{channel.id}/#{channel.provider_config['webhook_verify_token']}") &&
-          body['excludeMessages'] == ['wasSentByApi'] && body['enabled'] == true
+          body['excludeMessages'] == [] && body['enabled'] == true
+      end)
+    end
+
+    # `/send/*` can accept a message and then time out on the way back, which the sender
+    # treats as retryable. The echo of that send is the only thing that says it landed:
+    # it carries the track_id this inbox generated, the row gets its source_id from it,
+    # and the retry then declines to send a message that already has one. Excluded, the
+    # contact reads the same message twice.
+    it 'asks for the echoes of its own sends, which are what a lost answer is recovered from' do
+      backend.connect(commands::SessionConnect.new(pairing: 'qr'))
+
+      expect(WebMock).to(have_requested(:post, "#{base}/webhook").with do |request|
+        JSON.parse(request.body)['excludeMessages'].exclude?('wasSentByApi')
       end)
     end
 
@@ -227,10 +246,8 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       )
     end
 
-    # The bytes are fetched through the SSRF filter, which resolves the host before it
-    # connects. Answered here so the example does not depend on a name server.
+    # The media host is resolved before it is connected to, like every other call.
     before do
-      allow(Resolv).to receive(:getaddresses).and_call_original
       allow(Resolv).to receive(:getaddresses).with('free.uazapi.com').and_return(['93.184.216.34'])
       stub_uazapi(:post, '/message/download', fixture('message_download_ptt'))
       stub_request(:get, %r{https://free\.uazapi\.com/files/}).to_return(

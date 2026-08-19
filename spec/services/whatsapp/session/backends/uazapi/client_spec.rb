@@ -5,6 +5,13 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
 
   let(:errors) { Whatsapp::Session::Errors }
 
+  # Every call resolves its host before it connects, so the test address is answered here
+  # rather than left to a name server.
+  before do
+    allow(Resolv).to receive(:getaddresses).and_call_original
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+  end
+
   it 'refuses to exist without somewhere to go and something to say' do
     expect { described_class.new(base_url: '', token: 'x') }.to raise_error(errors::InvalidConfig)
     expect { described_class.new(base_url: 'https://uazapi.test', token: '') }.to raise_error(errors::InvalidConfig)
@@ -15,6 +22,29 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
 
     expect(client.post('/send/text', { number: '55' })).to eq('messageid' => '3EB0')
     expect(WebMock).to have_requested(:post, 'https://uazapi.test/send/text').with(headers: { 'token' => 'instance-token' })
+  end
+
+  # The base URL is typed by whoever administers the account, and this class sends that
+  # account's credentials to it and hands the answer back to the dashboard. A check on the
+  # literal address cannot cover a name that resolves inward, so the destination is
+  # resolved and refused here, at the moment of the call.
+  it 'refuses to call an address that resolves inside the deployment' do
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['10.0.0.5'])
+    stub_request(:post, 'https://uazapi.test/send/text').to_return(status: 200, body: '{}')
+
+    expect { client.post('/send/text', { number: '55' }) }.to raise_error(errors::InvalidConfig)
+    expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/send/text')
+  end
+
+  # An operator running the instance next to Chatwoot is the one case the filter cannot be
+  # asked about: it has no way of being told that this private address is the intended one.
+  it 'calls it anyway where the operator has opened the private network' do
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['10.0.0.5'])
+    stub_request(:post, 'https://uazapi.test/send/text').to_return(status: 200, body: '{"messageid":"3EB0"}')
+
+    with_modified_env SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+      expect(client.post('/send/text', { number: '55' })).to eq('messageid' => '3EB0')
+    end
   end
 
   describe 'what it makes of a failure' do

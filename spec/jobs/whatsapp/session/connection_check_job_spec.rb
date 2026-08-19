@@ -10,6 +10,8 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
   end
 
   before do
+    allow(Resolv).to receive(:getaddresses).and_call_original
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
     stub_request(:get, "#{base}/instance/status").to_return(
       status: 200, body: fixture('instance_status_connected').deep_merge('instance' => { 'owner' => channel.phone_number.delete('+') }).to_json,
       headers: { 'Content-Type' => 'application/json' }

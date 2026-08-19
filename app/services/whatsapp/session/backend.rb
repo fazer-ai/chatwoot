@@ -33,15 +33,15 @@ class Whatsapp::Session::Backend
       false
     end
 
-    # Whether the provider runs outside this deployment's network. What it decides is the
-    # address outbound media is offered at: a hosted service fetches the attachment over
-    # the internet and can never resolve INTERNAL_HOST_URL, while the connector sits next
-    # to Rails and on a closed installation can resolve nothing else.
+    # Whether this inbox's provider runs outside the deployment's network. What it decides
+    # is the address outbound media is offered at: a service on the far side of the
+    # firewall fetches the attachment over the internet and can never resolve
+    # INTERNAL_HOST_URL, while one sitting next to Rails on a closed installation can
+    # resolve nothing else.
     #
-    # A self-hosted instance of a hosted provider is the one case this gets wrong, and it
-    # gets it wrong in the harmless direction: it is offered the public URL, which works
-    # wherever that URL is reachable at all.
-    def hosted?
+    # Asked per inbox rather than per provider, because a provider that is normally a
+    # hosted service can also be self-hosted, and then it is a neighbour.
+    def hosted?(_channel)
       false
     end
 

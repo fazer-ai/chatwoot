@@ -98,12 +98,12 @@ module Whatsapp::Session::Registry
       descriptor(channel.provider)&.backend_class&.translator
     end
 
-    # Whether the provider runs outside this deployment's network. Unknown counts as
-    # hosted: the public address is the one that works everywhere an internal one is not
-    # strictly needed.
-    def hosted?(provider)
-      backend = descriptor(provider)&.backend_class
-      backend.nil? || backend.hosted?
+    # Whether this inbox's provider runs outside the deployment's network. Unknown counts
+    # as hosted: the public address is the one that works everywhere an internal one is
+    # not strictly needed.
+    def hosted?(channel)
+      backend = descriptor(channel.provider)&.backend_class
+      backend.nil? || backend.hosted?(channel)
     end
 
     def backend_for(channel)
