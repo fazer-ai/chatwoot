@@ -138,16 +138,41 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   # A stream the connector stopped writing to still holds what it wrote before the count
-  # changed. Retiring it at once left those messages unread for good.
-  it 'keeps reading a retired shard until its stream is empty' do
+  # changed, and a session that moved streams has its older events there and its newer
+  # ones on the new one. Reading both at once would let the newer worker push the session
+  # cursor past what the older one has not reached, so the retired stream goes first and
+  # alone.
+  it 'reads only the retired shards until they are empty' do
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
 
-    # 2 was retired empty and is gone; 3 stays until what is on it has been read.
-    expect(supervisor.workers.keys).to contain_exactly(0, 1, 3)
+    # Not 0 and 1: the new range waits until nothing is left on 3.
+    expect(supervisor.workers.keys).to eq([3])
+  end
+
+  # The connector may have been publishing more shards than this installation was ever
+  # configured for, so the local setting cannot bound the search for retired streams.
+  it 'finds a retired shard above anything it was configured for' do
+    redis.xadd("#{prefix}events:11", { 'v' => '1' })
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([11])
+  end
+
+  # Written to before any consumer created the group: answering "nothing here" would
+  # mean nobody ever creates it and the events sit on the stream for good.
+  it 'counts a retired stream with no consumer group as work' do
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([3])
   end
 
   it 'lets a drained retired shard go' do
