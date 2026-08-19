@@ -11,12 +11,7 @@ class Whatsapp::Connector::Consumer::Supervisor
   Consumer = Whatsapp::Connector::Consumer
   ShardWorker = Whatsapp::Connector::Consumer::ShardWorker
 
-  HEARTBEAT_TTL = 15
   TICK = 5
-  # How many consumer heartbeats one SCAN pass walks over. The registry is one key per
-  # process, so a single pass covers any realistic deployment; the loop is there because
-  # SCAN promises no more than a best effort per call.
-  SCAN_BATCH = 100
   # How long a shutdown waits for the workers to come out. They all start winding down
   # together, so this bounds the whole handover rather than each shard. It has to clear
   # ShardWorker::BLOCK_MS, which is how long an idle worker sits in XREADGROUP before it
@@ -79,6 +74,7 @@ class Whatsapp::Connector::Consumer::Supervisor
   # One pass of the claim loop, which is also what the specs drive directly.
   def tick
     @mutex.synchronize do
+      @peers = nil
       # Twice on purpose: the first announces this consumer so peers count it before it
       # claims anything, the second publishes what it ended up holding.
       heartbeat
@@ -135,38 +131,40 @@ class Whatsapp::Connector::Consumer::Supervisor
     advertised
   end
 
-  # Published so the super admin screen can tell whether anyone is reading, and so the
-  # fair share below knows how many of us there are.
-  #
-  # A draining process takes itself out of the registry at once rather than waiting for
-  # the key to lapse: it is not going to read anything again, and a replacement that
-  # counted it would claim half the shards and leave the rest unread for the whole
-  # shutdown grace period.
-  def heartbeat
-    return redis.del(Consumer.consumer_key(consumer_id)) if @draining
+  def registry
+    @registry ||= Whatsapp::Connector::Consumer::Registry.new(redis, consumer_id)
+  end
 
-    redis.set(Consumer.consumer_key(consumer_id), { 'shards' => workers.keys.sort, 'at' => Time.current.to_i }.to_json,
-              ex: HEARTBEAT_TTL)
+  # Published so the super admin screen can tell whether anyone is reading, and so the
+  # shares below know how many of us there are.
+  def heartbeat
+    @draining ? registry.withdraw : registry.announce(workers.keys)
   end
 
   # How many shards this process may hold. Every consumer computes the same number from
   # the same registry, so the shards spread out without anyone coordinating.
+  # The most a consumer may hold. Every consumer computes the same number from the same
+  # registry, so the shards spread out without anyone coordinating.
   def fair_share
-    [(shards.size.to_f / [peers, 1].max).ceil, 1].max
+    [(shards.size.to_f / [peers.size, 1].max).ceil, 1].max
   end
 
-  # SCAN rather than KEYS: this runs every tick in every consumer, against the Redis the
-  # whole installation shares, and KEYS walks the entire keyspace under a lock.
+  # The least every consumer should end up holding. The ceiling alone does not get there:
+  # with four shards and two consumers holding two each, a third arriving finds the
+  # ceiling still two, nobody over it, and nothing to claim, so it reads nothing at all
+  # until something restarts. Giving up one shard whenever a peer is below the floor is
+  # what lets a scale-out actually spread the load.
+  def floor_share
+    shards.size / [peers.size, 1].max
+  end
+
+  def starved_peer?
+    peers.any? { |held| held < floor_share }
+  end
+
+  # Read once per tick, because both the ceiling and the floor come from it.
   def peers
-    pattern = Consumer.consumer_key('*')
-    cursor = '0'
-    count = 0
-    loop do
-      cursor, keys = redis.scan(cursor, match: pattern, count: SCAN_BATCH)
-      count += keys.size
-      break if cursor == '0'
-    end
-    count
+    @peers ||= registry.held_counts
   end
 
   def claim
@@ -195,16 +193,24 @@ class Whatsapp::Connector::Consumer::Supervisor
     retired = workers.keys - shards
     retired.each { |shard| stop_worker(shard) }
 
-    # Counted over the shards being read, not the leases still held: a worker that was
-    # already told to stop is on its way out, and counting it again on the next tick
-    # would stop another one, and another, until nothing was reading at all.
-    excess = workers.size - fair_share
-    return if excess <= 0
-
-    workers.keys.sort.last(excess).each do |shard|
+    workers.keys.sort.last(surplus).each do |shard|
       Rails.logger.info("[WHATSAPP CONNECTOR] #{consumer_id} releasing shard #{shard} to a peer")
       stop_worker(shard)
     end
+  end
+
+  # How many shards to give back this tick.
+  #
+  # Counted over the shards being read, not the leases still held: a worker that was
+  # already told to stop is on its way out, and counting it again on the next tick would
+  # stop another one, and another, until nothing was reading at all.
+  def surplus
+    over_ceiling = workers.size - fair_share
+    return over_ceiling if over_ceiling.positive?
+    # One at a time, so several consumers giving way at once cannot all empty themselves.
+    return 1 if workers.size > floor_share && starved_peer?
+
+    0
   end
 
   # Every shard whose thread is still around, not only the ones being read: a worker that

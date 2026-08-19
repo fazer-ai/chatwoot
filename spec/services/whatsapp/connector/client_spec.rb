@@ -122,6 +122,16 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       expect(client.media_token('http://wa-1:8080/media/abc')).to eq('token-one')
     end
 
+    # The hashes expire but the set does not, so an instance that crashed or came back
+    # under a new id stayed a member for good and every send paid a round trip for it.
+    it 'drops members whose instance is gone' do
+      redis.hset("#{prefix}instance:one", 'protocol_min', '1', 'protocol_max', '1')
+      redis.sadd("#{prefix}instances", %w[one long-gone])
+
+      expect(client.instances.size).to eq(1)
+      expect(redis.smembers("#{prefix}instances")).to eq(['one'])
+    end
+
     it 'falls back to a published token for a URL no instance advertises' do
       redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
       redis.sadd("#{prefix}instances", 'one')

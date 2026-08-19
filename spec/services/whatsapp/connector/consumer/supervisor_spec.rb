@@ -121,6 +121,22 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers).to be_empty
   end
 
+  # The ceiling alone does not spread a scale-out: with four shards and two consumers
+  # holding two each, a third finds the ceiling still two, nobody over it, and nothing
+  # free, so it reads nothing at all until something restarts.
+  it 'frees a shard for a peer that has none' do
+    redis.set("#{prefix}events:0:lease", 'consumer-2', ex: 30)
+    redis.set("#{prefix}events:1:lease", 'consumer-2', ex: 30)
+    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [0, 1] }.to_json, ex: 15)
+    supervisor.tick
+    expect(supervisor.workers.keys).to eq([2, 3])
+
+    redis.set("#{prefix}consumer:consumer-3", { 'shards' => [] }.to_json, ex: 15)
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([2])
+  end
+
   it 'reads as many shards as the connector says it publishes' do
     redis.hset("#{prefix}meta", 'event_shards', '2')
 

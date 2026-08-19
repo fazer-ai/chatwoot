@@ -85,13 +85,23 @@ class Whatsapp::Connector::Client
   end
 
   # Live connector instances and what they advertise (version, protocol range, media
-  # endpoint). Their keys expire on their own, so what is here is what is alive.
+  # endpoint). Their hashes expire on their own, so what is here is what is alive.
+  #
+  # The set does not expire with them, and an instance that crashed or came back under a
+  # new id would otherwise stay a member for good: every send would then pay an extra
+  # round trip for it, for as long as the installation lives. Members whose hash is gone
+  # are dropped as they are found. An instance registers by writing its hash before
+  # joining the set, so this cannot delete one that is still starting up.
   def instances
     self.class.with_redis do |redis|
-      redis.smembers(Whatsapp::Connector.key('instances')).filter_map do |id|
-        instance = redis.hgetall(Whatsapp::Connector.key('instance', id))
-        instance.presence
+      expired = []
+      live = redis.smembers(Whatsapp::Connector.key('instances')).filter_map do |id|
+        instance = redis.hgetall(Whatsapp::Connector.key('instance', id)).presence
+        expired << id if instance.nil?
+        instance
       end
+      redis.srem(Whatsapp::Connector.key('instances'), expired) if expired.any?
+      live
     end
   end
 
