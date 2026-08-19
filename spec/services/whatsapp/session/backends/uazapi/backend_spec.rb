@@ -39,6 +39,24 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(described_class.validate_config('base_url' => 'not a url', 'token' => 'x')).to eq(['base_url'])
       expect(described_class.validate_config('base_url' => base, 'token' => 'x')).to be_empty
     end
+
+    # Whoever administers the account types this address, and every method here sends that
+    # account's credentials to it and shows the answer on the dashboard. An address on the
+    # deployment's own network would make the inbox form a way of reading services that
+    # were never meant to be reachable from it.
+    it 'refuses an address inside the deployment' do
+      %w[http://localhost:3000 http://127.0.0.1 http://10.0.0.5:8080 http://169.254.169.254 http://[::1]:3000].each do |url|
+        expect(described_class.validate_config('base_url' => url, 'token' => 'x')).to eq(['base_url'])
+      end
+    end
+
+    # An instance the operator self-hosts next to Chatwoot is the legitimate case, and it
+    # is the same switch the media fetch already reads.
+    it 'takes one where the operator has opened the private network' do
+      with_modified_env SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+        expect(described_class.validate_config('base_url' => 'http://uazapi:3333', 'token' => 'x')).to be_empty
+      end
+    end
   end
 
   describe 'connecting' do
@@ -209,7 +227,11 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       )
     end
 
+    # The bytes are fetched through the SSRF filter, which resolves the host before it
+    # connects. Answered here so the example does not depend on a name server.
     before do
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('free.uazapi.com').and_return(['93.184.216.34'])
       stub_uazapi(:post, '/message/download', fixture('message_download_ptt'))
       stub_request(:get, %r{https://free\.uazapi\.com/files/}).to_return(
         status: 200, body: 'bytes', headers: { 'Content-Type' => 'audio/mpeg' }
@@ -231,6 +253,16 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       stub_uazapi(:post, '/message/download', { 'mimetype' => 'image/jpeg' })
 
       expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::MediaUnavailable)
+    end
+
+    # The URL is the provider's to choose, and a hostile or compromised instance could
+    # name an address on the deployment's own network to have Rails read something that
+    # was never meant to be reachable from it and attach the answer to a conversation.
+    it 'refuses to follow the provider onto a private address' do
+      allow(Resolv).to receive(:getaddresses).with('free.uazapi.com').and_return(['169.254.169.254'])
+
+      expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::MediaUnavailable)
+      expect(WebMock).not_to have_requested(:get, %r{https://free\.uazapi\.com/files/})
     end
 
     # The provider keeps the decrypted copy for a while and answers 404 once it is gone.

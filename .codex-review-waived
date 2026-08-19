@@ -83,3 +83,15 @@ app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion befor
 # a commit and a SET, and a processed-events table to prevent it would cost a write per
 # event on the ordering-critical path.
 app/services/whatsapp/connector/consumer/shard_worker.rb: Commit event progress atomically with handler effects  # PR#379
+# PR#380: real, known and not what this slice can fix. The webhook transport carries no
+# ordering, which is what fazer-ai/chatwoot#373 records and what the job this finding
+# names documents at its top: the payloads have nothing monotonic to rebuild an order
+# from, so the only thing on offer is waiting, and waiting is what `:deferred` does for
+# the case a target that is not stored yet. The remedy asked for here, serializing every
+# event of a session or a chat, is a different inbound design (one queue per session, or
+# a per-chat cursor with something to compare), not a change to this job. The reaction
+# sub-case has a cheaper answer that is worse: deferring a removal that finds no active
+# reaction would spend the whole retry ladder on every stray removal, which is the
+# ordinary shape (a reaction taken back on a message from before the inbox was connected)
+# in exchange for a race between two webhooks that are usually seconds apart.
+app/jobs/webhooks/whatsapp_session_events_job.rb: Preserve order for dependent webhook events  # PR#380

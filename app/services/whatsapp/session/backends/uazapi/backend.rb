@@ -76,17 +76,41 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     def validate_config(provider_config)
       config = (provider_config || {}).with_indifferent_access
       keys = []
-      keys << 'base_url' unless http_url?(config[:base_url])
+      keys << 'base_url' unless reachable_http_url?(config[:base_url])
       keys << 'token' if config[:token].blank?
       keys
     end
 
     private
 
-    def http_url?(value)
+    # The instance address is set by whoever administers the account, and every method on
+    # this backend sends that account's credentials to it and puts the answer on the
+    # dashboard. An address inside the deployment's own network would turn the inbox form
+    # into a way of reading services that were never meant to be reachable from it, so one
+    # is refused unless the operator has said the private network is fair game.
+    #
+    # Literal addresses only, on purpose: this runs on every save of an inbox and must not
+    # depend on a name server being up, or on what it answers this second. A name that
+    # resolves inward is still refused where it counts, which is the media fetch: that is
+    # the one place a provider's own answer is followed, and it goes through SafeFetch.
+    def reachable_http_url?(value)
       uri = URI.parse(value.to_s)
-      uri.is_a?(URI::HTTP) && uri.host.present?
+      return false unless uri.is_a?(URI::HTTP) && uri.host.present?
+
+      SafeFetch.allow_private_network? || !private_host?(uri.host)
     rescue URI::InvalidURIError
+      false
+    end
+
+    def private_host?(host)
+      host = host.delete_prefix('[').delete_suffix(']').downcase
+      return true if host == 'localhost' || host.end_with?('.localhost')
+
+      address = IPAddr.new(host)
+      address.loopback? || address.private? || address.link_local? || address.to_s == '0.0.0.0'
+    rescue IPAddr::Error
+      # A name, not an address. Resolving it here is the network call this method promises
+      # not to make.
       false
     end
   end
@@ -267,14 +291,35 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
 
   # --- media -------------------------------------------------------------------------
 
+  # Filtered rather than downloaded outright, because this URL is the provider's to
+  # choose: it arrives on the webhook or in the answer to `/message/download`, and an
+  # instance that is hostile or merely compromised could name a link-local address and
+  # have Rails read a cloud metadata endpoint and attach the answer to a conversation.
+  # SafeFetch resolves the host and refuses everything that is not public, which is also
+  # why an instance self-hosted on a private network needs SAFE_FETCH_ALLOW_PRIVATE_NETWORK.
+  #
+  # The content type is deliberately not checked: WhatsApp media is whatever a phone can
+  # attach, and the type is a label here, not a decision.
+  #
+  # Copied out of the block because SafeFetch unlinks its tempfile the moment the block
+  # returns, and these bytes are attached later, after the caller has taken its lock.
   def fetch(url, mime: nil)
-    file = Down.download(url, max_size: MAX_MEDIA_BYTES)
-    model::MediaPayload.new(io: file, mime: mime.presence || file.content_type, filename: file.original_filename, size: file.size)
-  rescue Down::NotFound, Down::ClientError => e
-    raise Whatsapp::Session::Errors::MediaUnavailable, "uazapi media is gone: #{e.message}"
-  rescue Down::TooLarge => e
+    SafeFetch.fetch(url, max_bytes: MAX_MEDIA_BYTES, validate_content_type: false) do |result|
+      file = Tempfile.new('uazapi-media', binmode: true)
+      IO.copy_stream(result.tempfile, file)
+      file.rewind
+      model::MediaPayload.new(io: file, mime: mime.presence || result.content_type, filename: result.filename, size: file.size)
+    end
+  rescue SafeFetch::FileTooLargeError => e
     raise Whatsapp::Session::Errors::MediaTooLarge, e.message
-  rescue Down::Error => e
+  rescue SafeFetch::HttpError, SafeFetch::UnsafeUrlError, SafeFetch::InvalidUrlError => e
+    # A status is only ever in the message, and only HttpError has one. A server error is
+    # the host having a bad minute and worth another pass; the rest is the file being gone
+    # or never having been fetchable at all.
+    raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}" if e.message.to_i >= 500
+
+    raise Whatsapp::Session::Errors::MediaUnavailable, "uazapi media is gone: #{e.message}"
+  rescue SafeFetch::Error => e
     raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}"
   end
 
