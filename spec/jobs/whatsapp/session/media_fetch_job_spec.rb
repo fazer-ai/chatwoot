@@ -36,6 +36,18 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(command.message_id).to eq('3EB0AAAA0001')
   end
 
+  # The job outlives the inbox's provider: converted while this sat in the queue, the
+  # channel answers with a backend the session layer does not serve, and the bubble used
+  # to sit empty forever with the job in the dead set.
+  it 'gives up on media for an inbox that has left the session layer' do
+    allow(Whatsapp::Session::Registry).to receive(:backend_for)
+      .and_raise(Whatsapp::Session::Errors::InvalidConfig, 'whatsapp_cloud is not served by the session layer')
+
+    expect { described_class.perform_now(message, media.to_h) }.not_to raise_error
+
+    expect(message.reload.content_attributes['is_unsupported']).to be(true)
+  end
+
   it 'asks without a chat when the event carried none' do
     described_class.perform_now(message, media.to_h)
 

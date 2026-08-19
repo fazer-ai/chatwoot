@@ -15,6 +15,17 @@ class Whatsapp::Connector::Client
   RPC_TIMEOUT = 20
   DEADLINE_MARGIN = 2
   CHECKOUT_TIMEOUT = 5
+
+  # Drops a set member whose instance hash is gone, checking again inside the same round
+  # trip: an instance that re-registered under the same id between the read and this
+  # would otherwise be taken back out of the set, and every RPC would be refused as if no
+  # connector were running until it announced itself again.
+  FORGET_INSTANCE = <<~LUA.freeze
+    if redis.call('exists', KEYS[1]) == 0 then
+      return redis.call('srem', KEYS[2], ARGV[1])
+    end
+    return 0
+  LUA
   REPLY_TTL = 60
   # A connector heartbeat older than this means nobody is holding the sessions.
   INSTANCE_TTL = 60
@@ -90,8 +101,7 @@ class Whatsapp::Connector::Client
   # The set does not expire with them, and an instance that crashed or came back under a
   # new id would otherwise stay a member for good: every send would then pay an extra
   # round trip for it, for as long as the installation lives. Members whose hash is gone
-  # are dropped as they are found. An instance registers by writing its hash before
-  # joining the set, so this cannot delete one that is still starting up.
+  # are dropped as they are found.
   def instances
     self.class.with_redis do |redis|
       expired = []
@@ -100,7 +110,7 @@ class Whatsapp::Connector::Client
         expired << id if instance.nil?
         instance
       end
-      redis.srem(Whatsapp::Connector.key('instances'), expired) if expired.any?
+      forget(redis, expired)
       live
     end
   end
@@ -170,6 +180,13 @@ class Whatsapp::Connector::Client
   def error_for(reply)
     error = reply['error'] || {}
     Errors.build(error['code'], error['message'])
+  end
+
+  def forget(redis, ids)
+    ids.each do |id|
+      redis.eval(FORGET_INSTANCE,
+                 keys: [Whatsapp::Connector.key('instance', id), Whatsapp::Connector.key('instances')], argv: [id])
+    end
   end
 
   def speaks_our_protocol?(instance)

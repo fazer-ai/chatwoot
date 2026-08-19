@@ -132,6 +132,21 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       expect(redis.smembers("#{prefix}instances")).to eq(['one'])
     end
 
+    # The prune is a read followed by a write, and an instance that came back under the
+    # same id in between would be taken out of the set by it: every RPC would then be
+    # refused as if nothing were running, until it announced itself again.
+    it 'keeps a member whose instance came back while it was being pruned' do
+      redis.sadd("#{prefix}instances", 'flapping')
+      # Absent when it is read, back by the time the member would be dropped.
+      allow_any_instance_of(Redis).to receive(:hgetall).and_wrap_original do |original, *args| # rubocop:disable RSpec/AnyInstance
+        original.call(*args).tap { redis.hset("#{prefix}instance:flapping", 'protocol_min', '1', 'protocol_max', '1') }
+      end
+
+      client.instances
+
+      expect(redis.smembers("#{prefix}instances")).to eq(['flapping'])
+    end
+
     it 'falls back to a published token for a URL no instance advertises' do
       redis.hset("#{prefix}instance:one", 'advertise_url', 'http://wa-1:8080', 'media_token', 'token-one')
       redis.sadd("#{prefix}instances", 'one')
