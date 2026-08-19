@@ -16,6 +16,13 @@ class Whatsapp::Session::LogoutJob < ApplicationJob
     # converted the inbox altogether, and logging out then kills the session that
     # replaced the one this was sent to remove. The quarantine is the whole reason this
     # job exists, so its absence is reason enough not to run.
+    #
+    # A check, not a fence, and it cannot be one here: a retry that passes it and is still
+    # inside the provider call when the operator reconnects ends the new session anyway.
+    # Closing that needs a logout naming the session it means to end, and `session.logout`
+    # addresses whichever session the inbox holds now. The operator's own sequence does
+    # not depend on it: `Facade#setup_channel_provider` ends the wrong account inline
+    # before connecting, and this job then finds no quarantine and stands down.
     return unless Whatsapp::Session::ConnectionStateWriter.disowned?(channel.reload)
 
     channel.session_backend.logout

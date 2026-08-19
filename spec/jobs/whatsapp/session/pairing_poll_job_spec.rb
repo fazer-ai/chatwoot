@@ -104,6 +104,27 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
       .to have_enqueued_job(described_class)
   end
 
+  # `current?` runs before the provider is asked; the second connect lands after it and
+  # before the write. Without the fence this chain's QR replaces the one on screen and
+  # puts its own token back on the record, which retires the chain that is actually
+  # driving the pairing.
+  it 'refuses to write once a newer attempt has claimed the pairing' do
+    channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
+    allow(backend).to receive(:fetch_connection_state).and_return(state('connecting', qr_data_url: 'data:image/png;base64,OLDER'))
+    allow(Whatsapp::Session::ConnectionStateWriter).to receive(:new).and_wrap_original do |original, argument|
+      channel.update_provider_connection!(
+        { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,NEWER', 'pairing_attempt' => 'attempt-2' }
+      )
+      original.call(argument)
+    end
+
+    described_class.perform_now(channel, pairing: 'qr', attempt: 'attempt-1')
+
+    expect(channel.reload.provider_connection).to include(
+      'qr_data_url' => 'data:image/png;base64,NEWER', 'pairing_attempt' => 'attempt-2'
+    )
+  end
+
   # Connecting twice leaves two chains running. The older one keeps its earlier deadline,
   # and without knowing which attempt it belongs to it would time out over the QR the
   # operator is looking at right now.

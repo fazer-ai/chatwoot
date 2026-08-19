@@ -67,7 +67,10 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     state = backend.fetch_connection_state
     return unless current?
 
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(stamped(state))
+    # Fenced, not merely checked above: a second connect claiming the pairing between that
+    # check and this write would have its QR replaced by the one this chain is holding,
+    # and the chain driving the screen would retire itself over a token it never wrote.
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(stamped(state), attempt: attempt)
     return if settled?(state)
     return give_up(TIMEOUT_ERRORS.fetch(pairing, 'pairing_timed_out')) if Time.current + INTERVAL >= deadline_at
 
@@ -91,7 +94,7 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     return unless current?
 
     Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
-      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: error)
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: error), attempt: attempt
     )
   end
 

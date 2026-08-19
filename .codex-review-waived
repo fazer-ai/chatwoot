@@ -57,3 +57,13 @@ app/services/whatsapp/session/outbound/message_sender.rb: Allow deleted reaction
 # would duplicate the model's guarantee. Covered by "reacts to a target a phone-originated
 # reaction knows only by its WhatsApp id" in message_sender_spec.
 app/services/whatsapp/session/outbound/message_sender.rb: Resolve phone-originated reactions by external target ID  # PR#377
+# PR#377: real, and deliberately left open. A logout retry that passes the quarantine
+# check and is still inside its provider call when the operator connects again can end the
+# replacement session. Closing it needs the logout to name the session it is meant to end,
+# which the contract does not have: `session.logout` addresses whatever session the inbox
+# holds now. The alternative, a distributed lock held across both provider calls, buys a
+# very rare and self-healing case (the operator scans again) at the price of a lock on the
+# connect path. The operator-driven sequence is already covered: `Facade#setup_channel_provider`
+# ends the wrong account inline before connecting and the retry then stands down. Revisit
+# with the session-scoped logout in the connector slice.
+app/jobs/whatsapp/session/logout_job.rb: Serialize stale logout checks with reconnects  # PR#377

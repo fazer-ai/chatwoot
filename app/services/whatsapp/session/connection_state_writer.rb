@@ -48,10 +48,11 @@ class Whatsapp::Session::ConnectionStateWriter
   # `reset: true` means the operator asked for this connection: a quarantine from the
   # previous pairing does not carry over, because re-pairing is the way out of one.
   #
-  # `attempt:` fences the write to one pairing attempt. Two connects racing (the operator
-  # clicking twice, or two tabs) both answer, and the one that answers last would
-  # otherwise be the state on screen even when it is the older of the two.
-  def apply(state, reset: false, attempt: nil)
+  # `attempt:` fences the write to one pairing attempt and `provider:` to the provider the
+  # caller was built for. Both are checked inside the lock, which is the only place they
+  # mean anything: a caller that reads the record, then asks the provider, then writes,
+  # has left a gap in the middle for a second connect or a conversion to land in.
+  def apply(state, reset: false, attempt: nil, provider: nil)
     written = nil
 
     result = channel.with_lock do
@@ -60,7 +61,7 @@ class Whatsapp::Session::ConnectionStateWriter
       # event quarantined the inbox reads the pre-quarantine record and clears it.
       written = enforce_number_ownership(state, reset: reset)
       persisted = channel.provider_connection.presence || {}
-      next :stale if superseded?(attempt, persisted) || stale?(written, persisted)
+      next :stale if refuse?(written, persisted, attempt: attempt, provider: provider)
 
       payload = merge(written, persisted)
       next :unchanged if payload == persisted
@@ -156,17 +157,38 @@ class Whatsapp::Session::ConnectionStateWriter
     payload['pairing_attempt'] = persisted['pairing_attempt'] if persisted['pairing_attempt'].present?
   end
 
-  # The record has moved on to another pairing attempt, so this is an older connect
-  # answering late: its QR is not the one the operator is looking at, and the poll driving
-  # that screen would be retired by it. Epoch does not cover this one: two connects on the
-  # same session raise it in the order the provider answers, and a backend without an
-  # ownership model (Uazapi) has no epoch at all.
+  # Three ways a state arrives too late to be true: the inbox is on another provider now,
+  # the pairing it belongs to has been retired, or an older owner of the session is still
+  # talking.
+  def refuse?(state, persisted, attempt:, provider:)
+    converted?(provider) || superseded?(attempt, persisted) || stale?(state, persisted)
+  end
+
+  # The record has moved on from the pairing attempt this write belongs to, so it is an
+  # older connect or an older poll answering late: its QR is not the one the operator is
+  # looking at, and the chain driving that screen would be retired by it. A record with no
+  # token at all counts as moved on, because the token is only ever absent once the
+  # attempt it named has ended. Epoch does not cover this: two connects on the same
+  # session raise it in the order the provider answers, and a backend without an ownership
+  # model (Uazapi) has no epoch at all.
   def superseded?(attempt, persisted)
-    return false if attempt.blank? || persisted['pairing_attempt'].blank?
+    return false if attempt.blank?
 
     superseded = persisted['pairing_attempt'] != attempt
-    Rails.logger.warn("[WHATSAPP SESSION] connect answer for a retired attempt discarded on ##{channel.id}") if superseded
+    Rails.logger.warn("[WHATSAPP SESSION] write for a retired pairing attempt discarded on ##{channel.id}") if superseded
     superseded
+  end
+
+  # The inbox was converted while this write was in flight. `convert_provider!` empties the
+  # connection record, so what would land here is one provider's state under another
+  # provider's name: a QR nobody can scan, or an `open` for a session this inbox no longer
+  # has.
+  def converted?(provider)
+    return false if provider.blank?
+
+    converted = channel.provider != provider
+    Rails.logger.warn("[WHATSAPP SESSION] #{provider} state discarded on ##{channel.id}, now #{channel.provider}") if converted
+    converted
   end
 
   # Events without an epoch (Uazapi, which has no ownership model) are always accepted.

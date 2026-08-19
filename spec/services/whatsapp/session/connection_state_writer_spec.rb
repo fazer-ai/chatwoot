@@ -45,6 +45,44 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(channel.reload.provider_connection).to include('connection' => 'close', 'epoch' => 5)
   end
 
+  describe 'writes fenced to the caller they came from' do
+    # The connect and the poll both read the record, ask the provider and then write, and
+    # a second connect claiming the pairing lands in that gap. Checking before the call
+    # cannot see it; the fence is read inside the lock that does the write.
+    it 'refuses a write whose pairing attempt the record has moved past' do
+      channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-2' })
+
+      result = writer.apply(state.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,OLD'), attempt: 'attempt-1')
+
+      expect(result).to eq(:stale)
+      expect(channel.reload.provider_connection).not_to have_key('qr_data_url')
+    end
+
+    # The token is only ever absent once the attempt it named is over, so a write still
+    # carrying one is answering about a pairing that has already ended.
+    it 'refuses a write for an attempt the record no longer names' do
+      channel.update_provider_connection!({ 'connection' => 'open', 'phone_number' => '5541988887777' })
+
+      result = writer.apply(state.new(connection: 'connecting'), attempt: 'attempt-1')
+
+      expect(result).to eq(:stale)
+      expect(channel.reload.provider_connection).to include('connection' => 'open')
+    end
+
+    # An inbox converted mid-connect has an empty record belonging to another provider,
+    # and the old backend's answer would land in it as a QR nobody can scan.
+    it 'refuses a write from the provider the inbox used to be on' do
+      result = writer.apply(state.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,OLD'), provider: 'uazapi')
+
+      expect(result).to eq(:stale)
+      expect(channel.reload.provider_connection).to eq({})
+    end
+
+    it 'writes when the inbox is still on the provider the caller was built for' do
+      expect(writer.apply(state.new(connection: 'connecting'), provider: 'baileys')).to eq(:written)
+    end
+  end
+
   it 'does not rewrite an unchanged state' do
     writer.apply(state.new(connection: 'open', epoch: 1))
 
