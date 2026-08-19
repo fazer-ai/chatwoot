@@ -33,6 +33,12 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # The webhook translator for a provider that pushes over HTTP. nil means there is
+    # nothing to translate: the connector publishes canonical events already.
+    def translator
+      nil
+    end
+
     # Schema-only validation: returns the list of invalid/missing config keys. Must not
     # touch the network, so saving an inbox never depends on a provider being up.
     def validate_config(_provider_config)

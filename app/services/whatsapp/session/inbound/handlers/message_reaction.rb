@@ -42,9 +42,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     # The reaction belongs in the thread holding the message it annotates, and that is
     # checked before anybody is resolved: resolving creates a Contact, a ContactInbox and
     # an avatar job, and a reaction whose target was never stored has nothing to annotate.
-    # It is dropped rather than opening a thread of its own to hold it.
+    # It is never given a thread of its own to live in; on an unordered transport it waits
+    # for the message instead, and is dropped only once the retries are spent.
     target = find_message(payload.target_id)
-    return :ignored if target.nil?
+    return :deferred if target.nil?
 
     contact_inbox = resolve_contact_inbox
     return :ignored if contact_inbox.nil?

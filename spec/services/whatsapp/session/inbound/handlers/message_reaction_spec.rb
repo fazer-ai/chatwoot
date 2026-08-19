@@ -151,8 +151,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
       )
     end
 
-    it 'drops it instead of inventing a contact and a thread' do
-      expect { expect(dispatch).to eq(:ignored) }
+    it 'waits for it instead of inventing a contact and a thread' do
+      expect { expect(dispatch).to eq(:deferred) }
         .to not_change(Contact, :count).and not_change(inbox.conversations, :count)
     end
   end

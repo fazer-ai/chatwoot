@@ -29,9 +29,13 @@ module Whatsapp::Session::Registry
       key: 'uazapi',
       backend: 'Whatsapp::Session::Backends::Uazapi::Backend',
       pairing_modes: %w[qr code],
+      # No group_invites: the captured build answers 405 on `/group/invitelink`, and the
+      # group snapshot it does serve carries no invite code either. A capability that is
+      # declared and then refused by the provider is a button that fails in the agent's
+      # face, so it is not declared.
       capabilities: %w[
         qr_pairing code_pairing edit revoke reactions typing presence read_receipts check_number
-        profile_picture groups group_admin group_invites account_limits media_download
+        profile_picture groups group_admin account_limits media_download
       ],
       fields: [
         Field.new(name: 'base_url', type: 'url', required: true),
@@ -85,6 +89,13 @@ module Whatsapp::Session::Registry
     # 24-hour messaging window and no template requirement.
     def session_family?(provider)
       descriptor(provider)&.session? || false
+    end
+
+    # The class that turns this provider's webhook body into canonical events, or nil when
+    # the provider does not deliver over HTTP (the connector publishes canonical events
+    # already) or the inbox has left the session layer.
+    def translator_for(channel)
+      descriptor(channel.provider)&.backend_class&.translator
     end
 
     def backend_for(channel)
