@@ -223,6 +223,24 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(3)
   end
 
+  # A shape this build cannot read is not going to become readable, and taking the whole
+  # retry ladder to find that out stalls every session that shares the shard.
+  it 'parks a frame whose nested payload is malformed, without retrying it' do
+    stub_const("#{described_class}::RETRY_WAITS", [0, 0, 0])
+    allow(Whatsapp::Session::Model::Event).to receive(:from_frame).and_call_original
+    payload = JSON.parse(frame['payload'])
+    payload['message']['content'] = { 'type' => 'media', 'kind' => 'image', 'ref' => { 'kind' => 'carrier_pigeon' } }
+    redis.xadd(stream, frame.merge('payload' => payload.to_json))
+
+    expect(worker.poll).to eq(0)
+
+    # Once, not four times: the ladder would hold the shard for its whole length and then
+    # park the entry anyway.
+    expect(Whatsapp::Session::Model::Event).to have_received(:from_frame).once
+    expect(redis.llen("#{prefix}dlq:events")).to eq(1)
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(0)
+  end
+
   it 'takes over what a dead consumer left unacknowledged' do
     redis.xadd(stream, frame)
     redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0', mkstream: true)
