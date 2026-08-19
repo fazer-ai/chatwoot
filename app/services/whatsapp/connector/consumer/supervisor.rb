@@ -55,17 +55,21 @@ class Whatsapp::Connector::Consumer::Supervisor
   def quiet
     @draining = true
     @mutex.synchronize do
+      # Told to stop before anything else is attempted: a Redis that is not there must
+      # not leave the workers reading. Their leases would lapse while they were still
+      # dispatching, and a peer would take the shard and read it alongside them.
+      stop_all
       # Taken out here rather than on the next tick: a shutdown that follows straight on
       # (the standalone consumer answering TERM) ends the loop before another one runs,
       # and the replacement would count this process as a peer until the key lapsed.
-      redis.del(Consumer.consumer_key(consumer_id))
-      stop_all
+      withdraw
     end
   end
 
   def stop
-    quiet
+    # Before quiet, so the loop ends even if the wind-down cannot reach Redis.
     @stopped = true
+    quiet
     @supervisor_thread&.join(TICK + 1)
     @supervisor_thread&.kill
     @mutex.synchronize { drain }
@@ -133,6 +137,14 @@ class Whatsapp::Connector::Consumer::Supervisor
 
   def registry
     @registry ||= Whatsapp::Connector::Consumer::Registry.new(redis, consumer_id)
+  end
+
+  # The key lapses on its own within its TTL, so a Redis that is not there is worth a
+  # line in the log and nothing more. What it must not do is abort the shutdown.
+  def withdraw
+    registry.withdraw
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP CONNECTOR] could not leave the consumer registry: #{e.class}: #{e.message}")
   end
 
   # Published so the super admin screen can tell whether anyone is reading, and so the

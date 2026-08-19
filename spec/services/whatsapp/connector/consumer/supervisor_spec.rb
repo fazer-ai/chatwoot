@@ -199,6 +199,17 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(redis.get("#{prefix}consumer:consumer-1")).to be_nil
   end
 
+  # A Redis that is not there must not leave the workers reading: their leases lapse
+  # while they are still dispatching, and a peer takes the shard and reads it alongside.
+  it 'still stops the workers when it cannot leave the registry' do
+    supervisor.tick
+    allow_any_instance_of(Redis).to receive(:del).and_raise(Redis::CannotConnectError, 'gone') # rubocop:disable RSpec/AnyInstance
+
+    expect { supervisor.quiet }.not_to raise_error
+
+    expect(supervisor.workers).to be_empty
+  end
+
   it 'claims nothing more once it is draining' do
     supervisor.quiet
 

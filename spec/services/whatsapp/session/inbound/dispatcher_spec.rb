@@ -20,6 +20,21 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
     expect(missing).to be_empty
   end
 
+  # The window is widest exactly where a backlog is: a stream replay, a job that waited
+  # in a queue, a retry that waited out a lock. Without this, events already in flight
+  # when an operator converted the inbox kept filing the old provider's chats into it.
+  it 'drops an event for an inbox that has since changed provider' do
+    inbound = model::InboundMessage.new(id: '3EB0AAAA0001', chat: model::Address.phone('5541999990000'),
+                                        from_me: false, content: model::Content::Text.new(body: 'oi'))
+    event = model::Event.build(model::Events::MessageReceived.new(message: inbound))
+    # The object the worker is holding, loaded while the inbox was still native.
+    in_flight = Channel::Whatsapp.find(channel.id)
+    channel.update_columns(provider: 'whatsapp_cloud') # rubocop:disable Rails/SkipsModelValidations
+
+    expect(described_class.dispatch(in_flight, event)).to eq(:ignored)
+    expect(channel.inbox.messages).to be_empty
+  end
+
   # A session paired with a number the inbox is not configured for is somebody else's
   # WhatsApp account. The logout that removes it is asynchronous and retried, so without
   # this its chats would be filed here in the meantime.
