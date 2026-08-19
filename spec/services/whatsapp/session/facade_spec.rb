@@ -76,6 +76,49 @@ RSpec.describe Whatsapp::Session::Facade do
       .with(channel, hash_including(pairing: 'qr', provider: 'native'))
   end
 
+  # Two connects racing: the operator clicking twice, or a second tab. Whichever provider
+  # call answers last would otherwise be the state on screen even when it belongs to the
+  # older attempt, and the poll driving the QR the operator is actually looking at would
+  # read the record, find somebody else's token and retire itself.
+  it 'refuses a connect answer for an attempt the inbox has already moved past' do
+    allow(backend).to receive(:connect) do
+      # The second click lands while this one is still waiting on the provider.
+      channel.update_provider_connection!(
+        { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,NEWER', 'pairing_attempt' => 'attempt-2' }
+      )
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,OLDER')
+    end
+
+    channel.provider_service.setup_channel_provider
+
+    expect(channel.reload.provider_connection).to include(
+      'qr_data_url' => 'data:image/png;base64,NEWER', 'pairing_attempt' => 'attempt-2'
+    )
+  end
+
+  # The attempt is claimed before the provider is asked, which puts the dashboard on
+  # "connecting" straight away. A refusal that left it there parks the operator on a
+  # pairing that never started, with no poll running to ever correct it.
+  it 'reports a refused connection instead of leaving the claim on screen' do
+    allow(backend).to receive(:connect).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)
+
+    expect { channel.setup_channel_provider }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+
+    expect(channel.reload.provider_connection).to include('connection' => 'close', 'error_code' => 'connect_failure')
+  end
+
+  # The ceiling belongs to the attempt, not to the worker: a QR lives two minutes from
+  # the moment the provider issued it, and a queue running ten minutes late would give
+  # that dead code two more minutes of polling.
+  it 'hands the poll a deadline counted from the connect, not from the worker' do
+    allow(backend.class).to receive(:state_polling?).and_return(true)
+
+    expect { channel.setup_channel_provider }.to(
+      have_enqueued_job(Whatsapp::Session::PairingPollJob)
+        .with { |_channel, options| expect(options[:deadline_at]).to be_within(5.seconds).of(2.minutes.from_now) }
+    )
+  end
+
   # The inbound layer keeps an inbox paired with the wrong number quarantined, and no
   # event lifts that on its own: a state that names no number is refused precisely so a
   # pending logout cannot clear it. Connecting again is the operator's way out, so it

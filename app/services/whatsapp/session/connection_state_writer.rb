@@ -47,7 +47,11 @@ class Whatsapp::Session::ConnectionStateWriter
   #
   # `reset: true` means the operator asked for this connection: a quarantine from the
   # previous pairing does not carry over, because re-pairing is the way out of one.
-  def apply(state, reset: false)
+  #
+  # `attempt:` fences the write to one pairing attempt. Two connects racing (the operator
+  # clicking twice, or two tabs) both answer, and the one that answers last would
+  # otherwise be the state on screen even when it is the older of the two.
+  def apply(state, reset: false, attempt: nil)
     written = nil
 
     result = channel.with_lock do
@@ -56,7 +60,7 @@ class Whatsapp::Session::ConnectionStateWriter
       # event quarantined the inbox reads the pre-quarantine record and clears it.
       written = enforce_number_ownership(state, reset: reset)
       persisted = channel.provider_connection.presence || {}
-      next :stale if stale?(written, persisted)
+      next :stale if superseded?(attempt, persisted) || stale?(written, persisted)
 
       payload = merge(written, persisted)
       next :unchanged if payload == persisted
@@ -150,6 +154,19 @@ class Whatsapp::Session::ConnectionStateWriter
     return unless payload['connection'].in?(%w[connecting reconnecting])
 
     payload['pairing_attempt'] = persisted['pairing_attempt'] if persisted['pairing_attempt'].present?
+  end
+
+  # The record has moved on to another pairing attempt, so this is an older connect
+  # answering late: its QR is not the one the operator is looking at, and the poll driving
+  # that screen would be retired by it. Epoch does not cover this one: two connects on the
+  # same session raise it in the order the provider answers, and a backend without an
+  # ownership model (Uazapi) has no epoch at all.
+  def superseded?(attempt, persisted)
+    return false if attempt.blank? || persisted['pairing_attempt'].blank?
+
+    superseded = persisted['pairing_attempt'] != attempt
+    Rails.logger.warn("[WHATSAPP SESSION] connect answer for a retired attempt discarded on ##{channel.id}") if superseded
+    superseded
   end
 
   # Events without an epoch (Uazapi, which has no ownership model) are always accepted.

@@ -21,6 +21,11 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   # own.
   TIMEOUT_ERRORS = { 'resume' => 'connect_failure' }.freeze
 
+  # Resolved by whoever starts the attempt, so the ceiling covers the queue wait too.
+  def self.deadline_for(pairing)
+    Time.current + DEADLINES.fetch(pairing.to_s, DEADLINES['qr'])
+  end
+
   # `pairing` is the mode the connect command asked for; `deadline_at` is set on the first
   # run and carried forward so re-enqueueing never extends the ceiling. `provider` and
   # `attempt` say which pairing this chain belongs to: an inbox converted, or connected
@@ -31,7 +36,7 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     @pairing = pairing.to_s
     @provider = provider
     @attempt = attempt
-    @deadline_at = deadline_at || (Time.current + DEADLINES.fetch(@pairing, DEADLINES['qr']))
+    @deadline_at = deadline_at || self.class.deadline_for(@pairing)
     return unless current?
 
     backend = channel.session_backend

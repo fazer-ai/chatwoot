@@ -35,25 +35,13 @@ class Whatsapp::Session::Facade
   def setup_channel_provider
     end_disowned_session
     mode = pairing_mode
-    # Identifies this attempt. Two connects for the same provider produce two polling
-    # chains, and without a token the older one cannot tell that the QR on screen is no
-    # longer the one it was following: it would time out and overwrite a live pairing.
-    attempt = SecureRandom.uuid
-    state = backend.connect(
-      model::Commands::SessionConnect.new(
-        pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy
-      )
-    )
+    attempt = claim_pairing_attempt
+    state = connect(mode, attempt)
     # The connect answer is the first state the dashboard has to show (it carries the QR
     # for a provider that returns one), and for a polled backend it is also what starts
     # the pairing poll: nothing else would refresh the code as it rotates.
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with(pairing_attempt: attempt), reset: true)
-    if backend.class.state_polling?
-      Whatsapp::Session::PairingPollJob.perform_later(
-        channel, pairing: mode, provider: channel.provider, attempt: attempt
-      )
-    end
+    writer.apply(state.with(pairing_attempt: attempt), reset: true, attempt: attempt)
+    start_pairing_poll(mode, attempt) if backend.class.state_polling?
     state
   end
 
@@ -214,6 +202,48 @@ class Whatsapp::Session::Facade
     { 'auto_reject' => true } if capability?('calls')
   end
 
+  def writer
+    Whatsapp::Session::ConnectionStateWriter.new(channel)
+  end
+
+  # Identifies this attempt, and claims it before the provider is asked rather than after
+  # it answers. Two connects for the same inbox produce two polling chains, and without a
+  # token the older one cannot tell that the QR on screen is no longer the one it was
+  # following: it would time out over a live pairing. Claiming first also orders the two
+  # by the click rather than by which provider call happens to answer first, which is what
+  # the fence in the writer then enforces: the older answer, and its dead QR, is refused.
+  def claim_pairing_attempt
+    attempt = SecureRandom.uuid
+    writer.apply(model::ConnectionState.new(connection: 'connecting', pairing_attempt: attempt), reset: true)
+    attempt
+  end
+
+  # The claim above already moved the dashboard to "connecting". Leaving it there when the
+  # provider refuses the connection parks the operator on a pairing that never started,
+  # which is the same dead screen the poll's ceiling exists to prevent.
+  def connect(mode, attempt)
+    backend.connect(
+      model::Commands::SessionConnect.new(
+        pairing: mode, phone: channel.phone_number.to_s.delete('+'),
+        groups: capability?('groups'), calls: call_policy
+      )
+    )
+  rescue Whatsapp::Session::Errors::Error
+    writer.apply(model::ConnectionState.new(connection: 'close', error: 'connect_failure'), attempt: attempt)
+    raise
+  end
+
+  # With the deadline resolved here, not by the worker. It is a ceiling on the attempt,
+  # and a busy queue would otherwise hand a QR that expired while the job waited its own
+  # two full minutes of polling on top of the wait.
+  def start_pairing_poll(mode, attempt)
+    Whatsapp::Session::PairingPollJob.perform_later(
+      channel,
+      pairing: mode, provider: channel.provider, attempt: attempt,
+      deadline_at: Whatsapp::Session::PairingPollJob.deadline_for(mode)
+    )
+  end
+
   # Connecting again is the way out of a wrong-number quarantine, and the connect below
   # is what lifts it. The rejected account is still on the provider until its logout
   # lands, though, and that marker is the only thing keeping its chats out of this inbox:
@@ -222,11 +252,10 @@ class Whatsapp::Session::Facade
   # which also stands the asynchronous retry down before there is a new session for it to
   # kill. A provider that cannot be reached raises, and nothing was cleared or connected.
   def end_disowned_session
-    writer = Whatsapp::Session::ConnectionStateWriter
-    return unless writer.disowned?(channel)
+    return unless Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
 
     backend.logout
-    writer.new(channel).apply(model::ConnectionState.new(connection: 'close'), reset: true)
+    writer.apply(model::ConnectionState.new(connection: 'close'), reset: true)
   rescue Whatsapp::Session::Errors::NotSupported
     # A backend with no logout cannot be held in quarantine either: pairing again is the
     # only exit it has, and refusing that would leave the inbox with none at all.
