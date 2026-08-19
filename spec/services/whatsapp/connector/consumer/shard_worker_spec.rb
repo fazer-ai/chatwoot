@@ -168,9 +168,29 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0', mkstream: true)
     redis.xreadgroup(described_class::Consumer::GROUP, 'consumer-dead', stream, '>')
 
-    stub_const("#{described_class}::IDLE_CLAIM_MS", 0)
     expect(worker.poll).to eq(1)
 
     expect(inbox.messages.pluck(:source_id)).to eq(['3EB0AAAA0001'])
+  end
+
+  # The lease is what makes a shard single-reader, so a pending entry belongs to an owner
+  # that is already gone. Leaving it to age out lets the newer events go first, move the
+  # cursor past it, and turn it into a message that is silently never delivered.
+  it 'drains a backlog longer than one batch before it reads anything new' do
+    stub_const("#{described_class}::BATCH", 2)
+    ids = (1..5).map { |n| format('3EB0AAAA%<n>04d', n: n) }
+    ids.each do |source_id|
+      payload = JSON.parse(frame['payload'])
+      payload['message']['id'] = source_id
+      redis.xadd(stream, frame.merge('id' => "evt-#{source_id}", 'seq' => ids.index(source_id).succ.to_s,
+                                     'payload' => payload.to_json))
+    end
+    redis.xgroup(:create, stream, described_class::Consumer::GROUP, '0', mkstream: true)
+    redis.xreadgroup(described_class::Consumer::GROUP, 'consumer-dead', stream, '>', count: 5)
+
+    expect(worker.poll).to eq(5)
+
+    expect(inbox.messages.pluck(:source_id)).to match_array(ids)
+    expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(0)
   end
 end

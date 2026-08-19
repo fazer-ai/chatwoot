@@ -8,7 +8,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # A worker that only reports whether it is alive: the claim loop is what is under test.
   let(:worker_class) do
     Class.new do
-      attr_reader :shard
+      attr_reader :shard, :queue
 
       def initialize(shard, _consumer_id)
         @shard = shard
@@ -81,13 +81,57 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     # Without this the first consumer to start would hold every shard forever: the
     # newcomers find every lease taken and never get one.
     expect(supervisor.workers.keys).to eq([0, 1])
+    # Told to stop, but the lease is still ours until the thread is out.
+    expect(redis.get("#{prefix}events:3:lease")).to eq('consumer-1')
+
+    supervisor.tick
+
     expect(redis.get("#{prefix}events:3:lease")).to be_nil
+  end
+
+  # The window this closes: a handler that runs longer than the supervisor is willing to
+  # wait used to have its lease dropped anyway, and a peer would then read the shard
+  # alongside a thread that was still writing rows and moving the session cursor.
+  it 'keeps the lease of a worker that has not finished its current entry' do
+    supervisor.tick
+    stuck = supervisor.workers[0]
+    allow(stuck).to receive(:stop) # the thread stays parked in run
+
+    supervisor.quiet
+    supervisor.tick
+
+    expect(redis.get("#{prefix}events:0:lease")).to eq('consumer-1')
+    expect(redis.get("#{prefix}events:1:lease")).to be_nil
+
+    stuck.queue << :stop # let it out, so the shutdown in the around hook is not a wait
+  end
+
+  it 'reads as many shards as the connector says it publishes' do
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    supervisor.tick
+
+    # The local setting says four; following it would leave the connector's own streams
+    # unread, and every inbox sharded onto them silently deaf.
+    expect(supervisor.workers.keys).to eq([0, 1])
   end
 
   it 'releases everything when it is asked to go quiet' do
     supervisor.tick
 
     supervisor.quiet
+
+    expect(supervisor.workers).to be_empty
+    # The lease follows the thread out, on the tick after it exits: quiet returns without
+    # waiting, because Sidekiq calls it before its own shutdown clock starts.
+    supervisor.tick
+    expect(redis.get("#{prefix}events:0:lease")).to be_nil
+  end
+
+  it 'claims nothing more once it is draining' do
+    supervisor.quiet
+
+    supervisor.tick
 
     expect(supervisor.workers).to be_empty
     expect(redis.get("#{prefix}events:0:lease")).to be_nil

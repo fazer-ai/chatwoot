@@ -59,7 +59,10 @@ class Whatsapp::Session::Backend
   def react_message(_command) = not_supported!(:react_message)
   def mark_read(_command) = not_supported!(:mark_read)
   def mark_unread(_command) = not_supported!(:mark_unread)
-  def download_media(_ref) = not_supported!(:download_media)
+  # Takes the whole MessageDownloadMedia command, not a bare ref: the contract requires
+  # the message id, which is what lets a provider find the original message and fetch its
+  # bytes again once the ref it first handed out has lapsed.
+  def download_media(_command) = not_supported!(:download_media)
 
   # --- presence --------------------------------------------------------------------
   def send_chat_presence(_command) = not_supported!(:send_chat_presence)

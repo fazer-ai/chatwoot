@@ -8,10 +8,11 @@ class Whatsapp::Connector::Consumer::ShardWorker
   Consumer = Whatsapp::Connector::Consumer
   Model = Whatsapp::Session::Model
 
-  # How long an entry may sit unacknowledged before another consumer may take it over:
-  # long enough that a slow dispatch is not stolen, short enough that a crashed
-  # consumer's backlog moves within a minute.
-  IDLE_CLAIM_MS = 60_000
+  # Pending entries are taken with no idle time at all. The shard lease is what
+  # guarantees a single reader, so anything still pending here was left by an owner that
+  # is already gone. Waiting one out would let `read_new` run ahead of it, advance the
+  # session cursor past it, and then drop it as stale the moment it became claimable.
+  CLAIM_IDLE_MS = 0
   BLOCK_MS = 5_000
   BATCH = 10
   # How long a cursor outlives the session it belongs to. It only has to outlast what a
@@ -55,8 +56,10 @@ class Whatsapp::Connector::Consumer::ShardWorker
     @stopped
   end
 
-  # One pass: whatever a dead consumer left behind first, then what is new. Returns the
-  # number of entries processed, which is what makes the loop testable without threads.
+  # One pass: everything a previous owner left behind, then what is new. The backlog is
+  # drained first and in full, because an event read out of that order is an event whose
+  # session sees its own history rearranged. Returns the number of entries processed,
+  # which is what makes the loop testable without threads.
   def poll
     ensure_group
     claim_orphans + read_new
@@ -80,10 +83,19 @@ class Whatsapp::Connector::Consumer::ShardWorker
     raise unless e.message.include?('BUSYGROUP')
   end
 
-  # Entries another consumer read and never acknowledged, because it died holding them.
+  # Entries a previous owner read and never acknowledged, because it died or was told to
+  # stop holding them. Walked to the end of the pending list rather than one batch at a
+  # time: a backlog longer than BATCH would otherwise be overtaken by `read_new`.
   def claim_orphans
-    claimed = redis.xautoclaim(stream, Consumer::GROUP, consumer_id, IDLE_CLAIM_MS, '0-0', count: BATCH)
-    process(claimed['entries'])
+    cursor = '0-0'
+    processed = 0
+    loop do
+      claimed = redis.xautoclaim(stream, Consumer::GROUP, consumer_id, CLAIM_IDLE_MS, cursor, count: BATCH)
+      processed += process(claimed['entries'])
+      cursor = claimed['next']
+      break if cursor.blank? || cursor == '0-0' || stopped?
+    end
+    processed
   rescue Redis::CommandError => e
     raise unless e.message.include?('NOGROUP')
 
@@ -99,10 +111,9 @@ class Whatsapp::Connector::Consumer::ShardWorker
   def process(entries)
     handled = 0
     entries.to_a.each do |entry_id, fields|
-      # A worker that lost its shard, or whose process is going away, leaves the rest of
-      # the batch alone: the entries stay in this consumer's pending list and whoever
-      # takes the shard next claims them by idle time. Acknowledging them unprocessed
-      # here would drop the events instead.
+      # A worker whose process is going away leaves the rest of the batch alone: the
+      # entries stay pending and whoever takes the shard next drains them before reading
+      # anything new. Acknowledging them unprocessed here would drop the events instead.
       break if stopped?
 
       handled += 1 if handle(entry_id, fields)
@@ -181,7 +192,11 @@ class Whatsapp::Connector::Consumer::ShardWorker
   def channel_for(session_id)
     return if session_id.blank?
 
-    channel = Channel::Whatsapp.where("provider_config->>'session_id' = ?", session_id).first
+    # Narrowed to the provider as well as the id: the session-id index is partial on the
+    # session providers, so without this Postgres cannot use it and reads the table for
+    # every event, and a colliding id could resolve another provider's inbox.
+    channel = Channel::Whatsapp.where(provider: 'native')
+                               .where("provider_config->>'session_id' = ?", session_id).first
     Rails.logger.warn("[WHATSAPP CONNECTOR] no inbox for session #{session_id}") if channel.nil?
     channel
   end

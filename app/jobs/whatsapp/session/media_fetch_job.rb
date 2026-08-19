@@ -14,7 +14,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     return if message.attachments.any?
 
     media = Whatsapp::Session::Model::Content.from_h(content)
-    payload = message.inbox.channel.session_backend.download_media(media.ref)
+    payload = message.inbox.channel.session_backend.download_media(download_command(message, media))
     # Re-read under lock, after the download: a deletion that landed while this job was
     # queued or running destroyed the attachments, and attaching now would put the
     # supposedly deleted media back into storage and back on the API.
@@ -39,6 +39,16 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   end
 
   private
+
+  # The ref alone is not enough to ask for a second time: a blob the connector has already
+  # dropped is fetched again from the message it came from, so the command carries the
+  # message the ref belongs to as well as the ref itself.
+  def download_command(message, media)
+    Whatsapp::Session::Model::Commands::MessageDownloadMedia.new(
+      chat: Whatsapp::Session::Model::Address.for_contact(message.conversation.contact),
+      message_id: message.source_id, ref: media.ref
+    )
+  end
 
   def attach(message, media, payload)
     attachment = message.attachments.build(

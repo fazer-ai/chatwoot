@@ -84,18 +84,46 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   end
 
   it 'downloads media straight from the URL the event carried' do
-    payload = backend.download_media(model::MediaRef.url('https://connector.test/media/abc', mime: 'image/jpeg'))
+    payload = backend.download_media(download_command(model::MediaRef.url('https://connector.test/media/abc', mime: 'image/jpeg')))
 
+    expect(client).not_to have_received(:call)
     expect(Down).to have_received(:download).with(
       'https://connector.test/media/abc', hash_including(headers: hash_including('Authorization' => 'Bearer media-token'))
     )
     expect(payload.mime).to eq('image/jpeg')
   end
 
-  it 'asks the connector to fetch the bytes again when the blob is gone' do
-    backend.download_media(model::MediaRef.new(kind: 'connector_blob', id: 'abc'))
+  it 'asks the connector to fetch the bytes again when the ref carries no URL' do
+    backend.download_media(download_command(model::MediaRef.new(kind: 'connector_blob', id: 'abc')))
 
     expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
+  # The connector drops its blobs on a TTL and an LRU quota, so a URL handed out with the
+  # event is routinely dead by the time the download job runs. Treating that as terminal
+  # marked the message unsupported while the bytes were still one command away.
+  it 'asks again for a ref that has already lapsed' do
+    lapsed = model::MediaRef.new(kind: 'connector_blob', id: 'abc', url: 'https://connector.test/media/stale',
+                                 expires_at: 1.hour.ago.to_i * 1000)
+
+    backend.download_media(download_command(lapsed))
+
+    expect(Down).not_to have_received(:download).with('https://connector.test/media/stale', anything)
+    expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
+  it 'asks again when the blob turns out to be gone mid-flight' do
+    allow(Down).to receive(:download).with('https://connector.test/media/stale', anything).and_raise(Down::NotFound, 'gone')
+    fresh = model::MediaRef.url('https://connector.test/media/stale', mime: 'image/jpeg').with(expires_at: 1.hour.from_now.to_i * 1000)
+
+    backend.download_media(download_command(fresh))
+
+    expect(client).to have_received(:call).once
+    expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
+  def download_command(ref)
+    model::Commands::MessageDownloadMedia.new(chat: model::Address.phone('5541999990000'), message_id: '3EB0AAAA', ref: ref)
   end
 
   it 'answers fire-and-forget commands without waiting' do

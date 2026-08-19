@@ -100,9 +100,9 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     true
   end
 
-  def download_media(ref)
-    record(ref)
-    model::MediaPayload.new(io: StringIO.new('fake-media'), mime: ref.mime || 'application/octet-stream',
+  def download_media(command)
+    record(command)
+    model::MediaPayload.new(io: StringIO.new('fake-media'), mime: command.ref&.mime || 'application/octet-stream',
                             filename: 'fake-media', size: 10)
   end
 

@@ -96,11 +96,21 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   # The connector keeps the bytes on its own disk and serves them over its internal HTTP
-  # port; the ref that came with the event is a URL there. A ref whose blob has expired
-  # is re-requested, which makes the connector download it from WhatsApp again.
-  def download_media(ref)
-    ref = Model::MediaRef.from_h(client.call(Commands::MessageDownloadMedia.new(ref: ref))) unless ref.fetchable?
-    fetch_blob(ref)
+  # port; the ref that came with the event is a URL there. Those blobs are dropped on a
+  # TTL and an LRU quota, so a ref that has lapsed, or one whose blob turns out to be gone
+  # already, is asked for again: that makes the connector download it from WhatsApp anew.
+  def download_media(command)
+    ref = command.ref
+    return fetch_blob(refresh(command)) if ref.nil? || !ref.fetchable?
+
+    begin
+      fetch_blob(ref)
+    rescue Whatsapp::Session::Errors::MediaUnavailable
+      # Dropped between the event and this job, which the quota makes ordinary rather than
+      # exceptional. Asking again is what makes the connector pull it from WhatsApp a
+      # second time; if that copy is gone as well, it is gone.
+      fetch_blob(refresh(command))
+    end
   end
 
   # --- presence and contacts -----------------------------------------------------
@@ -183,6 +193,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   private
+
+  def refresh(command)
+    Model::MediaRef.from_h(client.call(command))
+  end
 
   def session_id
     id = provider_config['session_id']

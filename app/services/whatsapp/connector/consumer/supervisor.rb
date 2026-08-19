@@ -3,6 +3,10 @@
 # Shards are claimed with a Redis lease, so several Chatwoot processes can run the
 # consumer without ever reading the same shard twice. A process that dies stops
 # renewing, its leases expire, and the survivors pick the shards up on their next tick.
+#
+# The lease outlives the worker, never the other way round: a shard is only given back
+# once the thread that was reading it has actually exited. Releasing it while a dispatch
+# is still running is what would let a peer read the same shard alongside it.
 class Whatsapp::Connector::Consumer::Supervisor
   Consumer = Whatsapp::Connector::Consumer
   ShardWorker = Whatsapp::Connector::Consumer::ShardWorker
@@ -16,6 +20,12 @@ class Whatsapp::Connector::Consumer::Supervisor
   # process, so a single pass covers any realistic deployment; the loop is there because
   # SCAN promises no more than a best effort per call.
   SCAN_BATCH = 100
+  # How long a shutdown waits for the workers to come out. They all start winding down
+  # together, so this bounds the whole handover rather than each shard. It has to clear
+  # ShardWorker::BLOCK_MS, which is how long an idle worker sits in XREADGROUP before it
+  # looks at its stop flag, and stay inside the grace period a container manager gives a
+  # process before it kills it.
+  DRAIN_TIMEOUT = 10
 
   # Extending a lease this process no longer holds would push another consumer off a
   # shard it is already reading, and deleting one would hand a live shard to a third.
@@ -45,6 +55,7 @@ class Whatsapp::Connector::Consumer::Supervisor
     @workers = {}
     @threads = {}
     @stopped = false
+    @draining = false
     # Sidekiq calls quiet and shutdown from its own thread while the supervisor thread
     # is somewhere inside a tick, and both touch the worker table and the same Redis
     # connection, which is not thread safe.
@@ -62,22 +73,22 @@ class Whatsapp::Connector::Consumer::Supervisor
     end
   end
 
-  # Sidekiq's quiet phase: stop reading so a peer can take the shards over before this
-  # process goes away.
+  # Sidekiq's quiet phase: stop claiming and tell the workers to finish, so a peer can
+  # take the shards over before this process goes away. It returns without waiting for
+  # them, because Sidekiq runs this before it starts its own shutdown clock; the
+  # supervisor thread stays up through the drain, renewing the leases of the workers that
+  # are still inside an entry and giving each one back as it exits.
   def quiet
-    @stopped = true
-    @mutex.synchronize { release_all }
+    @draining = true
+    @mutex.synchronize { stop_all }
   end
 
   def stop
     quiet
+    @stopped = true
     @supervisor_thread&.join(TICK + 1)
     @supervisor_thread&.kill
-    @mutex.synchronize do
-      @threads.each_value { |thread| thread.join(5) }
-      @threads.clear
-      @workers.clear
-    end
+    @mutex.synchronize { drain }
   end
 
   # One pass of the claim loop, which is also what the specs drive directly.
@@ -109,8 +120,26 @@ class Whatsapp::Connector::Consumer::Supervisor
     @redis ||= Redis.new(Redis::Config.app)
   end
 
+  # The connector owns the fan-out: it is what decides which stream a session's events go
+  # on, and it publishes the count it is using. Reading fewer than it publishes would
+  # leave whole streams unconsumed, and the inboxes on them silently deaf, so the local
+  # setting is only the answer for an installation whose connector has never run.
   def shards
-    (0...Whatsapp::Connector.event_shards).to_a
+    (0...advertised_shards).to_a
+  end
+
+  def advertised_shards
+    configured = Whatsapp::Connector.event_shards
+    advertised = redis.hget(Whatsapp::Connector.key('meta'), 'event_shards').to_i
+    return configured unless advertised.positive?
+
+    if advertised != configured
+      Rails.logger.warn(
+        "[WHATSAPP CONNECTOR] the connector publishes #{advertised} event shards, this is configured for " \
+        "#{configured}; following the connector"
+      )
+    end
+    advertised
   end
 
   # Published so the super admin screen can tell whether anyone is reading, and so the
@@ -141,12 +170,12 @@ class Whatsapp::Connector::Consumer::Supervisor
   end
 
   def claim
-    return if @stopped
+    return if @draining
 
     share = fair_share
     shards.each do |shard|
-      break if workers.size >= share
-      next if workers.key?(shard)
+      break if @threads.size >= share
+      next if @threads.key?(shard)
       next unless redis.set(Consumer.lease_key(shard), consumer_id, nx: true, ex: LEASE_TTL)
 
       spawn_worker(shard)
@@ -157,9 +186,10 @@ class Whatsapp::Connector::Consumer::Supervisor
   # back from it: the newcomers find every lease taken. Giving up the excess is what
   # makes a rolling restart converge instead of leaving one process reading everything.
   def rebalance
-    return if @stopped
+    return if @draining
 
-    excess = workers.size - fair_share
+    # Draining shards count: their leases are still ours, so a peer cannot take them yet.
+    excess = @threads.size - fair_share
     return if excess <= 0
 
     workers.keys.sort.last(excess).each do |shard|
@@ -168,27 +198,34 @@ class Whatsapp::Connector::Consumer::Supervisor
     end
   end
 
-  # A lease is only worth renewing while this process still holds it: losing it (a stall
-  # long enough for it to expire) means someone else may already be reading the shard,
-  # so the worker has to go.
+  # Every shard whose thread is still around, not only the ones being read: a worker that
+  # was told to stop is still inside its current entry, and its lease has to stay ours
+  # until it is out.
+  #
+  # Losing a lease (a stall long enough for it to expire) means someone else may already
+  # be reading the shard, so the worker is told to stop the moment it is noticed.
   def renew
     # A snapshot: stop_worker deletes from the table this is walking.
-    held = workers.keys
+    held = @threads.keys
     held.each do |shard|
       next if redis.eval(RENEW_SCRIPT, keys: [Consumer.lease_key(shard)], argv: [consumer_id, LEASE_TTL]) == 1
 
       Rails.logger.warn("[WHATSAPP CONNECTOR] lost the lease on shard #{shard}")
-      stop_worker(shard)
+      workers.delete(shard)&.stop
     end
   end
 
+  # Threads that are out, either because they were told to stop and have finished, or
+  # because they died on their own. This is the only place a lease is given back.
   def reap
     running = @threads.keys
     running.each do |shard|
       next if @threads[shard].alive?
 
-      Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} worker stopped; releasing it")
-      stop_worker(shard)
+      Rails.logger.warn("[WHATSAPP CONNECTOR] shard #{shard} worker stopped; releasing it") if workers.key?(shard)
+      @threads.delete(shard)
+      workers.delete(shard)
+      release(shard)
     end
   end
 
@@ -199,16 +236,31 @@ class Whatsapp::Connector::Consumer::Supervisor
     Rails.logger.info("[WHATSAPP CONNECTOR] #{consumer_id} reading shard #{shard}")
   end
 
+  # Tells the worker to stop and leaves it in @threads. `reap` is what releases the lease,
+  # once the thread has actually exited: a shard handed over while its previous reader is
+  # still inside a dispatch is a shard being read twice.
   def stop_worker(shard)
     workers.delete(shard)&.stop
-    thread = @threads.delete(shard)
-    thread&.join(2)
-    release(shard)
   end
 
-  def release_all
-    held = workers.keys
+  def stop_all
+    held = @threads.keys
     held.each { |shard| stop_worker(shard) }
+    reap
+  end
+
+  # The last wait before the process goes. Whatever is still running after it keeps its
+  # lease until that expires: a thread stuck inside one entry is worse to take a shard
+  # away from than to leave the shard idle for LEASE_TTL.
+  def drain
+    held = @threads.keys
+    # They were all told to stop together, so one deadline covers all of them.
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + DRAIN_TIMEOUT
+    held.each do |shard|
+      remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @threads[shard]&.join(remaining) if remaining.positive?
+    end
+    reap
   end
 
   # Only the holder releases: a lease that already expired belongs to whoever took it.
