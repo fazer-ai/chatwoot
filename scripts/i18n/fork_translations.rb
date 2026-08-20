@@ -24,7 +24,7 @@ REFERENCE_LOCALE = 'en'
 
 # The Chatwoot release whose translations this fork currently carries.
 # The sync-fork flow bumps it together with the upstream merge.
-UPSTREAM_BASE = 'v4.16.2'
+UPSTREAM_BASE = 'v4.17.0'
 
 class ForkTranslations
   def initialize

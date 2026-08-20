@@ -16,6 +16,7 @@
 #  priority               :integer
 #  snoozed_until          :datetime
 #  status                 :integer          default("open"), not null
+#  status_changed_at      :datetime
 #  uuid                   :uuid             not null
 #  waiting_since          :datetime
 #  created_at             :datetime         not null
@@ -42,6 +43,7 @@
 #  index_conversations_on_campaign_id                 (campaign_id)
 #  index_conversations_on_contact_id                  (contact_id)
 #  index_conversations_on_contact_inbox_id            (contact_inbox_id)
+#  index_conversations_on_created_at                  (created_at)
 #  index_conversations_on_first_reply_created_at      (first_reply_created_at)
 #  index_conversations_on_id_and_account_id           (account_id,id)
 #  index_conversations_on_identifier_and_account_id   (identifier,account_id)
@@ -93,8 +95,8 @@ class Conversation < ApplicationRecord
   enum priority: { low: 0, medium: 1, high: 2, urgent: 3 }
   enum group_type: { individual: 0, group: 1 }, _prefix: true
 
-  scope :unassigned, -> { where(assignee_id: nil) }
-  scope :assigned, -> { where.not(assignee_id: nil) }
+  scope :unassigned, -> { where(assignee_id: nil, assignee_agent_bot_id: nil) }
+  scope :assigned, -> { where.not(assignee_id: nil).or(where.not(assignee_agent_bot_id: nil)) }
   scope :assigned_to, ->(agent) { where(assignee_id: agent.id) }
   scope :sort_on_unread, lambda { |_direction|
     order(unread_messages_count_arel.desc).sort_on_last_activity_at('desc')
@@ -149,8 +151,10 @@ class Conversation < ApplicationRecord
   has_many :reporting_events, dependent: :destroy_async
   has_many :scheduled_messages, dependent: :destroy
   has_many :recurring_scheduled_messages, dependent: :destroy
+  has_many :automation_rule_pending_executions, dependent: :delete_all
 
   before_save :ensure_snooze_until_reset
+  before_save :set_status_changed_at
   before_create :determine_conversation_status
   before_create :ensure_waiting_since
 
@@ -238,10 +242,14 @@ class Conversation < ApplicationRecord
     save!
   end
 
-  def bot_handoff!
+  def bot_handoff!(dispatch_event: true)
     update!(waiting_since: Time.current) if waiting_since.blank?
     self.assignee_agent_bot = nil
     open!
+    dispatch_bot_handoff_event if dispatch_event
+  end
+
+  def dispatch_bot_handoff_event
     dispatcher_dispatch(CONVERSATION_BOT_HANDOFF)
   end
 
@@ -346,6 +354,10 @@ class Conversation < ApplicationRecord
 
   def ensure_snooze_until_reset
     self.snoozed_until = nil unless snoozed?
+  end
+
+  def set_status_changed_at
+    self.status_changed_at = Time.current if new_record? || status_changed?
   end
 
   def ensure_waiting_since

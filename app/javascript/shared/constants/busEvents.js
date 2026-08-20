@@ -16,4 +16,5 @@ export const BUS_EVENTS = {
   INSERT_INTO_NORMAL_EDITOR: 'insertIntoNormalEditor',
   NAVIGATE_TO_GROUP: 'navigateToGroup',
   ASSIGNMENT_CONFLICT: 'assignmentConflict',
+  MFA_STATE_CHANGED: 'MFA_STATE_CHANGED',
 };

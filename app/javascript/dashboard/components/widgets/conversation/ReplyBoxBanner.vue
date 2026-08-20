@@ -33,9 +33,8 @@ const assignAgent = agent =>
     assignee: agent,
   });
 
-const isUserTyping = computed(
-  () => props.message !== '' && !props.isOnPrivateNote
-);
+const hasMessage = computed(() => props.message !== '');
+const isUserTyping = computed(() => hasMessage.value && !props.isOnPrivateNote);
 const isUnassigned = computed(() => !assignedAgent.value);
 const isAssignedToOtherAgent = computed(
   () => assignedAgent.value?.id !== currentUser.value?.id
@@ -47,16 +46,24 @@ const showSelfAssignBanner = computed(() => {
   );
 });
 
-const showBotHandoffBanner = computed(
-  () =>
-    isUserTyping.value &&
-    currentChat.value?.status === wootConstants.STATUS_TYPE.PENDING
+const isPendingConversation = computed(
+  () => currentChat.value?.status === wootConstants.STATUS_TYPE.PENDING
 );
 
-const botHandoffActionLabel = computed(() => {
-  return assignedAgent.value?.id === currentUser.value?.id
-    ? t('CONVERSATION.BOT_HANDOFF_REOPEN_ACTION')
-    : t('CONVERSATION.BOT_HANDOFF_ACTION');
+const isAgentBotOwned = computed(
+  () => currentChat.value?.meta?.assignee_type === 'AgentBot'
+);
+
+const showBotHandoffBanner = computed(() => {
+  return isPendingConversation.value && isAgentBotOwned.value;
+});
+
+const botAssigneeName = computed(() => {
+  if (isAgentBotOwned.value && assignedAgent.value?.name) {
+    return assignedAgent.value.name;
+  }
+
+  return t('CONVERSATION.BOT_HANDOFF_FALLBACK_ASSIGNEE');
 });
 
 const selfAssignConversation = async () => {
@@ -80,15 +87,18 @@ const onClickSelfAssign = async () => {
 const reopenConversation = async () => {
   await store.dispatch('toggleStatus', {
     conversationId: currentChat.value?.id,
-    status: wootConstants.STATUS_TYPE.OPEN,
+    status: 'open',
   });
 };
 
 const onClickBotHandoff = async () => {
   try {
+    const shouldAssignToCurrentUser =
+      isAgentBotOwned.value || needsAssignmentToCurrentUser.value;
+
     await reopenConversation();
 
-    if (needsAssignmentToCurrentUser.value) {
+    if (shouldAssignToCurrentUser) {
       await selfAssignConversation();
     }
 
@@ -115,9 +125,13 @@ const onClickBotHandoff = async () => {
     action-button-variant="ghost"
     color-scheme="secondary"
     class="mx-2 mb-2 rounded-lg !py-2"
-    :banner-message="$t('CONVERSATION.BOT_HANDOFF_MESSAGE')"
+    :banner-message="
+      $t('CONVERSATION.BOT_HANDOFF_MESSAGE', {
+        assigneeName: botAssigneeName,
+      })
+    "
     has-action-button
-    :action-button-label="botHandoffActionLabel"
+    :action-button-label="$t('CONVERSATION.BOT_HANDOFF_ACTION')"
     @primary-action="onClickBotHandoff"
   />
 </template>
