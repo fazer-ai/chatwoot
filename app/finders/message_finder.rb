@@ -6,6 +6,8 @@ class MessageFinder
   # it directly — `#>>'{}'` unwraps the outer encoding into proper jsonb.
   NON_REACTION_CLAUSE = "((content_attributes#>>'{}')::jsonb->>'is_reaction') IS DISTINCT FROM 'true'".freeze
 
+  MESSAGE_ID_MAX = 2_147_483_647
+
   def initialize(conversation, params)
     @conversation = conversation
     @params = params
@@ -28,12 +30,14 @@ class MessageFinder
   end
 
   def current_messages
+    return messages.none if oversized_message_id?(@params[:after])
+
     if @params[:after].present? && @params[:before].present?
-      messages_between(@params[:after].to_i, @params[:before].to_i)
+      messages_between(normalized_message_id(@params[:after]), @params[:before].to_i)
     elsif @params[:before].present?
       messages_before(@params[:before].to_i)
     elsif @params[:after].present?
-      messages_after(@params[:after].to_i)
+      messages_after(normalized_message_id(@params[:after]))
     else
       messages_latest
     end
@@ -44,11 +48,15 @@ class MessageFinder
   end
 
   def messages_before(before_id)
-    page_window(messages.where('id < ?', before_id))
+    return messages_latest if oversized_message_id?(before_id)
+
+    page_window(messages.where('id < ?', normalized_message_id(before_id)))
   end
 
   def messages_between(after_id, before_id)
-    messages.reorder('created_at asc').where('id >= ? AND id < ?', after_id, before_id).limit(1000)
+    message_scope = messages.reorder('created_at asc').where('id >= ?', after_id)
+    message_scope = message_scope.where('id < ?', normalized_message_id(before_id)) unless oversized_message_id?(before_id)
+    message_scope.limit(1000)
   end
 
   def messages_latest
@@ -79,6 +87,14 @@ class MessageFinder
                          "(#{json_path}->>'in_reply_to')::bigint IN (:ids))"
     scope.where("id IN (:ids) OR #{reaction_in_window}", ids: window_ids)
          .reorder('created_at asc')
+  end
+
+  def normalized_message_id(value)
+    value.to_i.clamp(0, MESSAGE_ID_MAX)
+  end
+
+  def oversized_message_id?(value)
+    value.to_i > MESSAGE_ID_MAX
   end
 end
 

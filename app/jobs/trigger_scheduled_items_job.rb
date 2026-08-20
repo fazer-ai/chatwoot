@@ -25,6 +25,9 @@ class TriggerScheduledItemsJob < ApplicationJob
 
     # Same, for the session providers whose state has to be pulled
     Whatsapp::Session::ConnectionCheckSchedulerJob.perform_later
+
+    # Job to trigger pending executions
+    AutomationRules::TriggerPendingExecutionsJob.perform_later
   end
 end
 

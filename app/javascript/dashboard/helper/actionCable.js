@@ -13,6 +13,7 @@ import {
   isLocalWhatsappCall,
 } from 'dashboard/composables/useWhatsappCallSession';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
+import { markCallDismissed, isLocalCall } from 'dashboard/helper/voice';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
@@ -98,6 +99,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'internal_chat.reaction.deleted': this.onInternalChatReactionDeleted,
       'internal_chat.poll.voted': this.onInternalChatPollVoted,
       'voice_call.incoming': this.onVoiceCallIncoming,
+      'voice_call.accepted': this.onVoiceCallAccepted,
       'voice_call.outbound_connected': this.onVoiceCallOutboundConnected,
       'voice_call.outbound_accepted': this.onVoiceCallOutboundAccepted,
       'voice_call.ended': this.onVoiceCallEnded,
@@ -481,6 +483,9 @@ class ActionCableConnector extends BaseActionCableConnector {
     // regained role or custom role would otherwise leave a pinned conversation rendering as unpinned until
     // the next reconnect. Inbox membership does not emit this event, so that path still waits for one.
     this.app.$store.dispatch('conversationPins/fetch');
+    this.app.$store.dispatch('revalidateCannedResponses', {
+      newKey: keys.canned_response,
+    });
 
     if (this.isFilteredUnreadCountsEnabled()) {
       // Inbox/team/label visibility changes can change the accessible set used
@@ -622,6 +627,29 @@ class ActionCableConnector extends BaseActionCableConnector {
     });
   };
 
+  // Inbound call accepted (in this tab or a sibling tab/window on the same
+  // account, on either provider). Broadcast is account-wide, so drop the
+  // ringing card everywhere except the tab that actually owns the now-active
+  // call — removing an active call here would tear down its live WebRTC
+  // session. Check isLocalWhatsappCall/isLocalCall (both set synchronously
+  // before their respective accept/join API calls) rather than the store's
+  // isActive flag, which this tab may not have set yet.
+  // Mark dismissed regardless of locality: the ringing message.created for
+  // this call is queued through ActionCableBroadcastJob and can still be
+  // delivered after this (synchronous) broadcast, which would otherwise
+  // re-add the call as ringing once it finally arrives.
+  // eslint-disable-next-line class-methods-use-this
+  onVoiceCallAccepted = data => {
+    if (!data?.provider) return;
+    markCallDismissed(data.call_id);
+    const isLocal =
+      data.provider === VOICE_CALL_PROVIDERS.WHATSAPP
+        ? isLocalWhatsappCall(data.id)
+        : isLocalCall(data.call_id);
+    if (isLocal) return;
+    useCallsStore().removeCall(data.call_id);
+  };
+
   // `connect` is the WebRTC tunnel-ready signal (fires ~20s before pickup
   // for outbound). Apply the SDP answer so the handshake completes during
   // ringing, but stay non-active until `outbound_accepted` arrives.
@@ -652,12 +680,22 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   // eslint-disable-next-line class-methods-use-this
   onVoiceCallEnded = async data => {
-    if (data?.provider !== VOICE_CALL_PROVIDERS.WHATSAPP) return;
+    if (!Object.values(VOICE_CALL_PROVIDERS).includes(data?.provider)) return;
+    // A still-queued ringing message.created (see onVoiceCallAccepted) must not
+    // resurrect a call that has already ended.
+    markCallDismissed(data.call_id);
     // The store entry should always be removed for this account-wide broadcast,
     // but the WebRTC/recorder teardown must only run for the call this tab owns
     // — otherwise an unrelated agent's call ending would stop this tab's
-    // recorder and upload its chunks against the wrong call id.
-    if (isLocalWhatsappCall(data.id)) {
+    // recorder and upload its chunks against the wrong call id. For Twilio,
+    // removeCall's own isActive check already scopes teardown to the owning
+    // tab (via TwilioVoiceClient.endClientCall in teardownByProvider), so no
+    // extra guard is needed here — only WhatsApp's recorder upload must be
+    // awaited before the store entry (and its in-memory chunks) is wiped.
+    if (
+      data.provider === VOICE_CALL_PROVIDERS.WHATSAPP &&
+      isLocalWhatsappCall(data.id)
+    ) {
       // Await upload before removeCall — the store's sync teardown would otherwise
       // wipe the recorder chunks before they reach the server.
       try {

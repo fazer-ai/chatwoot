@@ -30,7 +30,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['applyFilter', 'updateFolder', 'close']);
-const { filterTypes } = useConversationFilterContext();
+const { attributeFilterTypes } = useConversationFilterContext();
 
 const filters = defineModel({
   type: Array,
@@ -147,7 +147,7 @@ const outsideClickHandler = [
           v-model:attribute-key="filter.attributeKey"
           v-model:filter-operator="filter.filterOperator"
           v-model:values="filter.values"
-          :filter-types="filterTypes"
+          :filter-types="attributeFilterTypes"
           :show-query-operator="false"
           @remove="removeFilter(index)"
         />
@@ -160,7 +160,7 @@ const outsideClickHandler = [
           v-model:query-operator="filters[index - 1].queryOperator"
           v-model:values="filter.values"
           show-query-operator
-          :filter-types="filterTypes"
+          :filter-types="attributeFilterTypes"
           @remove="removeFilter(index)"
         />
       </template>

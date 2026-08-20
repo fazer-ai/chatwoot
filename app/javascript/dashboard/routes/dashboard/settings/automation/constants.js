@@ -834,3 +834,26 @@ export const AUTOMATION_ACTION_TYPES = [
 
 // Default delay for scheduled messages (24 hours in minutes)
 export const DEFAULT_SCHEDULED_MESSAGE_DELAY_MINUTES = 24 * 60;
+export const DEFAULT_DELAY_MINUTES = 240; // 4 hours
+export const MIN_DELAY_MINUTES = 10;
+export const MAX_DELAY_MINUTES = 43200; // 30 days
+export const DEFAULT_TRIGGER_STATUS = 'pending';
+
+// A delayed rule is expressed as one meaningful trigger instead of a raw event + conditions. Each
+// trigger maps to the automation's event_name plus a preset condition: message_type for the two
+// unresponsive cases (reply-chase / awaiting-agent), or a chosen status for conversation_updated.
+export const DELAYED_TRIGGERS = [
+  { key: 'conversation_status', eventName: 'conversation_updated' },
+  {
+    key: 'customer_unresponsive',
+    eventName: 'message_created',
+    messageType: 'outgoing',
+  },
+  {
+    key: 'agent_unresponsive',
+    eventName: 'message_created',
+    messageType: 'incoming',
+  },
+];
+
+export const DEFAULT_TRIGGER = DELAYED_TRIGGERS[0].key;

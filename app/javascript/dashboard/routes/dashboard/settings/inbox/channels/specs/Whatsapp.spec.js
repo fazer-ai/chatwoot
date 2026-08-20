@@ -26,6 +26,8 @@ vi.mock('dashboard/composables/useAccount', () => ({
   useAccount: () => ({
     isCloudFeatureEnabled: () => false,
     isOnChatwootCloud: ref(false),
+    // Meta's incident switch, off: the picker offers the embedded signup as usual.
+    isMetaInboxCreationDisabled: ref(false),
   }),
 }));
 

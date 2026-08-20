@@ -23,7 +23,7 @@
 #  index_accounts_on_status  (status)
 #
 
-class Account < ApplicationRecord
+class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   # used for multi-flag bitset columns
   include FlagShihTzu
   include Reportable
@@ -70,6 +70,7 @@ class Account < ApplicationRecord
   has_many :articles, dependent: :destroy_async, class_name: '::Article'
   has_many :assignment_policies, dependent: :destroy_async
   has_many :automation_rules, dependent: :destroy_async
+  has_many :automation_rule_pending_executions, dependent: :delete_all
   has_many :macros, dependent: :destroy_async
   has_many :campaigns, dependent: :destroy_async
   has_many :canned_responses, dependent: :destroy_async
@@ -121,6 +122,7 @@ class Account < ApplicationRecord
   after_create_commit :notify_creation
   after_create_commit :setup_internal_chat
   after_update_commit :clear_unread_conversation_counts_cache, if: :saved_change_to_feature_conversation_unread_counts?
+  after_update :resume_delayed_automations, if: -> { saved_change_to_feature_delayed_automations? && feature_delayed_automations? }
   after_destroy :remove_account_sequences
 
   def agents
@@ -205,6 +207,10 @@ class Account < ApplicationRecord
 
   def clear_unread_conversation_counts_cache
     ::Conversations::UnreadCounts::Store.clear_account!(id)
+  end
+
+  def resume_delayed_automations
+    AutomationRulePendingExecution.reschedule_paused(self)
   end
 
   trigger.after(:insert).for_each(:row) do

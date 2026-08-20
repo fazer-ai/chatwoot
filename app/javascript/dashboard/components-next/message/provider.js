@@ -66,6 +66,8 @@ const MessageControl = Symbol('MessageControl');
  * @property {EmailContent} [email] - Email content and metadata
  * @property {string|null} [ccEmail] - CC email addresses
  * @property {string|null} [bccEmail] - BCC email addresses
+ * @property {Object} [whatsappFlowResponse] - WhatsApp Flow response metadata
+ * @property {Record<string, unknown>|string} [whatsappFlowResponse.responseJson] - Structured fields or the raw response submitted by the contact
  * @property {Object} [referral] - Click-to-WhatsApp ad metadata on the first message after an ad click (keys camelized by MessageList)
  * @property {string} [referral.sourceType] - Ad source type (e.g. 'ad', 'post')
  * @property {string} [referral.sourceId] - Source ad identifier
@@ -75,6 +77,8 @@ const MessageControl = Symbol('MessageControl');
  * @property {string} [referral.body] - Ad body text
  * @property {string} [referral.mediaType] - Ad media type ('image'|'video'|'none')
  * @property {string} [referral.thumbnailUrl] - Ad thumbnail URL
+ * @property {string} [referral.mediaUrl] - Media URL of a Twilio referral
+ * @property {string} [referral.mediaContentType] - Media content type of a Twilio referral
  */
 
 /**

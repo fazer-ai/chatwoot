@@ -30,15 +30,18 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
     messages_data.first[:type]
   end
 
+  # Where a body can live, in the order WhatsApp can carry them. A message has exactly one
+  # of these, so the first hit is the content.
+  CONTENT_PATHS = [
+    %i[text body], %i[button text], %i[interactive button_reply title],
+    %i[interactive list_reply title], %i[name formatted_name], %i[reaction emoji]
+  ].freeze
+
   def message_content(message)
+    return I18n.t('conversations.messages.whatsapp.flow_response') if message.dig(:interactive, :nfm_reply).present?
+
     # TODO: map interactive messages back to button messages in chatwoot
-    message.dig(:text, :body) ||
-      message.dig(:button, :text) ||
-      message.dig(:interactive, :button_reply, :title) ||
-      message.dig(:interactive, :list_reply, :title) ||
-      message.dig(:name, :formatted_name) ||
-      message.dig(:reaction, :emoji) ||
-      referral_fallback_content(message)
+    CONTENT_PATHS.lazy.filter_map { |path| message.dig(*path) }.first || referral_fallback_content(message)
   end
 
   # Edited messages nest the new content under `edit.message`, which carries its own
@@ -118,6 +121,13 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
     { source: source, app: context_info[:entryPointConversionApp].presence }.compact.presence
   end
 
+  def parse_flow_response_json(response_json)
+    parsed_response = JSON.parse(response_json)
+    parsed_response.is_a?(Hash) ? parsed_response : response_json
+  rescue JSON::ParserError, TypeError
+    response_json
+  end
+
   def file_content_type(file_type)
     return :image if %w[image sticker].include?(file_type)
     return :audio if %w[audio voice].include?(file_type)
@@ -159,6 +169,19 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
   def process_in_reply_to(message)
     @in_reply_to_external_id = message['context']&.[]('id')
     @in_reply_to_external_id = message.dig(:reaction, :message_id) if message[:type] == 'reaction'
+  end
+
+  # Resolved when the message row is built, not when the reply id is read. This fork reads
+  # that id before the conversation is chosen, because a reaction has to land in the
+  # conversation of the message it annotates, and the finder searches inside a conversation.
+  def in_reply_to_message_id
+    return @in_reply_to_message_id if defined?(@in_reply_to_message_id)
+    return @in_reply_to_message_id = nil if @in_reply_to_external_id.blank? || @conversation.blank?
+
+    @in_reply_to_message_id = Whatsapp::InReplyToMessageFinder.new(
+      conversation: @conversation,
+      source_id: @in_reply_to_external_id
+    ).perform&.id
   end
 
   def find_message_by_source_id(source_id)
