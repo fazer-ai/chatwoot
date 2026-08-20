@@ -193,6 +193,44 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  # A rotated token, a moved address, a second instance on the same hosted service: the
+  # provider key does not change, so nothing else in the layer notices. Left alone, the
+  # record goes on reporting the session the previous instance had while the new one has
+  # never been told where to deliver, and the inbox reads as connected and receives nothing.
+  describe 'an inbox pointed at another instance' do
+    let(:channel) { build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'first' }) }
+
+    before do
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+      channel.update_provider_connection!({ 'connection' => 'open', 'phone_number' => '5541988887777' })
+    end
+
+    it 'stops reporting the session the instance it left was holding' do
+      channel.update!(provider_config: channel.provider_config.merge('token' => 'second'))
+
+      expect(channel.reload.provider_connection).to eq({})
+    end
+
+    # With the credentials it is leaving with, which are the only ones that instance takes
+    # and the last chance to use them: nothing on the record names it afterwards.
+    it 'withdraws the registration from the instance it left' do
+      channel.update!(provider_config: channel.provider_config.merge('token' => 'second'))
+
+      expect(WebMock).to have_requested(:post, 'https://uazapi.test/webhook')
+        .with(headers: { 'token' => 'first' }, body: hash_including('enabled' => false))
+    end
+
+    it 'leaves the session alone when the save did not move the instance' do
+      channel.update!(provider_config: channel.provider_config.merge('mark_as_read' => false))
+
+      expect(channel.reload.provider_connection).to include('connection' => 'open')
+      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook')
+    end
+  end
+
   # The connector keys its whatsmeow store by this id, and provider_config is permitted
   # wholesale by the inbox API, so an update that left the key out used to mint a new one
   # and orphan the session the connector was still holding under the old one.

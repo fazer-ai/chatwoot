@@ -10,6 +10,7 @@ module Whatsapp::Session::ChannelExtension
   # (`convert_provider!` pre-validates with `valid?` before it persists anything).
   def self.prepended(base)
     base.validate :validate_session_provider_enabled
+    base.after_update_commit :handle_repointed_instance, if: :saved_change_to_provider_config?
   end
 
   def session_provider?
@@ -106,6 +107,51 @@ module Whatsapp::Session::ChannelExtension
   end
 
   private
+
+  # An inbox pointed at another instance of the same provider: a rotated token, a moved
+  # address, a second instance on the same hosted service. The provider key does not
+  # change, so nothing else in the layer notices. The connection record goes on reporting
+  # the session the previous instance had, down to the number it was paired with, while
+  # the new one has never been told where to deliver: the inbox reads as connected and
+  # receives nothing until somebody thinks to reconnect it.
+  #
+  # So the record is emptied, which is what puts the dashboard back on "connect", and the
+  # registration on the instance being left behind is withdrawn. Registering the new one is
+  # deliberately not done here: that is what `connect` does, it is the operator's action,
+  # and on an instance that is not paired it would start a pairing nobody is watching.
+  #
+  # Inline, like the teardown a destroy and a conversion already run: the credentials it
+  # needs are the ones that just left the record, and a job would have to carry them
+  # through Redis to use them.
+  def handle_repointed_instance
+    return unless session_provider?
+    # A conversion changes the provider and the config in the same save, and
+    # `convert_provider!` has already torn the old provider down and emptied the record.
+    return if saved_change_to_provider?
+
+    previous = previous_instance(saved_change_to_provider_config.first)
+    return if previous.nil?
+
+    with_lock { update_provider_connection!({}) }
+    Whatsapp::Session::Registry.backend_for(previous).release_registration
+  rescue Whatsapp::Session::Errors::Error => e
+    # This runs after the commit, so raising would answer a save that already succeeded
+    # with a 500, and the instance we are letting go is one nothing depends on any more.
+    Rails.logger.warn("[WHATSAPP SESSION] could not let go of the previous instance of inbox ##{inbox&.id}: #{e.message}")
+  end
+
+  # This channel as it was before the save, for the single purpose of reaching the instance
+  # it used to point at. nil when the inbox still points at the same one, which is every
+  # save that did not touch the credentials, and nil when the backend has no instance to
+  # name (the connector keys its session by an id this cannot change).
+  def previous_instance(config)
+    previous = self.class.find(id)
+    previous.provider_config = config || {}
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(previous)
+    return if fingerprint.blank? || fingerprint == Whatsapp::Session::Registry.instance_fingerprint(self)
+
+    previous
+  end
 
   # The account toggles are the rollout switch, and a picker that hides a provider is
   # not a gate: the API would happily create a `native` inbox for any account. Only new

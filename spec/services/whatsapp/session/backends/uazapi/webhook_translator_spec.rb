@@ -390,6 +390,8 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::WebhookTranslator do
   # that authenticated them is gone by then, and nothing else in a queued job says which
   # instance it was meant for.
   it 'refuses a body that names an instance this inbox is no longer pointed at' do
+    # Moving the inbox lets go of the instance it leaves, which is a request of its own.
+    stub_request(:post, "#{channel.provider_config['base_url']}/webhook").to_return(status: 200, body: '{}')
     channel.update!(provider_config: channel.provider_config.merge('base_url' => 'https://other.uazapi.com'))
 
     events = described_class.new(channel.reload, fixture('message_incoming_text')).perform

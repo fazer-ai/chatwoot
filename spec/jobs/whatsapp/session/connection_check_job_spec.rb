@@ -19,6 +19,9 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
     stub_request(:get, "#{base}/instance/wa_messages_limits").to_return(
       status: 200, body: fixture('instance_wa_messages_limits').to_json, headers: { 'Content-Type' => 'application/json' }
     )
+    # Pointing the inbox somewhere else lets go of the instance it leaves, which the
+    # examples below do mid-request.
+    stub_request(:post, "#{base}/webhook").to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
   end
 
   it 'writes what the provider reports and the limits it only answers when asked' do

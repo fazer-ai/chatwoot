@@ -22,6 +22,12 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # stops well below this; the limit is there so a wrong URL cannot fill a disk.
   MAX_MEDIA_BYTES = 100.megabytes
 
+  # Withdrawing the webhook is always a goodbye: a destroy, a conversion, an inbox pointed
+  # somewhere else. Nothing reads the answer and one of those callers is a request the
+  # administrator is waiting on, so an instance that has stopped answering costs seconds
+  # rather than the full ceiling.
+  RELEASE_TIMEOUT = 5
+
   # The events this inbox asks for. `chats`, `contacts`, `labels` and `history` are the
   # instance's own CRM chatter and are not subscribed: everything Chatwoot needs is in
   # these five.
@@ -256,7 +262,7 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # is unreachable (or that has already dropped the instance) must not keep a conversion
   # from finishing.
   def withdraw_webhook
-    client.post('/webhook', webhook_body(enabled: false))
+    client.post('/webhook', webhook_body(enabled: false), timeout: RELEASE_TIMEOUT)
   rescue Whatsapp::Session::Errors::Error => e
     Rails.logger.warn("[WHATSAPP SESSION] could not withdraw the uazapi webhook of inbox ##{channel.inbox&.id}: #{e.message}")
   end
