@@ -59,7 +59,11 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
   # Re-pointed while this waited in the queue. The token that authenticated the body is
   # stripped before it is enqueued, and two instances of a hosted provider share a base
   # URL, so without this the previous instance's messages are filed under the new one.
-  # Optional, so a body enqueued by the release before this one is still delivered.
+  #
+  # Answered as "not re-pointed" when the job carries no instance, which is what a caller
+  # with nothing to compare gets: this job is only ever enqueued by the controller, which
+  # always names one, and a fence that refused everything else would be a fence on the
+  # shape of the call rather than on the inbox.
   def reconfigured?(channel, instance)
     instance.present? && instance != Whatsapp::Session::Registry.instance_fingerprint(channel)
   end

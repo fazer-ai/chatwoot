@@ -95,3 +95,10 @@ app/services/whatsapp/connector/consumer/shard_worker.rb: Commit event progress 
 # ordinary shape (a reaction taken back on a message from before the inbox was connected)
 # in exchange for a race between two webhooks that are usually seconds apart.
 app/jobs/webhooks/whatsapp_session_events_job.rb: Preserve order for dependent webhook events  # PR#380
+# PR#380: the deployment this describes cannot have happened. `origin/main` carries no
+# file under `whatsapp/session` at all: the layer is unreleased, and this job has never
+# run anywhere, so no queue holds one of its entries under the previous keywords. A shim
+# accepting them would be unreachable on the day it was written. Worth remembering once
+# the layer does ship, because from then on a signature change to a queued job does have
+# to survive a rolling deploy.
+app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queued pairing polls  # PR#380
