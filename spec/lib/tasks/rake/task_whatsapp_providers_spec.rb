@@ -148,6 +148,45 @@ RSpec.describe Rake::Task do
         expect(other.reload.provider).to eq('baileys')
       end
 
+      # `convert_provider!` disconnects the old session first, and Z-API's disconnect is an
+      # HTTParty call with no timeout and no rescue of its own. One unreachable host used
+      # to kill the whole run with earlier rows already committed and no summary, which is
+      # the population this tool exists to migrate.
+      it 'fails only the row whose provider cannot be reached' do
+        zapi = create(:channel_whatsapp, account: account, provider: 'zapi', phone_number: '+551155554444',
+                                         validate_provider_config: false, sync_templates: false)
+        allow_any_instance_of(Whatsapp::Providers::WhatsappZapiService) # rubocop:disable RSpec/AnyInstance
+          .to receive(:disconnect_channel_provider).and_raise(Net::ReadTimeout)
+        write_plan([
+                     [zapi.inbox.id, 'uazapi', uazapi_config.to_json],
+                     [channel.inbox.id, 'uazapi', uazapi_config.to_json]
+                   ])
+
+        with_modified_env APPLY: '1' do
+          expect { run('whatsapp:providers:convert_batch', csv_path) }
+            .to raise_error(SystemExit)
+            .and output(/FAIL.*Net::ReadTimeout.*2 row\(s\), 1 failed/m).to_stdout
+        end
+
+        expect(zapi.reload.provider).to eq('zapi')
+        expect(channel.reload.provider).to eq('uazapi')
+      end
+
+      # The reason to rerun a batch is that the last one failed part way. Counting an
+      # already-converted row as a failure meant the retry could never exit zero, however
+      # well it went.
+      it 'exits zero on a rerun where every row is already converted' do
+        write_plan([[channel.inbox.id, 'uazapi', uazapi_config.to_json]])
+
+        with_modified_env APPLY: '1' do
+          expect { run('whatsapp:providers:convert_batch', csv_path) }.not_to raise_error
+          expect { run('whatsapp:providers:convert_batch', csv_path) }
+            .to output(/SKIP.*already on that provider.*1 row\(s\), 0 failed/m).to_stdout
+        end
+
+        expect(channel.reload.provider).to eq('uazapi')
+      end
+
       it 'skips a row whose inbox is gone and keeps going' do
         write_plan([
                      [0, 'uazapi', uazapi_config.to_json],

@@ -244,7 +244,10 @@ module WhatsappProviderConversion
     def convert(channel, target, config)
       label = "inbox #{channel.inbox.id} (#{channel.provider} -> #{target})"
       return report(label, TARGET_REFUSED) unless Whatsapp::Session::PROVIDERS.include?(target.to_s)
-      return report(label, 'already on that provider') if channel.provider == target.to_s
+      # Not a failure: it is the state the row asked for. Counting it as one meant a batch
+      # rerun after a partial failure could never exit zero, since every row the first
+      # attempt converted now lands here.
+      return report(label, nil, verb: 'SKIP', note: 'already on that provider') if channel.provider == target.to_s
 
       invalid = validation_errors(channel, target, config)
       return report(label, invalid) if invalid
@@ -253,8 +256,15 @@ module WhatsappProviderConversion
 
       channel.convert_provider!(new_provider: target.to_s, new_provider_config: config)
       report(label, nil)
-    rescue ActiveRecord::RecordInvalid, Whatsapp::Session::Errors::Error => e
-      report(label, e.message)
+    # Deliberately everything, and only around one row. `convert_provider!` disconnects the
+    # old session first, and Z-API's `disconnect_channel_provider` is an HTTParty call with
+    # no timeout and no rescue of its own, so an unreachable host raises `Net::ReadTimeout`
+    # or `SocketError` straight through. Letting that escape would kill the batch with
+    # earlier rows already committed and no summary, which is the failure mode the plan
+    # pre-parsing was added to prevent, arriving through a different door. The class name
+    # goes in the message so a bug in here still reads as a bug.
+    rescue StandardError => e
+      report(label, "#{e.class}: #{e.message}")
     end
 
     private
@@ -267,9 +277,11 @@ module WhatsappProviderConversion
       errors
     end
 
-    def report(label, error, verb: 'OK')
-      puts error ? "  FAIL  #{label}: #{error}" : "  #{verb}    #{label}"
-      error.nil?
+    def report(label, error, verb: 'OK', note: nil)
+      return (puts "  FAIL  #{label}: #{error}") && false if error
+
+      puts "  #{verb}    #{label}#{note ? ": #{note}" : ''}"
+      true
     end
   end
 end
