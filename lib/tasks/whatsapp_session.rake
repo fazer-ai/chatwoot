@@ -208,9 +208,10 @@ module WhatsappProviderConversion
     # A method, not a constant. Rake evaluates a module body while it loads the task files,
     # which happens before the `:environment` prerequisite sets up autoloading, so naming an
     # app constant out here breaks *every* rake invocation with a NameError, `rake -T` and
-    # `db:migrate` included. Nothing in the suite catches it either: `rails_helper` requires
-    # `config/environment` before it calls `load_tasks`, so specs and CI stay green while the
-    # command line is dead.
+    # `db:migrate` included. The spec suite cannot see it: `rails_helper` requires
+    # `config/environment` before it calls `load_tasks`, so by then the constant resolves.
+    # CI does catch it, but only as all 16 backend shards failing at `rake db:create` during
+    # setup, which is a slow and opaque way to learn about a one-line mistake.
     def target_refused
       "target must be one of #{Whatsapp::Session::PROVIDERS.join(', ')} " \
         '(converting to a cloud or frozen provider contacts it, and is a one-inbox job for the dashboard)'
