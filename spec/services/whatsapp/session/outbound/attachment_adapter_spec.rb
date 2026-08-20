@@ -60,7 +60,8 @@ RSpec.describe Whatsapp::Session::Outbound::AttachmentAdapter do
     # neighbour, and on a closed installation the public URL is the one it cannot reach.
     it 'uses the internal host for an instance that is inside the deployment' do
       neighbour = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
-                                            provider_config: { 'base_url' => 'http://uazapi:3333', 'token' => 'x' })
+                                            provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x',
+                                                               'use_internal_host' => true })
 
       with_modified_env INTERNAL_HOST_URL: 'http://rails:3000' do
         expect(described_class.new(attachment, channel: neighbour).media_url)

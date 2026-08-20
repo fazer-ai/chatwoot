@@ -101,15 +101,14 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
     # an inbox would pair and then never receive an event.
     it 'points a neighbouring instance at the internal host' do
       neighbour = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
-                                            provider_config: { 'base_url' => 'http://uazapi:3333', 'token' => 'x',
+                                            provider_config: { 'base_url' => base, 'token' => 'x', 'use_internal_host' => true,
                                                                'webhook_verify_token' => 'secret' })
-      stub_request(:any, %r{http://uazapi:3333}).to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
 
-      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000', SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000' do
         described_class.new(neighbour).connect(commands::SessionConnect.new(pairing: 'qr'))
       end
 
-      expect(WebMock).to(have_requested(:post, 'http://uazapi:3333/webhook').with do |request|
+      expect(WebMock).to(have_requested(:post, "#{base}/webhook").with do |request|
         JSON.parse(request.body)['url'].start_with?('http://rails:3000/webhooks/whatsapp/session/uazapi/')
       end)
     end
@@ -313,6 +312,14 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
 
       expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::MediaUnavailable)
       expect(WebMock).not_to have_requested(:get, %r{https://free\.uazapi\.com/files/})
+    end
+
+    # A throttle is the host having a bad minute, not the file being gone: read as gone,
+    # the fetch job marks the bubble unsupported instead of coming back for it.
+    it 'comes back later when the media host is throttling' do
+      stub_request(:get, %r{https://free\.uazapi\.com/files/}).to_return(status: 429, body: 'slow down')
+
+      expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
     end
 
     # The provider keeps the decrypted copy for a while and answers 404 once it is gone.

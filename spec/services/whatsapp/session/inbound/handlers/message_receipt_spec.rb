@@ -37,6 +37,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     end
   end
 
+  # A receipt is a batch by nature and a large one by habit: opening a chat produced one
+  # read event naming 246 messages, most of them from before the inbox existed. A lookup
+  # per id put hundreds of round trips on the queue inbound messages share.
+  context 'with a receipt naming many messages' do
+    let(:receipt) do
+      model::Events::MessageReceipt.new(chat: model::Address.phone('5541999990000'),
+                                        message_ids: [message.source_id] + Array.new(40) { |n| "3EB0BEFORE#{n}" },
+                                        type: type)
+    end
+
+    it 'looks them up in one query' do
+      message
+      lookups = 0
+      subscriber = ActiveSupport::Notifications.subscribe('sql.active_record') do |*, payload|
+        lookups += 1 if payload[:sql].include?('"messages"') && payload[:sql].include?('"source_id"')
+      end
+
+      expect(dispatch).to eq(:handled)
+
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+      expect(lookups).to eq(1)
+    end
+  end
+
   # The race that motivates the locked write is covered where it happens, in the
   # StatusTransition unit; this only checks the failure reaches the row it names.
   context 'when the send failed for a message already deleted' do

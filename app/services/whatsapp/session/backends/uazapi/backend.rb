@@ -65,12 +65,18 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       true
     end
 
-    # The instance is somebody else's host unless the inbox says otherwise: an address on
-    # this deployment's own network is a neighbour, and a neighbour on a closed
-    # installation is exactly who INTERNAL_HOST_URL exists for. Everyone else has to be
-    # offered an address the internet can reach.
+    # Whether the instance is somebody else's host is not a question its address can
+    # answer. A self-hosted one is reached by whatever name the network gives it, from a
+    # compose service to an internal FQDN to a plain address, and reading any of those as
+    # a signal gets a deployment wrong in one direction or the other. Only whoever set it
+    # up knows, so the inbox is asked and its answer is a field on the form.
+    #
+    # Not the same switch that opens the private network to the SSRF filter: that one is
+    # the operator's, in the environment, and this one sits in a form an account
+    # administrator can edit. Saying an instance is a neighbour must not be a way of
+    # authorizing calls into the deployment.
     def hosted?(channel)
-      !Whatsapp::Session::PrivateAddress.url?(channel.provider_config['base_url'])
+      !ActiveModel::Type::Boolean.new.cast(channel.provider_config['use_internal_host'])
     end
 
     # Resolved on every call rather than held in a constant: a constant captured when this
@@ -309,14 +315,19 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   rescue SafeFetch::FileTooLargeError => e
     raise Whatsapp::Session::Errors::MediaTooLarge, e.message
   rescue SafeFetch::HttpError, SafeFetch::UnsafeUrlError, SafeFetch::InvalidUrlError => e
-    # A status is only ever in the message, and only HttpError has one. A server error is
-    # the host having a bad minute and worth another pass; the rest is the file being gone
-    # or never having been fetchable at all.
-    raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}" if e.message.to_i >= 500
+    # A status is only ever in the message, and only HttpError has one. A server error or
+    # a throttle is the host having a bad minute and worth another pass; the rest is the
+    # file being gone, or never having been fetchable at all.
+    raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}" if retryable_media?(e)
 
     raise Whatsapp::Session::Errors::MediaUnavailable, "uazapi media is gone: #{e.message}"
   rescue SafeFetch::Error => e
     raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}"
+  end
+
+  def retryable_media?(error)
+    status = error.message.to_i
+    status >= 500 || status == 429
   end
 
   # --- addressing ----------------------------------------------------------------------
