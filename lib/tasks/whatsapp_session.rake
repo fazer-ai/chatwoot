@@ -89,9 +89,15 @@ namespace :whatsapp do
       end
 
       channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
-      config = WhatsappProviderConversion.parse_config(ENV.fetch('PROVIDER_CONFIG', nil))
+      begin
+        config = WhatsappProviderConversion.parse_config(ENV.fetch('PROVIDER_CONFIG', nil))
+      rescue ArgumentError => e
+        abort e.message
+      end
       WhatsappProviderConversion.announce_mode
-      WhatsappProviderConversion.convert(channel, args[:target], config)
+      # Exits non-zero on failure, like the batch: a migration driven from a script reads
+      # the status, and a silent success there is a conversion nobody notices did not run.
+      abort 'conversion failed' unless WhatsappProviderConversion.convert(channel, args[:target], config)
     end
 
     # The config travels in the CSV rather than in the environment because a batch is
@@ -103,13 +109,23 @@ namespace :whatsapp do
       abort 'usage: rake "whatsapp:providers:convert_batch[path/to/plan.csv]"' if args[:csv_path].blank?
       abort "#{args[:csv_path]} does not exist" unless File.exist?(args[:csv_path])
 
-      WhatsappProviderConversion.announce_mode
+      # The whole plan is parsed before the first inbox is touched. A malformed config on
+      # row 40 used to surface only once rows 1 to 39 had already been converted, leaving a
+      # half-migrated fleet and no summary; a plan that cannot be read is a file to fix,
+      # not a batch to start.
       rows = CSV.read(args[:csv_path], headers: true)
-      failures = rows.count do |row|
+      configs = rows.each_with_index.map do |row, index|
+        WhatsappProviderConversion.parse_config(row['provider_config'])
+      rescue ArgumentError => e
+        abort "row #{index + 1}: #{e.message} (nothing was converted)"
+      end
+
+      WhatsappProviderConversion.announce_mode
+      failures = rows.zip(configs).count do |row, config|
         channel = WhatsappProviderConversion.channel_for(row['inbox_id'], abort_on_missing: false)
         next true if channel.nil?
 
-        !WhatsappProviderConversion.convert(channel, row['target'], WhatsappProviderConversion.parse_config(row['provider_config']))
+        !WhatsappProviderConversion.convert(channel, row['target'], config)
       end
 
       puts format('%<total>d row(s), %<failed>d failed', total: rows.size, failed: failures)
@@ -148,8 +164,12 @@ namespace :whatsapp do
         abort 'usage: rake "whatsapp:providers:session:resync_groups[<inbox_id>]"' if args[:inbox_id].blank?
 
         channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
-        unless Whatsapp::Session::Registry.session_family?(channel.provider)
-          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which has no groups to sync"
+        # The capability, not the family: `zapi` pairs with a phone and so is session
+        # family, but it declares no `groups` and its frozen service has no `sync_group`,
+        # so every job this enqueued for one would die on NoMethodError. Reading the
+        # capability also honours the instance-wide groups kill switch for free.
+        unless Whatsapp::Session::Registry.capabilities_for(channel).include?('groups')
+          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which cannot answer for groups"
         end
 
         inbox = channel.inbox
@@ -177,6 +197,16 @@ end
 # the dry-run switch is read in exactly one place: a task that decided for itself whether
 # it was applying is how half a batch runs for real.
 module WhatsappProviderConversion
+  # Only the session layer is a destination here, which is also what the dashboard's
+  # convert picker offers. It is not a taste question: validating a target runs that
+  # provider's `validate_provider_config?`, and every legacy and cloud one does it over
+  # the network. 360dialog's goes further and POSTs a new webhook URL, so a dry run aimed
+  # at it would rewrite a live inbox's delivery address while promising to change nothing.
+  # A session backend's `validate_config` is shape-only by contract, which is what makes
+  # the dry run below actually free of side effects.
+  TARGET_REFUSED = "target must be one of #{Whatsapp::Session::PROVIDERS.join(', ')} " \
+                   '(converting to a cloud or frozen provider contacts it, and is a one-inbox job for the dashboard)'.freeze
+
   class << self
     def apply?
       ENV.fetch('APPLY', nil) == '1'
@@ -195,15 +225,17 @@ module WhatsappProviderConversion
       abort_on_missing ? abort(message) : (puts("  SKIP  #{message}") || nil)
     end
 
+    # Raises rather than aborts: the batch has rows after this one and has to decide for
+    # itself, and a helper that kills the process takes that decision away from it.
     def parse_config(raw)
       return {} if raw.blank?
 
       parsed = JSON.parse(raw)
-      raise JSON::ParserError, 'provider config must be a JSON object' unless parsed.is_a?(Hash)
+      raise ArgumentError, 'provider config must be a JSON object' unless parsed.is_a?(Hash)
 
       parsed
     rescue JSON::ParserError => e
-      abort "provider config is not a JSON object: #{e.message}"
+      raise ArgumentError, "provider config is not valid JSON: #{e.message}"
     end
 
     # Validation runs the same way in both modes, so a dry run reports exactly what the
@@ -211,7 +243,7 @@ module WhatsappProviderConversion
     # touches the provider until the conversion itself.
     def convert(channel, target, config)
       label = "inbox #{channel.inbox.id} (#{channel.provider} -> #{target})"
-      return report(label, 'target is not a known provider') unless Channel::Whatsapp::PROVIDERS.include?(target.to_s)
+      return report(label, TARGET_REFUSED) unless Whatsapp::Session::PROVIDERS.include?(target.to_s)
       return report(label, 'already on that provider') if channel.provider == target.to_s
 
       invalid = validation_errors(channel, target, config)

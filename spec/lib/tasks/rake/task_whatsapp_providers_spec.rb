@@ -36,6 +36,7 @@ RSpec.describe Rake::Task do
         end
 
         expect(channel.reload.provider).to eq('baileys')
+        expect(WebMock).not_to have_requested(:any, //)
       end
 
       it 'converts when told to' do
@@ -51,21 +52,41 @@ RSpec.describe Rake::Task do
       # A dry run that reported success and a real run that then failed would be worse than
       # no dry run at all, so both modes validate the same way.
       it 'reports the config the conversion would refuse, in either mode' do
-        with_modified_env APPLY: nil, PROVIDER_CONFIG: { 'base_url' => 'nope' }.to_json do
-          expect { run('whatsapp:providers:convert', channel.inbox.id.to_s, 'uazapi') }
-            .to output(/FAIL.*base_url/m).to_stdout
+        [nil, '1'].each do |apply|
+          with_modified_env APPLY: apply, PROVIDER_CONFIG: { 'base_url' => 'nope' }.to_json do
+            expect { run('whatsapp:providers:convert', channel.inbox.id.to_s, 'uazapi') }
+              .to raise_error(SystemExit)
+              .and output(/FAIL.*base_url/m).to_stdout
+          end
         end
 
         expect(channel.reload.provider).to eq('baileys')
       end
 
-      it 'refuses a provider that does not exist' do
-        with_modified_env APPLY: '1', PROVIDER_CONFIG: '{}' do
-          expect { run('whatsapp:providers:convert', channel.inbox.id.to_s, 'carrier-pigeon') }
-            .to output(/FAIL.*not a known provider/m).to_stdout
+      # Validating a target runs that provider's `validate_provider_config?`, and every
+      # cloud and frozen one does it over the network. 360dialog's POSTs a new webhook URL,
+      # so a dry run aimed at it would rewrite a live inbox's delivery address. Refusing
+      # the target is what keeps the dry run honest.
+      it 'refuses a target outside the session layer, without contacting it' do
+        %w[default whatsapp_cloud baileys carrier-pigeon].each do |target|
+          with_modified_env APPLY: '1', PROVIDER_CONFIG: '{}' do
+            expect { run('whatsapp:providers:convert', channel.inbox.id.to_s, target) }
+              .to raise_error(SystemExit)
+              .and output(/FAIL.*target must be one of/m).to_stdout
+          end
         end
 
         expect(channel.reload.provider).to eq('baileys')
+        expect(WebMock).not_to have_requested(:any, //)
+      end
+
+      # A migration driven from a script reads the exit status, so a failure that exits
+      # zero is a conversion nobody notices did not happen.
+      it 'exits non-zero when the conversion fails' do
+        with_modified_env APPLY: '1', PROVIDER_CONFIG: { 'base_url' => 'nope' }.to_json do
+          expect { run('whatsapp:providers:convert', channel.inbox.id.to_s, 'uazapi') }
+            .to raise_error(SystemExit)
+        end
       end
 
       it 'refuses a provider config that is not a JSON object' do
@@ -109,6 +130,24 @@ RSpec.describe Rake::Task do
 
       # An id that no longer resolves is a stale plan, not a reason to stop: the rows after
       # it are still inboxes someone is waiting to have converted.
+      # Parsing every row first is what keeps a typo on row 2 from leaving row 1 converted
+      # and the rest untouched, with no summary saying so.
+      it 'converts nothing when any row carries a config it cannot read' do
+        write_plan([
+                     [channel.inbox.id, 'uazapi', uazapi_config.to_json],
+                     [other.inbox.id, 'uazapi', '{not json']
+                   ])
+
+        with_modified_env APPLY: '1' do
+          expect { run('whatsapp:providers:convert_batch', csv_path) }
+            .to raise_error(SystemExit)
+            .and output(/row 2.*nothing was converted/m).to_stderr
+        end
+
+        expect(channel.reload.provider).to eq('baileys')
+        expect(other.reload.provider).to eq('baileys')
+      end
+
       it 'skips a row whose inbox is gone and keeps going' do
         write_plan([
                      [0, 'uazapi', uazapi_config.to_json],
@@ -150,7 +189,7 @@ RSpec.describe Rake::Task do
       end
 
       it 'enqueues nothing without APPLY' do
-        with_modified_env APPLY: nil do
+        with_modified_env APPLY: nil, WHATSAPP_GROUPS_ENABLED: 'true' do
           expect { run('whatsapp:providers:session:resync_groups', session_channel.inbox.id.to_s) }
             .to output(/dry run.*Time/m).to_stdout
         end
@@ -159,7 +198,7 @@ RSpec.describe Rake::Task do
       end
 
       it 'enqueues one forced sync per group when told to' do
-        with_modified_env APPLY: '1' do
+        with_modified_env APPLY: '1', WHATSAPP_GROUPS_ENABLED: 'true' do
           expect { run('whatsapp:providers:session:resync_groups', session_channel.inbox.id.to_s) }
             .to output(/1 group\(s\), spread over/).to_stdout
         end
@@ -167,14 +206,39 @@ RSpec.describe Rake::Task do
         expect(Contacts::SyncGroupJob).to have_been_enqueued.with(group, force: true, channel: session_channel)
       end
 
-      # Groups belong to the session family; asking a cloud inbox for them is a mistake
-      # worth naming rather than an empty run that looks like success.
+      # Asking an inbox for groups it cannot answer for is a mistake worth naming rather
+      # than an empty run that looks like success.
       it 'refuses an inbox whose provider has no groups' do
         cloud = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
                                           validate_provider_config: false, sync_templates: false)
 
         expect { run('whatsapp:providers:session:resync_groups', cloud.inbox.id.to_s) }
           .to raise_error(SystemExit)
+      end
+
+      # `zapi` pairs with a phone, so it is session family, but it declares no `groups` and
+      # its frozen service has no `sync_group`. Gating on the family enqueued jobs that
+      # died on NoMethodError; gating on the capability is what tells the two apart.
+      it 'refuses a session-family provider that declares no groups' do
+        zapi = create(:channel_whatsapp, account: account, provider: 'zapi', phone_number: '+551166665555',
+                                         validate_provider_config: false, sync_templates: false)
+        create(:contact_inbox, contact: create(:contact, account: account, group_type: :group), inbox: zapi.inbox)
+
+        with_modified_env APPLY: '1', WHATSAPP_GROUPS_ENABLED: 'true' do
+          expect { run('whatsapp:providers:session:resync_groups', zapi.inbox.id.to_s) }
+            .to raise_error(SystemExit)
+        end
+
+        expect(Contacts::SyncGroupJob).to have_been_enqueued.exactly(0).times
+      end
+
+      # The instance-wide kill switch reaches the capability list, so a deployment with
+      # groups off does not get a fleet of syncs it disabled on purpose.
+      it 'refuses when groups are turned off instance-wide' do
+        with_modified_env APPLY: '1', WHATSAPP_GROUPS_ENABLED: 'false', BAILEYS_WHATSAPP_GROUPS_ENABLED: 'false' do
+          expect { run('whatsapp:providers:session:resync_groups', session_channel.inbox.id.to_s) }
+            .to raise_error(SystemExit)
+        end
       end
     end
   end
