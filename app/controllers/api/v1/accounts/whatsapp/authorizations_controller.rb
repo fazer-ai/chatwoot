@@ -55,7 +55,6 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   def can_reconfigure_channel?
     channel = @inbox.channel
     return false unless channel.is_a?(Channel::Whatsapp)
-    return true if ChatwootApp.chatwoot_cloud?
 
     # Reconfiguring a live embedded-signup channel requires the feature flag.
     return Current.account.feature_enabled?('whatsapp_reconfigure') if channel.provider_config['source'] == 'embedded_signup'
