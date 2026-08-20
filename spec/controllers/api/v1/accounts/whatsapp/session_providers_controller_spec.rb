@@ -64,13 +64,19 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         end
       end
 
-      # Legacy providers are described so an existing inbox can be labelled, never
-      # offered as a destination for a new one.
-      it 'never marks a legacy provider creatable' do
+      # Frozen, not withdrawn: they are what most inboxes run on today, and the
+      # deprecation is what stops offering them.
+      it 'keeps the legacy providers on offer' do
         legacy = payload.select { |p| p['legacy'] }
 
         expect(legacy.pluck('key')).to contain_exactly('baileys', 'zapi')
-        expect(legacy.pluck('creatable')).to all(be(false))
+        expect(legacy.pluck('creatable')).to all(be(true))
+      end
+
+      it 'withdraws the legacy providers when the deprecation switch is thrown' do
+        with_modified_env WHATSAPP_LEGACY_PROVIDERS_CREATABLE: 'false' do
+          expect(payload.select { |p| p['legacy'] }.pluck('creatable')).to all(be(false))
+        end
       end
     end
   end

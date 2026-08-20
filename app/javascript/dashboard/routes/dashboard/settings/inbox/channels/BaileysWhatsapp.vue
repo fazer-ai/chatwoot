@@ -170,7 +170,13 @@ const setShowAdvancedOptions = () => {
       v-if="!showAdvancedOptions"
       class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4"
     >
-      <NextButton icon="i-lucide-plus" sm link @click="setShowAdvancedOptions">
+      <NextButton
+        type="button"
+        icon="i-lucide-plus"
+        sm
+        link
+        @click="setShowAdvancedOptions"
+      >
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
       </NextButton>
     </div>

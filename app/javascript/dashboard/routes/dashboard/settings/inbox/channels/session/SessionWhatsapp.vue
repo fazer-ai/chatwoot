@@ -201,6 +201,7 @@ const submit = async () => {
       class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4"
     >
       <NextButton
+        type="button"
         icon="i-lucide-plus"
         sm
         link

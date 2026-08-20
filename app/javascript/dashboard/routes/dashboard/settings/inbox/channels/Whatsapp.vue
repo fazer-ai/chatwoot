@@ -176,24 +176,19 @@ const PROVIDER_CATALOG = computed(() => [
   },
 ]);
 
-// Keys shown in the picker. 360Dialog is intentionally hidden in create mode
-// (URL-reachable only) but offered in convert mode where it is a valid target.
-const CREATE_PICKER_KEYS = [
-  PROVIDER_TYPES.WHATSAPP,
-  PROVIDER_TYPES.TWILIO,
-  PROVIDER_TYPES.BAILEYS,
-  PROVIDER_TYPES.ZAPI,
-];
+// The cloud family, which this dashboard has always known statically. 360Dialog is
+// intentionally hidden in create mode (URL-reachable only) but offered in convert mode
+// where it is a valid target.
+const CREATE_PICKER_KEYS = [PROVIDER_TYPES.WHATSAPP, PROVIDER_TYPES.TWILIO];
 const CONVERT_PICKER_KEYS = [
   PROVIDER_TYPES.WHATSAPP,
-  PROVIDER_TYPES.BAILEYS,
-  PROVIDER_TYPES.ZAPI,
   PROVIDER_TYPES.THREE_SIXTY_DIALOG,
 ];
 
-// The session providers are offered per account during the rollout, so the server is
-// what says whether this account may pick one. Offering a choice it would then refuse
-// is worse than not offering it.
+// Every session provider comes from the catalog instead, legacy included: eligibility is
+// per account during the rollout and per installation once the deprecation starts, and
+// the server is what knows both. Offering a choice it would then refuse is worse than
+// not offering it, and withdrawing one becomes a server-side change.
 const { creatableProviders, descriptorFor, fetchProviders } =
   useWhatsappSessionProviders();
 onMounted(fetchProviders);
@@ -452,7 +447,7 @@ const requestEmbeddedSignupAccess = () => {
           :inbox="inbox"
         />
         <SessionWhatsapp
-          v-else-if="selectedDescriptor"
+          v-else-if="selectedDescriptor && !selectedDescriptor.legacy"
           :descriptor="selectedDescriptor"
           :mode="mode"
           :inbox="inbox"
