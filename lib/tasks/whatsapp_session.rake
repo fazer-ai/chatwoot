@@ -204,10 +204,18 @@ module WhatsappProviderConversion
   # at it would rewrite a live inbox's delivery address while promising to change nothing.
   # A session backend's `validate_config` is shape-only by contract, which is what makes
   # the dry run below actually free of side effects.
-  TARGET_REFUSED = "target must be one of #{Whatsapp::Session::PROVIDERS.join(', ')} " \
-                   '(converting to a cloud or frozen provider contacts it, and is a one-inbox job for the dashboard)'.freeze
-
   class << self
+    # A method, not a constant. Rake evaluates a module body while it loads the task files,
+    # which happens before the `:environment` prerequisite sets up autoloading, so naming an
+    # app constant out here breaks *every* rake invocation with a NameError, `rake -T` and
+    # `db:migrate` included. Nothing in the suite catches it either: `rails_helper` requires
+    # `config/environment` before it calls `load_tasks`, so specs and CI stay green while the
+    # command line is dead.
+    def target_refused
+      "target must be one of #{Whatsapp::Session::PROVIDERS.join(', ')} " \
+        '(converting to a cloud or frozen provider contacts it, and is a one-inbox job for the dashboard)'
+    end
+
     def apply?
       ENV.fetch('APPLY', nil) == '1'
     end
@@ -243,7 +251,7 @@ module WhatsappProviderConversion
     # touches the provider until the conversion itself.
     def convert(channel, target, config)
       label = "inbox #{channel.inbox.id} (#{channel.provider} -> #{target})"
-      return report(label, TARGET_REFUSED) unless Whatsapp::Session::PROVIDERS.include?(target.to_s)
+      return report(label, target_refused) unless Whatsapp::Session::PROVIDERS.include?(target.to_s)
       # Not a failure: it is the state the row asked for. Counting it as one meant a batch
       # rerun after a partial failure could never exit zero, since every row the first
       # attempt converted now lands here.
