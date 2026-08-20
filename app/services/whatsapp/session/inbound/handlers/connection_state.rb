@@ -9,7 +9,11 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     state = build_state
     return :ignored if state.nil?
 
-    result = Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state)
+    # Fenced to the instance the event arrived from, and the writer compares it inside the
+    # row lock: an inbox re-pointed after the dispatcher looked would otherwise take the
+    # previous instance's state, down to the number it was paired with, which reads as the
+    # wrong one and ends the session that just replaced it.
+    result = Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state, instance: instance)
     result == :stale ? :ignored : :handled
   end
 

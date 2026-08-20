@@ -30,13 +30,19 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
     Rails.logger.warn("[WHATSAPP SESSION] giving up on an out-of-order event for inbox ##{job.arguments.first&.id}: #{error.message}")
   end
 
-  # `payload` is the provider's webhook body, as it arrived, and `instance` names what it
-  # was authenticated against.
+  # `payload` is the provider's webhook body, as it arrived, and `instance` names the
+  # provider instance it was authenticated against, which the dispatcher fences every
+  # event against: the token that authenticated the body is stripped before it is
+  # enqueued, and two instances of a hosted provider share a base URL, so without it the
+  # previous instance's messages are filed under the new one.
+  #
+  # Optional because a caller can have nothing to name, and a fence on the shape of the
+  # call would be no fence at all. Every enqueue in this build names one.
   def perform(channel, payload, instance = nil)
     translator = Whatsapp::Session::Registry.translator_for(channel)
-    return if translator.nil? || reconfigured?(channel, instance)
+    return if translator.nil?
 
-    deferred = dispatch(channel, translator.new(channel, payload).perform)
+    deferred = dispatch(channel, translator.new(channel, payload).perform, instance)
     return if deferred.empty?
 
     raise Whatsapp::Session::Errors::EventOutOfOrder,
@@ -52,19 +58,9 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
   # Every event first, and only then the wait. Raising on the first one that has to wait
   # would leave the rest of a bulk deletion undispatched, and every retry would stop at
   # the same missing message: the ids after it would never be deleted at all.
-  def dispatch(channel, events)
-    events.select { |event| Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred }
-  end
-
-  # Re-pointed while this waited in the queue. The token that authenticated the body is
-  # stripped before it is enqueued, and two instances of a hosted provider share a base
-  # URL, so without this the previous instance's messages are filed under the new one.
-  #
-  # Answered as "not re-pointed" when the job carries no instance, which is what a caller
-  # with nothing to compare gets: this job is only ever enqueued by the controller, which
-  # always names one, and a fence that refused everything else would be a fence on the
-  # shape of the call rather than on the inbox.
-  def reconfigured?(channel, instance)
-    instance.present? && instance != Whatsapp::Session::Registry.instance_fingerprint(channel)
+  def dispatch(channel, events, instance)
+    events.select do |event|
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event, instance: instance) == :deferred
+    end
   end
 end

@@ -17,7 +17,7 @@ RSpec.describe Webhooks::WhatsappSessionEventsJob do
 
     job.perform_now(channel, body)
 
-    expect(dispatcher).to have_received(:dispatch).with(channel, having_attributes(type: 'message.received'))
+    expect(dispatcher).to have_received(:dispatch).with(channel, having_attributes(type: 'message.received'), instance: nil)
   end
 
   # A body this build cannot read produces nothing, which is what lets the provider send
@@ -31,16 +31,17 @@ RSpec.describe Webhooks::WhatsappSessionEventsJob do
   end
 
   # Re-pointed while the body sat in the queue. The token that authenticated it is gone by
-  # then and two instances of a hosted provider share a base URL, so nothing else in the
-  # job says which one it was meant for.
-  it 'does nothing for a body the inbox has since stopped listening to' do
-    allow(dispatcher).to receive(:dispatch)
+  # then and two instances of a hosted provider share a base URL, so the fingerprint taken
+  # when it arrived is the only thing left that says which instance it was meant for.
+  it 'writes nothing from a body the inbox has since stopped listening to' do
     fingerprint = Whatsapp::Session::Registry.instance_fingerprint(channel)
+    # The move itself lets go of the instance being left, which is a request of its own.
+    stub_request(:post, 'https://free.uazapi.com/webhook').to_return(status: 200, body: '{}')
     channel.update!(provider_config: channel.provider_config.merge('token' => 'another-instance'))
 
     job.perform_now(channel.reload, body, fingerprint)
 
-    expect(dispatcher).not_to have_received(:dispatch)
+    expect(channel.inbox.messages).to be_empty
   end
 
   # Converted while the body sat in the queue: this provider's events are not this

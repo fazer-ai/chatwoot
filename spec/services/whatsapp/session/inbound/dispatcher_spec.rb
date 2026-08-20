@@ -35,6 +35,22 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
     expect(channel.inbox.messages).to be_empty
   end
 
+  # The move the provider check cannot see: two instances of a hosted provider share a
+  # base URL, so re-pointing an inbox leaves the key alone and changes only the token
+  # behind it. What arrives afterwards is the traffic of an instance this inbox has left,
+  # and filing it here files another WhatsApp account's chats.
+  it 'drops an event authenticated for an instance the inbox has left' do
+    uazapi = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(uazapi)
+    inbound = model::InboundMessage.new(id: '3EB0AAAA0002', chat: model::Address.phone('5541999990000'),
+                                        from_me: false, content: model::Content::Text.new(body: 'oi'))
+    event = model::Event.build(model::Events::MessageReceived.new(message: inbound))
+    uazapi.update_columns(provider_config: uazapi.provider_config.merge('token' => 'another-instance')) # rubocop:disable Rails/SkipsModelValidations
+
+    expect(described_class.dispatch(uazapi, event, instance: fingerprint)).to eq(:ignored)
+    expect(uazapi.inbox.messages).to be_empty
+  end
+
   # A session paired with a number the inbox is not configured for is somebody else's
   # WhatsApp account. The logout that removes it is asynchronous and retried, so without
   # this its chats would be filed here in the meantime.

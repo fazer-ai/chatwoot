@@ -11,11 +11,15 @@
 # connector delivers a session's events in order, so there the target is genuinely absent
 # and the answer means the same as `:ignored`.
 class Whatsapp::Session::Inbound::Handlers::Base
-  attr_reader :channel, :event
+  attr_reader :channel, :event, :instance
 
-  def initialize(channel:, event:)
+  # `instance` is the provider instance the event was authenticated against, when the
+  # transport can tell. Only the connection record can act on it (the writer compares it
+  # inside the row lock); for everything else the dispatcher's check is the whole fence.
+  def initialize(channel:, event:, instance: nil)
     @channel = channel
     @event = event
+    @instance = instance
   end
 
   def perform
