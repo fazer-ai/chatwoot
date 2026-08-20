@@ -6,6 +6,8 @@ import {
   useStore,
 } from 'dashboard/composables/store';
 import { useAccount } from 'dashboard/composables/useAccount';
+import { useInbox } from 'dashboard/composables/useInbox';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
@@ -90,8 +92,14 @@ const conversationAdditionalAttributes = computed(
 );
 
 const channelType = computed(() => currentChat.value.meta?.channel);
+const { hasInboxCapability } = useInbox();
 const isGroupConversation = computed(
   () => currentChat.value.group_type === 'group'
+);
+// A group thread whose provider cannot answer for groups has no member list to show and
+// no sync to run: asking anyway is a request that fails behind the panel.
+const showGroupInfo = computed(
+  () => isGroupConversation.value && hasInboxCapability(CAPABILITIES.GROUPS)
 );
 const sidebarTitle = computed(() =>
   isGroupConversation.value
@@ -113,7 +121,7 @@ const getContactDetails = () => {
 };
 
 const triggerGroupSync = () => {
-  if (isGroupConversation.value && contactId.value) {
+  if (showGroupInfo.value && contactId.value) {
     store.dispatch('groupMembers/sync', { contactId: contactId.value });
   }
 };
@@ -155,7 +163,7 @@ onMounted(() => {
       :title="$t(sidebarTitle)"
       @close="closeContactPanel"
     />
-    <GroupContactInfo v-if="isGroupConversation" :contact="contact" />
+    <GroupContactInfo v-if="showGroupInfo" :contact="contact" />
     <ContactInfo v-else :contact="contact" :channel-type="channelType" />
     <div class="px-2 pb-8 list-group">
       <Draggable

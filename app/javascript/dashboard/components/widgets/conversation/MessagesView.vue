@@ -22,6 +22,7 @@ import { mapGetters } from 'vuex';
 
 // mixins
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 
 // utils
 import { emitter } from 'shared/helpers/mitt';
@@ -126,7 +127,6 @@ export default {
       currentUser: 'getCurrentUser',
       listLoadingStatus: 'getAllMessagesLoaded',
       currentAccountId: 'getCurrentAccountId',
-      globalConfig: 'globalConfig/get',
       isMetaMessageSendingDisabled: 'globalConfig/isMetaMessageSendingDisabled',
     }),
     currentInbox() {
@@ -291,15 +291,10 @@ export default {
       return { incoming, outgoing };
     },
     inboxSupportsEdit() {
-      // Currently only Baileys WhatsApp channel supports message editing
-      return this.isAWhatsAppBaileysChannel;
+      return this.hasInboxCapability(CAPABILITIES.EDIT);
     },
     inboxSupportsReactions() {
-      return (
-        this.isAWhatsAppCloudChannel ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel
-      );
+      return this.hasInboxCapability(CAPABILITIES.REACTIONS);
     },
     currentContact() {
       const senderId = this.currentChat?.meta?.sender?.id;
@@ -340,7 +335,7 @@ export default {
     },
     isAnnouncementModeRestricted() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.announce === true &&
         this.isGroupMembersLoaded &&
@@ -349,16 +344,18 @@ export default {
     },
     isGroupLeft() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.group_left === true
       );
     },
     isGroupsDisabled() {
+      // The server already strips the group capabilities when the kill switch is off, so
+      // the absence of `groups` is what "disabled" means here — for every provider.
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        !this.globalConfig.baileysWhatsappGroupsEnabled
+        !this.hasInboxCapability(CAPABILITIES.GROUPS)
       );
     },
     isSuperAdmin() {
@@ -433,7 +430,7 @@ export default {
       handler(contactId) {
         if (
           contactId &&
-          this.isAWhatsAppBaileysChannel &&
+          this.hasInboxCapability(CAPABILITIES.GROUPS) &&
           this.isGroupConversation &&
           !this.isGroupMembersLoaded
         ) {
@@ -848,7 +845,7 @@ export default {
     class="flex flex-col justify-between flex-grow h-full min-w-0 m-0"
   >
     <div ref="topBannerRef">
-      <template v-if="isAWhatsAppBaileysChannel || isAWhatsAppZapiChannel">
+      <template v-if="isASessionWhatsAppChannel">
         <WhatsappLinkDeviceModal
           v-if="showLinkDeviceModal"
           :show="showLinkDeviceModal"

@@ -73,9 +73,8 @@ export default {
   validations() {
     return {
       whatsAppInboxAPIKey: {
-        requiredIf: requiredIf(
-          !this.isAWhatsAppBaileysChannel && !this.isAWhatsAppZapiChannel
-        ),
+        // A session provider pairs with a phone; there is no API key to ask for.
+        requiredIf: requiredIf(!this.isASessionWhatsAppChannel),
       },
       baileysProviderUrl: { isValidURL: value => !value || isValidURL(value) },
       zapiInstanceIdUpdate: {},

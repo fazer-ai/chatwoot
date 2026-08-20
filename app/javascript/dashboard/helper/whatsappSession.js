@@ -1,0 +1,72 @@
+/**
+ * The QR/pairing family of WhatsApp providers, legacy ones included.
+ *
+ * What sets these apart from the cloud family (`whatsapp_cloud`, `default`) is
+ * behavioral, not who serves them: a paired session is a real WhatsApp client, so there
+ * is no 24-hour messaging window and no template requirement. Mirrors
+ * `Whatsapp::Session::Registry.session_family?`.
+ */
+export const SESSION_PROVIDERS = ['baileys', 'zapi', 'native', 'uazapi'];
+
+/**
+ * What a provider can actually do. Mirrors `Whatsapp::Session::Capabilities::ALL`, which
+ * is what the server declares per provider and serves on the inbox payload.
+ *
+ * Gate features on these instead of on a provider name: a name says who is answering, a
+ * capability says whether the call will work, and the two stop agreeing the moment a
+ * provider is added or a kill switch is thrown.
+ */
+export const CAPABILITIES = {
+  QR_PAIRING: 'qr_pairing',
+  CODE_PAIRING: 'code_pairing',
+  SESSION_IMPORT: 'session_import',
+  ECHO_BY_RESERVED_ID: 'echo_by_reserved_id',
+  EDIT: 'edit',
+  REVOKE: 'revoke',
+  REACTIONS: 'reactions',
+  TYPING: 'typing',
+  PRESENCE: 'presence',
+  PRESENCE_SUBSCRIBE: 'presence_subscribe',
+  READ_RECEIPTS: 'read_receipts',
+  MARK_UNREAD: 'mark_unread',
+  CHECK_NUMBER: 'check_number',
+  PROFILE_PICTURE: 'profile_picture',
+  GROUPS: 'groups',
+  GROUP_ADMIN: 'group_admin',
+  GROUP_INVITES: 'group_invites',
+  GROUP_JOIN_REQUESTS: 'group_join_requests',
+  ACCOUNT_LIMITS: 'account_limits',
+  HISTORY_SYNC: 'history_sync',
+  CALLS: 'calls',
+  MEDIA_DOWNLOAD: 'media_download',
+};
+
+/**
+ * Takes the provider rather than the whole inbox on purpose: an inbox reaches the
+ * dashboard in two shapes (snake_case straight from the store, camelCase through
+ * `useCamelCase`), so a helper reading `channel_type` off it would silently answer false
+ * on half the call sites. Each caller pairs this with the channel-type check it already
+ * has in its own shape.
+ *
+ * @param {string|undefined} provider
+ * @returns {boolean}
+ */
+export const isSessionProvider = provider =>
+  SESSION_PROVIDERS.includes(provider);
+
+/**
+ * The capability list the server put on this inbox. Absent for every non-WhatsApp
+ * channel, so a gate on an unrelated inbox reads false instead of throwing.
+ *
+ * @param {{capabilities?: string[]}|null|undefined} inbox
+ * @returns {string[]}
+ */
+export const inboxCapabilities = inbox => inbox?.capabilities ?? [];
+
+/**
+ * @param {{capabilities?: string[]}|null|undefined} inbox
+ * @param {string} capability - one of CAPABILITIES
+ * @returns {boolean}
+ */
+export const hasCapability = (inbox, capability) =>
+  inboxCapabilities(inbox).includes(capability);
