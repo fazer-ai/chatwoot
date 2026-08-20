@@ -7,7 +7,7 @@ import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
 import { required } from '@vuelidate/validators';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
-import { isValidURL } from 'dashboard/helper/URLHelper';
+import { isHttpUrl } from 'dashboard/helper/whatsappSession';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
@@ -73,7 +73,7 @@ const fieldRules = field => {
   const rules = {};
   if (field.required) rules.required = required;
   if (field.type === 'url')
-    rules.isValidURL = value => !value || isValidURL(value);
+    rules.isHttpUrl = value => !value || isHttpUrl(value);
   return rules;
 };
 

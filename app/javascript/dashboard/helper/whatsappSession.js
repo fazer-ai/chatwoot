@@ -70,3 +70,29 @@ export const inboxCapabilities = inbox => inbox?.capabilities ?? [];
  */
 export const hasCapability = (inbox, capability) =>
   inboxCapabilities(inbox).includes(capability);
+
+/**
+ * Whether a provider address has a shape the server would accept.
+ *
+ * It lives here rather than in `helper/URLHelper` because it exists to mirror one
+ * server-side rule: `Backend.validate_config` takes any http(s) URI that has a host, and
+ * decides separately whether one inside the deployment's own network is permitted
+ * (`Whatsapp::Session::PrivateAddress` plus `SafeFetch.allow_private_network?`). The
+ * dashboard cannot know that policy, so it checks shape only.
+ *
+ * `isValidURL` is stricter than that: its regex needs a dot in the host, which refuses
+ * `http://uazapi:3000` and `http://localhost:3000` (the compose-network addresses the
+ * `use_internal_host` field exists for) and every IPv6 literal. A form that refuses more
+ * than the server does is a provider the operator cannot enter at all.
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+export const isHttpUrl = value => {
+  try {
+    const { protocol, hostname } = new URL(value);
+    return (protocol === 'http:' || protocol === 'https:') && hostname !== '';
+  } catch {
+    return false;
+  }
+};

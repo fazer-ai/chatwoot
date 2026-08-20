@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
-import { isValidURL } from 'dashboard/helper/URLHelper';
+import { isHttpUrl } from 'dashboard/helper/whatsappSession';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 
 import SettingsSection from 'dashboard/components/SettingsSection.vue';
@@ -65,7 +65,7 @@ const isInvalid = field => {
   const value = values.value[field.name];
   if (field.required && field.secret) return false;
   if (field.required && !value) return true;
-  return field.type === 'url' && value && !isValidURL(value);
+  return field.type === 'url' && value && !isHttpUrl(value);
 };
 
 const save = async field => {
