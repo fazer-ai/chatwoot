@@ -82,6 +82,11 @@ class Whatsapp::Session::Backend
   # trying. Best effort by definition, and a no-op for a backend that registers nothing.
   def release_registration = nil
 
+  # The other half: whatever the provider has to hold to reach this inbox, put back in
+  # place. Called when the address it should post to changes without the session itself
+  # changing, and a no-op for a backend that registers nothing.
+  def ensure_registration = nil
+
   # Reach-out lock and new-chat quota, polled while the session is open.
   def fetch_account_limits = not_supported!(:fetch_account_limits)
 

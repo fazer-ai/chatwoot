@@ -93,7 +93,10 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       config = channel.provider_config || {}
       return if config['token'].blank?
 
-      Digest::SHA256.hexdigest("#{config['base_url']}\n#{config['token']}")
+      # Normalized the way the client normalizes it, so an address that differs only in a
+      # trailing slash is not read as another instance: that would empty a live connection
+      # record and withdraw a webhook that was never pointed anywhere else.
+      Digest::SHA256.hexdigest("#{config['base_url'].to_s.chomp('/')}\n#{config['token']}")
     end
 
     # Resolved on every call rather than held in a constant: a constant captured when this
@@ -174,9 +177,12 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     withdraw_webhook
   end
 
-  def release_registration
-    withdraw_webhook
-  end
+  def release_registration = withdraw_webhook
+
+  # Points the instance at this inbox's webhook URL again. The URL is not derived from
+  # anything the instance knows, so a deployment that changes which host it hands out has
+  # to say so: nothing else would, and the instance would go on posting at the old one.
+  def ensure_registration = register_webhook
 
   def fetch_connection_state
     connection_state(client.get('/instance/status'))
