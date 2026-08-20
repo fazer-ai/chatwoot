@@ -27,15 +27,17 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   end
 
   # `pairing` is the mode the connect command asked for; `deadline_at` is set on the first
-  # run and carried forward so re-enqueueing never extends the ceiling. `provider` and
-  # `attempt` say which pairing this chain belongs to: an inbox converted, or connected
-  # again, while a poll sat in the queue would otherwise be polled against whatever it
-  # became, and this chain's timeout would land on somebody else's live QR.
-  def perform(channel, pairing: 'qr', deadline_at: nil, provider: nil, attempt: nil)
+  # run and carried forward so re-enqueueing never extends the ceiling.
+  #
+  # `fence` is which pairing this chain belongs to: its provider, the instance behind it
+  # and the attempt that claimed the screen. An inbox converted, re-pointed at another
+  # instance, or connected again while a poll sat in the queue would otherwise be polled
+  # against whatever it became, and this chain's timeout would land on somebody else's
+  # live QR. A chain runs for minutes, so the window is not a small one.
+  def perform(channel, pairing: 'qr', deadline_at: nil, fence: {})
     @channel = channel
     @pairing = pairing.to_s
-    @provider = provider
-    @attempt = attempt
+    @fence = (fence || {}).symbolize_keys
     @deadline_at = deadline_at || self.class.deadline_for(@pairing)
     return unless current?
 
@@ -50,7 +52,11 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
 
   private
 
-  attr_reader :channel, :pairing, :provider, :attempt, :deadline_at
+  attr_reader :channel, :pairing, :fence, :deadline_at
+
+  def provider = fence[:provider]
+  def instance = fence[:instance]
+  def attempt = fence[:attempt]
 
   # Whether the inbox is still the one this chain started on, and still on this attempt.
   # Re-read every time, including after the provider request, because a conversion or a
@@ -58,6 +64,7 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
   def current?
     channel.reload
     return false if provider.present? && channel.provider != provider
+    return false if instance.present? && instance != Whatsapp::Session::Registry.instance_fingerprint(channel)
     return true if attempt.blank?
 
     channel.provider_connection['pairing_attempt'] == attempt
@@ -70,12 +77,13 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     # Fenced, not merely checked above: a second connect claiming the pairing between that
     # check and this write would have its QR replaced by the one this chain is holding,
     # and the chain driving the screen would retire itself over a token it never wrote.
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with_attempt(attempt), attempt: attempt)
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state.with_attempt(attempt), attempt: attempt,
+                                                                                             instance: instance)
     return if settled?(state)
     return give_up(TIMEOUT_ERRORS.fetch(pairing, 'pairing_timed_out')) if Time.current + INTERVAL >= deadline_at
 
     self.class.set(wait: INTERVAL).perform_later(
-      channel, pairing: pairing, deadline_at: deadline_at, provider: provider, attempt: attempt
+      channel, pairing: pairing, deadline_at: deadline_at, fence: fence
     )
   end
 
@@ -86,7 +94,8 @@ class Whatsapp::Session::PairingPollJob < ApplicationJob
     return unless current?
 
     Whatsapp::Session::ConnectionStateWriter.new(channel).apply(
-      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: error), attempt: attempt
+      Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: error), attempt: attempt,
+                                                                                        instance: instance
     )
   end
 

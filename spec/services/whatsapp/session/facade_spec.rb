@@ -73,7 +73,7 @@ RSpec.describe Whatsapp::Session::Facade do
     # The attempt token is generated per connect, so it is matched by shape, not value.
     expect { channel.provider_service.setup_channel_provider }
       .to have_enqueued_job(Whatsapp::Session::PairingPollJob)
-      .with(channel, hash_including(pairing: 'qr', provider: 'native'))
+      .with(channel, hash_including(pairing: 'qr', fence: hash_including(provider: 'native')))
   end
 
   # Two connects racing: the operator clicking twice, or a second tab. Whichever provider
