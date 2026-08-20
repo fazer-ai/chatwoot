@@ -199,7 +199,9 @@ describe Whatsapp::Providers::WhatsappCloudService do
         attachment.save!
         # Simulate Marcel detecting audio/opus (as happens with OGG Opus files in Marcel 1.1.0)
         attachment.file.blob.update_column(:content_type, 'audio/opus') # rubocop:disable Rails/SkipsModelValidations
-        attachment.file.blob.reload
+        # The service reads the attachment the way a job does, straight from the database. Without
+        # dropping the association cache it would keep the pre-update blob and never normalize.
+        message.attachments.reload
 
         stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
           .with(
