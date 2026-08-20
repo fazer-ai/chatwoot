@@ -114,9 +114,25 @@ class Whatsapp::Session::Inbound::ReactionStore
 
     # Active-only: when every match is already deleted this returns nil, so an echoed
     # removal does not re-delete the row and bump the conversation again.
-    matches.where.not(content: '')
-           .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
-           .reorder(created_at: :desc)
-           .first
+    preferred(matches.where.not(content: '')
+                     .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
+                     .reorder(created_at: :desc)
+                     .to_a)
+  end
+
+  # Which of them the echo belongs to, for a provider that gives it neither our reserved
+  # id nor a token of our own. Two agents can each hold an outgoing reaction on one
+  # target, since a row is filed per user here where WhatsApp keeps one reaction per
+  # number, so the newest is a guess: writing this echo's id onto the wrong one leaves the
+  # row that actually sent it without an id at all, and its retry sends a second time.
+  #
+  # The send that produced the echo is the one still waiting for an id, and among those
+  # the one that asked for this emoji. A removal carries no emoji to match on and is
+  # aimed at whatever is active, so it keeps the plain newest-first answer.
+  def preferred(candidates)
+    return candidates.first unless reaction.from_me && reaction.emoji.present?
+
+    pending = candidates.select { |message| message.source_id.blank? }
+    pending.find { |message| message.content == reaction.emoji } || pending.first || candidates.first
   end
 end

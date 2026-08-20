@@ -158,6 +158,21 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       expect(build_channel('baileys').provider_config['webhook_verify_token']).to be_present
       expect(build_channel('default').provider_config['webhook_verify_token']).to be_nil
     end
+
+    # provider_config is permitted wholesale by the inbox API and this secret is never
+    # shown on the form, so an update that left the key out minted a new one while the
+    # provider went on posting to the URL carrying the old: every webhook answered 401
+    # until somebody reconnected the inbox.
+    it 'keeps the stored one when an update leaves the key out' do
+      channel = build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      original = channel.provider_config['webhook_verify_token']
+
+      expect(original).to be_present
+
+      channel.update!(provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+
+      expect(channel.reload.provider_config['webhook_verify_token']).to eq(original)
+    end
   end
 
   # The connector keys its whatsmeow store by this id, and provider_config is permitted

@@ -128,16 +128,21 @@ module Whatsapp::Session::ChannelExtension
   def ensure_webhook_verify_token
     return super unless session_provider?
 
-    provider_config['webhook_verify_token'] ||= SecureRandom.hex(16)
-    provider_config['session_id'] = own_session_id
+    provider_config['webhook_verify_token'] = kept('webhook_verify_token') { SecureRandom.hex(16) }
+    provider_config['session_id'] = kept('session_id') { SecureRandom.uuid }
   end
 
   # Written from the stored value rather than from whatever came in, because
-  # provider_config is permitted wholesale by the inbox API: an update that left this key
-  # out used to mint a new id and orphan the session the connector is still holding under
-  # the old one, and one supplied by a caller could name another inbox's session.
-  def own_session_id
-    stored = persisted? ? (provider_config_was || {})['session_id'] : nil
-    stored.presence || SecureRandom.uuid
+  # provider_config is permitted wholesale by the inbox API and neither of these keys is
+  # shown on the form. An update that leaves one out used to mint a new one: a new session
+  # id orphans the session the connector is still holding under the old one, and a new
+  # webhook secret leaves the provider posting to a URL this app now answers 401, so the
+  # inbox goes quiet until somebody reconnects it.
+  #
+  # One handed in by a caller is ignored for the same reason it is not asked for: it could
+  # name another inbox's session, or make the secret a value somebody else chose.
+  def kept(key)
+    stored = persisted? ? (provider_config_was || {})[key] : nil
+    stored.presence || yield
   end
 end

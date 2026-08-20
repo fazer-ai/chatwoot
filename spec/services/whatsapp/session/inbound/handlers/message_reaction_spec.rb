@@ -101,6 +101,36 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     end
   end
 
+  # Two agents can each hold an outgoing reaction on one target, since a row is filed per
+  # user here where WhatsApp keeps one reaction per number. Landing the echo on the newest
+  # would leave the row that actually sent it without an id, and its retry would send a
+  # second time.
+  context 'with two agents holding a reaction on the same message' do
+    let(:agent) { create(:user, account: channel.account) }
+    let(:other) { create(:user, account: channel.account) }
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '5511999990001:3EB0PROVIDER', chat: model::Address.phone('5541999990000'), sender: nil,
+        from_me: true, target_id: target.source_id, emoji: '👍', timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'confirms the one still waiting for an id that asked for this emoji' do
+      sending = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                 message_type: :outgoing, sender: agent, source_id: nil, content: '👍',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: target.source_id,
+                                                       pending_source_id: '3EB0RESERVED' })
+      settled = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                 message_type: :outgoing, sender: other, source_id: '3EB0SETTLED', content: '❤️',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: target.source_id })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(sending.reload.source_id).to eq('5511999990001:3EB0PROVIDER')
+      expect(settled.reload.source_id).to eq('3EB0SETTLED')
+    end
+  end
+
   # Resolving a sender creates a Contact, a ContactInbox and an avatar job, and a
   # removal aimed at a message nobody reacted to has nothing to remove.
   context 'with a removal that matches nothing' do
