@@ -17,6 +17,7 @@ import TextArea from 'next/textarea/TextArea.vue';
 import { sanitizeAllowedDomains, isValidURL } from 'dashboard/helper/URLHelper';
 import { requiredIf } from '@vuelidate/validators';
 import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
+import WhatsappBusinessManagementToken from './WhatsappBusinessManagementToken.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
 
@@ -31,6 +32,7 @@ export default {
     NextButton,
     TextArea,
     WhatsappLinkDeviceModal,
+    WhatsappBusinessManagementToken,
     InboxName,
     // eslint-disable-next-line vue/no-reserved-component-names
     Switch,
@@ -620,6 +622,14 @@ export default {
           </div>
         </SettingsFieldSection>
       </template>
+      <WhatsappBusinessManagementToken
+        v-if="
+          isOnChatwootCloud &&
+          inbox.provider === 'whatsapp_cloud' &&
+          isEmbeddedSignupWhatsApp
+        "
+        :inbox="inbox"
+      />
       <SettingsFieldSection
         :label="$t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_TEMPLATES_SYNC_TITLE')"
         :help-text="

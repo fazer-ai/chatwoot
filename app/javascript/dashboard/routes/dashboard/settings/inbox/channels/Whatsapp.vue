@@ -9,8 +9,12 @@ import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
 import BaileysWhatsapp from './BaileysWhatsapp.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
+import Banner from 'dashboard/components-next/banner/Banner.vue';
+import Button from 'dashboard/components-next/button/Button.vue';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { META_RESTRICTION_STATUS_URL } from 'dashboard/constants/globals';
 
 const props = defineProps({
   mode: {
@@ -29,7 +33,11 @@ const isConvertMode = computed(() => props.mode === 'convert');
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
-const { isCloudFeatureEnabled, isOnChatwootCloud } = useAccount();
+const {
+  isCloudFeatureEnabled,
+  isOnChatwootCloud,
+  isMetaInboxCreationDisabled,
+} = useAccount();
 
 // Latched by the child once it triggers the post-success router.replace.
 // Suppresses rendering during the navigation tail so the parent doesn't
@@ -51,6 +59,16 @@ const PROVIDER_TYPES = {
   BAILEYS: 'baileys',
   ZAPI: 'zapi',
 };
+
+// Upstream's own gate for the access-request card: the app id alone says embedded signup
+// exists on this installation. The fork's check below is the stricter one, and decides
+// whether the flow can actually run.
+const hasWhatsappAppId = computed(() => {
+  return (
+    window.chatwootConfig?.whatsappAppId &&
+    window.chatwootConfig.whatsappAppId !== 'none'
+  );
+});
 
 const hasEmbeddedSignupConfig = computed(() => {
   const { whatsappAppId, whatsappConfigurationId } =
@@ -77,12 +95,31 @@ const currentProviderKey = computed(() => {
   return INBOX_PROVIDER_TO_KEY[props.inbox.provider] || null;
 });
 
+const isWhatsappEmbeddedSignupDisabled = computed(
+  () => isMetaInboxCreationDisabled.value
+);
+
+const isWhatsappEmbeddedSignupFeatureEnabled = computed(
+  () =>
+    !isOnChatwootCloud.value ||
+    isCloudFeatureEnabled(FEATURE_FLAGS.WHATSAPP_EMBEDDED_SIGNUP_FLOW)
+);
+
 const shouldShowWhatsappEmbeddedSignup = computed(() => {
   return (
     selectedProvider.value === PROVIDER_TYPES.WHATSAPP &&
     hasEmbeddedSignupConfig.value &&
-    (!isOnChatwootCloud.value ||
-      isCloudFeatureEnabled(FEATURE_FLAGS.WHATSAPP_EMBEDDED_SIGNUP_FLOW))
+    isWhatsappEmbeddedSignupFeatureEnabled.value
+  );
+});
+
+const shouldShowEmbeddedSignupAccessRequest = computed(() => {
+  return (
+    selectedProvider.value === PROVIDER_TYPES.WHATSAPP &&
+    isOnChatwootCloud.value &&
+    hasWhatsappAppId.value &&
+    !isWhatsappEmbeddedSignupFeatureEnabled.value &&
+    !isWhatsappEmbeddedSignupDisabled.value
   );
 });
 
@@ -90,7 +127,9 @@ const PROVIDER_CATALOG = computed(() => [
   {
     key: PROVIDER_TYPES.WHATSAPP,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
-    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD_DESC'),
+    description: isWhatsappEmbeddedSignupDisabled.value
+      ? t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD_MANUAL_SETUP_DESC')
+      : t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD_DESC'),
     icon: 'i-woot-whatsapp',
   },
   {
@@ -172,11 +211,23 @@ const showConfiguration = computed(
   () => !isLeaving.value && isValidSelectedProvider.value
 );
 
+const providerSelectionDescription = computed(() =>
+  isWhatsappEmbeddedSignupDisabled.value
+    ? t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.RESTRICTION_DESCRIPTION')
+    : t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION')
+);
+
 const selectProvider = providerValue => {
+  const targetProvider =
+    providerValue === PROVIDER_TYPES.WHATSAPP &&
+    isWhatsappEmbeddedSignupDisabled.value
+      ? PROVIDER_TYPES.WHATSAPP_MANUAL
+      : providerValue;
+
   router.push({
     name: route.name,
     params: route.params,
-    query: { provider: providerValue },
+    query: { provider: targetProvider },
   });
 };
 
@@ -190,6 +241,10 @@ const shouldShowCloudWhatsapp = provider => {
 
 const handleManualLinkClick = () => {
   selectProvider(PROVIDER_TYPES.WHATSAPP_MANUAL);
+};
+
+const requestEmbeddedSignupAccess = () => {
+  window.$chatwoot?.toggle();
 };
 </script>
 
@@ -211,7 +266,7 @@ const handleManualLinkClick = () => {
                   inboxName: inbox?.name,
                   currentProvider: currentProviderLabel,
                 })
-              : $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION')
+              : providerSelectionDescription
           }}
         </p>
       </div>
@@ -235,6 +290,9 @@ const handleManualLinkClick = () => {
           <WhatsappEmbeddedSignup
             :mode="mode"
             :inbox="inbox"
+            :is-disabled="isWhatsappEmbeddedSignupDisabled"
+            :show-restriction-alert="isWhatsappEmbeddedSignupDisabled"
+            :restriction-status-url="META_RESTRICTION_STATUS_URL"
             @leaving="handleEmbeddedSignupLeaving"
           />
 
@@ -263,11 +321,82 @@ const handleManualLinkClick = () => {
         </div>
 
         <!-- Show manual setup -->
-        <CloudWhatsapp
-          v-else-if="shouldShowCloudWhatsapp(selectedProvider)"
-          :mode="mode"
-          :inbox="inbox"
-        />
+        <div v-else-if="shouldShowCloudWhatsapp(selectedProvider)">
+          <div
+            v-if="shouldShowEmbeddedSignupAccessRequest"
+            class="w-full p-4 mb-6 border rounded-xl border-n-weak bg-n-solid-2"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div
+                class="flex items-center justify-center flex-shrink-0 rounded-lg size-9 bg-n-blue-3"
+              >
+                <Icon icon="i-woot-whatsapp" class="size-5 text-n-slate-10" />
+              </div>
+              <div class="flex-1 min-w-0 text-start">
+                <div class="font-medium text-n-slate-12">
+                  {{
+                    $t(
+                      'INBOX_MGMT.ADD.WHATSAPP.EMBEDDED_SIGNUP.ACCESS_REQUEST.TITLE'
+                    )
+                  }}
+                </div>
+                <p class="mt-1 text-sm leading-5 text-n-slate-11">
+                  {{
+                    $t(
+                      'INBOX_MGMT.ADD.WHATSAPP.EMBEDDED_SIGNUP.ACCESS_REQUEST.DESCRIPTION'
+                    )
+                  }}
+                </p>
+                <p class="mt-2 text-xs leading-5 text-n-slate-10">
+                  {{
+                    $t(
+                      'INBOX_MGMT.ADD.WHATSAPP.EMBEDDED_SIGNUP.ACCESS_REQUEST.FOOTNOTE'
+                    )
+                  }}
+                </p>
+              </div>
+              <Button
+                solid
+                blue
+                sm
+                class="self-start flex-shrink-0 sm:mt-0.5"
+                icon="i-lucide-life-buoy"
+                :label="
+                  $t(
+                    'INBOX_MGMT.ADD.WHATSAPP.EMBEDDED_SIGNUP.ACCESS_REQUEST.BUTTON'
+                  )
+                "
+                @click="requestEmbeddedSignupAccess"
+              />
+            </div>
+          </div>
+          <Banner
+            v-if="isWhatsappEmbeddedSignupDisabled"
+            color="amber"
+            class="w-full mb-6"
+          >
+            <div class="flex items-start gap-3 text-start">
+              <Icon
+                icon="i-lucide-triangle-alert"
+                class="flex-shrink-0 size-4 mt-0.5"
+              />
+              <span>
+                {{
+                  $t('INBOX_MGMT.ADD.WHATSAPP.API.MANUAL_RESTRICTION_WARNING')
+                }}
+                <a
+                  :href="META_RESTRICTION_STATUS_URL"
+                  class="link underline"
+                  rel="noopener noreferrer nofollow"
+                  target="_blank"
+                >
+                  {{ $t('INBOX_MGMT.ADD.WHATSAPP.API.STATUS_LINK') }}
+                </a>
+              </span>
+            </div>
+          </Banner>
+          <CloudWhatsapp :mode="mode" :inbox="inbox" />
+        </div>
 
         <!-- Other providers -->
         <Twilio

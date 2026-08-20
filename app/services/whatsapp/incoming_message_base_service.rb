@@ -372,11 +372,22 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
 
   def message_content_attributes(message)
     content_attrs = outgoing_echo ? { external_echo: true } : {}
+    content_attrs[:in_reply_to] = in_reply_to_message_id if in_reply_to_message_id.present?
     content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
     content_attrs[:external_created_at] = message[:timestamp].to_i
     content_attrs[:is_reaction] = true if message_type == 'reaction'
     referral = normalize_cloud_referral(message)
     content_attrs[:referral] = referral if referral.present?
+
+    flow_response = message.dig(:interactive, :nfm_reply)
+    if flow_response.present?
+      content_attrs[:whatsapp_flow_response] = {
+        name: flow_response[:name],
+        body: flow_response[:body],
+        response_json: parse_flow_response_json(flow_response[:response_json])
+      }.compact
+    end
+
     content_attrs
   end
 
@@ -420,3 +431,5 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
     @contact.name == phone_number || @contact.name == formatted_phone_number
   end
 end
+
+Whatsapp::IncomingMessageBaseService.prepend_mod_with('Whatsapp::IncomingMessageBaseService')

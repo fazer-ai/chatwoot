@@ -164,3 +164,5 @@ class Whatsapp::Providers::BaseService
     Base64.strict_encode64(buffer)
   end
 end
+
+Whatsapp::Providers::BaseService.prepend_mod_with('Whatsapp::Providers::BaseService')

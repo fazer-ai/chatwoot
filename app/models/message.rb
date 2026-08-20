@@ -57,6 +57,7 @@ class Message < ApplicationRecord
           'category': { 'type': 'string' },
           'language': { 'type': 'string' },
           'namespace': { 'type': 'string' },
+          'content_mode': { 'type': 'string', 'enum': %w[raw_template rendered] },
           'processed_params': { 'type': 'object' }
         },
         'required': %w[name]
@@ -519,6 +520,8 @@ class Message < ApplicationRecord
   end
 
   def reindex_for_search
+    return unless respond_to?(:reindex)
+
     reindex(mode: :async)
   end
 end
