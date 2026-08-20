@@ -175,6 +175,24 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  # Destruction goes ahead whether or not the provider answered the teardown, and a
+  # webhook left registered against a channel that no longer exists is a customer's
+  # instance posting at a 404 for as long as it keeps trying.
+  describe 'the teardown of a destroyed inbox' do
+    it 'releases the webhook even when the provider will not disconnect' do
+      channel = build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      stub_request(:post, 'https://uazapi.test/instance/disconnect').to_return(status: 500, body: '{}')
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+
+      channel.inbox.destroy!
+
+      expect(WebMock).to have_requested(:post, 'https://uazapi.test/webhook').with(body: hash_including('enabled' => false))
+    end
+  end
+
   # The connector keys its whatsmeow store by this id, and provider_config is permitted
   # wholesale by the inbox API, so an update that left the key out used to mint a new one
   # and orphan the session the connector was still holding under the old one.

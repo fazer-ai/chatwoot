@@ -67,6 +67,13 @@ class Whatsapp::Session::Backend
   def request_pairing_code(_command) = not_supported!(:request_pairing_code)
   def import_session(_payload) = not_supported!(:import_session)
 
+  # Whatever the provider holds pointing at this inbox, released on its own. Called when
+  # the inbox is destroyed, after the session teardown and whether or not that teardown
+  # worked: destruction goes ahead either way, and a registration left behind is a
+  # customer's instance posting at a channel that no longer exists for as long as it keeps
+  # trying. Best effort by definition, and a no-op for a backend that registers nothing.
+  def release_registration = nil
+
   # Reach-out lock and new-chat quota, polled while the session is open.
   def fetch_account_limits = not_supported!(:fetch_account_limits)
 

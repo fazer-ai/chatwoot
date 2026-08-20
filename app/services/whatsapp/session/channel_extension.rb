@@ -41,6 +41,21 @@ module Whatsapp::Session::ChannelExtension
     Whatsapp::Session::Registry.backend_for(self)
   end
 
+  # The destroy path alone: `convert_provider!` reaches the provider service directly.
+  # Destruction goes ahead whether or not the provider answered, which is why the model
+  # swallows a teardown failure here, and why the registration is released separately: the
+  # teardown stops at the disconnect when that fails, deliberately, because on a
+  # conversion the webhook has to survive a rollback. There is no inbox left for it to
+  # survive for, so it goes. On the ordinary path this repeats a withdrawal the teardown
+  # already made, which is one request against an instance we are done with.
+  def disconnect_channel_provider
+    return super unless session_provider?
+
+    super
+  ensure
+    session_backend.release_registration if session_provider?
+  end
+
   # A session provider fetches outbound media from Rails itself, so on an installation
   # where it cannot reach the public frontend URL (local Active Storage behind a private
   # network) the operator points INTERNAL_HOST_URL at something it can. Setting it is the

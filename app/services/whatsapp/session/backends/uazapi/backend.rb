@@ -157,6 +157,10 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     withdraw_webhook
   end
 
+  def release_registration
+    withdraw_webhook
+  end
+
   def fetch_connection_state
     connection_state(client.get('/instance/status'))
   end
