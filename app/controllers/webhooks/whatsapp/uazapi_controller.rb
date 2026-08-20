@@ -14,7 +14,10 @@ class Webhooks::Whatsapp::UazapiController < ActionController::API
     return head :not_found if channel.blank?
     return head :unauthorized unless authentic?
 
-    Webhooks::WhatsappSessionEventsJob.perform_later(channel, event_payload)
+    # The instance this body was authenticated against, so a job dispatched after the
+    # inbox was re-pointed can tell that it belongs to the one before.
+    Webhooks::WhatsappSessionEventsJob.perform_later(channel, event_payload,
+                                                     Whatsapp::Session::Registry.instance_fingerprint(channel))
     head :ok
   end
 

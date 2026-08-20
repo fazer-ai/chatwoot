@@ -110,6 +110,12 @@ module Whatsapp::Session::Registry
       backend.nil? || backend.hosted?(channel)
     end
 
+    # See `Backend.instance_fingerprint`. nil for a provider this layer does not serve, so
+    # a caller comparing two of them is never fenced by a pair of nils.
+    def instance_fingerprint(channel)
+      descriptor(channel.provider)&.backend_class&.instance_fingerprint(channel)
+    end
+
     def backend_for(channel)
       descriptor = descriptor(channel.provider)
       raise Whatsapp::Session::Errors::InvalidConfig, "#{channel.provider} is not served by the session layer" unless descriptor&.served?

@@ -76,6 +76,21 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
     expect(channel.reload.provider_connection['reachout_time_lock']).to be_nil
   end
 
+  # A conversion is not the only way the answer stops belonging here: pointed at another
+  # instance of the same provider, the key does not change and only the address and the
+  # token behind it do, so the provider fence sees nothing. What lands is the old
+  # instance's number read against the new inbox, which is the shape of a wrong-number
+  # quarantine, and a quarantine ends the session that just replaced it.
+  it 'does not write the state of an instance the inbox has been moved off' do
+    stub_request(:get, "#{base}/instance/status").to_return(
+      status: 200, body: fixture('instance_status_connected').to_json, headers: { 'Content-Type' => 'application/json' }
+    ).with { channel.update!(provider_config: channel.provider_config.merge('token' => 'another-instance')) || true }
+
+    described_class.perform_now(channel)
+
+    expect(channel.reload.provider_connection['connection']).to be_nil
+  end
+
   it 'does nothing for an inbox that has left the session layer' do
     channel.update_column(:provider, 'whatsapp_cloud') # rubocop:disable Rails/SkipsModelValidations
 

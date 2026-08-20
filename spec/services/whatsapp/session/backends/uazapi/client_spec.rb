@@ -58,6 +58,21 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
     end
   end
 
+  # HTTParty carries every header it was given across a redirect, the instance token
+  # among them, so a 3xx to another host would hand that credential to whoever answers
+  # there.
+  it 'does not follow a redirect off the private-network path' do
+    allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['10.0.0.5'])
+    stub_request(:post, 'https://uazapi.test/send/text').to_return(status: 302, headers: { 'Location' => 'https://evil.test/x' })
+    stub_request(:post, 'https://evil.test/x').to_return(status: 200, body: '{}')
+
+    with_modified_env SAFE_FETCH_ALLOW_PRIVATE_NETWORK: 'true' do
+      expect { client.post('/send/text', { number: '55' }) }.to raise_error(errors::ProviderUnavailable)
+    end
+
+    expect(WebMock).not_to have_requested(:post, 'https://evil.test/x')
+  end
+
   describe 'what it makes of a failure' do
     # The class decides what the caller does next: a retryable error keeps an outbound
     # message in the queue, a non-retryable one puts the reason in front of the agent.

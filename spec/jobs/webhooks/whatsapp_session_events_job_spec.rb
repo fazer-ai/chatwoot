@@ -30,6 +30,19 @@ RSpec.describe Webhooks::WhatsappSessionEventsJob do
     expect(dispatcher).not_to have_received(:dispatch)
   end
 
+  # Re-pointed while the body sat in the queue. The token that authenticated it is gone by
+  # then and two instances of a hosted provider share a base URL, so nothing else in the
+  # job says which one it was meant for.
+  it 'does nothing for a body the inbox has since stopped listening to' do
+    allow(dispatcher).to receive(:dispatch)
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(channel)
+    channel.update!(provider_config: channel.provider_config.merge('token' => 'another-instance'))
+
+    job.perform_now(channel.reload, body, fingerprint)
+
+    expect(dispatcher).not_to have_received(:dispatch)
+  end
+
   # Converted while the body sat in the queue: this provider's events are not this
   # inbox's business any more, and there is no translator to read them with.
   it 'does nothing for an inbox that has left the session layer' do

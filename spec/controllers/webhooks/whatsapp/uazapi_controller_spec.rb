@@ -14,9 +14,12 @@ RSpec.describe 'Webhooks::Whatsapp::UazapiController', type: :request do
     "/webhooks/whatsapp/session/uazapi/#{id}/#{token}"
   end
 
-  it 'queues the events of an authentic delivery' do
+  it 'queues the events of an authentic delivery, naming the instance they came from' do
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(channel)
+
     expect { post_webhook(webhook_path, body) }
-      .to have_enqueued_job(Webhooks::WhatsappSessionEventsJob).with(channel, hash_including('EventType' => 'connection'))
+      .to have_enqueued_job(Webhooks::WhatsappSessionEventsJob)
+      .with(channel, hash_including('EventType' => 'connection'), fingerprint)
 
     expect(response).to have_http_status(:ok)
   end
@@ -25,7 +28,8 @@ RSpec.describe 'Webhooks::Whatsapp::UazapiController', type: :request do
   # carry the credential into a job argument, its retries and whatever logs those pass.
   it 'strips the instance credential before the body goes anywhere' do
     expect { post_webhook(webhook_path, body) }
-      .to have_enqueued_job(Webhooks::WhatsappSessionEventsJob).with(channel, satisfy { |payload| payload.exclude?('token') })
+      .to have_enqueued_job(Webhooks::WhatsappSessionEventsJob)
+      .with(channel, satisfy { |payload| payload.exclude?('token') }, anything)
   end
 
   # Two independent secrets: one proves the caller was told where to post, the other that

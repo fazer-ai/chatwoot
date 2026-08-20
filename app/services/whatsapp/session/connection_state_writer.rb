@@ -48,11 +48,12 @@ class Whatsapp::Session::ConnectionStateWriter
   # `reset: true` means the operator asked for this connection: a quarantine from the
   # previous pairing does not carry over, because re-pairing is the way out of one.
   #
-  # `attempt:` fences the write to one pairing attempt and `provider:` to the provider the
-  # caller was built for. Both are checked inside the lock, which is the only place they
-  # mean anything: a caller that reads the record, then asks the provider, then writes,
-  # has left a gap in the middle for a second connect or a conversion to land in.
-  def apply(state, reset: false, attempt: nil, provider: nil)
+  # `attempt:` fences the write to one pairing attempt, `provider:` to the provider the
+  # caller was built for and `instance:` to the one it asked. All three are checked inside
+  # the lock, which is the only place they mean anything: a caller that reads the record,
+  # then asks the provider, then writes, has left a gap in the middle for a second connect,
+  # a conversion or a re-pointing to land in.
+  def apply(state, reset: false, attempt: nil, provider: nil, instance: nil)
     written = nil
 
     result = channel.with_lock do
@@ -61,7 +62,7 @@ class Whatsapp::Session::ConnectionStateWriter
       # event quarantined the inbox reads the pre-quarantine record and clears it.
       written = enforce_number_ownership(state, reset: reset)
       persisted = channel.provider_connection.presence || {}
-      next :stale if refuse?(written, persisted, attempt: attempt, provider: provider)
+      next :stale if refuse?(written, persisted, attempt: attempt, provider: provider, instance: instance)
 
       payload = merge(written, persisted)
       next :unchanged if payload == persisted
@@ -170,8 +171,20 @@ class Whatsapp::Session::ConnectionStateWriter
   # Three ways a state arrives too late to be true: the inbox is on another provider now,
   # the pairing it belongs to has been retired, or an older owner of the session is still
   # talking.
-  def refuse?(state, persisted, attempt:, provider:)
-    converted?(provider) || superseded?(attempt, persisted) || stale?(state, persisted)
+  def refuse?(state, persisted, attempt:, provider:, instance:)
+    converted?(provider) || reconfigured?(instance) || superseded?(attempt, persisted) || stale?(state, persisted)
+  end
+
+  # The inbox was pointed at another instance of the same provider while this write was in
+  # flight, which the provider fence cannot see: the key does not change, only the address
+  # and the token behind it. What would land here is one instance's state under another,
+  # down to a phone number that would read as the wrong one and end the new session.
+  def reconfigured?(instance)
+    return false if instance.blank?
+
+    moved = instance != Whatsapp::Session::Registry.instance_fingerprint(channel)
+    Rails.logger.warn("[WHATSAPP SESSION] write for a previous instance discarded on ##{channel.id}") if moved
+    moved
   end
 
   # The record has moved on from the pairing attempt this write belongs to, so it is an

@@ -14,18 +14,20 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
     backend = channel.session_backend
     return unless backend.class.state_polling?
 
-    # Both writes are fenced to the provider this backend was built for. A conversion can
-    # land while a request is in flight, and either write would then go into the empty
-    # connection record the new provider just started with.
-    provider = channel.provider
-    refresh_state(channel, backend, provider)
-    refresh_limits(channel, backend, provider)
+    # Both writes are fenced to the instance this backend was built for. A conversion, or a
+    # re-pointing to another instance of the same provider, can land while a request is in
+    # flight: the first would write into the empty connection record the new provider just
+    # started with, and the second would report one instance's state, down to a phone
+    # number that reads as the wrong one and ends the new session, under another.
+    fence = { provider: channel.provider, instance: Whatsapp::Session::Registry.instance_fingerprint(channel) }
+    refresh_state(channel, backend, fence)
+    refresh_limits(channel, backend, fence)
   end
 
   private
 
-  def refresh_state(channel, backend, provider)
-    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(backend.fetch_connection_state, provider: provider)
+  def refresh_state(channel, backend, fence)
+    Whatsapp::Session::ConnectionStateWriter.new(channel).apply(backend.fetch_connection_state, **fence)
   rescue Whatsapp::Session::Errors::Error => e
     # A provider that cannot be reached is not the same as a session that closed, and
     # writing `close` over a healthy connection because of one failed request would show
@@ -41,10 +43,11 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
   # sticky fields, so a limit written onto an inbox that has just been converted survives
   # every state update the new provider sends and shows the agent the old provider's
   # restrictions until the new one happens to report its own.
-  def refresh_limits(channel, backend, provider)
+  def refresh_limits(channel, backend, fence)
     limits = backend.fetch_account_limits || {}
     channel.with_lock do
-      next if channel.provider != provider
+      next if channel.provider != fence[:provider]
+      next if fence[:instance] != Whatsapp::Session::Registry.instance_fingerprint(channel)
 
       channel.update_account_limits!(limits)
     end

@@ -45,6 +45,14 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # What identifies the instance an inbox is pointed at, in a form safe to carry in a job
+    # payload and compare later: a webhook is authenticated when it arrives and dispatched
+    # afterwards, and a poll asks the provider before it writes, so both have a gap in the
+    # middle for the inbox to be re-pointed. nil where the provider has no such notion.
+    def instance_fingerprint(_channel)
+      nil
+    end
+
     # The webhook translator for a provider that pushes over HTTP. nil means there is
     # nothing to translate: the connector publishes canonical events already.
     def translator

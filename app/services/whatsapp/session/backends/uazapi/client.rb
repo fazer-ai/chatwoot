@@ -109,11 +109,18 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # An operator who has opened the private network is running the instance next to
   # Chatwoot, which is the one case the filter above cannot be asked about: it has no way
   # to be told that this particular private address is the intended one.
-  # `open_timeout` on its own line because HTTParty's `timeout` sets all three, and a
+  #
+  # `open_timeout` on its own key because HTTParty's `timeout` sets all three, and a
   # blackholed instance would otherwise hold a worker for the whole read budget, which on
   # a media send is a minute, before the connection even failed.
+  #
+  # `no_follow` because this library carries every header it was given across a redirect,
+  # the instance token among them, so a 3xx to another host would hand that credential to
+  # whoever answers there. There is no redirect on this API worth following: one is either
+  # a misconfiguration or somebody standing in front of it, and both read better as the
+  # provider being unreachable.
   def direct(method, path, query, payload, timeout)
-    options = { headers: headers, timeout: timeout, open_timeout: OPEN_TIMEOUT }
+    options = { headers: headers, timeout: timeout, open_timeout: OPEN_TIMEOUT, no_follow: true }
     options[:query] = query if query.present?
     options[:body] = payload if payload.present?
     response = HTTParty.public_send(method, url(path), **options)

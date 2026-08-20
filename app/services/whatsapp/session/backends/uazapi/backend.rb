@@ -79,6 +79,17 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       !ActiveModel::Type::Boolean.new.cast(channel.provider_config['use_internal_host'])
     end
 
+    # The token is what tells two instances apart: on the hosted service they share a base
+    # URL and nothing else in the config belongs to them. Digested, because this is written
+    # into a job payload and waits in Redis until the job runs, and a credential does not
+    # belong there.
+    def instance_fingerprint(channel)
+      config = channel.provider_config || {}
+      return if config['token'].blank?
+
+      Digest::SHA256.hexdigest("#{config['base_url']}\n#{config['token']}")
+    end
+
     # Resolved on every call rather than held in a constant: a constant captured when this
     # file loads keeps the class from before the last reload.
     def translator

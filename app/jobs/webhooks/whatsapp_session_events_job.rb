@@ -30,16 +30,13 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
     Rails.logger.warn("[WHATSAPP SESSION] giving up on an out-of-order event for inbox ##{job.arguments.first&.id}: #{error.message}")
   end
 
-  # `payload` is the provider's webhook body, as it arrived.
-  def perform(channel, payload)
+  # `payload` is the provider's webhook body, as it arrived, and `instance` names what it
+  # was authenticated against.
+  def perform(channel, payload, instance = nil)
     translator = Whatsapp::Session::Registry.translator_for(channel)
-    return if translator.nil?
+    return if translator.nil? || reconfigured?(channel, instance)
 
-    events = translator.new(channel, payload).perform
-    # Every event first, and only then the wait. Raising on the first one that has to wait
-    # would leave the rest of a bulk deletion undispatched, and every retry would stop at
-    # the same missing message: the ids after it would never be deleted at all.
-    deferred = events.select { |event| Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred }
+    deferred = dispatch(channel, translator.new(channel, payload).perform)
     return if deferred.empty?
 
     raise Whatsapp::Session::Errors::EventOutOfOrder,
@@ -48,5 +45,22 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
     # A body this version cannot read is a provider or contract problem, not something a
     # retry fixes.
     Rails.logger.error("[WHATSAPP SESSION] invalid webhook on inbox ##{channel.inbox&.id}: #{e.message}")
+  end
+
+  private
+
+  # Every event first, and only then the wait. Raising on the first one that has to wait
+  # would leave the rest of a bulk deletion undispatched, and every retry would stop at
+  # the same missing message: the ids after it would never be deleted at all.
+  def dispatch(channel, events)
+    events.select { |event| Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred }
+  end
+
+  # Re-pointed while this waited in the queue. The token that authenticated the body is
+  # stripped before it is enqueued, and two instances of a hosted provider share a base
+  # URL, so without this the previous instance's messages are filed under the new one.
+  # Optional, so a body enqueued by the release before this one is still delivered.
+  def reconfigured?(channel, instance)
+    instance.present? && instance != Whatsapp::Session::Registry.instance_fingerprint(channel)
   end
 end
