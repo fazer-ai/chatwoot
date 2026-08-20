@@ -5,6 +5,7 @@ import { useAlert } from 'dashboard/composables';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Spinner from 'shared/components/Spinner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import { CAPABILITIES, hasCapability } from 'dashboard/helper/whatsappSession';
 
 const props = defineProps({
   show: { type: Boolean, required: true },
@@ -25,8 +26,16 @@ const error = computed(() => providerConnection.value?.error);
 
 // Alternative onboarding when WhatsApp's extra device-linking verification blocks
 // the QR: install the browser extension and import an already-linked session.
+//
+// The credentials it hands over are Baileys', and only a Baileys inbox can consume
+// them, so the offer follows the capability. Advertising it to a provider that cannot
+// accept the import sends the agent through an install and a scan that end in a refused
+// request.
 const extensionUrl =
   'https://chromewebstore.google.com/detail/fazerai-whatsapp-connecto/nchdjpjplcnggifnemiiclgjplooible';
+const supportsSessionImport = computed(() =>
+  hasCapability(props.inbox, CAPABILITIES.SESSION_IMPORT)
+);
 
 const loading = ref(false);
 const showImportDetails = ref(false);
@@ -171,7 +180,7 @@ watchEffect(() => {
           <!-- Fallback kept available in every non-open state, including while the
                QR is shown: import an already-linked session via the extension. -->
           <div
-            v-if="connection !== 'open'"
+            v-if="connection !== 'open' && supportsSessionImport"
             class="flex flex-col gap-1 items-center pt-4 mt-2 w-full border-t border-n-weak"
           >
             <p class="text-sm font-medium text-center text-n-slate-12">
