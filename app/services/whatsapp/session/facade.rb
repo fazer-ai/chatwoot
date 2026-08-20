@@ -271,14 +271,30 @@ class Whatsapp::Session::Facade
   # long as the new QR is on screen. So the wrong account goes before the marker does,
   # which also stands the asynchronous retry down before there is a new session for it to
   # kill. A provider that cannot be reached raises, and nothing was cleared or connected.
+  #
+  # None of which holds where a logout does not unpair. Uazapi answers 405 on
+  # `/instance/logout`, so the strongest thing available is a disconnect, and the account's
+  # credentials stay on the instance: connecting again resumes that same account, and this
+  # would have lifted the marker for an account that never left, filing its chats here
+  # until the next state quarantined the inbox all over again. The exits there are the
+  # real ones, and the operator is told so: reset the instance on the provider, point the
+  # inbox at another one, or correct the number on the inbox, which the next state the
+  # provider reports then lifts the marker for.
   def end_disowned_session
     return unless Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
 
-    backend.logout
+    end_wrong_account
+    raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.cannot_unpair') unless backend.class.unpairs?
+
     writer.apply(model::ConnectionState.new(connection: 'close'), reset: true, provider: provider, instance: instance)
+  end
+
+  # Best effort, and worth asking even of a provider that cannot unpair: a disconnected
+  # instance stops sending, which takes the wrong account's traffic off this inbox at the
+  # source while the quarantine holds.
+  def end_wrong_account
+    backend.logout
   rescue Whatsapp::Session::Errors::NotSupported
-    # A backend with no logout cannot be held in quarantine either: pairing again is the
-    # only exit it has, and refusing that would leave the inbox with none at all.
     nil
   end
 

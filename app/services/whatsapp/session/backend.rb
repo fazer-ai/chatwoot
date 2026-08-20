@@ -33,6 +33,15 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # Whether `logout` ends the pairing or only the connection. A provider that cannot
+    # unpair keeps the account's credentials whatever it is asked, so connecting again
+    # resumes the very session that was just refused: what that decides is whether
+    # re-pairing is a way out of a wrong-number quarantine, which for most of this layer
+    # is the only exit an operator has.
+    def unpairs?
+      false
+    end
+
     # Whether this inbox's provider runs outside the deployment's network. What it decides
     # is the address outbound media is offered at: a service on the far side of the
     # firewall fetches the attachment over the internet and can never resolve

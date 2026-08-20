@@ -18,6 +18,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
       Whatsapp::Session::Registry.descriptor('native').capabilities
     end
 
+    # `session.logout` unregisters the device with WhatsApp: the store's credentials go
+    # with it, and the next connect asks for a new QR.
+    def unpairs?
+      true
+    end
+
     # The session id is generated when the inbox is saved; the rest of the config is
     # optional toggles, so there is nothing that can be missing here.
     def validate_config(_provider_config)

@@ -18,6 +18,9 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     def capabilities
       Whatsapp::Session::Capabilities::ALL
     end
+
+    # Everything a backend can do, this one does.
+    def unpairs? = true
   end
 
   attr_reader :commands, :connection_state

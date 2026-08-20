@@ -184,6 +184,23 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(backend.commands_of('session.logout')).to be_empty
   end
 
+  # A logout that only disconnects leaves the account's credentials on the provider, so
+  # connecting again resumes the very session that was refused: the marker would be lifted
+  # for an account that never left, and its chats would be filed here until the next state
+  # quarantined the inbox again. The disconnect is still asked for, because an instance
+  # that stops sending takes that account's traffic off this inbox at the source.
+  it 'refuses to connect again on a provider that cannot end the pairing' do
+    channel.update_provider_connection!({ 'connection' => 'close', 'error_code' => 'wrong_phone_number' })
+    allow(backend.class).to receive(:unpairs?).and_return(false)
+
+    expect { channel.provider_service.setup_channel_provider }
+      .to raise_error(Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.cannot_unpair'))
+
+    expect(backend.commands_of('session.logout')).not_to be_empty
+    expect(backend.commands_of('session.connect')).to be_empty
+    expect(channel.reload.provider_connection).to include('error_code' => 'wrong_phone_number')
+  end
+
   it 'leaves the inbox quarantined when the wrong account cannot be ended' do
     channel.update_provider_connection!({ 'connection' => 'close', 'error_code' => 'wrong_phone_number' })
     allow(backend).to receive(:logout).and_raise(Whatsapp::Session::Errors::ProviderUnavailable)

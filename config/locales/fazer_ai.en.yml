@@ -31,6 +31,7 @@ en:
         provider_unavailable: This WhatsApp provider is not available on this installation yet.
         invalid_provider_config: 'Invalid configuration for: %{keys}'
         provider_not_enabled_for_account: This WhatsApp provider is not enabled for this account yet.
+        cannot_unpair: This provider cannot unlink the WhatsApp account paired with it, so connecting again would resume the same account. Reset the instance on the provider, point this inbox at another one, or correct the number configured here.
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.

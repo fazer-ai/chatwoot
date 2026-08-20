@@ -93,6 +93,10 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
     channel.setup_channel_provider
     head :ok
+  rescue Whatsapp::Session::Errors::NotSupported => e
+    # Connecting is refused rather than attempted, and the sentence says what to do
+    # instead: a wrong-number quarantine on a provider that cannot unpair is the case.
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   # Hot-loads a WhatsApp Web session extracted by the browser extension into a

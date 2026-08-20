@@ -177,6 +177,13 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(WebMock).to have_requested(:post, "#{base}/instance/disconnect")
     end
 
+    # Which is not the same as ending the pairing, and the difference decides whether
+    # connecting again is a way out of a wrong-number quarantine: here it is not, because
+    # the account's credentials stay on the instance and the next connect resumes them.
+    it 'does not claim to end a pairing it cannot end' do
+      expect(described_class).not_to be_unpairs
+    end
+
     it 'withdraws the webhook when the inbox is torn down' do
       backend.delete_session
 
