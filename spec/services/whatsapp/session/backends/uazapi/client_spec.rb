@@ -47,6 +47,17 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
     end
   end
 
+  # Anything not named as transport escapes as itself, and a caller that rescues this
+  # layer's own errors lets it through: the pairing poll stops, and the inbox goes on
+  # showing a QR that stopped being valid.
+  it 'answers a closed connection and a gone route as the provider being unreachable' do
+    [EOFError, Errno::ENETUNREACH, Errno::EPIPE, Net::HTTPBadResponse].each do |failure|
+      stub_request(:post, 'https://uazapi.test/send/text').to_raise(failure)
+
+      expect { client.post('/send/text', { number: '55' }) }.to raise_error(errors::ProviderUnavailable)
+    end
+  end
+
   describe 'what it makes of a failure' do
     # The class decides what the caller does next: a retryable error keeps an outbound
     # message in the queue, a non-retryable one puts the reason in front of the agent.

@@ -37,10 +37,17 @@ class Whatsapp::Session::Backends::Uazapi::Client
 
   # Connection-level failures. All of them mean the same thing to a caller: nobody
   # answered, so ask again later.
+  #
+  # The list is long on purpose. Anything left out escapes as itself, and a caller that
+  # rescues this layer's own errors (the pairing poll, the outbound sender) would let it
+  # through and leave an inbox showing state that stopped being true. A peer that closes
+  # before answering raises EOFError, a route that is gone raises ENETUNREACH, and neither
+  # is an HTTParty::Error.
   TRANSPORT_ERRORS = [
-    Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH,
-    Errno::ETIMEDOUT, SocketError, OpenSSL::SSL::SSLError, HTTParty::Error, SsrfFilter::UnresolvedHostname,
-    SsrfFilter::TooManyRedirects
+    Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, Net::HTTPBadResponse, Net::ProtocolError,
+    Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ECONNABORTED, Errno::EHOSTUNREACH, Errno::ENETUNREACH,
+    Errno::ETIMEDOUT, Errno::EPIPE, EOFError, IOError, SocketError, OpenSSL::SSL::SSLError,
+    HTTParty::Error, SsrfFilter::UnresolvedHostname, SsrfFilter::TooManyRedirects
   ].freeze
 
   attr_reader :base_url, :token
@@ -99,8 +106,11 @@ class Whatsapp::Session::Backends::Uazapi::Client
   # An operator who has opened the private network is running the instance next to
   # Chatwoot, which is the one case the filter above cannot be asked about: it has no way
   # to be told that this particular private address is the intended one.
+  # `open_timeout` on its own line because HTTParty's `timeout` sets all three, and a
+  # blackholed instance would otherwise hold a worker for the whole read budget, which on
+  # a media send is a minute, before the connection even failed.
   def direct(method, path, query, payload, timeout)
-    options = { headers: headers, timeout: timeout }
+    options = { headers: headers, timeout: timeout, open_timeout: OPEN_TIMEOUT }
     options[:query] = query if query.present?
     options[:body] = payload if payload.present?
     response = HTTParty.public_send(method, url(path), **options)
