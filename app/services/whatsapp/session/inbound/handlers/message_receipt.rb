@@ -1,7 +1,11 @@
 # Delivery receipts for messages this session sent, and read marks the contact made.
 class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::Inbound::Handlers::Base
+  # One query for the whole batch. A receipt is a batch by nature and a large one by
+  # habit: opening a chat produced a single read event naming 246 messages, most of them
+  # from before the inbox existed, and a lookup per id put hundreds of round trips on the
+  # queue that inbound messages share.
   def perform
-    messages = Array(payload.message_ids).flat_map { |id| find_messages(id).to_a }
+    messages = find_messages(Array(payload.message_ids).compact_blank).to_a
     return :ignored if messages.empty?
 
     updated = messages.count { |message| apply(message) }

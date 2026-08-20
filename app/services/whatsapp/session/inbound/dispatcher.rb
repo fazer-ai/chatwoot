@@ -45,17 +45,22 @@ class Whatsapp::Session::Inbound::Dispatcher
     call.offer call.terminate history.sync
   ].freeze
 
-  attr_reader :channel, :event
+  attr_reader :channel, :event, :instance
 
   # Returns :handled, :ignored or :duplicate. Raises Locks::Busy when another worker
   # holds the chat, which the caller answers by retrying the job.
-  def self.dispatch(channel, event)
-    new(channel, event).perform
+  #
+  # `instance` names the provider instance the event was authenticated against, for the
+  # transports that can tell (a webhook body carries the token it arrived with; the
+  # connector publishes for whichever instance holds the session and has none to name).
+  def self.dispatch(channel, event, instance: nil)
+    new(channel, event, instance: instance).perform
   end
 
-  def initialize(channel, event)
+  def initialize(channel, event, instance: nil)
     @channel = channel
     @event = event
+    @instance = instance
   end
 
   def perform
@@ -64,9 +69,11 @@ class Whatsapp::Session::Inbound::Dispatcher
     handler = HANDLERS[event.type]
     return skip('no handler') if handler.nil?
     return skip('inbox changed provider') if converted?
+    return skip('inbox points at another instance') if repointed?
     return skip('inbox disowned its session') unless allowed_while_disowned?(handler)
 
-    "Whatsapp::Session::Inbound::Handlers::#{handler}".constantize.new(channel: channel, event: event).perform
+    klass = "Whatsapp::Session::Inbound::Handlers::#{handler}".constantize
+    klass.new(channel: channel, event: event, instance: instance).perform
   end
 
   private
@@ -82,6 +89,15 @@ class Whatsapp::Session::Inbound::Dispatcher
     !Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
   end
 
+  # The inbox as it is now, not as the caller's copy remembers it. Read once and used by
+  # both checks below: a job that waited in a queue, a retry that waited out a lock or a
+  # stream replay can all be holding a channel from minutes ago.
+  def current
+    return @current if defined?(@current)
+
+    @current = Channel::Whatsapp.find_by(id: channel.id)
+  end
+
   # A check, not a fence: a conversion can land the moment after this reads, and closing
   # that window properly would mean every handler writing under the channel lock and
   # re-reading the provider there. What it does buy is that a backlog delivered after the
@@ -89,10 +105,25 @@ class Whatsapp::Session::Inbound::Dispatcher
   # a queue, a retry that waited out a lock), stops filing the old provider's chats into
   # an inbox that has moved on.
   def converted?
-    current = Channel::Whatsapp.where(id: channel.id).pick(:provider)
-    return false if current == channel.provider
+    return false if current&.provider == channel.provider
 
-    Rails.logger.warn("[WHATSAPP SESSION] #{channel.provider} event dropped on ##{channel.id}, now #{current.inspect}")
+    Rails.logger.warn("[WHATSAPP SESSION] #{channel.provider} event dropped on ##{channel.id}, now #{current&.provider.inspect}")
+    true
+  end
+
+  # The same check for the move the provider cannot see: the inbox was pointed at another
+  # instance of the same provider, so the key did not change, only the address and the
+  # token behind it. What arrives is another instance's traffic, filed here as if this
+  # inbox had received it, down to a state naming a phone number this one never paired.
+  #
+  # Also a check rather than a fence, for the same reason, and the one write that can be
+  # fenced properly is: `ConnectionState` carries the instance into the writer, which
+  # compares it inside the row lock.
+  def repointed?
+    return false if instance.blank?
+    return false if instance == Whatsapp::Session::Registry.instance_fingerprint(current)
+
+    Rails.logger.warn("[WHATSAPP SESSION] #{event.type} for a previous instance dropped on ##{channel.id}")
     true
   end
 

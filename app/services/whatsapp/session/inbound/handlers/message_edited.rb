@@ -2,7 +2,8 @@
 class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::Inbound::Handlers::Base
   def perform
     target = find_message(payload.message_id)
-    return :ignored if target.nil?
+    # Not stored yet, as far as this transport can tell. On an ordered one it never was.
+    return :deferred if target.nil?
 
     content = edited_content
     # nil is a content type this layer cannot render as text; an empty string is a real

@@ -171,8 +171,8 @@ class Whatsapp::Connector::Consumer::ShardWorker
     rescue Whatsapp::Session::Errors::InvalidEvent, Whatsapp::Session::Errors::InvalidPayload, JSON::ParserError => e
       # A frame this build cannot read does not become readable by being read again.
       # InvalidPayload belongs here with InvalidEvent: every raiser of it is a shape check
-      # on the payload itself, and EventJob, which is the same contract on the HTTP side,
-      # already parks the two together. Without it a malformed nested field stalls every
+      # on the payload itself, and the webhook job, which is the same contract on the HTTP
+      # side, already drops the two together. Without it a malformed nested field stalls every
       # session on the shard for the whole retry ladder before being parked anyway.
       dead_letter(entry_id, fields, e)
       :parked

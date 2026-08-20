@@ -22,6 +22,9 @@ class TriggerScheduledItemsJob < ApplicationJob
 
     # Job to check WhatsApp connection status
     Channels::Whatsapp::BaileysConnectionCheckSchedulerJob.perform_later
+
+    # Same, for the session providers whose state has to be pulled
+    Whatsapp::Session::ConnectionCheckSchedulerJob.perform_later
   end
 end
 

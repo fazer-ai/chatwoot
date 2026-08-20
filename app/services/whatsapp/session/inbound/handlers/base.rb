@@ -1,15 +1,25 @@
-# Common ground for every inbound handler: what the event is about, and the three
+# Common ground for every inbound handler: what the event is about, and the four
 # answers a handler may give.
 #
 #   :handled   the event changed something
 #   :ignored   the event is not actionable here (disabled capability, unknown chat...)
 #   :duplicate the event had already been processed
+#   :deferred  the message this event is about is not stored yet
+#
+# `:deferred` is about delivery order, and only an unordered transport can act on it: an
+# HTTP webhook can run an edit before the message it edits, so its job retries. The
+# connector delivers a session's events in order, so there the target is genuinely absent
+# and the answer means the same as `:ignored`.
 class Whatsapp::Session::Inbound::Handlers::Base
-  attr_reader :channel, :event
+  attr_reader :channel, :event, :instance
 
-  def initialize(channel:, event:)
+  # `instance` is the provider instance the event was authenticated against, when the
+  # transport can tell. Only the connection record can act on it (the writer compares it
+  # inside the row lock); for everything else the dispatcher's check is the whole fence.
+  def initialize(channel:, event:, instance: nil)
     @channel = channel
     @event = event
+    @instance = instance
   end
 
   def perform

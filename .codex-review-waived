@@ -6,11 +6,6 @@ app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide p
 app/javascript/dashboard/helper/actionCable.js: Refresh cached permissions before applying this gate  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Align bot assignments with frontend list visibility  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Upsert conversations when assignment grants access  # PR#367
-# PR#372: real, tracked in fazer-ai/chatwoot#373, and deliberately not answered here.
-# The mechanism depends on payloads captured from a live Uazapi instance in slice 6.
-# The note in event_job.rb sits where the fix belongs; this line only stops the review
-# from reporting it every round. Removing this waiver does not close the issue.
-app/jobs/whatsapp/session/event_job.rb: Preserve HTTP event order before dispatch  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
 # `group_left` is stored on the account-level group Contact, which is exactly where the
 # Baileys layer writes it and where three dashboard components read it. Scoping it per
@@ -23,10 +18,12 @@ app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group
 # that shared job a freshness check, which is its own change. Removing this waiver does
 # not close the issue.
 app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
-# PR#372: the redelivery half of fazer-ai/chatwoot#373, deliberately not answered here.
-# No session provider has a backend until slices 5 and 6, so nothing can replay an event
-# yet, and the claim mechanism depends on what the provider payloads carry. The note in
-# event_job.rb sits where the fix belongs. Removing this waiver does not close the issue.
+# PR#372: the redelivery half of fazer-ai/chatwoot#373, still deliberately not answered.
+# Slice 6 settled the ordering half and left this one open: nothing claims an event id
+# before a handler runs, so a webhook the provider redelivers (a timeout on our 200, a
+# retry of its own) writes a second activity row for a group change. A claim needs a key,
+# and the capture showed the only id this provider sends rides on `connection` events.
+# Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
 # snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
@@ -89,3 +86,22 @@ app/services/whatsapp/session/outbound/message_sender.rb: Recheck deletion befor
 # a commit and a SET, and a processed-events table to prevent it would cost a write per
 # event on the ordering-critical path.
 app/services/whatsapp/connector/consumer/shard_worker.rb: Commit event progress atomically with handler effects  # PR#379
+# PR#380: real, known and not what this slice can fix. The webhook transport carries no
+# ordering, which is what fazer-ai/chatwoot#373 records and what the job this finding
+# names documents at its top: the payloads have nothing monotonic to rebuild an order
+# from, so the only thing on offer is waiting, and waiting is what `:deferred` does for
+# the case a target that is not stored yet. The remedy asked for here, serializing every
+# event of a session or a chat, is a different inbound design (one queue per session, or
+# a per-chat cursor with something to compare), not a change to this job. The reaction
+# sub-case has a cheaper answer that is worse: deferring a removal that finds no active
+# reaction would spend the whole retry ladder on every stray removal, which is the
+# ordinary shape (a reaction taken back on a message from before the inbox was connected)
+# in exchange for a race between two webhooks that are usually seconds apart.
+app/jobs/webhooks/whatsapp_session_events_job.rb: Preserve order for dependent webhook events  # PR#380
+# PR#380: the deployment this describes cannot have happened. `origin/main` carries no
+# file under `whatsapp/session` at all: the layer is unreleased, and this job has never
+# run anywhere, so no queue holds one of its entries under the previous keywords. A shim
+# accepting them would be unreachable on the day it was written. Worth remembering once
+# the layer does ship, because from then on a signature change to a queued job does have
+# to survive a rolling deploy.
+app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queued pairing polls  # PR#380

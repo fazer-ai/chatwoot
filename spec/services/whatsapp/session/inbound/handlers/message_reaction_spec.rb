@@ -73,6 +73,64 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     end
   end
 
+  # The provider that assigns its own message id gives the echo one we never stored, and
+  # its reaction echo carries no correlation token either, so neither the id nor the
+  # reservation can recognize it. What is left is the target: on the WhatsApp side a
+  # `from_me` reaction has one author, the connected number, whether the agent wrote it
+  # here or somebody wrote it on the phone. Read as two authors it becomes a second emoji
+  # on the bubble that no removal can take back.
+  context 'with the echo of an agent reaction the provider named itself' do
+    let(:agent) { create(:user, account: channel.account) }
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '5511999990001:3EB0PROVIDER', chat: model::Address.phone('5541999990000'), sender: nil,
+        from_me: true, target_id: target.source_id, emoji: emoji, timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'lands on the row the agent already has instead of adding a second one' do
+      agent_row = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                   message_type: :outgoing, sender: agent, source_id: nil, content: emoji,
+                                   content_attributes: { is_reaction: true, in_reply_to_external_id: target.source_id,
+                                                         pending_source_id: '3EB0RESERVED' })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(conversation.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").count).to eq(1)
+      expect(agent_row.reload.source_id).to eq('5511999990001:3EB0PROVIDER')
+    end
+  end
+
+  # Two agents can each hold an outgoing reaction on one target, since a row is filed per
+  # user here where WhatsApp keeps one reaction per number. Landing the echo on the newest
+  # would leave the row that actually sent it without an id, and its retry would send a
+  # second time.
+  context 'with two agents holding a reaction on the same message' do
+    let(:agent) { create(:user, account: channel.account) }
+    let(:other) { create(:user, account: channel.account) }
+    let(:reaction) do
+      model::Events::MessageReaction.new(
+        id: '5511999990001:3EB0PROVIDER', chat: model::Address.phone('5541999990000'), sender: nil,
+        from_me: true, target_id: target.source_id, emoji: '👍', timestamp: 1_755_440_000_123
+      )
+    end
+
+    it 'confirms the one still waiting for an id that asked for this emoji' do
+      sending = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                 message_type: :outgoing, sender: agent, source_id: nil, content: '👍',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: target.source_id,
+                                                       pending_source_id: '3EB0RESERVED' })
+      settled = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                                 message_type: :outgoing, sender: other, source_id: '3EB0SETTLED', content: '❤️',
+                                 content_attributes: { is_reaction: true, in_reply_to_external_id: target.source_id })
+
+      expect(dispatch).to eq(:handled)
+
+      expect(sending.reload.source_id).to eq('5511999990001:3EB0PROVIDER')
+      expect(settled.reload.source_id).to eq('3EB0SETTLED')
+    end
+  end
+
   # Resolving a sender creates a Contact, a ContactInbox and an avatar job, and a
   # removal aimed at a message nobody reacted to has nothing to remove.
   context 'with a removal that matches nothing' do
@@ -151,8 +209,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
       )
     end
 
-    it 'drops it instead of inventing a contact and a thread' do
-      expect { expect(dispatch).to eq(:ignored) }
+    it 'waits for it instead of inventing a contact and a thread' do
+      expect { expect(dispatch).to eq(:deferred) }
         .to not_change(Contact, :count).and not_change(inbox.conversations, :count)
     end
   end

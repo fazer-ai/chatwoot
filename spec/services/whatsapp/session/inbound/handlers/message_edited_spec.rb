@@ -44,13 +44,13 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageEdited do
     expect(message.content).to eq('terceira versão')
   end
 
-  it 'ignores an edit of a message it never stored' do
+  it 'waits for a message it has not stored yet' do
     event = model::Event.build(
       model::Events::MessageEdited.new(chat: model::Address.phone('5541999990000'), message_id: '3EB0UNKNOWN',
                                        content: model::Content::Text.new(body: 'x'))
     )
 
-    expect(described_class.new(channel: channel, event: event).perform).to eq(:ignored)
+    expect(described_class.new(channel: channel, event: event).perform).to eq(:deferred)
   end
 
   # Removing a caption is a real edit, and dropping it left the old caption on screen

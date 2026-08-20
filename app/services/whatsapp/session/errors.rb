@@ -123,11 +123,22 @@ module Whatsapp::Session::Errors
     CODE = 'message_already_processing'.freeze
   end
 
+  # The event refers to a message that is not stored yet. Never on the wire: it is how a
+  # transport with no ordering guarantee says "come back in a moment". The ordered
+  # transport never raises it, because there the target really is absent.
+  class EventOutOfOrder < Error
+    CODE = 'event_out_of_order'.freeze
+
+    def retryable?
+      true
+    end
+  end
+
   CLASSES = [
     ProviderUnavailable, Internal, SessionNotFound, NotConnected, NotPaired, OwnedElsewhere,
     Quarantined, ClientOutdated, Timeout, Expired, Unauthorized, NotSupported, InvalidPayload,
     InvalidConfig, InvalidEvent, RateLimited, MediaTooLarge, MediaUnavailable,
-    RecipientNotOnWhatsapp, GroupParticipantNotAllowed, MessageAlreadyProcessing
+    RecipientNotOnWhatsapp, GroupParticipantNotAllowed, MessageAlreadyProcessing, EventOutOfOrder
   ].freeze
 
   BY_CODE = CLASSES.index_by { |klass| klass::CODE }.freeze

@@ -1,12 +1,12 @@
 # A message was deleted for everyone: by the contact, or from the connected phone.
 #
-# If the revoke somehow arrives before the message it points at, this is a no-op and
-# the message is later stored without the flag. WhatsApp delivers in order, so that is
-# rare and accepted; persisting pending revokes would need its own state.
+# A revoke that arrives before the message it points at is answered `:deferred`, which an
+# unordered transport retries. Nothing is persisted in the meantime: a revoke that outlives
+# the retries leaves the message on screen rather than deleting it later.
 class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::Inbound::Handlers::Base
   def perform
     targets = find_messages(payload.message_id).to_a
-    return :ignored if targets.empty?
+    return :deferred if targets.empty?
 
     results = targets.map { |target| payload.by_self? ? revoke_by_self(target) : revoke_by_contact(target) }
     return :ignored unless results.include?(:handled)

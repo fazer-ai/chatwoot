@@ -158,6 +158,122 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       expect(build_channel('baileys').provider_config['webhook_verify_token']).to be_present
       expect(build_channel('default').provider_config['webhook_verify_token']).to be_nil
     end
+
+    # provider_config is permitted wholesale by the inbox API and this secret is never
+    # shown on the form, so an update that left the key out minted a new one while the
+    # provider went on posting to the URL carrying the old: every webhook answered 401
+    # until somebody reconnected the inbox.
+    it 'keeps the stored one when an update leaves the key out' do
+      channel = build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      original = channel.provider_config['webhook_verify_token']
+
+      expect(original).to be_present
+
+      channel.update!(provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+
+      expect(channel.reload.provider_config['webhook_verify_token']).to eq(original)
+    end
+  end
+
+  # Destruction goes ahead whether or not the provider answered the teardown, and a
+  # webhook left registered against a channel that no longer exists is a customer's
+  # instance posting at a 404 for as long as it keeps trying.
+  describe 'the teardown of a destroyed inbox' do
+    it 'releases the webhook even when the provider will not disconnect' do
+      channel = build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      stub_request(:post, 'https://uazapi.test/instance/disconnect').to_return(status: 500, body: '{}')
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+
+      channel.inbox.destroy!
+
+      expect(WebMock).to have_requested(:post, 'https://uazapi.test/webhook').with(body: hash_including('enabled' => false))
+    end
+  end
+
+  # A rotated token, a moved address, a second instance on the same hosted service: the
+  # provider key does not change, so nothing else in the layer notices. Left alone, the
+  # record goes on reporting the session the previous instance had while the new one has
+  # never been told where to deliver, and the inbox reads as connected and receives nothing.
+  describe 'an inbox pointed at another instance' do
+    let(:channel) { build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'first' }) }
+
+    before do
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+      channel.update_provider_connection!({ 'connection' => 'open', 'phone_number' => '5541988887777' })
+    end
+
+    it 'stops reporting the session the instance it left was holding' do
+      channel.update!(provider_config: channel.provider_config.merge('token' => 'second'))
+
+      expect(channel.reload.provider_connection).to eq({})
+    end
+
+    # With the credentials it is leaving with, which are the only ones that instance takes
+    # and the last chance to use them: nothing on the record names it afterwards.
+    it 'withdraws the registration from the instance it left' do
+      channel.update!(provider_config: channel.provider_config.merge('token' => 'second'))
+
+      expect(WebMock).to have_requested(:post, 'https://uazapi.test/webhook')
+        .with(headers: { 'token' => 'first' }, body: hash_including('enabled' => false))
+    end
+
+    it 'leaves the session alone when the save did not move the instance' do
+      channel.update!(provider_config: channel.provider_config.merge('mark_as_read' => false))
+
+      expect(channel.reload.provider_connection).to include('connection' => 'open')
+      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook')
+    end
+
+    # The client drops the trailing slash before it calls anything, so an address that
+    # grows or loses one is the same instance. Read as a different one, it would empty a
+    # live connection record and withdraw a webhook that was never pointed anywhere else.
+    it 'is not moved by an address that differs only in a trailing slash' do
+      channel.update!(provider_config: channel.provider_config.merge('base_url' => 'https://uazapi.test/'))
+
+      expect(channel.reload.provider_connection).to include('connection' => 'open')
+      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook')
+    end
+  end
+
+  # The webhook URL is not derived from anything the instance knows: it is handed one, and
+  # the choice between the public address and the one that only resolves inside the
+  # deployment is a field on the inbox form. Outbound media follows a change to it on the
+  # next message; the webhook would go on arriving at the old address, or stop arriving at
+  # all, which on the closed network this option exists for is all of the inbound traffic.
+  describe 'an inbox whose webhook host changes' do
+    let(:channel) { build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'first' }) }
+
+    before do
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+    end
+
+    it 'hands the instance the address the inbox now asks for' do
+      internal = 'http://rails.internal/webhooks/whatsapp/session/uazapi/'
+      with_modified_env INTERNAL_HOST_URL: 'http://rails.internal' do
+        channel.update!(provider_config: channel.provider_config.merge('use_internal_host' => true))
+      end
+
+      expect(WebMock).to(
+        have_requested(:post, 'https://uazapi.test/webhook').with { |request| JSON.parse(request.body)['url'].start_with?(internal) }
+      )
+    end
+
+    # The field only chooses between two addresses, and an installation that never set the
+    # internal one has a single address to hand out either way.
+    it 'says nothing to the instance when the deployment has no internal address' do
+      channel.update!(provider_config: channel.provider_config.merge('use_internal_host' => true))
+
+      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook')
+    end
   end
 
   # The connector keys its whatsmeow store by this id, and provider_config is permitted

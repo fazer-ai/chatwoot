@@ -37,6 +37,27 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     )
   end
 
+  # The dispatcher looks before the handler runs, and this lands in between: the operator
+  # saved new credentials while the event was on its way to the write. The instance travels
+  # with the event so the writer can compare it inside the row lock, which is the only place
+  # the comparison is atomic. What it keeps out is the old instance's number, read against
+  # the new inbox as a wrong-number quarantine that would end the session replacing it.
+  it 'refuses a state whose instance the inbox left while the event was in flight' do
+    uazapi = create(:channel_whatsapp, provider: 'uazapi', phone_number: '+5541988886666',
+                                       validate_provider_config: false, sync_templates: false)
+    paired = model::Event.build(model::Events::SessionState.new(state: 'open', phone: '5541988886666'), epoch: 2)
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(uazapi)
+    allow(Whatsapp::Session::ConnectionStateWriter).to receive(:new).and_wrap_original do |original, argument|
+      uazapi.update_columns(provider_config: uazapi.provider_config.merge('token' => 'another')) # rubocop:disable Rails/SkipsModelValidations
+      original.call(argument)
+    end
+
+    result = described_class.new(channel: uazapi, event: paired, instance: fingerprint).perform
+
+    expect(result).to eq(:ignored)
+    expect(uazapi.reload.provider_connection).to eq({})
+  end
+
   it 'discards an event from a previous owner of the session' do
     dispatch
     stale = model::Event.build(model::Events::SessionState.new(state: 'close'), epoch: 1)

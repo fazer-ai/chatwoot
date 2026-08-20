@@ -44,6 +44,31 @@ RSpec.describe Whatsapp::Session::Outbound::AttachmentAdapter do
       end
     end
 
+    # INTERNAL_HOST_URL is one address for the whole deployment, and a hosted provider is
+    # on the far side of the network it points into. An installation running a connector
+    # next to a hosted inbox would otherwise hand that inbox a host it cannot resolve, and
+    # every attachment it sent would fail with nothing pointing at the setting.
+    it 'leaves a hosted provider on the public host even where an internal one is set' do
+      hosted = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
+
+      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000' do
+        expect(described_class.new(attachment, channel: hosted).media_url).to eq(disk_url)
+      end
+    end
+
+    # The other side of the same rule: an instance the operator runs next to Chatwoot is a
+    # neighbour, and on a closed installation the public URL is the one it cannot reach.
+    it 'uses the internal host for an instance that is inside the deployment' do
+      neighbour = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
+                                            provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x',
+                                                               'use_internal_host' => true })
+
+      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000' do
+        expect(described_class.new(attachment, channel: neighbour).media_url)
+          .to eq('http://rails:3000/rails/active_storage/disk/TOKEN/avatar.png')
+      end
+    end
+
     # With S3, GCS or any other cloud service the blob answers a presigned URL of its
     # own. Its path is not one Rails serves and its signature is bound to the host it was
     # made for, so moving it to the internal host is a 404 on every attachment the inbox

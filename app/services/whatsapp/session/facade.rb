@@ -16,7 +16,7 @@ class Whatsapp::Session::Facade
     Events::Types::CONVERSATION_TYPING_OFF => 'paused'
   }.freeze
 
-  attr_reader :channel, :backend, :provider
+  attr_reader :channel, :backend, :provider, :instance
 
   # Resolved on every call, never held in a constant: `Whatsapp::Session::Model` is an
   # implicit namespace (there is no model.rb), so a constant here captures a module
@@ -27,10 +27,14 @@ class Whatsapp::Session::Facade
   def initialize(channel)
     @channel = channel
     @backend = Whatsapp::Session::Registry.backend_for(channel)
-    # The provider this backend was resolved for. An inbox converted while a connect is in
-    # flight has an empty connection record belonging to another provider, and every write
-    # below is fenced against landing there.
+    # The provider this backend was resolved for, and the instance it was pointed at. An
+    # inbox converted while a connect is in flight has an empty connection record belonging
+    # to another provider; one re-pointed at another instance of the same provider keeps
+    # its key and changes nothing the provider fence can see, while the answer in flight
+    # can name a different phone, which reads as a wrong-number quarantine and ends the
+    # session that just replaced it. Every write below is fenced against landing there.
     @provider = channel.provider
+    @instance = Whatsapp::Session::Registry.instance_fingerprint(channel)
   end
 
   # --- session lifecycle ---------------------------------------------------------
@@ -50,7 +54,7 @@ class Whatsapp::Session::Facade
     # the pairing poll: nothing else would refresh the code as it rotates. A resume that
     # answers `open` has nothing left to poll, and a chain started over one would write
     # `connect_failure` over a healthy connection the first time a request failed.
-    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider)
+    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider, instance: instance)
     start_pairing_poll(mode, attempt) if state.connecting? && backend.class.state_polling?
     state
   end
@@ -225,7 +229,8 @@ class Whatsapp::Session::Facade
   def claim_pairing_attempt
     attempt = SecureRandom.uuid
     result = writer.apply(
-      model::ConnectionState.new(connection: 'connecting', pairing_attempt: attempt), reset: true, provider: provider
+      model::ConnectionState.new(connection: 'connecting', pairing_attempt: attempt), reset: true, provider: provider,
+                                                                                      instance: instance
     )
     attempt if result == :written
   end
@@ -242,7 +247,8 @@ class Whatsapp::Session::Facade
     )
   rescue Whatsapp::Session::Errors::Error
     writer.apply(
-      model::ConnectionState.new(connection: 'close', error: 'connect_failure'), attempt: attempt, provider: provider
+      model::ConnectionState.new(connection: 'close', error: 'connect_failure'), attempt: attempt, provider: provider,
+                                                                                 instance: instance
     )
     raise
   end
@@ -253,8 +259,8 @@ class Whatsapp::Session::Facade
   def start_pairing_poll(mode, attempt)
     Whatsapp::Session::PairingPollJob.perform_later(
       channel,
-      pairing: mode, provider: channel.provider, attempt: attempt,
-      deadline_at: Whatsapp::Session::PairingPollJob.deadline_for(mode)
+      pairing: mode, deadline_at: Whatsapp::Session::PairingPollJob.deadline_for(mode),
+      fence: { provider: channel.provider, instance: instance, attempt: attempt }
     )
   end
 
@@ -265,14 +271,30 @@ class Whatsapp::Session::Facade
   # long as the new QR is on screen. So the wrong account goes before the marker does,
   # which also stands the asynchronous retry down before there is a new session for it to
   # kill. A provider that cannot be reached raises, and nothing was cleared or connected.
+  #
+  # None of which holds where a logout does not unpair. Uazapi answers 405 on
+  # `/instance/logout`, so the strongest thing available is a disconnect, and the account's
+  # credentials stay on the instance: connecting again resumes that same account, and this
+  # would have lifted the marker for an account that never left, filing its chats here
+  # until the next state quarantined the inbox all over again. The exits there are the
+  # real ones, and the operator is told so: reset the instance on the provider, point the
+  # inbox at another one, or correct the number on the inbox, which the next state the
+  # provider reports then lifts the marker for.
   def end_disowned_session
     return unless Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
 
+    end_wrong_account
+    raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.cannot_unpair') unless backend.class.unpairs?
+
+    writer.apply(model::ConnectionState.new(connection: 'close'), reset: true, provider: provider, instance: instance)
+  end
+
+  # Best effort, and worth asking even of a provider that cannot unpair: a disconnected
+  # instance stops sending, which takes the wrong account's traffic off this inbox at the
+  # source while the quarantine holds.
+  def end_wrong_account
     backend.logout
-    writer.apply(model::ConnectionState.new(connection: 'close'), reset: true, provider: provider)
   rescue Whatsapp::Session::Errors::NotSupported
-    # A backend with no logout cannot be held in quarantine either: pairing again is the
-    # only exit it has, and refusing that would leave the inbox with none at all.
     nil
   end
 

@@ -16,8 +16,9 @@ class Whatsapp::Session::Inbound::ReactionStore
   # on its way to doing nothing: scoped to the target alone, somebody else's reaction
   # would answer yes and the contact would be created anyway.
   #
-  # `sender` is the Contact, or nil for a reaction written from the connected phone, and
-  # the caller finds it without creating one.
+  # `sender` is the Contact, or nil for a reaction from the connected number, which has
+  # one author on the WhatsApp side whether an agent or the phone wrote it. The caller
+  # finds the Contact without creating one.
   def self.active?(inbox:, target_id:, sender:, from_me: false)
     json = "(content_attributes#>>'{}')::jsonb"
     scope = Message.where(inbox_id: inbox.id)
@@ -26,7 +27,7 @@ class Whatsapp::Session::Inbound::ReactionStore
                    .where.not(content: '')
                    .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
     scope = if from_me
-              scope.where(sender_id: nil, sender_type: nil).where(message_type: Message.message_types[:outgoing])
+              scope.where(message_type: Message.message_types[:outgoing])
             else
               scope.where(sender: sender)
             end
@@ -100,17 +101,38 @@ class Whatsapp::Session::Inbound::ReactionStore
                   .where("#{json}->>'is_reaction' = 'true'")
                   .where("#{json}->>'in_reply_to_external_id' = ?", reaction.target_id)
     matches = if reaction.from_me
-                # Written from the phone: no agent on the row, stored outgoing.
-                base.where(sender_id: nil, sender_type: nil).where(message_type: Message.message_types[:outgoing])
+                # Outgoing is the whole test. On the WhatsApp side there is one author of
+                # a `from_me` reaction, the connected number, whether it was written on the
+                # phone (no agent on the row) or by an agent here (the agent on the row).
+                # Asking for a sender-less row instead would miss the agent's, and the echo
+                # of what the agent just sent would become a second emoji on the bubble
+                # that no removal can take back.
+                base.where(message_type: Message.message_types[:outgoing])
               else
                 base.where(sender: sender)
               end
 
     # Active-only: when every match is already deleted this returns nil, so an echoed
     # removal does not re-delete the row and bump the conversation again.
-    matches.where.not(content: '')
-           .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
-           .reorder(created_at: :desc)
-           .first
+    preferred(matches.where.not(content: '')
+                     .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
+                     .reorder(created_at: :desc)
+                     .to_a)
+  end
+
+  # Which of them the echo belongs to, for a provider that gives it neither our reserved
+  # id nor a token of our own. Two agents can each hold an outgoing reaction on one
+  # target, since a row is filed per user here where WhatsApp keeps one reaction per
+  # number, so the newest is a guess: writing this echo's id onto the wrong one leaves the
+  # row that actually sent it without an id at all, and its retry sends a second time.
+  #
+  # The send that produced the echo is the one still waiting for an id, and among those
+  # the one that asked for this emoji. A removal carries no emoji to match on and is
+  # aimed at whatever is active, so it keeps the plain newest-first answer.
+  def preferred(candidates)
+    return candidates.first unless reaction.from_me && reaction.emoji.present?
+
+    pending = candidates.select { |message| message.source_id.blank? }
+    pending.find { |message| message.content == reaction.emoji } || pending.first || candidates.first
   end
 end

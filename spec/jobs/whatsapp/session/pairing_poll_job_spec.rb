@@ -16,6 +16,21 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     Whatsapp::Session::Model::ConnectionState.new(connection: connection, **attrs)
   end
 
+  # An inbox re-pointed at another instance of the same provider keeps its key, so the
+  # provider fence sees nothing, and this chain runs for minutes. What the old instance
+  # answers can name a different phone, which reads as a wrong-number quarantine and ends
+  # the session that just replaced it.
+  it 'does nothing once the inbox has been pointed at another instance' do
+    allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
+    fingerprint = Whatsapp::Session::Registry.instance_fingerprint(channel)
+    channel.update!(provider_config: channel.provider_config.merge('token' => 'another-instance'))
+
+    described_class.perform_now(channel.reload, pairing: 'qr', fence: { instance: fingerprint })
+
+    expect(backend).not_to have_received(:fetch_connection_state)
+    expect(channel.reload.provider_connection).to eq({})
+  end
+
   it 'writes the rotated QR and asks for another round while the session is still connecting' do
     allow(backend).to receive(:fetch_connection_state).and_return(state('connecting', qr_data_url: 'data:image/png;base64,ROTATED'))
 
@@ -46,7 +61,7 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
     allow(backend).to receive(:fetch_connection_state).and_return(state('open', phone_number: '5541988887777'))
 
-    described_class.perform_now(channel, pairing: 'qr', attempt: 'attempt-1')
+    described_class.perform_now(channel, pairing: 'qr', fence: { attempt: 'attempt-1' })
 
     expect(channel.reload.provider_connection).not_to have_key('pairing_attempt')
   end
@@ -84,7 +99,7 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
   it 'does nothing once the inbox has been converted to another provider' do
     allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
 
-    described_class.perform_now(channel, pairing: 'qr', provider: 'native')
+    described_class.perform_now(channel, pairing: 'qr', fence: { provider: 'native' })
 
     expect(backend).not_to have_received(:fetch_connection_state)
     expect(channel.reload.provider_connection).to eq({})
@@ -100,7 +115,7 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     )
     allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
 
-    expect { described_class.perform_now(channel.reload, pairing: 'qr', attempt: 'attempt-1') }
+    expect { described_class.perform_now(channel.reload, pairing: 'qr', fence: { attempt: 'attempt-1' }) }
       .to have_enqueued_job(described_class)
   end
 
@@ -118,7 +133,7 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
       original.call(argument)
     end
 
-    described_class.perform_now(channel, pairing: 'qr', attempt: 'attempt-1')
+    described_class.perform_now(channel, pairing: 'qr', fence: { attempt: 'attempt-1' })
 
     expect(channel.reload.provider_connection).to include(
       'qr_data_url' => 'data:image/png;base64,NEWER', 'pairing_attempt' => 'attempt-2'
@@ -134,7 +149,7 @@ RSpec.describe Whatsapp::Session::PairingPollJob do
     )
     allow(backend).to receive(:fetch_connection_state).and_return(state('connecting'))
 
-    described_class.perform_now(channel, pairing: 'qr', deadline_at: 10.seconds.from_now, attempt: 'attempt-1')
+    described_class.perform_now(channel, pairing: 'qr', deadline_at: 10.seconds.from_now, fence: { attempt: 'attempt-1' })
 
     expect(backend).not_to have_received(:fetch_connection_state)
     expect(channel.reload.provider_connection).to include(
