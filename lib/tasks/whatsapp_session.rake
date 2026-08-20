@@ -76,6 +76,168 @@ namespace :whatsapp do
                     provider: provider, count: count, states: states, legacy: legacy)
       end
     end
+
+    # Converting forces a re-pairing: the old session is terminated and nobody can be
+    # messaged until someone scans a new QR. Run for real only with APPLY=1, so a
+    # mistyped switch prints a plan instead of disconnecting a fleet. `DRY_RUN=0` is
+    # deliberately not the way in: an env var whose absence is dangerous is the wrong
+    # default for this.
+    desc 'Convert one inbox to another provider (PROVIDER_CONFIG=json, APPLY=1 to execute)'
+    task :convert, [:inbox_id, :target] => :environment do |_task, args|
+      if args[:inbox_id].blank? || args[:target].blank?
+        abort 'usage: rake "whatsapp:providers:convert[<inbox_id>,<target>]" PROVIDER_CONFIG=\'{...}\''
+      end
+
+      channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
+      config = WhatsappProviderConversion.parse_config(ENV.fetch('PROVIDER_CONFIG', nil))
+      WhatsappProviderConversion.announce_mode
+      WhatsappProviderConversion.convert(channel, args[:target], config)
+    end
+
+    # The config travels in the CSV rather than in the environment because a batch is
+    # rows with different credentials. Columns: inbox_id,target,provider_config, where
+    # provider_config is a JSON object; CSV quoting is what keeps its commas out of the
+    # column split, which is also why this is not a rake argument list.
+    desc 'Convert many inboxes from a CSV of inbox_id,target,provider_config (APPLY=1 to execute)'
+    task :convert_batch, [:csv_path] => :environment do |_task, args|
+      abort 'usage: rake "whatsapp:providers:convert_batch[path/to/plan.csv]"' if args[:csv_path].blank?
+      abort "#{args[:csv_path]} does not exist" unless File.exist?(args[:csv_path])
+
+      WhatsappProviderConversion.announce_mode
+      rows = CSV.read(args[:csv_path], headers: true)
+      failures = rows.count do |row|
+        channel = WhatsappProviderConversion.channel_for(row['inbox_id'], abort_on_missing: false)
+        next true if channel.nil?
+
+        !WhatsappProviderConversion.convert(channel, row['target'], WhatsappProviderConversion.parse_config(row['provider_config']))
+      end
+
+      puts format('%<total>d row(s), %<failed>d failed', total: rows.size, failed: failures)
+      abort 'batch finished with failures' if failures.positive?
+    end
+
+    namespace :legacy do
+      desc 'List the inboxes still on a frozen provider, with what a conversion would cost'
+      task report: :environment do
+        legacy = Whatsapp::Session::Registry.descriptors.select(&:legacy?).map(&:key)
+        channels = Channel::Whatsapp.where(provider: legacy).includes(inbox: :account)
+        if channels.empty?
+          puts "no inbox left on #{legacy.join(', ')}"
+          next
+        end
+
+        puts 'account  inbox  provider  connection  phone            name'
+        channels.find_each do |channel|
+          inbox = channel.inbox
+          puts format('%<account>7d  %<inbox>5d  %<provider>-8s  %<state>-10s  %<phone>-15s  %<name>s',
+                      account: inbox.account_id, inbox: inbox.id, provider: channel.provider,
+                      state: channel.provider_connection&.dig('connection') || 'n/a',
+                      phone: channel.phone_number, name: inbox.name)
+        end
+        puts
+        puts format('%<count>d inbox(es) on a frozen provider; each conversion needs a new pairing.', count: channels.size)
+      end
+    end
+
+    namespace :session do
+      # After a conversion the new provider knows nothing about the groups the old one
+      # had synced, and a group thread with a stale member list is one where mentions and
+      # admin actions silently address the wrong people.
+      desc 'Re-sync every group of one session inbox (INTERVAL_SECONDS spaces the jobs)'
+      task :resync_groups, [:inbox_id] => :environment do |_task, args|
+        abort 'usage: rake "whatsapp:providers:session:resync_groups[<inbox_id>]"' if args[:inbox_id].blank?
+
+        channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
+        unless Whatsapp::Session::Registry.session_family?(channel.provider)
+          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which has no groups to sync"
+        end
+
+        inbox = channel.inbox
+        contacts = Contact.where(account_id: inbox.account_id, group_type: :group)
+                          .joins(:contact_inboxes).where(contact_inboxes: { inbox_id: inbox.id }).distinct
+        interval = ENV.fetch('INTERVAL_SECONDS', '2').to_i.seconds
+        WhatsappProviderConversion.announce_mode
+
+        contacts.each_with_index do |contact, index|
+          puts format('  %<id>7d  %<name>s', id: contact.id, name: contact.name)
+          next unless WhatsappProviderConversion.apply?
+
+          Contacts::SyncGroupJob.set(wait: interval * index).perform_later(contact, force: true, channel: channel)
+        end
+
+        tail = WhatsappProviderConversion.apply? ? ", spread over #{(interval * contacts.size).inspect}" : ''
+        puts format('%<count>d group(s)%<tail>s', count: contacts.size, tail: tail)
+      end
+    end
   end
 end
 # rubocop:enable Metrics/BlockLength
+
+# Shared by the conversion tasks above. A module rather than helpers in the rake block so
+# the dry-run switch is read in exactly one place: a task that decided for itself whether
+# it was applying is how half a batch runs for real.
+module WhatsappProviderConversion
+  class << self
+    def apply?
+      ENV.fetch('APPLY', nil) == '1'
+    end
+
+    def announce_mode
+      puts apply? ? 'APPLY=1: converting for real' : 'dry run (pass APPLY=1 to execute)'
+    end
+
+    def channel_for(inbox_id, abort_on_missing: true)
+      inbox = Inbox.find_by(id: inbox_id)
+      channel = inbox&.channel
+      return channel if channel.is_a?(Channel::Whatsapp)
+
+      message = "inbox #{inbox_id} is not a WhatsApp inbox"
+      abort_on_missing ? abort(message) : (puts("  SKIP  #{message}") || nil)
+    end
+
+    def parse_config(raw)
+      return {} if raw.blank?
+
+      parsed = JSON.parse(raw)
+      raise JSON::ParserError, 'provider config must be a JSON object' unless parsed.is_a?(Hash)
+
+      parsed
+    rescue JSON::ParserError => e
+      abort "provider config is not a JSON object: #{e.message}"
+    end
+
+    # Validation runs the same way in both modes, so a dry run reports exactly what the
+    # real one would refuse. `validate_config` is shape-only by contract, so nothing here
+    # touches the provider until the conversion itself.
+    def convert(channel, target, config)
+      label = "inbox #{channel.inbox.id} (#{channel.provider} -> #{target})"
+      return report(label, 'target is not a known provider') unless Channel::Whatsapp::PROVIDERS.include?(target.to_s)
+      return report(label, 'already on that provider') if channel.provider == target.to_s
+
+      invalid = validation_errors(channel, target, config)
+      return report(label, invalid) if invalid
+
+      return report(label, nil, verb: 'WOULD') unless apply?
+
+      channel.convert_provider!(new_provider: target.to_s, new_provider_config: config)
+      report(label, nil)
+    rescue ActiveRecord::RecordInvalid, Whatsapp::Session::Errors::Error => e
+      report(label, e.message)
+    end
+
+    private
+
+    def validation_errors(channel, target, config)
+      previous = [channel.provider, channel.provider_config.deep_dup]
+      channel.assign_attributes(provider: target.to_s, provider_config: config)
+      errors = channel.valid? ? nil : channel.errors.full_messages.join('; ')
+      channel.assign_attributes(provider: previous.first, provider_config: previous.last)
+      errors
+    end
+
+    def report(label, error, verb: 'OK')
+      puts error ? "  FAIL  #{label}: #{error}" : "  #{verb}    #{label}"
+      error.nil?
+    end
+  end
+end
