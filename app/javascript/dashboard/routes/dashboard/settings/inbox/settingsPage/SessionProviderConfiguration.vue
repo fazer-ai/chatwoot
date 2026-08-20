@@ -1,0 +1,168 @@
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue';
+import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
+import { useAlert } from 'dashboard/composables';
+import { isValidURL } from 'dashboard/helper/URLHelper';
+import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
+
+import SettingsSection from 'dashboard/components/SettingsSection.vue';
+import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
+import InboxName from 'dashboard/components/widgets/InboxName.vue';
+import NextButton from 'dashboard/components-next/button/Button.vue';
+import Switch from 'dashboard/components-next/switch/Switch.vue';
+
+const props = defineProps({
+  inbox: { type: Object, required: true },
+});
+
+const store = useStore();
+const { t } = useI18n();
+const { descriptorFor, fetchProviders } = useWhatsappSessionProviders();
+onMounted(fetchProviders);
+
+const descriptor = computed(() => descriptorFor(props.inbox.provider));
+const credentialFields = computed(
+  () => descriptor.value?.fields?.filter(f => f.type !== 'boolean') ?? []
+);
+const preferenceFields = computed(
+  () => descriptor.value?.fields?.filter(f => f.type === 'boolean') ?? []
+);
+
+// Edited values live apart from the inbox so a failed save leaves the record showing
+// what the server still holds.
+const values = ref({});
+watch(
+  [descriptor, () => props.inbox.provider_config],
+  ([shape, config]) => {
+    if (!shape) return;
+    values.value = Object.fromEntries(
+      shape.fields.map(field => [
+        field.name,
+        // A secret is never served back, so its input starts empty and an untouched one
+        // is left alone on save rather than overwriting the stored credential with ''.
+        field.secret
+          ? ''
+          : (config?.[field.name] ??
+            field.default ??
+            (field.type === 'boolean' ? false : '')),
+      ])
+    );
+  },
+  { immediate: true }
+);
+
+const showLinkDeviceModal = ref(false);
+
+const fieldKey = field =>
+  `INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.${field.name.toUpperCase()}`;
+
+const isInvalid = field => {
+  const value = values.value[field.name];
+  if (field.required && field.secret) return false;
+  if (field.required && !value) return true;
+  return field.type === 'url' && value && !isValidURL(value);
+};
+
+const save = async field => {
+  if (isInvalid(field)) return;
+
+  const value = values.value[field.name];
+  // An untouched secret input means "leave it as it is", not "clear it".
+  if (field.secret && !value) return;
+
+  try {
+    await store.dispatch('inboxes/updateInbox', {
+      id: props.inbox.id,
+      formData: false,
+      channel: {
+        provider_config: {
+          ...props.inbox.provider_config,
+          [field.name]: value,
+        },
+      },
+    });
+    useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+  } catch (error) {
+    useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+  }
+};
+</script>
+
+<template>
+  <div>
+    <WhatsappLinkDeviceModal
+      v-if="showLinkDeviceModal"
+      :show="showLinkDeviceModal"
+      :on-close="() => (showLinkDeviceModal = false)"
+      :inbox="inbox"
+    />
+    <div class="mx-8">
+      <SettingsSection
+        :title="
+          $t(
+            'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE'
+          )
+        "
+        :sub-title="
+          $t(
+            'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER'
+          )
+        "
+      >
+        <div class="flex flex-col gap-2">
+          <InboxName
+            :inbox="inbox"
+            class="!text-lg !m-0"
+            with-phone-number
+            with-provider-connection-status
+          />
+          <NextButton class="w-fit" @click="showLinkDeviceModal = true">
+            {{
+              $t(
+                'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON'
+              )
+            }}
+          </NextButton>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        v-for="field in credentialFields"
+        :key="field.name"
+        :title="$t(`${fieldKey(field)}.LABEL`)"
+        :sub-title="$t(`${fieldKey(field)}.PLACEHOLDER`)"
+      >
+        <div class="flex items-center justify-between flex-1 mt-2">
+          <woot-input
+            v-model="values[field.name]"
+            :type="field.type === 'password' ? 'password' : 'text'"
+            class="flex-1 mr-2 items-center"
+            :placeholder="$t(`${fieldKey(field)}.PLACEHOLDER`)"
+          />
+          <NextButton
+            :disabled="isInvalid(field)"
+            :label="$t('INBOX_MGMT.SETTINGS_POPUP.UPDATE')"
+            @click="save(field)"
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        v-for="field in preferenceFields"
+        :key="field.name"
+        :title="$t(`${fieldKey(field)}.LABEL`)"
+        :sub-title="$t(`${fieldKey(field)}.LABEL`)"
+      >
+        <div class="flex items-center gap-2">
+          <Switch
+            :id="field.name"
+            v-model="values[field.name]"
+            @change="save(field)"
+          />
+          <span class="text-sm">{{ $t(`${fieldKey(field)}.LABEL`) }}</span>
+        </div>
+      </SettingsSection>
+    </div>
+  </div>
+</template>

@@ -179,13 +179,17 @@ export default {
       if (this.isAWhatsAppZapiChannel) {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI');
       }
+      if (this.isASessionWhatsAppChannel) {
+        return this.$t(
+          `INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.${this.whatsAppAPIProvider.toUpperCase()}`
+        );
+      }
       return '';
     },
     isConvertibleWhatsAppChannel() {
       return (
         this.isAWhatsAppCloudChannel ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel ||
+        this.isASessionWhatsAppChannel ||
         this.is360DialogWhatsAppChannel
       );
     },
@@ -230,12 +234,7 @@ export default {
         (this.isAnEmailChannel && !this.inbox.provider) ||
         this.shouldShowWhatsAppConfiguration ||
         this.isAWebWidgetInbox ||
-        // Deliberately the two legacy providers rather than the session family: this
-        // tab has to track the branches ConfigurationPage actually renders, and the
-        // session providers get theirs with the provider catalog. Offering the tab
-        // first would land the agent on an empty page.
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel
+        this.isASessionWhatsAppChannel
       ) {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
