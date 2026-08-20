@@ -95,11 +95,14 @@ class Whatsapp::Session::Backends::Uazapi::Client
   #
   # The token is named as sensitive, which is what keeps a redirect to another origin from
   # carrying it there.
+  #
+  # All three timeouts: an endpoint that accepts the connection and then stops reading a
+  # large body (a group photo travels as base64) would otherwise hold a worker for
+  # Net::HTTP's own write default, well past the ceiling this class advertises.
   def filtered(method, path, query, payload, timeout)
-    response = SsrfFilter.public_send(
-      method, url(path), headers: headers, body: payload, params: query.presence,
-                         sensitive_headers: [TOKEN_HEADER], http_options: { open_timeout: OPEN_TIMEOUT, read_timeout: timeout }
-    )
+    options = { open_timeout: OPEN_TIMEOUT, read_timeout: timeout, write_timeout: timeout }
+    response = SsrfFilter.public_send(method, url(path), headers: headers, body: payload, params: query.presence,
+                                                         sensitive_headers: [TOKEN_HEADER], http_options: options)
     [response.code.to_i, response.body]
   end
 

@@ -321,7 +321,10 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}" if retryable_media?(e)
 
     raise Whatsapp::Session::Errors::MediaUnavailable, "uazapi media is gone: #{e.message}"
-  rescue SafeFetch::Error => e
+  rescue SafeFetch::Error, *Whatsapp::Session::Backends::Uazapi::Client::TRANSPORT_ERRORS => e
+    # SafeFetch names some transport failures and not others: a host that refuses or
+    # resets the connection comes out as the raw system error, which would escape this
+    # backend as itself and miss the fetch job's retry policy entirely.
     raise Whatsapp::Session::Errors::ProviderUnavailable, "uazapi media fetch failed: #{e.message}"
   end
 

@@ -314,6 +314,15 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(WebMock).not_to have_requested(:get, %r{https://free\.uazapi\.com/files/})
     end
 
+    # SafeFetch names some transport failures and not others: a refused or reset
+    # connection comes out as the raw system error, and left alone it escapes this backend
+    # as itself and misses the fetch job's retry policy.
+    it 'answers a refused media host as the provider being unreachable' do
+      stub_request(:get, %r{https://free\.uazapi\.com/files/}).to_raise(Errno::ECONNREFUSED)
+
+      expect { backend.download_media(command) }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+    end
+
     # A throttle is the host having a bad minute, not the file being gone: read as gone,
     # the fetch job marks the bubble unsupported instead of coming back for it.
     it 'comes back later when the media host is throttling' do
