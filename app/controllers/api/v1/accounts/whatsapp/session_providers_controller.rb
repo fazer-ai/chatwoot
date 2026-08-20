@@ -28,13 +28,9 @@ class Api::V1::Accounts::Whatsapp::SessionProvidersController < Api::V1::Account
   # serves theirs, so it does not apply to them. Withdrawing them ahead of the removal is
   # then one env var on this line rather than a dashboard change.
   def creatable?(descriptor)
-    return legacy_creatable? if descriptor.legacy?
+    return Whatsapp::Session::Registry.legacy_creatable? if descriptor.legacy?
     return false unless descriptor.available?
 
     Current.account.whatsapp_session_provider_enabled?(descriptor.key)
-  end
-
-  def legacy_creatable?
-    ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_LEGACY_PROVIDERS_CREATABLE', true))
   end
 end

@@ -6,7 +6,7 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
   # The real descriptors stay unavailable until their backends ship, so the validation
   # examples stand in a descriptor that is already serving.
   def stub_descriptor(provider, backend)
-    descriptor = instance_double(Whatsapp::Session::ProviderDescriptor, available?: true, backend_class: backend)
+    descriptor = instance_double(Whatsapp::Session::ProviderDescriptor, available?: true, backend_class: backend, legacy?: false)
     allow(Whatsapp::Session::Registry).to receive(:descriptor).and_call_original
     allow(Whatsapp::Session::Registry).to receive(:descriptor).with(provider).and_return(descriptor)
   end
@@ -63,6 +63,30 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
 
       expect(channel).not_to be_valid
       expect(channel.errors[:provider_config].first).to include('base_url', 'token')
+    end
+
+    # The picker is not the gate: the API, the rake conversion tasks and a `?provider=`
+    # URL all reach the record without reading the dashboard.
+    it 'refuses a frozen provider once the deprecation switch is thrown' do
+      with_modified_env WHATSAPP_LEGACY_PROVIDERS_CREATABLE: 'false' do
+        channel = build(:channel_whatsapp, account: account, provider: 'baileys', provider_config: {})
+        # The factory's bypass runs on create; this example never gets that far, and the
+        # legacy validation reaches for the provider over the network.
+        channel.define_singleton_method(:validate_provider_config) { nil }
+
+        expect(channel).not_to be_valid
+        expect(channel.errors[:provider]).to include(I18n.t('errors.inboxes.channel.provider_withdrawn'))
+      end
+    end
+
+    it 'leaves an existing inbox on a frozen provider saveable after the switch is thrown' do
+      channel = build_channel('baileys')
+
+      with_modified_env WHATSAPP_LEGACY_PROVIDERS_CREATABLE: 'false' do
+        channel.provider_config = { 'mark_as_read' => false }
+
+        expect(channel.valid?).to be(true)
+      end
     end
 
     it 'accepts a config the backend approves' do

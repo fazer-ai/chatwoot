@@ -149,6 +149,13 @@ module Whatsapp::Session::Registry
       value == 'true'
     end
 
+    # Whether the frozen providers are still offered when standing up a new inbox. They
+    # are frozen, not withdrawn: existing inboxes keep working either way, and this is
+    # what the deprecation flips when it starts.
+    def legacy_creatable?
+      ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_LEGACY_PROVIDERS_CREATABLE', true))
+    end
+
     def available_providers
       descriptors.select(&:available?).map(&:key)
     end
