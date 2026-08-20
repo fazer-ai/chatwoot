@@ -35,6 +35,7 @@ class ForkTranslations
     check_reference_locale_exists
     check_fork_keys_are_not_duplicated_upstream
     check_every_key_exists_in_reference
+    check_reference_keys_are_translated_everywhere
     check_upstream_indexes_ignore_the_fork
     report_coverage
     finish
@@ -169,6 +170,24 @@ class ForkTranslations
       next if orphans.empty?
 
       @errors << "#{locale}: #{orphans.size} chaves nao existem em #{REFERENCE_LOCALE} (#{orphans.first(3).join(', ')})"
+    end
+  end
+
+  # The mirror case: a key the reference defines and another language does not
+  # renders in English for that language. Upstream's other ~55 locales live off
+  # that fallback, but the languages we ship are supposed to be complete, so a
+  # gap here is an untranslated string, not a graceful degradation.
+  # Overrides stay out of this on purpose: replacing an upstream string in one
+  # language says nothing about whether upstream got the others right.
+  def check_reference_keys_are_translated_everywhere
+    return unless fork_locales.include?(REFERENCE_LOCALE)
+
+    reference = fork_keys(REFERENCE_LOCALE).keys
+    (fork_locales - [REFERENCE_LOCALE]).each do |locale|
+      missing = reference - fork_keys(locale).keys
+      next if missing.empty?
+
+      @errors << "#{locale}: #{missing.size} chaves de #{REFERENCE_LOCALE} sem traducao (#{missing.first(3).join(', ')})"
     end
   end
 

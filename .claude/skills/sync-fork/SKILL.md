@@ -23,7 +23,9 @@ Branch from our fork's `main`, merge `upstream/develop` (or a release tag like `
 
 ### B) fazer-ai/chatwoot → fazer-ai/chatwoot-pro (Pro merge)
 
-Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/chatwoot-pro-main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/chatwoot-pro-main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+
+⚠️ The remote branch is `chatwoot-pro-main`, so the tracking ref is `chatwoot-pro/chatwoot-pro-main`. **`chatwoot-pro/main` is a different, long-dead branch** that the Pro repo keeps only as its nominal GitHub default. Resetting onto it or pushing to it puts the merge on a stale ancestor.
 
 - HEAD = Pro (`chatwoot-pro-main`), MERGE_HEAD = CE (`main`).
 - Pro is a strict superset of CE: every conflict is either "CE changed something we overrode" (usually KC/CO to preserve Pro behavior) or "CE added new code next to our additions" (usually CO).
@@ -40,7 +42,7 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
 6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
 7. Merge the CE sync PR with a **merge commit, never squash** (**Merging the sync PR** section), then verify the upstream tag is an ancestor of `main`.
-8. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+8. For Pro merges, recall that pushing to `chatwoot-pro/chatwoot-pro-main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
 
@@ -252,9 +254,16 @@ Pro adds `PROTECTED_SUBSCRIPTION_KEYS` constant + `protected_subscription_key_ch
 
 ### i18n files
 
-`config/locales/en.yml` / `pt_BR.yml` and `app/javascript/dashboard/i18n/locale/en/settings.json` / `pt_BR/settings.json` conflict because both sides add keys. Almost always **CO**: merge both key sets under the right parent.
+**This section changed with the i18n split (PR #364). The old advice was to merge both key sets under the right parent; doing that now fails CI.**
 
-When upstream only adds `en.yml` keys and not `pt_BR.yml`, match upstream's scope — do not invent pt_BR translations as part of the merge. Those come in as community PRs or a separate translation pass.
+Upstream's locale files (`config/locales/<locale>.yml`, `app/javascript/dashboard/i18n/locale/**`) no longer carry a single fork key. Everything we translate lives in `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/` and `config/locales/fazer_ai.<locale>.yml`, deep-merged on top at runtime. So:
+
+- Conflicts in an upstream locale file are **TU**, wholesale. Take upstream's side and do not carry anything of ours across. The `drift` check compares those files byte-for-byte against the tracked tag and fails on any difference.
+- A conflict there at all means the fork side still has a stray key. Resolve as TU, then run `check` to find where it should have lived.
+- Our own files (`fazer_ai.*.yml`, `fazer-ai/locale/**`) are ours alone. Upstream never touches them, so they only conflict on a CE → Pro merge, resolved as **CO** like any other fork file.
+- After the merge, bump `UPSTREAM_BASE` in `scripts/i18n/fork_translations.rb` to the new tag and run `check` and `drift`.
+
+Upstream adding an `en.yml` key without the `pt_BR.yml` counterpart is still upstream's business: match their scope and do not invent translations for their files. Our own three languages are a different rule, and `check` enforces them (see **Fork translations** in `AGENTS.md`).
 
 ### New features from both sides
 

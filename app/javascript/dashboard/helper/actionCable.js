@@ -15,6 +15,12 @@ import {
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
+import {
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+  MANAGE_ALL_CONVERSATION_PERMISSIONS,
+} from 'dashboard/constants/permissions';
 
 const { isImpersonating } = useImpersonation();
 const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 5000;
@@ -22,6 +28,12 @@ const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS = 30000;
 const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS = 15000;
 const MENTION_UNREAD_COUNTS_REFETCH_DELAY_MS =
   UNREAD_COUNTS_REFETCH_THROTTLE_MS;
+// The only roles whose accessible set follows assignment. Everyone else, plain agents and administrators
+// included, sees by inbox membership, so no assignment can hide a conversation and later hand it back.
+const ASSIGNMENT_SCOPED_PERMISSIONS = [
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+];
 const getFilteredUnreadCountsRefreshRetryDelay = () =>
   FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS +
   Math.random() * FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS;
@@ -133,7 +145,43 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (id) {
       this.app.$store.dispatch('updateConversation', payload);
     }
+    if (this.assignmentMayHaveGrantedAccess(payload)) {
+      this.app.$store.dispatch('conversationPins/fetch');
+    }
     this.fetchConversationStats();
+  };
+
+  // A custom role can scope what an agent sees down to the conversations assigned to them or left
+  // unassigned, so an assignment can hand back a conversation that was invisible when the pins were last
+  // read. The server then leads the list with a pin the client no longer knows about, and the client
+  // re-sorts it away as unpinned until the next reconnect. Being added as a participant grants access the
+  // same way but emits no event, so that path still waits for one.
+  assignmentMayHaveGrantedAccess = payload => {
+    const user = this.app.$store.getters.getCurrentUser;
+    const accountId = this.app.$store.getters.getCurrentAccountId;
+    const permissions = getUserPermissions(user, accountId);
+
+    // This event reaches every member of the inbox, and auto assignment fires it constantly, so it is only
+    // worth a request for the roles that can lose a conversation to an assignment in the first place.
+    // Manage-all is checked first because holding it says nothing on its own: the role editor adds both
+    // scoped permissions alongside it, and the backend reads it with precedence over them, so such a role
+    // sees by inbox membership like a plain agent does.
+    if (permissions.includes(MANAGE_ALL_CONVERSATION_PERMISSIONS)) return false;
+    if (!permissions.some(held => ASSIGNMENT_SCOPED_PERMISSIONS.includes(held)))
+      return false;
+
+    // A conversation handed to a bot is unassigned as far as visibility goes: the assignment service
+    // clears `assignee_id` and tracks the bot beside it, so the filter that scopes a role to the
+    // unassigned ones takes it in even though the payload still names the bot.
+    const { assignee, assignee_type: assigneeType } = payload.meta || {};
+    const humanAssignee = assigneeType === 'User' ? assignee : null;
+    if (humanAssignee && humanAssignee.id === user?.id) return true;
+
+    // Losing the assignee hands the conversation back to a role that sees the unassigned ones.
+    return (
+      !humanAssignee &&
+      permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
+    );
   };
 
   onConversationCreated = data => {

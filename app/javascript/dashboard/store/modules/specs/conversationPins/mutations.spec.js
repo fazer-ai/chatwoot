@@ -20,12 +20,12 @@ describe('#mutations', () => {
       expect(state.records).toEqual({});
     });
 
-    it('bumps the revision so an older in-flight hydration is discarded', () => {
+    it('leaves the revision alone, since only a reset invalidates a hydration', () => {
       const state = { records: {}, appliedAt: {}, revision: 3 };
       mutations[types.SET_CONVERSATION_PINS](state, {
         pins: [{ conversation_id: 1, pinned_at: 100 }],
       });
-      expect(state.revision).toBe(4);
+      expect(state.revision).toBe(3);
     });
   });
 
