@@ -3,7 +3,12 @@ require 'rails_helper'
 RSpec.describe Webhooks::WhatsappSessionEventsJob do
   subject(:job) { described_class }
 
-  let(:channel) { create(:channel_whatsapp, provider: 'uazapi', sync_templates: false, validate_provider_config: false) }
+  # Pointed at the instance the captured bodies name, since the translator refuses one
+  # that says it came from somewhere else.
+  let(:channel) do
+    create(:channel_whatsapp, provider: 'uazapi', sync_templates: false, validate_provider_config: false,
+                              provider_config: { 'base_url' => 'https://free.uazapi.com', 'token' => 'instance-token' })
+  end
   let(:dispatcher) { Whatsapp::Session::Inbound::Dispatcher }
   let(:body) { JSON.parse(Rails.root.join('spec/fixtures/whatsapp/session/uazapi/webhook/message_incoming_text.json').read) }
 

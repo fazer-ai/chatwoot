@@ -35,6 +35,8 @@ class Whatsapp::Session::Backends::Uazapi::WebhookTranslator
   # to wait for its message, so anything emitted alongside one has to survive being run
   # twice.
   def perform
+    return [] unless this_instance?
+
     case body[:EventType]
     when 'connection' then [connection].compact
     when 'messages' then [message].compact
@@ -46,6 +48,20 @@ class Whatsapp::Session::Backends::Uazapi::WebhookTranslator
   end
 
   private
+
+  # The instance the body says it came from, against the one the inbox is pointed at now.
+  # A body is authenticated when it arrives and dispatched later, and an inbox re-pointed
+  # in between would file the old instance's messages under the new one: the token that
+  # authenticated them is gone by then, and the provider on its own says nothing about
+  # which instance a queued job was meant for.
+  #
+  # Only when the body carries the field, which every captured one does. Missing, it is a
+  # shape this build does not know, and a shape is not a reason to drop an event.
+  def this_instance?
+    sent_from = body[:BaseUrl].to_s.chomp('/').downcase
+    configured = channel.provider_config['base_url'].to_s.chomp('/').downcase
+    sent_from.blank? || configured.blank? || sent_from == configured
+  end
 
   def model = Whatsapp::Session::Model
   def events = Whatsapp::Session::Model::Events

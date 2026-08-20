@@ -7,7 +7,12 @@ require 'rails_helper'
 RSpec.describe Whatsapp::Session::Backends::Uazapi::WebhookTranslator do
   subject(:events) { described_class.new(channel, body).perform }
 
-  let(:channel) { create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false) }
+  # Pointed at the instance the captures came from, since the translator refuses a body
+  # that names a different one.
+  let(:channel) do
+    create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
+                              provider_config: { 'base_url' => 'https://free.uazapi.com', 'token' => 'instance-token' })
+  end
   let(:model) { Whatsapp::Session::Model }
 
   # One loader for two dozen examples, which is the repetition a helper is for.
@@ -378,5 +383,17 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::WebhookTranslator do
                        .map { |event| event.to_frame.to_json }
 
     expect(serialized).to all(satisfy { |frame| frame.exclude?('secret-token') })
+  end
+
+  # A body is authenticated when it arrives and dispatched later. An inbox re-pointed at
+  # another instance in between would file the old one's messages under the new: the token
+  # that authenticated them is gone by then, and nothing else in a queued job says which
+  # instance it was meant for.
+  it 'refuses a body that names an instance this inbox is no longer pointed at' do
+    channel.update!(provider_config: channel.provider_config.merge('base_url' => 'https://other.uazapi.com'))
+
+    events = described_class.new(channel.reload, fixture('message_incoming_text')).perform
+
+    expect(events).to be_empty
   end
 end
