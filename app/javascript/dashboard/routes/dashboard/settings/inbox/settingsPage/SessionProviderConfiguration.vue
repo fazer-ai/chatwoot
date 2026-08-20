@@ -11,6 +11,7 @@ import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
+import Label from 'dashboard/components-next/label/Label.vue';
 
 const props = defineProps({
   inbox: { type: Object, required: true },
@@ -22,6 +23,9 @@ const { descriptorFor, fetchProviders } = useWhatsappSessionProviders();
 onMounted(fetchProviders);
 
 const descriptor = computed(() => descriptorFor(props.inbox.provider));
+// Said where the inbox is managed, not only where it was picked: whoever inherits an
+// inbox never saw the picker, and this is the page they change its credentials on.
+const isBeta = computed(() => Boolean(descriptor.value?.beta));
 const credentialFields = computed(
   () => descriptor.value?.fields?.filter(f => f.type !== 'boolean') ?? []
 );
@@ -111,12 +115,21 @@ const save = async field => {
         "
       >
         <div class="flex flex-col gap-2">
-          <InboxName
-            :inbox="inbox"
-            class="!text-lg !m-0"
-            with-phone-number
-            with-provider-connection-status
-          />
+          <div class="flex items-center gap-2">
+            <InboxName
+              :inbox="inbox"
+              class="!text-lg !m-0"
+              with-phone-number
+              with-provider-connection-status
+            />
+            <Label
+              v-if="isBeta"
+              v-tooltip.top="t('GENERAL.BETA_DESCRIPTION')"
+              :label="t('GENERAL.BETA')"
+              color="blue"
+              compact
+            />
+          </div>
           <NextButton class="w-fit" @click="showLinkDeviceModal = true">
             {{
               $t(

@@ -200,6 +200,11 @@ const selectedDescriptor = computed(() =>
   descriptorFor(selectedProvider.value)
 );
 
+// The catalog is what knows a provider is still in beta, so the badge follows the server
+// rather than a literal in the label: ending the beta is one field on the descriptor.
+// The cloud providers have no descriptor here and answer false, which is what they are.
+const isBetaProvider = key => Boolean(descriptorFor(key)?.beta);
+
 const availableProviders = computed(() => {
   const allowed = [
     ...(isConvertMode.value ? CONVERT_PICKER_KEYS : CREATE_PICKER_KEYS),
@@ -306,6 +311,7 @@ const requestEmbeddedSignupAccess = () => {
           :title="provider.title"
           :description="provider.description"
           :icon="provider.icon"
+          :is-beta="isBetaProvider(provider.key)"
           @click="selectProvider(provider.key)"
         />
       </div>

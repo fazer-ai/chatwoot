@@ -1,7 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { defineComponent, h, nextTick, reactive, ref } from 'vue';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import Whatsapp from '../Whatsapp.vue';
+import WhatsappChannel from 'dashboard/api/channel/whatsappChannel';
+
+// The picker fetches the session catalog on mount. Without this the real module reaches
+// for axios and the composable's own catch swallows it, so every session provider would
+// silently be missing from the picker rather than the test saying so.
+vi.mock('dashboard/api/channel/whatsappChannel', () => ({
+  default: { getSessionProviders: vi.fn() },
+}));
+
+const SESSION_CATALOG = [
+  { key: 'uazapi', creatable: true, beta: true, fields: [] },
+  { key: 'baileys', creatable: true, beta: false, legacy: true, fields: [] },
+];
 
 // Mutable reactive route — tests drive route.query / route.name through it
 // to exercise how the parent reacts to navigation events.
@@ -58,6 +71,15 @@ const stubComponent = name =>
     template: `<div class="${name}-stub" />`,
   });
 
+const ChannelSelectorStub = defineComponent({
+  name: 'ChannelSelector',
+  // Declared so the assertion can read it back with `props()`. eslint cannot see into a
+  // string template, so it reads the prop as unused.
+  // eslint-disable-next-line vue/no-unused-properties
+  props: { isBeta: { type: Boolean, default: false } },
+  template: '<div class="ChannelSelector-stub" />',
+});
+
 const WhatsappEmbeddedSignupStub = defineComponent({
   name: 'WhatsappEmbeddedSignup',
   // eslint-disable-next-line vue/no-unused-emit-declarations
@@ -86,7 +108,7 @@ const mountWhatsapp = (overrides = {}) => {
         Twilio: stubComponent('Twilio'),
         ThreeSixtyDialogWhatsapp: stubComponent('ThreeSixtyDialogWhatsapp'),
         CloudWhatsapp: stubComponent('CloudWhatsapp'),
-        ChannelSelector: stubComponent('ChannelSelector'),
+        ChannelSelector: ChannelSelectorStub,
         BaileysWhatsapp: stubComponent('BaileysWhatsapp'),
         ZapiWhatsapp: stubComponent('ZapiWhatsapp'),
       },
@@ -107,6 +129,9 @@ describe('Whatsapp.vue (convert mode)', () => {
     originalChatwootConfig = window.chatwootConfig;
     mockPush.mockReset();
     mockReplace.mockReset();
+    WhatsappChannel.getSessionProviders.mockResolvedValue({
+      data: { payload: SESSION_CATALOG },
+    });
     mockRoute = reactive({
       name: 'settings_inbox_convert',
       params: { inboxId: 30 },
@@ -130,6 +155,22 @@ describe('Whatsapp.vue (convert mode)', () => {
     await nextTick();
     expect(wrapper.find('.WhatsappEmbeddedSignup-stub').exists()).toBe(true);
     expect(wrapper.find('.ChannelSelector-stub').exists()).toBe(false);
+  });
+
+  // The badge is what tells the admin a provider is not settled yet, and it follows the
+  // catalog rather than the label, so a provider leaving beta is a server-side change.
+  it('badges the session providers the catalog reports as beta', async () => {
+    const wrapper = mountWhatsapp();
+    await flushPromises();
+
+    const badged = wrapper
+      .findAllComponents(ChannelSelectorStub)
+      .filter(selector => selector.props('isBeta'));
+
+    expect(
+      wrapper.findAllComponents(ChannelSelectorStub).length
+    ).toBeGreaterThan(badged.length);
+    expect(badged).toHaveLength(1);
   });
 
   // Reproduces the "flash" bug: a successful embedded signup runs

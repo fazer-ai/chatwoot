@@ -2,7 +2,11 @@
 # does its form look like" for every WhatsApp provider, including the legacy and cloud
 # ones it does not serve, so the dashboard can drive itself from capabilities instead of
 # provider-name literals.
-module Whatsapp::Session::Registry
+#
+# Most of the length below is the catalog literal itself, and it grows by a table entry
+# every time a provider is described, so the module-length metric is measuring the data
+# rather than the behavior.
+module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
   Descriptor = Whatsapp::Session::ProviderDescriptor
   Field = Whatsapp::Session::ProviderDescriptor::Field
 
@@ -13,6 +17,7 @@ module Whatsapp::Session::Registry
     Descriptor.new(
       key: 'native',
       backend: 'Whatsapp::Session::Backends::Connector::Backend',
+      beta: true,
       pairing_modes: %w[qr code],
       # No session_import: that is the Baileys credential import, which whatsmeow cannot
       # consume, and there is no such command in the contract. Its replacement for the
@@ -28,6 +33,7 @@ module Whatsapp::Session::Registry
     Descriptor.new(
       key: 'uazapi',
       backend: 'Whatsapp::Session::Backends::Uazapi::Backend',
+      beta: true,
       pairing_modes: %w[qr code],
       # No group_invites: the captured build answers 405 on `/group/invitelink`, and the
       # group snapshot it does serve carries no invite code either. A capability that is

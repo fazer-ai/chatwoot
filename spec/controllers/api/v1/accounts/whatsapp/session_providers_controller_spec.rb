@@ -44,6 +44,10 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         expect(uazapi['pairing_modes']).to contain_exactly('qr', 'code')
       end
 
+      it 'tells the picker which providers are still in beta' do
+        expect(payload.select { |p| p['beta'] }.pluck('key')).to contain_exactly('native', 'uazapi')
+      end
+
       it 'marks a provider creatable only once the account is opted in' do
         expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(false)
 
