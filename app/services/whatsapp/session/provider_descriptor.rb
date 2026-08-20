@@ -42,6 +42,12 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
     family == 'session'
   end
 
+  # Frozen: still described so an existing inbox can be labelled and gated, never offered
+  # as a destination.
+  def legacy?
+    legacy
+  end
+
   # Served by this layer (as opposed to the legacy session providers, which keep their
   # own services).
   def served?

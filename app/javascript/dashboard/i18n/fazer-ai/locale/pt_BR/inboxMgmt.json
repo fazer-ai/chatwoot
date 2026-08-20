@@ -7,7 +7,11 @@
           "BAILEYS": "Baileys",
           "BAILEYS_DESC": "Conectar via API não-oficial Baileys",
           "ZAPI": "Z-API",
-          "ZAPI_DESC": "Conectar via API não-oficial Z-API"
+          "ZAPI_DESC": "Conectar via API não-oficial Z-API",
+          "NATIVE": "WhatsApp (nativo)",
+          "NATIVE_DESC": "Conecte um telefone pelo conector que já vem nesta instalação",
+          "UAZAPI": "uazapi",
+          "UAZAPI_DESC": "Conecte um telefone pela sua própria instância da uazapi"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",
@@ -51,6 +55,29 @@
             "IMPORT_SESSION_SHOW_MORE": "Ver mais",
             "IMPORT_SESSION_DESC": "O WhatsApp passou a exigir chave de acesso ao vincular algumas contas, o que bloqueia o QR code. Instale a extensão de navegador para importar uma sessão em que você já está logado no WhatsApp Web.",
             "IMPORT_SESSION_INSTALL": "Instalar a extensão"
+          }
+        },
+        "SESSION": {
+          "FIELDS": {
+            "BASE_URL": {
+              "LABEL": "URL da instância",
+              "PLACEHOLDER": "https://sua-instancia.uazapi.com",
+              "ERROR": "Informe o endereço da sua instância"
+            },
+            "TOKEN": {
+              "LABEL": "Token da instância",
+              "PLACEHOLDER": "Cole o token da instância que você quer usar",
+              "ERROR": "O token da instância é obrigatório"
+            },
+            "USE_INTERNAL_HOST": {
+              "LABEL": "A instância roda na rede deste servidor"
+            },
+            "MARK_AS_READ": {
+              "LABEL": "Marcar mensagens como lidas no WhatsApp"
+            },
+            "PRESENCE_SUBSCRIBE": {
+              "LABEL": "Mostrar quando o contato está online"
+            }
           }
         }
       }

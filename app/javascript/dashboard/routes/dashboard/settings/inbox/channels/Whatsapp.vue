@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n, I18nT } from 'vue-i18n';
 import Twilio from './Twilio.vue';
@@ -9,10 +9,12 @@ import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
 import BaileysWhatsapp from './BaileysWhatsapp.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
+import SessionWhatsapp from './session/SessionWhatsapp.vue';
 import Banner from 'dashboard/components-next/banner/Banner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import { useAccount } from 'dashboard/composables/useAccount';
+import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { META_RESTRICTION_STATUS_URL } from 'dashboard/constants/globals';
 
@@ -58,6 +60,8 @@ const PROVIDER_TYPES = {
   THREE_SIXTY_DIALOG: '360dialog',
   BAILEYS: 'baileys',
   ZAPI: 'zapi',
+  NATIVE: 'native',
+  UAZAPI: 'uazapi',
 };
 
 // Upstream's own gate for the access-request card: the app id alone says embedded signup
@@ -88,6 +92,8 @@ const INBOX_PROVIDER_TO_KEY = {
   default: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
   baileys: PROVIDER_TYPES.BAILEYS,
   zapi: PROVIDER_TYPES.ZAPI,
+  native: PROVIDER_TYPES.NATIVE,
+  uazapi: PROVIDER_TYPES.UAZAPI,
 };
 
 const currentProviderKey = computed(() => {
@@ -151,6 +157,18 @@ const PROVIDER_CATALOG = computed(() => [
     icon: 'i-woot-zapi',
   },
   {
+    key: PROVIDER_TYPES.NATIVE,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
+    key: PROVIDER_TYPES.UAZAPI,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
     key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG_DESC'),
@@ -173,10 +191,25 @@ const CONVERT_PICKER_KEYS = [
   PROVIDER_TYPES.THREE_SIXTY_DIALOG,
 ];
 
+// The session providers are offered per account during the rollout, so the server is
+// what says whether this account may pick one. Offering a choice it would then refuse
+// is worse than not offering it.
+const { creatableProviders, descriptorFor, fetchProviders } =
+  useWhatsappSessionProviders();
+onMounted(fetchProviders);
+
+const creatableSessionKeys = computed(() =>
+  creatableProviders.value.map(({ key }) => key)
+);
+const selectedDescriptor = computed(() =>
+  descriptorFor(selectedProvider.value)
+);
+
 const availableProviders = computed(() => {
-  const allowed = isConvertMode.value
-    ? CONVERT_PICKER_KEYS
-    : CREATE_PICKER_KEYS;
+  const allowed = [
+    ...(isConvertMode.value ? CONVERT_PICKER_KEYS : CREATE_PICKER_KEYS),
+    ...creatableSessionKeys.value,
+  ];
   return PROVIDER_CATALOG.value
     .filter(p => allowed.includes(p.key))
     .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
@@ -415,6 +448,12 @@ const requestEmbeddedSignupAccess = () => {
         />
         <ZapiWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI"
+          :mode="mode"
+          :inbox="inbox"
+        />
+        <SessionWhatsapp
+          v-else-if="selectedDescriptor"
+          :descriptor="selectedDescriptor"
           :mode="mode"
           :inbox="inbox"
         />
