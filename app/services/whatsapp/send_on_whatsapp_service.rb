@@ -63,19 +63,28 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     # Whatsapp::Session::Outbound::MessageSender, which already does this for the
     # session providers.
     raise if e.retryable?
+    # A processing conflict is not retryable by the definition retryable? uses — the
+    # same command is not going to answer differently, because we are not the one
+    # running it. But the MESSAGE is still on its way out through the worker holding
+    # the lock, so failing it here would be a lie, and it would swallow the dedicated
+    # backoff SendReplyJob has for exactly this conflict.
+    raise if e.code == Whatsapp::Session::Errors::MessageAlreadyProcessing::CODE
 
     fail_message(e)
   end
 
-  # Never over a reason that is already there: a provider that already knows why it
-  # refused writes the specific sentence on the message before raising, and the
-  # exception's own message is the vaguer of the two. Same guard, same reason, as
-  # Whatsapp::Session::Outbound::MessageSender#fail_message.
+  # Through StatusTransition, which owns the rule and applies it under the row lock.
+  # Writing status/external_error directly here would be the third copy of that rule,
+  # and the two that already existed had drifted apart — but more concretely: a send
+  # that timed out may still have reached WhatsApp, so a receipt can mark this message
+  # delivered or read while we are deciding it failed. delivered/read are terminal, and
+  # walking one back to failed invites the agent to send a duplicate.
   def fail_message(error)
     message.reload
-    return if message.status == 'failed' && message.external_error.present?
-
-    message.update_under_lock!(status: :failed, external_error: error.message)
+    # error.message, not the exception: StatusTransition appends the wire code when it
+    # is handed an exception, and external_error is the sentence the agent reads on the
+    # bubble. The code is already in the logs.
+    Whatsapp::Session::Inbound::StatusTransition.apply(message, 'failed', error: error.message)
     nil
   end
 

@@ -149,6 +149,21 @@ RSpec.describe SendReplyJob do
       expect { described_class.fail_message(-1, 'gone') }.not_to raise_error
     end
 
+    # A send that timed out may still have reached WhatsApp, so a receipt can mark this
+    # message delivered while its retries are running out. Either status is proof it
+    # arrived, and walking one back to failed is what puts a duplicate in front of the
+    # customer.
+    %w[delivered read].each do |terminal|
+      it "leaves a message already marked #{terminal} alone" do
+        message.update_under_lock!(status: terminal.to_sym)
+
+        described_class.fail_message(message.id, 'retries exhausted')
+
+        expect(message.reload.status).to eq(terminal)
+        expect(message.external_error).to be_blank
+      end
+    end
+
     # The idempotency lock clears in about the time a bounded send takes; the default
     # backoff burned all three retries well before that, so the conflict alone was enough
     # to kill the job every time.

@@ -489,6 +489,44 @@ describe Whatsapp::SendOnWhatsappService do
           expect(message.external_error).to eq('may have gone through')
         end
 
+        # retryable? is false for a processing conflict, but the message is NOT failed:
+        # another worker holds the idempotency lock and is sending it right now. Failing
+        # it here would both lie to the agent and swallow the dedicated backoff
+        # SendReplyJob has for exactly this conflict, which never runs if the exception
+        # does not reach the job.
+        it 'lets a processing conflict reach the job instead of failing the message' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Providers::WhatsappBaileysService::MessageAlreadyProcessingError
+          )
+
+          expect { described_class.new(message: message).perform }.to raise_error(
+            Whatsapp::Session::Errors::MessageAlreadyProcessing
+          )
+
+          expect(message.reload.status).not_to eq('failed')
+        end
+
+        # A send that timed out may still have reached WhatsApp, so a receipt can mark
+        # this message delivered while we are deciding it failed. Walking that back is
+        # what puts a duplicate in front of the customer.
+        it 'leaves a message the provider already confirmed delivered alone' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Providers::WhatsappBaileysService::SendOutcomeUnknownError, 'may have gone through'
+          )
+          delivered = create(
+            :message,
+            message_type: :outgoing,
+            content: 'test',
+            conversation: conversation,
+            status: :delivered
+          )
+
+          described_class.new(message: delivered).perform
+
+          expect(delivered.reload.status).to eq('delivered')
+          expect(delivered.external_error).to be_blank
+        end
+
         # The other half: a provider that is down answers differently once it is back, so
         # the job has to fail and be retried rather than bury a message the agent could
         # still send.

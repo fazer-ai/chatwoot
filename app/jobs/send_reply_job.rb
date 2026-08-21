@@ -29,15 +29,17 @@ class SendReplyJob < ApplicationJob
     fail_message(job.arguments.first, 'The message was still being sent elsewhere and could not be confirmed.')
   end
 
-  # Marks the message failed so the agent sees it and can resend, mirroring
-  # Whatsapp::SendOnWhatsappService#fail_message. Never overwrites a reason already
-  # recorded there.
+  # Marks the message failed so the agent sees it and can resend. Through
+  # StatusTransition because it owns the terminal-status rule and applies it under the
+  # row lock: an attempt that timed out may still have reached WhatsApp, so a receipt
+  # can mark this message delivered or read while its retries are still running out.
+  # Either status is proof it arrived, and walking one back to failed here is what
+  # would put a duplicate in front of the customer.
   def self.fail_message(message_id, reason)
     message = Message.find_by(id: message_id)
     return if message.blank?
-    return if message.status == 'failed' && message.external_error.present?
 
-    message.update_under_lock!(status: :failed, external_error: reason)
+    Whatsapp::Session::Inbound::StatusTransition.apply(message, 'failed', error: reason)
   rescue StandardError => e
     Rails.logger.error "SendReplyJob could not mark message #{message_id} as failed: #{e.message}"
   end
