@@ -216,12 +216,17 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     nil
   end
 
+  # `phone` comes from `jid`, never from `query`. The whole reason anyone checks a number
+  # is to learn the one WhatsApp actually knows it by (the Brazilian ninth digit is the
+  # case that made this necessary), and `query` is only the echo of what we asked. It is
+  # the fallback for a number that is not on WhatsApp, where `jid` comes back empty.
   def check_numbers(command)
     Array(client.post('/chat/check', { numbers: Array(command.phones) })).map do |entry|
       entry = entry.to_h
+      checked = model::Address.parse(entry['jid'].presence)
       model::NumberCheck.new(
-        phone: entry['query'], exists: entry['isInWhatsapp'].present?,
-        address: model::Address.parse(entry['lid'].presence || entry['jid'].presence)
+        phone: checked&.id || entry['query'], exists: entry['isInWhatsapp'].present?,
+        address: model::Address.parse(entry['lid'].presence) || checked
       )
     end
   end

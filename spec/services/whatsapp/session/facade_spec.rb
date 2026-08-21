@@ -52,6 +52,18 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(response).to eq({ 'jid' => '5541999990000@s.whatsapp.net', 'exists' => true })
   end
 
+  # The caller writes these digits to contacts.phone_number, so a LID here would rename
+  # the contact after an opaque internal id and then address it at a JID nobody answers.
+  it 'answers with the phone even when the provider also knows a LID' do
+    allow(backend).to receive(:check_numbers).and_return(
+      [Whatsapp::Session::Model::NumberCheck.new(
+        phone: '554199990000', exists: true, address: Whatsapp::Session::Model::Address.lid('900000100000000')
+      )]
+    )
+
+    expect(channel.on_whatsapp('+5541999990000')).to eq({ 'jid' => '554199990000@s.whatsapp.net', 'exists' => true })
+  end
+
   # The factory neutralizes Channel::Whatsapp#sync_templates, so the facade is asked directly.
   it 'has no templates to sync or to send' do
     expect(facade.sync_templates).to be(true)

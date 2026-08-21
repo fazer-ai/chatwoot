@@ -193,14 +193,19 @@ class Whatsapp::Session::Facade
   end
 
   # Answered in the shape the contact builder and the inbox controller already read:
-  # `exists` plus the JID WhatsApp actually knows the number by, which is what the
+  # `exists` plus the phone JID WhatsApp actually knows the number by, which is what the
   # ninth-digit normalization needs.
+  #
+  # The phone, never the LID, even when the provider volunteers one. Both callers take
+  # the digits off this JID and write them to `contacts.phone_number` (and to the contact
+  # inbox's source id), so answering with a LID renames the contact after an opaque
+  # internal id and then addresses it at `<lid>@s.whatsapp.net`, which reaches nobody.
   def on_whatsapp(recipient_id)
     digits = recipient_id.to_s.split('@').first.to_s.delete('+')
     check = backend.check_numbers(model::Commands::ContactCheck.new(phones: [digits])).first
     return { 'jid' => "#{digits}@s.whatsapp.net", 'exists' => false } if check.blank?
 
-    { 'jid' => (check.address || model::Address.phone(check.phone)).to_jid, 'exists' => check.exists }
+    { 'jid' => model::Address.phone(check.phone.presence || digits).to_jid, 'exists' => check.exists }
   end
 
   private

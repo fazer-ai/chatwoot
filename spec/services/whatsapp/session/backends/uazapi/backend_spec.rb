@@ -370,6 +370,19 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(checks.first.address).to eq(model::Address.lid('900000100000000'))
       expect(checks.last).to have_attributes(exists: false, address: nil)
     end
+
+    # The captured number is the same either way, so it cannot show which field the phone
+    # is read from. This is the ninth-digit case the check exists for: the query carries
+    # the digit, the answer does not, and the answer is the one WhatsApp routes to.
+    it 'keeps the number WhatsApp answered with, not the one it was asked about' do
+      stub_uazapi(:post, '/chat/check', [{ 'isInWhatsapp' => true, 'query' => '5534999990002',
+                                           'jid' => '553499990002@s.whatsapp.net', 'lid' => '900000100000000@lid' }])
+
+      check = backend.check_numbers(commands::ContactCheck.new(phones: %w[5534999990002])).first
+
+      expect(check.phone).to eq('553499990002')
+      expect(check.address).to eq(model::Address.lid('900000100000000'))
+    end
   end
 
   describe 'groups' do

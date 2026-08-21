@@ -180,8 +180,13 @@ const canHandleJoinRequests = computed(
     canEditGroup.value && hasInboxCapability(CAPABILITIES.GROUP_JOIN_REQUESTS)
 );
 
+// The panel itself renders for any group thread, because being a group is identity and
+// not a capability. Everything that WRITES still has to ask: `Facade#group` refuses every
+// group call without this one.
+const supportsGroups = computed(() => hasInboxCapability(CAPABILITIES.GROUPS));
+
 const startEditName = () => {
-  if (isGroupLeft.value) return;
+  if (isGroupLeft.value || !canEditGroup.value) return;
   editNameValue.value = props.contact.name || '';
   isEditingName.value = true;
 };
@@ -218,7 +223,7 @@ const onNameKeydown = event => {
 };
 
 const startEditDescription = () => {
-  if (isGroupLeft.value) return;
+  if (isGroupLeft.value || !canEditGroup.value) return;
   editDescriptionValue.value = contactDescription.value;
   isEditingDescription.value = true;
 };
@@ -616,6 +621,8 @@ const handleJoinRequest = async (request, action) => {
 };
 
 const leaveGroup = async () => {
+  if (!supportsGroups.value) return;
+
   isLeavingGroup.value = true;
   const dismiss = usePendingAlert(t('GROUP.SETTINGS.LEAVING'));
   try {
@@ -726,7 +733,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
           <div v-else class="flex items-center gap-2 min-w-0">
             <h3
               class="my-0 text-base font-medium capitalize break-words text-n-slate-12"
-              :class="{ 'cursor-pointer hover:text-n-brand': !isGroupLeft }"
+              :class="{ 'cursor-pointer hover:text-n-brand': canEditGroup }"
               @click="startEditName"
             >
               {{ contact.name }}
@@ -781,7 +788,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             ref="descriptionContentRef"
             class="text-sm break-words whitespace-pre-wrap text-n-slate-12"
             :class="[
-              { 'cursor-pointer hover:text-n-brand': !isGroupLeft },
+              { 'cursor-pointer hover:text-n-brand': canEditGroup },
               showDescReadMore ? 'line-clamp-3' : '',
             ]"
             @click="startEditDescription"
@@ -1079,7 +1086,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
       </div>
 
       <Accordion
-        v-if="!isGroupLeft"
+        v-if="supportsGroups && !isGroupLeft"
         :title="t('GROUP.SETTINGS.ADVANCED_OPTIONS')"
         class="mt-4"
       >
