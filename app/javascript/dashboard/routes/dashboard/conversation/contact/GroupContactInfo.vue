@@ -19,6 +19,8 @@ import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import ContactsAPI from 'dashboard/api/contacts';
 import GroupMembersAPI from 'dashboard/api/groupMembers';
 import { phonesMatch } from 'dashboard/helper/phoneHelper';
+import { useInbox } from 'dashboard/composables/useInbox';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 import Avatar from 'next/avatar/Avatar.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
@@ -36,6 +38,7 @@ const props = defineProps({
 const store = useStore();
 const route = useRoute();
 const { t } = useI18n();
+const { hasInboxCapability } = useInbox();
 
 const currentChat = useMapGetter('getSelectedChat');
 const inboxGetter = useMapGetter('inboxes/getInboxById');
@@ -150,7 +153,17 @@ const isGroupLeft = computed(
   () => props.contact.additional_attributes?.group_left === true
 );
 
-const canEditGroup = computed(() => isInboxAdmin.value && !isGroupLeft.value);
+// The one predicate for "may this agent change the group". It carries the provider's
+// capability too: without `groups` every write below is a request the server refuses, so
+// the panel stays a readable shell rather than offering buttons that fail. The condition
+// used to be spelled out inline at five more sites, which is how a new term in it gets
+// missed at four of them.
+const canEditGroup = computed(
+  () =>
+    isInboxAdmin.value &&
+    !isGroupLeft.value &&
+    hasInboxCapability(CAPABILITIES.GROUPS)
+);
 
 const startEditName = () => {
   if (isGroupLeft.value) return;
@@ -797,7 +810,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
           </h4>
           <div class="flex items-center gap-1">
             <NextButton
-              v-if="isInboxAdmin && !isGroupLeft"
+              v-if="canEditGroup"
               :label="t('GROUP.MEMBERS.ADD_BUTTON')"
               icon="i-lucide-user-plus"
               variant="ghost"
@@ -918,14 +931,12 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             </div>
             <!-- Loading spinner for this member -->
             <span
-              v-if="
-                isInboxAdmin && !isGroupLeft && loadingMemberId === member.id
-              "
+              v-if="canEditGroup && loadingMemberId === member.id"
               class="i-lucide-loader-2 animate-spin size-4 text-n-slate-10"
             />
             <!-- Action menu toggle (admin only, not for self) -->
             <div
-              v-else-if="isInboxAdmin && !isGroupLeft && !isOwnMember(member)"
+              v-else-if="canEditGroup && !isOwnMember(member)"
               class="relative"
               :class="{
                 'opacity-0 group-hover:opacity-100':
@@ -960,10 +971,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
       </div>
 
       <!-- Pending Join Requests section (admin only) -->
-      <div
-        v-if="!isGroupLeft && isInboxAdmin && pendingRequests.length > 0"
-        class="mt-4"
-      >
+      <div v-if="canEditGroup && pendingRequests.length > 0" class="mt-4">
         <h4 class="mb-2 text-sm font-semibold text-n-slate-11">
           {{ t('GROUP.JOIN_REQUESTS.SECTION_TITLE') }}
           <span class="ml-1 text-xs font-normal text-n-slate-10">
@@ -1057,7 +1065,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
         :title="t('GROUP.SETTINGS.ADVANCED_OPTIONS')"
         class="mt-4"
       >
-        <BaileysGroupOptions :contact="contact" :is-admin="isInboxAdmin" />
+        <BaileysGroupOptions :contact="contact" :is-admin="canEditGroup" />
 
         <!-- Leave Group section -->
         <div class="mt-3">

@@ -11,6 +11,20 @@ class Inboxes extends CacheEnabledApiClient {
     return 'inbox';
   }
 
+  // The inbox payload carries `capabilities`, which the build that served it decides, so a
+  // key fetched from a different request cannot vouch for these rows. The index sends the
+  // key for the body it just built; without one, this response came from a build that does
+  // not, and it is not cached at all.
+  // eslint-disable-next-line class-methods-use-this
+  get usesResponseBoundCacheKey() {
+    return true;
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  cacheKeyFromResponse(response) {
+    return response?.data?.cache_key ?? null;
+  }
+
   // Keeps the locally cached inbox fresh on connection-status changes without bumping
   // the cache key (so it never triggers a full refetch). Silent if IDB is unavailable.
   async updateCachedProviderConnection(id, providerConnection) {

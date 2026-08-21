@@ -15,8 +15,7 @@ import ContentTemplateSelector from './ContentTemplateSelector.vue';
 const props = defineProps({
   attachedFiles: { type: Array, default: () => [] },
   isWhatsappInbox: { type: Boolean, default: false },
-  isWhatsappBaileysInbox: { type: Boolean, default: false },
-  isWhatsappZapiInbox: { type: Boolean, default: false },
+  isWhatsappSessionInbox: { type: Boolean, default: false },
   isEmailOrWebWidgetInbox: { type: Boolean, default: false },
   isTwilioSmsInbox: { type: Boolean, default: false },
   isTwilioWhatsAppInbox: { type: Boolean, default: false },
@@ -80,22 +79,17 @@ const shouldShowEmojiButton = computed(() => {
   );
 });
 
-// Attachments on conversation-create are supported for email/web widget and
-// for WhatsApp providers that send free-form media (Baileys, Z-API). The
-// template-based WhatsApp flows (Cloud, Twilio) can't start with media.
+// Attachments on conversation-create are supported for email/web widget and for the
+// WhatsApp session providers, which send free-form media. The template-based WhatsApp
+// flows (Cloud, Twilio) can't start with media.
 const shouldShowAttachButton = computed(() => {
-  return (
-    props.isEmailOrWebWidgetInbox ||
-    props.isWhatsappBaileysInbox ||
-    props.isWhatsappZapiInbox
-  );
+  return props.isEmailOrWebWidgetInbox || props.isWhatsappSessionInbox;
 });
 
 const isRegularMessageMode = computed(() => {
   return (
     (!props.isWhatsappInbox && !props.isTwilioWhatsAppInbox) ||
-    props.isWhatsappBaileysInbox ||
-    props.isWhatsappZapiInbox
+    props.isWhatsappSessionInbox
   );
 });
 

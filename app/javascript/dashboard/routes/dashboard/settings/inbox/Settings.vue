@@ -230,6 +230,10 @@ export default {
         (this.isAnEmailChannel && !this.inbox.provider) ||
         this.shouldShowWhatsAppConfiguration ||
         this.isAWebWidgetInbox ||
+        // Deliberately the two legacy providers rather than the session family: this
+        // tab has to track the branches ConfigurationPage actually renders, and the
+        // session providers get theirs with the provider catalog. Offering the tab
+        // first would land the agent on an empty page.
         this.isAWhatsAppBaileysChannel ||
         this.isAWhatsAppZapiChannel
       ) {
