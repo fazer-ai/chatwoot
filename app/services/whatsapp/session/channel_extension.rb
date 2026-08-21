@@ -5,7 +5,7 @@
 # Each override answers for the session providers and falls straight back to `super` for
 # the legacy and cloud ones, so no existing provider changes behavior.
 module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLength
-  # Registers the rollout gate as a real validation so it covers both paths that can
+  # Registers the eligibility gate as a real validation so it covers both paths that can
   # put an inbox on a session provider: creating one and converting an existing one
   # (`convert_provider!` pre-validates with `valid?` before it persists anything).
   def self.prepended(base)

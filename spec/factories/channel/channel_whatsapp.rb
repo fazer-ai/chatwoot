@@ -93,12 +93,12 @@ FactoryBot.define do
       session_provider_enabled { true }
     end
 
-    # The session providers are gated per account by a rollout toggle, so a channel on
-    # one is invalid until its account opts in. Specs that exercise the gate itself pass
-    # `session_provider_enabled: false`.
+    # The session providers are offered to every account, so a channel on one needs no
+    # setup to be valid. Specs that exercise the gate pass `session_provider_enabled:
+    # false`, which is what turns the provider off for the account.
     after(:build) do |channel_whatsapp, options|
-      if options.session_provider_enabled && channel_whatsapp.provider.in?(Whatsapp::Session::PROVIDERS)
-        channel_whatsapp.account&.update!("whatsapp_#{channel_whatsapp.provider}_enabled" => true)
+      if !options.session_provider_enabled && channel_whatsapp.provider.in?(Whatsapp::Session::PROVIDERS)
+        channel_whatsapp.account&.update!("whatsapp_#{channel_whatsapp.provider}_disabled" => true)
       end
     end
 

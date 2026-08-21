@@ -186,9 +186,10 @@ const CONVERT_PICKER_KEYS = [
 ];
 
 // Every session provider comes from the catalog instead, legacy included: eligibility is
-// per account during the rollout and per installation once the deprecation starts, and
-// the server is what knows both. Offering a choice it would then refuse is worse than
-// not offering it, and withdrawing one becomes a server-side change.
+// per installation (a connector has to be deployed for `native`, and the deprecation
+// withdraws the legacy ones) and per account, and the server is what knows both. Offering
+// a choice it would then refuse is worse than not offering it, and withdrawing one
+// becomes a server-side change.
 const { creatableProviders, descriptorFor, fetchProviders } =
   useWhatsappSessionProviders();
 onMounted(fetchProviders);

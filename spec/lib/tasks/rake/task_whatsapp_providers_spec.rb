@@ -19,7 +19,6 @@ RSpec.describe Rake::Task do
     end
 
     before do
-      account.update!(whatsapp_uazapi_enabled: true)
       # The conversion terminates the old session before it swaps the provider, and the
       # frozen Baileys service does that over the network.
       allow_any_instance_of(Whatsapp::Providers::WhatsappBaileysService) # rubocop:disable RSpec/AnyInstance

@@ -48,19 +48,17 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         expect(payload.select { |p| p['beta'] }.pluck('key')).to contain_exactly('native', 'uazapi')
       end
 
-      it 'marks a provider creatable only once the account is opted in' do
-        expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(false)
-
-        account.update!(whatsapp_uazapi_enabled: true)
-
+      it 'marks a provider creatable until the account turns it off' do
         expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(true)
+
+        account.update!(whatsapp_uazapi_disabled: true)
+
+        expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(false)
       end
 
       # The connector is what serves `native`, so an installation without one must not
       # offer it however the account is configured.
       it 'keeps native uncreatable while no connector is deployed' do
-        account.update!(whatsapp_native_enabled: true)
-
         expect(payload.find { |p| p['key'] == 'native' }).to include('available' => false, 'creatable' => false)
 
         with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do

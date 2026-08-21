@@ -30,7 +30,7 @@ es:
       channel:
         provider_unavailable: Este proveedor de WhatsApp aún no está disponible en esta instalación.
         invalid_provider_config: 'Configuración inválida en: %{keys}'
-        provider_not_enabled_for_account: Este proveedor de WhatsApp aún no está habilitado para esta cuenta.
+        provider_not_enabled_for_account: Este proveedor de WhatsApp está desactivado para esta cuenta.
         provider_withdrawn: Este proveedor de WhatsApp ya no se ofrece para bandejas de entrada nuevas. Las que ya lo usan siguen funcionando.
         cannot_unpair: Este proveedor no puede desvincular la cuenta de WhatsApp emparejada con él, así que conectar de nuevo retomaría la misma cuenta. Reinicia la instancia en el proveedor, apunta esta bandeja de entrada a otra, o corrige el número configurado aquí.
         provider_connection:
