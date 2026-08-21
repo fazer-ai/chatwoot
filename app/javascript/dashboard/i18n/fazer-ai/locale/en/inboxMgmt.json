@@ -10,8 +10,8 @@
           "ZAPI_DESC": "Connect via non-official API Z-API",
           "NATIVE": "WhatsApp (native)",
           "NATIVE_DESC": "Pair a phone through the connector that ships with this installation",
-          "UAZAPI": "uazapi",
-          "UAZAPI_DESC": "Pair a phone through your own uazapi instance"
+          "UAZAPI": "Uazapi",
+          "UAZAPI_DESC": "Pair a phone through your own Uazapi instance"
         },
         "PROVIDER_URL": {
           "LABEL": "Provider URL",
@@ -165,7 +165,7 @@
       "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - native",
-      "WHATSAPP_UAZAPI": "WhatsApp - uazapi"
+      "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
     }
   }
 }
