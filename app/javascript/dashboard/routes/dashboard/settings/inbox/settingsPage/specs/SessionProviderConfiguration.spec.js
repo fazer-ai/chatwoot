@@ -117,6 +117,31 @@ describe('SessionProviderConfiguration', () => {
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
+  // The switch has already moved by the time the save fails, so leaving it there shows a
+  // setting the server never took -- and the next change event needs a different value,
+  // so retrying the one that failed would mean toggling away and back.
+  it('puts a preference switch back when the save is refused', async () => {
+    const wrapper = await mountPage();
+    const preference = FIELDS.find(field => field.type === 'boolean');
+    mockDispatch.mockRejectedValueOnce(new Error('refused'));
+    wrapper.vm.values[preference.name] = false;
+
+    await wrapper.vm.save(preference);
+
+    expect(wrapper.vm.values[preference.name]).toBe(true);
+  });
+
+  it('keeps what was typed into a text field when the save is refused', async () => {
+    const wrapper = await mountPage();
+    const url = FIELDS.find(field => field.type === 'url');
+    mockDispatch.mockRejectedValueOnce(new Error('refused'));
+    wrapper.vm.values[url.name] = 'https://moved.example';
+
+    await wrapper.vm.save(url);
+
+    expect(wrapper.vm.values[url.name]).toBe('https://moved.example');
+  });
+
   it('sends a secret the operator actually typed', async () => {
     const wrapper = await mountPage();
     const token = FIELDS.find(field => field.secret);

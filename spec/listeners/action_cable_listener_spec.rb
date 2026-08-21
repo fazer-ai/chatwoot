@@ -20,6 +20,33 @@ describe ActionCableListener do
     Current.account = nil
   end
 
+  # The roster arrives twice: once from the REST fetch and again on every sync. Both have
+  # to answer "which row is us" the same way, or the second undoes the first -- which is
+  # what happened while each carried its own phone-only query and only the fetch knew
+  # about LIDs.
+  describe '#contact_group_synced' do
+    let(:channel) do
+      create(:channel_whatsapp, account: account, provider: 'uazapi', phone_number: '+5541999990000',
+                                validate_provider_config: false, sync_templates: false)
+    end
+    let(:group_contact) { create(:contact, account: account, group_type: :group, identifier: '1203630001@g.us') }
+
+    it 'broadcasts the same ownership the roster endpoint reports' do
+      channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '900000100000000' })
+      create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+      own = create(:contact, account: account, phone_number: nil, identifier: '900000100000000@lid')
+      own_member = create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
+      event = Events::Base.new(:'contact.group_synced', Time.zone.now, contact: group_contact)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        anything, 'contact.group_synced',
+        hash_including(own_member_id: own_member.id, is_inbox_admin: true)
+      )
+
+      listener.contact_group_synced(event)
+    end
+  end
+
   describe '#account_cache_invalidated' do
     let!(:event) do
       Events::Base.new(

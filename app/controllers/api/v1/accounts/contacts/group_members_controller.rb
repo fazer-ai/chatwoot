@@ -14,7 +14,7 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     @page = [(params[:page] || 1).to_i, 1].max
     @per_page = (params[:per_page] || DEFAULT_PER_PAGE).to_i.clamp(1, 100)
     @inbox_phone_number = inbox_phone_number
-    @own_member = own_member_matchable? ? find_own_member : nil
+    @own_member = Whatsapp::Session::Owner.group_member(channel, @contact)
     @is_inbox_admin = @own_member&.role == 'admin'
 
     paginated = base_query.order(role: :desc, id: :asc)
@@ -93,23 +93,6 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     channel&.phone_number
   end
 
-  # The same rule Whatsapp::Session::Owner applies on the server: the connected account is
-  # matched by its phone, and by its LID when the provider gave one. A native or Uazapi
-  # roster can name that account by LID alone, and a contact known that way carries no
-  # phone number at all, so a phone-only match reports the inbox as an ordinary member of
-  # a group it administers -- which is what the dashboard reads to decide whether replies
-  # are allowed in an announcement-only group.
-  def own_member_identifier
-    return @own_member_identifier if defined?(@own_member_identifier)
-
-    lid = channel&.provider_connection.to_h['lid'].presence
-    @own_member_identifier = lid && "#{lid}@lid"
-  end
-
-  def own_member_matchable?
-    @inbox_phone_number.present? || own_member_identifier.present?
-  end
-
   def pin_own_member_on_first_page(paginated)
     return paginated unless @page == 1
 
@@ -119,27 +102,6 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
 
     # Prepend own member; drop the last one so total per-page stays consistent
     [own] + paginated.where.not(id: own.id).limit(@per_page - 1).to_a
-  end
-
-  # A blank phone must not match the contacts that have none, and a nil identifier needs
-  # no guard of its own: `contacts.identifier = NULL` is never true. Spelling that guard
-  # out is in fact what Postgres refuses -- a bare parameter next to `IS NOT NULL` has no
-  # type to infer, and the query dies with IndeterminateDatatype.
-  OWN_MEMBER_SQL = <<~SQL.squish.freeze
-    (:phone <> '' AND (
-      REPLACE(contacts.phone_number, '+', '') = :phone
-      OR RIGHT(REPLACE(contacts.phone_number, '+', ''), 8) = RIGHT(:phone, 8)
-    ))
-    OR contacts.identifier = :identifier
-  SQL
-
-  def find_own_member
-    GroupMember.active
-               .where(group_contact: @contact)
-               .joins(:contact)
-               .where(OWN_MEMBER_SQL, phone: @inbox_phone_number.to_s.delete('+'), identifier: own_member_identifier)
-               .includes(:contact)
-               .first
   end
 
   def format_participants(phone_numbers)

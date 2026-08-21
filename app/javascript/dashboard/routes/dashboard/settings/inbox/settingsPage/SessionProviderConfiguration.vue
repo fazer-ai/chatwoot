@@ -89,6 +89,14 @@ const save = async field => {
     useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
   } catch (error) {
     useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+    // A switch has already moved by the time this runs, so leaving it there shows a
+    // setting the server never took -- and since the next change event needs a different
+    // value, retrying the one that failed means toggling away and back. Text keeps what
+    // was typed: there the value is the user's work and they can correct and save again.
+    if (field.type === 'boolean') {
+      values.value[field.name] =
+        props.inbox.provider_config?.[field.name] ?? field.default ?? false;
+    }
   }
 };
 </script>
