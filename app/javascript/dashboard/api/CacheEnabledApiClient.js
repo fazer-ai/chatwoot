@@ -45,6 +45,14 @@ class CacheEnabledApiClient extends ApiClient {
     return response.data.payload;
   }
 
+  // The cache key a resource sends with its own body, when it sends one. Committing that
+  // instead of the one /cache_keys answered is what stops a rolling deploy filing an old
+  // payload under a new build's key. Null keeps every other resource on the old path.
+  // eslint-disable-next-line class-methods-use-this, no-unused-vars
+  cacheKeyFromResponse(_response) {
+    return null;
+  }
+
   // eslint-disable-next-line class-methods-use-this
   marshallData(dataToParse) {
     return { data: { payload: dataToParse } };
@@ -90,7 +98,7 @@ class CacheEnabledApiClient extends ApiClient {
       });
 
       await this.dataManager.setCacheKeys({
-        [this.cacheModelName]: newKey,
+        [this.cacheModelName]: this.cacheKeyFromResponse(response) ?? newKey,
       });
     } catch {
       // Ignore error

@@ -11,30 +11,13 @@ class Inboxes extends CacheEnabledApiClient {
     return 'inbox';
   }
 
-  // A cached row is only usable if the build that wrote it serialized the same fields.
-  // The account's cache key does not say that: it changes when an inbox changes, not when
-  // the payload grows one, so after a deploy the browser keeps serving rows that predate
-  // the new field and the dashboard reads absent as empty. That is how `capabilities`
-  // would have hidden reactions, editing and group threads on inboxes that support them,
-  // for as long as the account's inboxes happened not to change.
-  //
-  // Folding a version into the stored key invalidates this model alone. DATA_VERSION is
-  // not the tool for it: it versions the IndexedDB schema, and it deliberately preserves
-  // the keys so that adding a store does not refetch unrelated models.
-  //
-  // Bump on any change to the inbox payload's shape.
-  static PAYLOAD_VERSION = 2;
-
-  versionedCacheKey(cacheKey) {
-    return `v${this.constructor.PAYLOAD_VERSION}:${cacheKey}`;
-  }
-
-  validateCacheKey(cacheKeyFromApi) {
-    return super.validateCacheKey(this.versionedCacheKey(cacheKeyFromApi));
-  }
-
-  refetchAndCommit(newKey = null) {
-    return super.refetchAndCommit(this.versionedCacheKey(newKey));
+  // The inbox index sends the key for the body it just built, so the row and the key it is
+  // filed under always come from the same build. A rolling deploy can otherwise answer
+  // /cache_keys from one build and the index from another, and an old payload filed under
+  // the new build's key stays valid for good.
+  // eslint-disable-next-line class-methods-use-this
+  cacheKeyFromResponse(response) {
+    return response?.data?.cache_key ?? null;
   }
 
   // Keeps the locally cached inbox fresh on connection-status changes without bumping

@@ -98,9 +98,13 @@ const isGroupConversation = computed(
 );
 // A group thread whose provider cannot answer for groups has no member list to show and
 // no sync to run: asking anyway is a request that fails behind the panel.
-const showGroupInfo = computed(
-  () => isGroupConversation.value && hasInboxCapability(CAPABILITIES.GROUPS)
-);
+// A group thread is a group thread whatever the provider can do about it, so the panel
+// follows the conversation. Gating it on the capability sent group conversations to the
+// generic contact panel instead, which offers rename, merge, delete and compose against
+// the synthetic group contact. What the capability governs is inside the panel: the member
+// sync below, and the write actions in GroupContactInfo.
+const showGroupInfo = isGroupConversation;
+const supportsGroups = computed(() => hasInboxCapability(CAPABILITIES.GROUPS));
 const sidebarTitle = computed(() =>
   isGroupConversation.value
     ? 'GROUP.SIDEBAR_TITLE'
@@ -121,7 +125,7 @@ const getContactDetails = () => {
 };
 
 const triggerGroupSync = () => {
-  if (showGroupInfo.value && contactId.value) {
+  if (showGroupInfo.value && supportsGroups.value && contactId.value) {
     store.dispatch('groupMembers/sync', { contactId: contactId.value });
   }
 };
@@ -136,8 +140,8 @@ watch(contactId, (newContactId, prevContactId) => {
 // Same reason as the group-member watchers: the inbox carrying the capability can arrive
 // after this mounts, and `triggerGroupSync` reads it. Without this the panel rendered for a
 // group thread whose members were never synced.
-watch(showGroupInfo, shouldShow => {
-  if (shouldShow) triggerGroupSync();
+watch(supportsGroups, supported => {
+  if (supported) triggerGroupSync();
 });
 
 const onDragEnd = () => {
