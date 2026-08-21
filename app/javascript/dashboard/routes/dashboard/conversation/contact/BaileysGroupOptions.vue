@@ -17,6 +17,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Invite links are their own capability: a provider can administer a group and still
+  // refuse `group_invite_code`/`revoke_group_invite`, which is what uazapi does.
+  canManageInvites: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const store = useStore();
@@ -132,8 +138,10 @@ const toggleAddMembers = async () => {
       enabled: newValue,
     });
 
-    // Also revoke invite link when restricting member additions
-    if (!newValue) {
+    // Also revoke invite link when restricting member additions, where the provider
+    // serves invites at all. Without the guard the revoke throws, the whole block lands
+    // in the catch, and the toggle reports failure on a property it just changed.
+    if (!newValue && props.canManageInvites) {
       await GroupMembersAPI.revokeInviteLink(props.contact.id);
     }
 
@@ -234,7 +242,10 @@ const toggleJoinApproval = async () => {
           </div>
         </div>
 
-        <div class="flex items-center justify-between py-1">
+        <div
+          v-if="canManageInvites"
+          class="flex items-center justify-between py-1"
+        >
           <div class="flex flex-col pr-2">
             <span class="text-sm text-n-slate-12">
               {{ t('GROUP.BAILEYS_OPTIONS.RESET_INVITE_LINK') }}

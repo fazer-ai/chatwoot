@@ -62,7 +62,7 @@ class SuperAdmin::InstanceStatusesController < SuperAdmin::ApplicationController
 
   def baileys_api_version
     @metrics['Baileys API version'] = Whatsapp::Providers::WhatsappBaileysService.status[:packageInfo][:version]
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::ProviderUnavailable => e
     @metrics['Baileys API version'] = e.message
   end
 end

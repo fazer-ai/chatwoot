@@ -14,7 +14,8 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     @page = [(params[:page] || 1).to_i, 1].max
     @per_page = (params[:per_page] || DEFAULT_PER_PAGE).to_i.clamp(1, 100)
     @inbox_phone_number = inbox_phone_number
-    @is_inbox_admin = inbox_admin?
+    @own_member = Whatsapp::Session::Owner.group_member(channel, @contact)
+    @is_inbox_admin = @own_member&.role == 'admin'
 
     paginated = base_query.order(role: :desc, id: :asc)
                           .offset((@page - 1) * @per_page)
@@ -31,7 +32,7 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     channel.update_group_participants(@contact.identifier, format_participants(participants), 'add')
     add_group_members(participants)
     head :ok
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -45,9 +46,9 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     channel.update_group_participants(@contact.identifier, [jid_for_member(member)], action)
     member.update!(role: role)
     head :ok
-  rescue Whatsapp::Providers::WhatsappBaileysService::GroupParticipantNotAllowedError
+  rescue Whatsapp::Session::Errors::GroupParticipantNotAllowed
     render json: { error: 'group_creator_not_modifiable' }, status: :unprocessable_entity
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -58,9 +59,9 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     channel.update_group_participants(@contact.identifier, [jid_for_member(member)], 'remove')
     member.update!(is_active: false)
     head :ok
-  rescue Whatsapp::Providers::WhatsappBaileysService::GroupParticipantNotAllowedError
+  rescue Whatsapp::Session::Errors::GroupParticipantNotAllowed
     render json: { error: 'group_creator_not_modifiable' }, status: :unprocessable_entity
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -92,40 +93,31 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     channel&.phone_number
   end
 
-  def inbox_admin?
-    return false if @inbox_phone_number.blank?
-
-    find_own_member&.role == 'admin'
-  end
-
   def pin_own_member_on_first_page(paginated)
-    return paginated unless @page == 1 && @inbox_phone_number.present?
+    return paginated unless @page == 1
 
     ids = paginated.pluck(:id)
-    own = find_own_member
+    own = @own_member
     return paginated if own.blank? || ids.include?(own.id)
 
     # Prepend own member; drop the last one so total per-page stays consistent
     [own] + paginated.where.not(id: own.id).limit(@per_page - 1).to_a
   end
 
-  def find_own_member
-    clean = @inbox_phone_number.delete('+')
-    GroupMember.active
-               .where(group_contact: @contact)
-               .joins(:contact)
-               .where('REPLACE(contacts.phone_number, \'+\', \'\') = ? OR RIGHT(REPLACE(contacts.phone_number, \'+\', \'\'), 8) = RIGHT(?, 8)',
-                      clean, clean)
-               .includes(:contact)
-               .first
-  end
-
   def format_participants(phone_numbers)
     Array(phone_numbers).map { |phone| "#{phone.to_s.delete('+')}@s.whatsapp.net" }
   end
 
+  # A group roster can name a participant WhatsApp only ever gave a LID for, and those
+  # contacts have no phone number at all: building a phone JID from one produced
+  # `@s.whatsapp.net`, which no provider accepts, so the member could not be promoted,
+  # demoted or removed. Address is where the rule for which id a contact is reachable by
+  # already lives.
   def jid_for_member(member)
-    "#{member.contact.phone_number.to_s.delete('+')}@s.whatsapp.net"
+    address = Whatsapp::Session::Model::Address.for_contact(member.contact)
+    raise Whatsapp::Session::Errors::InvalidPayload, 'group member has no WhatsApp address' if address.nil?
+
+    address.to_jid
   end
 
   def add_group_members(phone_numbers)

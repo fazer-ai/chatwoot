@@ -1,5 +1,6 @@
 class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
-  class ProviderUnavailableError < StandardError; end
+  # See the note in WhatsappBaileysService: legacy errors share the session hierarchy.
+  class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
 
   API_BASE_PATH = 'https://api.z-api.io'.freeze
 

@@ -7,7 +7,11 @@
           "BAILEYS": "Baileys",
           "BAILEYS_DESC": "Conectar mediante la API no oficial Baileys",
           "ZAPI": "Z-API",
-          "ZAPI_DESC": "Conectar mediante la API no oficial Z-API"
+          "ZAPI_DESC": "Conectar mediante la API no oficial Z-API",
+          "NATIVE": "WhatsApp (nativo)",
+          "NATIVE_DESC": "Conecta un teléfono con el conector que ya viene en esta instalación",
+          "UAZAPI": "uazapi",
+          "UAZAPI_DESC": "Conecta un teléfono con tu propia instancia de uazapi"
         },
         "PROVIDER_URL": {
           "LABEL": "URL del proveedor",
@@ -51,6 +55,29 @@
             "IMPORT_SESSION_SHOW_MORE": "Ver más",
             "IMPORT_SESSION_DESC": "WhatsApp ahora exige una clave de acceso al vincular algunas cuentas, lo que bloquea el código QR. Instale la extensión del navegador para importar una sesión que ya tenga iniciada en WhatsApp Web.",
             "IMPORT_SESSION_INSTALL": "Instalar la extensión"
+          }
+        },
+        "SESSION": {
+          "FIELDS": {
+            "BASE_URL": {
+              "LABEL": "URL de la instancia",
+              "PLACEHOLDER": "https://tu-instancia.uazapi.com",
+              "ERROR": "Indica la dirección de tu instancia"
+            },
+            "TOKEN": {
+              "LABEL": "Token de la instancia",
+              "PLACEHOLDER": "Pega el token de la instancia que quieres usar",
+              "ERROR": "El token de la instancia es obligatorio"
+            },
+            "USE_INTERNAL_HOST": {
+              "LABEL": "La instancia corre en la red de este servidor"
+            },
+            "MARK_AS_READ": {
+              "LABEL": "Marcar mensajes como leídos en WhatsApp"
+            },
+            "PRESENCE_SUBSCRIBE": {
+              "LABEL": "Mostrar cuándo el contacto está en línea"
+            }
           }
         }
       }
@@ -139,7 +166,9 @@
     },
     "CHANNELS": {
       "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
-      "WHATSAPP_ZAPI": "WhatsApp - Z-API"
+      "WHATSAPP_ZAPI": "WhatsApp - Z-API",
+      "WHATSAPP_NATIVE": "WhatsApp - nativo",
+      "WHATSAPP_UAZAPI": "WhatsApp - uazapi"
     }
   }
 }

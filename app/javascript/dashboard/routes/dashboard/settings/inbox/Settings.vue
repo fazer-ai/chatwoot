@@ -179,13 +179,17 @@ export default {
       if (this.isAWhatsAppZapiChannel) {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI');
       }
+      if (this.isASessionWhatsAppChannel) {
+        return this.$t(
+          `INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.${this.whatsAppAPIProvider.toUpperCase()}`
+        );
+      }
       return '';
     },
     isConvertibleWhatsAppChannel() {
       return (
         this.isAWhatsAppCloudChannel ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel ||
+        this.isASessionWhatsAppChannel ||
         this.is360DialogWhatsAppChannel
       );
     },
@@ -230,8 +234,7 @@ export default {
         (this.isAnEmailChannel && !this.inbox.provider) ||
         this.shouldShowWhatsAppConfiguration ||
         this.isAWebWidgetInbox ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel
+        this.isASessionWhatsAppChannel
       ) {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,

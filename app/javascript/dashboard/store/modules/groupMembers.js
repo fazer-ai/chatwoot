@@ -28,7 +28,7 @@ export const getters = {
 export const actions = {
   setGroupMembers(
     { commit },
-    { contactId, members, inboxPhoneNumber, isInboxAdmin }
+    { contactId, members, inboxPhoneNumber, ownMemberId, isInboxAdmin }
   ) {
     commit(types.SET_GROUP_MEMBERS, { contactId, members });
     commit(types.SET_GROUP_MEMBERS_META, {
@@ -38,6 +38,10 @@ export const actions = {
         page: 1,
         per_page: members.length,
         inbox_phone_number: inboxPhoneNumber || null,
+        // Which row is the connected account. Dropping it here is what made a sync event
+        // undo what the fetch had established on a provider that names that account by
+        // LID alone: no "You" badge, and its own demote and remove menu offered.
+        own_member_id: ownMemberId ?? null,
         is_inbox_admin: isInboxAdmin ?? null,
       },
     });

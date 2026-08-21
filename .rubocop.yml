@@ -217,6 +217,20 @@ CustomCopLocation:
 
 Style/OneClassPerFile:
   Enabled: true
+  Exclude:
+    # The WhatsApp session layer groups its value objects by family (the event catalog,
+    # the command catalog, the content union, the error hierarchy). Each family is read
+    # and changed as one unit, and splitting ~40 eight-line Data classes across as many
+    # files would hide the catalog rather than clarify it.
+    - 'app/services/whatsapp/session/**/*'
+
+Style/DataInheritance:
+  Exclude:
+    # Same layer: its Data classes carry their own enums (KINDS, CONNECTIONS, ROLES...),
+    # and constants declared inside a `Data.define do ... end` block leak into the
+    # enclosing namespace instead of landing on the class, so the class form is the
+    # correct one here.
+    - 'app/services/whatsapp/session/**/*'
 
 AllCops:
   NewCops: enable

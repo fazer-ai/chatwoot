@@ -22,6 +22,7 @@ import { mapGetters } from 'vuex';
 
 // mixins
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 
 // utils
 import { emitter } from 'shared/helpers/mitt';
@@ -126,7 +127,6 @@ export default {
       currentUser: 'getCurrentUser',
       listLoadingStatus: 'getAllMessagesLoaded',
       currentAccountId: 'getCurrentAccountId',
-      globalConfig: 'globalConfig/get',
       isMetaMessageSendingDisabled: 'globalConfig/isMetaMessageSendingDisabled',
     }),
     currentInbox() {
@@ -291,15 +291,10 @@ export default {
       return { incoming, outgoing };
     },
     inboxSupportsEdit() {
-      // Currently only Baileys WhatsApp channel supports message editing
-      return this.isAWhatsAppBaileysChannel;
+      return this.hasInboxCapability(CAPABILITIES.EDIT);
     },
     inboxSupportsReactions() {
-      return (
-        this.isAWhatsAppCloudChannel ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel
-      );
+      return this.hasInboxCapability(CAPABILITIES.REACTIONS);
     },
     currentContact() {
       const senderId = this.currentChat?.meta?.sender?.id;
@@ -308,6 +303,13 @@ export default {
     },
     isGroupConversation() {
       return this.currentChat?.group_type === 'group';
+    },
+    groupMembersFetchTarget() {
+      if (!this.groupContactId || !this.isGroupConversation) return null;
+
+      return this.hasInboxCapability(CAPABILITIES.GROUPS)
+        ? this.groupContactId
+        : null;
     },
     groupContactId() {
       return this.currentChat?.meta?.sender?.id || null;
@@ -340,7 +342,7 @@ export default {
     },
     isAnnouncementModeRestricted() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.announce === true &&
         this.isGroupMembersLoaded &&
@@ -349,16 +351,18 @@ export default {
     },
     isGroupLeft() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.group_left === true
       );
     },
     isGroupsDisabled() {
+      // The server already strips the group capabilities when the kill switch is off, so
+      // the absence of `groups` is what "disabled" means here — for every provider.
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        !this.globalConfig.baileysWhatsappGroupsEnabled
+        !this.hasInboxCapability(CAPABILITIES.GROUPS)
       );
     },
     isSuperAdmin() {
@@ -428,18 +432,15 @@ export default {
       this.messageSentSinceOpened = false;
       this.resetReplyEditorHeight();
     },
-    groupContactId: {
+    // Watches the whole condition, not just the contact. The capability arrives with the
+    // inbox, and that request can land after this component mounts, so a watcher keyed on
+    // the contact alone saw no capability, skipped the fetch and never ran again: a group
+    // thread stayed without members until the agent switched conversations.
+    groupMembersFetchTarget: {
       immediate: true,
       handler(contactId) {
-        if (
-          contactId &&
-          this.isAWhatsAppBaileysChannel &&
-          this.isGroupConversation &&
-          !this.isGroupMembersLoaded
-        ) {
-          this.$store.dispatch('groupMembers/fetch', {
-            contactId,
-          });
+        if (contactId && !this.isGroupMembersLoaded) {
+          this.$store.dispatch('groupMembers/fetch', { contactId });
         }
       },
     },
@@ -848,7 +849,7 @@ export default {
     class="flex flex-col justify-between flex-grow h-full min-w-0 m-0"
   >
     <div ref="topBannerRef">
-      <template v-if="isAWhatsAppBaileysChannel || isAWhatsAppZapiChannel">
+      <template v-if="isASessionWhatsAppChannel">
         <WhatsappLinkDeviceModal
           v-if="showLinkDeviceModal"
           :show="showLinkDeviceModal"

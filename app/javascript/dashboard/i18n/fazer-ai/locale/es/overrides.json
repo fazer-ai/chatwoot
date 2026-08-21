@@ -1,4 +1,7 @@
 {
+  "GENERAL": {
+    "BETA_DESCRIPTION": "Esta función está en fase beta y puede cambiar a medida que la mejoramos."
+  },
   "CONVERSATION": {
     "UNSUPPORTED_MESSAGE": "Este mensaje no es compatible. Puede verlo en la aplicación."
   },

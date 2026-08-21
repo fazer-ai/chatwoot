@@ -24,11 +24,28 @@ en:
       limit_reached: You can pin up to %{limit} conversations.
       conversation_resolved: A resolved conversation cannot be pinned.
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
+    whatsapp:
+      group_announcement_only: Only administrators are allowed to send messages in this group
     inboxes:
       channel:
+        provider_unavailable: This WhatsApp provider is not available on this installation yet.
+        invalid_provider_config: 'Invalid configuration for: %{keys}'
+        provider_not_enabled_for_account: This WhatsApp provider is turned off for this account.
+        provider_withdrawn: This WhatsApp provider is no longer offered for new inboxes. Existing inboxes on it keep working.
+        cannot_unpair: This provider cannot unlink the WhatsApp account paired with it, so connecting again would resume the same account. Reset the instance on the provider, point this inbox at another one, or correct the number configured here.
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.
+          invalid_credentials: The provider rejected the credentials for this inbox. Check the address and the token and try again.
+          logged_out: This device was disconnected from WhatsApp on the phone. Pair it again to keep receiving messages.
+          stream_replaced: This session was replaced by another connection to the same WhatsApp account. Pair it again to use it here.
+          temporary_ban: WhatsApp temporarily blocked this number. Wait until the block expires before pairing again.
+          client_outdated: The WhatsApp connector is out of date and can no longer connect. Update it to restore the connection.
+          quarantined: Too many failed reconnection attempts in a row. New attempts continue at increasing intervals.
+          connector_unavailable: The WhatsApp connector is not responding. Messages will only be sent again once it is back.
+          connector_incompatible: The WhatsApp connector version is incompatible with this Chatwoot version. Update the connector.
+          connect_failure: WhatsApp refused the connection. New attempts continue automatically.
+          pairing_timed_out: The code expired before the phone finished pairing. Start the connection again to get a new one.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}
@@ -63,6 +80,7 @@ en:
         join_approval_mode_enabled: "%{author_name} turned on admin approval to join this group"
         join_approval_mode_disabled: "%{author_name} turned off admin approval to join this group"
         invite_link_reset: "%{author_name} reset this group's invite link"
+        unknown_author: Someone
         membership_request_created: "%{contact_name} wants to join the group"
         membership_request_revoked: "%{contact_name} no longer wants to join the group"
         icon_changed: "%{author_name} changed the group image"

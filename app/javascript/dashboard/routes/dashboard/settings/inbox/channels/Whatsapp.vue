@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n, I18nT } from 'vue-i18n';
 import Twilio from './Twilio.vue';
@@ -9,10 +9,12 @@ import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
 import BaileysWhatsapp from './BaileysWhatsapp.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
+import SessionWhatsapp from './session/SessionWhatsapp.vue';
 import Banner from 'dashboard/components-next/banner/Banner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import { useAccount } from 'dashboard/composables/useAccount';
+import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { META_RESTRICTION_STATUS_URL } from 'dashboard/constants/globals';
 
@@ -58,6 +60,8 @@ const PROVIDER_TYPES = {
   THREE_SIXTY_DIALOG: '360dialog',
   BAILEYS: 'baileys',
   ZAPI: 'zapi',
+  NATIVE: 'native',
+  UAZAPI: 'uazapi',
 };
 
 // Upstream's own gate for the access-request card: the app id alone says embedded signup
@@ -88,6 +92,8 @@ const INBOX_PROVIDER_TO_KEY = {
   default: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
   baileys: PROVIDER_TYPES.BAILEYS,
   zapi: PROVIDER_TYPES.ZAPI,
+  native: PROVIDER_TYPES.NATIVE,
+  uazapi: PROVIDER_TYPES.UAZAPI,
 };
 
 const currentProviderKey = computed(() => {
@@ -151,6 +157,18 @@ const PROVIDER_CATALOG = computed(() => [
     icon: 'i-woot-zapi',
   },
   {
+    key: PROVIDER_TYPES.NATIVE,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
+    key: PROVIDER_TYPES.UAZAPI,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
     key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG_DESC'),
@@ -158,25 +176,41 @@ const PROVIDER_CATALOG = computed(() => [
   },
 ]);
 
-// Keys shown in the picker. 360Dialog is intentionally hidden in create mode
-// (URL-reachable only) but offered in convert mode where it is a valid target.
-const CREATE_PICKER_KEYS = [
-  PROVIDER_TYPES.WHATSAPP,
-  PROVIDER_TYPES.TWILIO,
-  PROVIDER_TYPES.BAILEYS,
-  PROVIDER_TYPES.ZAPI,
-];
+// The cloud family, which this dashboard has always known statically. 360Dialog is
+// intentionally hidden in create mode (URL-reachable only) but offered in convert mode
+// where it is a valid target.
+const CREATE_PICKER_KEYS = [PROVIDER_TYPES.WHATSAPP, PROVIDER_TYPES.TWILIO];
 const CONVERT_PICKER_KEYS = [
   PROVIDER_TYPES.WHATSAPP,
-  PROVIDER_TYPES.BAILEYS,
-  PROVIDER_TYPES.ZAPI,
   PROVIDER_TYPES.THREE_SIXTY_DIALOG,
 ];
 
+// Every session provider comes from the catalog instead, legacy included: eligibility is
+// per installation (a connector has to be deployed for `native`, and the deprecation
+// withdraws the legacy ones) and per account, and the server is what knows both. Offering
+// a choice it would then refuse is worse than not offering it, and withdrawing one
+// becomes a server-side change.
+const { creatableProviders, descriptorFor, fetchProviders } =
+  useWhatsappSessionProviders();
+onMounted(fetchProviders);
+
+const creatableSessionKeys = computed(() =>
+  creatableProviders.value.map(({ key }) => key)
+);
+const selectedDescriptor = computed(() =>
+  descriptorFor(selectedProvider.value)
+);
+
+// The catalog is what knows a provider is still in beta, so the badge follows the server
+// rather than a literal in the label: ending the beta is one field on the descriptor.
+// The cloud providers have no descriptor here and answer false, which is what they are.
+const isBetaProvider = key => Boolean(descriptorFor(key)?.beta);
+
 const availableProviders = computed(() => {
-  const allowed = isConvertMode.value
-    ? CONVERT_PICKER_KEYS
-    : CREATE_PICKER_KEYS;
+  const allowed = [
+    ...(isConvertMode.value ? CONVERT_PICKER_KEYS : CREATE_PICKER_KEYS),
+    ...creatableSessionKeys.value,
+  ];
   return PROVIDER_CATALOG.value
     .filter(p => allowed.includes(p.key))
     .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
@@ -278,6 +312,7 @@ const requestEmbeddedSignupAccess = () => {
           :title="provider.title"
           :description="provider.description"
           :icon="provider.icon"
+          :is-beta="isBetaProvider(provider.key)"
           @click="selectProvider(provider.key)"
         />
       </div>
@@ -415,6 +450,12 @@ const requestEmbeddedSignupAccess = () => {
         />
         <ZapiWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI"
+          :mode="mode"
+          :inbox="inbox"
+        />
+        <SessionWhatsapp
+          v-else-if="selectedDescriptor && !selectedDescriptor.legacy"
+          :descriptor="selectedDescriptor"
           :mode="mode"
           :inbox="inbox"
         />

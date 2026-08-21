@@ -20,6 +20,33 @@ describe ActionCableListener do
     Current.account = nil
   end
 
+  # The roster arrives twice: once from the REST fetch and again on every sync. Both have
+  # to answer "which row is us" the same way, or the second undoes the first -- which is
+  # what happened while each carried its own phone-only query and only the fetch knew
+  # about LIDs.
+  describe '#contact_group_synced' do
+    let(:channel) do
+      create(:channel_whatsapp, account: account, provider: 'uazapi', phone_number: '+5541999990000',
+                                validate_provider_config: false, sync_templates: false)
+    end
+    let(:group_contact) { create(:contact, account: account, group_type: :group, identifier: '1203630001@g.us') }
+
+    it 'broadcasts the same ownership the roster endpoint reports' do
+      channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '900000100000000' })
+      create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+      own = create(:contact, account: account, phone_number: nil, identifier: '900000100000000@lid')
+      own_member = create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
+      event = Events::Base.new(:'contact.group_synced', Time.zone.now, contact: group_contact)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        anything, 'contact.group_synced',
+        hash_including(own_member_id: own_member.id, is_inbox_admin: true)
+      )
+
+      listener.contact_group_synced(event)
+    end
+  end
+
   describe '#account_cache_invalidated' do
     let!(:event) do
       Events::Base.new(
@@ -480,6 +507,10 @@ describe ActionCableListener do
   end
 
   describe '#inbox_provider_connection_updated' do
+    # Only Channel::Whatsapp emits this event, and only it knows how to present the
+    # admin half of the payload. The generic inbox the rest of this file uses would be
+    # testing a combination that cannot happen.
+    let!(:inbox) { create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false).inbox }
     let(:event_name) { :'inbox.provider_connection_updated' }
     let(:provider_connection) do
       { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,qr', 'error' => nil }
@@ -510,6 +541,51 @@ describe ActionCableListener do
       )
 
       listener.inbox_provider_connection_updated(event)
+    end
+
+    # The push and the REST payload are built by the same presenter now. Before that they
+    # were built separately, so a live update dropped the pairing code until something
+    # refetched the inbox. `error` is already a sentence by this point: the key is
+    # resolved when the state is persisted, because a broadcast has no single reader
+    # whose locale could be used.
+    context 'when the inbox is on a session provider' do
+      let!(:inbox) do
+        create(:channel_whatsapp, account: account, provider: 'uazapi',
+                                  validate_provider_config: false, sync_templates: false).inbox
+      end
+      let(:provider_connection) do
+        { 'connection' => 'close', 'error' => I18n.t('errors.inboxes.channel.provider_connection.logged_out'),
+          'pairing_code' => 'K7QP-2M4X' }
+      end
+
+      it 'pushes the error and the pairing details to administrators' do
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([agent.pubsub_token], anything, anything)
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [admin.pubsub_token],
+          'inbox.provider_connection_updated',
+          {
+            inbox_id: inbox.id,
+            provider_connection: {
+              connection: 'close', qr_data_url: nil, pairing_code: 'K7QP-2M4X',
+              error: I18n.t('errors.inboxes.channel.provider_connection.logged_out')
+            },
+            account_id: account.id
+          }
+        )
+
+        listener.inbox_provider_connection_updated(event)
+      end
+
+      it 'still tells agents nothing but the connection status' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          { inbox_id: inbox.id, provider_connection: { connection: 'close' }, account_id: account.id }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
     end
 
     context 'when a reach-out time-lock is present' do

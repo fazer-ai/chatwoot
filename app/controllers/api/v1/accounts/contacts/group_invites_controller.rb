@@ -3,7 +3,7 @@ class Api::V1::Accounts::Contacts::GroupInvitesController < Api::V1::Accounts::C
     authorize @contact, :show?
     code = channel.group_invite_code(@contact.identifier)
     render json: invite_response(code)
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
@@ -11,7 +11,7 @@ class Api::V1::Accounts::Contacts::GroupInvitesController < Api::V1::Accounts::C
     authorize @contact, :update?
     code = channel.revoke_group_invite(@contact.identifier)
     render json: invite_response(code)
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError => e
+  rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
 

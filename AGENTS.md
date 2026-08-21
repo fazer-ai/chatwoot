@@ -61,6 +61,7 @@
 - Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
 - Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs
 - Specs in parallel/reloading environments: prefer comparing `error.class.name` over constant class equality when asserting raised errors
+- Specs tagged `:redis_streams` talk to a real Redis (the app's own pools are MockRedis in tests, which implements no stream, blocking or scripting command). They need `REDIS_URL` to point at a running server; CI already provides one.
 
 ## Worktree Workflow
 

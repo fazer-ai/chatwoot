@@ -19,6 +19,8 @@ import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import ContactsAPI from 'dashboard/api/contacts';
 import GroupMembersAPI from 'dashboard/api/groupMembers';
 import { phonesMatch } from 'dashboard/helper/phoneHelper';
+import { useInbox } from 'dashboard/composables/useInbox';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 import Avatar from 'next/avatar/Avatar.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
@@ -36,6 +38,7 @@ const props = defineProps({
 const store = useStore();
 const route = useRoute();
 const { t } = useI18n();
+const { hasInboxCapability } = useInbox();
 
 const currentChat = useMapGetter('getSelectedChat');
 const inboxGetter = useMapGetter('inboxes/getInboxById');
@@ -85,7 +88,13 @@ const isInboxAdmin = computed(() => {
   );
 });
 
+// The server already worked out which row is the connected account, by phone and by LID,
+// and says so. The phone comparison stays as the fallback for a roster served before that
+// field existed; it cannot answer for an account a provider names by LID alone, because
+// such a contact has no phone number to compare.
 const isOwnMember = member => {
+  const ownId = membersMeta.value.own_member_id;
+  if (ownId) return member.id === ownId;
   if (!inboxPhone.value) return false;
   return phonesMatch(inboxPhone.value, member.contact?.phone_number);
 };
@@ -150,10 +159,40 @@ const isGroupLeft = computed(
   () => props.contact.additional_attributes?.group_left === true
 );
 
-const canEditGroup = computed(() => isInboxAdmin.value && !isGroupLeft.value);
+// The one predicate for "may this agent change the group". It carries the provider's
+// capability too, so the panel stays a readable shell rather than offering buttons that
+// fail. The condition used to be spelled out inline at five more sites, which is how a
+// new term in it gets missed at four of them.
+//
+// `group_admin`, not `groups`: the coarse one only promises that group info can be READ
+// (it maps to `group_info`), and a provider is free to serve that without serving a
+// single write.
+const canEditGroup = computed(
+  () =>
+    isInboxAdmin.value &&
+    !isGroupLeft.value &&
+    hasInboxCapability(CAPABILITIES.GROUP_ADMIN)
+);
+
+// A control is gated by the capability of the endpoint IT calls, never by the coarse
+// `groups`. Uazapi is the live case: it administers groups but serves neither invite
+// links nor join requests, so anything below that reaches those two routes has to ask
+// for them by name or it renders a button that answers 422.
+const canManageInvites = computed(
+  () => canEditGroup.value && hasInboxCapability(CAPABILITIES.GROUP_INVITES)
+);
+const canHandleJoinRequests = computed(
+  () =>
+    canEditGroup.value && hasInboxCapability(CAPABILITIES.GROUP_JOIN_REQUESTS)
+);
+
+// The panel itself renders for any group thread, because being a group is identity and
+// not a capability. Everything that WRITES still has to ask: `Facade#group` refuses every
+// group call without this one.
+const supportsGroups = computed(() => hasInboxCapability(CAPABILITIES.GROUPS));
 
 const startEditName = () => {
-  if (isGroupLeft.value) return;
+  if (isGroupLeft.value || !canEditGroup.value) return;
   editNameValue.value = props.contact.name || '';
   isEditingName.value = true;
 };
@@ -190,7 +229,7 @@ const onNameKeydown = event => {
 };
 
 const startEditDescription = () => {
-  if (isGroupLeft.value) return;
+  if (isGroupLeft.value || !canEditGroup.value) return;
   editDescriptionValue.value = contactDescription.value;
   isEditingDescription.value = true;
 };
@@ -588,6 +627,8 @@ const handleJoinRequest = async (request, action) => {
 };
 
 const leaveGroup = async () => {
+  if (!supportsGroups.value) return;
+
   isLeavingGroup.value = true;
   const dismiss = usePendingAlert(t('GROUP.SETTINGS.LEAVING'));
   try {
@@ -607,7 +648,7 @@ const fetchGroupData = contactId => {
   if (!contactId) return;
   store.dispatch('groupMembers/fetch', { contactId });
   // Only fetch from API if we don't already have a stored invite code
-  if (!storedInviteCode.value) {
+  if (canManageInvites.value && !storedInviteCode.value) {
     fetchInviteLink();
   }
 };
@@ -698,7 +739,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
           <div v-else class="flex items-center gap-2 min-w-0">
             <h3
               class="my-0 text-base font-medium capitalize break-words text-n-slate-12"
-              :class="{ 'cursor-pointer hover:text-n-brand': !isGroupLeft }"
+              :class="{ 'cursor-pointer hover:text-n-brand': canEditGroup }"
               @click="startEditName"
             >
               {{ contact.name }}
@@ -753,7 +794,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             ref="descriptionContentRef"
             class="text-sm break-words whitespace-pre-wrap text-n-slate-12"
             :class="[
-              { 'cursor-pointer hover:text-n-brand': !isGroupLeft },
+              { 'cursor-pointer hover:text-n-brand': canEditGroup },
               showDescReadMore ? 'line-clamp-3' : '',
             ]"
             @click="startEditDescription"
@@ -797,7 +838,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
           </h4>
           <div class="flex items-center gap-1">
             <NextButton
-              v-if="isInboxAdmin && !isGroupLeft"
+              v-if="canEditGroup"
               :label="t('GROUP.MEMBERS.ADD_BUTTON')"
               icon="i-lucide-user-plus"
               variant="ghost"
@@ -822,7 +863,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             class="absolute i-lucide-loader-2 animate-spin size-4 text-n-slate-10 right-3 top-2.5"
           />
           <NextButton
-            v-if="hasInviteLink"
+            v-if="canManageInvites && hasInviteLink"
             :label="t('GROUP.INVITE.COPY_INVITE_LINK')"
             icon="i-lucide-link"
             variant="ghost"
@@ -918,14 +959,12 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             </div>
             <!-- Loading spinner for this member -->
             <span
-              v-if="
-                isInboxAdmin && !isGroupLeft && loadingMemberId === member.id
-              "
+              v-if="canEditGroup && loadingMemberId === member.id"
               class="i-lucide-loader-2 animate-spin size-4 text-n-slate-10"
             />
             <!-- Action menu toggle (admin only, not for self) -->
             <div
-              v-else-if="isInboxAdmin && !isGroupLeft && !isOwnMember(member)"
+              v-else-if="canEditGroup && !isOwnMember(member)"
               class="relative"
               :class="{
                 'opacity-0 group-hover:opacity-100':
@@ -961,7 +1000,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
 
       <!-- Pending Join Requests section (admin only) -->
       <div
-        v-if="!isGroupLeft && isInboxAdmin && pendingRequests.length > 0"
+        v-if="canHandleJoinRequests && pendingRequests.length > 0"
         class="mt-4"
       >
         <h4 class="mb-2 text-sm font-semibold text-n-slate-11">
@@ -1053,11 +1092,15 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
       </div>
 
       <Accordion
-        v-if="!isGroupLeft"
+        v-if="supportsGroups && !isGroupLeft"
         :title="t('GROUP.SETTINGS.ADVANCED_OPTIONS')"
         class="mt-4"
       >
-        <BaileysGroupOptions :contact="contact" :is-admin="isInboxAdmin" />
+        <BaileysGroupOptions
+          :contact="contact"
+          :is-admin="canEditGroup"
+          :can-manage-invites="canManageInvites"
+        />
 
         <!-- Leave Group section -->
         <div class="mt-3">

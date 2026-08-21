@@ -179,7 +179,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController 
       contact: @contact,
       inbox: inbox,
       source_id: params[:source_id],
-      validate_baileys_phone: true
+      validate_whatsapp_phone: true
     ).perform
   end
 

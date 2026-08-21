@@ -35,6 +35,7 @@ import ContentTemplates from './ContentTemplates/ContentTemplatesModal.vue';
 import ScheduledMessageModal from 'dashboard/routes/dashboard/conversation/scheduledMessages/ScheduledMessageModal.vue';
 import { MESSAGE_MAX_LENGTH } from 'shared/helpers/MessageTypeHelper';
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 import { trimContent, debounce, getRecipients } from '@chatwoot/utils';
 import wootConstants from 'dashboard/constants/globals';
 import {
@@ -189,6 +190,13 @@ export default {
     isGroupConversation() {
       return this.currentChat?.group_type === 'group';
     },
+    groupMembersFetchTarget() {
+      if (!this.groupContactId || !this.isGroupConversation) return null;
+
+      return this.hasInboxCapability(CAPABILITIES.GROUPS)
+        ? this.groupContactId
+        : null;
+    },
     groupContactId() {
       return this.currentChat?.meta?.sender?.id || null;
     },
@@ -223,7 +231,7 @@ export default {
     },
     isAnnouncementModeRestricted() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.announce === true &&
         this.isGroupMembersLoaded &&
@@ -232,16 +240,18 @@ export default {
     },
     isGroupLeft() {
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
         this.currentContact?.additional_attributes?.group_left === true
       );
     },
     isGroupsDisabled() {
+      // The server already strips the group capabilities when the kill switch is off, so
+      // the absence of `groups` is what "disabled" means here — for every provider.
       return (
-        this.isAWhatsAppBaileysChannel &&
+        this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        !this.globalConfig.baileysWhatsappGroupsEnabled
+        !this.hasInboxCapability(CAPABILITIES.GROUPS)
       );
     },
     shouldShowReplyToMessage() {
@@ -652,18 +662,15 @@ export default {
       // Autosave the current message draft.
       this.doAutoSaveDraft();
     },
-    groupContactId: {
+    // Watches the whole condition, not just the contact. The capability arrives with the
+    // inbox, and that request can land after this component mounts, so a watcher keyed on
+    // the contact alone saw no capability, skipped the fetch and never ran again: a group
+    // thread stayed without members until the agent switched conversations.
+    groupMembersFetchTarget: {
       immediate: true,
       handler(contactId) {
-        if (
-          contactId &&
-          this.isAWhatsAppBaileysChannel &&
-          this.isGroupConversation &&
-          !this.isGroupMembersLoaded
-        ) {
-          this.$store.dispatch('groupMembers/fetch', {
-            contactId,
-          });
+        if (contactId && !this.isGroupMembersLoaded) {
+          this.$store.dispatch('groupMembers/fetch', { contactId });
         }
       },
     },

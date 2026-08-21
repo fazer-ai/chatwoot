@@ -24,11 +24,28 @@ es:
       limit_reached: Puede fijar hasta %{limit} conversaciones.
       conversation_resolved: No se puede fijar una conversación resuelta.
       conversation_not_visible: Esta conversación no está en su lista, así que no se puede fijar.
+    whatsapp:
+      group_announcement_only: Solo los administradores pueden enviar mensajes en este grupo
     inboxes:
       channel:
+        provider_unavailable: Este proveedor de WhatsApp aún no está disponible en esta instalación.
+        invalid_provider_config: 'Configuración inválida en: %{keys}'
+        provider_not_enabled_for_account: Este proveedor de WhatsApp está desactivado para esta cuenta.
+        provider_withdrawn: Este proveedor de WhatsApp ya no se ofrece para bandejas de entrada nuevas. Las que ya lo usan siguen funcionando.
+        cannot_unpair: Este proveedor no puede desvincular la cuenta de WhatsApp emparejada con él, así que conectar de nuevo retomaría la misma cuenta. Reinicia la instancia en el proveedor, apunta esta bandeja de entrada a otra, o corrige el número configurado aquí.
         provider_connection:
           wrong_phone_number: El número de teléfono que intenta vincular no es el mismo que tiene configurado. Verifique que el número sea correcto antes de escanear el código QR.
           reconnect_loop_detected: No se pudo restablecer la conexión después de varios intentos. Los reintentos automáticos continúan a intervalos cada vez mayores. Si el problema persiste, desconecte la bandeja de entrada y vuelva a vincularla escaneando un código QR nuevo.
+          invalid_credentials: El proveedor rechazó las credenciales de esta bandeja de entrada. Verifique la dirección y el token e inténtelo de nuevo.
+          logged_out: Este dispositivo fue desconectado de WhatsApp desde el teléfono. Vuelva a vincularlo para seguir recibiendo mensajes.
+          stream_replaced: Esta sesión fue reemplazada por otra conexión de la misma cuenta de WhatsApp. Vuelva a vincularla para usarla aquí.
+          temporary_ban: WhatsApp bloqueó temporalmente este número. Espere a que termine el bloqueo antes de volver a vincularlo.
+          client_outdated: El conector de WhatsApp está desactualizado y ya no puede conectarse. Actualícelo para restablecer la conexión.
+          quarantined: Demasiados intentos de reconexión fallidos seguidos. Los nuevos intentos continúan a intervalos cada vez mayores.
+          connector_unavailable: El conector de WhatsApp no responde. Los mensajes volverán a enviarse cuando esté disponible.
+          connector_incompatible: La versión del conector de WhatsApp es incompatible con esta versión de Chatwoot. Actualice el conector.
+          connect_failure: WhatsApp rechazó la conexión. Los nuevos intentos continúan automáticamente.
+          pairing_timed_out: El código expiró antes de que el teléfono completara la vinculación. Inicie la conexión de nuevo para obtener uno nuevo.
   notifications:
     notification_title:
       internal_chat_mention: Le mencionaron en %{name}
@@ -63,6 +80,7 @@ es:
         join_approval_mode_enabled: "%{author_name} activó la aprobación del administrador para unirse a este grupo"
         join_approval_mode_disabled: "%{author_name} desactivó la aprobación del administrador para unirse a este grupo"
         invite_link_reset: "%{author_name} restableció el enlace de invitación de este grupo"
+        unknown_author: Alguien
         membership_request_created: "%{contact_name} quiere unirse al grupo"
         membership_request_revoked: "%{contact_name} ya no quiere unirse al grupo"
         icon_changed: "%{author_name} cambió la imagen del grupo"

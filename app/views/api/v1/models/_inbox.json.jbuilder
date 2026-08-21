@@ -149,6 +149,9 @@ if resource.whatsapp?
     resource.channel.try(:reauthorization_required?)
   )
   json.provider_connection resource.channel.try(:provider_connection_data)
+  # What this provider can do, so the dashboard gates features by capability instead of
+  # by provider name. See Whatsapp::Session::Capabilities.
+  json.capabilities resource.channel.try(:session_capabilities)
 end
 
 ## Voice attributes for TwilioSms

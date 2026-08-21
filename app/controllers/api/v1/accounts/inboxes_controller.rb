@@ -93,6 +93,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
     channel.setup_channel_provider
     head :ok
+  rescue Whatsapp::Session::Errors::Error => e
+    render_session_error(e)
   end
 
   # Hot-loads a WhatsApp Web session extracted by the browser extension into a
@@ -115,7 +117,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
       candidate_index: import_session_params[:candidate_index].to_i
     )
     head :ok
-  rescue Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError
+  rescue Whatsapp::Session::Errors::ProviderUnavailable
     render json: { error: 'WhatsApp provider is currently unavailable. Please try again.' }, status: :service_unavailable
   end
 
@@ -127,9 +129,13 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     end
 
     channel.disconnect_channel_provider
-    head :ok
-  ensure
     channel.update_provider_connection!(connection: 'close') if channel.respond_to?(:update_provider_connection!)
+    head :ok
+  rescue Whatsapp::Session::Errors::Error => e
+    # Marked closed on success only. A session the provider refused to end is still open,
+    # and recording it as closed is how an operator ends up with a connected number, a
+    # dashboard that says otherwise, and no reason to try again.
+    render_session_error(e)
   end
 
   def convert_provider
@@ -174,6 +180,28 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   end
 
   private
+
+  # The session layer's errors are answers, not crashes: a token typed wrong, an instance
+  # that is down, a provider that is rate limiting, a connect refused rather than
+  # attempted because the number is quarantined on a provider that cannot unpair. Both
+  # actions above are called straight from the pairing UI, which shows what comes back, so
+  # a 500 is a blank wall where a sentence belongs.
+  #
+  # Unauthorized and InvalidConfig are the operator's to fix and say so with a 422, even
+  # though they sit under ProviderUnavailable; retrying them changes nothing.
+  def render_session_error(error)
+    operator_fixable = error.is_a?(Whatsapp::Session::Errors::Unauthorized) ||
+                       error.is_a?(Whatsapp::Session::Errors::InvalidConfig)
+    status = if error.is_a?(Whatsapp::Session::Errors::RateLimited)
+               :too_many_requests
+             elsif error.is_a?(Whatsapp::Session::Errors::ProviderUnavailable) && !operator_fixable
+               :service_unavailable
+             else
+               :unprocessable_entity
+             end
+
+    render json: { error: error.message, code: error.class::CODE }, status: status
+  end
 
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:id])

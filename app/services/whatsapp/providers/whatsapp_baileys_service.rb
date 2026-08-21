@@ -2,9 +2,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   include BaileysHelper
 
   class MessageContentTypeNotSupported < StandardError; end
-  class ProviderUnavailableError < StandardError; end
-  class GroupParticipantNotAllowedError < StandardError; end
-  class MessageAlreadyProcessingError < StandardError; end
+  # Legacy errors inherit from the session hierarchy so every caller rescues a single
+  # namespace, whatever the provider. Nothing else about this service changes: it is
+  # frozen until baileys is removed.
+  class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
+  class GroupParticipantNotAllowedError < Whatsapp::Session::Errors::GroupParticipantNotAllowed; end
+  class MessageAlreadyProcessingError < Whatsapp::Session::Errors::MessageAlreadyProcessing; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
@@ -15,8 +18,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # session, not a transient blip.
   RECONNECT_LOOP_RESET_STRIKES = 3
 
+  # One switch for the whole WhatsApp group subsystem, resolved in one place. Reading the
+  # legacy variable here while the registry reads the new one would let an inbox advertise
+  # `groups` in its capabilities and still refuse to create one.
   def self.groups_enabled?
-    ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false') == 'true'
+    Whatsapp::Session::Registry.groups_enabled?
   end
 
   def self.status

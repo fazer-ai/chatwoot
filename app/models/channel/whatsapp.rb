@@ -22,20 +22,25 @@
 #
 #  index_channel_whatsapp_on_phone_number                    (phone_number) UNIQUE
 #  index_channel_whatsapp_on_phone_number_health_checked_at  (phone_number_health_checked_at)
+#  index_channel_whatsapp_connection_state                   (((provider_connection ->> 'connection'::text))) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))
 #  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text])) USING gin
+#  index_channel_whatsapp_session_id                         (((provider_config ->> 'session_id'::text))) UNIQUE WHERE ((provider)::text = ANY ((ARRAY['native'::character varying, 'uazapi'::character varying])::text[]))
 #
 # rubocop:enable Layout/LineLength
 
 class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Channelable
   include Reauthorizable
+  # Session providers (native, uazapi) answer through this module; every override falls
+  # back to `super` for the cloud and legacy providers.
+  prepend Whatsapp::Session::ChannelExtension
 
   self.table_name = 'channel_whatsapp'
   EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
   encrypts :business_management_token if Chatwoot.encryption_configured?
 
   # default at the moment is 360dialog lets change later.
-  PROVIDERS = %w[default whatsapp_cloud baileys zapi].freeze
+  PROVIDERS = (%w[default whatsapp_cloud baileys zapi] + Whatsapp::Session::PROVIDERS).freeze
   REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi].freeze
   # UI-relevant subset of the baileys new-chat message cap payload that we persist in
   # provider_connection. server_sent_timestamp is intentionally dropped (it changes on every
@@ -201,11 +206,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     data = { connection: provider_connection['connection'] }
     data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
     data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
-    if Current.account_user&.administrator?
-      data[:qr_data_url] = provider_connection['qr_data_url']
-      data[:error] = provider_connection['error']
-    end
+    data.merge!(provider_connection_admin_data) if Current.account_user&.administrator?
     data
+  end
+
+  # The admin-only half of the connection payload, shared by the REST serializer above and
+  # by the cable push, so a field added to one cannot go missing from the other. The
+  # argument is the snapshot being presented: on the push path that is the hash the event
+  # carried, not whatever the record happens to hold by the time the listener runs.
+  def provider_connection_admin_data(connection = provider_connection)
+    { qr_data_url: connection['qr_data_url'], error: connection['error'] }
   end
 
   def toggle_typing_status(typing_status, conversation:)

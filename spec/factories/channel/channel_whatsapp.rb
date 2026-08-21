@@ -90,6 +90,16 @@ FactoryBot.define do
       sync_templates { true }
       validate_provider_config { true }
       received_messages { true }
+      session_provider_enabled { true }
+    end
+
+    # The session providers are offered to every account, so a channel on one needs no
+    # setup to be valid. Specs that exercise the gate pass `session_provider_enabled:
+    # false`, which is what turns the provider off for the account.
+    after(:build) do |channel_whatsapp, options|
+      if !options.session_provider_enabled && channel_whatsapp.provider.in?(Whatsapp::Session::PROVIDERS)
+        channel_whatsapp.account&.update!("whatsapp_#{channel_whatsapp.provider}_disabled" => true)
+      end
     end
 
     before(:create) do |channel_whatsapp, options|
@@ -100,6 +110,14 @@ FactoryBot.define do
       if channel_whatsapp.provider == 'baileys'
         channel_whatsapp.provider_config = channel_whatsapp.provider_config.merge({ 'api_key' => 'test_key', 'provider_url' => 'https://baileys.api',
                                                                                     'phone_number_id' => '123456789', 'mark_as_read' => true })
+      elsif channel_whatsapp.provider.in?(Whatsapp::Session::PROVIDERS)
+        # Session providers carry their own config; the cloud defaults above are noise for them.
+        defaults = { 'mark_as_read' => true }
+        if channel_whatsapp.provider == 'uazapi'
+          defaults['base_url'] = 'https://uazapi.test'
+          defaults['token'] = 'test_token'
+        end
+        channel_whatsapp.provider_config = defaults.merge(channel_whatsapp.provider_config.except('api_key', 'phone_number_id'))
       elsif channel_whatsapp.provider == 'whatsapp_cloud'
         # Add 'source' => 'embedded_signup' to skip after_commit :setup_webhooks callback in tests
         # The callback is for manual setup flow; embedded signup handles webhook setup explicitly

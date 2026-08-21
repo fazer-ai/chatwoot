@@ -20,6 +20,26 @@ RSpec.describe Contacts::SyncGroupService do
       expect { described_class.new(contact: contact).perform }.to raise_error(ActionController::BadRequest)
     end
 
+    # The caller that supplied a channel means "sync this group as that inbox sees it".
+    # Taking the contact's first contact_inbox drove the supplied channel with a
+    # conversation belonging to another inbox, writing the result into the wrong one.
+    it 'takes the conversation from the supplied channel inbox, not the first one' do
+      account = create(:account)
+      first = create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false)
+      second = create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false)
+      contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+      create(:contact_inbox, contact: contact, inbox: first.inbox)
+      wanted = create(:contact_inbox, contact: contact, inbox: second.inbox)
+
+      allow(second).to receive(:sync_group).and_return(true)
+
+      described_class.new(contact: contact, channel: second).perform
+
+      expect(second).to have_received(:sync_group) do |conversation, **|
+        expect(conversation.contact_inbox_id).to eq(wanted.id)
+      end
+    end
+
     it 'calls channel.sync_group with a conversation' do
       channel = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false)
       contact = create(:contact, account: channel.account, group_type: :group, identifier: 'group@g.us')

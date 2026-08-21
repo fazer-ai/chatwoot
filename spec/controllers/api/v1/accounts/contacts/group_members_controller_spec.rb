@@ -28,6 +28,27 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
         expect(response.parsed_body['payload'].length).to eq 2
       end
 
+      # A native or Uazapi roster can name the connected account by LID alone, and such a
+      # contact has no phone number at all. Matching on the phone only reported the inbox
+      # as an ordinary member, which is what the reply box reads to decide whether an
+      # announcement-only group accepts a reply.
+      it 'recognises the connected account by its LID when the roster has no phone for it' do
+        channel = create(:channel_whatsapp, provider: 'uazapi', account: account,
+                                            validate_provider_config: false, sync_templates: false)
+        channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '900000100000000' })
+        group_contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+        own = create(:contact, account: account, phone_number: nil, identifier: '900000100000000@lid')
+        own_member = create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
+
+        get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+            headers: admin.create_new_auth_token
+
+        # `own_member_id` is the half the panel needs: without it the account's own row
+        # carries no "You" badge and is offered the demote and remove menu.
+        expect(response.parsed_body['meta']).to include('is_inbox_admin' => true, 'own_member_id' => own_member.id)
+      end
+
       it 'does not return inactive group members' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
         create(:group_member, group_contact: contact, contact: contact)
@@ -184,6 +205,22 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
     end
 
     context 'when user is logged in' do
+      # A roster can name a participant WhatsApp only ever gave a LID for, and that contact
+      # has no phone number: the request used to build `@s.whatsapp.net` and come back 422
+      # with the member still a member.
+      it 'promotes a member the roster only knows by LID' do
+        member_contact.update!(phone_number: nil, identifier: '112233445566778@lid')
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members/#{member.id}",
+              params: { role: 'admin' },
+              headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(baileys_service).to have_received(:update_group_participants)
+          .with('group@g.us', ['112233445566778@lid'], 'promote')
+        expect(member.reload.role).to eq('admin')
+      end
+
       it 'promotes member to admin' do
         patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members/#{member.id}",
               params: { role: 'admin' },

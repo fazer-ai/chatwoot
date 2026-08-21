@@ -94,8 +94,11 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   def persist_source_id(message_id)
     return if message_id.blank?
 
-    message.update_under_lock!(source_id: message_id)
-    return unless message.deleted?
+    # Only whoever assigns the id owns the revoke: a session inbox has a second writer of
+    # this column, the echo of our own send, and both of them seeing `deleted` would ask
+    # the provider to revoke the same message twice. The assignment and that decision
+    # share one row lock, which is what makes the answer unambiguous.
+    return unless Whatsapp::Session::Outbound::SourceIdReservation.assign(message, { source_id: message_id }) == :revoke
 
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end
@@ -107,7 +110,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   end
 
   def recipient_id
-    return message.conversation.contact_inbox.source_id unless %w[baileys zapi].include?(channel.provider)
+    return message.conversation.contact_inbox.source_id unless channel.session_family?
 
     # NOTE: `identifier` must be in the WhatsApp LID format
     message.conversation.contact.phone_number&.gsub(/[^\d]/, '') || message.conversation.contact.identifier

@@ -2,33 +2,38 @@
 # For Specific Channels like whatsapp, email etc . it smartly generated appropriate the source id when none is provided.
 
 class ContactInboxBuilder
-  pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false, validate_baileys_phone: false }]
+  pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false, validate_whatsapp_phone: false }]
 
   def perform
-    normalize_phone_for_baileys! if validate_baileys_phone && baileys_whatsapp_inbox?
+    normalize_phone_for_whatsapp! if validate_whatsapp_phone && whatsapp_session_inbox?
     @source_id ||= generate_source_id
     create_contact_inbox if source_id.present?
   end
 
   private
 
-  def baileys_whatsapp_inbox?
-    @inbox.channel_type == 'Channel::Whatsapp' && @inbox.channel.provider == 'baileys'
+  # Providers that address a contact by the exact number registered on WhatsApp, rather
+  # than by the account's canonical phone. Z-API is frozen legacy and keeps its current
+  # behavior of not resolving the number.
+  def whatsapp_session_inbox?
+    return false unless @inbox.channel_type == 'Channel::Whatsapp'
+
+    @inbox.channel.session_provider? || @inbox.channel.provider == 'baileys'
   end
 
-  # WhatsApp matches the canonical phone for an account, but Baileys requires
+  # WhatsApp matches the canonical phone for an account, but a paired session requires
   # the exact number registered there. For Brazilian mobile numbers the leading
   # "9" may or may not be present in the user-typed value; sending to the wrong
   # variant fails silently. Use on_whatsapp to resolve the canonical number and
-  # align the contact (and source_id) with what Baileys expects. Provider
-  # lookup errors are swallowed; write/merge errors must surface so the caller
-  # sees inconsistent state.
-  def normalize_phone_for_baileys!
+  # align the contact (and source_id) with what the paired session expects.
+  # Provider lookup errors are swallowed; write/merge errors must surface so the
+  # caller sees inconsistent state.
+  def normalize_phone_for_whatsapp!
     return if @contact.phone_number.blank?
 
     old_source_id_candidate = @contact.phone_number.delete('+')
 
-    canonical_phone = fetch_canonical_baileys_phone
+    canonical_phone = fetch_canonical_whatsapp_phone
     return if canonical_phone.blank? || canonical_phone == @contact.phone_number
 
     apply_canonical_phone(canonical_phone)
@@ -36,7 +41,7 @@ class ContactInboxBuilder
     @source_id = canonical_phone.delete('+') if @source_id == old_source_id_candidate
   end
 
-  def fetch_canonical_baileys_phone
+  def fetch_canonical_whatsapp_phone
     response = @inbox.channel.on_whatsapp(@contact.phone_number)
     return unless response.is_a?(Hash) && response['exists']
 
@@ -45,7 +50,7 @@ class ContactInboxBuilder
 
     "+#{jid_digits}"
   rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP][BAILEYS] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
+    Rails.logger.warn("[WHATSAPP] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
     nil
   end
 

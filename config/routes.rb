@@ -449,6 +449,7 @@ Rails.application.routes.draw do
 
           namespace :whatsapp do
             resource :authorization, only: [:create]
+            resources :session_providers, only: [:index]
           end
 
           resources :webhooks, only: [:index, :create, :update, :destroy]
@@ -734,6 +735,10 @@ Rails.application.routes.draw do
   post 'webhooks/line/:line_channel_id', to: 'webhooks/line#process_payload'
   post 'webhooks/telegram/:bot_token', to: 'webhooks/telegram#process_payload'
   post 'webhooks/sms/:phone_number', to: 'webhooks/sms#process_payload'
+  # Ahead of the phone-number route below, which is the legacy shape: this one has more
+  # segments, so the two cannot collide, and keeping them together is what makes that
+  # obvious to whoever adds the next provider.
+  post 'webhooks/whatsapp/session/uazapi/:channel_id/:webhook_token', to: 'webhooks/whatsapp/uazapi#process_payload'
   get 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#verify'
   post 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#process_payload'
   get 'webhooks/instagram', to: 'webhooks/instagram#verify'
