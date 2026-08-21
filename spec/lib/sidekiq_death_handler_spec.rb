@@ -36,10 +36,24 @@ RSpec.describe SidekiqDeathHandler do
     expect(Rails.logger).to have_received(:error).with(/\[SIDEKIQ\]\[DEAD\] SendReplyJob/)
   end
 
-  it 'reads args from a plain Sidekiq worker payload' do
-    described_class.call({ 'class' => 'PlainWorker', 'args' => [7] }, exception)
+  it 'reports a plain Sidekiq worker payload by class and jid' do
+    described_class.call({ 'class' => 'PlainWorker', 'args' => [7], 'jid' => 'abc123', 'queue' => 'low' }, exception)
 
-    expect(Rails.logger).to have_received(:error).with(/PlainWorker args=\[7\]/)
+    expect(Rails.logger).to have_received(:error).with(/PlainWorker jid=abc123 queue=low/)
+  end
+
+  # Arguments are job payloads: WebhookJob carries the customer's message body and its
+  # signing secret positionally, so dumping them here would put message content and a
+  # credential into the log aggregator on any unexpected terminal failure. The jid is
+  # enough to pull the full payload from the dead set, where access is already controlled.
+  it 'never writes job arguments to the log' do
+    described_class.call(
+      { 'class' => 'WebhookJob', 'args' => ['https://hook.example', { 'content' => 'private' }, 's3cr3t'], 'jid' => 'abc123' },
+      exception
+    )
+
+    expect(Rails.logger).not_to have_received(:error).with(/s3cr3t|private/)
+    expect(Rails.logger).to have_received(:error).with(/WebhookJob jid=abc123/)
   end
 
   it 'sends the exception to the tracker with the account attached' do

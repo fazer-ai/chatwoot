@@ -219,7 +219,7 @@ describe Whatsapp::IncomingMessageBaileysService do
       # out, so this webhook is the only thing that says so. `action` is what tells an
       # operator whether the provider already recreated the socket or is holding off —
       # and holding off is when a human has to step in.
-      it 'persists a reported send stall and clears it on the next update' do
+      it 'persists a reported send stall and clears it only when the connection reopens' do
         params = base_params.merge(
           {
             data: {
@@ -246,6 +246,21 @@ describe Whatsapp::IncomingMessageBaileysService do
           }
         )
 
+        # The provider reports a stall once per episode. An unrelated update in the
+        # meantime — a standalone reachoutTimeLock push carries no sendStall — must not
+        # clear the warning, because nothing would ever say it again while the connection
+        # is still mute.
+        unrelated = base_params.merge(
+          { data: { reachoutTimeLock: { isActive: false } } }
+        )
+        described_class.new(inbox: inbox, params: unrelated).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to include(
+          'consecutive_timeouts' => 3
+        )
+
+        # `open` is a NEW socket, hence a new keystore mutex, whether the provider
+        # restarted it or WhatsApp dropped it. That is the one event that means recovery.
         next_update = base_params.merge({ data: { connection: 'open' } })
         described_class.new(inbox: inbox, params: next_update).perform
 

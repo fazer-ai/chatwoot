@@ -39,7 +39,7 @@ class SendReplyJob < ApplicationJob
     message = Message.find_by(id: message_id)
     return if message.blank?
 
-    Whatsapp::Session::Inbound::StatusTransition.apply(message, 'failed', error: reason)
+    Whatsapp::Session::Inbound::StatusTransition.fail_send(message, reason)
   rescue StandardError => e
     Rails.logger.error "SendReplyJob could not mark message #{message_id} as failed: #{e.message}"
   end

@@ -149,6 +149,19 @@ RSpec.describe SendReplyJob do
       expect { described_class.fail_message(-1, 'gone') }.not_to raise_error
     end
 
+    # source_id is only ever written by the provider — the send response, or the echo
+    # promoting a reservation — so it is proof the message exists on WhatsApp even while
+    # the status is still 'sent'. A send WE could not confirm has nothing to say about
+    # one the provider already did.
+    it 'leaves a message the provider already echoed back alone' do
+      message.update_under_lock!(source_id: 'wa_msg_123')
+
+      described_class.fail_message(message.id, 'retries exhausted')
+
+      expect(message.reload.status).not_to eq('failed')
+      expect(message.external_error).to be_blank
+    end
+
     # A send that timed out may still have reached WhatsApp, so a receipt can mark this
     # message delivered while its retries are running out. Either status is proof it
     # arrived, and walking one back to failed is what puts a duplicate in front of the
@@ -187,8 +200,11 @@ RSpec.describe SendReplyJob do
       expect { described_class.perform_now(whatsapp_message.id) }
         .to have_enqueued_job(described_class)
 
+      # Asserted as a floor rather than a window: what this catches is the broad handler
+      # shadowing this one, which schedules the first retry ~3s out. Pinning the exact 60
+      # would only add flake from suite timing.
       scheduled_in = enqueued_jobs.last[:at] - Time.zone.now.to_f
-      expect(scheduled_in).to be_within(5).of(60)
+      expect(scheduled_in).to be > 30
     end
   end
 end

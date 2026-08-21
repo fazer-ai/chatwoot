@@ -84,7 +84,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     # error.message, not the exception: StatusTransition appends the wire code when it
     # is handed an exception, and external_error is the sentence the agent reads on the
     # bubble. The code is already in the logs.
-    Whatsapp::Session::Inbound::StatusTransition.apply(message, 'failed', error: error.message)
+    Whatsapp::Session::Inbound::StatusTransition.fail_send(message, error.message)
     nil
   end
 

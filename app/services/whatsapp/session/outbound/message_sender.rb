@@ -152,7 +152,7 @@ class Whatsapp::Session::Outbound::MessageSender
   # one, and external_error is the sentence the agent reads on the bubble.
   def fail_message(error)
     message.reload
-    Whatsapp::Session::Inbound::StatusTransition.apply(message, 'failed', error: error.message)
+    Whatsapp::Session::Inbound::StatusTransition.fail_send(message, error.message)
     nil
   end
 

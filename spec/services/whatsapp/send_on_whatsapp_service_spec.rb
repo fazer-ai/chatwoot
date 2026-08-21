@@ -563,7 +563,7 @@ describe Whatsapp::SendOnWhatsappService do
         end
       end
 
-      describe 'duplicate send on Net::ReadTimeout retry' do
+      describe 'a read timeout on the send' do
         let(:send_message_url) do
           "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"
         end
@@ -578,22 +578,49 @@ describe Whatsapp::SendOnWhatsappService do
           stub_request(:post, setup_url).to_return(status: 200, body: '', headers: {})
         end
 
-        it 'sends the message twice when first attempt times out and job is retried' do
+        # A transport failure used to escape as Net::ReadTimeout, which is not in the session
+        # hierarchy, so SendReplyJob's retry_on never saw it: Sidekiq burned its native
+        # retries and the job died in the dead set with the bubble still reading 'sent'.
+        # That is the silent failure this whole change exists to remove, so the transport is
+        # translated too. A read timeout says the same thing a 504 does — the send may or may
+        # not have arrived — which is why it maps to the retryable timeout and not to a
+        # provider-down error.
+        it 'translates into the session hierarchy so the job can retry it' do
           message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
 
+          stub_request(:post, send_message_url)
+            .with { |req| JSON.parse(req.body)['chatwootMessageId'].to_s.start_with?("#{message.id}:") }
+            .to_raise(Net::ReadTimeout.new('Net::ReadTimeout'))
+
+          expect { described_class.new(message: message).perform }.to(raise_error do |e|
+            expect(e.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::SendTimeoutError')
+            expect(e.retryable?).to be(true)
+          end)
+
+          # Not failed: the send may still have arrived, and the retry reuses the reserved id
+          # so WhatsApp dedupes it rather than delivering twice.
+          expect(message.reload.status).not_to eq('failed')
+          expect(message.pending_source_id).to be_present
+        end
+
+        # The retry sends the same reserved WhatsApp id, which is what makes it safe: two
+        # requests, one message on the customer's phone.
+        it 'reuses the reserved id when the retry goes through' do
+          message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
+          sent_ids = []
+
           stub = stub_request(:post, send_message_url)
-                 .with { |req| JSON.parse(req.body)['chatwootMessageId'].to_s.start_with?("#{message.id}:") }
+                 .with { |req| sent_ids << JSON.parse(req.body)['messageId'] }
                  .to_raise(Net::ReadTimeout.new('Net::ReadTimeout'))
                  .then
                  .to_return(status: 200, body: success_body, headers: { 'Content-Type' => 'application/json' })
 
-          expect { SendReplyJob.perform_now(message.id) }.to(raise_error { |e| expect(e.class.name).to eq('Net::ReadTimeout') })
-          expect(message.reload.source_id).to be_nil
-
-          SendReplyJob.perform_now(message.id)
-          expect(message.reload.source_id).to eq('wa_msg_123')
+          expect { described_class.new(message: message).perform }.to raise_error(Whatsapp::Session::Errors::Timeout)
+          described_class.new(message: message).perform
 
           expect(stub).to have_been_requested.twice
+          expect(sent_ids.uniq.length).to eq(1)
+          expect(message.reload.source_id).to eq('wa_msg_123')
         end
       end
     end

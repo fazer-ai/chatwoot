@@ -17,7 +17,8 @@ class SidekiqDeathHandler
 
   def report
     Rails.logger.error(
-      "[SIDEKIQ][DEAD] #{job_class} args=#{job_args.inspect} error=#{@exception.class}: #{@exception.message}#{context_suffix}"
+      "[SIDEKIQ][DEAD] #{job_class} jid=#{@job['jid']} queue=#{@job['queue']} " \
+      "error=#{@exception.class}: #{@exception.message}#{context_suffix}"
     )
     ChatwootExceptionTracker.new(@exception, account: account).capture_exception
   rescue StandardError => e
@@ -32,6 +33,13 @@ class SidekiqDeathHandler
     @job['wrapped'] || @job['class']
   end
 
+  # NEVER logged, only used to resolve the message below. Arguments are job payloads:
+  # WebhookJob carries the customer's message body and `secret: webhook.secret`
+  # positionally, so dumping them here would put message content and a signing credential
+  # into the log aggregator on any unexpected terminal failure. Key-based filtering does
+  # not help with a bare secret in a positional array. The jid in the log line is enough to
+  # pull the full payload from the dead set, where access is already controlled, and
+  # ChatwootExceptionTracker ships it to Sentry with the same protection.
   def job_args
     payload = @job['args']&.first
     payload.is_a?(Hash) ? payload['arguments'] : @job['args']

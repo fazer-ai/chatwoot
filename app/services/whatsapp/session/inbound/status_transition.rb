@@ -33,6 +33,25 @@ module Whatsapp::Session::Inbound::StatusTransition
     end
   end
 
+  # The SEND side's failure writer, as opposed to `apply`, which records what the provider
+  # told us. The difference is source_id: it is only ever written by the provider
+  # confirming the message exists on WhatsApp — the send response, or the echo promoting a
+  # reservation — so a send WE could not confirm has nothing to say about a message the
+  # provider already confirmed, and saying it anyway invites the agent to resend a
+  # duplicate. Read under the row lock, because the echo can land while the last attempt
+  # is still unwinding.
+  #
+  # `apply` deliberately does NOT carry this rule: a provider-reported failure (a 463 NACK,
+  # say) is about a message that did reach the server, and suppressing that would hide a
+  # real delivery failure.
+  def fail_send(message, reason)
+    message.with_lock do
+      next false if message.source_id.present?
+
+      apply(message, 'failed', error: reason)
+    end
+  end
+
   def failure_attributes(status, error)
     return { status: status } unless status == 'failed'
 

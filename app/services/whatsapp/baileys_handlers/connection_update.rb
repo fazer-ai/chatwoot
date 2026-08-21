@@ -45,11 +45,22 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   # health checks while every send times out. Worth surfacing on its own rather than as a
   # bare error string, because "action" is what tells an operator whether the provider
   # already recreated the socket or is holding off — and holding off is when a human has
-  # to step in. Shares the error's lifecycle, like quarantine: the next connection.update
-  # clears both, so a recovered inbox never keeps a stale warning.
+  # to step in.
+  #
+  # Unlike quarantine, this does NOT share the error's lifecycle. The provider reports a
+  # stall once per episode, so an unrelated update in the meantime (a standalone
+  # reachoutTimeLock push carries no sendStall) would clear the warning for good while the
+  # connection is still mute — and nothing would ever say it again. So it is preserved,
+  # and cleared only by the one event that actually means recovery: the connection
+  # reaching `open` with nothing wrong, which is a NEW socket and therefore a new keystore
+  # mutex, whether the provider restarted it or WhatsApp dropped it.
   def send_stall_payload(data)
     raw = data[:sendStall]
-    return nil if raw.blank?
+    if raw.blank?
+      return nil if data[:connection] == 'open' && data[:error].blank?
+
+      return inbox.channel.provider_connection['send_stall']
+    end
 
     {
       consecutive_timeouts: raw[:consecutiveTimeouts],
