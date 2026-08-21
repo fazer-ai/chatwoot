@@ -62,6 +62,8 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include AccountAgentRestrictions
   include AccountWhatsappProviders
   include AccountCaptainAutoResolve
+  # After CacheKeys: it overrides `cache_keys` to say what the payload was built from.
+  include AccountInboxPayloadFingerprint
 
   has_many :account_users, dependent: :destroy_async
   has_many :agent_bot_inboxes, dependent: :destroy_async
