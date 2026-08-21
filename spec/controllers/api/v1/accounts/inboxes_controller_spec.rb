@@ -1654,6 +1654,36 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:ok)
       end
 
+      # The pairing UI calls this and shows whatever comes back, so an error the session
+      # layer raises on purpose has to arrive as a sentence and a status the dashboard can
+      # act on. A wrong Uazapi token used to escape as a 500 and read as a blank wall.
+      it 'answers a session error with its own status instead of a 500' do
+        session_channel = create(:channel_whatsapp, account: account, provider: 'uazapi',
+                                                    validate_provider_config: false, sync_templates: false)
+        allow_any_instance_of(Whatsapp::Session::Facade) # rubocop:disable RSpec/AnyInstance
+          .to receive(:setup_channel_provider)
+          .and_raise(Whatsapp::Session::Errors::Unauthorized, 'the instance refused the token')
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{session_channel.inbox.id}/setup_channel_provider",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body).to include('error' => 'the instance refused the token', 'code' => 'unauthorized')
+      end
+
+      it 'answers a provider that is down with a 503, which is worth retrying' do
+        session_channel = create(:channel_whatsapp, account: account, provider: 'uazapi',
+                                                    validate_provider_config: false, sync_templates: false)
+        allow_any_instance_of(Whatsapp::Session::Facade) # rubocop:disable RSpec/AnyInstance
+          .to receive(:setup_channel_provider)
+          .and_raise(Whatsapp::Session::Errors::ProviderUnavailable, 'the instance did not answer')
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{session_channel.inbox.id}/setup_channel_provider",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:service_unavailable)
+      end
+
       it 'allows agents to setup channel provider for assigned inboxes' do
         create(:inbox_member, user: agent, inbox: inbox)
         service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, setup_channel_provider: true)

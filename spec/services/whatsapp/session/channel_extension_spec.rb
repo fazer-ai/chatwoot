@@ -216,6 +216,22 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
 
       expect(WebMock).to have_requested(:post, 'https://uazapi.test/webhook').with(body: hash_including('enabled' => false))
     end
+
+    # The other caller of the same method wants the opposite. An operator who pressed
+    # disconnect is waiting for an answer, and a session the provider refused to end is
+    # still live: reporting it closed and withdrawing its webhook leaves them with a
+    # connected number, a dashboard that disagrees, and no reason to try again.
+    it 'lets an explicit disconnect fail, and keeps the webhook when it does' do
+      channel = build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'x' })
+      stub_request(:post, 'https://uazapi.test/instance/disconnect').to_return(status: 500, body: '{}')
+      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
+                                                                   headers: { 'Content-Type' => 'application/json' })
+      allow(Resolv).to receive(:getaddresses).and_call_original
+      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
+
+      expect { channel.disconnect_channel_provider }.to raise_error(Whatsapp::Session::Errors::Error)
+      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook').with(body: hash_including('enabled' => false))
+    end
   end
 
   # A rotated token, a moved address, a second instance on the same hosted service: the

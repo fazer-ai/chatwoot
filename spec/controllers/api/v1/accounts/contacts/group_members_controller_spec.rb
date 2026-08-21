@@ -39,12 +39,14 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
         group_contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
         create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
         own = create(:contact, account: account, phone_number: nil, identifier: '900000100000000@lid')
-        create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
+        own_member = create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
 
         get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
             headers: admin.create_new_auth_token
 
-        expect(response.parsed_body['meta']['is_inbox_admin']).to be(true)
+        # `own_member_id` is the half the panel needs: without it the account's own row
+        # carries no "You" badge and is offered the demote and remove menu.
+        expect(response.parsed_body['meta']).to include('is_inbox_admin' => true, 'own_member_id' => own_member.id)
       end
 
       it 'does not return inactive group members' do

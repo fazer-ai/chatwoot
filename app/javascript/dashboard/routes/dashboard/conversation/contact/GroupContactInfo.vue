@@ -88,7 +88,13 @@ const isInboxAdmin = computed(() => {
   );
 });
 
+// The server already worked out which row is the connected account, by phone and by LID,
+// and says so. The phone comparison stays as the fallback for a roster served before that
+// field existed; it cannot answer for an account a provider names by LID alone, because
+// such a contact has no phone number to compare.
 const isOwnMember = member => {
+  const ownId = membersMeta.value.own_member_id;
+  if (ownId) return member.id === ownId;
   if (!inboxPhone.value) return false;
   return phonesMatch(inboxPhone.value, member.contact?.phone_number);
 };

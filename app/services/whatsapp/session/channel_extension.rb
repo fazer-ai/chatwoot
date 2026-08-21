@@ -11,6 +11,10 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def self.prepended(base)
     base.validate :validate_provider_eligible
     base.after_update_commit :handle_provider_config_change, if: :saved_change_to_provider_config?
+    # Prepended so it runs before the model's own teardown callback. It is the only thing
+    # that tells the destroy path apart from an explicit disconnect, which reaches the
+    # same method through the inboxes controller.
+    base.before_destroy :begin_session_teardown, prepend: true
   end
 
   def session_provider?
@@ -42,19 +46,37 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     Whatsapp::Session::Registry.backend_for(self)
   end
 
-  # The destroy path alone: `convert_provider!` reaches the provider service directly.
+  # Two callers reach this, and they want opposite things. `convert_provider!` is neither:
+  # it goes to the provider service directly.
+  #
   # Destruction goes ahead whether or not the provider answered, which is why the model
-  # swallows a teardown failure here, and why the registration is released separately: the
+  # swallows a teardown failure, and why the registration is released separately: the
   # teardown stops at the disconnect when that fails, deliberately, because on a
   # conversion the webhook has to survive a rollback. There is no inbox left for it to
-  # survive for, so it goes. On the ordinary path this repeats a withdrawal the teardown
-  # already made, which is one request against an instance we are done with.
+  # survive for, so it goes.
+  #
+  # An explicit disconnect is an operator waiting for an answer. A failure travels instead
+  # of being logged, because reporting a session closed while it is still live leaves them
+  # with a connected number and a dashboard that disagrees. The registration stays for the
+  # same reason: a live session still needs somewhere to deliver.
   def disconnect_channel_provider
     return super unless session_provider?
 
+    unless @session_teardown
+      # The same teardown `super` performs, minus the rescue that swallows it. Not
+      # `backend.disconnect`: the facade deletes the session, and only disconnecting
+      # leaves the pairing alive under a session id Chatwoot is about to stop using.
+      provider_service.disconnect_channel_provider
+      return session_backend.release_registration
+    end
+
     super
   ensure
-    session_backend.release_registration if session_provider?
+    session_backend.release_registration if @session_teardown && session_provider?
+  end
+
+  def begin_session_teardown
+    @session_teardown = true
   end
 
   # A session provider fetches outbound media from Rails itself, so on an installation
