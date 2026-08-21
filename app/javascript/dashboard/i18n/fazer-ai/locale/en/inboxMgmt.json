@@ -69,9 +69,6 @@
               "PLACEHOLDER": "Paste the token of the instance you want to use",
               "ERROR": "The instance token is required"
             },
-            "USE_INTERNAL_HOST": {
-              "LABEL": "Instance runs on this server’s network"
-            },
             "MARK_AS_READ": {
               "LABEL": "Mark messages as read on WhatsApp"
             },

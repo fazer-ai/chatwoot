@@ -69,9 +69,6 @@
               "PLACEHOLDER": "Cole o token da instância que você quer usar",
               "ERROR": "O token da instância é obrigatório"
             },
-            "USE_INTERNAL_HOST": {
-              "LABEL": "A instância roda na rede deste servidor"
-            },
             "MARK_AS_READ": {
               "LABEL": "Marcar mensagens como lidas no WhatsApp"
             },

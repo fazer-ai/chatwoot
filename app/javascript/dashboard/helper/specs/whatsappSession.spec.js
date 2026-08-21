@@ -45,7 +45,7 @@ describe('whatsappSession', () => {
     });
 
     // The reason this helper exists: `isValidURL` needs a dot in the host, so it refused
-    // the compose-network address that `use_internal_host` is for.
+    // the private address an operator who set `SAFE_FETCH_ALLOW_PRIVATE_NETWORK` may enter.
     it('accepts an address on the deployment own network', () => {
       expect(isHttpUrl('http://uazapi:3000')).toBe(true);
       expect(isHttpUrl('http://localhost:3000')).toBe(true);

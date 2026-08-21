@@ -81,9 +81,9 @@ export const hasCapability = (inbox, capability) =>
  * dashboard cannot know that policy, so it checks shape only.
  *
  * `isValidURL` is stricter than that: its regex needs a dot in the host, which refuses
- * `http://uazapi:3000` and `http://localhost:3000` (the compose-network addresses the
- * `use_internal_host` field exists for) and every IPv6 literal. A form that refuses more
- * than the server does is a provider the operator cannot enter at all.
+ * `http://uazapi:3000` and `http://localhost:3000` (the addresses an operator who has set
+ * `SAFE_FETCH_ALLOW_PRIVATE_NETWORK` is entitled to enter) and every IPv6 literal. A form
+ * that refuses more than the server does is a provider the operator cannot enter at all.
  *
  * @param {string} value
  * @returns {boolean}

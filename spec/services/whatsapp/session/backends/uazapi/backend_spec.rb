@@ -97,22 +97,6 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       end)
     end
 
-    # An instance the operator runs next to Chatwoot cannot resolve the public address, so
-    # an inbox would pair and then never receive an event.
-    it 'points a neighbouring instance at the internal host' do
-      neighbour = create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
-                                            provider_config: { 'base_url' => base, 'token' => 'x', 'use_internal_host' => true,
-                                                               'webhook_verify_token' => 'secret' })
-
-      with_modified_env INTERNAL_HOST_URL: 'http://rails:3000' do
-        described_class.new(neighbour).connect(commands::SessionConnect.new(pairing: 'qr'))
-      end
-
-      expect(WebMock).to(have_requested(:post, "#{base}/webhook").with do |request|
-        JSON.parse(request.body)['url'].start_with?('http://rails:3000/webhooks/whatsapp/session/uazapi/')
-      end)
-    end
-
     it 'answers with the QR the operator has to scan' do
       state = backend.connect(commands::SessionConnect.new(pairing: 'qr'))
 

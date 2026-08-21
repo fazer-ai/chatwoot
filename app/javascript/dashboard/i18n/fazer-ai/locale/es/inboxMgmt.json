@@ -69,9 +69,6 @@
               "PLACEHOLDER": "Pega el token de la instancia que quieres usar",
               "ERROR": "El token de la instancia es obligatorio"
             },
-            "USE_INTERNAL_HOST": {
-              "LABEL": "La instancia corre en la red de este servidor"
-            },
             "MARK_AS_READ": {
               "LABEL": "Marcar mensajes como leídos en WhatsApp"
             },

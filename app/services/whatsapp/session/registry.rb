@@ -46,10 +46,6 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       fields: [
         Field.new(name: 'base_url', type: 'url', required: true),
         Field.new(name: 'token', type: 'password', required: true, secret: true),
-        # An instance the operator runs on this deployment's own network, which is offered
-        # INTERNAL_HOST_URL instead of the public address for its webhook and for the
-        # attachments it fetches.
-        Field.new(name: 'use_internal_host', type: 'boolean', default: false),
         MARK_AS_READ,
         PRESENCE_SUBSCRIBE
       ]
