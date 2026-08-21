@@ -36,6 +36,7 @@ pt_BR:
         provider_connection:
           wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.
           reconnect_loop_detected: Não foi possível restabelecer a conexão após várias tentativas. Novas tentativas automáticas continuam em intervalos crescentes. Se o problema persistir, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.
+          send_stall_detected: Esta conexão está recebendo mensagens, mas não consegue enviá-las. Se não se resolver sozinha em alguns minutos, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.
           invalid_credentials: O provedor recusou as credenciais desta caixa de entrada. Confira o endereço e o token e tente novamente.
           logged_out: Este dispositivo foi desconectado do WhatsApp pelo celular. Conecte novamente para continuar recebendo mensagens.
           stream_replaced: Esta sessão foi substituída por outra conexão da mesma conta do WhatsApp. Conecte novamente para usar aqui.

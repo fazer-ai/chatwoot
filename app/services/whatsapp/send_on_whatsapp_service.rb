@@ -54,6 +54,29 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
 
       send_session_message
     end
+  rescue Whatsapp::Session::Errors::Error => e
+    # A refusal the provider will repeat, or a send whose outcome nobody can determine.
+    # Letting it escape leaves the bubble reading "sent" while the job retries something
+    # that cannot work and then dies in the dead set, so the reason goes on the message
+    # instead — the agent sees it and can act. Only an error that might answer
+    # differently next time is worth raising for. Mirrors
+    # Whatsapp::Session::Outbound::MessageSender, which already does this for the
+    # session providers.
+    raise if e.retryable?
+
+    fail_message(e)
+  end
+
+  # Never over a reason that is already there: a provider that already knows why it
+  # refused writes the specific sentence on the message before raising, and the
+  # exception's own message is the vaguer of the two. Same guard, same reason, as
+  # Whatsapp::Session::Outbound::MessageSender#fail_message.
+  def fail_message(error)
+    message.reload
+    return if message.status == 'failed' && message.external_error.present?
+
+    message.update_under_lock!(status: :failed, external_error: error.message)
+    nil
   end
 
   def validate_announcement_mode!

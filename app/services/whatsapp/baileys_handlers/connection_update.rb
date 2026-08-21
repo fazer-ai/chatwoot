@@ -30,6 +30,7 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       qr_data_url: data[:qrDataUrl] || nil,
       error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
       quarantine: quarantine_payload(data),
+      send_stall: send_stall_payload(data),
       reachout_time_lock: reachout_time_lock_payload(data),
       # new_chat_cap never rides a connection.update (it arrives via message-capping.update / the
       # poll). update_provider_connection! replaces provider_connection wholesale, so without
@@ -37,6 +38,24 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       # off until the next cap push/poll. Preserve the existing value; .compact omits it when unset.
       new_chat_cap: inbox.channel.provider_connection['new_chat_cap'],
       epoch: data[:epoch]
+    }.compact
+  end
+
+  # Rides only the send_stall_detected webhook: the connection is receiving and answering
+  # health checks while every send times out. Worth surfacing on its own rather than as a
+  # bare error string, because "action" is what tells an operator whether the provider
+  # already recreated the socket or is holding off — and holding off is when a human has
+  # to step in. Shares the error's lifecycle, like quarantine: the next connection.update
+  # clears both, so a recovered inbox never keeps a stale warning.
+  def send_stall_payload(data)
+    raw = data[:sendStall]
+    return nil if raw.blank?
+
+    {
+      consecutive_timeouts: raw[:consecutiveTimeouts],
+      stalled_for_ms: raw[:stalledForMs],
+      action: raw[:action],
+      until: raw[:until]
     }.compact
   end
 
