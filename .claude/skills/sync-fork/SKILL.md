@@ -195,6 +195,62 @@ Upstream 4.16.0 rearchitected `Featurable`: `FEATURE_FLAG_COLUMNS = ['feature_fl
 - Controller gate: `can_reconfigure_channel?` (upstream name, our body) accepts any `Channel::Whatsapp` (fork conversion flow) and requires the `whatsapp_reconfigure` feature flag only when `provider_config['source'] == 'embedded_signup'`. Keep that shape.
 - Enterprise's new `Inbox#ensure_create_permitted` runs `account.inboxes.count` in `before_create` — fork specs that `instance_double` the `account.inboxes` relation must materialize factory records BEFORE installing the double (lazy `let` inside the `allow(...).with(baileys_inbox.id)` line fires mid-stub otherwise).
 
+### WhatsApp session providers (`native`, `uazapi`)
+
+The provider-neutral layer for the QR/pairing family. Nearly all of it is fork-only code in
+paths upstream has never had, so it does not conflict: `app/services/whatsapp/session/**`,
+`app/jobs/whatsapp/session/**`, `app/controllers/webhooks/whatsapp/**`,
+`app/controllers/api/v1/accounts/whatsapp/**`, `app/javascript/dashboard/helper/whatsappSession.js`,
+`.../inbox/channels/session/**`, `.../inbox/settingsPage/SessionProviderConfiguration.vue`,
+`lib/tasks/whatsapp_session.rake`. Merge conflicts there mean someone edited our tree, not upstream.
+
+What it *does* touch upstream is deliberately small, and every one is **KC** on a CE merge
+(upstream has no idea these providers exist):
+
+| File | Ours |
+|---|---|
+| `app/models/channel/whatsapp.rb` | `prepend Whatsapp::Session::ChannelExtension` and `PROVIDERS = (%w[...] + Whatsapp::Session::PROVIDERS)`. Every behavior override lives in the module, so upstream changing a method body usually merges clean. |
+| `app/services/whatsapp/send_on_whatsapp_service.rb` | `persist_source_id` goes through `Session::Outbound::SourceIdReservation.assign`, and `recipient_id` branches on `channel.session_family?`. |
+| `app/services/conversations/message_window_service.rb` | one line: `session_family?` instead of a provider list. |
+| `app/views/api/v1/models/_inbox.json.jbuilder` | `json.capabilities resource.channel.try(:session_capabilities)` inside the whatsapp block. If upstream restructures this file, re-attach it: the dashboard gates features on it, and a missing key reads as "provider supports nothing". |
+
+`app/services/whatsapp/incoming_message_base_service.rb` is **untouched** by this layer, on
+purpose: it is the worst conflict zone in the repo and the session layer has its own inbound
+path (`Session::Inbound::Dispatcher`). Keep it that way; if a merge tempts you to add a
+session branch there, it belongs in the dispatcher instead.
+
+**The literal trap, and the one check to run after every merge.** `%w[baileys zapi]` used to be
+how the fork asked "is this a paired session?", and the answer is now `channel.session_family?`.
+Upstream does not write those literals, but *our own* older code did, and a merge that resurrects
+one silently gives `native`/`uazapi` a 24-hour messaging window or the wrong recipient id, and no
+spec fails, because the literal is still true for the two legacy providers. After every merge:
+
+```sh
+git grep -nE "%w\[baileys zapi\]|['\"]baileys['\"].{0,40}['\"]zapi['\"]" app/ lib/ \
+  | grep -v "whatsapp/session/" | grep -vE "native|uazapi" | grep -vE ":[0-9]+:\s*#"
+```
+
+It prints nothing on a healthy tree (verified on `wa/08-provider-catalog`). The filters are what
+make it worth running: the session layer's own files name both providers legitimately, the
+canonical `SESSION_PROVIDERS` list names all four, and annotate_rb writes both into the schema
+comment block. Anything that survives all three is a runtime branch that forgot the new
+providers, and it should be `session_family?`, `session_provider?` or a capability check.
+
+Two constants deliberately still name the legacy pair and are **not** hits to fix:
+`Channel::Whatsapp::PROVIDERS` (a declaration, and it concatenates `Whatsapp::Session::PROVIDERS`)
+and `REACTION_SUPPORTED_PROVIDERS` (only reached through `supports_reactions?`, which returns
+early for session providers via the capability list).
+
+**The legacy providers are frozen, not maintained.** `whatsapp_baileys_service.rb`,
+`whatsapp_zapi_service.rb`, `baileys_handlers/**`, `zapi_handlers/**`, `BaileysWhatsapp.vue`,
+`ZapiWhatsapp.vue` and their ~9k lines of specs are a deliberate safety net: do not refactor them
+during a merge, even when a cop or a rename makes it tempting. Take upstream's change only if it
+fixes a real bug in them.
+
+**Pro side.** `Session::Inbound::Dispatcher` and `Session::Outbound::MessageSender` carry
+`prepend_mod_with`, so Pro extends them without editing CE. Before merging CE into Pro, check
+whether Pro overrides `Channel::Whatsapp` or the inbox jbuilder: both are on the touched list above.
+
 ### db/schema.rb
 
 Always conflicts because both sides have different migration versions. Resolution is mechanical but has traps:
