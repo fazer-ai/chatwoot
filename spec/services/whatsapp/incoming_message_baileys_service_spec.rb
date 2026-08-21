@@ -215,6 +215,43 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(inbox.channel.reload.provider_connection['quarantine']).to be_nil
       end
 
+      # The connection keeps receiving and passing health checks while every send times
+      # out, so this webhook is the only thing that says so. `action` is what tells an
+      # operator whether the provider already recreated the socket or is holding off —
+      # and holding off is when a human has to step in.
+      it 'persists a reported send stall and clears it on the next update' do
+        params = base_params.merge(
+          {
+            data: {
+              error: 'send_stall_detected',
+              sendStall: {
+                consecutiveTimeouts: 3,
+                stalledForMs: 120_000,
+                action: 'suppressed',
+                until: '2026-08-21T12:00:00.000Z'
+              }
+            }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection).to include(
+          'error' => I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected'),
+          'send_stall' => {
+            'consecutive_timeouts' => 3,
+            'stalled_for_ms' => 120_000,
+            'action' => 'suppressed',
+            'until' => '2026-08-21T12:00:00.000Z'
+          }
+        )
+
+        next_update = base_params.merge({ data: { connection: 'open' } })
+        described_class.new(inbox: inbox, params: next_update).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to be_nil
+      end
+
       context 'with reach-out time-lock (error 463 / account restriction)' do
         let(:reachout_data) do
           { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' }

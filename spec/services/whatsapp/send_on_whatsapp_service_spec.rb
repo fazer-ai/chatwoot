@@ -461,6 +461,70 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('msg_group')
       end
 
+      # The bubble used to sit on "sent" with a clock next to it while Sidekiq retried a
+      # send that could never work, and then died in the dead set with nobody watching.
+      # The agent had no way to know it had not gone out.
+      describe 'a send the provider will refuse again' do
+        let(:message) { create(:message, message_type: :outgoing, content: 'test', conversation: conversation) }
+
+        it 'fails the message with the reason instead of raising' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Session::Errors::MediaTooLarge, 'The attachment is too large to send'
+          )
+
+          expect { described_class.new(message: message).perform }.not_to raise_error
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to eq('The attachment is too large to send')
+        end
+
+        it 'fails the message when the send outcome cannot be determined' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Providers::WhatsappBaileysService::SendOutcomeUnknownError, 'may have gone through'
+          )
+
+          expect { described_class.new(message: message).perform }.not_to raise_error
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to eq('may have gone through')
+        end
+
+        # The other half: a provider that is down answers differently once it is back, so
+        # the job has to fail and be retried rather than bury a message the agent could
+        # still send.
+        it 'lets a retryable error take the job down with it' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Session::Errors::ProviderUnavailable
+          )
+
+          expect { described_class.new(message: message).perform }.to raise_error(
+            Whatsapp::Session::Errors::ProviderUnavailable
+          )
+
+          expect(message.reload.status).not_to eq('failed')
+        end
+
+        # validate_announcement_mode! writes its own translated sentence before raising;
+        # the exception's message is the English one meant for the log.
+        it 'does not overwrite a reason already recorded on the message' do
+          allow(whatsapp_channel).to receive(:send_message).and_raise(
+            Whatsapp::Session::Errors::MediaTooLarge, 'the later reason'
+          )
+          failed_message = create(
+            :message,
+            message_type: :outgoing,
+            content: 'test',
+            conversation: conversation,
+            status: :failed,
+            content_attributes: { external_error: 'already recorded' }
+          )
+
+          described_class.new(message: failed_message).perform
+
+          expect(failed_message.reload.external_error).to eq('already recorded')
+        end
+      end
+
       describe 'duplicate send on Net::ReadTimeout retry' do
         let(:send_message_url) do
           "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/send-message"

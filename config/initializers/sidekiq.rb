@@ -1,5 +1,6 @@
 require Rails.root.join('lib/redis/config')
 require Rails.root.join('lib/captain_response_dequeued_logger')
+require Rails.root.join('lib/sidekiq_death_handler')
 
 schedule_file = 'config/schedule.yml'
 
@@ -18,6 +19,11 @@ end
 
 Sidekiq.configure_server do |config|
   config.redis = Redis::Config.app
+
+  # A job that exhausts its retries is otherwise silent: it lands in the dead set and
+  # nobody is told. For a reply that means the agent keeps seeing "sent" on a message
+  # that never went out.
+  config.death_handlers << SidekiqDeathHandler.method(:call)
 
   config.server_middleware do |chain|
     chain.add CaptainResponseDequeuedLogger

@@ -37,6 +37,7 @@ en:
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.
+          send_stall_detected: This connection is receiving messages but cannot send them. If it does not clear on its own within a few minutes, disconnect the inbox and connect again by scanning a new QR code.
           invalid_credentials: The provider rejected the credentials for this inbox. Check the address and the token and try again.
           logged_out: This device was disconnected from WhatsApp on the phone. Pair it again to keep receiving messages.
           stream_replaced: This session was replaced by another connection to the same WhatsApp account. Pair it again to use it here.
