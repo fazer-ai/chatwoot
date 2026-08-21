@@ -154,15 +154,30 @@ const isGroupLeft = computed(
 );
 
 // The one predicate for "may this agent change the group". It carries the provider's
-// capability too: without `groups` every write below is a request the server refuses, so
-// the panel stays a readable shell rather than offering buttons that fail. The condition
-// used to be spelled out inline at five more sites, which is how a new term in it gets
-// missed at four of them.
+// capability too, so the panel stays a readable shell rather than offering buttons that
+// fail. The condition used to be spelled out inline at five more sites, which is how a
+// new term in it gets missed at four of them.
+//
+// `group_admin`, not `groups`: the coarse one only promises that group info can be READ
+// (it maps to `group_info`), and a provider is free to serve that without serving a
+// single write.
 const canEditGroup = computed(
   () =>
     isInboxAdmin.value &&
     !isGroupLeft.value &&
-    hasInboxCapability(CAPABILITIES.GROUPS)
+    hasInboxCapability(CAPABILITIES.GROUP_ADMIN)
+);
+
+// A control is gated by the capability of the endpoint IT calls, never by the coarse
+// `groups`. Uazapi is the live case: it administers groups but serves neither invite
+// links nor join requests, so anything below that reaches those two routes has to ask
+// for them by name or it renders a button that answers 422.
+const canManageInvites = computed(
+  () => canEditGroup.value && hasInboxCapability(CAPABILITIES.GROUP_INVITES)
+);
+const canHandleJoinRequests = computed(
+  () =>
+    canEditGroup.value && hasInboxCapability(CAPABILITIES.GROUP_JOIN_REQUESTS)
 );
 
 const startEditName = () => {
@@ -620,7 +635,7 @@ const fetchGroupData = contactId => {
   if (!contactId) return;
   store.dispatch('groupMembers/fetch', { contactId });
   // Only fetch from API if we don't already have a stored invite code
-  if (!storedInviteCode.value) {
+  if (canManageInvites.value && !storedInviteCode.value) {
     fetchInviteLink();
   }
 };
@@ -835,7 +850,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             class="absolute i-lucide-loader-2 animate-spin size-4 text-n-slate-10 right-3 top-2.5"
           />
           <NextButton
-            v-if="hasInviteLink"
+            v-if="canManageInvites && hasInviteLink"
             :label="t('GROUP.INVITE.COPY_INVITE_LINK')"
             icon="i-lucide-link"
             variant="ghost"
@@ -971,7 +986,10 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
       </div>
 
       <!-- Pending Join Requests section (admin only) -->
-      <div v-if="canEditGroup && pendingRequests.length > 0" class="mt-4">
+      <div
+        v-if="canHandleJoinRequests && pendingRequests.length > 0"
+        class="mt-4"
+      >
         <h4 class="mb-2 text-sm font-semibold text-n-slate-11">
           {{ t('GROUP.JOIN_REQUESTS.SECTION_TITLE') }}
           <span class="ml-1 text-xs font-normal text-n-slate-10">
@@ -1065,7 +1083,11 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
         :title="t('GROUP.SETTINGS.ADVANCED_OPTIONS')"
         class="mt-4"
       >
-        <BaileysGroupOptions :contact="contact" :is-admin="canEditGroup" />
+        <BaileysGroupOptions
+          :contact="contact"
+          :is-admin="canEditGroup"
+          :can-manage-invites="canManageInvites"
+        />
 
         <!-- Leave Group section -->
         <div class="mt-3">

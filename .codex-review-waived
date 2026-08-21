@@ -114,3 +114,8 @@ app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queue
 # new-conversation composer never did. Fixing it means touching a helper shared with
 # email and the web widget, where one message carrying several files is correct.
 app/javascript/dashboard/components-next/NewConversation/components/ActionButtons.vue: Split multiple session attachments before sending  # PR#383
+
+# Tracked as #388, and a missing half rather than a defect: no button offers code
+# pairing, so nothing promises the user something that fails. Withdrawing the capability
+# instead would make backends refuse `request_pairing_code`, which both of them serve.
+app/services/whatsapp/session/registry.rb: Add a reachable pairing-code flow  # PR#387 → #388
