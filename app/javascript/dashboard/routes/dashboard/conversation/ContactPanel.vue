@@ -133,6 +133,13 @@ watch(contactId, (newContactId, prevContactId) => {
   }
 });
 
+// Same reason as the group-member watchers: the inbox carrying the capability can arrive
+// after this mounts, and `triggerGroupSync` reads it. Without this the panel rendered for a
+// group thread whose members were never synced.
+watch(showGroupInfo, shouldShow => {
+  if (shouldShow) triggerGroupSync();
+});
+
 const onDragEnd = () => {
   dragging.value = false;
   updateUISettings({
