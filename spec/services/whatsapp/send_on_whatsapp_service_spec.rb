@@ -603,6 +603,39 @@ describe Whatsapp::SendOnWhatsappService do
           expect(message.pending_source_id).to be_present
         end
 
+        # An enumerated list of exception types is a promise to have thought of every way a
+        # socket can fail, and it will be wrong: Net::WriteTimeout on a large media body,
+        # OpenSSL::SSL::SSLError on a handshake, whatever the next gem raises. Rescued as a
+        # class instead, which is why nothing but the HTTP call is inside that rescue.
+        [
+          [Net::WriteTimeout, 'Whatsapp::Providers::WhatsappBaileysService::SendTimeoutError'],
+          [OpenSSL::SSL::SSLError, 'Whatsapp::Providers::WhatsappBaileysService::SendTimeoutError'],
+          [Net::OpenTimeout, 'Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError'],
+          [SocketError, 'Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError']
+        ].each do |raised, expected|
+          it "maps #{raised} into the session hierarchy" do
+            message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
+            stub_request(:post, send_message_url).to_raise(raised)
+
+            expect { described_class.new(message: message).perform }.to(raise_error do |e|
+              expect(e.class.name).to eq(expected)
+              expect(e.retryable?).to be(true)
+            end)
+          end
+        end
+
+        # A send that may already be on the wire must not mark the channel closed: that
+        # drops the inbox out of the health-check cycle. A connect that never left our
+        # socket is a real provider-down signal and should.
+        it 'leaves the channel open for a write that may already have been transmitted' do
+          message = create(:message, message_type: :outgoing, content: 'test', conversation: conversation, source_id: nil)
+          stub_request(:post, send_message_url).to_raise(Net::WriteTimeout)
+
+          expect { described_class.new(message: message).perform }.to raise_error(Whatsapp::Session::Errors::Timeout)
+
+          expect(WebMock).not_to have_requested(:post, setup_url)
+        end
+
         # The retry sends the same reserved WhatsApp id, which is what makes it safe: two
         # requests, one message on the customer's phone.
         it 'reuses the reserved id when the retry goes through' do

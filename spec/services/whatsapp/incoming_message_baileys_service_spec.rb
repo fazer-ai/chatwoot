@@ -258,6 +258,13 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(inbox.channel.reload.provider_connection['send_stall']).to include(
           'consecutive_timeouts' => 3
         )
+        # The error string is the only half of this warning an operator can see:
+        # provider_connection_admin_data serializes error and qr_data_url, and send_stall
+        # reaches no serializer. Preserving the detail without the string preserves nothing
+        # anyone reads.
+        expect(inbox.channel.provider_connection['error']).to eq(
+          I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected')
+        )
 
         # `open` is a NEW socket, hence a new keystore mutex, whether the provider
         # restarted it or WhatsApp dropped it. That is the one event that means recovery.
@@ -265,6 +272,7 @@ describe Whatsapp::IncomingMessageBaileysService do
         described_class.new(inbox: inbox, params: next_update).perform
 
         expect(inbox.channel.reload.provider_connection['send_stall']).to be_nil
+        expect(inbox.channel.provider_connection['error']).to be_nil
       end
 
       context 'with reach-out time-lock (error 463 / account restriction)' do

@@ -744,7 +744,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def send_message_request
     message_id = reserve_source_id
 
-    response = HTTParty.post(
+    response = post_send_message(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
@@ -771,30 +771,41 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     update_external_created_at(response)
     response.parsed_response.dig('data', 'key', 'id')
-  rescue *TRANSPORT_ERRORS => e
-    raise_transport_error(e)
   end
 
   # A transport failure never reaches raise_send_error, because there is no response to
-  # classify — it escapes as Net::ReadTimeout or an Errno, which is not in the session
-  # hierarchy, so SendReplyJob's retry_on never sees it and the job dies in the dead set
-  # with the bubble still reading "sent". That is the exact silent failure this whole
-  # change exists to remove, so the transport gets translated too.
-  TRANSPORT_ERRORS = [
-    Net::ReadTimeout, Net::OpenTimeout, Net::HTTPBadResponse, EOFError, SocketError, IOError,
-    Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Errno::ETIMEDOUT
+  # classify — it escapes as itself, outside the session hierarchy, so SendReplyJob's
+  # retry_on never sees it and the job dies in the dead set with the bubble still reading
+  # "sent". That is the exact silent failure this change exists to remove.
+  #
+  # Rescued as a CLASS rather than as a list of exception types, which is why nothing but
+  # the HTTP call lives in here: an enumerated list is a promise to have thought of every
+  # way a socket can fail, and it will be wrong (Net::WriteTimeout on a large media body,
+  # OpenSSL::SSL::SSLError on a handshake, whatever the next TLS or HTTP gem raises).
+  # Anything StandardError can be here is a transport failure by construction.
+  def post_send_message(url, **)
+    HTTParty.post(url, **)
+  rescue StandardError => e
+    raise_transport_error(e)
+  end
+
+  # Failures that cannot have put a single byte of the request on the wire. Everything
+  # else defaults to indeterminate, and the asymmetry is deliberate: calling a
+  # possibly-delivered send "the provider is down" marks the channel closed, which drops
+  # the inbox out of the health-check cycle, while calling a never-sent one indeterminate
+  # costs one retry that the reserved message id makes duplicate-safe anyway.
+  NEVER_TRANSMITTED_ERRORS = [
+    Net::OpenTimeout, SocketError, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH
   ].freeze
 
   def raise_transport_error(error)
     Rails.logger.error "[WHATSAPP][BAILEYS] transport failure on send: #{error.class}: #{error.message}"
 
-    # A read timeout means the request went out and no answer came back, which is the same
-    # thing a 504 says: the send may or may not have reached WhatsApp. Everything else here
-    # failed before or during connect, so the send definitively did not happen and the
-    # provider really is unreachable — which is a channel-down signal, unlike the timeout.
-    raise SendTimeoutError, 'The send timed out; it may or may not have reached WhatsApp' if error.is_a?(Net::ReadTimeout)
+    if NEVER_TRANSMITTED_ERRORS.any? { |klass| error.is_a?(klass) }
+      raise ProviderUnavailableError, "Could not reach the WhatsApp provider (#{error.class})"
+    end
 
-    raise ProviderUnavailableError, "Could not reach the WhatsApp provider (#{error.class})"
+    raise SendTimeoutError, "The send did not complete (#{error.class}); it may or may not have reached WhatsApp"
   end
 
   # Every non-2xx used to collapse into a bare ProviderUnavailableError, which made it

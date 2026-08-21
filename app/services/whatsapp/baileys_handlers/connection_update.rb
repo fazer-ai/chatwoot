@@ -25,12 +25,13 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   #   - `reconnecting`: Connection has been established, but not open (i.e. device is being linked for the first time, or Baileys server restart)
   #   - `open`: Open and ready to send/receive messages
   def provider_connection_payload(data)
+    stall = send_stall_payload(data)
     {
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
       qr_data_url: data[:qrDataUrl] || nil,
-      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
+      error: connection_error(data, stall),
       quarantine: quarantine_payload(data),
-      send_stall: send_stall_payload(data),
+      send_stall: stall,
       reachout_time_lock: reachout_time_lock_payload(data),
       # new_chat_cap never rides a connection.update (it arrives via message-capping.update / the
       # poll). update_provider_connection! replaces provider_connection wholesale, so without
@@ -45,6 +46,21 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   # health checks while every send times out. Worth surfacing on its own rather than as a
   # bare error string, because "action" is what tells an operator whether the provider
   # already recreated the socket or is holding off — and holding off is when a human has
+  # `error` is the only half of this warning an operator can actually see:
+  # provider_connection_admin_data serializes error and qr_data_url, and send_stall reaches
+  # no serializer and no frontend consumer (neither does quarantine — both are there for
+  # support and for the API). Preserving the detail without the string would preserve
+  # nothing anyone reads, so the two share a fate.
+  #
+  # Re-derived from the stall rather than copied from the stored error: copying would
+  # resurrect whatever unrelated error happened to be stored last.
+  def connection_error(data, stall)
+    return I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) if data[:error]
+    return I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected') if stall.present?
+
+    nil
+  end
+
   # to step in.
   #
   # Unlike quarantine, this does NOT share the error's lifecycle. The provider reports a
