@@ -45,9 +45,15 @@ class CacheEnabledApiClient extends ApiClient {
     return response.data.payload;
   }
 
-  // The cache key a resource sends with its own body, when it sends one. Committing that
-  // instead of the one /cache_keys answered is what stops a rolling deploy filing an old
-  // payload under a new build's key. Null keeps every other resource on the old path.
+  // Whether this resource's cached rows are only valid under a key that came with the body
+  // itself. Opt in when the payload depends on the build that served it, and the key from
+  // /cache_keys therefore cannot vouch for it.
+  // eslint-disable-next-line class-methods-use-this
+  get usesResponseBoundCacheKey() {
+    return false;
+  }
+
+  // The cache key a resource sends with its own body, when it sends one.
   // eslint-disable-next-line class-methods-use-this, no-unused-vars
   cacheKeyFromResponse(_response) {
     return null;
@@ -88,6 +94,14 @@ class CacheEnabledApiClient extends ApiClient {
 
   async refetchAndCommit(newKey = null) {
     const response = await this.getFromNetwork();
+    const boundKey = this.cacheKeyFromResponse(response);
+
+    // No key on a resource that requires one means an older build answered this request,
+    // which during a rolling deploy is exactly when the key from /cache_keys belongs to a
+    // different build. Borrowing it would file this payload under a fingerprint that
+    // outlives the rollout and never expires. Nothing is cached; the caller still gets the
+    // fresh response, and the next read tries again against a worker that sends the key.
+    if (this.usesResponseBoundCacheKey && boundKey === null) return response;
 
     try {
       await this.dataManager.initDb();
@@ -98,7 +112,7 @@ class CacheEnabledApiClient extends ApiClient {
       });
 
       await this.dataManager.setCacheKeys({
-        [this.cacheModelName]: this.cacheKeyFromResponse(response) ?? newKey,
+        [this.cacheModelName]: boundKey ?? newKey,
       });
     } catch {
       // Ignore error

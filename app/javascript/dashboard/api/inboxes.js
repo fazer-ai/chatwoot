@@ -11,10 +11,15 @@ class Inboxes extends CacheEnabledApiClient {
     return 'inbox';
   }
 
-  // The inbox index sends the key for the body it just built, so the row and the key it is
-  // filed under always come from the same build. A rolling deploy can otherwise answer
-  // /cache_keys from one build and the index from another, and an old payload filed under
-  // the new build's key stays valid for good.
+  // The inbox payload carries `capabilities`, which the build that served it decides, so a
+  // key fetched from a different request cannot vouch for these rows. The index sends the
+  // key for the body it just built; without one, this response came from a build that does
+  // not, and it is not cached at all.
+  // eslint-disable-next-line class-methods-use-this
+  get usesResponseBoundCacheKey() {
+    return true;
+  }
+
   // eslint-disable-next-line class-methods-use-this
   cacheKeyFromResponse(response) {
     return response?.data?.cache_key ?? null;

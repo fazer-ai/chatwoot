@@ -29,15 +29,18 @@ describe('InboxesAPI cache key binding', () => {
     });
   });
 
-  it('falls back to the requested key when the response carries none', async () => {
+  // The empty case of the guard above, and the one that reopened the hole: borrowing the
+  // key from /cache_keys is precisely what must not happen, because during a rolling
+  // deploy that key belongs to the build that did not serve this body.
+  it('caches nothing when the response carries no key of its own', async () => {
     vi.spyOn(InboxesAPI, 'getFromNetwork').mockResolvedValue({
-      data: { payload: [] },
+      data: { payload: [{ id: 1 }] },
     });
 
-    await InboxesAPI.refetchAndCommit('from-cache-keys');
+    const response = await InboxesAPI.refetchAndCommit('from-cache-keys');
 
-    expect(dataManager.setCacheKeys).toHaveBeenCalledWith({
-      inbox: 'from-cache-keys',
-    });
+    expect(dataManager.setCacheKeys).not.toHaveBeenCalled();
+    expect(dataManager.replace).not.toHaveBeenCalled();
+    expect(response.data.payload).toEqual([{ id: 1 }]);
   });
 });
