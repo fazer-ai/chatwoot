@@ -31,6 +31,7 @@ pt_BR:
         provider_unavailable: Este provedor de WhatsApp ainda não está disponível nesta instalação.
         invalid_provider_config: 'Configuração inválida em: %{keys}'
         provider_not_enabled_for_account: Este provedor de WhatsApp ainda não está habilitado para esta conta.
+        provider_withdrawn: Este provedor de WhatsApp não é mais oferecido para novas caixas de entrada. As caixas que já usam ele continuam funcionando.
         cannot_unpair: Este provedor não consegue desvincular a conta do WhatsApp pareada com ele, então conectar de novo retomaria a mesma conta. Reinicie a instância no provedor, aponte esta caixa de entrada para outra, ou corrija o número configurado aqui.
         provider_connection:
           wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.

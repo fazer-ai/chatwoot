@@ -4,12 +4,12 @@
 #
 # Each override answers for the session providers and falls straight back to `super` for
 # the legacy and cloud ones, so no existing provider changes behavior.
-module Whatsapp::Session::ChannelExtension
+module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLength
   # Registers the rollout gate as a real validation so it covers both paths that can
   # put an inbox on a session provider: creating one and converting an existing one
   # (`convert_provider!` pre-validates with `valid?` before it persists anything).
   def self.prepended(base)
-    base.validate :validate_session_provider_enabled
+    base.validate :validate_provider_eligible
     base.after_update_commit :handle_provider_config_change, if: :saved_change_to_provider_config?
   end
 
@@ -163,16 +163,30 @@ module Whatsapp::Session::ChannelExtension
     session_backend.ensure_registration
   end
 
-  # The account toggles are the rollout switch, and a picker that hides a provider is
-  # not a gate: the API would happily create a `native` inbox for any account. Only new
-  # records and provider changes are checked, so turning a toggle back off never makes
-  # an inbox that already exists unsaveable.
-  def validate_session_provider_enabled
-    return unless session_provider?
+  # Who may stand up an inbox on this provider: the account toggles while the new
+  # providers roll out, the deprecation switch once the frozen ones are withdrawn.
+  #
+  # Enforced where the record is written rather than where it is offered, because a
+  # picker that hides a provider is not a gate: the API, the rake conversion tasks and a
+  # `?provider=` URL all reach this code and none of them read the dashboard. Only new
+  # records and provider changes are checked, so flipping a switch back never makes an
+  # inbox that already exists unsaveable.
+  def validate_provider_eligible
     return unless new_record? || provider_changed?
-    return if account&.whatsapp_session_provider_enabled?(provider)
 
-    errors.add(:provider, I18n.t('errors.inboxes.channel.provider_not_enabled_for_account'))
+    reason = ineligible_reason
+    errors.add(:provider, I18n.t("errors.inboxes.channel.#{reason}")) if reason
+  end
+
+  def ineligible_reason
+    return 'provider_withdrawn' if legacy_provider? && !Whatsapp::Session::Registry.legacy_creatable?
+    return 'provider_not_enabled_for_account' if session_provider? && !account&.whatsapp_session_provider_enabled?(provider)
+
+    nil
+  end
+
+  def legacy_provider?
+    Whatsapp::Session::Registry.descriptor(provider)&.legacy? || false
   end
 
   # Session backends validate their config against the descriptor's field list, never

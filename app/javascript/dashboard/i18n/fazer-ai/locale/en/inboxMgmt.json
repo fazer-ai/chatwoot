@@ -7,7 +7,11 @@
           "BAILEYS": "Baileys",
           "BAILEYS_DESC": "Connect via non-official API Baileys",
           "ZAPI": "Z-API",
-          "ZAPI_DESC": "Connect via non-official API Z-API"
+          "ZAPI_DESC": "Connect via non-official API Z-API",
+          "NATIVE": "WhatsApp (native)",
+          "NATIVE_DESC": "Pair a phone through the connector that ships with this installation",
+          "UAZAPI": "uazapi",
+          "UAZAPI_DESC": "Pair a phone through your own uazapi instance"
         },
         "PROVIDER_URL": {
           "LABEL": "Provider URL",
@@ -51,6 +55,29 @@
             "IMPORT_SESSION_SHOW_MORE": "Show more",
             "IMPORT_SESSION_DESC": "WhatsApp now requires a passkey when linking some accounts, which blocks the QR code. Install the browser extension to import a session you're already logged into on WhatsApp Web.",
             "IMPORT_SESSION_INSTALL": "Install the extension"
+          }
+        },
+        "SESSION": {
+          "FIELDS": {
+            "BASE_URL": {
+              "LABEL": "Instance URL",
+              "PLACEHOLDER": "https://your-instance.uazapi.com",
+              "ERROR": "Enter the address of your instance"
+            },
+            "TOKEN": {
+              "LABEL": "Instance token",
+              "PLACEHOLDER": "Paste the token of the instance you want to use",
+              "ERROR": "The instance token is required"
+            },
+            "USE_INTERNAL_HOST": {
+              "LABEL": "Instance runs on this server’s network"
+            },
+            "MARK_AS_READ": {
+              "LABEL": "Mark messages as read on WhatsApp"
+            },
+            "PRESENCE_SUBSCRIBE": {
+              "LABEL": "Show when the contact is online"
+            }
           }
         }
       }
@@ -139,7 +166,9 @@
     },
     "CHANNELS": {
       "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
-      "WHATSAPP_ZAPI": "WhatsApp - Z-API"
+      "WHATSAPP_ZAPI": "WhatsApp - Z-API",
+      "WHATSAPP_NATIVE": "WhatsApp - native",
+      "WHATSAPP_UAZAPI": "WhatsApp - uazapi"
     }
   }
 }

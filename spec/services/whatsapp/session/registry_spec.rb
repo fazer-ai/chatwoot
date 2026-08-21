@@ -28,6 +28,15 @@ RSpec.describe Whatsapp::Session::Registry do
     expect(described_class.descriptor('baileys').served?).to be(false)
   end
 
+  # The badge follows the descriptor, so this is what decides whether the picker warns the
+  # admin. Ending the beta is flipping these two, and the frozen providers were never in
+  # one.
+  it 'marks the new session providers as beta and nothing else' do
+    beta = described_class.descriptors.select(&:beta?).map(&:key)
+
+    expect(beta).to contain_exactly('native', 'uazapi')
+  end
+
   it 'reports a provider as unavailable while its backend class is missing' do
     descriptor = Whatsapp::Session::ProviderDescriptor.new(key: 'uazapi', backend: 'Whatsapp::Session::Backends::NotShippedYet')
 

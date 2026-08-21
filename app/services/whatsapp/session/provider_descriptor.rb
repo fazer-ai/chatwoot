@@ -3,7 +3,7 @@
 # fields its setup form asks for. The dashboard renders the form from this, instead of
 # carrying one hardcoded component and one literal check per provider.
 class Whatsapp::Session::ProviderDescriptor < Data.define(
-  :key, :family, :backend, :capabilities, :pairing_modes, :fields, :legacy
+  :key, :family, :backend, :capabilities, :pairing_modes, :fields, :legacy, :beta
 )
   # `session` pairs with a phone (QR / pairing code); `cloud` is the hosted Meta API
   # family (`default` = 360dialog, `whatsapp_cloud`), which this layer does not serve.
@@ -23,7 +23,9 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
     end
   end
 
-  DEFAULTS = { family: 'session', backend: nil, capabilities: [], pairing_modes: [], fields: [], legacy: false }.freeze
+  DEFAULTS = {
+    family: 'session', backend: nil, capabilities: [], pairing_modes: [], fields: [], legacy: false, beta: false
+  }.freeze
 
   def initialize(**attributes)
     attributes = DEFAULTS.merge(attributes.compact)
@@ -34,12 +36,26 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
       key: attributes[:key].to_s, family: family, backend: attributes[:backend],
       capabilities: Whatsapp::Session::Capabilities.validate!(attributes[:capabilities]),
       pairing_modes: attributes[:pairing_modes].map(&:to_s).freeze,
-      fields: attributes[:fields].freeze, legacy: attributes[:legacy]
+      fields: attributes[:fields].freeze, legacy: attributes[:legacy], beta: attributes[:beta]
     )
   end
 
   def session?
     family == 'session'
+  end
+
+  # Frozen: still described so an existing inbox can be labelled and gated, never offered
+  # as a destination.
+  def legacy?
+    legacy
+  end
+
+  # Offered, but not yet trusted enough to be picked without being told so. The dashboard
+  # badges it; nothing gates on it. It is a property of the provider rather than of the
+  # account precisely so that ending the beta is one line here instead of a translation
+  # hunt across every label that names it.
+  def beta?
+    beta
   end
 
   # Served by this layer (as opposed to the legacy session providers, which keep their
@@ -69,7 +85,7 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
 
   def to_h
     {
-      'key' => key, 'family' => family, 'legacy' => legacy, 'available' => available?,
+      'key' => key, 'family' => family, 'legacy' => legacy, 'beta' => beta, 'available' => available?,
       'capabilities' => capabilities, 'pairing_modes' => pairing_modes, 'fields' => fields.map(&:to_h)
     }
   end
