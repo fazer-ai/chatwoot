@@ -6,6 +6,11 @@ class Whatsapp::Session::Model::MediaRef < Data.define(:kind, :id, :url, :header
 
   KINDS = %w[url connector_blob uazapi_message].freeze
 
+  # Two of the three kinds name something only the provider that issued them still holds:
+  # a blob on that connector's disk, a message in that Uazapi instance. A `url` carries
+  # everything needed to fetch it and travels anywhere.
+  PROVIDER_KINDS = { 'connector_blob' => 'native', 'uazapi_message' => 'uazapi' }.freeze
+
   def self.url(url, mime: nil, size: nil)
     new(kind: 'url', url: url, mime: mime, size: size)
   end
@@ -26,5 +31,13 @@ class Whatsapp::Session::Model::MediaRef < Data.define(:kind, :id, :url, :header
 
   def expired?
     expires_at.present? && Time.zone.at(expires_at / 1000.0) <= Time.current
+  end
+
+  # Whether `provider` can still answer for this ref. Only anything but true for a ref
+  # that outlived a conversion, which is the one path where the ref and the backend asked
+  # to resolve it can come from different providers.
+  def served_by?(provider)
+    kind_owner = PROVIDER_KINDS[kind]
+    kind_owner.nil? || kind_owner == provider.to_s
   end
 end

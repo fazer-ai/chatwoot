@@ -47,6 +47,28 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.content_attributes['is_unsupported']).to be(true)
   end
 
+  # Converted inside the family, which the guard above lets through: the blob id belongs
+  # to the connector that issued it, and the instance that held it has been disconnected.
+  it 'gives up on a ref the inbox\'s new provider cannot have issued' do
+    blob = model::Content::Media.new(kind: 'image', mime: 'image/jpeg',
+                                     ref: model::MediaRef.new(kind: 'connector_blob', id: 'blob-1'))
+    channel.update_columns(provider: 'uazapi') # rubocop:disable Rails/SkipsModelValidations
+
+    described_class.perform_now(message, blob.to_h)
+
+    expect(message.reload.content_attributes['is_unsupported']).to be(true)
+    expect(backend.commands).to be_empty
+  end
+
+  # A plain URL carries everything needed to fetch it, so a conversion does not strand it.
+  it 'still fetches a portable ref after a conversion inside the family' do
+    channel.update_columns(provider: 'uazapi') # rubocop:disable Rails/SkipsModelValidations
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
+  end
+
   # A native inbox whose config is broken is a deployment bug, not media that is gone:
   # marking the bubble unsupported would hide it.
   it 'lets a genuine misconfiguration fail loudly' do

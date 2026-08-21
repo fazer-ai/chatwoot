@@ -119,3 +119,8 @@ app/javascript/dashboard/components-next/NewConversation/components/ActionButton
 # pairing, so nothing promises the user something that fails. Withdrawing the capability
 # instead would make backends refuse `request_pairing_code`, which both of them serve.
 app/services/whatsapp/session/registry.rb: Add a reachable pairing-code flow  # PR#387 → #388
+
+# Tracked as #389, and present on origin/main unchanged: `Contact#group_channel` is
+# `contact_inboxes.first`, every group controller has always resolved its channel that
+# way, and this branch neither introduces nor touches it. Same family as #374.
+app/javascript/dashboard/routes/dashboard/conversation/contact/GroupContactInfo.vue: Scope group commands to the selected inbox  # PR#387 → #389

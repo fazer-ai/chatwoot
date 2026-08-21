@@ -15,13 +15,10 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     return if message.attachments.any?
 
     channel = message.inbox.channel
-    # Converted while this waited in the queue: the inbox belongs to a provider this
-    # layer does not serve, and the bytes are never coming. Asked here rather than caught
-    # from the backend, so that a native inbox which is simply misconfigured still fails
-    # loudly instead of quietly marking its media unsupported.
-    return give_up(message, "inbox ##{message.inbox_id} left the session layer") unless channel.session_provider?
-
     media = Whatsapp::Session::Model::Content.from_h(content)
+    refusal = conversion_refusal(channel, media)
+    return give_up(message, refusal) if refusal
+
     payload = channel.session_backend.download_media(download_command(message, media, chat))
     # Re-read under lock, after the download: a deletion that landed while this job was
     # queued or running destroyed the attachments, and attaching now would put the
@@ -43,6 +40,22 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   end
 
   private
+
+  # One question in two halves, both about a queue entry that outlived a conversion: can
+  # the inbox this message belongs to still fetch these bytes?
+  #
+  # Asked here rather than caught from the backend, so that a native inbox which is simply
+  # misconfigured still fails loudly instead of quietly marking its media unsupported.
+  #
+  # The second half is the one that survives being in the family: a connector blob and a
+  # Uazapi message id mean nothing to anyone but the provider that issued them, and the
+  # conversion has already disconnected the one that did.
+  def conversion_refusal(channel, media)
+    return "inbox ##{channel.inbox.id} left the session layer" unless channel.session_provider?
+    return "ref was issued by a provider other than #{channel.provider}" unless media.ref&.served_by?(channel.provider)
+
+    nil
+  end
 
   # The agent needs to see that the attachment is not coming rather than a bubble that
   # loads forever. Under lock and off a reloaded row: `is_unsupported` is a

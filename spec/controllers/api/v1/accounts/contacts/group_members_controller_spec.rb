@@ -28,6 +28,25 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
         expect(response.parsed_body['payload'].length).to eq 2
       end
 
+      # A native or Uazapi roster can name the connected account by LID alone, and such a
+      # contact has no phone number at all. Matching on the phone only reported the inbox
+      # as an ordinary member, which is what the reply box reads to decide whether an
+      # announcement-only group accepts a reply.
+      it 'recognises the connected account by its LID when the roster has no phone for it' do
+        channel = create(:channel_whatsapp, provider: 'uazapi', account: account,
+                                            validate_provider_config: false, sync_templates: false)
+        channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '900000100000000' })
+        group_contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+        own = create(:contact, account: account, phone_number: nil, identifier: '900000100000000@lid')
+        create(:group_member, group_contact: group_contact, contact: own, role: 'admin')
+
+        get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+            headers: admin.create_new_auth_token
+
+        expect(response.parsed_body['meta']['is_inbox_admin']).to be(true)
+      end
+
       it 'does not return inactive group members' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
         create(:group_member, group_contact: contact, contact: contact)
