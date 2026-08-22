@@ -18,7 +18,7 @@
     "msg_delay_min": 1,
     "name": "testes-chatwoot",
     "openai_apikey": "",
-    "owner": "553499990002",
+    "owner": "5511999990001",
     "paircode": "",
     "plataform": "android",
     "profileName": "",
@@ -32,7 +32,7 @@
   },
   "status": {
     "connected": true,
-    "jid": "553499990002:57@s.whatsapp.net",
+    "jid": "5511999990001:57@s.whatsapp.net",
     "loggedIn": true,
     "resetting": false
   }
