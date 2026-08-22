@@ -175,6 +175,44 @@ export const prepareNewMessagePayload = ({
   return payload;
 };
 
+/**
+ * Whether this inbox's channel carries one attachment per message.
+ *
+ * WhatsApp has no multi-media message, so every sender takes `attachments.first`
+ * (`WhatsappBaileysService#attachment_message_content` and
+ * `Whatsapp::Session::Outbound::MessageSender#attachment_content` alike). A payload with
+ * three files therefore shows three in Chatwoot and delivers one, with nothing telling
+ * the agent. The reply box already splits for this reason (#277).
+ *
+ * @param {{channelType?: string}|null|undefined} targetInbox
+ * @returns {boolean}
+ */
+export const carriesOneAttachmentPerMessage = targetInbox =>
+  targetInbox?.channelType === INBOX_TYPES.WHATSAPP;
+
+/**
+ * Splits the attached files into the one that travels with the new conversation and the
+ * ones that have to follow it as their own messages.
+ *
+ * Only for the channels that need it: on email and the web widget one message carrying
+ * several files is correct, and splitting there would turn one email into three.
+ *
+ * @param {{targetInbox: Object, attachedFiles: Array}} params
+ * @returns {{first: Array, rest: Array}}
+ */
+export const splitAttachmentsForChannel = ({
+  targetInbox,
+  attachedFiles = [],
+}) => {
+  if (
+    !carriesOneAttachmentPerMessage(targetInbox) ||
+    attachedFiles.length < 2
+  ) {
+    return { first: attachedFiles, rest: [] };
+  }
+  return { first: attachedFiles.slice(0, 1), rest: attachedFiles.slice(1) };
+};
+
 export const prepareWhatsAppMessagePayload = ({
   targetInbox,
   selectedContact,
