@@ -260,6 +260,16 @@ class Message < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(content_attributes['deleted']) == true
   end
 
+  # A removed reaction is a deleted row on purpose. WhatsApp allows one reaction per
+  # (message, sender), so Chatwoot reuses the row and marks it deleted rather than
+  # accumulating one per toggle, and the empty content it then carries is exactly the
+  # payload that clears the reaction on the contact's phone. Every guard that keeps a
+  # deleted message off the channel has to let this one through, or the emoji disappears
+  # in Chatwoot and stays on the contact's phone forever.
+  def removed_reaction?
+    deleted? && content_attributes['is_reaction'].present?
+  end
+
   # `content_attributes` is a single JSON column, so writing any of its store accessors from a stale
   # object rewrites the whole hash and drops flags another request set in the meantime — e.g. `deleted`,
   # written by the DELETE endpoint while an outgoing message was still in flight on the provider.

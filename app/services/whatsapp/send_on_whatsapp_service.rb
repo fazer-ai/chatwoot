@@ -138,7 +138,8 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   # Reads the flag straight from the database: a full `message.reload` would also drop the cached
   # conversation/inbox/channel chain this service leans on.
   def deleted_in_database?
-    Message.select(:id, :content_attributes).find_by(id: message.id)&.deleted?
+    stored = Message.select(:id, :content_attributes).find_by(id: message.id)
+    stored.present? && stored.deleted? && !stored.removed_reaction?
   end
 
   def recipient_id

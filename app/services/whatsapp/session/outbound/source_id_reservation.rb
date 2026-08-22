@@ -70,8 +70,13 @@ module Whatsapp::Session::Outbound::SourceIdReservation
 
     assigned_here = message.source_id.blank? && attributes[:source_id].present?
     message.update!(attributes.merge(assigned_here ? send_confirmation(message) : {}))
-    assigned_here && message.deleted? ? :revoke : :written
+    assigned_here && revoked?(message) ? :revoke : :written
   end
+
+  # A removed reaction is deleted from the start, and the empty emoji just sent is what
+  # clears it. Revoking on top of that would ask the provider to delete the reaction
+  # message itself, which is a different thing and one the contact never saw.
+  def revoked?(message) = message.deleted? && !message.removed_reaction?
 
   # Filling source_id is proof the message exists on WhatsApp, so it also retires a
   # failure recorded while it did not. StatusTransition.fail_send only ever writes one
