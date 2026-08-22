@@ -262,7 +262,15 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   def disconnect_channel_provider
     provider_service.disconnect_channel_provider
   rescue StandardError => e
-    # NOTE: Don't prevent destruction if disconnect fails
+    # Two callers, opposite needs. A destroy must not be blocked by a provider that will
+    # not let go, so there the failure is logged and swallowed. An explicit disconnect is
+    # an operator waiting for an answer: reporting a session closed while it is still
+    # live leaves them with a connected number, a dashboard that disagrees, and no reason
+    # to try again — and for a send stall it also clears the warning that was the only
+    # thing telling anyone the inbox was mute. @session_teardown is set by the prepended
+    # before_destroy callback, so it means exactly "we are being destroyed".
+    raise unless @session_teardown
+
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 

@@ -130,17 +130,27 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # block a provider conversion or channel teardown — the only point of
   # calling this is to avoid leaving a dangling session, not to gate the
   # caller's flow on that cleanup succeeding.
+  # Reports the outcome instead of always claiming success. An explicit disconnect is an
+  # operator waiting for an answer, and it is now the recovery path for a send stall:
+  # returning true on a 500 or a read timeout meant the inbox was recorded as closed and
+  # the stall warning cleared while the wedged socket was still there, which is the one
+  # state where the UI stops telling anyone anything is wrong. The teardown callers that
+  # legitimately do not care are the ones that catch it (see Channel::Whatsapp).
   def disconnect_channel_provider
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       timeout: 10
     )
-    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}") unless response.success?
-    true
+    return true if response.success?
+
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}")
+    raise ProviderUnavailableError, "The provider did not end the session (HTTP #{response.code})"
+  rescue Whatsapp::Session::Errors::Error
+    raise
   rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
-    true
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed: #{e.class}: #{e.message}")
+    raise ProviderUnavailableError, "Could not reach the provider to end the session (#{e.class})"
   end
 
   # Confirmed reconnect loop: the provider reported enough consecutive failed
@@ -817,17 +827,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     Rails.logger.error response.body
 
     case response.code
-    when 409
-      # Two different conflicts share this status; the header is what tells them apart.
-      raise SendOutcomeUnknownError, INDETERMINATE_SEND_MESSAGE if indeterminate_send?(response)
-
-      raise MessageAlreadyProcessingError
-    when 503
-      # Distinct from the generic 5xx below: this connection is known to be wedged, so it
-      # must not be marked 'close' (see NON_CHANNEL_DOWN_CODES) — that would drop it out
-      # of the very health-check cycle that detects the stall. It is also the status the
-      # whole episode settles on, since every send after the third timeout gets it.
-      raise SendStalledError, 'The WhatsApp connection is not accepting sends right now'
+    when 409 then raise_conflict_send_error(response)
+    when 503 then raise_unavailable_send_error(response)
     when 504
       raise SendTimeoutError, 'The send timed out; it may or may not have reached WhatsApp'
     when 413
@@ -839,8 +840,31 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
   end
 
+  # The two statuses a send can come back with where the status alone is not the answer:
+  # each covers two conditions that need opposite handling, and a header tells them apart.
+  def raise_conflict_send_error(response)
+    raise SendOutcomeUnknownError, INDETERMINATE_SEND_MESSAGE if indeterminate_send?(response)
+
+    raise MessageAlreadyProcessingError
+  end
+
+  # A wedged connection must NOT be marked 'close' (see NON_CHANNEL_DOWN_CODES): that
+  # would drop it out of the very health-check cycle that detects the stall, and 503 is
+  # where the whole episode settles, since every send after the third timeout gets it.
+  # But an outage and a draining proxy answer 503 too, and reading those as a stall leaves
+  # a genuinely dead channel recorded as open, skipping the reconnect it needed.
+  def raise_unavailable_send_error(response)
+    raise SendStalledError, 'The WhatsApp connection is not accepting sends right now' if stalled_send?(response)
+
+    raise ProviderUnavailableError
+  end
+
   def indeterminate_send?(response)
     response.headers['x-baileys-idempotency-state'] == 'indeterminate'
+  end
+
+  def stalled_send?(response)
+    response.headers['x-baileys-send-state'] == 'stalled'
   end
 
   # The WhatsApp message id this send will use, picked here instead of letting Baileys generate it.
