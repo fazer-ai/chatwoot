@@ -23,6 +23,6 @@ class Whatsapp::Session::Inbound::Handlers::GroupPictureChanged < Whatsapp::Sess
   def refresh_avatar(group_contact)
     return Whatsapp::Session::UpdateGroupAvatarJob.perform_later(group_contact, force: true, channel: channel) unless payload.removed
 
-    group_contact.avatar.purge if group_contact.avatar.attached?
+    Whatsapp::Session::AvatarSync.remove(group_contact)
   end
 end

@@ -6,12 +6,6 @@ app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide p
 app/javascript/dashboard/helper/actionCable.js: Refresh cached permissions before applying this gate  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Align bot assignments with frontend list visibility  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Upsert conversations when assignment grants access  # PR#367
-# PR#372: real, tracked in fazer-ai/chatwoot#375, and not specific to this layer. The
-# window belongs to `Avatar::AvatarFromUrlJob`, which is handed a URL with no notion of
-# how fresh it is; the Baileys avatar paths have the same one. Closing it means giving
-# that shared job a freshness check, which is its own change. Removing this waiver does
-# not close the issue.
-app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
 # PR#372: the redelivery half of fazer-ai/chatwoot#373, still deliberately not answered.
 # Slice 6 settled the ordering half and left this one open: nothing claims an event id
 # before a handler runs, so a webhook the provider redelivers (a timeout on our 200, a

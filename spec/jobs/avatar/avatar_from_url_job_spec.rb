@@ -14,6 +14,48 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       .to have_enqueued_job(described_class).on_queue('purgable')
   end
 
+  # A picture removed between the URL being resolved and this job running cannot be seen
+  # from inside it: an avatarable with nothing attached is both "just purged" and "never
+  # had one", and filling the second is the job's whole purpose. The date the caller
+  # stamps is what separates them.
+  context 'when the picture was removed while the job waited' do
+    let(:avatarable) { create(:contact) }
+
+    before do
+      stub_request(:get, valid_url).to_return(
+        status: 200,
+        body: File.read(Rails.root.join('spec/assets/avatar.png')),
+        headers: { 'Content-Type' => 'image/png' }
+      )
+    end
+
+    it 'does not put the removed picture back' do
+      resolved_at = 1.minute.ago.iso8601
+      Whatsapp::Session::AvatarSync.remove(avatarable)
+
+      described_class.perform_now(avatarable, valid_url, resolved_at: resolved_at)
+
+      expect(avatarable.reload.avatar).not_to be_attached
+    end
+
+    it 'attaches a picture resolved after the removal' do
+      Whatsapp::Session::AvatarSync.remove(avatarable)
+
+      described_class.perform_now(avatarable, valid_url, resolved_at: 1.minute.from_now.iso8601)
+
+      expect(avatarable.reload.avatar).to be_attached
+    end
+
+    # Every caller that does not date its URL keeps the behaviour it had.
+    it 'attaches when the caller did not date the url' do
+      Whatsapp::Session::AvatarSync.remove(avatarable)
+
+      described_class.perform_now(avatarable, valid_url)
+
+      expect(avatarable.reload.avatar).to be_attached
+    end
+  end
+
   context 'with rate-limited avatarable (Contact)' do
     let(:avatarable) { create(:contact) }
 

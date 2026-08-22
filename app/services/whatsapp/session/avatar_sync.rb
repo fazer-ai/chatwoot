@@ -8,6 +8,7 @@
 # refresh, and the group rejoin snapshot.
 module Whatsapp::Session::AvatarSync
   MARKERS = %w[last_avatar_sync_at avatar_url_hash].freeze
+  REMOVED_AT = 'avatar_removed_at'.freeze
 
   module_function
 
@@ -31,6 +32,24 @@ module Whatsapp::Session::AvatarSync
     return if contact.blank? || url.blank?
 
     reset(contact)
-    ::Avatar::AvatarFromUrlJob.perform_later(contact, url)
+    ::Avatar::AvatarFromUrlJob.perform_later(contact, url, resolved_at: Time.current.iso8601)
+  end
+
+  # Drops the picture and records when, so a download already queued for the picture
+  # that was just removed does not put it back.
+  #
+  # `Avatar::AvatarFromUrlJob` is handed a URL with no notion of how fresh it is, and a
+  # removal that lands between the URL being resolved and the job running cannot be seen
+  # from inside it: an avatarable with nothing attached is both "just purged" and "never
+  # had one", which is the case the job exists to fill. The timestamp is what separates
+  # them, and the job compares it against the moment its URL was resolved.
+  def remove(contact)
+    return if contact.blank?
+
+    contact.avatar.purge if contact.avatar.attached?
+    contact.with_lock do
+      attributes = (contact.additional_attributes || {}).except(*MARKERS).merge(REMOVED_AT => Time.current.iso8601)
+      contact.update_columns(additional_attributes: attributes) # rubocop:disable Rails/SkipsModelValidations
+    end
   end
 end

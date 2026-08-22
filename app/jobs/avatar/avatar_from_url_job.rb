@@ -15,8 +15,12 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
   MAX_DOWNLOAD_SIZE = 15.megabytes
   RATE_LIMIT_WINDOW = 1.minute
 
-  def perform(avatarable, avatar_url)
+  # `resolved_at` is when the caller obtained the URL. Without it the job cannot tell a
+  # picture that was removed while it waited in the queue from one that was never there,
+  # and it puts the deleted photo back until the next picture event.
+  def perform(avatarable, avatar_url, resolved_at: nil)
     return unless syncable_avatar?(avatarable, avatar_url)
+    return if superseded?(avatarable, resolved_at)
 
     fetch_and_attach_avatar(avatarable, avatar_url)
   rescue SafeFetch::HttpError => e
@@ -28,6 +32,18 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
   end
 
   private
+
+  # A removal recorded after the URL was resolved makes that URL a picture the contact
+  # has already taken down. Only Contacts carry the marker, which is where this job
+  # keeps its other two; a caller that does not date its URL keeps the old behaviour.
+  def superseded?(avatarable, resolved_at)
+    return false if resolved_at.blank? || !avatarable.is_a?(Contact)
+
+    removed_at = (avatarable.additional_attributes || {})[Whatsapp::Session::AvatarSync::REMOVED_AT]
+    return false if removed_at.blank?
+
+    Time.zone.parse(removed_at) > Time.zone.parse(resolved_at)
+  end
 
   def syncable_avatar?(avatarable, avatar_url)
     avatarable.respond_to?(:avatar) &&
