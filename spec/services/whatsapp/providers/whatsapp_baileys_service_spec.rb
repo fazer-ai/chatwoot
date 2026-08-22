@@ -277,19 +277,30 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     # re-pairing, that also cleared the warning that was the only thing telling anyone the
     # inbox was mute. The teardown callers that genuinely do not care rescue it themselves
     # (Channel::Whatsapp#disconnect_channel_provider), which is where that decision belongs.
+    # 404 is the state being asked for, not a failure. Reporting it as one aborts a
+    # provider conversion and leaves the modal offering Disconnect forever for a session
+    # that is already gone.
+    context 'when the session is already absent' do
+      it 'returns true for HTTP 404' do
+        stub_request(:delete, disconnect_url)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_return(status: 404, body: 'not found')
+
+        expect(service.disconnect_channel_provider).to be(true)
+      end
+    end
+
     context 'when the Baileys API responds with an error status' do
-      [404, 500].each do |status|
-        it "raises and logs a warning for HTTP #{status}" do
-          stub_request(:delete, disconnect_url)
-            .with(headers: stub_headers(whatsapp_channel))
-            .to_return(status: status, body: 'baileys error')
+      it 'raises and logs a warning for HTTP 500' do
+        stub_request(:delete, disconnect_url)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_return(status: 500, body: 'baileys error')
 
-          allow(Rails.logger).to receive(:warn)
+        allow(Rails.logger).to receive(:warn)
 
-          expect { service.disconnect_channel_provider }
-            .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /did not end the session/)
-          expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=#{status}/)
-        end
+        expect { service.disconnect_channel_provider }
+          .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /did not end the session/)
+        expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=500/)
       end
     end
 

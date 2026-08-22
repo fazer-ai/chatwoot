@@ -142,7 +142,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       timeout: 10
     )
-    return true if response.success?
+    # 404 is the state being asked for, not a failure: the session is already gone, so
+    # reporting it as one would abort a provider conversion, block the rejected-session
+    # path in setup_channel_provider, and leave the modal offering Disconnect forever for
+    # a connection that no longer exists.
+    return true if response.success? || response.code == 404
 
     Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}")
     raise ProviderUnavailableError, "The provider did not end the session (HTTP #{response.code})"
