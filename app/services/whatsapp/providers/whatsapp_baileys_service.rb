@@ -844,7 +844,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     when 422
       raise Whatsapp::Session::Errors::InvalidPayload, outgoing_error(:invalid_payload)
     else
-      raise ProviderUnavailableError
+      # Reasoned, not bare: SendReplyJob persists this message as external_error when the
+      # retries run out, and a bare raise makes that message the Ruby class name. The
+      # agent then reads an internal constant where the reason should be.
+      raise ProviderUnavailableError, outgoing_error(:provider_error)
     end
   end
 
@@ -864,7 +867,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def raise_unavailable_send_error(response)
     raise SendStalledError, outgoing_error(:send_stalled) if stalled_send?(response)
 
-    raise ProviderUnavailableError
+    raise ProviderUnavailableError, outgoing_error(:provider_error)
   end
 
   def outgoing_error(key)

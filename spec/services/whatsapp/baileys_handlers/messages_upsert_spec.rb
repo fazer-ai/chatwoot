@@ -968,6 +968,23 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(sent.reload.source_id).to eq('RESERVED_4')
     end
 
+    # The retries ran out before this echo arrived, so the message was marked failed. The
+    # echo proves it reached WhatsApp, and leaving it failed puts a Retry button on it —
+    # Retry clears the reservation and sends a fresh id, which is the duplicate the
+    # reservation exists to prevent.
+    it 'retires the send failure of a message the echo proves arrived' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: nil, status: :failed,
+                              external_error: 'send timed out',
+                              content_attributes: { pending_source_id: 'RESERVED_5' })
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_5')).perform
+
+      expect(sent.reload.source_id).to eq('RESERVED_5')
+      expect(sent.status).to eq('sent')
+      expect(sent.external_error).to be_blank
+    end
+
     it 'keeps the source_id already confirmed by the send response' do
       sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
                               content: '**John** olá', source_id: 'RESERVED_2',

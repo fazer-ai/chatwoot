@@ -952,6 +952,21 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
+    # SendReplyJob persists error.message as external_error when the retries run out, so a
+    # bare raise puts the Ruby class name in front of the agent where the reason belongs.
+    it 'gives a generic provider failure a reason an agent can read' do
+      stub_request(:post, request_path).to_return(status: 500, body: 'Internal Server Error')
+      stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+        .to_return(status: 200)
+
+      expect do
+        service.send_message(test_send_phone_number, message)
+      end.to(raise_error do |error|
+        expect(error.message).to eq(I18n.t('errors.inboxes.channel.outgoing.provider_error'))
+        expect(error.message).not_to include('WhatsappBaileysService')
+      end)
+    end
+
     context 'when the provider is unavailable' do
       it 'raises a retryable provider error' do
         stub_request(:post, request_path)

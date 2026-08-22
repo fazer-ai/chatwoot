@@ -35,6 +35,7 @@ pt_BR:
         cannot_unpair: Este provedor não consegue desvincular a conta do WhatsApp pareada com ele, então conectar de novo retomaria a mesma conta. Reinicie a instância no provedor, aponte esta caixa de entrada para outra, ou corrija o número configurado aqui.
         code_pairing_unsupported: Este provedor do WhatsApp não consegue parear com código. Escaneie o QR Code no lugar.
         outgoing:
+          provider_error: O WhatsApp não conseguiu enviar esta mensagem no momento.
           provider_unreachable: Não foi possível alcançar o provedor do WhatsApp.
           disconnect_refused: O provedor não encerrou a sessão.
           disconnect_unreachable: Não foi possível alcançar o provedor para encerrar a sessão.

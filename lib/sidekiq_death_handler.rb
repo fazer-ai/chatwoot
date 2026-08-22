@@ -15,18 +15,31 @@ class SidekiqDeathHandler
     @exception = exception
   end
 
+  # The enrichment is best-effort and the report is not. Resolving the message hits the
+  # database, and the failures that fill the dead set are exactly the ones that come with a
+  # database in trouble: an exception raised while building the context used to take out
+  # the line reporting the original error AND the exception tracker call, so monitoring
+  # recorded "handler failed" and lost the terminal failure it exists to surface.
   def report
+    suffix = safely('context') { context_suffix } || ''
     Rails.logger.error(
       "[SIDEKIQ][DEAD] #{job_class} jid=#{@job['jid']} queue=#{@job['queue']} " \
-      "error=#{@exception.class}: #{@exception.message}#{context_suffix}"
+      "error=#{@exception.class}: #{@exception.message}#{suffix}"
     )
-    ChatwootExceptionTracker.new(@exception, account: account).capture_exception
+    ChatwootExceptionTracker.new(@exception, account: safely('account') { account }).capture_exception
   rescue StandardError => e
     # A death handler that raises takes the reporting down with the job it was reporting.
     Rails.logger.error "[SIDEKIQ][DEAD] handler failed: #{e.message}"
   end
 
   private
+
+  def safely(what)
+    yield
+  rescue StandardError => e
+    Rails.logger.warn "[SIDEKIQ][DEAD] could not resolve #{what}: #{e.class}: #{e.message}"
+    nil
+  end
 
   # ActiveJob wraps the real class name; plain Sidekiq workers use 'class'.
   def job_class

@@ -72,4 +72,20 @@ RSpec.describe SidekiqDeathHandler do
 
     expect { described_class.call(job_for('SendReplyJob', [1]), exception) }.not_to raise_error
   end
+
+  # Enrichment is best-effort; the report is not. Resolving the message hits the database,
+  # and the failures that fill the dead set come with a database in trouble — so an
+  # exception there used to take out the line reporting the ORIGINAL error and the tracker
+  # call with it, leaving monitoring with "handler failed" and nothing else.
+  it 'still reports the original failure when the context lookup blows up' do
+    allow(Message).to receive(:find_by).and_raise(StandardError, 'db down')
+    allow(ChatwootExceptionTracker).to receive(:new).and_return(instance_double(ChatwootExceptionTracker,
+                                                                               capture_exception: true))
+
+    described_class.call(job_for('SendReplyJob', [1]), exception)
+
+    expect(Rails.logger).to have_received(:error).with(/the provider never answered/)
+    expect(Rails.logger).not_to have_received(:error).with(/handler failed/)
+    expect(ChatwootExceptionTracker).to have_received(:new).with(exception, account: nil)
+  end
 end
