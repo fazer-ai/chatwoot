@@ -87,7 +87,8 @@ describe('groupMembers store', () => {
         GroupMembersAPI.getGroupMembers.mockResolvedValue({
           data: { payload: sampleMembers, meta },
         });
-        await actions.fetch({ commit }, { contactId: 42 });
+        await actions.fetch({ commit }, { contactId: 42, inboxId: 7 });
+        expect(GroupMembersAPI.getGroupMembers).toHaveBeenCalledWith(42, 7, 1);
         expect(commit.mock.calls).toEqual([
           [types.default.SET_GROUP_MEMBERS_UI_FLAG, { isFetching: true }],
           [
@@ -110,8 +111,8 @@ describe('groupMembers store', () => {
     describe('sync', () => {
       it('calls syncGroup without re-fetching (fire-and-forget)', async () => {
         GroupMembersAPI.syncGroup.mockResolvedValue({});
-        await actions.sync({ commit }, { contactId: 42 });
-        expect(GroupMembersAPI.syncGroup).toHaveBeenCalledWith(42);
+        await actions.sync({ commit }, { contactId: 42, inboxId: 7 });
+        expect(GroupMembersAPI.syncGroup).toHaveBeenCalledWith(42, 7);
         expect(dispatch).not.toHaveBeenCalled();
       });
     });
@@ -122,9 +123,17 @@ describe('groupMembers store', () => {
         dispatch.mockResolvedValue();
         await actions.addMembers(
           { commit, dispatch },
-          { contactId: 42, participants: ['+5511999'] }
+          { contactId: 42, participants: ['+5511999'], inboxId: 7 }
         );
-        expect(dispatch).toHaveBeenCalledWith('fetch', { contactId: 42 });
+        expect(GroupMembersAPI.addMembers).toHaveBeenCalledWith(
+          42,
+          ['+5511999'],
+          7
+        );
+        expect(dispatch).toHaveBeenCalledWith('fetch', {
+          contactId: 42,
+          inboxId: 7,
+        });
       });
     });
 
@@ -134,9 +143,13 @@ describe('groupMembers store', () => {
         dispatch.mockResolvedValue();
         await actions.removeMembers(
           { commit, dispatch },
-          { contactId: 42, memberId: 1 }
+          { contactId: 42, memberId: 1, inboxId: 7 }
         );
-        expect(dispatch).toHaveBeenCalledWith('fetch', { contactId: 42 });
+        expect(GroupMembersAPI.removeMembers).toHaveBeenCalledWith(42, 1, 7);
+        expect(dispatch).toHaveBeenCalledWith('fetch', {
+          contactId: 42,
+          inboxId: 7,
+        });
       });
     });
 
@@ -146,9 +159,18 @@ describe('groupMembers store', () => {
         dispatch.mockResolvedValue();
         await actions.updateMemberRole(
           { commit, dispatch },
-          { contactId: 42, memberId: 1, role: 'admin' }
+          { contactId: 42, memberId: 1, role: 'admin', inboxId: 7 }
         );
-        expect(dispatch).toHaveBeenCalledWith('fetch', { contactId: 42 });
+        expect(GroupMembersAPI.updateMemberRole).toHaveBeenCalledWith(
+          42,
+          1,
+          'admin',
+          7
+        );
+        expect(dispatch).toHaveBeenCalledWith('fetch', {
+          contactId: 42,
+          inboxId: 7,
+        });
       });
     });
   });
