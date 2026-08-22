@@ -122,7 +122,7 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
 
   describe 'the connection state' do
     it 'reports the paired number when the session is open' do
-      expect(backend.fetch_connection_state).to have_attributes(connection: 'open', phone_number: '553499990002')
+      expect(backend.fetch_connection_state).to have_attributes(connection: 'open', phone_number: '5511999990001')
     end
 
     context 'when the instance is disconnected' do
