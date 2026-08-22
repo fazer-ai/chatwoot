@@ -64,8 +64,20 @@ class Conversations::EventDataPresenter < SimpleDelegator
       first_reply_created_at: first_reply_created_at,
       priority: priority,
       waiting_since: waiting_since.to_i,
-      **push_timestamps
+      **push_timestamps,
+      **group_left_data
     }
+  end
+
+  # Whether THIS thread's number has left the WhatsApp group. The group contact is
+  # account-scoped and can be in two inboxes of one account, so the answer belongs to the
+  # conversation rather than to the contact every thread shares. Absent, rather than
+  # false, on everything that is not a group: the question does not apply there, and the
+  # conversation partial leaves it out on the same terms.
+  def group_left_data
+    return {} unless group_type_group?
+
+    { group_left: contact_inbox&.group_left? }
   end
 
   # Like #push_data but with message text normalized for external integrations (webhooks).

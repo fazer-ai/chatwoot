@@ -355,10 +355,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def sync_group(conversation, soft: false)
     group_contact = conversation.contact
-
-    return true if group_contact.additional_attributes&.dig('group_left')
-
     inbox = conversation.inbox
+
+    return true if conversation.contact_inbox&.group_left?
 
     metadata = group_metadata(group_contact.identifier)
     raise ProviderUnavailableError, 'Could not fetch group metadata' if metadata.blank?
@@ -1011,11 +1010,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
   end
 
+  # `group_left` is not cleared here. It is per inbox now (see WhatsappGroupMembership),
+  # and a sync only ever reaches this point for an inbox that has not left, so there was
+  # nothing for it to clear; rejoining is what clears it, and only the rejoin path knows
+  # that happened.
   def persist_sync_status(group_contact)
-    new_attrs = (group_contact.additional_attributes || {}).merge(
-      'group_last_synced_at' => Time.current.to_i,
-      'group_left' => false
-    )
+    new_attrs = (group_contact.additional_attributes || {}).merge('group_last_synced_at' => Time.current.to_i)
     group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
   end
 

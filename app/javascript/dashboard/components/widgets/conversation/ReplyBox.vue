@@ -242,11 +242,15 @@ export default {
         !this.isInboxAdminInCurrentGroup
       );
     },
+    // Read off the conversation, not off the contact: a group contact is
+    // account-scoped and the same group can be open in two inboxes of one account,
+    // where only one of them may have left. The server answers for this thread's own
+    // number.
     isGroupLeft() {
       return (
         this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        this.currentContact?.additional_attributes?.group_left === true
+        this.currentChat?.group_left === true
       );
     },
     isGroupsDisabled() {

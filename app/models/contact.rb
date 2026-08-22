@@ -158,6 +158,16 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
     contact_inboxes.first&.inbox&.channel
   end
 
+  # Whether the number behind one inbox has left the WhatsApp group this contact is.
+  # The fact belongs to the contact inbox (see `ContactInbox#group_left?`); this is the
+  # reader for the callers that hold the group contact and an inbox id rather than the
+  # row itself.
+  def group_left_in?(inbox_id)
+    return false if inbox_id.blank?
+
+    contact_inboxes.find_by(inbox_id: inbox_id)&.group_left? || false
+  end
+
   def push_event_data
     data = {
       additional_attributes: additional_attributes,
