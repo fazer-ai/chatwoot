@@ -21,13 +21,28 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   # and an avatar job, and a removal aimed at a reaction this sender never made has
   # nothing to remove. Without this, every stray removal leaves a contact behind, which
   # is why the lookup here is the non-creating one.
+  #
+  # Nothing recorded at all is the out-of-order case rather than the stray one, and it is
+  # the half of it that deferring the *add* cannot cover: a removal that ran first would
+  # be dropped here, and the add behind it would then write a reaction the sender has
+  # already taken back, which nothing later corrects. A row that exists and is already
+  # gone is the ordinary echo of a removal made here, and answers itself.
   def remove
     known = payload.from_me ? nil : inbound::ContactLookup.contact(inbox: inbox, party: peer_party)
-    return :ignored if known.nil? && !payload.from_me
+    return :deferred unless recorded?(known)
     return :ignored unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id,
                                                           sender: known, from_me: payload.from_me)
 
     store(sender_contact).remove ? :handled : :ignored
+  end
+
+  # No contact says the same thing as no row: the add is what resolves one, so a removal
+  # that finds nobody arrived before the reaction it takes back.
+  def recorded?(known)
+    return false if known.nil? && !payload.from_me
+
+    inbound::ReactionStore.recorded?(inbox: inbox, target_id: payload.target_id,
+                                     sender: known, from_me: payload.from_me)
   end
 
   def add
@@ -50,8 +65,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     contact_inbox = resolve_contact_inbox
     return :ignored if contact_inbox.nil?
 
-    store(payload.chat.group? ? sender_contact : contact_inbox.contact).write(target.conversation)
-    :handled
+    written = store(payload.chat.group? ? sender_contact : contact_inbox.contact).write(target.conversation)
+    # nil when a newer reaction from the same sender is already on the bubble, which is
+    # what an emoji swap looks like when its two halves arrive the wrong way round.
+    written.nil? ? :ignored : :handled
   end
 
   def store(sender)

@@ -2,6 +2,10 @@
 # (target, sender), toggled instead of duplicated. This holds both halves of that:
 # writing a new reaction and marking an existing one removed.
 class Whatsapp::Session::Inbound::ReactionStore
+  # `content_attributes` is a `store`, so it reaches Postgres as json rather than jsonb
+  # and every predicate below has to cast before it can index into it.
+  JSON_COLUMN = "(content_attributes#>>'{}')::jsonb".freeze
+
   attr_reader :inbox, :reaction, :sender
 
   # `sender` is the Contact that reacted, nil for a reaction sent from the phone.
@@ -20,20 +24,35 @@ class Whatsapp::Session::Inbound::ReactionStore
   # one author on the WhatsApp side whether an agent or the phone wrote it. The caller
   # finds the Contact without creating one.
   def self.active?(inbox:, target_id:, sender:, from_me: false)
-    json = "(content_attributes#>>'{}')::jsonb"
-    scope = Message.where(inbox_id: inbox.id)
-                   .where("#{json}->>'is_reaction' = 'true'")
-                   .where("#{json}->>'in_reply_to_external_id' = ?", target_id)
-                   .where.not(content: '')
-                   .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
-    scope = if from_me
-              scope.where(message_type: Message.message_types[:outgoing])
-            else
-              scope.where(sender: sender)
-            end
-    scope.exists?
+    live(rows(inbox: inbox, target_id: target_id, sender: sender, from_me: from_me)).exists?
   end
 
+  # The same pair, deleted rows included. What tells a removal that arrived before its
+  # reaction apart from one with nothing to do: the first has no row at all, the second
+  # has one that is already gone.
+  def self.recorded?(inbox:, target_id:, sender:, from_me: false)
+    rows(inbox: inbox, target_id: target_id, sender: sender, from_me: from_me).exists?
+  end
+
+  # Every reaction row this (target, sender) pair has, in any state. The one scope the
+  # three questions below are asked of, so "which rows are this pair's" is answered in a
+  # single place: `sender` decides it for a contact's reaction, and `message_type` for
+  # one from the connected number, which has a single author on the WhatsApp side
+  # whether an agent or the phone wrote it.
+  def self.rows(inbox:, target_id:, sender:, from_me:)
+    scope = Message.where(inbox_id: inbox.id)
+                   .where("#{JSON_COLUMN}->>'is_reaction' = 'true'")
+                   .where("#{JSON_COLUMN}->>'in_reply_to_external_id' = ?", target_id)
+    from_me ? scope.where(message_type: Message.message_types[:outgoing]) : scope.where(sender: sender)
+  end
+
+  # The subset that still shows an emoji on the bubble.
+  def self.live(scope)
+    scope.where.not(content: '').where("COALESCE(#{JSON_COLUMN}->>'deleted', 'false') != 'true'")
+  end
+
+  # nil when there was nothing to do: this reaction is older than the one already stored,
+  # so applying it would put the emoji the sender swapped away from back on the bubble.
   def write(conversation)
     existing = find_existing
     return replace(existing) if existing
@@ -48,7 +67,7 @@ class Whatsapp::Session::Inbound::ReactionStore
     {
       is_reaction: true,
       in_reply_to_external_id: reaction.target_id,
-      external_created_at: reaction.timestamp && (reaction.timestamp / 1000),
+      external_created_at: created_at,
       external_sender_name: ('WhatsApp' if reaction.from_me)
     }.compact
   end
@@ -79,45 +98,48 @@ class Whatsapp::Session::Inbound::ReactionStore
   # for another arrives as a fresh event rather than as an edit. One row per (target,
   # sender) is the invariant the removal path depends on: a second row would show both
   # emojis on the bubble and leave one of them behind when the reaction is taken back.
+  #
+  # Refused when this reaction is older than the stored one, on the provider's clock
+  # rather than on arrival: arrival is the thing that is out of order. Ties pass, since
+  # equal timestamps carry no order to respect, which is also what the second half of a
+  # swap looks like when the provider stamps both in the same second.
   def replace(existing)
-    existing.with_lock do
+    replaced = existing.with_lock do
+      next false if stale?(existing)
+
       existing.update!(
         source_id: reaction.id,
         content: reaction.emoji,
         content_attributes: existing.content_attributes.merge(
-          { 'external_created_at' => reaction.timestamp && (reaction.timestamp / 1000) }.compact
+          { 'external_created_at' => created_at }.compact
         )
       )
+      true
     end
+    return nil unless replaced
+
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
 
+  def stale?(existing)
+    stored = existing.external_created_at
+    created_at.present? && stored.present? && created_at < stored.to_i
+  end
+
+  def created_at
+    reaction.timestamp && (reaction.timestamp / 1000)
+  end
+
   # Deliberately not scoped to any conversation: the original reaction may live in an
   # older or resolved thread while the inbound flow picked a different one.
+  #
+  # Active-only: when every match is already deleted this returns nil, so an echoed
+  # removal does not re-delete the row and bump the conversation again.
   def find_existing
-    json = "(content_attributes#>>'{}')::jsonb"
-    base = Message.where(inbox_id: inbox.id)
-                  .where("#{json}->>'is_reaction' = 'true'")
-                  .where("#{json}->>'in_reply_to_external_id' = ?", reaction.target_id)
-    matches = if reaction.from_me
-                # Outgoing is the whole test. On the WhatsApp side there is one author of
-                # a `from_me` reaction, the connected number, whether it was written on the
-                # phone (no agent on the row) or by an agent here (the agent on the row).
-                # Asking for a sender-less row instead would miss the agent's, and the echo
-                # of what the agent just sent would become a second emoji on the bubble
-                # that no removal can take back.
-                base.where(message_type: Message.message_types[:outgoing])
-              else
-                base.where(sender: sender)
-              end
+    matches = self.class.rows(inbox: inbox, target_id: reaction.target_id, sender: sender, from_me: reaction.from_me)
 
-    # Active-only: when every match is already deleted this returns nil, so an echoed
-    # removal does not re-delete the row and bump the conversation again.
-    preferred(matches.where.not(content: '')
-                     .where("COALESCE(#{json}->>'deleted', 'false') != 'true'")
-                     .reorder(created_at: :desc)
-                     .to_a)
+    preferred(self.class.live(matches).reorder(created_at: :desc).to_a)
   end
 
   # Which of them the echo belongs to, for a provider that gives it neither our reserved

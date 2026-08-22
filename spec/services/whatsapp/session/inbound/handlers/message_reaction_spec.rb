@@ -143,9 +143,29 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
       )
     end
 
-    it 'leaves no contact behind' do
-      expect { expect(dispatch).to eq(:ignored) }.not_to change(Contact, :count)
+    # Deferred rather than dropped, and still without resolving anybody: nothing recorded
+    # for this sender is also what a removal that overtook its own reaction looks like,
+    # and this transport cannot tell the two apart. The job waits, and a removal that
+    # really is aimed at nothing is dropped once the retries are spent.
+    it 'waits for the reaction it takes back, leaving no contact behind' do
+      expect { expect(dispatch).to eq(:deferred) }.not_to change(Contact, :count)
     end
+  end
+
+  # A swap arriving the wrong way round: the emoji the sender moved away from must not
+  # land back on the bubble.
+  it 'refuses a reaction older than the one already on the bubble' do
+    newer = model::Events::MessageReaction.new(
+      id: '3EB0SWAP2', chat: model::Address.phone('5541999990000'), sender: sender, from_me: false,
+      target_id: target.source_id, emoji: '❤️', timestamp: 1_755_440_002_000
+    )
+    older = newer.with(id: '3EB0SWAP1', emoji: '👍', timestamp: 1_755_440_001_000)
+
+    expect(described_class.new(channel: channel, event: model::Event.build(newer)).perform).to eq(:handled)
+    expect(described_class.new(channel: channel, event: model::Event.build(older)).perform).to eq(:ignored)
+
+    stored = inbox.messages.find_by("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
+    expect(stored.content).to eq('❤️')
   end
 
   context 'when the contact takes the reaction back' do
@@ -197,7 +217,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     end
 
     it 'leaves no contact behind' do
-      expect { expect(dispatch).to eq(:ignored) }.not_to change(Contact, :count)
+      expect { expect(dispatch).to eq(:deferred) }.not_to change(Contact, :count)
     end
   end
 
