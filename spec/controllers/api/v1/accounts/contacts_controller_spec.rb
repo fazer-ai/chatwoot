@@ -808,7 +808,36 @@ RSpec.describe 'Contacts API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:accepted)
-        expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact)
+        expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact, channel: nil)
+      end
+
+      # A group contact is account-scoped, so the same WhatsApp group can sit in two
+      # inboxes. Syncing through whichever came first can run the refresh over a session
+      # that is not even connected, and it is not the one the agent is looking at.
+      context 'when the group is in two inboxes' do
+        let(:first) { create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false) }
+        let(:second) { create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false) }
+
+        before do
+          create(:contact_inbox, contact: contact, inbox: first.inbox, source_id: '12345678901234567890')
+          create(:contact_inbox, contact: contact, inbox: second.inbox, source_id: '12345678901234567890')
+        end
+
+        it 'syncs through the inbox the caller named' do
+          post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+               params: { inbox_id: second.inbox.id }, headers: agent.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:accepted)
+          expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact, channel: second)
+        end
+
+        it 'refuses to guess when the caller names none' do
+          post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+               headers: agent.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:bad_request)
+          expect(Contacts::SyncGroupJob).not_to have_been_enqueued
+        end
       end
 
       it 'returns bad request when contact is not a group' do

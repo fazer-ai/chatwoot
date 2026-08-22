@@ -440,7 +440,10 @@ export default {
       immediate: true,
       handler(contactId) {
         if (contactId && !this.isGroupMembersLoaded) {
-          this.$store.dispatch('groupMembers/fetch', { contactId });
+          this.$store.dispatch('groupMembers/fetch', {
+            contactId,
+            inboxId: this.currentChat?.inbox_id,
+          });
         }
       },
     },

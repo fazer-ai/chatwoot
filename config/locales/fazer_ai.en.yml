@@ -89,6 +89,8 @@ en:
       recurring_message_cancelled: Recurring scheduled message has been stopped by %{agent}.
       unknown_agent: Unknown
   contacts:
+    group:
+      inbox_id_required: This group is in more than one inbox. Say which one the action is for by sending inbox_id.
     sync_group:
       not_a_group: Contact is not a group
       no_identifier: Contact does not have a group identifier

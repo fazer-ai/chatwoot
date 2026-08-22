@@ -6,6 +6,17 @@ parameters:
     schema:
       type: number
     description: ID of the contact
+  - name: inbox_id
+    in: query
+    required: false
+    schema:
+      type: number
+    description: >-
+      Which inbox the action is performed as. A group contact is account-scoped, so the
+      same WhatsApp group can belong to two inboxes of one account. Optional while a
+      group is in a single inbox; required once it is in more than one, since there is
+      otherwise no way to tell which number should act. An inbox the group is not in is
+      refused.
 
 post:
   tags:

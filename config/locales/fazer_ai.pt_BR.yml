@@ -89,6 +89,8 @@ pt_BR:
       recurring_message_cancelled: Recorrência de mensagem agendada foi interrompida por %{agent}.
       unknown_agent: Desconhecido
   contacts:
+    group:
+      inbox_id_required: Este grupo está em mais de uma caixa de entrada. Diga por qual delas a ação vale enviando inbox_id.
     sync_group:
       not_a_group: O contato não é um grupo
       no_identifier: O contato não possui um identificador de grupo

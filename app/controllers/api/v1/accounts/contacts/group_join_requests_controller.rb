@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::GroupJoinRequestsController < Api::V1::Accounts::Contacts::BaseController
+  include GroupChannelResolver
+
   def index
     authorize @contact, :show?
     requests = channel.group_join_requests(@contact.identifier)
@@ -20,10 +22,6 @@ class Api::V1::Accounts::Contacts::GroupJoinRequestsController < Api::V1::Accoun
 
   def handle_params
     params.permit(:request_action, participants: [])
-  end
-
-  def channel
-    @channel ||= @contact.group_channel
   end
 
   def remove_handled_requests(participants)

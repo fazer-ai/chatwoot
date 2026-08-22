@@ -57,14 +57,18 @@ export const actions = {
     }
   },
 
-  async fetch({ commit }, { contactId, page = 1 }) {
+  async fetch({ commit }, { contactId, page = 1, inboxId }) {
     const isFirstPage = page === 1;
     commit(
       types.SET_GROUP_MEMBERS_UI_FLAG,
       isFirstPage ? { isFetching: true } : { isFetchingMore: true }
     );
     try {
-      const { data } = await GroupMembersAPI.getGroupMembers(contactId, page);
+      const { data } = await GroupMembersAPI.getGroupMembers(
+        contactId,
+        inboxId,
+        page
+      );
       if (isFirstPage) {
         commit(types.SET_GROUP_MEMBERS, { contactId, members: data.payload });
       } else {
@@ -82,10 +86,10 @@ export const actions = {
     }
   },
 
-  async sync({ commit }, { contactId }) {
+  async sync({ commit }, { contactId, inboxId }) {
     commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isSyncing: true });
     try {
-      await GroupMembersAPI.syncGroup(contactId);
+      await GroupMembersAPI.syncGroup(contactId, inboxId);
     } catch (error) {
       // fire-and-forget: sync runs in background, results arrive via ActionCable
     } finally {
@@ -93,40 +97,48 @@ export const actions = {
     }
   },
 
-  async addMembers({ commit, dispatch }, { contactId, participants }) {
+  async addMembers({ commit, dispatch }, { contactId, participants, inboxId }) {
     commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: true });
     try {
-      await GroupMembersAPI.addMembers(contactId, participants);
-      await dispatch('fetch', { contactId });
+      await GroupMembersAPI.addMembers(contactId, participants, inboxId);
+      await dispatch('fetch', { contactId, inboxId });
     } finally {
       commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: false });
     }
   },
 
-  async removeMembers({ commit, dispatch }, { contactId, memberId }) {
+  async removeMembers({ commit, dispatch }, { contactId, memberId, inboxId }) {
     commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: true });
     try {
-      await GroupMembersAPI.removeMembers(contactId, memberId);
-      await dispatch('fetch', { contactId });
+      await GroupMembersAPI.removeMembers(contactId, memberId, inboxId);
+      await dispatch('fetch', { contactId, inboxId });
     } finally {
       commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: false });
     }
   },
 
-  async updateGroupMetadata({ commit }, { contactId, params }) {
+  async updateGroupMetadata({ commit }, { contactId, params, inboxId }) {
     commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: true });
     try {
-      await GroupMembersAPI.updateGroupMetadata(contactId, params);
+      await GroupMembersAPI.updateGroupMetadata(contactId, params, inboxId);
     } finally {
       commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: false });
     }
   },
 
-  async updateMemberRole({ commit, dispatch }, { contactId, memberId, role }) {
+  async updateMemberRole(
+    { commit, dispatch },
+    { contactId, memberId, role, inboxId }
+  ) {
     commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: true });
     try {
-      await GroupMembersAPI.updateMemberRole(contactId, memberId, role);
-      await dispatch('fetch', { contactId });
+      await GroupMembersAPI.updateMemberRole(
+        contactId,
+        memberId,
+        role,
+        inboxId
+      );
+      await dispatch('fetch', { contactId, inboxId });
     } finally {
       commit(types.SET_GROUP_MEMBERS_UI_FLAG, { isUpdating: false });
     }

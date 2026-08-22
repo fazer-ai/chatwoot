@@ -13,6 +13,12 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  // Which WhatsApp number these actions are performed as: the same group can belong to
+  // two inboxes of one account, and the panel is scoped to the one the agent has open.
+  inboxId: {
+    type: Number,
+    default: null,
+  },
   isAdmin: {
     type: Boolean,
     default: false,
@@ -66,10 +72,11 @@ const toggleEditGroupSettings = async () => {
     // NOTE: restrict=true means members CANNOT edit; flip to the opposite of current
     const currentValue = props.contact.additional_attributes?.restrict === true;
     const newValue = !currentValue;
-    await GroupMembersAPI.updateGroupProperty(props.contact.id, {
-      property: 'restrict',
-      enabled: newValue,
-    });
+    await GroupMembersAPI.updateGroupProperty(
+      props.contact.id,
+      { property: 'restrict', enabled: newValue },
+      props.inboxId
+    );
     await updateContactAttribute('restrict', newValue);
     useAlert(t('GROUP.SETTINGS.UPDATE_SUCCESS'));
   } catch {
@@ -85,10 +92,11 @@ const toggleSendMessages = async () => {
     // NOTE: announce=true means only admins can send; flip to the opposite of current
     const currentValue = props.contact.additional_attributes?.announce === true;
     const newValue = !currentValue;
-    await GroupMembersAPI.updateGroupProperty(props.contact.id, {
-      property: 'announce',
-      enabled: newValue,
-    });
+    await GroupMembersAPI.updateGroupProperty(
+      props.contact.id,
+      { property: 'announce', enabled: newValue },
+      props.inboxId
+    );
     await updateContactAttribute('announce', newValue);
     useAlert(t('GROUP.SETTINGS.UPDATE_SUCCESS'));
   } catch {
@@ -101,7 +109,10 @@ const toggleSendMessages = async () => {
 const resetInviteLink = async () => {
   isResettingInviteLink.value = true;
   try {
-    const { data } = await GroupMembersAPI.revokeInviteLink(props.contact.id);
+    const { data } = await GroupMembersAPI.revokeInviteLink(
+      props.contact.id,
+      props.inboxId
+    );
     if (data.invite_code) {
       store.dispatch('contacts/updateContact', {
         ...props.contact,
@@ -133,16 +144,17 @@ const toggleAddMembers = async () => {
 
   isTogglingMemberAdd.value = true;
   try {
-    await GroupMembersAPI.updateGroupProperty(props.contact.id, {
-      property: 'member_add_mode',
-      enabled: newValue,
-    });
+    await GroupMembersAPI.updateGroupProperty(
+      props.contact.id,
+      { property: 'member_add_mode', enabled: newValue },
+      props.inboxId
+    );
 
     // Also revoke invite link when restricting member additions, where the provider
     // serves invites at all. Without the guard the revoke throws, the whole block lands
     // in the catch, and the toggle reports failure on a property it just changed.
     if (!newValue && props.canManageInvites) {
-      await GroupMembersAPI.revokeInviteLink(props.contact.id);
+      await GroupMembersAPI.revokeInviteLink(props.contact.id, props.inboxId);
     }
 
     await updateContactAttribute('member_add_mode', newValue);
@@ -161,10 +173,11 @@ const toggleJoinApproval = async () => {
     const currentValue =
       props.contact.additional_attributes?.join_approval_mode === true;
     const newValue = !currentValue;
-    await GroupMembersAPI.updateGroupProperty(props.contact.id, {
-      property: 'join_approval_mode',
-      enabled: newValue,
-    });
+    await GroupMembersAPI.updateGroupProperty(
+      props.contact.id,
+      { property: 'join_approval_mode', enabled: newValue },
+      props.inboxId
+    );
     await updateContactAttribute('join_approval_mode', newValue);
     useAlert(t('GROUP.SETTINGS.UPDATE_SUCCESS'));
   } catch {

@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::GroupInvitesController < Api::V1::Accounts::Contacts::BaseController
+  include GroupChannelResolver
+
   def show
     authorize @contact, :show?
     code = channel.group_invite_code(@contact.identifier)
@@ -16,10 +18,6 @@ class Api::V1::Accounts::Contacts::GroupInvitesController < Api::V1::Accounts::C
   end
 
   private
-
-  def channel
-    @channel ||= @contact.group_channel
-  end
 
   def invite_response(code)
     { invite_code: code, invite_url: "https://chat.whatsapp.com/#{code}" }
