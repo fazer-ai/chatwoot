@@ -4,7 +4,6 @@
 #
 #  id            :bigint           not null, primary key
 #  group_left_at :datetime
-#  group_left_at :datetime
 #  hmac_verified :boolean          default(FALSE)
 #  pubsub_token  :string
 #  created_at    :datetime         not null
