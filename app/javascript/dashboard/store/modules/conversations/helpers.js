@@ -71,6 +71,27 @@ export const applyPageFilters = (conversation, filters) => {
  * @param {number|string} currentUserId - The ID of the current user
  * @returns {boolean} - Whether the user has permissions to access this conversation
  */
+/**
+ * The human this conversation is assigned to, or undefined.
+ *
+ * `meta.assignee` is whoever the conversation was handed to, bot included, and
+ * `meta.assignee_type` is what says which. Everything that asks "is this unassigned"
+ * means "does a human own it", because that is the question the server answers:
+ * assigning to a bot clears `assignee_id` and stores the bot in its own column, so the
+ * `unassigned` scope, the tab's badge and `conversation_unassigned_manage` all count it
+ * as unassigned.
+ *
+ * Bots are excluded rather than humans required: the payload sets the type in the same
+ * branch that names the bot, so a payload without one only ever named a human.
+ *
+ * @param {{meta?: {assignee?: Object, assignee_type?: string}}} conversation
+ * @returns {Object|undefined}
+ */
+export const humanAssignee = conversation => {
+  const { assignee, assignee_type: assigneeType } = conversation?.meta ?? {};
+  return assigneeType === 'AgentBot' ? undefined : assignee;
+};
+
 export const applyRoleFilter = (
   conversation,
   role,
@@ -90,7 +111,14 @@ export const applyRoleFilter = (
     return true;
   }
 
-  const conversationAssignee = conversation.meta.assignee;
+  // Assigned means assigned to a HUMAN, which is what the database says: handing a
+  // conversation to a bot clears `assignee_id` and stores the bot in its own column, so
+  // the server's `unassigned` scope, the tab's badge and
+  // `conversation_unassigned_manage` all count it as unassigned. The payload still names
+  // the bot under `meta.assignee` (`Conversation#assigned_entity` prefers it), so reading
+  // that alone made the client disagree with the server that fed it: an agent with only
+  // `conversation_unassigned_manage` lost the conversations the server had granted them.
+  const conversationAssignee = humanAssignee(conversation);
   const isUnassigned = !conversationAssignee;
   const isAssignedToUser = conversationAssignee?.id === currentUserId;
 
