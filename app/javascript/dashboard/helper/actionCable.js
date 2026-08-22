@@ -12,6 +12,7 @@ import {
   handleWhatsappRemoteEnd,
   isLocalWhatsappCall,
 } from 'dashboard/composables/useWhatsappCallSession';
+import { humanAssignee } from 'dashboard/store/modules/conversations/helpers';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { markCallDismissed, isLocalCall } from 'dashboard/helper/voice';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
@@ -175,14 +176,12 @@ class ActionCableConnector extends BaseActionCableConnector {
     // A conversation handed to a bot is unassigned as far as visibility goes: the assignment service
     // clears `assignee_id` and tracks the bot beside it, so the filter that scopes a role to the
     // unassigned ones takes it in even though the payload still names the bot.
-    const { assignee, assignee_type: assigneeType } = payload.meta || {};
-    const humanAssignee = assigneeType === 'User' ? assignee : null;
-    if (humanAssignee && humanAssignee.id === user?.id) return true;
+    const assignee = humanAssignee(payload);
+    if (assignee && assignee.id === user?.id) return true;
 
     // Losing the assignee hands the conversation back to a role that sees the unassigned ones.
     return (
-      !humanAssignee &&
-      permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
+      !assignee && permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
     );
   };
 
