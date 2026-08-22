@@ -60,7 +60,9 @@
         "NOT_CONNECTED": "WhatsApp no está conectado. Vincule su dispositivo de nuevo.",
         "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp no está conectado. Haga clic en este botón para intentar reconectar o contacte a su administrador para vincular el dispositivo de nuevo.",
         "LINK_DEVICE": "Vincular dispositivo",
-        "RECONNECT_FAILED": "No se pudo reconectar. Contacte a su administrador para vincular el dispositivo de nuevo."
+        "RECONNECT_FAILED": "No se pudo reconectar. Contacte a su administrador para vincular el dispositivo de nuevo.",
+        "SEND_STALL": "WhatsApp está conectado, pero no puede enviar mensajes. Vincule el dispositivo de nuevo para restablecer el envío.",
+        "SEND_STALL_CONTACT_ADMIN": "WhatsApp está conectado, pero no puede enviar mensajes. Sus respuestas no se entregarán hasta que un administrador vincule el dispositivo de nuevo."
       },
       "WHATSAPP_REACHOUT_RESTRICTION": {
         "RESTRICTED": "WhatsApp ha restringido temporalmente el inicio de conversaciones nuevas desde este número.",

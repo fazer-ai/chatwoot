@@ -630,6 +630,32 @@ describe ActionCableListener do
       end
     end
 
+    context 'when a send stall is present' do
+      let(:provider_connection) do
+        { 'connection' => 'open', 'send_stall' => { 'consecutive_timeouts' => 3, 'action' => 'suppressed' } }
+      end
+
+      # The push is the only thing that reaches an agent already sitting in the
+      # conversation: the REST payload was fetched before the stall started.
+      it 'includes the stall in the agent broadcast' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          {
+            inbox_id: inbox.id,
+            provider_connection: {
+              connection: 'open',
+              send_stall: { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
+            },
+            account_id: account.id
+          }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
+    end
+
     context 'when a new-chat cap is present' do
       let(:provider_connection) do
         { 'connection' => 'open', 'new_chat_cap' => { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 } }

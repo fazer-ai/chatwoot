@@ -42,15 +42,10 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
     }.compact
   end
 
-  # Rides only the send_stall_detected webhook: the connection is receiving and answering
-  # health checks while every send times out. Worth surfacing on its own rather than as a
-  # bare error string, because "action" is what tells an operator whether the provider
-  # already recreated the socket or is holding off — and holding off is when a human has
-  # `error` is the only half of this warning an operator can actually see:
-  # provider_connection_admin_data serializes error and qr_data_url, and send_stall reaches
-  # no serializer and no frontend consumer (neither does quarantine — both are there for
-  # support and for the API). Preserving the detail without the string would preserve
-  # nothing anyone reads, so the two share a fate.
+  # The human-readable half of the warning, and the half that survives serialization for a
+  # non-admin: provider_connection_data gives every agent `connection`, and only an admin
+  # also gets error and send_stall. Preserving the structured detail without the string
+  # would preserve nothing most viewers can read, so the two share a fate.
   #
   # Re-derived from the stall rather than copied from the stored error: copying would
   # resurrect whatever unrelated error happened to be stored last.
@@ -61,7 +56,12 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
     nil
   end
 
-  # to step in.
+  # Rides only the send_stall_detected webhook: the connection is receiving and answering
+  # health checks while every send times out. Worth surfacing on its own rather than as a
+  # bare error string, because "action" is what tells an operator whether the provider
+  # already recreated the socket or is holding off until `until` — and holding off is when
+  # a human has to step in, which is why it is serialized to admins rather than kept for
+  # support (quarantine, by contrast, still is).
   #
   # Unlike quarantine, this does NOT share the error's lifecycle. The provider reports a
   # stall once per episode, so an unrelated update in the meantime (a standalone

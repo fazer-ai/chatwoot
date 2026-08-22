@@ -47,6 +47,7 @@ import WhatsappLinkDeviceModal from '../../../routes/dashboard/settings/inbox/co
 import { isInboxAdminInGroup } from 'dashboard/helper/phoneHelper';
 import {
   isReachoutRestricted,
+  isSendStalled,
   reachoutRestrictionDeadline,
   isMessageCapped,
   isMessageCapReached,
@@ -377,6 +378,36 @@ export default {
     },
     inboxReachoutLock() {
       return this.currentInbox.provider_connection?.reachout_time_lock;
+    },
+    showSendStallWarning() {
+      return isSendStalled(
+        this.currentInbox.provider_connection?.send_stall,
+        this.inboxProviderConnection
+      );
+    },
+    providerConnectionBannerMessage() {
+      if (this.showSendStallWarning) {
+        return this.isAdmin
+          ? this.$t(
+              'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.SEND_STALL'
+            )
+          : this.$t(
+              'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.SEND_STALL_CONTACT_ADMIN'
+            );
+      }
+      return this.isAdmin
+        ? this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED'
+          )
+        : this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED_CONTACT_ADMIN'
+          );
+    },
+    // The agent's shortcut is a reconnect, and on a stall it is worse than nothing: it
+    // reaches a provider that already considers this socket live, refreshes presence, and
+    // reports success while the inbox stays mute. Only an admin has an action here.
+    providerConnectionBannerHasAction() {
+      return this.isAdmin || !this.showSendStallWarning;
     },
     showReachoutRestriction() {
       return isReachoutRestricted(
@@ -864,19 +895,11 @@ export default {
           :inbox="currentInbox"
         />
         <Banner
-          v-if="inboxProviderConnection !== 'open'"
+          v-if="inboxProviderConnection !== 'open' || showSendStallWarning"
           color-scheme="alert"
           class="mt-2 mx-2 rounded-lg overflow-hidden"
-          :banner-message="
-            isAdmin
-              ? $t(
-                  'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED'
-                )
-              : $t(
-                  'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED_CONTACT_ADMIN'
-                )
-          "
-          has-action-button
+          :banner-message="providerConnectionBannerMessage"
+          :has-action-button="providerConnectionBannerHasAction"
           :action-button-label="
             isAdmin
               ? $t(

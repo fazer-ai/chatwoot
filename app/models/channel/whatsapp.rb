@@ -206,6 +206,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     data = { connection: provider_connection['connection'] }
     data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
     data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
+    # Agent-visible, unlike the QR and the error string: a stall carries no credential (a
+    # timeout count, a duration, what the provider decided to do and until when), and the
+    # agent is the one being told their reply went nowhere. Without it the conversation
+    # view has nothing to render, because `connection` still reads 'open' throughout.
+    data[:send_stall] = provider_connection['send_stall'] if provider_connection['send_stall'].present?
     data.merge!(provider_connection_admin_data) if Current.account_user&.administrator?
     data
   end
