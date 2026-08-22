@@ -4,6 +4,11 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   # habit: opening a chat produced a single read event naming 246 messages, most of them
   # from before the inbox existed, and a lookup per id put hundreds of round trips on the
   # queue that inbound messages share.
+  #
+  # Never deferred, unlike the events that mutate one message. Waiting for the ids it
+  # names would replay that whole batch five times over the ones that are never coming,
+  # and losing a receipt is self-correcting in a way that losing a revoke is not: the
+  # next one on the chat carries the same marker forward.
   def perform
     messages = find_messages(Array(payload.message_ids).compact_blank).to_a
     return :ignored if messages.empty?

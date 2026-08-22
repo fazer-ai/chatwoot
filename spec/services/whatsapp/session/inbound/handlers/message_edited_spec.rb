@@ -28,6 +28,38 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageEdited do
     expect(message.previous_content).to eq('oi')
   end
 
+  # Two edits of one message, delivered the wrong way round. The provider's own clock is
+  # what orders them, since arrival is the thing that is out of order.
+  it 'refuses an edit older than the one already applied' do
+    newer = model::Events::MessageEdited.new(
+      chat: model::Address.phone('5541999990000'), message_id: message.source_id,
+      content: model::Content::Text.new(body: 'a segunda'), timestamp: 1_755_440_002_000
+    )
+    older = newer.with(content: model::Content::Text.new(body: 'a primeira'), timestamp: 1_755_440_001_000)
+
+    expect(described_class.new(channel: channel, event: model::Event.build(newer)).perform).to eq(:handled)
+    expect(described_class.new(channel: channel, event: model::Event.build(older)).perform).to eq(:ignored)
+
+    expect(message.reload.content).to eq('a segunda')
+  end
+
+  # Nobody edits a message they have deleted for everyone, so this only happens when the
+  # two arrive out of order. Applying it would put the text back on a bubble WhatsApp has
+  # already taken off the contact's phone.
+  it 'refuses an edit for a message that was revoked' do
+    message.update!(content_attributes: message.content_attributes.merge('deleted' => true))
+
+    expect(dispatch).to eq(:ignored)
+    expect(message.reload.is_edited).to be_nil
+  end
+
+  it 'refuses an edit for a message the contact revoked' do
+    message.update!(content_attributes: message.content_attributes.merge('deleted_by_contact' => true))
+
+    expect(dispatch).to eq(:ignored)
+    expect(message.reload.content).to eq('oi')
+  end
+
   it 'keeps the first version across a second edit' do
     dispatch
     described_class.new(
