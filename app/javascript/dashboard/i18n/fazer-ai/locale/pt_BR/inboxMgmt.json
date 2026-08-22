@@ -10,8 +10,8 @@
           "ZAPI_DESC": "Conectar via API não-oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
           "NATIVE_DESC": "Conecte um telefone pelo conector que já vem nesta instalação",
-          "UAZAPI": "uazapi",
-          "UAZAPI_DESC": "Conecte um telefone pela sua própria instância da uazapi"
+          "UAZAPI": "Uazapi",
+          "UAZAPI_DESC": "Conecte um telefone pela sua própria instância da Uazapi"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",
@@ -68,9 +68,6 @@
               "LABEL": "Token da instância",
               "PLACEHOLDER": "Cole o token da instância que você quer usar",
               "ERROR": "O token da instância é obrigatório"
-            },
-            "USE_INTERNAL_HOST": {
-              "LABEL": "A instância roda na rede deste servidor"
             },
             "MARK_AS_READ": {
               "LABEL": "Marcar mensagens como lidas no WhatsApp"
@@ -168,7 +165,7 @@
       "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - nativo",
-      "WHATSAPP_UAZAPI": "WhatsApp - uazapi"
+      "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
     }
   }
 }

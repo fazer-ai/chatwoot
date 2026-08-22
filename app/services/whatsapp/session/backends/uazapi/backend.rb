@@ -75,14 +75,13 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     # answer. A self-hosted one is reached by whatever name the network gives it, from a
     # compose service to an internal FQDN to a plain address, and reading any of those as
     # a signal gets a deployment wrong in one direction or the other. Only whoever set it
-    # up knows, so the inbox is asked and its answer is a field on the form.
-    #
-    # Not the same switch that opens the private network to the SSRF filter: that one is
-    # the operator's, in the environment, and this one sits in a form an account
-    # administrator can edit. Saying an instance is a neighbour must not be a way of
-    # authorizing calls into the deployment.
-    def hosted?(channel)
-      !ActiveModel::Type::Boolean.new.cast(channel.provider_config['use_internal_host'])
+    # up knows, and for this provider the answer is fixed: uazapi is sold as a service and
+    # the customer points an inbox at an instance it runs, so it is always on the far side
+    # of the deployment's network and always reachable at the public address. There is no
+    # build of it to stand up next to Rails, which is what an internal address would be
+    # for.
+    def hosted?(_channel)
+      true
     end
 
     # The token is what tells two instances apart: on the hosted service they share a base
@@ -285,18 +284,16 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     }
   end
 
-  # The address this instance can reach us at, which for a hosted one is the public
-  # FRONTEND_URL and for a self-hosted neighbour is INTERNAL_HOST_URL: on a closed
-  # installation the public address does not resolve there, and an inbox would pair and
-  # then never receive an event.
+  # The address this instance can reach us at. Always the public one: the instance runs on
+  # the provider's infrastructure, so an address that only resolves inside this deployment
+  # would leave the inbox paired and never receiving an event.
   #
   # The path carries a secret of its own, generated per inbox and never shown. It is not
   # the only check: the body carries the instance token, which the controller compares
   # too, so a URL leaked through a proxy log is not on its own enough to post events into
   # an inbox.
   def webhook_url
-    host = ENV.fetch('INTERNAL_HOST_URL', nil) if channel.use_internal_host?
-    host = ENV.fetch('FRONTEND_URL', nil) if host.blank?
+    host = ENV.fetch('FRONTEND_URL', nil)
     "#{host.to_s.chomp('/')}/webhooks/whatsapp/session/uazapi/#{channel.id}/#{provider_config['webhook_verify_token']}"
   end
 

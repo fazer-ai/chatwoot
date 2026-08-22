@@ -144,7 +144,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
 
     previous = self.class.find(id)
     previous.provider_config = saved_change_to_provider_config.first || {}
-    moved_instance?(previous) ? let_go_of(previous) : refresh_registration(previous)
+    let_go_of(previous) if moved_instance?(previous)
   rescue Whatsapp::Session::Errors::Error => e
     # This runs after the commit, so raising would answer a save that already succeeded
     # with a 500, and neither half of this is something the save depended on.
@@ -171,18 +171,6 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def let_go_of(previous)
     with_lock { update_provider_connection!({}) }
     Whatsapp::Session::Registry.backend_for(previous).release_registration
-  end
-
-  # The same instance, at an address it was never told about: `use_internal_host` is what
-  # decides between the public frontend URL and the one that works inside the deployment's
-  # own network, and the provider has no way to learn that a form was edited. Outbound media
-  # follows the new choice on the next message, while the webhook would go on arriving at the
-  # old address, or stop arriving at all, which on the closed network this option exists for
-  # is the whole of the inbox's inbound traffic.
-  def refresh_registration(previous)
-    return if previous.use_internal_host? == use_internal_host?
-
-    session_backend.ensure_registration
   end
 
   # Who may stand up an inbox on this provider: the account toggles while the new

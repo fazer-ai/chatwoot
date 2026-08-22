@@ -48,8 +48,9 @@ class Whatsapp::Session::Backend
     # INTERNAL_HOST_URL, while one sitting next to Rails on a closed installation can
     # resolve nothing else.
     #
-    # Asked per inbox rather than per provider, because a provider that is normally a
-    # hosted service can also be self-hosted, and then it is a neighbour.
+    # Takes the inbox rather than nothing so a provider that ships both a hosted service
+    # and a build to run next to Rails can answer per inbox. None does today: every
+    # provider here answers the same for all of its inboxes.
     def hosted?(_channel)
       false
     end
