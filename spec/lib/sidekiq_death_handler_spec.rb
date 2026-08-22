@@ -80,7 +80,7 @@ RSpec.describe SidekiqDeathHandler do
   it 'still reports the original failure when the context lookup blows up' do
     allow(Message).to receive(:find_by).and_raise(StandardError, 'db down')
     allow(ChatwootExceptionTracker).to receive(:new).and_return(instance_double(ChatwootExceptionTracker,
-                                                                               capture_exception: true))
+                                                                                capture_exception: true))
 
     described_class.call(job_for('SendReplyJob', [1]), exception)
 

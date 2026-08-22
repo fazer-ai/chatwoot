@@ -41,7 +41,13 @@ class SendReplyJob < ApplicationJob
 
     Whatsapp::Session::Inbound::StatusTransition.fail_send(message, reason)
   rescue StandardError => e
-    Rails.logger.error "SendReplyJob could not mark message #{message_id} as failed: #{e.message}"
+    # Logged AND re-raised. Returning normally from a retry_on block tells ActiveJob the
+    # original exception was handled, so Sidekiq neither retries nor buries the job — and
+    # the message stays on `sent` with a clock next to it, which is the exact silence this
+    # handler exists to end. A transient database failure here means the send is still
+    # unaccounted for, so the job has to die loudly and reach the dead-set handler.
+    Rails.logger.error "SendReplyJob could not mark message #{message_id} as failed (#{reason}): #{e.class}: #{e.message}"
+    raise
   end
 
   CHANNEL_SERVICES = {

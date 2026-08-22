@@ -149,6 +149,21 @@ RSpec.describe SendReplyJob do
       expect { described_class.fail_message(-1, 'gone') }.not_to raise_error
     end
 
+    # Returning normally from a retry_on block tells ActiveJob the original exception was
+    # handled, so Sidekiq neither retries nor buries the job — and the message stays on
+    # `sent` with a clock next to it, which is the exact silence this handler exists to
+    # end. If the write fails, the send is still unaccounted for and the job has to die
+    # loudly enough to reach the dead-set handler.
+    it 'raises when the failure could not be recorded' do
+      allow(Whatsapp::Session::Inbound::StatusTransition)
+        .to receive(:fail_send).and_raise(ActiveRecord::StatementInvalid, 'db down')
+      allow(Rails.logger).to receive(:error)
+
+      expect { described_class.fail_message(message.id, 'retries exhausted') }
+        .to raise_error(ActiveRecord::StatementInvalid)
+      expect(Rails.logger).to have_received(:error).with(/could not mark message #{message.id} as failed/)
+    end
+
     # source_id is only ever written by the provider — the send response, or the echo
     # promoting a reservation — so it is proof the message exists on WhatsApp even while
     # the status is still 'sent'. A send WE could not confirm has nothing to say about
