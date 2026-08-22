@@ -35,7 +35,7 @@ import ContentTemplates from './ContentTemplates/ContentTemplatesModal.vue';
 import ScheduledMessageModal from 'dashboard/routes/dashboard/conversation/scheduledMessages/ScheduledMessageModal.vue';
 import { MESSAGE_MAX_LENGTH } from 'shared/helpers/MessageTypeHelper';
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
-import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
+import { CAPABILITIES, hasLeftGroup } from 'dashboard/helper/whatsappSession';
 import { trimContent, debounce, getRecipients } from '@chatwoot/utils';
 import wootConstants from 'dashboard/constants/globals';
 import {
@@ -246,7 +246,7 @@ export default {
       return (
         this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        this.currentContact?.additional_attributes?.group_left === true
+        hasLeftGroup(this.currentContact, this.currentChat?.inbox_id)
       );
     },
     isGroupsDisabled() {

@@ -113,17 +113,10 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
     return unless action == 'leave'
     return unless contacts.any? { |contact| session_owner?(contact) }
 
-    # ACCOUNT-WIDE, ON PURPOSE, FOR NOW (fazer-ai/chatwoot#374). The group contact is
-    # shared by every inbox of the account that is in this WhatsApp group, so this marks
-    # the group as left for all of them, and nothing on the inboxes that stayed will
-    # clear it. The flag lives here because that is where the Baileys layer writes it and
-    # where three dashboard components read it; scoping it per inbox means changing that
-    # contract in the frozen legacy layer too. Do not delete this note without closing
-    # the issue.
-    merge_attributes('group_left' => true)
-    # Only this inbox's threads, which the flag above cannot manage. Closing another
-    # number's conversations because *this* session left would end a thread it can
-    # still use.
+    @group_contact.mark_group_left!(@group_contact_inbox.inbox_id)
+    # This inbox's threads only, for the same reason the flag above is this inbox's
+    # only. Closing another number's conversations because *this* session left would
+    # end a thread it can still use.
     # Snoozed as well: the snooze job reopens on its own schedule, and a thread reopened
     # for a group this inbox has left can no longer send anything.
     @group_contact_inbox.conversations.where(status: %i[open pending snoozed])

@@ -22,7 +22,7 @@ import { mapGetters } from 'vuex';
 
 // mixins
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
-import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
+import { CAPABILITIES, hasLeftGroup } from 'dashboard/helper/whatsappSession';
 
 // utils
 import { emitter } from 'shared/helpers/mitt';
@@ -357,7 +357,7 @@ export default {
       return (
         this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        this.currentContact?.additional_attributes?.group_left === true
+        hasLeftGroup(this.currentContact, this.currentChat?.inbox_id)
       );
     },
     isGroupsDisabled() {

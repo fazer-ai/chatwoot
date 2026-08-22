@@ -96,3 +96,25 @@ export const isHttpUrl = value => {
     return false;
   }
 };
+
+/**
+ * Whether *this* inbox has left the group. Mirrors `Contact#group_left_in?`.
+ *
+ * The group contact is account-scoped, so the same WhatsApp group can be in two inboxes
+ * of one account and only one of them may have left. `group_left_inbox_ids` names which,
+ * and the older boolean is kept alongside it meaning "every inbox left" — which is what
+ * it already said for the single-inbox case. A contact that predates the list carries
+ * the boolean alone, and it was account wide, so it answers for whichever inbox asks.
+ *
+ * @param {{additional_attributes?: Object}|null|undefined} contact
+ * @param {number|string|null|undefined} inboxId
+ * @returns {boolean}
+ */
+export const hasLeftGroup = (contact, inboxId) => {
+  const attributes = contact?.additional_attributes ?? {};
+  const leftInboxIds = attributes.group_left_inbox_ids;
+
+  if (!Array.isArray(leftInboxIds)) return attributes.group_left === true;
+
+  return leftInboxIds.some(id => Number(id) === Number(inboxId));
+};

@@ -79,7 +79,7 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
   context 'when the group was already left and the sync fetched its metadata' do
     subject(:fetched_sync) { described_class.new(channel: channel, group_contact: group_contact).perform }
 
-    let(:stored) { super().merge('group_left' => true) }
+    let(:stored) { super().merge('group_left_inbox_ids' => [channel.inbox.id]) }
     let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
     before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
@@ -87,7 +87,27 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     it 'keeps the group marked as left' do
       fetched_sync
 
-      expect(group_contact.reload.additional_attributes['group_left']).to be(true)
+      expect(group_contact.reload.group_left_in?(channel.inbox.id)).to be(true)
+    end
+  end
+
+  # The snapshot comes from `group.joined`, which is the one event that knows the session
+  # is back in the group, and it clears the flag for that inbox alone.
+  context 'when the group was left and an event brought its metadata back' do
+    let(:other_inbox) do
+      create(:channel_whatsapp, account: channel.account, provider: 'native', phone_number: '+5541977776666',
+                                validate_provider_config: false, sync_templates: false).inbox
+    end
+    let(:stored) { super().merge('group_left_inbox_ids' => [inbox.id, other_inbox.id], 'group_left' => true) }
+
+    before { create(:contact_inbox, inbox: other_inbox, contact: group_contact, source_id: '120363041234567890') }
+
+    it 'rejoins this inbox and leaves the other one out of the group' do
+      sync
+
+      expect(group_contact.reload.group_left_in?(inbox.id)).to be(false)
+      expect(group_contact.group_left_in?(other_inbox.id)).to be(true)
+      expect(group_contact.additional_attributes['group_left']).to be(false)
     end
   end
 

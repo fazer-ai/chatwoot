@@ -6,12 +6,6 @@ app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide p
 app/javascript/dashboard/helper/actionCable.js: Refresh cached permissions before applying this gate  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Align bot assignments with frontend list visibility  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Upsert conversations when assignment grants access  # PR#367
-# PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
-# `group_left` is stored on the account-level group Contact, which is exactly where the
-# Baileys layer writes it and where three dashboard components read it. Scoping it per
-# inbox means changing that contract in the frozen legacy layer as well, so it is its
-# own change, not a slice of this one. Removing this waiver does not close the issue.
-app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group-left state to the originating inbox  # PR#372
 # PR#372: real, tracked in fazer-ai/chatwoot#375, and not specific to this layer. The
 # window belongs to `Avatar::AvatarFromUrlJob`, which is handed a URL with no notion of
 # how fresh it is; the Baileys avatar paths have the same one. Closing it means giving
@@ -114,13 +108,3 @@ app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queue
 # new-conversation composer never did. Fixing it means touching a helper shared with
 # email and the web widget, where one message carrying several files is correct.
 app/javascript/dashboard/components-next/NewConversation/components/ActionButtons.vue: Split multiple session attachments before sending  # PR#383
-
-# Tracked as #388, and a missing half rather than a defect: no button offers code
-# pairing, so nothing promises the user something that fails. Withdrawing the capability
-# instead would make backends refuse `request_pairing_code`, which both of them serve.
-app/services/whatsapp/session/registry.rb: Add a reachable pairing-code flow  # PR#387 → #388
-
-# Tracked as #389, and present on origin/main unchanged: `Contact#group_channel` is
-# `contact_inboxes.first`, every group controller has always resolved its channel that
-# way, and this branch neither introduces nor touches it. Same family as #374.
-app/javascript/dashboard/routes/dashboard/conversation/contact/GroupContactInfo.vue: Scope group commands to the selected inbox  # PR#387 → #389

@@ -20,7 +20,7 @@ import ContactsAPI from 'dashboard/api/contacts';
 import GroupMembersAPI from 'dashboard/api/groupMembers';
 import { phonesMatch } from 'dashboard/helper/phoneHelper';
 import { useInbox } from 'dashboard/composables/useInbox';
-import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
+import { CAPABILITIES, hasLeftGroup } from 'dashboard/helper/whatsappSession';
 import Avatar from 'next/avatar/Avatar.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
@@ -161,9 +161,7 @@ const {
   checkOverflow: checkDescOverflow,
 } = useExpandableContent({ maxLines: 3, useResizeObserverForCheck: true });
 
-const isGroupLeft = computed(
-  () => props.contact.additional_attributes?.group_left === true
-);
+const isGroupLeft = computed(() => hasLeftGroup(props.contact, inboxId.value));
 
 // The one predicate for "may this agent change the group". It carries the provider's
 // capability too, so the panel stays a readable shell rather than offering buttons that
