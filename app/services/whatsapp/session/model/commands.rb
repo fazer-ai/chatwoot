@@ -123,6 +123,16 @@ module Whatsapp::Session::Model::Commands
     coerce chat: Address, ref: MediaRef
   end
 
+  # The history a chat already has on the phone. `count` is a hint rather than a cap: a
+  # live instance answered a request for 50 with 947 messages, so what bounds the import
+  # is the policy on the way in, not this. `before_id` is the anchor to page backwards
+  # from, which is what makes a second request continue the first instead of repeating it.
+  class HistoryRequest < Data.define(:chat, :count, :before_id)
+    include Serializable
+    wire_type 'history.request'
+    coerce chat: Address
+  end
+
   class PresenceSet < Data.define(:state)
     include Serializable
     wire_type 'presence.set'
@@ -250,7 +260,7 @@ module Whatsapp::Session::Model::Commands
 
   CLASSES = [
     SessionConnect, SessionDisconnect, SessionLogout, SessionDelete, SessionStatus, SessionUpdate, SessionWake,
-    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, MessageSend, MessageEdit,
+    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, HistoryRequest, MessageSend, MessageEdit,
     MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, PresenceSet,
     PresenceSubscribe, ChatPresence, ContactCheck, ContactProfilePicture, ContactInfo, ContactResolve, GroupCreate,
     GroupInfo, GroupList, GroupLeave, GroupParticipantsUpdate, GroupNameSet, GroupDescriptionSet, GroupPhotoSet,

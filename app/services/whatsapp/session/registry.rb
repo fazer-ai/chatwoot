@@ -12,6 +12,10 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
 
   MARK_AS_READ = Field.new(name: 'mark_as_read', type: 'boolean', default: true).freeze
   PRESENCE_SUBSCRIBE = Field.new(name: 'presence_subscribe', type: 'boolean', default: false).freeze
+  # Off by default, and behind the advanced toggle: the phone answers a history request
+  # with everything it has (947 messages for one chat, measured), so an inbox opts into
+  # that rather than discovering it on the first connect.
+  HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false).freeze
 
   DESCRIPTORS = [
     Descriptor.new(
@@ -41,13 +45,14 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # face, so it is not declared.
       capabilities: %w[
         qr_pairing code_pairing edit revoke reactions typing presence read_receipts check_number
-        profile_picture groups group_admin account_limits media_download
+        profile_picture groups group_admin account_limits media_download history_sync
       ],
       fields: [
         Field.new(name: 'base_url', type: 'url', required: true),
         Field.new(name: 'token', type: 'password', required: true, secret: true),
         MARK_AS_READ,
-        PRESENCE_SUBSCRIBE
+        PRESENCE_SUBSCRIBE,
+        HISTORY_SYNC
       ]
     ),
     # Legacy: described so the UI can label and gate an existing inbox, never served here.

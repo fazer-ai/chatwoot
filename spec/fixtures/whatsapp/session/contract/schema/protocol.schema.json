@@ -711,6 +711,7 @@
             { "properties": { "type": { "const": "message.mark_read" }, "payload": { "$ref": "#/definitions/command_message_mark_read" } }, "required": ["type"] },
             { "properties": { "type": { "const": "message.mark_unread" }, "payload": { "$ref": "#/definitions/command_message_mark_unread" } }, "required": ["type"] },
             { "properties": { "type": { "const": "message.download_media" }, "payload": { "$ref": "#/definitions/command_message_download_media" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "history.request" }, "payload": { "$ref": "#/definitions/command_history_request" } }, "required": ["type"] },
             { "properties": { "type": { "const": "presence.set" }, "payload": { "$ref": "#/definitions/command_presence_set" } }, "required": ["type"] },
             { "properties": { "type": { "const": "presence.subscribe" }, "payload": { "$ref": "#/definitions/command_presence_subscribe" } }, "required": ["type"] },
             { "properties": { "type": { "const": "chat.presence" }, "payload": { "$ref": "#/definitions/command_chat_presence" } }, "required": ["type"] },
@@ -860,6 +861,16 @@
         "chat": { "$ref": "#/definitions/address" },
         "last_message_id": { "type": ["string", "null"] },
         "from_me": { "type": "boolean" }
+      },
+      "required": ["chat"],
+      "additionalProperties": true
+    },
+    "command_history_request": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "count": { "type": ["integer", "null"], "minimum": 1 },
+        "before_id": { "type": ["string", "null"] }
       },
       "required": ["chat"],
       "additionalProperties": true

@@ -34,10 +34,16 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   DISCONNECT_SETTLE_TRIES = 4
   DISCONNECT_SETTLE_WAIT = 0.5
 
-  # The events this inbox asks for. `chats`, `contacts`, `labels` and `history` are the
-  # instance's own CRM chatter and are not subscribed: everything Chatwoot needs is in
-  # these five.
+  # The events this inbox asks for. `chats`, `contacts` and `labels` are the instance's own
+  # CRM chatter and are never subscribed: everything Chatwoot needs is in these five.
   WEBHOOK_EVENTS = %w[connection messages messages_update presence groups].freeze
+
+  # `history` is the sixth, and it is asked for only by an inbox that turned the sync on.
+  # It is not a stream of its own: the same event carries the initial dump the phone sends
+  # after pairing and the answer to every on-demand request, and it arrives in batches of
+  # up to 200 messages. An inbox that does not want the history should not be paying to
+  # receive it and then throw it away.
+  HISTORY_EVENT = 'history'.freeze
 
   # Our own sends come back as an echo, and nothing is excluded from the subscription:
   # the echo is the only way to learn that a send whose answer never arrived actually
@@ -188,6 +194,18 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     { 'reachout_time_lock' => reachout_time_lock(limits), 'new_chat_cap' => new_chat_cap(limits) }.compact
   end
 
+  # Asks the phone for what came before. The answer is not this call's: the provider
+  # acknowledges the request and the messages arrive later on the `history` webhook, in
+  # batches, and only if the phone is awake to answer at all. `count` is passed on as the
+  # hint it is.
+  def request_history(command)
+    client.post('/message/history-sync', {
+      number: command.chat.to_jid, mode: 'history',
+      count: command.count, messageid: command.before_id
+    }.compact)
+    nil
+  end
+
   # --- presence and contacts -------------------------------------------------------
 
   # `delay` is how long the provider holds the indicator up. Chatwoot sends a fresh one on
@@ -281,9 +299,19 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
 
   def webhook_body(enabled:)
     {
-      url: webhook_url, enabled: enabled, events: WEBHOOK_EVENTS, excludeMessages: WEBHOOK_EXCLUDES,
+      url: webhook_url, enabled: enabled, events: subscribed_events, excludeMessages: WEBHOOK_EXCLUDES,
       addUrlEvents: false, addUrlTypesMessages: false
     }
+  end
+
+  def subscribed_events
+    return WEBHOOK_EVENTS unless history_sync?
+
+    WEBHOOK_EVENTS + [HISTORY_EVENT]
+  end
+
+  def history_sync?
+    ActiveModel::Type::Boolean.new.cast(provider_config['history_sync']).present?
   end
 
   # The address this instance can reach us at. Always the public one: the instance runs on
