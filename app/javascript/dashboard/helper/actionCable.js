@@ -451,6 +451,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       inboxPhoneNumber: data.inbox_phone_number,
       ownMemberId: data.own_member_id,
       isInboxAdmin: data.is_inbox_admin,
+      inboxId: data.inbox_id,
     });
     this.app.$store.dispatch('contacts/updateContact', data);
   };

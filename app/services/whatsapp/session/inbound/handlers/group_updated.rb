@@ -143,6 +143,8 @@ class Whatsapp::Session::Inbound::Handlers::GroupUpdated < Whatsapp::Session::In
 
   def dispatch_group_synced
     @group_contact.reload
-    Rails.configuration.dispatcher.dispatch(Events::Types::CONTACT_GROUP_SYNCED, Time.zone.now, contact: @group_contact)
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::CONTACT_GROUP_SYNCED, Time.zone.now, contact: @group_contact, channel: channel
+    )
   end
 end

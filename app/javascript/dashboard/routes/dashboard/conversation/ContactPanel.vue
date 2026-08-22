@@ -126,7 +126,10 @@ const getContactDetails = () => {
 
 const triggerGroupSync = () => {
   if (showGroupInfo.value && supportsGroups.value && contactId.value) {
-    store.dispatch('groupMembers/sync', { contactId: contactId.value });
+    store.dispatch('groupMembers/sync', {
+      contactId: contactId.value,
+      inboxId: props.inboxId,
+    });
   }
 };
 

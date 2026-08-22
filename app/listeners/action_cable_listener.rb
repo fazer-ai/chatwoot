@@ -279,13 +279,19 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
   def contact_group_synced(event)
     contact, account = extract_contact_and_account(event)
-    channel = contact.group_channel
+    # The inbox the sync actually ran as. `Contact#group_channel` is the group contact's
+    # first contact inbox, which is an arbitrary pick as soon as the same group is in two
+    # inboxes of one account: it would answer "you administer this group" for a number
+    # that is not the one the agent has open. Kept as the fallback for an event queued by
+    # a version that did not name it.
+    channel = event.data[:channel] || contact.group_channel
     # The same answer the REST roster sends, from the same lookup. Two copies of it is how
     # an account known by LID alone was recognised by whichever ran last: the fetch said
     # "you administer this group" and the first sync event took it back.
     own_member = Whatsapp::Session::Owner.group_member(channel, contact)
     payload = contact.push_event_data.merge(
       group_members: group_members_data(contact, account),
+      inbox_id: channel&.inbox&.id,
       inbox_phone_number: channel&.phone_number,
       own_member_id: own_member&.id,
       is_inbox_admin: own_member&.role == 'admin'

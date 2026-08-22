@@ -90,6 +90,8 @@ es:
       recurring_message_cancelled: "%{agent} detuvo el mensaje programado recurrente."
       unknown_agent: Desconocido
   contacts:
+    group:
+      inbox_id_required: Este grupo está en más de una bandeja de entrada. Indique por cuál vale la acción enviando inbox_id.
     sync_group:
       not_a_group: El contacto no es un grupo
       no_identifier: El contacto no tiene un identificador de grupo

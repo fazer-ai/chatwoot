@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::GroupMetadataController < Api::V1::Accounts::Contacts::BaseController
+  include GroupChannelResolver
+
   def update
     authorize @contact, :update?
     update_subject if metadata_params[:subject].present?
@@ -31,9 +33,5 @@ class Api::V1::Accounts::Contacts::GroupMetadataController < Api::V1::Accounts::
     image_base64 = Base64.strict_encode64(avatar.read)
     channel.update_group_picture(@contact.identifier, image_base64)
     @contact.avatar.attach(avatar)
-  end
-
-  def channel
-    @channel ||= @contact.group_channel
   end
 end

@@ -64,7 +64,7 @@ RSpec.describe Contacts::SyncGroupService do
       allow(contact).to receive(:group_channel).and_return(channel)
 
       expect(Rails.configuration.dispatcher).to receive(:dispatch)
-        .with(Events::Types::CONTACT_GROUP_SYNCED, anything, contact: contact)
+        .with(Events::Types::CONTACT_GROUP_SYNCED, anything, contact: contact, channel: channel)
 
       described_class.new(contact: contact).perform
     end

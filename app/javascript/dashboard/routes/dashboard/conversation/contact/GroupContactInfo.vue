@@ -45,6 +45,11 @@ const inboxGetter = useMapGetter('inboxes/getInboxById');
 const inbox = computed(
   () => inboxGetter.value(currentChat.value?.inbox_id) || {}
 );
+// Which WhatsApp number every action on this panel is performed as. The same group can
+// belong to two inboxes of one account, and the panel decides what the agent may do from
+// the one they have open, so the server has to act as that one and not as whichever
+// contact inbox came first.
+const inboxId = computed(() => currentChat.value?.inbox_id);
 
 const contactProfileLink = computed(
   () => `/app/accounts/${route.params.accountId}/contacts/${props.contact.id}`
@@ -59,7 +64,7 @@ const members = computed(() => {
 });
 
 const membersMeta = computed(
-  () => getGroupMembersMeta.value(props.contact.id) || {}
+  () => getGroupMembersMeta.value(props.contact.id, inboxId.value) || {}
 );
 
 // Prefer inbox_phone_number from the group members meta (always available on
@@ -111,6 +116,7 @@ const loadMoreMembers = async () => {
   await store.dispatch('groupMembers/fetch', {
     contactId: props.contact.id,
     page: nextPage,
+    inboxId: inboxId.value,
   });
 };
 
@@ -208,6 +214,7 @@ const saveName = async () => {
     await store.dispatch('groupMembers/updateGroupMetadata', {
       contactId: props.contact.id,
       params: { subject: newName },
+      inboxId: inboxId.value,
     });
     useAlert(t('GROUP.METADATA.SAVE_SUCCESS'));
   } catch {
@@ -245,6 +252,7 @@ const saveDescription = async () => {
     await store.dispatch('groupMembers/updateGroupMetadata', {
       contactId: props.contact.id,
       params: { description: newDesc },
+      inboxId: inboxId.value,
     });
     useAlert(t('GROUP.METADATA.SAVE_SUCCESS'));
   } catch {
@@ -281,6 +289,7 @@ const onAvatarSelected = async event => {
     await store.dispatch('groupMembers/updateGroupMetadata', {
       contactId: props.contact.id,
       params: formData,
+      inboxId: inboxId.value,
     });
     useAlert(t('GROUP.METADATA.SAVE_SUCCESS'));
   } catch {
@@ -429,6 +438,7 @@ const addMember = async contact => {
     await store.dispatch('groupMembers/addMembers', {
       contactId: props.contact.id,
       participants: [contact.phone_number],
+      inboxId: inboxId.value,
     });
     dismiss();
     useAlert(t('GROUP.MEMBERS.ADD_SUCCESS'));
@@ -528,6 +538,7 @@ const handleMemberAction = async (member, { action }) => {
       await store.dispatch('groupMembers/removeMembers', {
         contactId: props.contact.id,
         memberId: member.id,
+        inboxId: inboxId.value,
       });
       dismiss();
       useAlert(t('GROUP.MEMBERS.REMOVE_SUCCESS'));
@@ -536,6 +547,7 @@ const handleMemberAction = async (member, { action }) => {
         contactId: props.contact.id,
         memberId: member.id,
         role: 'admin',
+        inboxId: inboxId.value,
       });
       dismiss();
       useAlert(t('GROUP.MEMBERS.PROMOTE_SUCCESS'));
@@ -544,6 +556,7 @@ const handleMemberAction = async (member, { action }) => {
         contactId: props.contact.id,
         memberId: member.id,
         role: 'member',
+        inboxId: inboxId.value,
       });
       dismiss();
       useAlert(t('GROUP.MEMBERS.DEMOTE_SUCCESS'));
@@ -570,7 +583,10 @@ const handleMemberAction = async (member, { action }) => {
 const fetchInviteLink = async () => {
   isFetchingInvite.value = true;
   try {
-    const { data } = await GroupMembersAPI.getInviteLink(props.contact.id);
+    const { data } = await GroupMembersAPI.getInviteLink(
+      props.contact.id,
+      inboxId.value
+    );
     inviteUrl.value = data.invite_url || '';
   } catch {
     inviteUrl.value = '';
@@ -599,10 +615,11 @@ const handleJoinRequest = async (request, action) => {
   loadingRequestJid.value = request.jid;
   const dismiss = usePendingAlert(t('GROUP.JOIN_REQUESTS.PROCESSING'));
   try {
-    await GroupMembersAPI.handleJoinRequest(props.contact.id, {
-      participants: [request.jid],
-      request_action: action,
-    });
+    await GroupMembersAPI.handleJoinRequest(
+      props.contact.id,
+      { participants: [request.jid], request_action: action },
+      inboxId.value
+    );
     // Optimistic local update — remove handled request from additional_attributes
     const updated = pendingRequests.value.filter(r => r.jid !== request.jid);
     await store.dispatch('contacts/update', {
@@ -632,7 +649,7 @@ const leaveGroup = async () => {
   isLeavingGroup.value = true;
   const dismiss = usePendingAlert(t('GROUP.SETTINGS.LEAVING'));
   try {
-    await GroupMembersAPI.leaveGroup(props.contact.id);
+    await GroupMembersAPI.leaveGroup(props.contact.id, inboxId.value);
     showLeaveConfirm.value = false;
     dismiss();
     useAlert(t('GROUP.SETTINGS.LEAVE_SUCCESS'));
@@ -646,19 +663,22 @@ const leaveGroup = async () => {
 
 const fetchGroupData = contactId => {
   if (!contactId) return;
-  store.dispatch('groupMembers/fetch', { contactId });
+  store.dispatch('groupMembers/fetch', { contactId, inboxId: inboxId.value });
   // Only fetch from API if we don't already have a stored invite code
   if (canManageInvites.value && !storedInviteCode.value) {
     fetchInviteLink();
   }
 };
 
+// The inbox counts as much as the contact: the same group contact is account-scoped and
+// can be open in two inboxes, and this panel decides what the agent may do from the
+// answer the server gave for one of them.
 watch(
-  () => props.contact.id,
-  (newId, oldId) => {
-    if (newId && newId !== oldId) {
+  () => [props.contact.id, inboxId.value].join(':'),
+  (target, previous) => {
+    if (props.contact.id && target !== previous) {
       visibleRequestCount.value = REQUESTS_PAGE_SIZE;
-      fetchGroupData(newId);
+      fetchGroupData(props.contact.id);
     }
   }
 );
@@ -1098,6 +1118,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
       >
         <BaileysGroupOptions
           :contact="contact"
+          :inbox-id="inboxId"
           :is-admin="canEditGroup"
           :can-manage-invites="canManageInvites"
         />
