@@ -118,6 +118,44 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
   # it as a 15 minute cooldown for every sync that is not forced, which includes the
   # manual one from the dashboard. A soft sync that skipped the roster would therefore
   # stamp the group as synced and leave a stale member list nothing could refresh.
+  # `group.joined` is treated as authoritative because nothing replays what happened
+  # while the session was out of the group. A null picture_url could not say whether the
+  # group has no photo or the snapshot does not mention one, so a photo removed while the
+  # session was away kept the stored image until somebody changed it again.
+  context 'when the snapshot says the group has no photo' do
+    let(:info) do
+      model::GroupInfo.new(group: group, subject: 'Equipe de Vendas', has_picture: false)
+    end
+
+    before do
+      group_contact.avatar.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png',
+                                  content_type: 'image/png')
+    end
+
+    it 'clears the stored photo' do
+      sync
+
+      expect(group_contact.reload.avatar).not_to be_attached
+    end
+  end
+
+  # A producer that cannot answer leaves the flag out, and that case has to stay exactly
+  # as it was: clearing on silence would drop the photo of every group on every sync.
+  context 'when the snapshot does not mention the photo' do
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe de Vendas') }
+
+    before do
+      group_contact.avatar.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png',
+                                  content_type: 'image/png')
+    end
+
+    it 'leaves the stored photo alone' do
+      sync
+
+      expect(group_contact.reload.avatar).to be_attached
+    end
+  end
+
   context 'with a soft sync' do
     subject(:soft_sync) do
       described_class.new(channel: channel, group_contact: group_contact, info: info, soft: true).perform

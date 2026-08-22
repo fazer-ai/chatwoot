@@ -13,12 +13,6 @@ app/javascript/dashboard/helper/actionCable.js: Upsert conversations when assign
 # and the capture showed the only id this provider sends rides on `connection` events.
 # Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
-# PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
-# snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
-# key and an explicit null the same way, so the syncer cannot tell a removal from a
-# field the snapshot did not mention. Fixing it is a contract change, decided with the
-# payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
-app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372
 # PR#377: not a defect. A reaction stored with only `in_reply_to_external_id` gets its
 # `in_reply_to` filled in by Message's own `before_save :ensure_in_reply_to`, which runs
 # InReplyToMessageBuilder and resolves the target by source_id within the conversation. The

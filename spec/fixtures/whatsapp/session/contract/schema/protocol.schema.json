@@ -270,6 +270,7 @@
         "join_approval": { "type": "boolean" },
         "member_add_mode": { "enum": ["admin_add", "all_member_add"] },
         "picture_url": { "type": ["string", "null"] },
+        "has_picture": { "type": ["boolean", "null"] },
         "invite_code": { "type": ["string", "null"] }
       },
       "required": ["group"],
