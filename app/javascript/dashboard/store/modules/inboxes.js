@@ -396,6 +396,13 @@ export const actions = {
       throwErrorMessage(error);
     }
   },
+  requestPairingCode: async (_, inboxId) => {
+    try {
+      await InboxesAPI.requestPairingCode(inboxId);
+    } catch (error) {
+      throwErrorMessage(error);
+    }
+  },
   disconnectChannelProvider: async (_, inboxId) => {
     try {
       await InboxesAPI.disconnectChannelProvider(inboxId);

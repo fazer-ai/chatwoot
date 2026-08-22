@@ -33,6 +33,7 @@ pt_BR:
         provider_not_enabled_for_account: Este provedor de WhatsApp está desativado para esta conta.
         provider_withdrawn: Este provedor de WhatsApp não é mais oferecido para novas caixas de entrada. As caixas que já usam ele continuam funcionando.
         cannot_unpair: Este provedor não consegue desvincular a conta do WhatsApp pareada com ele, então conectar de novo retomaria a mesma conta. Reinicie a instância no provedor, aponte esta caixa de entrada para outra, ou corrija o número configurado aqui.
+        code_pairing_unsupported: Este provedor do WhatsApp não consegue parear com código. Escaneie o QR Code no lugar.
         provider_connection:
           wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.
           reconnect_loop_detected: Não foi possível restabelecer a conexão após várias tentativas. Novas tentativas automáticas continuam em intervalos crescentes. Se o problema persistir, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.

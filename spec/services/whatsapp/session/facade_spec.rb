@@ -20,6 +20,34 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(channel.session_backend).to eq(backend)
   end
 
+  describe 'pairing by code' do
+    it 'connects in code mode and puts the code on the record' do
+      channel.request_pairing_code
+
+      expect(backend.last_command).to have_attributes(pairing: 'code', phone: channel.phone_number.delete('+'))
+      expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'pairing_code' => 'K7QP-2M4X')
+    end
+
+    # The mode is the only difference between the two ways in. Everything the QR path
+    # sets up for the screen has to be set up here too, or an operator pairing by code
+    # gets a session nobody is watching: no attempt token to order two clicks by, and no
+    # poll to notice that the code expired.
+    it 'claims the screen and polls, exactly like the QR path' do
+      allow(backend.class).to receive(:state_polling?).and_return(true)
+
+      expect { channel.request_pairing_code }.to have_enqueued_job(Whatsapp::Session::PairingPollJob)
+        .with(channel, hash_including(pairing: 'code'))
+      expect(channel.reload.provider_connection['pairing_attempt']).to be_present
+    end
+
+    it 'refuses a provider that does not declare the capability' do
+      allow(channel).to receive(:session_capabilities).and_return(%w[qr_pairing])
+
+      expect { channel.request_pairing_code }.to raise_error(Whatsapp::Session::Errors::NotSupported)
+      expect(backend.commands).to be_empty
+    end
+  end
+
   describe 'read receipts' do
     it 'marks the stored messages read on WhatsApp' do
       message = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA')

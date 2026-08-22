@@ -41,22 +41,22 @@ class Whatsapp::Session::Facade
 
   # "Make sure this session is up": resumes an existing pairing, or starts a new one.
   def setup_channel_provider
-    end_disowned_session
-    mode = pairing_mode
-    attempt = claim_pairing_attempt
-    # The inbox was converted while this was running, so it is not this backend's to
-    # connect: asking the old provider anyway leaves a session behind that no inbox owns.
-    return if attempt.nil?
+    start_pairing(pairing_mode)
+  end
 
-    state = connect(mode, attempt)
-    # The connect answer is the first state the dashboard has to show (it carries the QR
-    # for a provider that returns one), and for a polled backend it is also what starts
-    # the pairing poll: nothing else would refresh the code as it rotates. A resume that
-    # answers `open` has nothing left to poll, and a chain started over one would write
-    # `connect_failure` over a healthy connection the first time a request failed.
-    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider, instance: instance)
-    start_pairing_poll(mode, attempt) if state.connecting? && backend.class.state_polling?
-    state
+  # The operator saying they cannot scan the QR. `setup_channel_provider` picks QR for a
+  # session that has never paired because that is the mode needing nothing from them;
+  # this is the other way into the same pairing, and asking again is how a code that
+  # expired gets replaced.
+  #
+  # It pairs the inbox's own number, never one the request carries. Pairing links
+  # whatever phone the code is typed on, and this layer quarantines a session whose
+  # account is not the inbox's: letting the caller name a different number would spend a
+  # pairing to arrive at that quarantine.
+  def request_pairing_code
+    raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.code_pairing_unsupported') unless capability?('code_pairing')
+
+    start_pairing('code')
   end
 
   def import_session(session:, candidate_index: 0)
@@ -212,6 +212,27 @@ class Whatsapp::Session::Facade
 
   def capability?(capability)
     channel.session_capabilities.include?(capability)
+  end
+
+  # Both ways in share every step but the mode: the disowned-session guard, the claim
+  # that orders two clicks by the click, the write and the poll.
+  def start_pairing(mode)
+    end_disowned_session
+    attempt = claim_pairing_attempt
+    # The inbox was converted while this was running, so it is not this backend's to
+    # connect: asking the old provider anyway leaves a session behind that no inbox owns.
+    return if attempt.nil?
+
+    state = connect(mode, attempt)
+    # The connect answer is the first state the dashboard has to show (it carries the QR,
+    # or the code, for a provider that returns one), and for a polled backend it is also
+    # what starts the pairing poll: nothing else would refresh either as it rotates. A
+    # resume that answers `open` has nothing left to poll, and a chain started over one
+    # would write `connect_failure` over a healthy connection the first time a request
+    # failed.
+    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider, instance: instance)
+    start_pairing_poll(mode, attempt) if state.connecting? && backend.class.state_polling?
+    state
   end
 
   # An object in the contract, not a flag: the field says how calls are handled, and the

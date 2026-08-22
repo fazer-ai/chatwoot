@@ -45,8 +45,12 @@
           "LINK_BUTTON": "Link device",
           "LINK_DEVICE_MODAL": {
             "TITLE": "Link your device",
-            "SUBTITLE": "Scan the QR code to link your device. Make sure the phone number is correct before scanning.",
+            "SUBTITLE": "Link your device to this inbox. Make sure the phone number is correct before you start.",
             "LOADING_QRCODE": "Loading QR code...",
+            "USE_PAIRING_CODE": "Link with a code instead",
+            "USE_QRCODE": "Use the QR code instead",
+            "LOADING_PAIRING_CODE": "Requesting a code...",
+            "PAIRING_CODE_HELP": "On the phone, open WhatsApp, go to Linked devices, tap \"Link with phone number instead\" and type this code. It expires in a few minutes.",
             "RECONNECTING": "Connecting...",
             "LINK_DEVICE": "Link device",
             "DISCONNECT": "Disconnect",

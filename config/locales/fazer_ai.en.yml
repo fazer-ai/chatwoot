@@ -33,6 +33,7 @@ en:
         provider_not_enabled_for_account: This WhatsApp provider is turned off for this account.
         provider_withdrawn: This WhatsApp provider is no longer offered for new inboxes. Existing inboxes on it keep working.
         cannot_unpair: This provider cannot unlink the WhatsApp account paired with it, so connecting again would resume the same account. Reset the instance on the provider, point this inbox at another one, or correct the number configured here.
+        code_pairing_unsupported: This WhatsApp provider cannot pair with a code. Scan the QR code instead.
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.

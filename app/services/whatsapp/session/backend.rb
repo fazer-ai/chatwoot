@@ -82,7 +82,6 @@ class Whatsapp::Session::Backend
   def logout = not_supported!(:logout)
   def delete_session = not_supported!(:delete_session)
   def fetch_connection_state = not_supported!(:fetch_connection_state)
-  def request_pairing_code(_command) = not_supported!(:request_pairing_code)
   def import_session(_payload) = not_supported!(:import_session)
 
   # Whatever the provider holds pointing at this inbox, released on its own. Called when

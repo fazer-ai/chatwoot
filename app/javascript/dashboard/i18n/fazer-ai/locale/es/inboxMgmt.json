@@ -45,8 +45,12 @@
           "LINK_BUTTON": "Vincular dispositivo",
           "LINK_DEVICE_MODAL": {
             "TITLE": "Vincule su dispositivo",
-            "SUBTITLE": "Escanee el código QR para vincular su dispositivo. Verifique que el número de teléfono sea correcto antes de escanear.",
+            "SUBTITLE": "Vincule su dispositivo a esta bandeja de entrada. Verifique que el número de teléfono sea correcto antes de empezar.",
             "LOADING_QRCODE": "Cargando el código QR...",
+            "USE_PAIRING_CODE": "Vincular con un código",
+            "USE_QRCODE": "Usar el código QR",
+            "LOADING_PAIRING_CODE": "Solicitando un código...",
+            "PAIRING_CODE_HELP": "En el teléfono, abra WhatsApp, vaya a Dispositivos vinculados, toque \"Vincular con número de teléfono\" e ingrese este código. Caduca en unos minutos.",
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Vincular dispositivo",
             "DISCONNECT": "Desconectar",

@@ -68,13 +68,6 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     model::ConnectionState.from_h(client.call(commands::SessionStatus.new))
   end
 
-  # The code itself arrives as a pairing.code event: WhatsApp takes its time issuing it,
-  # and the inbox screen is already listening for connection updates.
-  def request_pairing_code(command)
-    client.publish(command)
-    nil
-  end
-
   # The limits ride along with the session status, which is the only thing that knows
   # them: they are pushed as events the rest of the time.
   def fetch_account_limits
