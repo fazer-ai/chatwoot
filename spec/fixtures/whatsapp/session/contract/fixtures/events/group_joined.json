@@ -43,7 +43,8 @@
       "announce": false,
       "locked": false,
       "join_approval": false,
-      "member_add_mode": "admin_add"
+      "member_add_mode": "admin_add",
+      "has_picture": false
     }
   }
 }
