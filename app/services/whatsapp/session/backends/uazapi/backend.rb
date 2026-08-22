@@ -187,14 +187,6 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     connection_state(client.get('/instance/status'))
   end
 
-  # The code comes back in this same answer, but it is not returned: the pairing poll is
-  # already running and writes it, and a backend that also wrote state would be the second
-  # writer of a record that has exactly one.
-  def request_pairing_code(command)
-    client.post('/instance/connect', { phone: command.phone })
-    nil
-  end
-
   def fetch_account_limits
     limits = client.get('/instance/wa_messages_limits') || {}
     { 'reachout_time_lock' => reachout_time_lock(limits), 'new_chat_cap' => new_chat_cap(limits) }.compact

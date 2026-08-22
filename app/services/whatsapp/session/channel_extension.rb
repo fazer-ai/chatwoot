@@ -46,6 +46,14 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     Whatsapp::Session::Registry.backend_for(self)
   end
 
+  # Not a delegate on the model, unlike `setup_channel_provider`: pairing by code is a
+  # session-family action, and the legacy services have nothing to answer it with.
+  def request_pairing_code
+    raise Whatsapp::Session::Errors::NotSupported, "#{provider} does not pair by code" unless session_provider?
+
+    provider_service.request_pairing_code
+  end
+
   # Two callers reach this, and they want opposite things. `convert_provider!` is neither:
   # it goes to the provider service directly.
   #

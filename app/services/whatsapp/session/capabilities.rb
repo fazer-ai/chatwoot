@@ -28,12 +28,14 @@ module Whatsapp::Session::Capabilities
   ].freeze
 
   # Capability -> the Backend method it unlocks. Only capabilities that map to a single
-  # entry point are listed: `qr_pairing` is covered by `connect` (every backend has it),
-  # and `echo_by_reserved_id`, `history_sync` and `calls` describe behavior rather than a
-  # call. The shared examples use this map to assert that a declared capability is
-  # actually implemented, and that an undeclared one still raises NotSupported.
+  # entry point are listed. `qr_pairing` and `code_pairing` are not: both are `connect`,
+  # which every backend has, told which mode to pair in, and a code is issued by raising
+  # the session rather than on top of one, so there is no second call to make. Neither
+  # are `echo_by_reserved_id`, `history_sync` and `calls`, which describe behavior. The
+  # shared examples use this map to assert that a declared capability is actually
+  # implemented, and that an undeclared one still raises NotSupported; the pairing modes
+  # get an example of their own, against `connect`.
   METHODS = {
-    'code_pairing' => :request_pairing_code,
     'session_import' => :import_session,
     'edit' => :edit_message,
     'revoke' => :revoke_message,

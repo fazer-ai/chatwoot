@@ -45,8 +45,12 @@
           "LINK_BUTTON": "Conectar dispositivo",
           "LINK_DEVICE_MODAL": {
             "TITLE": "Conecte o seu dispositivo",
-            "SUBTITLE": "Escaneie o QR code para conectar seu dispositivo. Certifique-se de que o número de telefone esteja correto antes de escanear.",
+            "SUBTITLE": "Conecte o seu dispositivo a esta caixa de entrada. Confira se o número de telefone está correto antes de começar.",
             "LOADING_QRCODE": "Carregando QR code...",
+            "USE_PAIRING_CODE": "Conectar com um código",
+            "USE_QRCODE": "Usar o QR code",
+            "LOADING_PAIRING_CODE": "Pedindo um código...",
+            "PAIRING_CODE_HELP": "No telefone, abra o WhatsApp, vá em Dispositivos conectados, toque em \"Conectar com número de telefone\" e digite este código. Ele expira em alguns minutos.",
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Conectar dispositivo",
             "DISCONNECT": "Desconectar",
