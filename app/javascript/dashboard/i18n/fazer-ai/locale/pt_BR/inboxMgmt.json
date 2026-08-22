@@ -9,9 +9,9 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Conectar via API não-oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conecte um telefone pelo conector que já vem nesta instalação",
+          "NATIVE_DESC": "Conectar via API não-oficial, pelo conector que já vem nesta instalação",
           "UAZAPI": "Uazapi",
-          "UAZAPI_DESC": "Conecte um telefone pela sua própria instância da Uazapi"
+          "UAZAPI_DESC": "Conectar via API não-oficial Uazapi, na sua própria instância"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",
@@ -50,7 +50,10 @@
             "USE_PAIRING_CODE": "Conectar com um código",
             "USE_QRCODE": "Usar o QR code",
             "LOADING_PAIRING_CODE": "Pedindo um código...",
-            "PAIRING_CODE_HELP": "No telefone, abra o WhatsApp, vá em Dispositivos conectados, toque em \"Conectar com número de telefone\" e digite este código. Ele expira em alguns minutos.",
+            "PAIRING_CODE_STEP_1": "No telefone que vai atender, abra o WhatsApp.",
+            "PAIRING_CODE_STEP_2": "Vá em Dispositivos conectados e toque em Conectar dispositivo.",
+            "PAIRING_CODE_STEP_3": "Toque em \"Conectar com número de telefone\" e digite o código acima.",
+            "PAIRING_CODE_EXPIRES": "O código vale por poucos minutos. Se expirar, peça outro.",
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Conectar dispositivo",
             "DISCONNECT": "Desconectar",

@@ -9,9 +9,9 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Connect via non-official API Z-API",
           "NATIVE": "WhatsApp (native)",
-          "NATIVE_DESC": "Pair a phone through the connector that ships with this installation",
+          "NATIVE_DESC": "Connect through an unofficial API, using the connector that ships with this installation",
           "UAZAPI": "Uazapi",
-          "UAZAPI_DESC": "Pair a phone through your own Uazapi instance"
+          "UAZAPI_DESC": "Connect through the unofficial Uazapi API, on your own instance"
         },
         "PROVIDER_URL": {
           "LABEL": "Provider URL",
@@ -50,7 +50,10 @@
             "USE_PAIRING_CODE": "Link with a code instead",
             "USE_QRCODE": "Use the QR code instead",
             "LOADING_PAIRING_CODE": "Requesting a code...",
-            "PAIRING_CODE_HELP": "On the phone, open WhatsApp, go to Linked devices, tap \"Link with phone number instead\" and type this code. It expires in a few minutes.",
+            "PAIRING_CODE_STEP_1": "On the phone that will answer, open WhatsApp.",
+            "PAIRING_CODE_STEP_2": "Go to Linked devices and tap Link a device.",
+            "PAIRING_CODE_STEP_3": "Tap \"Link with phone number instead\" and type the code above.",
+            "PAIRING_CODE_EXPIRES": "The code is good for a few minutes. Ask for another one if it expires.",
             "RECONNECTING": "Connecting...",
             "LINK_DEVICE": "Link device",
             "DISCONNECT": "Disconnect",

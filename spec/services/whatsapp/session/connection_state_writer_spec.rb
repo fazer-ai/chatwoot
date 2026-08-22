@@ -58,6 +58,31 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
       expect(channel.reload.provider_connection).not_to have_key('qr_data_url')
     end
 
+    # A provider knows nothing about this token, so a state that arrives without one says
+    # nothing about which pairing it belongs to and must not end the one in flight. The
+    # case that proved it: pairing by code on Uazapi needs a disconnected instance, and the
+    # webhook answering that disconnect lands after the connect that follows it.
+    it 'keeps the attempt in flight when a late close arrives without one' do
+      channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1',
+                                            'pairing_code' => 'K7QP-2M4X' })
+
+      expect(writer.apply(state.new(connection: 'close'))).to eq(:written)
+
+      expect(channel.reload.provider_connection).to include('connection' => 'close', 'pairing_attempt' => 'attempt-1')
+    end
+
+    # Which is what makes the chain survive it: the poll that owns the screen reads the
+    # record again on its next run and is still the one driving it.
+    it 'lets the attempt that owns the screen write again after that close' do
+      channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
+      writer.apply(state.new(connection: 'close'))
+
+      result = writer.apply(state.new(connection: 'connecting', pairing_code: 'K7QP-2M4X'), attempt: 'attempt-1')
+
+      expect(result).to eq(:written)
+      expect(channel.reload.provider_connection).to include('pairing_code' => 'K7QP-2M4X')
+    end
+
     # The token is only ever absent once the attempt it named is over, so a write still
     # carrying one is answering about a pairing that has already ended.
     it 'refuses a write for an attempt the record no longer names' do
