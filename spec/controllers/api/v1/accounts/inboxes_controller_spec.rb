@@ -1927,10 +1927,19 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(channel.reload.provider_connection).to eq('connection' => 'close')
       end
 
-      it 'ensures provider connection is updated to close' do
-        channel.update_provider_connection!(connection: 'open')
-        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, disconnect_channel_provider: true)
-        allow(service_double).to receive(:disconnect_channel_provider).and_raise(StandardError)
+      # Disconnect is the documented recovery for a send stall, and re-pairing is the only
+      # thing that replaces the wedged socket. Recording 'close' on a disconnect the
+      # provider refused would clear the stall warning without replacing anything: the
+      # operator is told it worked, the banner disappears, and the inbox is still mute
+      # with no signal left to say so.
+      it 'leaves the connection untouched when the provider refuses to end the session' do
+        channel.update_provider_connection!(
+          connection: 'open',
+          send_stall: { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
+        )
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(service_double).to receive(:disconnect_channel_provider)
+          .and_raise(Whatsapp::Session::Errors::ProviderUnavailable.new('The provider did not end the session (HTTP 500)'))
         allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
           .with(whatsapp_channel: channel)
           .and_return(service_double)
@@ -1939,8 +1948,11 @@ RSpec.describe 'Inboxes API', type: :request do
              headers: admin.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:ok)
-        expect(channel.reload.provider_connection).to eq('connection' => 'close')
+        expect(response).to have_http_status(:service_unavailable)
+        expect(channel.reload.provider_connection).to include(
+          'connection' => 'open',
+          'send_stall' => { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
+        )
       end
     end
   end

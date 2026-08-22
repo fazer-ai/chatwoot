@@ -272,34 +272,48 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
-    # disconnect is best-effort: a missing session (404), a Baileys API error
-    # (5xx), or a transport failure shouldn't propagate. The caller (e.g.
-    # convert_provider!) just needs the cleanup attempt to be made, not to
-    # succeed.
+    # The outcome has to travel. Swallowing it let the caller record the inbox as closed
+    # while the session was still live — and for a send stall, whose only recovery is
+    # re-pairing, that also cleared the warning that was the only thing telling anyone the
+    # inbox was mute. The teardown callers that genuinely do not care rescue it themselves
+    # (Channel::Whatsapp#disconnect_channel_provider), which is where that decision belongs.
+    # 404 is the state being asked for, not a failure. Reporting it as one aborts a
+    # provider conversion and leaves the modal offering Disconnect forever for a session
+    # that is already gone.
+    context 'when the session is already absent' do
+      it 'returns true for HTTP 404' do
+        stub_request(:delete, disconnect_url)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_return(status: 404, body: 'not found')
+
+        expect(service.disconnect_channel_provider).to be(true)
+      end
+    end
+
     context 'when the Baileys API responds with an error status' do
-      [404, 500].each do |status|
-        it "returns true, logs a warning, and does not raise for HTTP #{status}" do
-          stub_request(:delete, disconnect_url)
-            .with(headers: stub_headers(whatsapp_channel))
-            .to_return(status: status, body: 'baileys error')
+      it 'raises and logs a warning for HTTP 500' do
+        stub_request(:delete, disconnect_url)
+          .with(headers: stub_headers(whatsapp_channel))
+          .to_return(status: 500, body: 'baileys error')
 
-          allow(Rails.logger).to receive(:warn)
+        allow(Rails.logger).to receive(:warn)
 
-          expect(service.disconnect_channel_provider).to be(true)
-          expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=#{status}/)
-        end
+        expect { service.disconnect_channel_provider }
+          .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /did not end the session/)
+        expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider non-success status=500/)
       end
     end
 
     context 'when the request itself fails' do
-      it 'returns true, logs a warning, and does not raise' do
+      it 'raises and logs a warning' do
         stub_request(:delete, disconnect_url)
           .with(headers: stub_headers(whatsapp_channel))
           .to_raise(Net::OpenTimeout)
 
         allow(Rails.logger).to receive(:warn)
 
-        expect(service.disconnect_channel_provider).to be(true)
+        expect { service.disconnect_channel_provider }
+          .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /Could not reach the provider/)
         expect(Rails.logger).to have_received(:warn).with(/disconnect_channel_provider failed/)
       end
 
@@ -309,7 +323,7 @@ describe Whatsapp::Providers::WhatsappBaileysService do
           .to_raise(Net::OpenTimeout)
         reconnect_request = stub_request(:post, disconnect_url)
 
-        service.disconnect_channel_provider
+        expect { service.disconnect_channel_provider }.to raise_error(Whatsapp::Session::Errors::Error)
 
         expect(reconnect_request).not_to have_been_requested
       end
@@ -805,6 +819,167 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect do
           service.send_message(test_send_phone_number, message)
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+      end
+    end
+
+    # Every non-2xx used to collapse into a bare ProviderUnavailableError, so the job
+    # retried "this message can never be sent" exactly as hard as "the connection is
+    # down", and buried both in the dead set.
+    context 'when the server reports the send outcome is unknown' do
+      it 'raises a non-retryable error and does not reconnect the channel' do
+        stub_request(:post, request_path)
+          .to_return(
+            status: 409,
+            headers: { 'x-baileys-idempotency-state' => 'indeterminate' },
+            body: 'Previous send timed out; outcome unknown'
+          )
+
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::SendOutcomeUnknownError')
+          # Resending could deliver the message twice, and only a human can tell.
+          expect(error.retryable?).to be(false)
+        end)
+
+        expect(WebMock).not_to have_requested(:post, setup_url)
+      end
+    end
+
+    context 'when the send times out' do
+      it 'raises a retryable timeout error' do
+        stub_request(:post, request_path)
+          .to_return(status: 504, body: 'Send timed out; outcome unknown')
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::SendTimeoutError')
+          expect(error.retryable?).to be(true)
+        end)
+      end
+
+      # The connection is receiving and answering health checks; only sending is wedged.
+      # Marking it closed would drop it out of the health-check cycle that detects
+      # exactly this, and POST /connections cannot repair it anyway.
+      it 'leaves the channel open so the health check keeps watching it' do
+        stub_request(:post, request_path)
+          .to_return(status: 504, body: 'Send timed out; outcome unknown')
+
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
+        expect { service.send_message(test_send_phone_number, message) }.to raise_error(StandardError)
+
+        expect(WebMock).not_to have_requested(:post, setup_url)
+      end
+    end
+
+    # 503 is where the whole episode settles: after the third timeout the API's circuit
+    # breaker refuses without touching the socket, so every later send gets this. Folding
+    # it into the generic ProviderUnavailableError would mark the channel closed for the
+    # entire stall and drop it out of the very cycle meant to detect it.
+    context 'when the connection is refusing sends outright' do
+      it 'raises a retryable stall error and leaves the channel open' do
+        stub_request(:post, request_path)
+          .to_return(status: 503, body: 'Connection is not accepting sends',
+                     headers: { 'x-baileys-send-state' => 'stalled' })
+
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::SendStalledError')
+          # The provider recreates the socket on its own; the next attempt after that works.
+          expect(error.retryable?).to be(true)
+        end)
+
+        expect(WebMock).not_to have_requested(:post, setup_url)
+      end
+
+      # The stall branch is the one that must NOT mark the channel down. An outage and a
+      # draining proxy answer the same 503, and applying the stall reading to them leaves
+      # a genuinely dead channel recorded as open, skipping the reconnect it needed and
+      # dropping it out of the health-check cycle for good.
+      it 'treats a 503 without the provider marker as an ordinary outage' do
+        stub_request(:post, request_path)
+          .to_return(status: 503, body: 'Service Unavailable')
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+        stub_request(:post, setup_url).to_return(status: 200)
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error.class.name).to eq('Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError')
+        end)
+
+        expect(WebMock).to have_requested(:post, setup_url)
+      end
+    end
+
+    context 'when the attachment is rejected as too large' do
+      it 'raises a non-retryable error without marking the channel closed' do
+        stub_request(:post, request_path).to_return(status: 413, body: 'Payload Too Large')
+
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to raise_error(Whatsapp::Session::Errors::MediaTooLarge)
+
+        # Marking the channel closed here would drop it out of the health-check cycle,
+        # which only enqueues channels whose connection is 'open'.
+        expect(WebMock).not_to have_requested(:post, setup_url)
+      end
+    end
+
+    context 'when the message content is rejected' do
+      it 'raises a non-retryable error' do
+        stub_request(:post, request_path).to_return(status: 422, body: 'Unprocessable')
+
+        setup_url = "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error).to be_a(Whatsapp::Session::Errors::InvalidPayload)
+          expect(error.retryable?).to be(false)
+        end)
+
+        expect(WebMock).not_to have_requested(:post, setup_url)
+      end
+    end
+
+    # SendReplyJob persists error.message as external_error when the retries run out, so a
+    # bare raise puts the Ruby class name in front of the agent where the reason belongs.
+    it 'gives a generic provider failure a reason an agent can read' do
+      stub_request(:post, request_path).to_return(status: 500, body: 'Internal Server Error')
+      stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+        .to_return(status: 200)
+
+      expect do
+        service.send_message(test_send_phone_number, message)
+      end.to(raise_error do |error|
+        expect(error.message).to eq(I18n.t('errors.inboxes.channel.outgoing.provider_error'))
+        expect(error.message).not_to include('WhatsappBaileysService')
+      end)
+    end
+
+    context 'when the provider is unavailable' do
+      it 'raises a retryable provider error' do
+        stub_request(:post, request_path)
+          .to_return(status: 503, body: 'Service Unavailable')
+        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+          .to_return(status: 200)
+
+        expect do
+          service.send_message(test_send_phone_number, message)
+        end.to(raise_error do |error|
+          expect(error).to be_a(Whatsapp::Session::Errors::ProviderUnavailable)
+          expect(error.retryable?).to be(true)
+        end)
       end
     end
 

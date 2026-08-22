@@ -71,7 +71,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     return super unless session_provider?
 
     unless @session_teardown
-      # The same teardown `super` performs, minus the rescue that swallows it. Not
+      # The same teardown `super` performs, minus its logging branch. Not
       # `backend.disconnect`: the facade deletes the session, and only disconnecting
       # leaves the pairing alive under a session id Chatwoot is about to stop using.
       provider_service.disconnect_channel_provider

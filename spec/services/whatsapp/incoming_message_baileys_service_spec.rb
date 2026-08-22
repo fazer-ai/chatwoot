@@ -215,6 +215,66 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(inbox.channel.reload.provider_connection['quarantine']).to be_nil
       end
 
+      # The connection keeps receiving and passing health checks while every send times
+      # out, so this webhook is the only thing that says so. `action` is what tells an
+      # operator whether the provider already recreated the socket or is holding off —
+      # and holding off is when a human has to step in.
+      it 'persists a reported send stall and clears it only when the connection reopens' do
+        params = base_params.merge(
+          {
+            data: {
+              error: 'send_stall_detected',
+              sendStall: {
+                consecutiveTimeouts: 3,
+                stalledForMs: 120_000,
+                action: 'suppressed',
+                until: '2026-08-21T12:00:00.000Z'
+              }
+            }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection).to include(
+          'error' => I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected'),
+          'send_stall' => {
+            'consecutive_timeouts' => 3,
+            'stalled_for_ms' => 120_000,
+            'action' => 'suppressed',
+            'until' => '2026-08-21T12:00:00.000Z'
+          }
+        )
+
+        # The provider reports a stall once per episode. An unrelated update in the
+        # meantime — a standalone reachoutTimeLock push carries no sendStall — must not
+        # clear the warning, because nothing would ever say it again while the connection
+        # is still mute.
+        unrelated = base_params.merge(
+          { data: { reachoutTimeLock: { isActive: false } } }
+        )
+        described_class.new(inbox: inbox, params: unrelated).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to include(
+          'consecutive_timeouts' => 3
+        )
+        # The error string is the only half of this warning an operator can see:
+        # provider_connection_admin_data serializes error and qr_data_url, and send_stall
+        # reaches no serializer. Preserving the detail without the string preserves nothing
+        # anyone reads.
+        expect(inbox.channel.provider_connection['error']).to eq(
+          I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected')
+        )
+
+        # `open` is a NEW socket, hence a new keystore mutex, whether the provider
+        # restarted it or WhatsApp dropped it. That is the one event that means recovery.
+        next_update = base_params.merge({ data: { connection: 'open' } })
+        described_class.new(inbox: inbox, params: next_update).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to be_nil
+        expect(inbox.channel.provider_connection['error']).to be_nil
+      end
+
       context 'with reach-out time-lock (error 463 / account restriction)' do
         let(:reachout_data) do
           { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' }

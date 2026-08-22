@@ -58,10 +58,26 @@ RSpec.describe Whatsapp::Session::Inbound::StatusTransition do
     expect(message.external_error).to eq('file is too big media_too_large')
   end
 
-  it 'leaves a failed message alone' do
-    message.update!(status: :failed)
+  # The asymmetry with the failure rules below, and it is deliberate. A failure is a
+  # verdict: ours when we stopped waiting on a send (which says nothing about what
+  # WhatsApp did with it), the provider's about ONE attempt otherwise — and with a
+  # caller-reserved id every attempt carries the same key, so a NACK on the first and a
+  # delivery on the second describe the same message. A receipt is proof, and proof wins.
+  # Leaving it failed keeps a resend button on a message the customer already has, which
+  # is how a stalled send turns into a duplicate days later.
+  it 'promotes a failed message when a receipt proves it arrived' do
+    message.update!(status: :failed, external_error: 'send timed out')
 
-    expect(described_class.apply(message, 'delivered')).to be(false)
+    expect(described_class.apply(message, 'delivered')).to be(true)
+    expect(message.reload.status).to eq('delivered')
+    expect(message.external_error).to be_blank
+  end
+
+  it 'refuses to fail a message twice' do
+    message.update!(status: :failed, external_error: 'send timed out')
+
+    expect(described_class.apply(message, 'failed', error: 'send timed out again')).to be(false)
+    expect(message.reload.external_error).to eq('send timed out')
   end
 
   # Receipts arrive out of order, so a failure can land after the read that followed a

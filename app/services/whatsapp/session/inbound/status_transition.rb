@@ -8,9 +8,17 @@ module Whatsapp::Session::Inbound::StatusTransition
   # which always implies read.
   RECEIPTS = { 'delivered' => 'delivered', 'read' => 'read', 'played' => 'read', 'failed' => 'failed' }.freeze
   RANK = { 'sent' => 0, 'delivered' => 1, 'read' => 2 }.freeze
-  # Nothing moves a message out of these. A failure reported after the message was
+  # No FAILURE moves a message out of these. A failure reported after the message was
   # delivered or read describes an earlier attempt, not the message coming undone:
   # either status is proof it arrived. A second failure has nothing left to say.
+  #
+  # The reverse is not symmetric, and that asymmetry is the point: a positive receipt
+  # after a failure is proof the message arrived, and proof outranks a verdict. The
+  # verdict may have been ours (a send we stopped waiting on, which says nothing about
+  # what WhatsApp did with it) or the provider's about ONE attempt — and with a
+  # caller-reserved id every attempt carries the same key, so a NACK on the first and a
+  # delivery on the second describe the same message. Leaving it failed would keep
+  # offering the agent a resend for a message the customer already has.
   TERMINAL = %w[delivered read failed].freeze
 
   module_function
@@ -33,15 +41,37 @@ module Whatsapp::Session::Inbound::StatusTransition
     end
   end
 
-  def failure_attributes(status, error)
-    return { status: status } unless status == 'failed'
+  # The SEND side's failure writer, as opposed to `apply`, which records what the provider
+  # told us. The difference is source_id: it is only ever written by the provider
+  # confirming the message exists on WhatsApp — the send response, or the echo promoting a
+  # reservation — so a send WE could not confirm has nothing to say about a message the
+  # provider already confirmed, and saying it anyway invites the agent to resend a
+  # duplicate. Read under the row lock, because the echo can land while the last attempt
+  # is still unwinding.
+  #
+  # `apply` deliberately does NOT carry this rule: a provider-reported failure (a 463 NACK,
+  # say) is about a message that did reach the server, and suppressing that would hide a
+  # real delivery failure.
+  def fail_send(message, reason)
+    message.with_lock do
+      next false if message.source_id.present?
 
-    { status: :failed, external_error: error_message(error) }
+      apply(message, 'failed', error: reason)
+    end
+  end
+
+  def failure_attributes(status, error)
+    return { status: :failed, external_error: error_message(error) } if status == 'failed'
+
+    # Cleared, not just left behind: the dashboard decides between "resend" and "recreate"
+    # by whether a failed message carries an external_error, so a stale one on a message
+    # the receipt just confirmed would keep the resend button on a delivered message.
+    { status: status, external_error: nil }
   end
 
   def allowed?(current, new_status)
     return false if current.in?(TERMINAL) && new_status == 'failed'
-    return false if current.in?(%w[read failed])
+    return false if current == 'read'
     return true if new_status == 'failed'
 
     RANK.fetch(new_status, -1) > RANK.fetch(current, -1)

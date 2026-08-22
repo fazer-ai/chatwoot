@@ -7,6 +7,9 @@ const USE_PAIRING_CODE_KEY = `${KEY}.USE_PAIRING_CODE`;
 const USE_QRCODE_KEY = `${KEY}.USE_QRCODE`;
 const LOADING_PAIRING_CODE_KEY = `${KEY}.LOADING_PAIRING_CODE`;
 
+const DISCONNECT_KEY = `${KEY}.DISCONNECT`;
+const LINK_DEVICE_KEY = `${KEY}.LINK_DEVICE`;
+
 const dispatch = vi.fn(() => Promise.resolve());
 
 vi.mock('vuex', () => ({
@@ -33,7 +36,13 @@ const mountModal = (
       stubs: {
         'woot-modal': { template: '<div><slot /></div>' },
         'router-link': true,
-        Button: { props: ['label'], template: '<button>{{ label }}</button>' },
+        // The default stub swallows the slot, and the slot is where the button's
+        // label lives — which is the whole thing these examples assert on.
+        Button: {
+          props: ['label', 'variant', 'color'],
+          template:
+            '<button :data-variant="variant" :data-color="color">{{ label }}<slot /></button>',
+        },
       },
     },
   });
@@ -99,5 +108,35 @@ describe('WhatsappLinkDeviceModal', () => {
       expect(wrapper.html()).toContain('K7QP-2M4X');
       expect(wrapper.html()).toContain(USE_QRCODE_KEY);
     });
+  });
+
+  // A send stall leaves the connection reading 'open'. The error branch used to win
+  // regardless, which hid Disconnect and offered a setup call that only refreshes
+  // presence on a socket the provider already considers live: the one action that
+  // cannot repair the fault was the only one on offer.
+  it('offers disconnect, not setup, when an open connection is stalled', () => {
+    const wrapper = mountModal(['qr_pairing'], {
+      connection: 'open',
+      error: 'This connection cannot send messages.',
+      send_stall: { consecutive_timeouts: 3, action: 'suppressed' },
+    });
+
+    const html = wrapper.html();
+    expect(html).toContain(DISCONNECT_KEY);
+    expect(html).not.toContain(LINK_DEVICE_KEY);
+    expect(html).toContain('This connection cannot send messages.');
+  });
+
+  // The error is still the whole story when the connection is genuinely down:
+  // re-pairing from scratch is the action, and Disconnect would be a no-op.
+  it('keeps offering setup when the connection is closed with an error', () => {
+    const wrapper = mountModal(['qr_pairing'], {
+      connection: 'close',
+      error: 'Wrong phone number.',
+    });
+
+    const html = wrapper.html();
+    expect(html).toContain(LINK_DEVICE_KEY);
+    expect(html).not.toContain(DISCONNECT_KEY);
   });
 });

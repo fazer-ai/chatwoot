@@ -34,6 +34,12 @@ const supportsCodePairing = computed(() =>
   hasCapability(props.inbox, CAPABILITIES.CODE_PAIRING)
 );
 
+// A send stall is the one failure that leaves `connection` reading 'open' while the
+// inbox cannot answer anyone. That combination breaks the usual reading of this modal:
+// setup() only refreshes presence on a connection the provider already considers live,
+// so the recovery is re-pairing, and the button for it lives in the open branch below.
+const sendStall = computed(() => providerConnection.value?.send_stall);
+
 // Alternative onboarding when WhatsApp's extra device-linking verification blocks
 // the QR: install the browser extension and import an already-linked session.
 //
@@ -131,7 +137,13 @@ watchEffect(() => {
             with-provider-connection-status
           />
 
-          <template v-if="!connection || connection === 'close' || error">
+          <template
+            v-if="
+              !connection ||
+              connection === 'close' ||
+              (error && connection !== 'open')
+            "
+          >
             <p v-if="error" class="text-red-500 text-center">
               {{ error }}
             </p>
@@ -234,7 +246,10 @@ watchEffect(() => {
           </template>
 
           <template v-else-if="connection === 'open'">
-            <p v-if="isSetup" class="text-center">
+            <p v-if="error" class="text-center text-red-500">
+              {{ error }}
+            </p>
+            <p v-else-if="isSetup" class="text-center">
               {{
                 $t(
                   'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.CONNECTED'
@@ -242,7 +257,14 @@ watchEffect(() => {
               }}
             </p>
             <div class="flex gap-2">
-              <Button ghost :is-loading="loading" @click="disconnect">
+              <!-- Promoted from ghost while a stall is open: re-pairing stops being the
+                   way out of the modal and becomes the only thing that clears the fault. -->
+              <Button
+                :variant="sendStall ? 'solid' : 'ghost'"
+                :color="sendStall ? 'ruby' : 'blue'"
+                :is-loading="loading"
+                @click="disconnect"
+              >
                 {{
                   $t(
                     'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.DISCONNECT'

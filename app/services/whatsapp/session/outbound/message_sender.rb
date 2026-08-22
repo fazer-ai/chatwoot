@@ -140,14 +140,19 @@ class Whatsapp::Session::Outbound::MessageSender
     result.message_id
   end
 
-  # Never over a reason that is already there: the announcement guard writes a translated
-  # sentence before it raises, and the exception's own message would replace it with the
-  # English one meant for the log.
+  # Through StatusTransition, which owns the terminal-status rule and applies it under
+  # the row lock. It subsumes the reason it used to guard by hand — the announcement
+  # guard writes a translated sentence before raising and `failed` is terminal, so the
+  # English message meant for the log cannot replace it — and it adds the one this could
+  # not see: a send that timed out may still have arrived, so a receipt can mark the
+  # message delivered or read while we are deciding it failed, and walking that back is
+  # what puts a duplicate in front of the customer.
+  #
+  # error.message, not the exception: StatusTransition appends the wire code when handed
+  # one, and external_error is the sentence the agent reads on the bubble.
   def fail_message(error)
     message.reload
-    return if message.status == 'failed' && message.external_error.present?
-
-    message.update_under_lock!(status: :failed, external_error: error.message)
+    Whatsapp::Session::Inbound::StatusTransition.fail_send(message, error.message)
     nil
   end
 

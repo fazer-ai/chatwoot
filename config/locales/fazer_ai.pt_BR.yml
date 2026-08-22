@@ -34,9 +34,21 @@ pt_BR:
         provider_withdrawn: Este provedor de WhatsApp não é mais oferecido para novas caixas de entrada. As caixas que já usam ele continuam funcionando.
         cannot_unpair: Este provedor não consegue desvincular a conta do WhatsApp pareada com ele, então conectar de novo retomaria a mesma conta. Reinicie a instância no provedor, aponte esta caixa de entrada para outra, ou corrija o número configurado aqui.
         code_pairing_unsupported: Este provedor do WhatsApp não consegue parear com código. Escaneie o QR Code no lugar.
+        outgoing:
+          provider_error: O WhatsApp não conseguiu enviar esta mensagem no momento.
+          provider_unreachable: Não foi possível alcançar o provedor do WhatsApp.
+          disconnect_refused: O provedor não encerrou a sessão.
+          disconnect_unreachable: Não foi possível alcançar o provedor para encerrar a sessão.
+          send_timed_out: O envio excedeu o tempo limite; pode ou não ter chegado ao WhatsApp.
+          send_outcome_unknown: O envio excedeu o tempo limite e pode ter sido concluído. Confira a conversa no WhatsApp antes de enviar novamente.
+          send_stalled: A conexão com o WhatsApp não está aceitando envios no momento.
+          media_too_large: O anexo é grande demais para ser enviado.
+          invalid_payload: O WhatsApp recusou o conteúdo da mensagem.
+          still_processing: A mensagem ainda estava sendo enviada em outro lugar e não foi possível confirmar.
         provider_connection:
           wrong_phone_number: O número de telefone que você está tentando conectar não é o mesmo que o configurado. Certifique-se de que o número está correto antes de escanear o QR code.
           reconnect_loop_detected: Não foi possível restabelecer a conexão após várias tentativas. Novas tentativas automáticas continuam em intervalos crescentes. Se o problema persistir, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.
+          send_stall_detected: Esta conexão está recebendo mensagens, mas não consegue enviá-las. Se não se resolver sozinha em alguns minutos, desconecte a caixa de entrada e conecte novamente escaneando um novo QR code.
           invalid_credentials: O provedor recusou as credenciais desta caixa de entrada. Confira o endereço e o token e tente novamente.
           logged_out: Este dispositivo foi desconectado do WhatsApp pelo celular. Conecte novamente para continuar recebendo mensagens.
           stream_replaced: Esta sessão foi substituída por outra conexão da mesma conta do WhatsApp. Conecte novamente para usar aqui.

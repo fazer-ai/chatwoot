@@ -61,9 +61,19 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   # Mirrors Whatsapp::SendOnWhatsappService#persist_source_id: the id the send never got to store is
   # what a revoke needs, so a message deleted while that send was in flight can only be taken off the
   # contact's phone once this echo supplies it.
+  # Through SourceIdReservation, exactly like the session layer's EchoMatcher, because
+  # filling source_id now means two things and not one: it decides who owes the revoke,
+  # and it retires a send failure recorded while the id was still blank. Writing the
+  # column directly here left a message that exhausted its retries before this echo
+  # arrived sitting on `failed` with a Retry button — and Retry clears the reservation and
+  # sends a fresh id, which is the duplicate the reservation exists to prevent.
   def confirm_source_id(reserved)
-    reserved.update_under_lock!(source_id: raw_message_id)
-    ::Messages::DeleteOnChannelJob.perform_later(reserved.id) if reserved.deleted?
+    return if raw_message_id.blank?
+    return unless ::Whatsapp::Session::Outbound::SourceIdReservation.assign(
+      reserved, { source_id: raw_message_id }
+    ) == :revoke
+
+    ::Messages::DeleteOnChannelJob.perform_later(reserved.id)
   end
 
   # Mirrors the Cloud provider (create_contact_messages): one message per shared

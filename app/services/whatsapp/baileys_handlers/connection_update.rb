@@ -25,11 +25,13 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
   #   - `reconnecting`: Connection has been established, but not open (i.e. device is being linked for the first time, or Baileys server restart)
   #   - `open`: Open and ready to send/receive messages
   def provider_connection_payload(data)
+    stall = send_stall_payload(data)
     {
       connection: data[:connection] || inbox.channel.provider_connection['connection'],
       qr_data_url: data[:qrDataUrl] || nil,
-      error: data[:error] ? I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) : nil,
+      error: connection_error(data, stall),
       quarantine: quarantine_payload(data),
+      send_stall: stall,
       reachout_time_lock: reachout_time_lock_payload(data),
       # new_chat_cap never rides a connection.update (it arrives via message-capping.update / the
       # poll). update_provider_connection! replaces provider_connection wholesale, so without
@@ -37,6 +39,50 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       # off until the next cap push/poll. Preserve the existing value; .compact omits it when unset.
       new_chat_cap: inbox.channel.provider_connection['new_chat_cap'],
       epoch: data[:epoch]
+    }.compact
+  end
+
+  # The human-readable half of the warning, and the half that survives serialization for a
+  # non-admin: provider_connection_data gives every agent `connection`, and only an admin
+  # also gets error and send_stall. Preserving the structured detail without the string
+  # would preserve nothing most viewers can read, so the two share a fate.
+  #
+  # Re-derived from the stall rather than copied from the stored error: copying would
+  # resurrect whatever unrelated error happened to be stored last.
+  def connection_error(data, stall)
+    return I18n.t("errors.inboxes.channel.provider_connection.#{data[:error]}", default: data[:error].to_s.humanize) if data[:error]
+    return I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected') if stall.present?
+
+    nil
+  end
+
+  # Rides only the send_stall_detected webhook: the connection is receiving and answering
+  # health checks while every send times out. Worth surfacing on its own rather than as a
+  # bare error string, because "action" is what tells an operator whether the provider
+  # already recreated the socket or is holding off until `until` — and holding off is when
+  # a human has to step in, which is why it is serialized to admins rather than kept for
+  # support (quarantine, by contrast, still is).
+  #
+  # Unlike quarantine, this does NOT share the error's lifecycle. The provider reports a
+  # stall once per episode, so an unrelated update in the meantime (a standalone
+  # reachoutTimeLock push carries no sendStall) would clear the warning for good while the
+  # connection is still mute — and nothing would ever say it again. So it is preserved,
+  # and cleared only by the one event that actually means recovery: the connection
+  # reaching `open` with nothing wrong, which is a NEW socket and therefore a new keystore
+  # mutex, whether the provider restarted it or WhatsApp dropped it.
+  def send_stall_payload(data)
+    raw = data[:sendStall]
+    if raw.blank?
+      return nil if data[:connection] == 'open' && data[:error].blank?
+
+      return inbox.channel.provider_connection['send_stall']
+    end
+
+    {
+      consecutive_timeouts: raw[:consecutiveTimeouts],
+      stalled_for_ms: raw[:stalledForMs],
+      action: raw[:action],
+      until: raw[:until]
     }.compact
   end
 
