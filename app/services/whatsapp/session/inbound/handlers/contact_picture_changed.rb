@@ -14,7 +14,7 @@ class Whatsapp::Session::Inbound::Handlers::ContactPictureChanged < Whatsapp::Se
   private
 
   def remove_avatar(contact)
-    contact.avatar.purge if contact.avatar.attached?
+    Whatsapp::Session::AvatarSync.remove(contact)
   end
 
   # The stored avatar stays until its replacement is attached, and the two sync markers

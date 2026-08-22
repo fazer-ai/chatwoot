@@ -24,7 +24,7 @@ RSpec.describe Whatsapp::Session::UpdateGroupAvatarJob do
   it 'asks for the picture of a group that has none' do
     described_class.perform_now(group_contact, channel: channel)
 
-    expect(Avatar::AvatarFromUrlJob).to have_been_enqueued.with(group_contact, info.picture_url)
+    expect(Avatar::AvatarFromUrlJob).to have_been_enqueued.with(group_contact, info.picture_url, resolved_at: be_present)
   end
 
   it 'leaves an attached avatar alone when the refresh is not forced' do
