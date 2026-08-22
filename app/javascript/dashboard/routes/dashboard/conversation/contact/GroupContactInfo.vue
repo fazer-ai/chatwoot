@@ -161,9 +161,10 @@ const {
   checkOverflow: checkDescOverflow,
 } = useExpandableContent({ maxLines: 3, useResizeObserverForCheck: true });
 
-const isGroupLeft = computed(
-  () => props.contact.additional_attributes?.group_left === true
-);
+// Read off the conversation, not off the contact: a group contact is account-scoped and
+// the same group can be open in two inboxes of one account, where only one of them may
+// have left. The server answers for this thread's own number.
+const isGroupLeft = computed(() => currentChat.value?.group_left === true);
 
 // The one predicate for "may this agent change the group". It carries the provider's
 // capability too, so the panel stays a readable shell rather than offering buttons that
