@@ -26,7 +26,7 @@ class SendReplyJob < ApplicationJob
     Rails.logger.error(
       "SendReplyJob gave up on message #{job.arguments.first}: still processing elsewhere (#{error.message})"
     )
-    fail_message(job.arguments.first, 'The message was still being sent elsewhere and could not be confirmed.')
+    fail_message(job.arguments.first, I18n.t('errors.inboxes.channel.outgoing.still_processing'))
   end
 
   # Marks the message failed so the agent sees it and can resend. Through

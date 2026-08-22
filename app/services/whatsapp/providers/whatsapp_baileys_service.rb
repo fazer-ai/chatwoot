@@ -35,8 +35,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   RECONNECT_LOOP_RESET_STRIKES = 3
   # Shown to the agent on a message whose send outcome cannot be determined. Says what
   # to do, because "unknown" alone leaves them with no next step.
-  INDETERMINATE_SEND_MESSAGE = 'The send timed out and may have gone through. Check the ' \
-                               'conversation on WhatsApp before sending it again.'.freeze
+  # Persisted as external_error and rendered to the agent, so it is translated like every
+  # other agent-facing string. Resolved at raise time rather than at load: I18n.locale is
+  # per-request, and a constant would freeze whichever locale booted the process.
+  OUTGOING_ERRORS_SCOPE = 'errors.inboxes.channel.outgoing'.freeze
 
   # One switch for the whole WhatsApp group subsystem, resolved in one place. Reading the
   # legacy variable here while the registry reads the new one would let an inbox advertise
@@ -149,12 +151,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     return true if response.success? || response.code == 404
 
     Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}")
-    raise ProviderUnavailableError, "The provider did not end the session (HTTP #{response.code})"
+    raise ProviderUnavailableError, outgoing_error(:disconnect_refused)
   rescue Whatsapp::Session::Errors::Error
     raise
   rescue StandardError => e
     Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed: #{e.class}: #{e.message}")
-    raise ProviderUnavailableError, "Could not reach the provider to end the session (#{e.class})"
+    raise ProviderUnavailableError, outgoing_error(:disconnect_unreachable)
   end
 
   # Confirmed reconnect loop: the provider reported enough consecutive failed
@@ -815,11 +817,13 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def raise_transport_error(error)
     Rails.logger.error "[WHATSAPP][BAILEYS] transport failure on send: #{error.class}: #{error.message}"
 
-    if NEVER_TRANSMITTED_ERRORS.any? { |klass| error.is_a?(klass) }
-      raise ProviderUnavailableError, "Could not reach the WhatsApp provider (#{error.class})"
-    end
+    raise ProviderUnavailableError, outgoing_error(:provider_unreachable) if never_transmitted?(error)
 
-    raise SendTimeoutError, "The send did not complete (#{error.class}); it may or may not have reached WhatsApp"
+    raise SendTimeoutError, outgoing_error(:send_timed_out)
+  end
+
+  def never_transmitted?(error)
+    NEVER_TRANSMITTED_ERRORS.any? { |klass| error.is_a?(klass) }
   end
 
   # Every non-2xx used to collapse into a bare ProviderUnavailableError, which made it
@@ -834,11 +838,11 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     when 409 then raise_conflict_send_error(response)
     when 503 then raise_unavailable_send_error(response)
     when 504
-      raise SendTimeoutError, 'The send timed out; it may or may not have reached WhatsApp'
+      raise SendTimeoutError, outgoing_error(:send_timed_out)
     when 413
-      raise Whatsapp::Session::Errors::MediaTooLarge, 'The attachment is too large to send'
+      raise Whatsapp::Session::Errors::MediaTooLarge, outgoing_error(:media_too_large)
     when 422
-      raise Whatsapp::Session::Errors::InvalidPayload, 'WhatsApp rejected the message content'
+      raise Whatsapp::Session::Errors::InvalidPayload, outgoing_error(:invalid_payload)
     else
       raise ProviderUnavailableError
     end
@@ -847,7 +851,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # The two statuses a send can come back with where the status alone is not the answer:
   # each covers two conditions that need opposite handling, and a header tells them apart.
   def raise_conflict_send_error(response)
-    raise SendOutcomeUnknownError, INDETERMINATE_SEND_MESSAGE if indeterminate_send?(response)
+    raise SendOutcomeUnknownError, outgoing_error(:send_outcome_unknown) if indeterminate_send?(response)
 
     raise MessageAlreadyProcessingError
   end
@@ -858,9 +862,13 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # But an outage and a draining proxy answer 503 too, and reading those as a stall leaves
   # a genuinely dead channel recorded as open, skipping the reconnect it needed.
   def raise_unavailable_send_error(response)
-    raise SendStalledError, 'The WhatsApp connection is not accepting sends right now' if stalled_send?(response)
+    raise SendStalledError, outgoing_error(:send_stalled) if stalled_send?(response)
 
     raise ProviderUnavailableError
+  end
+
+  def outgoing_error(key)
+    I18n.t("#{OUTGOING_ERRORS_SCOPE}.#{key}")
   end
 
   def indeterminate_send?(response)
