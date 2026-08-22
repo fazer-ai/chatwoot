@@ -32,11 +32,20 @@ class GroupMembersAPI extends ApiClient {
     return axios.post(`${this.baseUrl()}/groups`, params);
   }
 
+  // The avatar upload sends FormData, and spreading one copies no entry at all: the
+  // request would carry the inbox and nothing else, and the server would answer 200 to
+  // an upload with no file in it.
   updateGroupMetadata(contactId, params, inboxId) {
-    return axios.patch(`${this.url}/${contactId}/group_metadata`, {
-      ...params,
-      inbox_id: inboxId,
-    });
+    const url = `${this.url}/${contactId}/group_metadata`;
+
+    if (params instanceof FormData) {
+      // A missing inbox is left out rather than appended: FormData stringifies, so it
+      // would reach the server as the literal "undefined" and fail the lookup.
+      if (inboxId != null) params.append('inbox_id', inboxId);
+      return axios.patch(url, params);
+    }
+
+    return axios.patch(url, { ...params, inbox_id: inboxId });
   }
 
   addMembers(contactId, participants, inboxId) {

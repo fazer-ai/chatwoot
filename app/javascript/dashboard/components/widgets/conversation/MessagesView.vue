@@ -304,12 +304,15 @@ export default {
     isGroupConversation() {
       return this.currentChat?.group_type === 'group';
     },
+    // The inbox is part of the target, not only the contact. A group contact is
+    // account-scoped, so the same group can be open in two inboxes of one account, and
+    // what the panel may do there is answered per inbox. Keyed on the contact alone,
+    // switching between the two threads kept the first inbox's answer.
     groupMembersFetchTarget() {
       if (!this.groupContactId || !this.isGroupConversation) return null;
+      if (!this.hasInboxCapability(CAPABILITIES.GROUPS)) return null;
 
-      return this.hasInboxCapability(CAPABILITIES.GROUPS)
-        ? this.groupContactId
-        : null;
+      return `${this.groupContactId}:${this.currentChat?.inbox_id}`;
     },
     groupContactId() {
       return this.currentChat?.meta?.sender?.id || null;
@@ -326,7 +329,8 @@ export default {
       if (!this.groupContactId) return {};
       return (
         this.$store.getters['groupMembers/getGroupMembersMeta'](
-          this.groupContactId
+          this.groupContactId,
+          this.currentChat?.inbox_id
         ) || {}
       );
     },
@@ -438,10 +442,10 @@ export default {
     // thread stayed without members until the agent switched conversations.
     groupMembersFetchTarget: {
       immediate: true,
-      handler(contactId) {
-        if (contactId && !this.isGroupMembersLoaded) {
+      handler(target) {
+        if (target && !this.isGroupMembersLoaded) {
           this.$store.dispatch('groupMembers/fetch', {
-            contactId,
+            contactId: this.groupContactId,
             inboxId: this.currentChat?.inbox_id,
           });
         }

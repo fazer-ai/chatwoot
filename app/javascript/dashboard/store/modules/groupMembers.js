@@ -1,6 +1,14 @@
 import types from '../mutation-types';
 import GroupMembersAPI from '../../api/groupMembers';
 
+// The roster belongs to the group, so it is shared: the same members whoever is looking.
+// The meta does not. `inbox_phone_number`, `own_member_id` and `is_inbox_admin` answer
+// "who are we in this group", and a group contact is account-scoped, so the same group
+// can be open in two inboxes of one account with a different answer in each. Keyed by
+// contact alone, whichever fetch or sync event landed last decided what the panel
+// offered, for both of them.
+const metaKey = (contactId, inboxId) => `${contactId}:${inboxId ?? ''}`;
+
 export const state = {
   records: {},
   meta: {},
@@ -17,8 +25,8 @@ export const getters = {
   getGroupMembers: _state => contactId => {
     return _state.records[contactId] || [];
   },
-  getGroupMembersMeta: _state => contactId => {
-    return _state.meta[contactId] || {};
+  getGroupMembersMeta: _state => (contactId, inboxId) => {
+    return _state.meta[metaKey(contactId, inboxId)] || {};
   },
   getUIFlags(_state) {
     return _state.uiFlags;
@@ -28,11 +36,12 @@ export const getters = {
 export const actions = {
   setGroupMembers(
     { commit },
-    { contactId, members, inboxPhoneNumber, ownMemberId, isInboxAdmin }
+    { contactId, members, inboxPhoneNumber, ownMemberId, isInboxAdmin, inboxId }
   ) {
     commit(types.SET_GROUP_MEMBERS, { contactId, members });
     commit(types.SET_GROUP_MEMBERS_META, {
       contactId,
+      inboxId,
       meta: {
         total_count: members.length,
         page: 1,
@@ -77,7 +86,11 @@ export const actions = {
           members: data.payload,
         });
       }
-      commit(types.SET_GROUP_MEMBERS_META, { contactId, meta: data.meta });
+      commit(types.SET_GROUP_MEMBERS_META, {
+        contactId,
+        inboxId,
+        meta: data.meta,
+      });
     } finally {
       commit(
         types.SET_GROUP_MEMBERS_UI_FLAG,
@@ -168,10 +181,10 @@ export const mutations = {
     };
   },
 
-  [types.SET_GROUP_MEMBERS_META](_state, { contactId, meta }) {
+  [types.SET_GROUP_MEMBERS_META](_state, { contactId, inboxId, meta }) {
     _state.meta = {
       ..._state.meta,
-      [contactId]: meta,
+      [metaKey(contactId, inboxId)]: meta,
     };
   },
 };

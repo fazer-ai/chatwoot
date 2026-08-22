@@ -53,11 +53,15 @@ class Contacts::SyncGroupService
     raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_identifier') if contact.identifier.blank?
   end
 
+  # The channel travels with the event because the payload it builds answers "who are we
+  # in this group", and that is per inbox. Without it the listener falls back to the
+  # contact's first contact inbox, which can be another number entirely.
   def dispatch_group_synced_event
     Rails.configuration.dispatcher.dispatch(
       Events::Types::CONTACT_GROUP_SYNCED,
       Time.zone.now,
-      contact: contact
+      contact: contact,
+      channel: channel || contact.group_channel
     )
   end
 end

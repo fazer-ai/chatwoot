@@ -64,7 +64,7 @@ const members = computed(() => {
 });
 
 const membersMeta = computed(
-  () => getGroupMembersMeta.value(props.contact.id) || {}
+  () => getGroupMembersMeta.value(props.contact.id, inboxId.value) || {}
 );
 
 // Prefer inbox_phone_number from the group members meta (always available on
@@ -670,12 +670,15 @@ const fetchGroupData = contactId => {
   }
 };
 
+// The inbox counts as much as the contact: the same group contact is account-scoped and
+// can be open in two inboxes, and this panel decides what the agent may do from the
+// answer the server gave for one of them.
 watch(
-  () => props.contact.id,
-  (newId, oldId) => {
-    if (newId && newId !== oldId) {
+  () => [props.contact.id, inboxId.value].join(':'),
+  (target, previous) => {
+    if (props.contact.id && target !== previous) {
       visibleRequestCount.value = REQUESTS_PAGE_SIZE;
-      fetchGroupData(newId);
+      fetchGroupData(props.contact.id);
     }
   }
 );

@@ -821,6 +821,8 @@ RSpec.describe 'Contacts API', type: :request do
         before do
           create(:contact_inbox, contact: contact, inbox: first.inbox, source_id: '12345678901234567890')
           create(:contact_inbox, contact: contact, inbox: second.inbox, source_id: '12345678901234567890')
+          create(:inbox_member, user: agent, inbox: first.inbox)
+          create(:inbox_member, user: agent, inbox: second.inbox)
         end
 
         it 'syncs through the inbox the caller named' do
@@ -836,6 +838,28 @@ RSpec.describe 'Contacts API', type: :request do
                headers: agent.create_new_auth_token, as: :json
 
           expect(response).to have_http_status(:bad_request)
+          expect(Contacts::SyncGroupJob).not_to have_been_enqueued
+        end
+
+        # An agent on one of the two inboxes has no ambiguity to resolve: the other one
+        # is not theirs to act as, named or not.
+        it 'syncs an agent on one of them through their own inbox, unasked' do
+          InboxMember.find_by(user: agent, inbox: second.inbox).destroy!
+
+          post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+               headers: agent.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:accepted)
+          expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact, channel: first)
+        end
+
+        it 'refuses an inbox the agent is not on' do
+          InboxMember.find_by(user: agent, inbox: second.inbox).destroy!
+
+          post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+               params: { inbox_id: second.inbox.id }, headers: agent.create_new_auth_token, as: :json
+
+          expect(response).to have_http_status(:not_found)
           expect(Contacts::SyncGroupJob).not_to have_been_enqueued
         end
       end

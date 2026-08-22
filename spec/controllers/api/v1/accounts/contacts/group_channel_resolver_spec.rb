@@ -58,6 +58,19 @@ RSpec.describe 'group actions and the inbox they run as', type: :request do
     expect(response).to have_http_status(:bad_request)
   end
 
+  # `ContactPolicy` lets every agent of the account read and update a contact, which was
+  # harmless while the inbox was ours to pick. Naming one is a request, so without this an
+  # agent on one inbox could leave the group, promote or remove members as another.
+  it 'refuses an inbox the agent is not on' do
+    agent = create(:user, account: account, role: :agent)
+    create(:inbox_member, user: agent, inbox: looking_at.inbox)
+
+    post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_admin/leave",
+         params: { inbox_id: other.inbox.id }, headers: agent.create_new_auth_token, as: :json
+
+    expect(response).to have_http_status(:not_found)
+  end
+
   # The endpoints predate the parameter and are documented without it, so a group that is
   # in one inbox still answers on its own.
   it 'needs no inbox when the group is in only one' do

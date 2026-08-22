@@ -28,8 +28,15 @@ module GroupChannelResolver
   #
   # Left out, one inbox answers for itself. Left out on a group that is in two, there is
   # no answer to give, and picking one is the coin flip: the caller is asked to say which.
+  #
+  # Only inboxes this agent is on are candidates. `ContactPolicy` lets every agent of the
+  # account read and update a contact, which was harmless while the inbox was ours to
+  # pick; naming one is a request, and without this an agent on inbox A could leave the
+  # group, promote or remove members as inbox B by asking for it. An inbox they are not
+  # on reads as an inbox the group is not in: refusing it differently would answer
+  # whether that number is in the group.
   def resolve_group_contact_inbox
-    candidates = @contact.contact_inboxes.includes(:inbox)
+    candidates = @contact.contact_inboxes.includes(:inbox).where(inbox: Current.user.assigned_inboxes)
     return candidates.find_by!(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
     return candidates.first if candidates.size <= 1
 

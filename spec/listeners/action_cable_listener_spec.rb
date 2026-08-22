@@ -45,6 +45,24 @@ describe ActionCableListener do
 
       listener.contact_group_synced(event)
     end
+
+    # The panel decides what the agent may do from this payload, so it has to answer for
+    # the inbox the sync ran as. `Contact#group_channel` is the group contact's first
+    # contact inbox, which is another number entirely as soon as the group is in two.
+    it 'answers for the inbox the event names, not for whichever came first' do
+      other = create(:channel_whatsapp, account: account, provider: 'uazapi', phone_number: '+5541988887777',
+                                        validate_provider_config: false, sync_templates: false)
+      create(:contact_inbox, inbox: other.inbox, contact: group_contact)
+      create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+      event = Events::Base.new(:'contact.group_synced', Time.zone.now, contact: group_contact, channel: channel)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        anything, 'contact.group_synced',
+        hash_including(inbox_id: channel.inbox.id, inbox_phone_number: '+5541999990000')
+      )
+
+      listener.contact_group_synced(event)
+    end
   end
 
   describe '#account_cache_invalidated' do

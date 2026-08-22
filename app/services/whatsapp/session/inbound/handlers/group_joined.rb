@@ -40,6 +40,8 @@ class Whatsapp::Session::Inbound::Handlers::GroupJoined < Whatsapp::Session::Inb
   # the group had before, until a reload or the next participant event.
   def broadcast_roster(group_contact)
     group_contact.reload
-    Rails.configuration.dispatcher.dispatch(Events::Types::CONTACT_GROUP_SYNCED, Time.zone.now, contact: group_contact)
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::CONTACT_GROUP_SYNCED, Time.zone.now, contact: group_contact, channel: channel
+    )
   end
 end

@@ -40,6 +40,25 @@ describe('groupMembers store', () => {
       expect(getters.getGroupMembers(localState)(99)).toEqual([]);
     });
 
+    // The roster is the group's and is shared, but `is_inbox_admin`, `own_member_id` and
+    // the phone number answer "who are we in this group", which is per inbox. Keyed by
+    // contact alone, the panel for one number showed the other one's answer.
+    it('getGroupMembersMeta answers per inbox', () => {
+      const localState = {
+        meta: {
+          '42:7': { is_inbox_admin: true },
+          '42:9': { is_inbox_admin: false },
+        },
+      };
+      expect(getters.getGroupMembersMeta(localState)(42, 7)).toEqual({
+        is_inbox_admin: true,
+      });
+      expect(getters.getGroupMembersMeta(localState)(42, 9)).toEqual({
+        is_inbox_admin: false,
+      });
+      expect(getters.getGroupMembersMeta(localState)(42, 11)).toEqual({});
+    });
+
     it('getUIFlags returns uiFlags', () => {
       const localState = {
         uiFlags: { isFetching: true, isSyncing: false, isUpdating: false },
@@ -64,6 +83,23 @@ describe('groupMembers store', () => {
         members: sampleMembers,
       });
       expect(localState.records[42]).toEqual(sampleMembers);
+    });
+
+    it('SET_GROUP_MEMBERS_META keeps one inbox from overwriting another', () => {
+      const localState = { meta: {} };
+      mutations[types.default.SET_GROUP_MEMBERS_META](localState, {
+        contactId: 42,
+        inboxId: 7,
+        meta: { is_inbox_admin: true },
+      });
+      mutations[types.default.SET_GROUP_MEMBERS_META](localState, {
+        contactId: 42,
+        inboxId: 9,
+        meta: { is_inbox_admin: false },
+      });
+
+      expect(localState.meta['42:7']).toEqual({ is_inbox_admin: true });
+      expect(localState.meta['42:9']).toEqual({ is_inbox_admin: false });
     });
   });
 
@@ -95,7 +131,10 @@ describe('groupMembers store', () => {
             types.default.SET_GROUP_MEMBERS,
             { contactId: 42, members: sampleMembers },
           ],
-          [types.default.SET_GROUP_MEMBERS_META, { contactId: 42, meta }],
+          [
+            types.default.SET_GROUP_MEMBERS_META,
+            { contactId: 42, inboxId: 7, meta },
+          ],
           [types.default.SET_GROUP_MEMBERS_UI_FLAG, { isFetching: false }],
         ]);
       });
