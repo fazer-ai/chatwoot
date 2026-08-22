@@ -1,5 +1,10 @@
 import { MESSAGE_TYPE } from 'shared/constants/messages';
-import { applyPageFilters, applyRoleFilter, sortComparator } from './helpers';
+import {
+  applyPageFilters,
+  applyRoleFilter,
+  humanAssignee,
+  sortComparator,
+} from './helpers';
 import filterQueryGenerator from 'dashboard/helper/filterQueryGenerator';
 import { matchesFilters } from './helpers/filterHelpers';
 import {
@@ -100,7 +105,10 @@ const getters = {
     const currentUserID = rootGetters.getCurrentUser?.id;
 
     const chats = _state.allConversations.filter(conversation => {
-      const { assignee } = conversation.meta;
+      // The human, not whoever holds it: an agent bot's id comes from its own table and
+      // can be the same integer as an agent's, which would put a bot's conversation in
+      // that agent's "Mine".
+      const assignee = humanAssignee(conversation);
       const isAssignedToMe = assignee && assignee.id === currentUserID;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       const isChatMine = isAssignedToMe && shouldFilter;
@@ -123,7 +131,11 @@ const getters = {
   },
   getUnAssignedChats: (_state, _, __, rootGetters) => activeFilters => {
     const chats = _state.allConversations.filter(conversation => {
-      const isUnAssigned = !conversation.meta.assignee;
+      // A human assignee, not any assignee: handing a conversation to a bot clears
+      // `assignee_id`, so the server counts it as unassigned and the tab's badge says
+      // so. Reading `meta.assignee` alone (which names the bot) kept it out of the list
+      // the badge was counting.
+      const isUnAssigned = !humanAssignee(conversation);
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       return isUnAssigned && shouldFilter;
     });
