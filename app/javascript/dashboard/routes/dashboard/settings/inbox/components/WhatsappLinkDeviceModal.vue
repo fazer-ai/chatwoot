@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, computed, onUnmounted, ref, watchEffect } from 'vue';
+import { onMounted, computed, ref, watchEffect } from 'vue';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
@@ -32,6 +32,16 @@ const error = computed(() => providerConnection.value?.error);
 const pairingMode = ref('qr');
 const supportsCodePairing = computed(() =>
   hasCapability(props.inbox, CAPABILITIES.CODE_PAIRING)
+);
+
+// What the screen shows, which is not the same question as what the operator asked for.
+// A provider can answer a code pairing with a QR alongside the code (uazapi keeps
+// rotating one), and this component's own request is client-side state that a blip in
+// the connection resets. Both together used to hide a perfectly valid code behind the
+// QR branch. A code on the record is only ever there because a code was asked for, so
+// it decides on its own; the request still decides while nothing has arrived yet.
+const displayedPairing = computed(() =>
+  pairingMode.value === 'code' || pairingCode.value ? 'code' : 'qr'
 );
 
 // A send stall is the one failure that leaves `connection` reading 'open' while the
@@ -82,6 +92,11 @@ const pairWithCode = () => {
     })
     .catch(handleError);
 };
+// Only ever the operator asking for it. Closing this screen used to end the pairing on
+// the way out, which made a look-and-close cost a fresh code, and on a provider that
+// issues one only from a disconnected instance that is a round trip the operator has to
+// discover. An attempt nobody completes expires on its own: the provider stops offering
+// it, and the poll writes the timeout.
 const disconnect = () => {
   loading.value = true;
   store
@@ -89,17 +104,14 @@ const disconnect = () => {
     .catch(handleError);
 };
 
+// Deliberately reads the record as it stands rather than refreshing it. Reloading the
+// inboxes from here replaces them in the store, which re-renders the settings page this
+// modal is mounted inside and takes the modal down with it: the operator clicks the
+// button and nothing opens. The connection record is kept current by the cable, and the
+// poll behind a live pairing is what refreshes what is on screen.
 onMounted(() => {
   if (!connection.value || connection.value === 'close') {
     setup();
-  }
-});
-onUnmounted(() => {
-  if (
-    connection.value === 'connecting' ||
-    connection.value === 'reconnecting'
-  ) {
-    disconnect();
   }
 });
 watchEffect(() => {
@@ -154,10 +166,28 @@ watchEffect(() => {
                 )
               }}
             </Button>
+
+            <!-- The other way in, offered before the pairing starts rather than only
+                 during it. A provider can refuse to issue a code once a pairing is
+                 already in flight (uazapi answers the state it is in and no code at
+                 all), which left the operator having to start the QR they cannot use
+                 to reach the option they can. -->
+            <Button
+              v-if="supportsCodePairing"
+              link
+              blue
+              :is-loading="loading"
+              :label="
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.USE_PAIRING_CODE'
+                )
+              "
+              @click="pairWithCode"
+            />
           </template>
 
           <template v-else-if="connection === 'connecting'">
-            <template v-if="pairingMode === 'code'">
+            <template v-if="displayedPairing === 'code'">
               <div v-if="!pairingCode" class="flex flex-col gap-4 items-center">
                 <p>
                   {{
@@ -174,10 +204,38 @@ watchEffect(() => {
                 >
                   {{ pairingCode }}
                 </p>
-                <p class="max-w-xs text-sm text-center text-n-slate-11">
+                <!-- Numbered, because this is read by someone holding the phone with
+                     one hand: a paragraph makes them find where they are again after
+                     every step. -->
+                <ol
+                  class="max-w-xs pl-5 text-sm list-decimal text-n-slate-11 marker:text-n-slate-10"
+                >
+                  <li>
+                    {{
+                      $t(
+                        'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.PAIRING_CODE_STEP_1'
+                      )
+                    }}
+                  </li>
+                  <li>
+                    {{
+                      $t(
+                        'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.PAIRING_CODE_STEP_2'
+                      )
+                    }}
+                  </li>
+                  <li>
+                    {{
+                      $t(
+                        'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.PAIRING_CODE_STEP_3'
+                      )
+                    }}
+                  </li>
+                </ol>
+                <p class="max-w-xs text-xs text-center text-n-slate-10">
                   {{
                     $t(
-                      'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.PAIRING_CODE_HELP'
+                      'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.PAIRING_CODE_EXPIRES'
                     )
                   }}
                 </p>
@@ -208,7 +266,7 @@ watchEffect(() => {
                  also how a code that expired is replaced. -->
             <template v-if="supportsCodePairing">
               <Button
-                v-if="pairingMode === 'code'"
+                v-if="displayedPairing === 'code'"
                 link
                 blue
                 :is-loading="loading"

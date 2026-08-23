@@ -3,9 +3,14 @@ import { defineComponent, nextTick } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import SessionProviderConfiguration from '../SessionProviderConfiguration.vue';
 import WhatsappChannel from 'dashboard/api/channel/whatsappChannel';
+import InboxesAPI from 'dashboard/api/inboxes';
 
 vi.mock('dashboard/api/channel/whatsappChannel', () => ({
   default: { getSessionProviders: vi.fn() },
+}));
+
+vi.mock('dashboard/api/inboxes', () => ({
+  default: { syncProviderHistory: vi.fn() },
 }));
 
 const mockDispatch = vi.fn();
@@ -60,13 +65,18 @@ const INBOX = {
   provider_config: { base_url: 'https://uaz.example', mark_as_read: true },
 };
 
-const mountPage = async ({ beta = true } = {}) => {
+// Scoped to the connection section, where the connect button is first and the history
+// one sits under it. The credential sections further down carry buttons of their own.
+const historyButton = wrapper =>
+  wrapper.findAll('.SettingsSection-stub')[0].findAll('.NextButton-stub')[1];
+
+const mountPage = async ({ beta = true, inbox = INBOX } = {}) => {
   WhatsappChannel.getSessionProviders.mockResolvedValue({
     data: { payload: catalog({ beta }) },
   });
 
   const wrapper = mount(SessionProviderConfiguration, {
-    props: { inbox: INBOX },
+    props: { inbox },
     global: {
       stubs: {
         WhatsappLinkDeviceModal: stub('WhatsappLinkDeviceModal'),
@@ -140,6 +150,76 @@ describe('SessionProviderConfiguration', () => {
     await wrapper.vm.save(url);
 
     expect(wrapper.vm.values[url.name]).toBe('https://moved.example');
+  });
+
+  describe('the history sync button', () => {
+    const withHistory = (config = {}, connection = 'open') => ({
+      ...INBOX,
+      capabilities: ['history_sync'],
+      provider_config: { ...INBOX.provider_config, ...config },
+      provider_connection: { connection },
+    });
+
+    it('is absent on a provider that cannot fetch history', async () => {
+      const wrapper = await mountPage();
+
+      expect(historyButton(wrapper)).toBeUndefined();
+    });
+
+    // Recovering one weekend must not require turning on the dump that repeats at every
+    // future pairing: the two are different decisions and the button owns neither.
+    it('does not wait for the connect-time setting', async () => {
+      InboxesAPI.syncProviderHistory.mockResolvedValue({});
+      const wrapper = await mountPage({
+        inbox: withHistory({ history_sync: false }),
+      });
+
+      expect(historyButton(wrapper).attributes('disabled')).toBe('false');
+
+      await historyButton(wrapper).trigger('click');
+      await flushPromises();
+
+      expect(InboxesAPI.syncProviderHistory).toHaveBeenCalledWith(INBOX.id);
+    });
+
+    it('reports back once the phone has been asked', async () => {
+      InboxesAPI.syncProviderHistory.mockResolvedValue({});
+      const wrapper = await mountPage({
+        inbox: withHistory({ history_sync: true }),
+      });
+
+      await historyButton(wrapper).trigger('click');
+      await flushPromises();
+
+      expect(InboxesAPI.syncProviderHistory).toHaveBeenCalledWith(INBOX.id);
+      expect(mockAlert).toHaveBeenCalledWith(
+        'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.REQUESTED'
+      );
+    });
+
+    // The request travels to the phone through the session, so with the session down the
+    // button would report that it asked and nothing would ever arrive.
+    it('is not offered while the session is down', async () => {
+      const wrapper = await mountPage({
+        inbox: withHistory({ history_sync: true }, 'close'),
+      });
+
+      expect(historyButton(wrapper).attributes('disabled')).toBe('true');
+    });
+
+    it('reports a request the provider refused', async () => {
+      InboxesAPI.syncProviderHistory.mockRejectedValue(new Error('nope'));
+      const wrapper = await mountPage({
+        inbox: withHistory({ history_sync: true }),
+      });
+
+      await historyButton(wrapper).trigger('click');
+      await flushPromises();
+
+      expect(mockAlert).toHaveBeenCalledWith(
+        'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.ERROR'
+      );
+    });
   });
 
   it('sends a secret the operator actually typed', async () => {

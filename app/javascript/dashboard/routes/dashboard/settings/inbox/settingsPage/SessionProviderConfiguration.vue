@@ -3,7 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
-import { isHttpUrl } from 'dashboard/helper/whatsappSession';
+import {
+  isHttpUrl,
+  hasCapability,
+  CAPABILITIES,
+} from 'dashboard/helper/whatsappSession';
+import InboxesAPI from 'dashboard/api/inboxes';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 
 import SettingsSection from 'dashboard/components/SettingsSection.vue';
@@ -57,6 +62,36 @@ watch(
 );
 
 const showLinkDeviceModal = ref(false);
+
+// Deliberately independent of the setting below, which is standing consent to the dump
+// that follows a pairing. This is a single act, and tying it to the setting would mean
+// turning on a permanent behaviour to recover one weekend.
+//
+// The phone answers whenever it feels like it, and sometimes never: the provider only
+// promises to pass the ask along. So the button reports that it asked, and the messages
+// appear later on their own.
+const supportsHistorySync = computed(() =>
+  hasCapability(props.inbox, CAPABILITIES.HISTORY_SYNC)
+);
+// A request travels to the phone through the session. With the session down there is
+// nothing to carry it, so the button would report that it asked and nothing would ever
+// arrive, which is worse than not offering it.
+const isConnected = computed(
+  () => props.inbox.provider_connection?.connection === 'open'
+);
+const syncingHistory = ref(false);
+
+const syncHistory = async () => {
+  syncingHistory.value = true;
+  try {
+    await InboxesAPI.syncProviderHistory(props.inbox.id);
+    useAlert(t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.REQUESTED'));
+  } catch (error) {
+    useAlert(t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.ERROR'));
+  } finally {
+    syncingHistory.value = false;
+  }
+};
 
 const fieldKey = field =>
   `INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.${field.name.toUpperCase()}`;
@@ -145,6 +180,27 @@ const save = async field => {
               )
             }}
           </NextButton>
+          <div v-if="supportsHistorySync" class="flex flex-col gap-1">
+            <NextButton
+              class="w-fit"
+              faded
+              slate
+              :is-loading="syncingHistory"
+              :disabled="!isConnected || syncingHistory"
+              @click="syncHistory"
+            >
+              {{ $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.BUTTON') }}
+            </NextButton>
+            <span class="text-sm text-n-slate-11">
+              {{
+                isConnected
+                  ? $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.HELP')
+                  : $t(
+                      'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_HISTORY_SYNC.OFFLINE_HELP'
+                    )
+              }}
+            </span>
+          </div>
         </div>
       </SettingsSection>
 
@@ -173,7 +229,7 @@ const save = async field => {
         v-for="field in preferenceFields"
         :key="field.name"
         :title="$t(`${fieldKey(field)}.LABEL`)"
-        :sub-title="$t(`${fieldKey(field)}.LABEL`)"
+        :sub-title="$t(`${fieldKey(field)}.DESCRIPTION`)"
       >
         <div class="flex items-center gap-2">
           <Switch

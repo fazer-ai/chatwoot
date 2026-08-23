@@ -58,6 +58,31 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
       expect(channel.reload.provider_connection).not_to have_key('qr_data_url')
     end
 
+    # A provider knows nothing about this token, so a state that arrives without one says
+    # nothing about which pairing it belongs to and must not end the one in flight. The
+    # case that proved it: pairing by code on Uazapi needs a disconnected instance, and the
+    # webhook answering that disconnect lands after the connect that follows it.
+    it 'keeps the attempt in flight when a late close arrives without one' do
+      channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1',
+                                            'pairing_code' => 'K7QP-2M4X' })
+
+      expect(writer.apply(state.new(connection: 'close'))).to eq(:written)
+
+      expect(channel.reload.provider_connection).to include('connection' => 'close', 'pairing_attempt' => 'attempt-1')
+    end
+
+    # Which is what makes the chain survive it: the poll that owns the screen reads the
+    # record again on its next run and is still the one driving it.
+    it 'lets the attempt that owns the screen write again after that close' do
+      channel.update_provider_connection!({ 'connection' => 'connecting', 'pairing_attempt' => 'attempt-1' })
+      writer.apply(state.new(connection: 'close'))
+
+      result = writer.apply(state.new(connection: 'connecting', pairing_code: 'K7QP-2M4X'), attempt: 'attempt-1')
+
+      expect(result).to eq(:written)
+      expect(channel.reload.provider_connection).to include('pairing_code' => 'K7QP-2M4X')
+    end
+
     # The token is only ever absent once the attempt it named is over, so a write still
     # carrying one is answering about a pairing that has already ended.
     it 'refuses a write for an attempt the record no longer names' do
@@ -102,5 +127,27 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(writer.apply(wrong)).to eq(:unchanged)
 
     expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+  end
+
+  # A history request travels to the phone through the session, so a session that ends
+  # takes any outstanding request with it. Without this the dump that follows the next
+  # pairing would be filed as if somebody had asked for it, and tuning the window's length
+  # to make that unlikely is a worse answer than removing the case.
+  describe 'an outstanding history backfill' do
+    let(:backfill) { Whatsapp::Session::HistoryBackfill }
+
+    before { backfill.open!(channel) }
+
+    it 'is closed when the session is no longer open' do
+      writer.apply(Whatsapp::Session::Model::ConnectionState.new(connection: 'close'))
+
+      expect(backfill.pending?(channel)).to be(false)
+    end
+
+    it 'survives a state that reports the session up' do
+      writer.apply(Whatsapp::Session::Model::ConnectionState.new(connection: 'open', phone_number: channel.phone_number))
+
+      expect(backfill.pending?(channel)).to be(true)
+    end
   end
 end

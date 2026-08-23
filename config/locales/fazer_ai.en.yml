@@ -34,6 +34,7 @@ en:
         provider_withdrawn: This WhatsApp provider is no longer offered for new inboxes. Existing inboxes on it keep working.
         cannot_unpair: This provider cannot unlink the WhatsApp account paired with it, so connecting again would resume the same account. Reset the instance on the provider, point this inbox at another one, or correct the number configured here.
         code_pairing_unsupported: This WhatsApp provider cannot pair with a code. Scan the QR code instead.
+        history_sync_unsupported: This WhatsApp provider cannot fetch the history behind a chat.
         outgoing:
           provider_error: WhatsApp could not send this message right now.
           provider_unreachable: Could not reach the WhatsApp provider.

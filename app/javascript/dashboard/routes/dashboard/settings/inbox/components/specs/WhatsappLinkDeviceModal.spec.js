@@ -96,6 +96,83 @@ describe('WhatsappLinkDeviceModal', () => {
       expect(wrapper.html()).not.toContain('data:image/png;base64,x');
     });
 
+    // The provider can answer a code pairing with a QR alongside the code (uazapi keeps
+    // rotating one), and this component's request is client-side state that a blip in
+    // the connection resets to the QR. Both together hid a perfectly good code behind
+    // the QR branch, which is what an operator reported as "the code never shows up".
+    it('shows the code even when the mode was reset and a QR is on the record', () => {
+      const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
+        connection: 'connecting',
+        qr_data_url: 'data:image/png;base64,x',
+        pairing_code: 'K7QP-2M4X',
+      });
+
+      expect(wrapper.html()).toContain('K7QP-2M4X');
+      expect(wrapper.html()).not.toContain('data:image/png;base64,x');
+    });
+
+    // The option used to live only inside the `connecting` branch, so reaching it meant
+    // starting the QR first. That is the one state a provider can refuse to issue a code
+    // from, which left the way in through the thing the operator already said they could
+    // not use.
+    it('is offered before the pairing starts, not only during it', async () => {
+      const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
+        connection: 'close',
+      });
+
+      expect(wrapper.html()).toContain(USE_PAIRING_CODE_KEY);
+
+      await wrapper.findAll('button')[1].trigger('click');
+      await flushPromises();
+
+      expect(dispatch).toHaveBeenCalledWith('inboxes/requestPairingCode', 1);
+    });
+
+    it('spells the phone steps out one by one under the code', () => {
+      const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
+        connection: 'connecting',
+        pairing_code: 'K7QP-2M4X',
+      });
+
+      expect(wrapper.html()).toContain(`${KEY}.PAIRING_CODE_STEP_1`);
+      expect(wrapper.html()).toContain(`${KEY}.PAIRING_CODE_STEP_3`);
+      expect(wrapper.html()).toContain(`${KEY}.PAIRING_CODE_EXPIRES`);
+    });
+
+    // Refreshing the inboxes from here replaces them in the store, which re-renders the
+    // settings page this is mounted inside and takes the modal down with it: the operator
+    // clicks the button and nothing opens. What is on screen is kept current by the cable
+    // and by the poll behind the pairing.
+    it('opens on the record it was given, without reloading the inboxes', async () => {
+      const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
+        connection: 'connecting',
+        pairing_code: 'K7QP-2M4X',
+      });
+      await flushPromises();
+
+      expect(dispatch).not.toHaveBeenCalledWith('inboxes/get');
+      expect(wrapper.html()).toContain('K7QP-2M4X');
+    });
+
+    // Closing the screen is not abandoning the account: it used to disconnect on the way
+    // out, and on a provider that issues a code only from a disconnected instance that
+    // turned a look-and-close into a new round of pairing.
+    it('leaves the pairing alone when the screen is closed', async () => {
+      const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
+        connection: 'connecting',
+        pairing_code: 'K7QP-2M4X',
+      });
+      await flushPromises();
+      dispatch.mockClear();
+
+      wrapper.unmount();
+
+      expect(dispatch).not.toHaveBeenCalledWith(
+        'inboxes/disconnectChannelProvider',
+        1
+      );
+    });
+
     it('shows the code the provider issued, and the way back to the QR', async () => {
       const wrapper = mountModal(['qr_pairing', 'code_pairing'], {
         ...connecting,

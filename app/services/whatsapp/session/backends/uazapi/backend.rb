@@ -15,6 +15,7 @@
 # NOT to exist on that build: `/instance/logout` and `/group/invitelink` both answer 405,
 # which is why logging out is a disconnect and why `group_invites` is not declared.
 class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
+  include Whatsapp::Session::Backends::Uazapi::Backend::State
   include Whatsapp::Session::Backends::Uazapi::Backend::Messages
   include Whatsapp::Session::Backends::Uazapi::Backend::Groups
 
@@ -28,10 +29,21 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # rather than the full ceiling.
   RELEASE_TIMEOUT = 5
 
-  # The events this inbox asks for. `chats`, `contacts`, `labels` and `history` are the
-  # instance's own CRM chatter and are not subscribed: everything Chatwoot needs is in
-  # these five.
+  # How long a code pairing waits for a disconnect to take effect before connecting
+  # anyway. See `restart_for_code_pairing`.
+  DISCONNECT_SETTLE_TRIES = 4
+  DISCONNECT_SETTLE_WAIT = 0.5
+
+  # The events this inbox asks for. `chats`, `contacts` and `labels` are the instance's own
+  # CRM chatter and are never subscribed: everything Chatwoot needs is in these five.
   WEBHOOK_EVENTS = %w[connection messages messages_update presence groups].freeze
+
+  # `history` is the sixth, and it is asked for only by an inbox that turned the sync on.
+  # It is not a stream of its own: the same event carries the initial dump the phone sends
+  # after pairing and the answer to every on-demand request, and it arrives in batches of
+  # up to 200 messages. An inbox that does not want the history should not be paying to
+  # receive it and then throw it away.
+  HISTORY_EVENT = 'history'.freeze
 
   # Our own sends come back as an echo, and nothing is excluded from the subscription:
   # the echo is the only way to learn that a send whose answer never arrived actually
@@ -43,17 +55,6 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # A second row is not the risk it looks like either: the same matcher recognizes the
   # echo of a message already stored.
   WEBHOOK_EXCLUDES = [].freeze
-
-  # `instance.status` -> canonical connection. `hibernated` is a paused instance on the
-  # provider's side, which for an inbox is the same as being closed.
-  CONNECTIONS = {
-    'disconnected' => 'close', 'disconnecting' => 'close', 'hibernated' => 'close',
-    'connecting' => 'connecting', 'connected' => 'open'
-  }.freeze
-
-  # The disconnect reason that means the pairing itself is gone, not just the socket.
-  # Anything else the provider reports is a connection that can come back.
-  LOGGED_OUT = /401|logged out/i
 
   class << self
     def provider_key
@@ -146,6 +147,7 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # where the session opens and its first messages have nowhere to be delivered.
   def connect(command)
     register_webhook
+    restart_for_code_pairing if command.pairing == 'code'
     body = { phone: (command.phone if command.pairing == 'code') }
     connection_state(client.post('/instance/connect', body))
   end
@@ -192,6 +194,24 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     { 'reachout_time_lock' => reachout_time_lock(limits), 'new_chat_cap' => new_chat_cap(limits) }.compact
   end
 
+  # Asks the phone for what came before. The answer is not this call's: the provider
+  # acknowledges the request and the messages arrive later on the `history` webhook, in
+  # batches, and only if the phone is awake to answer at all. `count` is passed on as the
+  # hint it is.
+  def request_history(command)
+    # The answer to this comes back on the webhook, and the webhook only carries history
+    # for an instance subscribed to that event. Subscription is set at connect time, so an
+    # inbox that turned the setting on afterwards would send the request and never see the
+    # reply. Registering is idempotent and this runs once per backend, so a backfill
+    # walking fifty chats still registers once.
+    ensure_history_subscription
+    client.post('/message/history-sync', {
+      number: command.chat.to_jid, mode: 'history',
+      count: command.count, messageid: command.before&.id
+    }.compact)
+    nil
+  end
+
   # --- presence and contacts -------------------------------------------------------
 
   # `delay` is how long the provider holds the indicator up. Chatwoot sends a fresh one on
@@ -233,31 +253,17 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
 
   # Both `/instance/status` and `/instance/connect` answer with the instance under the
   # same key, so one reader serves them.
-  def connection_state(response)
-    instance = (response.to_h['instance'] || response.to_h).to_h
-    connection = CONNECTIONS.fetch(instance['status'].to_s, 'close')
-    model::ConnectionState.new(
-      connection: connection,
-      qr_data_url: (instance['qrcode'].presence if connection == 'connecting'),
-      pairing_code: (instance['paircode'].presence if connection == 'connecting'),
-      phone_number: (instance['owner'].presence if connection == 'open'),
-      error: connection_error(instance, connection)
-    )
-  end
-
-  # `owner` keeps the previous number for as long as the instance sits disconnected, so a
-  # closed state never reports one: taking it at face value would tell the inbox it is
-  # paired with a number that is no longer there.
-  def connection_error(instance, connection)
-    return if connection != 'close'
-
-    'logged_out' if instance['lastDisconnectReason'].to_s.match?(LOGGED_OUT)
-  end
-
   # --- webhook -----------------------------------------------------------------------
 
   def register_webhook
     client.post('/webhook', webhook_body(enabled: true))
+  end
+
+  def ensure_history_subscription
+    return if @history_subscribed
+
+    register_webhook
+    @history_subscribed = true
   end
 
   # Best effort by design: the inbox is being torn down either way, and a provider that
@@ -269,11 +275,63 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     Rails.logger.warn("[WHATSAPP SESSION] could not withdraw the uazapi webhook of inbox ##{channel.inbox&.id}: #{e.message}")
   end
 
+  # This provider issues a pairing code only when the connect starts from a disconnected
+  # instance. Asked for one while a pairing is already in flight, it answers the state it
+  # is already in: no code, and the QR it was rotating before. The operator is then left
+  # on a screen waiting for a code that is never coming, which is exactly the state the
+  # dashboard offers the code from. Observed against a live instance on 22/08/2026.
+  #
+  # Ending that attempt first is safe, because pairing by code replaces whatever pairing
+  # was on screen anyway. An open session is deliberately left alone: disconnecting one
+  # here would cost the pairing itself, since this provider has no logout, its disconnect
+  # drops the credentials, and connecting again asks for a new QR.
+  # The disconnect itself settles asynchronously, and a connect fired before it does is
+  # answered with the state from before: a closed session, no code, and a pairing screen
+  # that never starts, which is how this looked the first time it was run against a live
+  # instance. So the connect waits for the instance to actually be down. The ceiling is
+  # what an operator waits on a button they pressed, and reaching it is not fatal: the
+  # connect goes out anyway and the poll picks up whatever the provider settles on.
+  def restart_for_code_pairing
+    return unless fetch_connection_state.connecting?
+
+    disconnect
+    DISCONNECT_SETTLE_TRIES.times do
+      sleep(DISCONNECT_SETTLE_WAIT)
+      break if instance_down?
+    end
+  end
+
+  # The provider's raw verdict, not the one `pairing_connection` softens: what this waits
+  # for is the socket being down, and a stale QR left on the instance is exactly what it
+  # is waiting to stop mattering.
+  def instance_down?
+    status = client.get('/instance/status').to_h['instance'].to_h['status'].to_s
+
+    CONNECTIONS.fetch(status, 'close') == 'close'
+  end
+
   def webhook_body(enabled:)
     {
-      url: webhook_url, enabled: enabled, events: WEBHOOK_EVENTS, excludeMessages: WEBHOOK_EXCLUDES,
+      url: webhook_url, enabled: enabled, events: subscribed_events, excludeMessages: WEBHOOK_EXCLUDES,
       addUrlEvents: false, addUrlTypesMessages: false
     }
+  end
+
+  # Always subscribed, because not listening is a decision that cannot be revisited later.
+  # The phone's account of what arrived while the session was down is pushed once, right
+  # after a pairing, and there is no request that fetches it afterwards: `/message/history-sync`
+  # only walks backwards from a message the instance already has (`mode` accepts nothing
+  # else, checked against the API). An inbox that was not subscribed at that moment has
+  # lost the weekend for good.
+  #
+  # Subscribing is not consent to import: the handler keeps only the gap out of a pile
+  # nobody asked for, and a first pairing has no coverage, so all of it is dropped.
+  def subscribed_events
+    WEBHOOK_EVENTS + [HISTORY_EVENT]
+  end
+
+  def history_sync?
+    ActiveModel::Type::Boolean.new.cast(provider_config['history_sync']).present?
   end
 
   # The address this instance can reach us at. Always the public one: the instance runs on
@@ -287,29 +345,6 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   def webhook_url
     host = ENV.fetch('FRONTEND_URL', nil)
     "#{host.to_s.chomp('/')}/webhooks/whatsapp/session/uazapi/#{channel.id}/#{provider_config['webhook_verify_token']}"
-  end
-
-  # --- limits ------------------------------------------------------------------------
-
-  # Answered in the shape the dashboard banner already reads, which the Baileys layer
-  # established. A provider that reports nothing leaves the key out entirely, because the
-  # check job treats a missing value as "unknown" and keeps the last one rather than
-  # clearing a banner that is legitimately up.
-  def reachout_time_lock(limits)
-    lock = limits['reachout_timelock']
-    return if lock.blank?
-
-    { 'is_active' => lock['active'].present?, 'time_enforcement_ends' => lock['until'].presence }.compact
-  end
-
-  def new_chat_cap(limits)
-    cap = limits['new_chat_message_capping']
-    return if cap.blank?
-
-    {
-      'capping_status' => cap['status'].presence, 'total_quota' => cap['total_quota'],
-      'used_quota' => cap['used_quota'], 'cycle_end_timestamp' => cap['cycle_end'].presence
-    }.compact
   end
 
   # --- media -------------------------------------------------------------------------

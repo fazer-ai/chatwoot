@@ -79,11 +79,29 @@ class Whatsapp::Session::ConnectionStateWriter
     # job transport leaves the state in place, so every repeat of it is reported as
     # unchanged and the logout is never asked for again. The job re-reads the quarantine
     # and stands down when it is gone, so asking twice costs nothing.
-    ensure_logout(written) if %i[written unchanged].include?(result)
+    if %i[written unchanged].include?(result)
+      ensure_logout(written)
+      end_backfill
+    end
     result
   end
 
   private
+
+  # A history request reaches the phone through the session, so a session that is no longer
+  # up cannot be answered: whatever arrives after the next pairing is the phone's own dump,
+  # not the answer to anything anybody asked for. Closing the window here is what keeps that
+  # dump out of an inbox whose operator only ever asked once, hours earlier.
+  #
+  # Read off the record rather than off the state that was applied, so what decides is what
+  # was actually persisted: a state can be replaced on the way in (an account that turns out
+  # to be the wrong one is rewritten as a quarantined close), and the record is the one place
+  # that has already been through all of it.
+  def end_backfill
+    return if channel.provider_connection.to_h['connection'] == 'open'
+
+    Whatsapp::Session::HistoryBackfill.close!(channel)
+  end
 
   def ensure_logout(written)
     return unless written.error == WRONG_PHONE_ERROR
@@ -158,12 +176,24 @@ class Whatsapp::Session::ConnectionStateWriter
 
   # The token identifying the pairing attempt in progress. Only the connect answer and the
   # poll carry one, and every other event about the same attempt (a rotated QR, a pairing
-  # code, a connecting state) arrives without it: dropping it there retires the polling
-  # chain that is driving the very screen those events are updating, and the code on it
-  # stops rotating. Kept while the attempt is still connecting, gone once it resolved.
+  # code, a connecting state, the close of the pairing before it) arrives without one.
+  # Dropping the token on any of those retires the polling chain that is driving the very
+  # screen they are updating, and whatever is on it stops rotating.
+  #
+  # Which is why a `close` that names no attempt no longer ends one. The provider does not
+  # know this token exists, so a closed state without it says nothing about which pairing
+  # it belongs to, and it is as likely to be the tail of the session before. The case that
+  # proved it is pairing by code on Uazapi, which only issues a code from a disconnected
+  # instance: the disconnect that clears the way is answered by a webhook landing after
+  # the connect that follows it, and that `close` used to retire the attempt the connect
+  # had just claimed, three milliseconds into the chain.
+  #
+  # `open` still ends it, from any writer. That one is not ambiguous: the session is
+  # paired, so whatever pairing was in flight is over, and leaving the token behind would
+  # keep a finished chain looking current to the fence.
   def carry_attempt(payload, persisted)
     return if payload['pairing_attempt'].present?
-    return unless payload['connection'].in?(%w[connecting reconnecting])
+    return if payload['connection'] == 'open'
 
     payload['pairing_attempt'] = persisted['pairing_attempt'] if persisted['pairing_attempt'].present?
   end

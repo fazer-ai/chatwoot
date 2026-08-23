@@ -118,9 +118,72 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Backend do
       expect(WebMock).to have_requested(:post, "#{base}/instance/connect")
         .with(body: hash_including('phone' => '5541999991111'))
     end
+
+    # The provider issues a code only when the connect starts from a disconnected
+    # instance: asked for one mid-pairing it answers the state it is already in, with no
+    # code at all, and the operator waits on a screen that never fills in.
+    it 'ends a pairing already in flight before asking for a code' do
+      stub_uazapi(:get, '/instance/status', fixture('instance_status_connecting'))
+
+      backend.connect(commands::SessionConnect.new(pairing: 'code', phone: '5541999991111'))
+
+      expect(WebMock).to have_requested(:post, "#{base}/instance/disconnect")
+    end
+
+    # The disconnect settles asynchronously there, and a connect that goes out before it
+    # does is answered with the state from before: closed, no code, and a screen that
+    # never starts. Observed against a live instance on 22/08/2026.
+    it 'waits for the disconnect to take effect before connecting' do
+      stub_const("#{described_class}::DISCONNECT_SETTLE_WAIT", 0)
+      json = { 'Content-Type' => 'application/json' }
+      stub_request(:get, "#{base}/instance/status").to_return(
+        { status: 200, body: fixture('instance_status_connecting').to_json, headers: json },
+        { status: 200, body: fixture('instance_status_connecting').to_json, headers: json },
+        { status: 200, body: fixture('instance_status_disconnected').to_json, headers: json }
+      )
+
+      backend.connect(commands::SessionConnect.new(pairing: 'code', phone: '5541999991111'))
+
+      # The one that opened the pairing, then one per wait until the instance is really down.
+      expect(WebMock).to have_requested(:get, "#{base}/instance/status").times(3)
+    end
+
+    # Disconnecting costs the pairing on this provider, so it is only worth spending on
+    # an attempt that is in the way.
+    it 'leaves a session that is not pairing alone' do
+      stub_uazapi(:get, '/instance/status', fixture('instance_status_disconnected'))
+
+      backend.connect(commands::SessionConnect.new(pairing: 'code', phone: '5541999991111'))
+
+      expect(WebMock).not_to have_requested(:post, "#{base}/instance/disconnect")
+    end
   end
 
   describe 'the connection state' do
+    # The provider answers `connecting` to the connect and can report `disconnected` a
+    # second later while still serving the same QR, unchanged, for as long as anyone asks.
+    # Read literally that empties the pairing screen one second after the operator asked
+    # for it, with the code they were about to scan still on offer.
+    it 'reads a state still handing out a QR as a pairing, not a closed session' do
+      stub_uazapi(:get, '/instance/status',
+                  { 'instance' => { 'status' => 'disconnected', 'qrcode' => 'data:image/png;base64,AAA' } })
+
+      expect(backend.fetch_connection_state).to have_attributes(connection: 'connecting',
+                                                                qr_data_url: 'data:image/png;base64,AAA')
+    end
+
+    it 'reads the same for a code the provider is still offering' do
+      stub_uazapi(:get, '/instance/status', { 'instance' => { 'status' => 'disconnected', 'paircode' => 'K7QP-2M4X' } })
+
+      expect(backend.fetch_connection_state).to have_attributes(connection: 'connecting', pairing_code: 'K7QP-2M4X')
+    end
+
+    it 'reads a closed session carrying neither as closed' do
+      stub_uazapi(:get, '/instance/status', fixture('instance_status_disconnected'))
+
+      expect(backend.fetch_connection_state).to have_attributes(connection: 'close')
+    end
+
     it 'reports the paired number when the session is open' do
       expect(backend.fetch_connection_state).to have_attributes(connection: 'open', phone_number: '5511999990001')
     end

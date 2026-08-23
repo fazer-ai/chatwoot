@@ -84,27 +84,11 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     inbound::EchoMatcher.new(inbox: inbox, message_id: message.id, client_ref: message.client_ref).perform.present?
   end
 
-  # Every id this chat can be addressed by. WhatsApp names the same 1:1 peer by phone in
-  # one event and by LID in the next, and both resolve to one contact: locking only the
-  # id this event carries lets a worker holding the other alias run alongside, and each
-  # opens a conversation of its own.
-  def chat_lock_ids
-    return [message.chat.id] if message.group?
-
-    # Every ninth-digit form as well: WhatsApp reports a Brazilian or Argentinian line
-    # with or without the extra digit, `ContactResolver` files both under one contact,
-    # and two keys differing by that digit would not serialize against each other.
-    [message.chat.id, peer_party&.lid, *Whatsapp::Session::PhoneMatch.variants(peer_party&.phone)]
-  end
-
-  # In a 1:1 chat the other side is the chat itself; `sender` is the author, which is
-  # the session owner on an echo and therefore not who the conversation belongs to.
-  # An incoming message carries the richer Party (phone and LID together), so it wins.
-  def peer_party
-    return message.sender if message.incoming? && message.sender.present?
-
-    model::Party.from_address(message.chat)
-  end
+  # Both delegate to Inbound::ChatIdentity, which the history import reads as well: the
+  # live path and the import must agree on who a chat belongs to and on the keys that
+  # serialize it, or the two file the same person twice.
+  def chat_lock_ids = inbound::ChatIdentity.lock_ids(message)
+  def peer_party = inbound::ChatIdentity.peer_party(message)
 
   # The same rule the Cloud path applies (`IncomingMessageBaseService#contact_processable?`):
   # a blocked contact stops generating messages and notifications, but the echo of a

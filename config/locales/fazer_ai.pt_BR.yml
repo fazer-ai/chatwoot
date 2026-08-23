@@ -34,6 +34,7 @@ pt_BR:
         provider_withdrawn: Este provedor de WhatsApp não é mais oferecido para novas caixas de entrada. As caixas que já usam ele continuam funcionando.
         cannot_unpair: Este provedor não consegue desvincular a conta do WhatsApp pareada com ele, então conectar de novo retomaria a mesma conta. Reinicie a instância no provedor, aponte esta caixa de entrada para outra, ou corrija o número configurado aqui.
         code_pairing_unsupported: Este provedor do WhatsApp não consegue parear com código. Escaneie o QR Code no lugar.
+        history_sync_unsupported: Este provedor do WhatsApp não consegue buscar o histórico de uma conversa.
         outgoing:
           provider_error: O WhatsApp não conseguiu enviar esta mensagem no momento.
           provider_unreachable: Não foi possível alcançar o provedor do WhatsApp.

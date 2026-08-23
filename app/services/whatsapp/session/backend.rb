@@ -111,6 +111,11 @@ class Whatsapp::Session::Backend
   # bytes again once the ref it first handed out has lapsed.
   def download_media(_command) = not_supported!(:download_media)
 
+  # --- history ---------------------------------------------------------------------
+  # Asks for what came before. What comes back is not the answer to this call: the
+  # provider acknowledges it and the messages arrive as `history.sync` events.
+  def request_history(_command) = not_supported!(:request_history)
+
   # --- presence --------------------------------------------------------------------
   def send_chat_presence(_command) = not_supported!(:send_chat_presence)
   def update_presence(_command) = not_supported!(:update_presence)

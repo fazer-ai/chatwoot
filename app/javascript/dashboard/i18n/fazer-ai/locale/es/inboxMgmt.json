@@ -9,9 +9,9 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Conectar mediante la API no oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conecta un teléfono con el conector que ya viene en esta instalación",
+          "NATIVE_DESC": "Conectar mediante una API no oficial, con el conector que ya viene en esta instalación",
           "UAZAPI": "Uazapi",
-          "UAZAPI_DESC": "Conecta un teléfono con tu propia instancia de Uazapi"
+          "UAZAPI_DESC": "Conectar mediante la API no oficial de Uazapi, en tu propia instancia"
         },
         "PROVIDER_URL": {
           "LABEL": "URL del proveedor",
@@ -50,7 +50,10 @@
             "USE_PAIRING_CODE": "Vincular con un código",
             "USE_QRCODE": "Usar el código QR",
             "LOADING_PAIRING_CODE": "Solicitando un código...",
-            "PAIRING_CODE_HELP": "En el teléfono, abra WhatsApp, vaya a Dispositivos vinculados, toque \"Vincular con número de teléfono\" e ingrese este código. Caduca en unos minutos.",
+            "PAIRING_CODE_STEP_1": "En el teléfono que va a atender, abre WhatsApp.",
+            "PAIRING_CODE_STEP_2": "Ve a Dispositivos vinculados y toca Vincular un dispositivo.",
+            "PAIRING_CODE_STEP_3": "Toca \"Vincular con número de teléfono\" e ingresa el código de arriba.",
+            "PAIRING_CODE_EXPIRES": "El código dura unos minutos. Pide otro si caduca.",
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Vincular dispositivo",
             "DISCONNECT": "Desconectar",
@@ -74,10 +77,16 @@
               "ERROR": "El token de la instancia es obligatorio"
             },
             "MARK_AS_READ": {
-              "LABEL": "Marcar mensajes como leídos en WhatsApp"
+              "LABEL": "Marcar mensajes como leídos en WhatsApp",
+              "DESCRIPTION": "Al responder desde Chatwoot, la conversación también aparece como leída en el teléfono."
             },
             "PRESENCE_SUBSCRIBE": {
-              "LABEL": "Mostrar cuándo el contacto está en línea"
+              "LABEL": "Mostrar cuándo el contacto está en línea",
+              "DESCRIPTION": "Muestra “escribiendo…” y “grabando…” en la conversación mientras el contacto escribe."
+            },
+            "HISTORY_SYNC": {
+              "LABEL": "Importar conversaciones antiguas al vincular",
+              "DESCRIPTION": "Trae el historial que el teléfono ofrece al vincular, todo como conversaciones resueltas. Los mensajes recibidos mientras la conexión estuvo caída se recuperan igual."
             }
           }
         }
@@ -131,7 +140,14 @@
       "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de seguridad",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Su Client Token de Z-API (vea la pestaña Security en el panel de Z-API).",
       "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Actualizar el token de seguridad",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Introduzca aquí el nuevo token de seguridad"
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Introduzca aquí el nuevo token de seguridad",
+      "WHATSAPP_HISTORY_SYNC": {
+        "BUTTON": "Sincronizar historial ahora",
+        "HELP": "Pide al teléfono el historial de las conversaciones más recientes. Tiene que estar encendido y desbloqueado para responder, y los mensajes llegan solos en los próximos minutos.",
+        "REQUESTED": "Historial solicitado. Los mensajes irán apareciendo a medida que el teléfono los envía.",
+        "ERROR": "No se pudo pedir el historial. Inténtalo de nuevo en un momento.",
+        "OFFLINE_HELP": "Conecta primero el dispositivo: la solicitud de historial llega al teléfono por la sesión."
+      }
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Impedir que otro agente tome la conversación",

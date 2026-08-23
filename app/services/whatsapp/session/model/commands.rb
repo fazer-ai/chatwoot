@@ -123,6 +123,32 @@ module Whatsapp::Session::Model::Commands
     coerce chat: Address, ref: MediaRef
   end
 
+  # Where a backwards page starts. An id on its own cannot address one: whatsmeow takes a
+  # whole `types.MessageInfo` to build the request, so the anchor carries the timestamp and
+  # the direction alongside it. Chatwoot holds all three on the message row, so nothing has
+  # to be reconstructed at the far end.
+  class HistoryAnchor < Data.define(:id, :timestamp, :from_me)
+    include Serializable
+    defaults from_me: false
+
+    # The anchor a stored message stands for.
+    def self.for_message(message)
+      return if message.blank?
+
+      new(id: message.source_id, timestamp: (message.created_at.to_f * 1000).to_i, from_me: message.outgoing?)
+    end
+  end
+
+  # The history a chat already has on the phone. `count` is a hint rather than a cap: a
+  # live instance answered a request for 50 with 947 messages, so what bounds the import
+  # is the policy on the way in, not this. `before` is the anchor to page backwards from,
+  # which is what makes a second request continue the first instead of repeating it.
+  class HistoryRequest < Data.define(:chat, :count, :before)
+    include Serializable
+    wire_type 'history.request'
+    coerce chat: Address, before: HistoryAnchor
+  end
+
   class PresenceSet < Data.define(:state)
     include Serializable
     wire_type 'presence.set'
@@ -250,7 +276,7 @@ module Whatsapp::Session::Model::Commands
 
   CLASSES = [
     SessionConnect, SessionDisconnect, SessionLogout, SessionDelete, SessionStatus, SessionUpdate, SessionWake,
-    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, MessageSend, MessageEdit,
+    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, HistoryRequest, MessageSend, MessageEdit,
     MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, PresenceSet,
     PresenceSubscribe, ChatPresence, ContactCheck, ContactProfilePicture, ContactInfo, ContactResolve, GroupCreate,
     GroupInfo, GroupList, GroupLeave, GroupParticipantsUpdate, GroupNameSet, GroupDescriptionSet, GroupPhotoSet,
@@ -265,6 +291,7 @@ module Whatsapp::Session::Model::Commands
   RPC_TYPES = %w[
     session.connect session.status session.update admin.ping
     message.send message.edit message.revoke message.react message.download_media
+    history.request
     contact.check contact.profile_picture contact.info contact.resolve
     group.create group.info group.list group.leave group.participants.update group.name.set
     group.description.set group.photo.set group.settings.set group.invite.get
