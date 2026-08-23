@@ -43,6 +43,10 @@ class MessageFinder
     end
   end
 
+  # Deliberately still by id, unlike `before_cursor`. This one answers "what has been
+  # written since I last looked", which is a question about the sequence and not about
+  # time: a client catching up has to be told about a backdated message imported a moment
+  # ago, and comparing timestamps is exactly what would hide it.
   def messages_after(after_id)
     messages.reorder('created_at asc').where('id > ?', after_id).limit(100)
   end
@@ -50,13 +54,43 @@ class MessageFinder
   def messages_before(before_id)
     return messages_latest if oversized_message_id?(before_id)
 
-    page_window(messages.where('id < ?', normalized_message_id(before_id)))
+    page_window(before_cursor(normalized_message_id(before_id)))
   end
 
   def messages_between(after_id, before_id)
     message_scope = messages.reorder('created_at asc').where('id >= ?', after_id)
-    message_scope = message_scope.where('id < ?', normalized_message_id(before_id)) unless oversized_message_id?(before_id)
+    message_scope = message_scope.merge(before_cursor(normalized_message_id(before_id))) unless oversized_message_id?(before_id)
     message_scope.limit(1000)
+  end
+
+  # Everything strictly earlier in the conversation than the cursor message.
+  #
+  # The cursor is an id, but "earlier" is a question about time, and the two only agree
+  # while ids are handed out in the order messages happened. Imported history breaks that
+  # by construction: the id comes from the sequence at INSERT and the timestamp is
+  # backdated to when the message was sent, so one delivered late carries a newer id and
+  # an older timestamp. An `id <` filter drops it from every page, permanently, including
+  # the ones reached by scrolling up. Measured on the first imported inbox: 167 of 951
+  # messages were unreachable that way, across 18 of 95 conversations.
+  #
+  # Comparing the pair puts this filter on the axis `page_window` has always ordered by,
+  # with the id as the tiebreak that keeps the cursor stable when two messages share a
+  # second (WhatsApp timestamps are second-resolution, and a burst lands inside one).
+  # Where ids do follow chronology the two predicates select exactly the same rows, so a
+  # conversation that never imported anything sees no change at all.
+  def before_cursor(before_id)
+    at = cursor_timestamp(before_id)
+    return messages.where('messages.id < ?', before_id) if at.nil?
+
+    messages.where('(messages.created_at, messages.id) < (?, ?)', at, before_id)
+  end
+
+  # Queried off the bare relation: `messages` carries the `includes` this finder needs for
+  # rendering, and Rails would try to eager-load the polymorphic sender for a one-column
+  # read. A cursor naming a message from another conversation has no timestamp to compare
+  # against, which is the one case that keeps the id-only filter.
+  def cursor_timestamp(message_id)
+    Message.where(conversation_id: @conversation.id, id: message_id).pick(:created_at)
   end
 
   def messages_latest
