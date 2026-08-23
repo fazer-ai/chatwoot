@@ -77,10 +77,12 @@
               "ERROR": "The instance token is required"
             },
             "MARK_AS_READ": {
-              "LABEL": "Mark messages as read on WhatsApp"
+              "LABEL": "Mark messages as read on WhatsApp",
+              "DESCRIPTION": "Replying from Chatwoot also marks the conversation read on the phone."
             },
             "PRESENCE_SUBSCRIBE": {
-              "LABEL": "Show when the contact is online"
+              "LABEL": "Show when the contact is online",
+              "DESCRIPTION": "Shows “typing…” and “recording…” in the conversation while the contact is writing."
             },
             "HISTORY_SYNC": {
               "LABEL": "Import older conversations when pairing",

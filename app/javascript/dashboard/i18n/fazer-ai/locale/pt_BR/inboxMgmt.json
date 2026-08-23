@@ -77,10 +77,12 @@
               "ERROR": "O token da instância é obrigatório"
             },
             "MARK_AS_READ": {
-              "LABEL": "Marcar mensagens como lidas no WhatsApp"
+              "LABEL": "Marcar mensagens como lidas no WhatsApp",
+              "DESCRIPTION": "Ao responder pelo Chatwoot, a conversa também aparece como lida no celular."
             },
             "PRESENCE_SUBSCRIBE": {
-              "LABEL": "Mostrar quando o contato está online"
+              "LABEL": "Mostrar quando o contato está online",
+              "DESCRIPTION": "Exibe “digitando…” e “gravando…” na conversa quando o contato está escrevendo."
             },
             "HISTORY_SYNC": {
               "LABEL": "Importar conversas antigas ao parear",

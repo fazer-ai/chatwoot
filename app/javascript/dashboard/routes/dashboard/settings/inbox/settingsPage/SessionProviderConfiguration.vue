@@ -229,7 +229,7 @@ const save = async field => {
         v-for="field in preferenceFields"
         :key="field.name"
         :title="$t(`${fieldKey(field)}.LABEL`)"
-        :sub-title="$t(`${fieldKey(field)}.LABEL`)"
+        :sub-title="$t(`${fieldKey(field)}.DESCRIPTION`)"
       >
         <div class="flex items-center gap-2">
           <Switch

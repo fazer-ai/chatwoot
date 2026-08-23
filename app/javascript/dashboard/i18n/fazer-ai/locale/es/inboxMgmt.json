@@ -77,10 +77,12 @@
               "ERROR": "El token de la instancia es obligatorio"
             },
             "MARK_AS_READ": {
-              "LABEL": "Marcar mensajes como leídos en WhatsApp"
+              "LABEL": "Marcar mensajes como leídos en WhatsApp",
+              "DESCRIPTION": "Al responder desde Chatwoot, la conversación también aparece como leída en el teléfono."
             },
             "PRESENCE_SUBSCRIBE": {
-              "LABEL": "Mostrar cuándo el contacto está en línea"
+              "LABEL": "Mostrar cuándo el contacto está en línea",
+              "DESCRIPTION": "Muestra “escribiendo…” y “grabando…” en la conversación mientras el contacto escribe."
             },
             "HISTORY_SYNC": {
               "LABEL": "Importar conversaciones antiguas al vincular",
