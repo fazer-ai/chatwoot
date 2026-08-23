@@ -160,13 +160,13 @@ const PROVIDER_CATALOG = computed(() => [
     key: PROVIDER_TYPES.NATIVE,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
-    icon: 'i-woot-whatsapp',
+    icon: 'i-woot-whatsapp-native',
   },
   {
     key: PROVIDER_TYPES.UAZAPI,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
-    icon: 'i-woot-whatsapp',
+    icon: 'i-woot-uazapi',
   },
   {
     key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
