@@ -865,12 +865,22 @@
       "required": ["chat"],
       "additionalProperties": true
     },
+    "history_anchor": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/message_id" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" },
+        "from_me": { "type": "boolean" }
+      },
+      "required": ["id", "timestamp", "from_me"],
+      "additionalProperties": true
+    },
     "command_history_request": {
       "type": "object",
       "properties": {
         "chat": { "$ref": "#/definitions/address" },
         "count": { "type": ["integer", "null"], "minimum": 1 },
-        "before_id": { "type": ["string", "null"] }
+        "before": { "anyOf": [{ "$ref": "#/definitions/history_anchor" }, { "type": "null" }] }
       },
       "required": ["chat"],
       "additionalProperties": true

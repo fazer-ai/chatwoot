@@ -361,6 +361,7 @@ Rails.application.routes.draw do
             post :request_pairing_code, on: :member
             post :import_whatsapp_session, on: :member
             post :disconnect_channel_provider, on: :member
+            post :sync_provider_history, on: :member
             post :convert_provider, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member

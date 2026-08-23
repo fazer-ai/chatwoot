@@ -10,7 +10,11 @@
       "id": "5541999990000"
     },
     "count": 50,
-    "before_id": "3EB0A1B2C3D4E5F60720"
+    "before": {
+      "id": "3EB0A1B2C3D4E5F60720",
+      "timestamp": 1755439000123,
+      "from_me": false
+    }
   },
   "reply_to": "wa:reply:cmd_000031",
   "deadline": 1755440015123

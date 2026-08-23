@@ -6,12 +6,16 @@
 # afterwards. Downloading inline would stall the consumer thread that keeps a session's
 # events in order, and the attachment lands within seconds either way.
 class Whatsapp::Session::Inbound::MessageWriter
-  attr_reader :conversation, :inbound, :sender
+  attr_reader :conversation, :inbound, :sender, :imported
 
-  def initialize(conversation:, inbound:, sender: nil)
+  # `imported` marks a row the history import is writing rather than one that just
+  # arrived. It changes two things and deliberately nothing else: the row is dated to when
+  # it was sent, and WhatsApp is not told it was received.
+  def initialize(conversation:, inbound:, sender: nil, imported: false)
     @conversation = conversation
     @inbound = inbound
     @sender = sender
+    @imported = imported
   end
 
   # The media an inbound message carries, whichever shape holds it, or nil.
@@ -59,7 +63,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   def content_type = content&.wire_type
 
   def message_attributes
-    {
+    attributes = {
       account_id: inbox.account_id,
       inbox_id: inbox.id,
       source_id: inbound.id,
@@ -71,6 +75,12 @@ class Whatsapp::Session::Inbound::MessageWriter
       status: incoming? ? :sent : :delivered,
       content_attributes: content_attributes
     }
+    # Dated to when it was sent, not to when it was filed. The thread renders in
+    # `created_at` order, so an import written at today's timestamp would stack a year of
+    # conversation on top of this morning's, in whatever order it was imported. It is also
+    # the clock Inbound::Coverage reads to decide what a later import already had eyes on.
+    attributes[:created_at] = inbound.sent_at if imported
+    attributes
   end
 
   def message_content
@@ -94,6 +104,10 @@ class Whatsapp::Session::Inbound::MessageWriter
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,
       is_unsupported: (true if unsupported?),
+      # Not the same statement as `external_created_at`, which every session message
+      # carries: this one says the row was filed after the fact, which is what a report
+      # excluding backfilled traffic, or a bubble explaining an old date, has to read.
+      imported: (true if imported),
       rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
   end
@@ -155,6 +169,11 @@ class Whatsapp::Session::Inbound::MessageWriter
   # and Z-API writers both do this for every incoming row; without it every message this
   # layer stores stays unread on the contact's phone forever.
   def acknowledge(messages)
+    # Never for an import. These are messages the contact sent long ago, or while nobody
+    # was watching, and reading them is an agent's act: acknowledging on their behalf puts
+    # the second tick on the contact's screen for a message no human has opened, and with
+    # `mark_as_read` on it empties the unread badge of the whole chat on the phone.
+    return messages if imported
     return messages unless incoming? && messages.present?
 
     inbox.channel.received_messages(messages, conversation)

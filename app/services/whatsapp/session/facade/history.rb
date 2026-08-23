@@ -8,21 +8,29 @@ module Whatsapp::Session::Facade::History
   # acknowledges the request and the messages arrive as `history.sync` events, if the
   # phone is awake to answer at all, which is why the caller is told the request went out
   # rather than what it produced.
-  def request_history(contact, count: nil, before_id: nil)
+  # `before` is the stored message to page backwards from, or nil to start from the oldest
+  # the provider knows. A message rather than an id: the anchor needs its timestamp and its
+  # direction too, and the row is the one place that has all three together.
+  def request_history(contact, count: nil, before: nil)
     raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.history_sync_unsupported') unless capability?('history_sync')
 
     backend.request_history(
-      model::Commands::HistoryRequest.new(chat: model::Address.for_contact(contact), count: count, before_id: before_id)
+      model::Commands::HistoryRequest.new(
+        chat: model::Address.for_contact(contact), count: count,
+        before: model::Commands::HistoryAnchor.for_message(before)
+      )
     )
     true
   end
-
-  private
 
   # Whether this inbox asked for the history the phone already has. Off unless the
   # operator turned it on: the phone answers with everything it has, and an inbox that
   # never asked should not have a year of somebody else's conversations imported into it
   # on the first connect.
+  #
+  # Public because it also gates the on-demand backfill. The answer to a request arrives
+  # on the webhook, and the webhook only carries history for an inbox that subscribed to
+  # it, so with this off the request would go out and the reply would be dropped.
   def history_sync?
     capability?('history_sync') && ActiveModel::Type::Boolean.new.cast(channel.provider_config&.dig('history_sync')).present?
   end

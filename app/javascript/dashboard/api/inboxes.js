@@ -122,6 +122,10 @@ class Inboxes extends CacheEnabledApiClient {
     return axios.post(`${this.url}/${inboxId}/disconnect_channel_provider`);
   }
 
+  syncProviderHistory(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/sync_provider_history`);
+  }
+
   convertProvider(inboxId, { provider, providerConfig }) {
     return axios.post(`${this.url}/${inboxId}/convert_provider`, {
       provider,

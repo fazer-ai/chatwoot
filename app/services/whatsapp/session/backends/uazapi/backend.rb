@@ -199,9 +199,15 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
   # batches, and only if the phone is awake to answer at all. `count` is passed on as the
   # hint it is.
   def request_history(command)
+    # The answer to this comes back on the webhook, and the webhook only carries history
+    # for an instance subscribed to that event. Subscription is set at connect time, so an
+    # inbox that turned the setting on afterwards would send the request and never see the
+    # reply. Registering is idempotent and this runs once per backend, so a backfill
+    # walking fifty chats still registers once.
+    ensure_history_subscription
     client.post('/message/history-sync', {
       number: command.chat.to_jid, mode: 'history',
-      count: command.count, messageid: command.before_id
+      count: command.count, messageid: command.before&.id
     }.compact)
     nil
   end
@@ -251,6 +257,13 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
 
   def register_webhook
     client.post('/webhook', webhook_body(enabled: true))
+  end
+
+  def ensure_history_subscription
+    return if @history_subscribed
+
+    register_webhook
+    @history_subscribed = true
   end
 
   # Best effort by design: the inbox is being torn down either way, and a provider that
@@ -304,9 +317,16 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
     }
   end
 
+  # Always subscribed, because not listening is a decision that cannot be revisited later.
+  # The phone's account of what arrived while the session was down is pushed once, right
+  # after a pairing, and there is no request that fetches it afterwards: `/message/history-sync`
+  # only walks backwards from a message the instance already has (`mode` accepts nothing
+  # else, checked against the API). An inbox that was not subscribed at that moment has
+  # lost the weekend for good.
+  #
+  # Subscribing is not consent to import: the handler keeps only the gap out of a pile
+  # nobody asked for, and a first pairing has no coverage, so all of it is dropped.
   def subscribed_events
-    return WEBHOOK_EVENTS unless history_sync?
-
     WEBHOOK_EVENTS + [HISTORY_EVENT]
   end
 

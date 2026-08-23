@@ -79,11 +79,29 @@ class Whatsapp::Session::ConnectionStateWriter
     # job transport leaves the state in place, so every repeat of it is reported as
     # unchanged and the logout is never asked for again. The job re-reads the quarantine
     # and stands down when it is gone, so asking twice costs nothing.
-    ensure_logout(written) if %i[written unchanged].include?(result)
+    if %i[written unchanged].include?(result)
+      ensure_logout(written)
+      end_backfill
+    end
     result
   end
 
   private
+
+  # A history request reaches the phone through the session, so a session that is no longer
+  # up cannot be answered: whatever arrives after the next pairing is the phone's own dump,
+  # not the answer to anything anybody asked for. Closing the window here is what keeps that
+  # dump out of an inbox whose operator only ever asked once, hours earlier.
+  #
+  # Read off the record rather than off the state that was applied, so what decides is what
+  # was actually persisted: a state can be replaced on the way in (an account that turns out
+  # to be the wrong one is rewritten as a quarantined close), and the record is the one place
+  # that has already been through all of it.
+  def end_backfill
+    return if channel.provider_connection.to_h['connection'] == 'open'
+
+    Whatsapp::Session::HistoryBackfill.close!(channel)
+  end
 
   def ensure_logout(written)
     return unless written.error == WRONG_PHONE_ERROR

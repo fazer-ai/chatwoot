@@ -33,6 +33,7 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.updated' => 'GroupUpdated',
     'group.picture_changed' => 'GroupPictureChanged',
     'group.activity' => 'GroupActivity',
+    'history.sync' => 'HistorySync',
     'account.reachout_timelock' => 'AccountLimits',
     'account.new_chat_cap' => 'AccountLimits',
     'raw' => 'Raw'
@@ -42,7 +43,7 @@ class Whatsapp::Session::Inbound::Dispatcher
   # missing from both tables shows up as a gap instead of as silence.
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
-    call.offer call.terminate history.sync
+    call.offer call.terminate
   ].freeze
 
   attr_reader :channel, :event, :instance

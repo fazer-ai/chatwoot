@@ -128,4 +128,26 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
 
     expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
   end
+
+  # A history request travels to the phone through the session, so a session that ends
+  # takes any outstanding request with it. Without this the dump that follows the next
+  # pairing would be filed as if somebody had asked for it, and tuning the window's length
+  # to make that unlikely is a worse answer than removing the case.
+  describe 'an outstanding history backfill' do
+    let(:backfill) { Whatsapp::Session::HistoryBackfill }
+
+    before { backfill.open!(channel) }
+
+    it 'is closed when the session is no longer open' do
+      writer.apply(Whatsapp::Session::Model::ConnectionState.new(connection: 'close'))
+
+      expect(backfill.pending?(channel)).to be(false)
+    end
+
+    it 'survives a state that reports the session up' do
+      writer.apply(Whatsapp::Session::Model::ConnectionState.new(connection: 'open', phone_number: channel.phone_number))
+
+      expect(backfill.pending?(channel)).to be(true)
+    end
+  end
 end
