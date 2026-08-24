@@ -366,6 +366,20 @@ RSpec.describe 'Reports API', type: :request do
 
         expect(response).to have_http_status(:success)
       end
+
+      it 'narrows the report to the given inbox' do
+        other_inbox = create(:inbox, account: account)
+        other_agent = create(:user, account: account, role: :agent)
+        create(:conversation, account: account, inbox: other_inbox, assignee: other_agent, created_at: Time.current)
+
+        get "/api/v2/accounts/#{account.id}/reports/agents.csv",
+            params: params.merge(inbox_id: inbox.id),
+            headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(user.name)
+        expect(response.body).not_to include(other_agent.name)
+      end
     end
 
     context 'when an agent has access to multiple accounts' do

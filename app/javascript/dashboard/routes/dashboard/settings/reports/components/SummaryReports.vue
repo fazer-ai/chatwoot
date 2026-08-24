@@ -34,6 +34,12 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  // Second dimension the summary can be narrowed to: 'inboxes' on an agents
+  // overview, 'agents' on an inboxes overview.
+  crossFilterType: {
+    type: String,
+    default: '',
+  },
 });
 
 const store = useStore();
@@ -41,6 +47,7 @@ const store = useStore();
 const from = ref(0);
 const to = ref(0);
 const businessHours = ref(false);
+const crossFilterId = ref(null);
 import { useI18n } from 'vue-i18n';
 import SummaryReportLink from './SummaryReportLink.vue';
 
@@ -108,8 +115,17 @@ const renderAvgTime = value => (value ? formatTime(value) : '--');
 
 const renderCount = value => (value ? value.toLocaleString() : '--');
 
+// Once the report is narrowed to a single inbox (or agent), the backend only
+// returns the rows that took part in it, so the roster is trimmed to match.
+const visibleRowItems = computed(() => {
+  if (!crossFilterId.value) return rowItems.value;
+
+  const reportedIds = new Set(reportMetrics.value.map(metrics => metrics.id));
+  return rowItems.value.filter(row => reportedIds.has(Number(row.id)));
+});
+
 const tableData = computed(() =>
-  rowItems.value.map(row => {
+  visibleRowItems.value.map(row => {
     const rowMetrics = getMetrics(row.id);
     const {
       conversationsCount,
@@ -132,11 +148,33 @@ const tableData = computed(() =>
   })
 );
 
+// Names the downloaded file, so the same report filtered two ways lands in two
+// files instead of overwriting itself.
+const crossFilterName = computed(() => {
+  if (!crossFilterId.value) return '';
+
+  const getterKey =
+    props.crossFilterType === 'inboxes'
+      ? 'inboxes/getInboxes'
+      : 'agents/getAgents';
+  const items = store.getters[getterKey] ?? [];
+  return items.find(item => item.id === crossFilterId.value)?.name ?? '';
+});
+
+const crossFilterParams = computed(() => {
+  if (!props.crossFilterType || !crossFilterId.value) return {};
+
+  return props.crossFilterType === 'inboxes'
+    ? { inboxId: crossFilterId.value }
+    : { userId: crossFilterId.value };
+});
+
 const fetchReportsWithRetry = async () => {
   const params = {
     since: from.value,
     until: to.value,
     businessHours: businessHours.value,
+    ...crossFilterParams.value,
   };
   try {
     await store.dispatch(props.actionKey, params);
@@ -160,6 +198,7 @@ const onFilterChange = updatedFilter => {
   from.value = updatedFilter.from;
   to.value = updatedFilter.to;
   businessHours.value = updatedFilter.businessHours;
+  crossFilterId.value = updatedFilter.inboxId ?? updatedFilter.userId ?? null;
   fetchAllData();
 };
 
@@ -188,12 +227,15 @@ const downloadReports = () => {
       type: props.type,
       to: to.value,
       businessHours: businessHours.value,
+      filteredBy: crossFilterName.value,
+      filterId: crossFilterId.value ?? '',
     });
     const params = {
       from: from.value,
       to: to.value,
       fileName,
       businessHours: businessHours.value,
+      ...crossFilterParams.value,
     };
     store.dispatch(dispatchMethods[props.type], params);
   }
@@ -205,12 +247,19 @@ defineExpose({ downloadReports });
 <template>
   <OverviewReportFilters
     :disabled="isLoading"
+    :cross-filter-type="crossFilterType"
     @filter-change="onFilterChange"
   />
   <div
     class="relative flex-1 overflow-auto px-2 py-2 mt-5 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"
   >
     <Table :table="table" />
+    <p
+      v-if="!isLoading && crossFilterId && !tableData.length"
+      class="py-8 mb-0 text-sm text-center text-n-slate-11"
+    >
+      {{ $t('REPORT.CROSS_FILTER.NO_RESULTS') }}
+    </p>
     <Transition
       enter-active-class="transition-opacity duration-300 ease-out"
       leave-active-class="transition-opacity duration-200 ease-in"

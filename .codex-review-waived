@@ -78,3 +78,13 @@ app/jobs/webhooks/whatsapp_session_events_job.rb: Preserve order for dependent w
 # the layer does ship, because from then on a signature change to a queued job does have
 # to survive a rolling deploy.
 app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queued pairing polls  # PR#380
+# PR#412: real, pre-existing, and bigger than this PR. `InboxPolicy::Scope` resolves to
+# `user.assigned_inboxes`, so an Enterprise custom role with `report_manage` already sees
+# only its own inboxes in the Inboxes overview itself, whose rows come from the same
+# `inboxes/getInboxes` this filter reads. Admins are unaffected (`assigned_inboxes` returns
+# every account inbox for them), and nothing is exposed either way: the summary endpoints
+# already return metrics for every account inbox to anyone who passes `ReportPolicy#view?`,
+# so only the names are scoped. Closing it means either widening `InboxPolicy::Scope`, which
+# changes every inbox picker in the app for those users, or a report-scoped inbox endpoint.
+# Neither belongs in a reports PR.
+app/javascript/dashboard/routes/dashboard/settings/reports/components/OverviewReportFilters.vue: Load all report-visible inboxes for the filter  # PR#412

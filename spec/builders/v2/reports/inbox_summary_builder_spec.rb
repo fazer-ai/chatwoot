@@ -74,6 +74,36 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
       end
     end
 
+    context 'when the report is narrowed to an agent' do
+      let(:business_hours) { false }
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:params) do
+        {
+          business_hours: business_hours,
+          since: 1.week.ago.beginning_of_day,
+          until: Time.current.end_of_day,
+          user_id: agent.id
+        }
+      end
+
+      before do
+        conversation = create(:conversation, account: account, inbox: i1, assignee: agent, created_at: 1.day.ago)
+        create(:reporting_event, account: account, conversation: conversation, inbox: i1, user: agent,
+                                 name: 'conversation_resolved', value: 20, value_in_business_hours: 10, created_at: 1.day.ago)
+      end
+
+      it 'keeps only the inboxes that agent took part in' do
+        expect(report).to contain_exactly(
+          id: i1.id,
+          conversations_count: 1,
+          resolved_conversations_count: 1,
+          avg_resolution_time: 20.0,
+          avg_first_response_time: nil,
+          avg_reply_time: nil
+        )
+      end
+    end
+
     context 'when there is no data for an inbox' do
       let!(:empty_inbox) { create(:inbox, account: account) }
       let(:business_hours) { false }
