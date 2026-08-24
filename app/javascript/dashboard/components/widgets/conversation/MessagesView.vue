@@ -214,6 +214,13 @@ export default {
           !this.isLoadingPrevious
       );
     },
+    // WhatsApp answered a request for this chat saying it holds nothing older. It only
+    // ever says so in that answer, so this stays false until somebody has asked once.
+    historyExhausted() {
+      return Boolean(
+        this.currentChat?.additional_attributes?.history_exhausted
+      );
+    },
     shouldShowSpinner() {
       return (
         (this.currentChat && this.currentChat.dataFetched === undefined) ||
@@ -1028,6 +1035,7 @@ export default {
         <ConversationHistorySync
           v-if="canRequestOlderMessages"
           :conversation-id="currentChat.id"
+          :exhausted="historyExhausted"
         />
         <ReferralBubble v-if="referralData" :referral="referralData" />
       </template>

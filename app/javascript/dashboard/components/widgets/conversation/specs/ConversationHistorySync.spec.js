@@ -16,9 +16,9 @@ vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => mockAlert(...args),
 }));
 
-const mountControl = () =>
+const mountControl = (props = {}) =>
   mount(ConversationHistorySync, {
-    props: { conversationId: 7 },
+    props: { conversationId: 7, ...props },
     global: {
       stubs: {
         NextButton: defineComponent({
@@ -57,6 +57,22 @@ describe('ConversationHistorySync', () => {
     expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.HISTORY_SYNC.REQUESTED'
     );
+  });
+
+  // WhatsApp only says a chat is finished on the answer to a request, so this state is
+  // reached by asking, never offered before the first press.
+  it('stops offering once the phone said there is nothing older', () => {
+    const wrapper = mountControl({ exhausted: true });
+
+    expect(button(wrapper).exists()).toBe(false);
+    expect(wrapper.text()).toContain('CONVERSATION.HISTORY_SYNC.EXHAUSTED');
+  });
+
+  it('offers the request while nothing has said the chat is finished', () => {
+    const wrapper = mountControl();
+
+    expect(button(wrapper).exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('CONVERSATION.HISTORY_SYNC.EXHAUSTED');
   });
 
   it('reports a request the server refused', async () => {

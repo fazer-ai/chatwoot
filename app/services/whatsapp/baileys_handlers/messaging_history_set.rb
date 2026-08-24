@@ -43,6 +43,8 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     sync_type = data[:syncType]
     return unless importable_sync_type?(sync_type)
 
+    mark_exhausted(data)
+
     batches = importable_batches(data)
     return if batches.empty?
 
@@ -60,6 +62,41 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     batches.each_value do |batch|
       Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, announce: announce)
     end
+  end
+
+  # WhatsApp saying a chat has nothing older left, which it says on the answer to a
+  # request and nowhere else -- the chat records in a volunteered dump never carry it.
+  # Recorded on the thread so the control that sent the request can stop offering and say
+  # what WhatsApp Web says in the same place: that the rest lives on the phone.
+  #
+  # Filed against the contact rather than one thread, because the anchor a request walks
+  # back from is the oldest message the inbox holds for that chat across every thread it
+  # opened. The answer is about the chat; which thread the operator happened to be reading
+  # when they asked is not part of it.
+  def mark_exhausted(data)
+    Array(data[:exhausted]).each do |jid|
+      conversations_for_chat(jid).each { |conversation| flag_exhausted(conversation) }
+    end
+  end
+
+  # Matched on the id alone, without the domain: the answer is addressed the way WhatsApp
+  # holds the chat, which is not always the way the request was addressed -- a request sent
+  # to a LID comes back answered as `<phone>@s.whatsapp.net`. The id either side of that
+  # swap is the one the contact inbox was keyed by.
+  def conversations_for_chat(jid)
+    source_id = jid.to_s.split('@').first
+    return Conversation.none if source_id.blank?
+
+    contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    return Conversation.none if contact_inbox.blank?
+
+    inbox.conversations.where(contact_id: contact_inbox.contact_id)
+  end
+
+  def flag_exhausted(conversation)
+    return if conversation.additional_attributes['history_exhausted']
+
+    conversation.update!(additional_attributes: conversation.additional_attributes.merge('history_exhausted' => true))
   end
 
   # One batch per chat, minus the ones no contact can be built from.

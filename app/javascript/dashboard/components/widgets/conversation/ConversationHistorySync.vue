@@ -6,21 +6,21 @@ import { useAlert } from 'dashboard/composables';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-// The end of what this inbox holds, and the offer to ask the phone for more.
+// The end of what this inbox holds, and either the offer to ask the phone for more or
+// the word that there is no more to ask for.
 //
 // Placed at the top of the thread rather than in a settings screen because that is where
 // the want appears: somebody reading a conversation that starts mid-sentence. It is also
 // the shape of the mechanism -- the provider walks one chat backwards from one anchor, so
 // a control per chat is the honest surface for it.
 //
-// Always offered rather than shown only when there is more to fetch. WhatsApp does carry a
-// per-chat "more remains on the primary device" flag, and measuring it on a real pairing
-// found it set on 40 chats out of 640 and never once set to its "nothing remains" value:
-// it can say there is more, never that there is not. A control that appeared on 6% of
-// threads and vanished from the rest, where history may well exist, would be worse than
-// one that is simply always there.
+// WhatsApp only ever says a chat is finished on the answer to a request, never before
+// one, so the two states are ordered rather than alternative: the offer stands until an
+// answer retires it, which is the same order WhatsApp Web shows them in.
+
 const props = defineProps({
   conversationId: { type: [Number, String], required: true },
+  exhausted: { type: Boolean, default: false },
 });
 
 const store = useStore();
@@ -45,7 +45,11 @@ const requestOlder = async () => {
 
 <template>
   <li class="flex flex-col items-center gap-1 py-3 list-none">
+    <span v-if="exhausted" class="text-xs text-n-slate-11">
+      {{ $t('CONVERSATION.HISTORY_SYNC.EXHAUSTED') }}
+    </span>
     <NextButton
+      v-if="!exhausted"
       faded
       slate
       sm
@@ -55,7 +59,7 @@ const requestOlder = async () => {
     >
       {{ $t('CONVERSATION.HISTORY_SYNC.BUTTON') }}
     </NextButton>
-    <span class="text-xs text-n-slate-11">
+    <span v-if="!exhausted" class="text-xs text-n-slate-11">
       {{ $t('CONVERSATION.HISTORY_SYNC.HELP') }}
     </span>
   </li>

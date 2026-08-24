@@ -89,7 +89,8 @@
       "BUTTON": "Carregar mensagens mais antigas",
       "HELP": "Pede ao celular o que veio antes. Ele precisa estar ligado para responder, e fica em silêncio quando já enviou este trecho.",
       "REQUESTED": "Pedimos as mensagens mais antigas ao celular. Elas aparecem aqui conforme ele envia.",
-      "ERROR": "Não foi possível pedir as mensagens mais antigas. Tente de novo em instantes."
+      "ERROR": "Não foi possível pedir as mensagens mais antigas. Tente de novo em instantes.",
+      "EXHAUSTED": "Não há nada mais antigo aqui. O restante desta conversa está apenas no celular."
     }
   },
   "CONVERSATION_SIDEBAR": {

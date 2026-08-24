@@ -146,4 +146,38 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     expect(watermarks.uniq.size).to eq(1)
     expect(Time.zone.parse(watermarks.first['value'])).to be_within(1.second).of(stored.created_at)
   end
+
+  # The only way WhatsApp ever says a chat is finished, and it says it on the answer to a
+  # request and nowhere else.
+  describe 'the chat WhatsApp says is finished' do
+    let(:contact) { create(:contact, account: inbox.account, phone_number: '+5511912345678') }
+    let!(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511912345678') }
+    let!(:conversation) { create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox, account: inbox.account) }
+
+    it 'records the answer on the thread' do
+      perform({ syncType: 6, messages: [], exhausted: ['5511912345678@s.whatsapp.net'] })
+
+      expect(conversation.reload.additional_attributes['history_exhausted']).to be(true)
+    end
+
+    # A request addressed to a LID comes back answered as `<phone>@s.whatsapp.net`, so the
+    # domain the answer carries is not the one the request used.
+    it 'matches the chat by id whichever domain the answer carries' do
+      perform({ syncType: 6, messages: [], exhausted: ['5511912345678@lid'] })
+
+      expect(conversation.reload.additional_attributes['history_exhausted']).to be(true)
+    end
+
+    it 'leaves the thread alone when no chat was flagged' do
+      perform({ syncType: 6, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
+
+      expect(conversation.reload.additional_attributes).not_to have_key('history_exhausted')
+    end
+
+    it 'ignores a chat this inbox has no contact for' do
+      expect do
+        perform({ syncType: 6, messages: [], exhausted: ['5511900000000@s.whatsapp.net'] })
+      end.not_to raise_error
+    end
+  end
 end

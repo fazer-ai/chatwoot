@@ -89,7 +89,8 @@
       "BUTTON": "Load older messages",
       "HELP": "Asks the phone for what came before. It has to be awake to answer, and it stays quiet once it has already sent this stretch.",
       "REQUESTED": "Asked the phone for older messages. They appear here as it sends them.",
-      "ERROR": "Could not ask for older messages. Try again in a moment."
+      "ERROR": "Could not ask for older messages. Try again in a moment.",
+      "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
     }
   },
   "CONVERSATION_SIDEBAR": {

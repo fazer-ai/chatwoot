@@ -89,7 +89,8 @@
       "BUTTON": "Cargar mensajes más antiguos",
       "HELP": "Pide al teléfono lo que vino antes. Tiene que estar encendido para responder, y se queda en silencio cuando ya envió este tramo.",
       "REQUESTED": "Le pedimos al teléfono los mensajes más antiguos. Aparecen aquí a medida que los envía.",
-      "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento."
+      "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento.",
+      "EXHAUSTED": "No hay nada más antiguo aquí. El resto de esta conversación está solo en el teléfono."
     }
   },
   "CONVERSATION_SIDEBAR": {
