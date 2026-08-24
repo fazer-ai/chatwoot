@@ -73,7 +73,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
 
     it 'does not tell WhatsApp the message was received' do
-      expect_any_instance_of(Channel::Whatsapp).not_to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
+      expect_any_instance_of(Whatsapp::Session::Facade).not_to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
 
       dispatch
     end

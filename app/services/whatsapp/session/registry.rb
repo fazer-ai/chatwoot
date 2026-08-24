@@ -56,6 +56,10 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       ]
     ),
     # Legacy: described so the UI can label and gate an existing inbox, never served here.
+    # history_sync, despite being frozen: this one is not a new feature so much as the
+    # provider's own data finally being kept. Baileys is the only provider that delivers
+    # WhatsApp's offline replay, so a message that arrived while a Baileys inbox was down
+    # is recoverable here and nowhere else.
     Descriptor.new(
       key: 'baileys',
       legacy: true,
@@ -63,7 +67,7 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       capabilities: %w[
         qr_pairing session_import echo_by_reserved_id edit revoke reactions typing presence presence_subscribe
         read_receipts mark_unread check_number profile_picture groups group_admin group_invites
-        group_join_requests account_limits media_download
+        group_join_requests account_limits media_download history_sync
       ]
     ),
     Descriptor.new(

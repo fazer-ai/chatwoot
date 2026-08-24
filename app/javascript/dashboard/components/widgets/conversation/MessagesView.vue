@@ -16,6 +16,7 @@ import Banner from 'dashboard/components/ui/Banner.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import ResizableEditorWrapper from './ResizableEditorWrapper.vue';
 import ReferralBubble from 'dashboard/components-next/Conversation/ReferralBubble.vue';
+import ConversationHistorySync from './ConversationHistorySync.vue';
 
 // stores and apis
 import { mapGetters } from 'vuex';
@@ -64,6 +65,7 @@ export default {
     ResizableEditorWrapper,
     WhatsappLinkDeviceModal,
     ReferralBubble,
+    ConversationHistorySync,
   },
   mixins: [inboxMixin],
   setup() {
@@ -189,6 +191,27 @@ export default {
       return getUnreadMessages(
         this.getMessages,
         this.currentChat.agent_last_seen_at
+      );
+    },
+    // Offered once the thread has been read back to the beginning of what this inbox
+    // holds, which is the moment the missing history becomes visible as an absence.
+    //
+    // Two ways to be at that beginning, and the store only knows one of them.
+    // `listLoadingStatus` (its `getAllMessagesLoaded` under an older name) is set when a
+    // fetch for older messages comes back empty, so it needs a scroll to the top to ever
+    // become true -- and a thread short enough to fit on screen is never scrolled, so it
+    // would never offer this. A first page that came back short is the other way: the
+    // server sends at most MessageFinder::PAGE_LIMIT, which is 20, so fewer than that
+    // means there was never a second page to ask for.
+    canRequestOlderMessages() {
+      const exhausted = this.listLoadingStatus || this.getMessages.length < 20;
+
+      return Boolean(
+        this.currentChat?.id &&
+          this.currentChat.dataFetched &&
+          this.hasInboxCapability(CAPABILITIES.HISTORY_SYNC) &&
+          exhausted &&
+          !this.isLoadingPrevious
       );
     },
     shouldShowSpinner() {
@@ -1002,6 +1025,10 @@ export default {
             <Spinner v-if="shouldShowSpinner" class="text-n-brand" />
           </li>
         </transition>
+        <ConversationHistorySync
+          v-if="canRequestOlderMessages"
+          :conversation-id="currentChat.id"
+        />
         <ReferralBubble v-if="referralData" :referral="referralData" />
       </template>
       <template #unreadBadge>

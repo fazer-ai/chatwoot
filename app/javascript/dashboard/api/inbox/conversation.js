@@ -58,6 +58,12 @@ class ConversationApi extends ApiClient {
     });
   }
 
+  // Asks the provider for the page before this thread's oldest message. Answers arrive on
+  // the webhook minutes later, or never, so there is nothing useful in the response.
+  syncHistory(conversationId) {
+    return axios.post(`${this.url}/${conversationId}/sync_history`);
+  }
+
   togglePriority({ conversationId, priority }) {
     return axios.post(`${this.url}/${conversationId}/toggle_priority`, {
       priority,

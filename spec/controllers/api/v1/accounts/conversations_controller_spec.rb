@@ -1529,6 +1529,62 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/sync_history' do
+    let(:channel) do
+      create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                provider_config: { 'webhook_verify_token' => 'x' },
+                                provider_connection: { 'connection' => 'open' })
+    end
+    let(:conversation) { create(:conversation, account: account, inbox: channel.inbox) }
+    let(:url) { "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/sync_history" }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post url
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      before { create(:inbox_member, user: agent, inbox: conversation.inbox) }
+
+      # Whoever is reading the thread is who wants its history, so this is not held to the
+      # administrator bar the inbox-wide setting is.
+      it 'asks the provider for what came before' do
+        expect do
+          post url, headers: agent.create_new_auth_token, as: :json
+        end.to have_enqueued_job(Whatsapp::Session::ConversationHistoryJob).with(conversation)
+
+        expect(response).to have_http_status(:success)
+      end
+
+      # The request reaches the phone through the session, so a closed one would have the
+      # operator told it was asked and nothing would ever arrive.
+      it 'refuses while the session is down' do
+        channel.update!(provider_connection: { 'connection' => 'close' })
+
+        expect do
+          post url, headers: agent.create_new_auth_token, as: :json
+        end.not_to have_enqueued_job(Whatsapp::Session::ConversationHistoryJob)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'refuses on an inbox whose provider cannot fetch history' do
+        other = create(:conversation, account: account, inbox: create(:inbox, account: account))
+        create(:inbox_member, user: agent, inbox: other.inbox)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{other.display_id}/sync_history",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/conversations/:id/transcript' do
     let(:conversation) { create(:conversation, account: account) }
 

@@ -33,6 +33,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # first. 3 full cycles span several minutes of backoff — a rejected
   # session, not a transient blip.
   RECONNECT_LOOP_RESET_STRIKES = 3
+  # How far back one history request asks. The phone treats it as a hint and routinely
+  # answers with far more (947 messages for a request of 50, measured), so the ceiling that
+  # matters is the one the import applies on the way in; this is the API's own cap.
+  HISTORY_REQUEST_COUNT = 50
   # Shown to the agent on a message whose send outcome cannot be determined. Says what
   # to do, because "unknown" alone leaves them with no next step.
   # Persisted as external_error and rendered to the agent, so it is translated like every
@@ -89,7 +93,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        syncFullHistory: history_sync?
       }.compact.to_json
     )
 
@@ -116,7 +121,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        syncFullHistory: history_sync?
       }.compact.to_json,
       timeout: 10
     )
@@ -502,6 +508,42 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
+  # Whether this inbox asked for the history the phone already has. Off unless the operator
+  # turned it on: the phone answers with everything it has, and an inbox that never asked
+  # should not have a year of somebody else's conversations imported into it on the first
+  # connect. Also what `syncFullHistory` is set from, so the setting decides what the socket
+  # asks for as well as what is kept.
+  def history_sync?
+    ActiveModel::Type::Boolean.new.cast(whatsapp_channel.provider_config&.dig('history_sync')).present?
+  end
+
+  # Asks the phone for what came before a chat's oldest stored message. WhatsApp can only
+  # walk backwards, so a request needs a message to walk back from: with nothing stored for
+  # this contact there is no anchor and nothing to ask.
+  #
+  # The answer is not this call's. The phone acknowledges and replies later on the
+  # `messaging-history.set` webhook, typed ON_DEMAND, and only if it is awake to answer at
+  # all; `count` is a hint the phone routinely overshoots.
+  def request_history(contact, count: nil, before: nil)
+    anchor = before || oldest_stored_message(contact)
+    jid = history_jid(contact)
+    return false if anchor.blank? || anchor.source_id.blank? || jid.blank?
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/fetch-message-history",
+      headers: api_headers,
+      body: {
+        count: (count || HISTORY_REQUEST_COUNT).to_i.clamp(1, HISTORY_REQUEST_COUNT),
+        oldestMsgKey: { id: anchor.source_id, remoteJid: jid, fromMe: anchor.outgoing? },
+        oldestMsgTimestamp: history_anchor_timestamp(anchor)
+      }.to_json
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
   def get_profile_pic(jid)
     response = HTTParty.get(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/profile-picture-url",
@@ -654,6 +696,39 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   private
+
+  # The chat as WhatsApp addresses it. Rebuilt from what the contact holds rather than
+  # stored: the original `remoteJid` is not kept on the message row, and the identifier the
+  # contact carries is the same value it was taken from.
+  def history_jid(contact)
+    contact_inbox = contact.contact_inboxes.find_by(inbox_id: whatsapp_channel.inbox.id)
+    return if contact_inbox.blank?
+
+    return "#{contact_inbox.source_id}@g.us" if contact.group_type_group?
+    return contact.identifier if contact.identifier.to_s.end_with?('@lid')
+
+    phone = contact.phone_number.to_s.delete('+')
+    "#{phone}@s.whatsapp.net" if phone.present?
+  end
+
+  def oldest_stored_message(contact)
+    Message.where(conversation_id: contact.conversations.where(inbox_id: whatsapp_channel.inbox.id).select(:id))
+           .where.not(source_id: nil)
+           .reorder(created_at: :asc)
+           .first
+  end
+
+  # The provider's own clock for the anchor when we have it, since that is the number the
+  # phone indexed the message by.
+  #
+  # In milliseconds: the field the bridge hands this to is `oldestMsgTimestampMs`, while
+  # both clocks we read from are in seconds. Baileys' own example and every port of it
+  # pass the raw `messageTimestamp` here, so the mismatch is widespread and quiet -- the
+  # server answers the key and never complains about the timestamp.
+  def history_anchor_timestamp(message)
+    seconds = message.content_attributes['external_created_at'].presence || message.created_at.to_i
+    seconds.to_i * 1000
+  end
 
   def provider_url
     whatsapp_channel.provider_config['provider_url'].presence || DEFAULT_URL

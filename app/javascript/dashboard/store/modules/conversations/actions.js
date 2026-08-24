@@ -106,6 +106,13 @@ const actions = {
     }
   },
 
+  // Asks the provider for the page before this thread's oldest message. Nothing comes
+  // back here: the phone answers on the webhook minutes later, or never, and the rows
+  // arrive through the same cable push live traffic uses.
+  syncHistory: async (_, conversationId) => {
+    await ConversationApi.syncHistory(conversationId);
+  },
+
   fetchAllAttachments: async ({ commit }, conversationId) => {
     let attachments = [];
 

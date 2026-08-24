@@ -1,0 +1,98 @@
+# WhatsApp's own account of what this inbox missed, and of what came before it existed.
+#
+# The phone sends this on its own after a pairing, and again after every reconnect, and it
+# answers an explicit request with it. Baileys types the dump, which is the fact that makes
+# this provider worth keeping alive for one more feature: `RECENT` is WhatsApp replaying
+# what arrived while the device was offline, so a Baileys inbox can recover a disconnect
+# that no other provider we serve can.
+#
+# The dump arrives in frames (see historySync.ts on the bridge), each one a slice of one
+# `messaging-history.set` under the byte budget. Every frame is filed on its own: order
+# between them carries no meaning, since the importer sorts by timestamp and deduplicates
+# by provider id.
+module Whatsapp::BaileysHandlers::MessagingHistorySet
+  include Whatsapp::BaileysHandlers::Helpers
+
+  # proto.HistorySync.HistorySyncType, as Baileys forwards it.
+  INITIAL_BOOTSTRAP = 0
+  INITIAL_STATUS_V3 = 1
+  FULL = 2
+  RECENT = 3
+  PUSH_NAME = 4
+  NON_BLOCKING_DATA = 5
+  ON_DEMAND = 6
+
+  # The four that carry conversation. The three that are left are the phone's status
+  # updates, its address book display names and an app-state blob: none of them is a
+  # message, and filing them would put empty rows in somebody's inbox.
+  IMPORTABLE_SYNC_TYPES = [INITIAL_BOOTSTRAP, FULL, RECENT, ON_DEMAND].freeze
+
+  # WhatsApp's own account, the one that sends service notices. Baileys' `shouldIgnoreJid`
+  # never sees a history dump -- it filters live traffic only -- so a full sync replays
+  # years of those, and each one asks the legacy pipeline to build a contact whose phone
+  # number is `+0`. Measured on a real pairing: 79 rows across 8 chats, every one of them
+  # a job dying on `Phone number should be in e164 format`.
+  SYSTEM_JID = '0@s.whatsapp.net'.freeze
+
+  private
+
+  def process_messaging_history_set
+    return unless inbox.channel.session_capabilities.include?('history_sync')
+
+    data = processed_params[:data]
+    sync_type = data[:syncType]
+    return unless importable_sync_type?(sync_type)
+
+    batches = importable_batches(data)
+    return if batches.empty?
+
+    # Read here, once, before any job runs. Each chat is imported by its own worker, and a
+    # boundary read inside them would be measured against whatever the workers that went
+    # first had already written.
+    watermark = Whatsapp::Session::Inbound::Coverage.watermark(inbox)
+    requested = requested?(sync_type)
+    # ON_DEMAND exists only as an answer to a request we sent, and the only thing that
+    # sends one is an operator pressing for older messages inside a thread. So the type is
+    # already the fact that somebody is watching this land, and the archive it carries is
+    # announced rather than filed in silence -- otherwise the press does nothing visible
+    # until the page is reloaded. Every other type is the phone volunteering.
+    announce = sync_type.to_i == ON_DEMAND
+    batches.each_value do |batch|
+      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, announce: announce)
+    end
+  end
+
+  # One batch per chat, minus the ones no contact can be built from.
+  def importable_batches(data)
+    Array(data[:messages])
+      .group_by { |message| message.dig(:key, :remoteJid) }
+      .reject { |jid, _| jid.blank? || jid == SYSTEM_JID }
+  end
+
+  # An absent type is taken as importable: the bridge may predate the field, and Coverage
+  # decides what happens to the pile either way. Only a type we recognise as carrying no
+  # conversation is dropped.
+  def importable_sync_type?(sync_type)
+    return true if sync_type.nil?
+
+    IMPORTABLE_SYNC_TYPES.include?(sync_type.to_i)
+  end
+
+  # Whether anybody asked for this pile, which decides how much of it is kept rather than
+  # whether any of it is. Three ways to have asked, and the first is the phone answering a
+  # question we put to it: `fetchMessageHistory` comes back typed ON_DEMAND, so the request
+  # identifies its own answer and no window has to hold that fact.
+  #
+  # The other two mirror the session layer exactly: standing consent on the inbox, or the
+  # window a press of the button opens. The window is re-opened while an answer is still
+  # arriving, because a dump comes in several frames and one closing between two of them
+  # would drop the tail of the import it authorised.
+  def requested?(sync_type)
+    return true if sync_type.to_i == ON_DEMAND
+    return true if inbox.channel.provider_service.try(:history_sync?)
+    return false unless Whatsapp::Session::HistoryBackfill.pending?(inbox.channel)
+
+    Whatsapp::Session::HistoryBackfill.open!(inbox.channel)
+    true
+  end
+end

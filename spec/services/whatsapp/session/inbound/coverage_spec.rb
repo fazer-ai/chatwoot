@@ -26,6 +26,17 @@ RSpec.describe Whatsapp::Session::Inbound::Coverage do
 
       expect(described_class.watermark(inbox)).to be_within(1.second).of(3.days.ago)
     end
+
+    # A dump arrives in several frames, each filed on its own. With imported rows counted,
+    # the second frame would measure itself against what the first one just wrote and file
+    # the rest of the outage as archive.
+    it 'ignores rows an import filed after the fact' do
+      create(:message, conversation: conversation, inbox: inbox, source_id: 'A', created_at: 3.days.ago)
+      create(:message, conversation: conversation, inbox: inbox, source_id: 'B', created_at: 1.day.ago,
+                       content_attributes: { imported: true })
+
+      expect(described_class.watermark(inbox)).to be_within(1.second).of(3.days.ago)
+    end
   end
 
   describe '.gap?' do

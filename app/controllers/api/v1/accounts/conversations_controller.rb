@@ -184,6 +184,32 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     update_last_seen_on_conversation(last_seen_at, true)
   end
 
+  # Asks the phone for the page before the oldest message this thread holds.
+  #
+  # Scoped to the conversation because that is the shape of the thing being asked: the
+  # provider walks one chat backwards from one anchor, and the operator asking is the one
+  # reading that chat. Nothing here waits for messages -- the phone answers on the webhook
+  # later, or never, so what the caller is told is that the request went out.
+  def sync_history
+    channel = @conversation.inbox.channel
+
+    unless channel.try(:session_capabilities)&.include?('history_sync')
+      render json: { error: 'Inbox does not support history sync' }, status: :unprocessable_entity and return
+    end
+
+    # The request travels to the phone through the session, so a closed one has nothing to
+    # carry it and the operator would be told it was asked for nothing.
+    unless channel.provider_connection.to_h['connection'] == 'open'
+      render json: { error: 'Inbox is not connected' }, status: :unprocessable_entity and return
+    end
+
+    # Held for the providers that do not classify their frames: a Baileys answer identifies
+    # itself as ON_DEMAND, uazapi's does not, and this is what tells that one somebody asked.
+    Whatsapp::Session::HistoryBackfill.open!(channel)
+    Whatsapp::Session::ConversationHistoryJob.perform_later(@conversation)
+    head :ok
+  end
+
   def destroy
     authorize @conversation, :destroy?
     ::Conversations::DeleteService.new(conversation: @conversation, user: Current.user, ip: request.ip).perform

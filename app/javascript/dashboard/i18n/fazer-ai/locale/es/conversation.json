@@ -84,6 +84,12 @@
     "CARD_CONTEXT_MENU": {
       "PIN": "Fijar",
       "UNPIN": "Dejar de fijar"
+    },
+    "HISTORY_SYNC": {
+      "BUTTON": "Cargar mensajes más antiguos",
+      "HELP": "Pide al teléfono lo que vino antes. Tiene que estar encendido para responder, y se queda en silencio cuando ya envió este tramo.",
+      "REQUESTED": "Le pedimos al teléfono los mensajes más antiguos. Aparecen aquí a medida que los envía.",
+      "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento."
     }
   },
   "CONVERSATION_SIDEBAR": {

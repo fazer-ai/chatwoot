@@ -86,10 +86,6 @@ class InboxPolicy < ApplicationPolicy
     @account_user.administrator?
   end
 
-  def sync_provider_history?
-    @account_user.administrator?
-  end
-
   def on_whatsapp?
     true
   end
