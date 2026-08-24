@@ -228,6 +228,7 @@ const downloadReports = () => {
       to: to.value,
       businessHours: businessHours.value,
       filteredBy: crossFilterName.value,
+      filterId: crossFilterId.value ?? '',
     });
     const params = {
       from: from.value,
