@@ -317,7 +317,7 @@ RSpec.describe 'Conversation Messages API', type: :request do
     context 'when channel supports delete_message' do
       let(:whatsapp_channel) { create(:channel_whatsapp, provider: 'baileys', account: account, validate_provider_config: false) }
       let(:whatsapp_inbox) { whatsapp_channel.inbox }
-      let(:contact) { create(:contact, account: account, identifier: '+551187654321', phone_number: '+551187654321') }
+      let(:contact) { create(:contact, account: account, identifier: '+551****4321', phone_number: '+551****4321') }
       let(:contact_inbox) { create(:contact_inbox, inbox: whatsapp_inbox, contact: contact) }
       let(:whatsapp_conversation) { create(:conversation, inbox: whatsapp_inbox, account: account, contact: contact, contact_inbox: contact_inbox) }
       let(:message_with_source) do
@@ -587,4 +587,43 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
     end
   end
+  describe 'conversation resolution when table id != display id (regression: API 404)' do
+    let!(:inbox) { create(:inbox, account: account) }
+    let!(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    before do
+      create(:conversation, inbox: inbox, account: account)
+      conversation.update!(display_id: conversation.display_id + 100)
+      create(:inbox_member, inbox: conversation.inbox, user: agent)
+    end
+
+    it 'lists messages by table id (the id reported by webhooks)' do
+      get api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.id),
+          headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:success)
+      expect(response).to conform_schema(200)
+    end
+
+    it 'still resolves by display id (used by the UI)' do
+      get api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+          headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:success)
+      expect(response).to conform_schema(200)
+    end
+
+    it 'posts a message by table id' do
+      post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.id),
+           params: { content: 'table-id-post', private: true },
+           headers: agent.create_new_auth_token,
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response).to conform_schema(200)
+      expect(conversation.messages.count).to eq(1)
+    end
+  end
+
 end

@@ -248,7 +248,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def conversation
-    @conversation ||= Current.account.conversations.find_by!(display_id: params[:id])
+    @conversation ||= Current.account.conversations.find_by(display_id: params[:id]) ||
+                     Current.account.conversations.find_by!(id: params[:id])
     authorize @conversation, :show?
   end
 
