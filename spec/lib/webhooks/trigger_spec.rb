@@ -63,14 +63,13 @@ describe Webhooks::Trigger do
       expect { trigger.execute(url, payload, webhook_type) }.to raise_error(CustomExceptions::Webhook::RetriableError)
     end
 
-    it 'treats blocked private webhook URLs as failures' do
+    it 'treats blocked private webhook URLs as failures without marking the message yet' do
       payload = { event: 'message_created', conversation: { id: conversation.id }, id: message.id }
 
       expect do
-        trigger.execute('http://127.0.0.1/webhook', payload, webhook_type)
-      rescue CustomExceptions::Webhook::RetriableError
-        nil
-      end.to change { message.reload.status }.from('sent').to('failed')
+        expect { trigger.execute('http://127.0.0.1/webhook', payload, webhook_type) }
+          .to raise_error(CustomExceptions::Webhook::RetriableError)
+      end.not_to(change { message.reload.status })
     end
 
     context 'when webhook type is agent bot' do
@@ -106,22 +105,18 @@ describe Webhooks::Trigger do
         expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
       end
 
-      it 'reopens conversation and enqueues activity message if pending' do
+      it 'leaves a pending conversation alone so the retries can still land' do
         payload = { event: 'message_created', id: pending_message.id }
 
         expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('404 Not Found'))
 
-        perform_enqueued_jobs do
-          trigger.execute(url, payload, webhook_type)
-        rescue CustomExceptions::Webhook::RetriableError
-          nil
-        end
+        expect { trigger.execute(url, payload, webhook_type) }.to raise_error(CustomExceptions::Webhook::RetriableError)
 
-        expect(pending_conversation.reload.status).to eq('open')
-
-        activity_message = pending_conversation.reload.messages.order(:created_at).last
-        expect(activity_message.message_type).to eq('activity')
-        expect(activity_message.content).to eq(agent_bot_error_content)
+        # The bot only answers a `pending` conversation. Escalating here would make every redelivery
+        # arrive at a conversation the bot will not answer, so the retries could never recover the
+        # turn. WebhookJob escalates once, after the attempts are exhausted (see spec/jobs).
+        expect(pending_conversation.reload.status).to eq('pending')
+        expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
       end
 
       it 'does not change message status or enqueue activity when conversation is not pending' do
@@ -130,56 +125,24 @@ describe Webhooks::Trigger do
         expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('404 Not Found'))
 
         expect do
-          trigger.execute(url, payload, webhook_type)
-        rescue CustomExceptions::Webhook::RetriableError
-          nil
+          expect { trigger.execute(url, payload, webhook_type) }
+            .to raise_error(CustomExceptions::Webhook::RetriableError)
         end.not_to(change { message.reload.status })
 
         expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
         expect(conversation.reload.status).to eq('open')
       end
-
-      it 'keeps conversation pending when keep_pending_on_bot_failure setting is enabled' do
-        account.update!(keep_pending_on_bot_failure: true)
-        payload = { event: 'message_created', id: pending_message.id }
-
-        expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('404 Not Found'))
-
-        expect { trigger.execute(url, payload, webhook_type) }.to raise_error(CustomExceptions::Webhook::RetriableError)
-
-        expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
-        expect(pending_conversation.reload.status).to eq('pending')
-      end
-
-      it 'reopens conversation when keep_pending_on_bot_failure setting is disabled' do
-        account.update!(keep_pending_on_bot_failure: false)
-        payload = { event: 'message_created', id: pending_message.id }
-
-        expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('404 Not Found'))
-
-        expect do
-          perform_enqueued_jobs do
-            trigger.execute(url, payload, webhook_type)
-          rescue CustomExceptions::Webhook::RetriableError
-            nil
-          end
-        end.not_to(change { pending_message.reload.status })
-
-        expect(pending_conversation.reload.status).to eq('open')
-
-        activity_message = pending_conversation.reload.messages.order(:created_at).last
-        expect(activity_message.message_type).to eq('activity')
-        expect(activity_message.content).to eq(agent_bot_error_content)
-      end
     end
 
-    it 'marks message as failed and raises RetriableError for non-agent webhooks on 500' do
+    it 'raises RetriableError for non-agent webhooks on 500 without marking the message failed' do
       payload = { event: 'message_created', conversation: { id: conversation.id }, id: message.id }
 
       expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('500 Internal Server Error'))
 
       expect { trigger.execute(url, payload, webhook_type) }.to raise_error(CustomExceptions::Webhook::RetriableError)
-      expect(message.reload.status).to eq('failed')
+      # Still 'sent': four attempts remain, and one of them may deliver. Marking it failed here is
+      # what let an agent resend a message the retry had already delivered.
+      expect(message.reload.status).to eq('sent')
     end
   end
 

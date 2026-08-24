@@ -28,7 +28,16 @@ class Webhooks::Trigger
   rescue StandardError => e
     raise RetryableError.new(status: http_status(e), message: e.message) if retryable_agent_bot_error?(e)
 
-    handle_failure(e)
+    # NO ESCALATION HERE. A failed request is not a failed delivery: WebhookJob retries this, and
+    # escalating on attempt 1 makes those retries unreachable for an agent bot. The bot only acts on
+    # a `pending` conversation, so moving it to `open` here means every redelivery arrives at a
+    # conversation the bot will not answer, and the retry lands without changing anything.
+    # The same holds for an api_inbox message marked `failed` here: a later attempt can still
+    # deliver it, leaving an agent to resend what the customer already received.
+    # Escalation belongs to whoever learns the delivery is over, which is the retries-exhausted
+    # block in WebhookJob (`Webhooks::ErrorHandler` applies the same guards and the same activity
+    # note as `update_conversation_status`).
+    Rails.logger.warn "Exception: webhook request to #{@url} failed : #{e.message}"
     raise CustomExceptions::Webhook::RetriableError, "Webhook request failed: #{e.message}"
   end
 
