@@ -79,11 +79,16 @@ const crossFilterOptions = computed(() => {
 
 const crossFilterName = computed(() => {
   if (!crossFilterConfig.value) return '';
+  if (!crossFilterId.value) return t(crossFilterConfig.value.allLabelKey);
 
   const selected = crossFilterOptions.value.find(
     item => item.id === crossFilterId.value
   );
-  return selected?.name ?? t(crossFilterConfig.value.allLabelKey);
+  // The "All" label belongs to a cleared filter and to nothing else. A bookmarked
+  // URL applies the id before its list arrives, and the id can name something this
+  // user cannot list at all, so falling back to it here would leave the chip
+  // claiming the opposite of the request that was actually sent.
+  return selected?.name ?? `#${crossFilterId.value}`;
 });
 
 const crossFilterPayload = computed(() => {
