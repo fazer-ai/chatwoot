@@ -12,9 +12,9 @@ class V2::Reports::InboxSummaryBuilder < V2::Reports::BaseSummaryBuilder
               :avg_resolution_time, :avg_first_response_time, :avg_reply_time
 
   def prepare_report
-    account.inboxes.map do |inbox|
-      build_inbox_stats(inbox)
-    end
+    reject_untouched_rows(
+      account.inboxes.map { |inbox| build_inbox_stats(inbox) }
+    )
   end
 
   def build_inbox_stats(inbox)

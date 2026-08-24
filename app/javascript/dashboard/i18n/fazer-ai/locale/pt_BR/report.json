@@ -1,0 +1,9 @@
+{
+  "REPORT": {
+    "CROSS_FILTER": {
+      "ALL_INBOXES": "Todas as caixas de entrada",
+      "ALL_AGENTS": "Todos os agentes",
+      "NO_RESULTS": "Nenhuma atividade para este filtro no período selecionado."
+    }
+  }
+}

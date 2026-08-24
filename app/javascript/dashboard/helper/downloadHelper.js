@@ -13,8 +13,27 @@ export const downloadCsvFile = (fileName, content) => {
   return link;
 };
 
-export const generateFileName = ({ type, to, businessHours = false }) => {
+// Keeps the same report downloaded for two different filters in two files.
+const slugifyFilterName = name =>
+  name
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+export const generateFileName = ({
+  type,
+  to,
+  businessHours = false,
+  filteredBy = '',
+}) => {
   let name = `${type}-report-${format(fromUnixTime(to), 'dd-MM-yyyy')}`;
+  const filterSlug = filteredBy ? slugifyFilterName(filteredBy) : '';
+  if (filterSlug) {
+    name = `${name}-${filterSlug}`;
+  }
   if (businessHours) {
     name = `${name}-business-hours`;
   }

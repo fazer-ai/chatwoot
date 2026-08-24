@@ -1,0 +1,9 @@
+{
+  "REPORT": {
+    "CROSS_FILTER": {
+      "ALL_INBOXES": "All inboxes",
+      "ALL_AGENTS": "All agents",
+      "NO_RESULTS": "No activity for this filter in the selected period."
+    }
+  }
+}
