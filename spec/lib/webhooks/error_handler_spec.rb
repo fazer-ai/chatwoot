@@ -88,6 +88,31 @@ describe Webhooks::ErrorHandler do
 
       expect(service).to have_received(:perform)
     end
+
+    # The retries put minutes between the send and this handler, and the channel can report the
+    # message delivered or read inside that window. `Messages::StatusUpdateService` only refuses
+    # `read` -> `delivered`, so nothing below it stops a stale failure from landing on top of a
+    # message the customer already has, which is what puts a resend in front of an agent.
+    %i[delivered read].each do |later_status|
+      it "leaves a message already #{later_status} alone" do
+        message.update!(status: later_status)
+        payload = { event: 'message_created', id: message.id }
+
+        described_class.perform(payload, webhook_type, error)
+
+        expect(message.reload.status).to eq(later_status.to_s)
+        expect(message.external_error).to be_nil
+      end
+    end
+
+    it 'still fails a message that never moved past sent' do
+      payload = { event: 'message_created', id: message.id }
+
+      described_class.perform(payload, webhook_type, error)
+
+      expect(message.reload.status).to eq('failed')
+      expect(message.external_error).to eq(error.message)
+    end
   end
 
   context 'when event is not supported' do
