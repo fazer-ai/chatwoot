@@ -203,6 +203,7 @@ Rails.application.routes.draw do
               post :destroy_custom_attributes
               get :attachments
               get :inbox_assistant
+              post :sync_history
               get :reporting_events if ChatwootApp.enterprise?
             end
           end
@@ -361,7 +362,6 @@ Rails.application.routes.draw do
             post :request_pairing_code, on: :member
             post :import_whatsapp_session, on: :member
             post :disconnect_channel_provider, on: :member
-            post :sync_provider_history, on: :member
             post :convert_provider, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member

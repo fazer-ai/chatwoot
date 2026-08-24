@@ -120,6 +120,23 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     with_lock { update_provider_connection!(provider_connection.merge(updates)) }
   end
 
+  # Telling WhatsApp a message was received is an agent's act, and an import is not one.
+  # These are messages the contact sent long ago, or while nobody was watching: reading
+  # them on the operator's behalf puts the second tick on the contact's screen for a
+  # message no human has opened, and with `mark_as_read` on it empties a year of unread
+  # badges on the phone.
+  #
+  # Guarded here, without the `session_provider?` fallback the rest of this file uses, on
+  # purpose: the legacy path acknowledges from inside `build_and_save_message` and has no
+  # notion of an imported row, so the guard has to sit where both paths pass. The session
+  # writer stands down on its own (`MessageWriter#acknowledge`), so this is the only check
+  # the Baileys import gets and it costs the live path a thread-local read.
+  def received_messages(messages, conversation)
+    return if Whatsapp::Session::SilentWrite.on?
+
+    super
+  end
+
   def supports_reactions?
     return super unless session_provider?
 

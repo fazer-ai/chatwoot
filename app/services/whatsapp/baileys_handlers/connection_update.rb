@@ -17,6 +17,19 @@ module Whatsapp::BaileysHandlers::ConnectionUpdate
       inbox.channel.update_provider_connection!(provider_connection_payload(data))
       Rails.logger.error "Baileys connection error: #{data[:error]}" if data[:error].present?
     end
+
+    end_backfill
+  end
+
+  # A history request travels to the phone through the session, so one that ends takes any
+  # outstanding request with it. Without this the window a button press opened would still
+  # be standing at the next pairing, and the dump the phone offers unprompted would be
+  # filed as if somebody had asked for it. Read off the record rather than off the event,
+  # because the payload can be rewritten on the way in.
+  def end_backfill
+    return if inbox.channel.provider_connection.to_h['connection'] == 'open'
+
+    Whatsapp::Session::HistoryBackfill.close!(inbox.channel)
   end
 
   # NOTE: `connection` values

@@ -34,18 +34,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
   # The Baileys and Z-API writers both acknowledge every incoming row, which is what puts
   # the second tick on the contact's screen and, when the inbox asks for it, marks the
   # chat read. Without it every message this layer stores stays unread on their phone.
-  # `any_instance` because the writer reaches the channel through the conversation's own
-  # inbox, which is a different object than the one this spec holds.
+  # `any_instance` because the writer reaches the provider through the conversation's own
+  # inbox, which is a different object than the one this spec holds. Asserted on the facade
+  # rather than on the channel: the channel's own method is defined on a prepended module,
+  # which `any_instance` cannot stub.
   it 'tells the provider the message was received' do
-    # `any_instance` because the writer reaches the channel through the conversation's
-    # own inbox, which is a different object than the one this spec holds.
-    expect_any_instance_of(Channel::Whatsapp).to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
+    expect_any_instance_of(Whatsapp::Session::Facade).to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
 
     dispatch
   end
 
   it 'says nothing to the provider about a message the phone itself sent' do
-    expect_any_instance_of(Channel::Whatsapp).not_to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
+    expect_any_instance_of(Whatsapp::Session::Facade).not_to receive(:received_messages) # rubocop:disable RSpec/AnyInstance
 
     Whatsapp::Session::Inbound::Dispatcher.dispatch(
       channel,

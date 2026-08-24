@@ -142,31 +142,6 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     render json: { error: 'WhatsApp provider is currently unavailable. Please try again.' }, status: :service_unavailable
   end
 
-  # Asks the phone for the history behind the conversations this inbox already holds.
-  # Administrator only, like disconnecting: it is reached from the same settings screen,
-  # and one press can file a year of conversation into the account.
-  #
-  # Queued rather than performed here, and answered on the webhook rather than in this
-  # response: one press walks up to twenty five chats, and the provider is explicit that a
-  # sleeping phone may never answer at all. What the operator is told is that it was asked.
-  def sync_provider_history
-    channel = @inbox.channel
-
-    unless channel.try(:session_capabilities)&.include?('history_sync')
-      render json: { error: 'Channel does not support history sync' }, status: :unprocessable_entity and return
-    end
-
-    # The request reaches the phone through the session, so a closed one has nothing to
-    # carry it. Refused here rather than queued, or the operator is told the phone was
-    # asked and nothing ever arrives.
-    unless channel.provider_connection.to_h['connection'] == 'open'
-      render json: { error: 'Channel is not connected' }, status: :unprocessable_entity and return
-    end
-
-    Whatsapp::Session::HistoryBackfillJob.perform_later(channel)
-    head :ok
-  end
-
   def disconnect_channel_provider
     channel = @inbox.channel
 

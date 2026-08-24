@@ -140,14 +140,7 @@
       "WHATSAPP_CLIENT_TOKEN_TITLE": "Security Token",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Your Z-API Client Token (see Security tab on Z-API dashboard).",
       "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Update Security Token",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Enter the new Security Token here",
-      "WHATSAPP_HISTORY_SYNC": {
-        "BUTTON": "Sync history now",
-        "HELP": "Asks the phone for the history of the most recent conversations. It has to be awake and unlocked to answer, and the messages arrive on their own over the next few minutes.",
-        "REQUESTED": "History requested. The messages will appear as the phone sends them.",
-        "ERROR": "Could not ask for the history. Try again in a moment.",
-        "OFFLINE_HELP": "Connect the device first: a history request travels to the phone through the session."
-      }
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Enter the new Security Token here"
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Prevent assignment takeover",

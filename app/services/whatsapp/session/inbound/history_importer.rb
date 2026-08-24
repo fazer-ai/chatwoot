@@ -20,6 +20,8 @@
 #                    while the archive stays silent because a reader has nothing to gain
 #                    from eight hundred backdated rows arriving one cable frame at a time.
 class Whatsapp::Session::Inbound::HistoryImporter
+  include Whatsapp::Session::Inbound::HistorySettlement
+
   # A chat's whole batch is written under one lock, and a batch can be two hundred
   # messages with an avatar lookup and a contact resolution behind the first of them. The
   # ordinary thirty seconds is a lease that would expire mid-import, and a lease that
@@ -184,66 +186,4 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # Raises the flag for the stretch it wraps. Only the gap ever asks for it, and only the
   # dashboard push gets through: see Whatsapp::Session::SilentWrite.
   def announcing(&) = Whatsapp::Session::SilentWrite.wrap(announce: true, &)
-
-  # Both halves are settled together rather than one after the other, because a chat can
-  # hand rows to each and the stamps have to see all of them at once: split in two, the
-  # archive pass would read a conversation's rows without the newer gap rows beside them.
-  # Which conversations may announce is therefore carried separately from the rows.
-  def settle(archived, gap)
-    announced = gap.compact.filter_map(&:conversation).uniq
-    (archived + gap).compact.group_by(&:conversation).each do |conversation, rows|
-      stamp_activity(conversation, rows)
-      stamp_waiting(conversation, rows)
-      if announced.include?(conversation)
-        announcing { inbound::ChatList.refresh(conversation) }
-      else
-        inbound::ChatList.refresh(conversation)
-      end
-    end
-  end
-
-  # Where the inbox sorts, and where a thread appears in the list. `set_conversation_activity`
-  # assigns whatever row it has just written, unconditionally: left to run over history it
-  # would drag a thread answered this morning back to 2025. A thread this run opened takes
-  # the batch outright, because it was born stamped with the time of the import; one that
-  # already existed only ever moves forward.
-  def stamp_activity(conversation, rows)
-    newest = rows.filter_map(&:created_at).max
-    return if newest.blank?
-    return if opened.exclude?(conversation.id) && conversation.last_activity_at.present? &&
-              conversation.last_activity_at >= newest
-
-    conversation.update_columns(last_activity_at: newest) # rubocop:disable Rails/SkipsModelValidations
-  end
-
-  # The clock the queue and the unattended reports read. Live traffic keeps it by hand: a
-  # message from the contact starts it, an answer of ours clears it. An archive thread is
-  # resolved and runs no clock at all; an open one gets the same reading live traffic
-  # would have left, taken over the whole batch.
-  def stamp_waiting(conversation, rows)
-    return if conversation.resolved?
-
-    waiting_since = first_unanswered(rows)
-    return unless restamp_waiting?(conversation, waiting_since)
-
-    conversation.update_columns(waiting_since: waiting_since) # rubocop:disable Rails/SkipsModelValidations
-  end
-
-  # A thread this run opened carries what `ensure_waiting_since` stamps on every new
-  # conversation, which reads "waiting since now" about a message from Saturday: an
-  # artifact, replaced by whatever the batch says, nil included. On a thread that already
-  # existed the stored clock is real, and only an older unanswered message may pull it back.
-  def restamp_waiting?(conversation, waiting_since)
-    return true if opened.include?(conversation.id)
-    return false if waiting_since.blank?
-
-    conversation.waiting_since.blank? || conversation.waiting_since > waiting_since
-  end
-
-  # The oldest message the contact sent that nothing of ours came after.
-  def first_unanswered(rows)
-    answered_at = rows.select(&:outgoing?).filter_map(&:created_at).max
-    pending = rows.select { |row| row.incoming? && (answered_at.blank? || row.created_at > answered_at) }
-    pending.first&.created_at
-  end
 end

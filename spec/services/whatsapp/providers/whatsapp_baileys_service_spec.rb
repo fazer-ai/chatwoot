@@ -108,7 +108,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
               webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
               includeMedia: false,
-              groupsEnabled: described_class.groups_enabled?
+              groupsEnabled: described_class.groups_enabled?,
+              syncFullHistory: false
             }.to_json
           )
           .to_return(status: 200)
@@ -129,7 +130,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
               webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
               includeMedia: false,
-              groupsEnabled: described_class.groups_enabled?
+              groupsEnabled: described_class.groups_enabled?,
+              syncFullHistory: false
             }.to_json
           )
           .to_return(
@@ -237,7 +239,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
                       webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
                       webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
                       includeMedia: false,
-                      groupsEnabled: described_class.groups_enabled?
+                      groupsEnabled: described_class.groups_enabled?,
+                      syncFullHistory: false
                     }.to_json
                   )
                   .to_return(status: 202)
@@ -1807,7 +1810,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
               webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
               includeMedia: false,
-              groupsEnabled: described_class.groups_enabled?
+              groupsEnabled: described_class.groups_enabled?,
+              syncFullHistory: false
             }.to_json
           )
           .to_return(status: 200)
@@ -1826,7 +1830,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
               webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
               includeMedia: false,
-              groupsEnabled: described_class.groups_enabled?
+              groupsEnabled: described_class.groups_enabled?,
+              syncFullHistory: false
             }.to_json
           )
           .to_return(status: 200)
@@ -1845,7 +1850,8 @@ describe Whatsapp::Providers::WhatsappBaileysService do
               webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
               webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
               includeMedia: false,
-              groupsEnabled: described_class.groups_enabled?
+              groupsEnabled: described_class.groups_enabled?,
+              syncFullHistory: false
             }.to_json
           )
           .to_return(status: 400, body: 'reconnection failed')
@@ -1925,6 +1931,57 @@ describe Whatsapp::Providers::WhatsappBaileysService do
 
           expect(WebMock).to have_requested(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
         end
+      end
+    end
+  end
+
+  describe 'history sync' do
+    let(:history_url) do
+      "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/fetch-message-history"
+    end
+    let(:contact) { create(:contact, account: whatsapp_channel.inbox.account, phone_number: '+551187654321', identifier: '99887766@lid') }
+    let(:conversation) { create(:conversation, inbox: whatsapp_channel.inbox, account: whatsapp_channel.inbox.account, contact: contact) }
+
+    before { create(:contact_inbox, inbox: whatsapp_channel.inbox, contact: contact, source_id: '99887766') }
+
+    describe '#history_sync?' do
+      it 'is off until the operator turns it on' do
+        expect(service.history_sync?).to be(false)
+      end
+
+      it 'is on once the inbox carries the setting' do
+        whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge('history_sync' => true))
+
+        expect(service.history_sync?).to be(true)
+      end
+    end
+
+    describe '#request_history' do
+      # WhatsApp can only walk backwards, so a request needs a message to walk back from.
+      it 'asks the phone for what came before the oldest stored message' do
+        create(:message, conversation: conversation, inbox: whatsapp_channel.inbox, source_id: 'NEWER',
+                         created_at: 1.day.ago, content_attributes: { external_created_at: 200 })
+        create(:message, conversation: conversation, inbox: whatsapp_channel.inbox, source_id: 'OLDEST',
+                         created_at: 5.days.ago, content_attributes: { external_created_at: 100 })
+        request = stub_request(:post, history_url)
+                  .with(
+                    headers: stub_headers(whatsapp_channel),
+                    body: {
+                      count: 50,
+                      oldestMsgKey: { id: 'OLDEST', remoteJid: '99887766@lid', fromMe: false },
+                      # In milliseconds: the bridge hands this to `oldestMsgTimestampMs`.
+                      oldestMsgTimestamp: 100_000
+                    }.to_json
+                  )
+                  .to_return(status: 200)
+
+        expect(service.request_history(contact)).to be(true)
+        expect(request).to have_been_requested
+      end
+
+      it 'asks nothing for a contact with no stored message to anchor on' do
+        expect(service.request_history(contact)).to be(false)
+        expect(a_request(:post, history_url)).not_to have_been_made
       end
     end
   end

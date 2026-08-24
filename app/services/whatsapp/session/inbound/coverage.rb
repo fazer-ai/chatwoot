@@ -16,6 +16,11 @@
 # bootstrap dump. Uazapi does not pass the type through (the frames carry `messages`,
 # `chats` or `labels` and nothing else), so the line is redrawn here from what we hold.
 module Whatsapp::Session::Inbound::Coverage
+  # A row this inbox filed after the fact rather than received. `content_attributes` is a
+  # text column holding JSON, hence the cast, and the key is absent on every row written
+  # before imports existed, hence the default.
+  IMPORTED_SQL = "COALESCE((content_attributes#>>'{}')::jsonb->>'imported', 'false') = 'true'".freeze
+
   module_function
 
   # Nil when the inbox has never stored a provider message, which is a first connection:
@@ -30,8 +35,19 @@ module Whatsapp::Session::Inbound::Coverage
   # message is written with its original date, so the column stays the same clock for both
   # kinds of row, and it is a column rather than a jsonb key. Live traffic puts the two
   # within seconds of each other, which is the precision this boundary needs.
+  #
+  # Imported rows are excluded, and that is what makes the boundary hold still. They are
+  # dated to when they were sent, so a gap message from Saturday is newer than the line it
+  # was just measured against: with them counted, the second frame of the same sync reads
+  # the first frame's own writes as coverage and files the rest of the weekend as archive.
+  # It is also the truer reading. The column says when this inbox was covering the
+  # channel, and a message filed after the fact is evidence of an import, not of an inbox
+  # that was listening.
   def watermark(inbox)
-    inbox.messages.where.not(source_id: nil).maximum(:created_at)
+    inbox.messages
+         .where.not(source_id: nil)
+         .where.not(IMPORTED_SQL)
+         .maximum(:created_at)
   end
 
   # True when the message arrived after the inbox stopped covering the channel: nobody
