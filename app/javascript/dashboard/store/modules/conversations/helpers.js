@@ -74,15 +74,14 @@ export const applyPageFilters = (conversation, filters) => {
 /**
  * The human this conversation is assigned to, or undefined.
  *
- * `meta.assignee` is whoever the conversation was handed to, bot included, and
- * `meta.assignee_type` is what says which. Everything that asks "is this unassigned"
- * means "does a human own it", because that is the question the server answers:
- * assigning to a bot clears `assignee_id` and stores the bot in its own column, so the
- * `unassigned` scope, the tab's badge and `conversation_unassigned_manage` all count it
- * as unassigned.
+ * `meta.assignee` is whoever holds the conversation, bot included, and `meta.assignee_type`
+ * is what says which. A bot holding a conversation counts as ASSIGNED everywhere the server
+ * decides: `scope :unassigned` requires `assignee_agent_bot_id` to be null too, the tab's
+ * badge counts the same way, and `conversation_unassigned_manage` grants access through that
+ * same scope. So this helper is not the answer to "is this unassigned" — `meta.assignee` is.
  *
- * Bots are excluded rather than humans required: the payload sets the type in the same
- * branch that names the bot, so a payload without one only ever named a human.
+ * Use it only where the question really is "which human", such as matching an agent's own id:
+ * a bot's id comes from its own table and can be the same integer as an agent's.
  *
  * @param {{meta?: {assignee?: Object, assignee_type?: string}}} conversation
  * @returns {Object|undefined}
@@ -111,14 +110,10 @@ export const applyRoleFilter = (
     return true;
   }
 
-  // Assigned means assigned to a HUMAN, which is what the database says: handing a
-  // conversation to a bot clears `assignee_id` and stores the bot in its own column, so
-  // the server's `unassigned` scope, the tab's badge and
-  // `conversation_unassigned_manage` all count it as unassigned. The payload still names
-  // the bot under `meta.assignee` (`Conversation#assigned_entity` prefers it), so reading
-  // that alone made the client disagree with the server that fed it: an agent with only
-  // `conversation_unassigned_manage` lost the conversations the server had granted them.
-  const conversationAssignee = humanAssignee(conversation);
+  // Whoever holds it, bot included: `conversation_unassigned_manage` is scoped on the server by
+  // `conversations.unassigned`, which excludes a conversation a bot holds. Reading the human
+  // assignee here instead would show the agent conversations the server never granted them.
+  const conversationAssignee = conversation.meta.assignee;
   const isUnassigned = !conversationAssignee;
   const isAssignedToUser = conversationAssignee?.id === currentUserId;
 

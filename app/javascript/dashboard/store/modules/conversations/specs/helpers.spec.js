@@ -266,11 +266,10 @@ describe('Conversation Helpers', () => {
       ).toBe(false);
     });
 
-    // A conversation handed to a bot has `assignee_id` cleared, so
-    // `conversation_unassigned_manage` grants it on the server. The client read
-    // `meta.assignee`, which still names the bot, and removed it from a list the server
-    // had already decided the agent could see.
-    it('treats a bot-held conversation as unassigned', () => {
+    // `conversation_unassigned_manage` is scoped on the server by `conversations.unassigned`,
+    // which requires `assignee_agent_bot_id` to be null: a bot-held conversation is never granted
+    // through it.
+    it('treats a bot-held conversation as assigned', () => {
       const conversation = {
         meta: { assignee: { id: 99, name: 'Bot' }, assignee_type: 'AgentBot' },
       };
@@ -281,7 +280,7 @@ describe('Conversation Helpers', () => {
           ['conversation_unassigned_manage'],
           1
         )
-      ).toBe(true);
+      ).toBe(false);
     });
 
     // Test edge cases for meta.assignee
