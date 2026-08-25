@@ -110,12 +110,13 @@ export const applyRoleFilter = (
     return true;
   }
 
-  // Whoever holds it, bot included: `conversation_unassigned_manage` is scoped on the server by
-  // `conversations.unassigned`, which excludes a conversation a bot holds. Reading the human
-  // assignee here instead would show the agent conversations the server never granted them.
-  const conversationAssignee = conversation.meta.assignee;
-  const isUnassigned = !conversationAssignee;
-  const isAssignedToUser = conversationAssignee?.id === currentUserId;
+  // Two different questions, and the server answers them from two different columns:
+  // `conversations.unassigned` (which excludes a conversation a bot holds, so whoever holds it is
+  // what settles it) OR `assigned_to(user)`, which reads `assignee_id` and can only ever name a
+  // human. Comparing the raw assignee's id against the agent's would match a bot that happens to
+  // share the integer, since bot ids come from their own table.
+  const isUnassigned = !conversation.meta.assignee;
+  const isAssignedToUser = humanAssignee(conversation)?.id === currentUserId;
 
   // Check unassigned management permission
   if (permissions.includes('conversation_unassigned_manage')) {

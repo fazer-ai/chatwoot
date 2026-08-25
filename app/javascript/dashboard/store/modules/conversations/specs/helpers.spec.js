@@ -283,6 +283,21 @@ describe('Conversation Helpers', () => {
       ).toBe(false);
     });
 
+    // The other half of the same payload: the server grants "mine" through `assigned_to(user)`,
+    // which reads `assignee_id` and can only name a human, so a bot sharing the agent's integer
+    // grants nothing. Both scoped roles ask the question, so both are checked.
+    it.each([
+      'conversation_unassigned_manage',
+      'conversation_participating_manage',
+    ])('keeps a bot sharing the agent id out of %s', permission => {
+      const conversation = {
+        meta: { assignee: { id: 1, name: 'Bot' }, assignee_type: 'AgentBot' },
+      };
+      expect(
+        applyRoleFilter(conversation, 'custom_role', [permission], 1)
+      ).toBe(false);
+    });
+
     // Test edge cases for meta.assignee
     describe('handles edge cases with meta.assignee', () => {
       const role = 'custom_role';
