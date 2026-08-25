@@ -173,15 +173,16 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (!permissions.some(held => ASSIGNMENT_SCOPED_PERMISSIONS.includes(held)))
       return false;
 
-    // A conversation handed to a bot is unassigned as far as visibility goes: the assignment service
-    // clears `assignee_id` and tracks the bot beside it, so the filter that scopes a role to the
-    // unassigned ones takes it in even though the payload still names the bot.
-    const assignee = humanAssignee(payload);
-    if (assignee && assignee.id === user?.id) return true;
+    // The human, because the id being compared is an agent's: a bot's id comes from its own table
+    // and can be the same integer.
+    if (humanAssignee(payload)?.id === user?.id) return true;
 
-    // Losing the assignee hands the conversation back to a role that sees the unassigned ones.
+    // Whoever holds it, bot included: an unassigned-only role is scoped on the server by
+    // `conversations.unassigned`, which a bot-held conversation is not part of. Being handed to a
+    // bot takes access away rather than granting it, the same as being handed to another agent.
     return (
-      !assignee && permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
+      !payload.meta?.assignee &&
+      permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
     );
   };
 

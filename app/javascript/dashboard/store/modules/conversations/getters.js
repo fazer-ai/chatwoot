@@ -131,11 +131,11 @@ const getters = {
   },
   getUnAssignedChats: (_state, _, __, rootGetters) => activeFilters => {
     const chats = _state.allConversations.filter(conversation => {
-      // A human assignee, not any assignee: handing a conversation to a bot clears
-      // `assignee_id`, so the server counts it as unassigned and the tab's badge says
-      // so. Reading `meta.assignee` alone (which names the bot) kept it out of the list
-      // the badge was counting.
-      const isUnAssigned = !humanAssignee(conversation);
+      // Any assignee, bot included, which is the server's own answer: `scope :unassigned`
+      // requires `assignee_agent_bot_id` to be null too, and the tab's badge counts the same
+      // way. Asking for a human here put bot-held conversations in a list whose badge did not
+      // count them, and only after a visit to "All" had loaded them into the store.
+      const isUnAssigned = !conversation.meta.assignee;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       return isUnAssigned && shouldFilter;
     });

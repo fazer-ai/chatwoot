@@ -64,6 +64,7 @@ import {
   getVisibleAssigneeTabPermissions,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
+import { humanAssignee } from '../store/modules/conversations/helpers';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
 
 const props = defineProps({
@@ -336,11 +337,14 @@ const pageTitle = computed(() => {
 
 function filterByAssigneeTab(conversations) {
   if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.ME) {
+    // The human, since the id being compared is an agent's: a bot's comes from its own table and
+    // can be the same integer.
     return conversations.filter(
-      c => c.meta?.assignee?.id === currentUser.value?.id
+      c => humanAssignee(c)?.id === currentUser.value?.id
     );
   }
   if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    // Whoever holds it, bot included, which is what the server's `unassigned` scope says.
     return conversations.filter(c => !c.meta?.assignee);
   }
   return [...conversations];
