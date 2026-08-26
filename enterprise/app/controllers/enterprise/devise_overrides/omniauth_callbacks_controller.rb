@@ -53,7 +53,11 @@ module Enterprise::DeviseOverrides::OmniauthCallbacksController
     return sign_in_saml_user(relay_state) if @resource.persisted?
 
     handle_saml_auth_error(relay_state, 'saml-authentication-failed')
-  rescue SamlUserBuilder::AuthenticationFailed
+  # `create_user` builds the record straight off the assertion and saves it with `User.create!`,
+  # so an IdP sending an address Rails will not accept raises out of the builder rather than
+  # coming back unsaved. That is a failed sign-in like any other: without this it leaves the
+  # browser on a 500 instead of the login page, and the `persisted?` branch above is unreachable.
+  rescue SamlUserBuilder::AuthenticationFailed, ActiveRecord::RecordInvalid
     handle_saml_auth_error(relay_state, 'saml-authentication-failed')
   end
 

@@ -283,16 +283,20 @@ RSpec.describe SamlUserBuilder do
       end
     end
 
-    context 'when there are errors' do
-      it 'returns unsaved user object when user creation fails' do
-        allow(User).to receive(:create).and_return(User.new(email: email))
-        user = builder.perform
-        expect(user.persisted?).to be false
+    # `create_user` saves with `User.create!`, so a record Rails refuses raises instead of
+    # coming back unsaved. The controller turns that into the ordinary failed-sign-in
+    # redirect; see the omniauth callbacks spec.
+    context 'when the user cannot be created' do
+      before { allow(User).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(User.new)) }
+
+      it 'raises instead of returning an unsaved user' do
+        expect { builder.perform }.to raise_error(ActiveRecord::RecordInvalid)
       end
 
-      it 'does not create account association for failed user' do
-        allow(User).to receive(:create).and_return(User.new(email: email))
-        expect { builder.perform }.not_to change(AccountUser, :count)
+      it 'does not create an account association' do
+        expect do
+          expect { builder.perform }.to raise_error(ActiveRecord::RecordInvalid)
+        end.not_to change(AccountUser, :count)
       end
     end
   end

@@ -94,7 +94,7 @@ RSpec.describe Cloudflare::CheckCustomHostnameService do
           stub_request(:get, 'https://api.cloudflare.com/client/v4/zones/test-zone-id/custom_hostnames?hostname=test.example.com')
             .to_return(status: 200, body: success_response.to_json, headers: { 'Content-Type' => 'application/json' })
 
-          expect(portal).to receive(:update).with(
+          expect(portal).to receive(:update!).with(
             ssl_settings: {
               'cf_verification_id' => 'verification-id',
               'cf_verification_body' => 'verification-body',
