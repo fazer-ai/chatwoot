@@ -88,3 +88,16 @@ app/jobs/whatsapp/session/pairing_poll_job.rb: Preserve compatibility with queue
 # changes every inbox picker in the app for those users, or a report-scoped inbox endpoint.
 # Neither belongs in a reports PR.
 app/javascript/dashboard/routes/dashboard/settings/reports/components/OverviewReportFilters.vue: Load all report-visible inboxes for the filter  # PR#412
+# PR#418: not a defect, and the remedy would make the payload worse. The mechanism is
+# real — `WebhookListener` runs at job time and rebuilds `webhook_data` from a row it just
+# reloaded through the GlobalID — but it is not this column's. Measured on a running
+# instance, in a rolled-back transaction: with the row at origin=77/priority=low/status=open
+# at enqueue and moved to 91/urgent/resolved before the perform, the payload carried
+# 91/"urgent"/"resolved". `priority` and `status` were in `list_of_keys` long before this
+# change and drift by exactly the same amount. Snapshotting only the pairing would make it
+# the one key in the account webhook whose value is event-time while everything beside it in
+# the same object is delivery-time, and a consumer reading two of them would be reading two
+# instants with no way to tell. The account webhook is a state snapshot at delivery; a
+# consumer that acts on it fences it as state, which is what fazer-ai/agents#355 does with a
+# version mark of its own.
+app/controllers/api/v1/widget/redirect_tokens_controller.rb: Snapshot the origin in async event payloads  # PR#418
