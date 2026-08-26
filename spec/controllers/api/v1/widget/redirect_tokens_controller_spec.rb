@@ -412,5 +412,233 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(contact.contact_inboxes.count).to eq(1)
       end
     end
+
+    # THE ORPHAN THIS ENDPOINT USED TO CREATE (fazer-ai/agents#286, split out of #269).
+    #
+    # `ContactIdentifyAction` decides by the identifier: it MERGES the visitor onto whoever holds the
+    # value and ASSIGNS the value when nobody does. For a redirect minted FOR a contact, assigning is
+    # wrong — the value belongs to that contact by construction, so a browser session that merely
+    # presented a token walks away holding it, and the lead ends up with two contacts, the second
+    # squatting the identifier every later redirect for it needs.
+    #
+    # Reproduced against this controller before the fix: with nobody holding the identifier, a resolve
+    # left 2 contacts, the lead carrying none and the visitor holding the lead's `fzwa:` value. That is
+    # the production state #269 measured and #272 could not reproduce.
+    context 'when the token names the contact it was minted for' do
+      let(:lead) { create(:contact, account: account, identifier: 'fzwa:77') }
+
+      it 'unifies the visitor onto it when the identifier is where it should be' do
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(contact.id)).to be(false)
+        expect(account.contacts.count).to eq(1)
+      end
+
+      it 'unifies onto it even when the identifier is no longer there, and restores the value' do
+        lead.update!(identifier: nil)
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(contact.id)).to be(false)
+        expect(account.contacts.count).to eq(1)
+        expect(lead.reload.identifier).to eq('fzwa:77')
+      end
+
+      # Identifiers are mutable through the contacts API and the ingestion services, and a link from
+      # yesterday is not evidence about who this contact says it is today.
+      it 'never overwrites an identifier the contact has since been given' do
+        lead.update!(identifier: 'crm-7788')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(lead.reload.identifier).to eq('crm-7788')
+        expect(Contact.exists?(contact.id)).to be(false)
+      end
+
+      it 'unifies without raising when a third contact took the value meanwhile' do
+        lead.update!(identifier: nil)
+        squatter = create(:contact, account: account, identifier: 'fzwa:77')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(contact.id)).to be(false)
+        # WHERE the visitor landed is the whole assertion: identifying by the identifier would have
+        # merged it onto the squatter, which holds the value and is not this lead.
+        expect(contact_inbox.reload.contact_id).to eq(lead.id)
+        expect(lead.reload.identifier).to be_nil
+        expect(squatter.reload.identifier).to eq('fzwa:77')
+      end
+
+      # A SESSION ALREADY LOGGED IN AS SOMEBODY ELSE IS NOT THE MERGEE.
+      #
+      # The fresh-session guard above keys on the identifier, so a token that names a contact and
+      # carries no identifier walked straight past it: the browser's own identified customer became
+      # the mergee, and the merge moved ITS conversations, inboxes and messages onto the named target
+      # and destroyed it. Clicking a link meant for someone else would take a customer's history with
+      # it.
+      it 'does not swallow a customer who is already identified as somebody else' do
+        stranger = create(:contact, account: account, identifier: 'crm-stranger')
+        stranger_inbox = create(:contact_inbox, contact: stranger, inbox: web_widget.inbox)
+        stranger_token = Widget::TokenService.new(
+          payload: { source_id: stranger_inbox.source_id, inbox_id: web_widget.inbox.id }
+        ).generate_token
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => stranger_token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(stranger.id)).to be(true)
+        expect(stranger.reload.identifier).to eq('crm-stranger')
+      end
+
+      # The lead clicking its own link again, in the browser it already crossed on. There is no other
+      # identity to protect here, so the session is kept rather than replaced: without the id
+      # comparison this branch would mint a throwaway contact and a fresh auth token on every click,
+      # and then merge it straight back.
+      it 'keeps the session when it is already the named contact' do
+        contact.update!(identifier: 'fzwa:55')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => contact.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['widget_auth_token']).to be_nil
+        expect(Contact.exists?(contact.id)).to be(true)
+        expect(contact_inbox.reload.contact_id).to eq(contact.id)
+      end
+
+      # THE SAME QUESTION, ASKED OF EVERY FIELD THAT ANSWERS IT.
+      #
+      # `ContactIdentifyAction` merges on three attributes — identifier, email and phone_number — so
+      # those three are what \"this browser is already somebody\" means. Asking only about the
+      # identifier left a pre-chat contact (email or phone, no identifier) reading as anonymous, and
+      # an anonymous session is the one thing this branch may consume: it became the mergee and its
+      # history moved onto a contact it has nothing to do with.
+      %i[email phone_number].each do |field|
+        it "does not swallow a customer established by #{field} alone" do
+          value = field == :email ? 'someone@example.com' : '+553299887766'
+          stranger = create(:contact, :account => account, field => value)
+          stranger_inbox = create(:contact_inbox, contact: stranger, inbox: web_widget.inbox)
+          stranger_token = Widget::TokenService.new(
+            payload: { source_id: stranger_inbox.source_id, inbox_id: web_widget.inbox.id }
+          ).generate_token
+          redirect_token = Widget::RedirectToken.generate(
+            { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => lead.id }
+          )
+
+          post '/api/v1/widget/redirect_token',
+               params: { website_token: web_widget.website_token, token: redirect_token },
+               headers: { 'X-Auth-Token' => stranger_token },
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(Contact.exists?(stranger.id)).to be(true)
+          expect(stranger.reload.public_send(field)).to eq(value)
+        end
+      end
+
+      # The rejected value must not ride out on the cloned message either: `Message.create!` builds
+      # its payload from this very object, and the SYNC dispatcher hands it to agent bots and
+      # websockets before anything reloads.
+      it 'does not announce an identifier the database refused' do
+        lead.update!(identifier: nil)
+        create(:contact, account: account, identifier: 'fzwa:77')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77',
+            'identified_contact_id' => lead.id, 'message' => 'Hello' }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        conversation = Conversation.find_by(display_id: response.parsed_body['conversation_id'])
+        cloned = conversation.messages.find_by(content: 'Hello')
+        expect(cloned.sender.identifier).to be_nil
+      end
+
+      it 'identifies nobody when the named contact is gone' do
+        gone_id = lead.id
+        lead.destroy!
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => gone_id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(contact.reload.identifier).to be_nil
+      end
+    end
+
+    # The older, looser contract, and it is the reason the field is optional: a deep link minted for
+    # an identity this account has never seen still creates it.
+    context 'when the token names no contact' do
+      it 'still establishes a brand-new identity on the visitor' do
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'crm-user-42' }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(contact.reload.identifier).to eq('crm-user-42')
+      end
+    end
   end
 end
