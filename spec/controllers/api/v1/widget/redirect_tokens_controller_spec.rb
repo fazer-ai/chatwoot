@@ -116,8 +116,12 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
 
         redirected = contact.reload.conversations.last
         expect(redirected.push_event_data[:redirect_origin_display_id]).to eq(77)
-        # A conversation outside a redirect episode does not carry the key at all.
-        expect(create(:conversation, account: account).push_event_data).not_to have_key(:redirect_origin_display_id)
+        # A conversation outside a redirect episode carries the key with nil — NOT absent. Absent is
+        # reserved for a Chatwoot that does not speak about pairings at all, so a consumer can tell
+        # "there is no pairing" from "this instance said nothing", and can therefore mirror a CLEAR.
+        unpaired = create(:conversation, account: account).push_event_data
+        expect(unpaired).to have_key(:redirect_origin_display_id)
+        expect(unpaired[:redirect_origin_display_id]).to be_nil
       end
 
       # The consumer acts on the FIRST event it receives, which is the cloned message. AgentBotListener
@@ -278,8 +282,9 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
 
         updated = payloads.find { |pl| pl[:event] == 'conversation_updated' }
         expect(updated).to be_present
-        # Absent rather than nil, the same shape a conversation outside an episode has.
-        expect(updated).not_to have_key(:redirect_origin_display_id)
+        # Stated as nil, so a consumer can mirror the clear instead of keeping what it had.
+        expect(updated).to have_key(:redirect_origin_display_id)
+        expect(updated[:redirect_origin_display_id]).to be_nil
       end
     end
 

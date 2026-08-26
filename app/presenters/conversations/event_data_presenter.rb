@@ -85,11 +85,16 @@ class Conversations::EventDataPresenter < SimpleDelegator
   # per-account number, the same one `id` above carries) — never the primary key, which is a
   # different number for the same conversation and is what a consumer would silently mis-join on.
   #
-  # Absent, rather than nil, on every conversation that is not the widget half of a redirect episode,
-  # on the same terms as group_left above: the question does not arise there.
+  # ALWAYS present, nil included, and that is the opposite of group_left right above. The two look
+  # alike and are not: a conversation does not stop being a group, but a pairing IS cleared — by a
+  # re-entry whose token names no origin (see the widget controller). Omitting nil would make that
+  # clear indistinguishable from "this conversation was never part of an episode", and a consumer
+  # holding the previous pairing has no way to tell it to drop one. It kept acting on it.
+  #
+  # A Chatwoot without this change omits the key entirely, so absent still means "said nothing" — the
+  # distinction a consumer needs is between an instance that speaks about pairings and one that does
+  # not, and the key's presence is exactly that.
   def redirect_origin_data
-    return {} if redirect_origin_display_id.blank?
-
     { redirect_origin_display_id: redirect_origin_display_id }
   end
 
