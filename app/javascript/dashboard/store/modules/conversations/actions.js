@@ -5,6 +5,8 @@ import { MESSAGE_STATUS, MESSAGE_TYPE } from 'shared/constants/messages';
 import { createPendingMessage } from 'dashboard/helper/commons';
 import { isStaleConversation } from './helpers';
 import wootConstants from 'dashboard/constants/globals';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   buildConversationList,
   isOnMentionsView,
@@ -116,7 +118,7 @@ const actions = {
   //
   // Returns what it removed, so the caller can drop the same conversations from anything keyed
   // by them.
-  reconcileConversationTab: async ({ commit, getters }, filters) => {
+  reconcileConversationTab: async ({ commit, getters, state }, filters) => {
     const tabGetter = TAB_GETTERS[filters.assigneeType];
     if (!tabGetter || UNRECONCILABLE_VIEWS.includes(filters.conversationType)) {
       return [];
@@ -153,6 +155,12 @@ const actions = {
           types.REMOVE_CONVERSATIONS,
           removed.map(c => c.id)
         );
+      }
+      // The panel is showing a conversation the server just refused to serve. Announced rather
+      // than acted on here, because the store has no router, and announced from here rather than
+      // left to each caller, because it is a fact about the removal and not about who asked.
+      if (removed.some(c => c.id === state.selectedChatId)) {
+        emitter.emit(BUS_EVENTS.OPEN_CONVERSATION_GONE);
       }
       return removed;
     } catch (error) {
