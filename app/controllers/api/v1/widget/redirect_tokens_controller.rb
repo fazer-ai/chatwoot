@@ -66,8 +66,18 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # the mirrored rows were tried downstream and each is wrong in its own way (fazer-ai/agents#222).
   #
   # Last write wins: a token is burned by exactly one click, so the value is always the origin of the
-  # redirect that just happened, which is the episode the follow-up ladder acts on. A re-entry with
-  # no origin in the token leaves the previous one standing rather than clearing it.
+  # redirect that just happened, which is the episode the follow-up ladder acts on.
+  #
+  # A token that names NO origin clears it, rather than leaving the previous one standing. Consuming a
+  # token is the one event that sets this column, so a re-entry that cannot say where it came from
+  # leaves the stored answer with nothing behind it — the lead came back through a link this instance
+  # cannot attribute. Keeping it would hand a consumer that MESSAGES and RESOLVES the named
+  # conversation full confidence in a previous episode's answer; clearing it sends that consumer to
+  # whatever it does with no answer at all, which is a decision it makes knowingly.
+  #
+  # Note the asymmetry with the consumer's own /reset, which deliberately KEEPS the pairing
+  # (fazer-ai/agents#355): a reset is not a redirect and does not un-click the link, so the stored
+  # answer is still the last true one. Here a redirect did happen and did not name an origin.
   #
   # On the message-less path this update is the ONLY thing that happens, so it has to be observable on
   # its own — nothing is created and no message is sent. That is why the column is in
@@ -78,9 +88,14 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # before dispatching anything. Removing this line leaves every event this endpoint emits identical
   # and only adds an UPDATE per repeated click — measured, because a repeated link from ONE WhatsApp
   # conversation is a supported flow and it would be easy to read the silence as this guard's doing.
+  # `.presence` normalizes for the equality check below and nothing else: an integer column casts ''
+  # to nil on assignment (measured), so a malformed token writes nil either way — but `nil == ''` is
+  # false, so without it the guard would miss and spend an UPDATE that changes nothing. That is why
+  # deleting it leaves the specs green.
   def record_redirect_origin(payload)
-    origin = payload['origin_display_id']
-    return if origin.blank? || @conversation.blank?
+    return if @conversation.blank?
+
+    origin = payload['origin_display_id'].presence
     return if @conversation.redirect_origin_display_id == origin
 
     @conversation.update!(redirect_origin_display_id: origin)

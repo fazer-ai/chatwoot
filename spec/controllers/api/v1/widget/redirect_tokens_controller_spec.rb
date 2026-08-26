@@ -163,7 +163,7 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
           # templates ride along on the first inbound and say nothing about the episode, so the
           # sequence below is the customer-visible one.
           expect(seen.map { |pl| pl[:redirect_origin_display_id] || pl.dig(:conversation, :redirect_origin_display_id) }.uniq)
-            .to eq(seen.empty? ? [] : [payload['origin_display_id']])
+            .to eq(seen.empty? ? [] : [payload['origin_display_id']].compact.presence || [nil])
           seen.reject { |pl| pl[:message_type] == 'template' }.map do |pl|
             [pl[:event], pl[:redirect_origin_display_id] || pl.dig(:conversation, :redirect_origin_display_id)]
           end
@@ -188,6 +188,13 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         # Origin unchanged, no message: no row changed and no message exists, so there is nothing for
         # an event to say. A repeated link from one WhatsApp conversation lands here.
         expect(redirect.call('origin_display_id' => 77)).to eq([])
+
+        # No origin at all: the pairing is CLEARED, and the clear is announced like any other change.
+        # The key is then absent from the payload, the same shape a conversation outside an episode has.
+        expect(redirect.call({})).to eq([['conversation_updated', nil]])
+
+        # ...and once it is gone, a second origin-less token has nothing left to clear.
+        expect(redirect.call({})).to eq([])
       end
 
       # The message-less resume path (cloneWaMessage off, or a media-only WhatsApp message) writes the
@@ -220,7 +227,7 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(updated[:redirect_origin_display_id]).to eq(91)
       end
 
-      it 'takes the newest origin on re-entry, and a token without one leaves the old standing' do
+      it 'takes the newest origin on re-entry, and a token without one clears it' do
         first = Widget::RedirectToken.generate(
           { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
         )
@@ -236,11 +243,43 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
              headers: { 'X-Auth-Token' => token }, as: :json
         expect(contact.reload.conversations.last.redirect_origin_display_id).to eq(91)
 
+        # Consuming a token is the ONE event that sets the pairing, so a token that names no origin
+        # leaves the previous one with nothing behind it: the lead came back through a link this
+        # instance cannot attribute. Keeping it would hand a consumer that MESSAGES and RESOLVES the
+        # named conversation full confidence in a previous episode's answer; clearing it sends that
+        # consumer to whatever it does when it has no answer, which is a decision it makes knowingly.
         third = Widget::RedirectToken.generate({ 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42' })
         post '/api/v1/widget/redirect_token',
              params: { website_token: web_widget.website_token, token: third },
              headers: { 'X-Auth-Token' => token }, as: :json
-        expect(contact.reload.conversations.last.redirect_origin_display_id).to eq(91)
+        expect(contact.reload.conversations.last.redirect_origin_display_id).to be_nil
+      end
+
+      # And the clear is announced, on the same terms as a change: it moves the column, so it emits
+      # its own conversation_updated. A consumer that only ever hears about origins it can act on
+      # would keep acting on the one this token just invalidated.
+      it 'announces the clear, and stops shipping the key' do
+        agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
+        create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
+        first = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: first },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        payloads = []
+        allow(AgentBots::WebhookJob).to receive(:perform_later) { |_url, pl, *| payloads << pl }
+
+        second = Widget::RedirectToken.generate({ 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42' })
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: second },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        updated = payloads.find { |pl| pl[:event] == 'conversation_updated' }
+        expect(updated).to be_present
+        # Absent rather than nil, the same shape a conversation outside an episode has.
+        expect(updated).not_to have_key(:redirect_origin_display_id)
       end
     end
 
