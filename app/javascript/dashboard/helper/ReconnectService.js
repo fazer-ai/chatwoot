@@ -59,6 +59,22 @@ class ReconnectService {
     await this.store.dispatch('updateChatListFilters', {
       updatedWithin: null,
     });
+    await this.reconcileConversationTab();
+  };
+
+  // The fetch above asks for one tab, so a conversation that LEFT that tab while the socket was
+  // down is not in the answer, and the merge that applies it only ever adds or replaces. The stale
+  // copy stays on the list.
+  //
+  // The list watcher normally catches that, but only when the list ends up longer than the tab's
+  // count, which needs the whole tab to fit in what the agent has loaded. On a tab of several
+  // pages the residue hides inside the count and nothing on screen contradicts anything, so the
+  // one moment we know events were missed is the moment to ask outright.
+  reconcileConversationTab = async () => {
+    await this.store.dispatch(
+      'reconcileConversationTab',
+      this.store.getters.getChatListFilters
+    );
   };
 
   fetchFilteredOrSavedConversations = async queryData => {

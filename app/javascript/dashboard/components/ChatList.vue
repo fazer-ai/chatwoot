@@ -919,9 +919,6 @@ const reconcileTab = debounce(
     if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
     if (conversationList.value.length <= activeAssigneeTabCount.value) return;
 
-    const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
-    if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
-
     const removed = await store.dispatch(
       'reconcileConversationTab',
       conversationFilters.value

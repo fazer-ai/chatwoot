@@ -4,6 +4,7 @@ import MessageApi from '../../../api/inbox/message';
 import { MESSAGE_STATUS, MESSAGE_TYPE } from 'shared/constants/messages';
 import { createPendingMessage } from 'dashboard/helper/commons';
 import { isStaleConversation } from './helpers';
+import wootConstants from 'dashboard/constants/globals';
 import {
   buildConversationList,
   isOnMentionsView,
@@ -33,14 +34,21 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
 };
 
 // The getter behind each assignee tab is the same predicate the list on screen uses, so what it
-// returns is exactly what the agent is looking at. The other views (mentions, participating, saved
-// filters, folders) narrow the list with a rule the store does not reproduce locally, so they are
-// left out: reconciling them would judge conversations against the wrong tab.
+// returns is exactly what the agent is looking at. Saved filters and folders narrow the list with
+// a rule of their own and have no assigneeType, so they fall out here.
 const TAB_GETTERS = {
   me: 'getMineChats',
   unassigned: 'getUnAssignedChats',
   all: 'getAllStatusChats',
 };
+
+// Mentions and participating do carry an assigneeType, but the server narrows those lists by a
+// membership the store cannot reproduce, so what is on screen there is not the tab a reconciliation
+// would judge it against.
+const UNRECONCILABLE_VIEWS = [
+  wootConstants.CONVERSATION_TYPE.MENTION,
+  wootConstants.CONVERSATION_TYPE.PARTICIPATING,
+];
 
 // The trigger fires from a watcher, which can fire again while the request is still out.
 const tabsBeingReconciled = new Set();
@@ -110,7 +118,10 @@ const actions = {
   // by them.
   reconcileConversationTab: async ({ commit, getters }, filters) => {
     const tabGetter = TAB_GETTERS[filters.assigneeType];
-    if (!tabGetter || tabsBeingReconciled.has(filters.assigneeType)) return [];
+    if (!tabGetter || UNRECONCILABLE_VIEWS.includes(filters.conversationType)) {
+      return [];
+    }
+    if (tabsBeingReconciled.has(filters.assigneeType)) return [];
 
     tabsBeingReconciled.add(filters.assigneeType);
     try {

@@ -805,6 +805,18 @@ describe('#deleteMessage', () => {
       expect(removed).toEqual([]);
     });
 
+    // Mentions and participating carry an assigneeType but are narrowed by a membership the store
+    // cannot reproduce, so what is on screen there is not the tab this would judge it against.
+    it('does nothing on a view the store cannot reproduce', async () => {
+      const removed = await actions.reconcileConversationTab(contextWith([]), {
+        ...filters,
+        conversationType: 'mention',
+      });
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
+    });
+
     it('does nothing on a view that has no tab getter', async () => {
       const removed = await actions.reconcileConversationTab(contextWith([]), {
         assigneeType: 'appliedFilters',
