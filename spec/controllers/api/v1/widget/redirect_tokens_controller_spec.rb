@@ -529,6 +529,58 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(stranger.reload.identifier).to eq('crm-stranger')
       end
 
+      # The lead clicking its own link again, in the browser it already crossed on. There is no other
+      # identity to protect here, so the session is kept rather than replaced: without the id
+      # comparison this branch would mint a throwaway contact and a fresh auth token on every click,
+      # and then merge it straight back.
+      it 'keeps the session when it is already the named contact' do
+        contact.update!(identifier: 'fzwa:55')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => contact.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['widget_auth_token']).to be_nil
+        expect(Contact.exists?(contact.id)).to be(true)
+        expect(contact_inbox.reload.contact_id).to eq(contact.id)
+      end
+
+      # THE SAME QUESTION, ASKED OF EVERY FIELD THAT ANSWERS IT.
+      #
+      # `ContactIdentifyAction` merges on three attributes — identifier, email and phone_number — so
+      # those three are what \"this browser is already somebody\" means. Asking only about the
+      # identifier left a pre-chat contact (email or phone, no identifier) reading as anonymous, and
+      # an anonymous session is the one thing this branch may consume: it became the mergee and its
+      # history moved onto a contact it has nothing to do with.
+      %i[email phone_number].each do |field|
+        it "does not swallow a customer established by #{field} alone" do
+          value = field == :email ? 'someone@example.com' : '+553299887766'
+          stranger = create(:contact, :account => account, field => value)
+          stranger_inbox = create(:contact_inbox, contact: stranger, inbox: web_widget.inbox)
+          stranger_token = Widget::TokenService.new(
+            payload: { source_id: stranger_inbox.source_id, inbox_id: web_widget.inbox.id }
+          ).generate_token
+          redirect_token = Widget::RedirectToken.generate(
+            { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => lead.id }
+          )
+
+          post '/api/v1/widget/redirect_token',
+               params: { website_token: web_widget.website_token, token: redirect_token },
+               headers: { 'X-Auth-Token' => stranger_token },
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(Contact.exists?(stranger.id)).to be(true)
+          expect(stranger.reload.public_send(field)).to eq(value)
+        end
+      end
+
       # The rejected value must not ride out on the cloned message either: `Message.create!` builds
       # its payload from this very object, and the SYNC dispatcher hands it to agent bots and
       # websockets before anything reloads.

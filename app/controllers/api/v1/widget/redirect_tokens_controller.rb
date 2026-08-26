@@ -44,13 +44,24 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # target and its contact was destroyed — a link meant for someone else taking a customer's history
   # with it.
   def another_identity?(payload)
-    return false if @contact.identifier.blank?
+    return established_identity? && @contact.id != payload['identified_contact_id'] if payload['identified_contact_id'].present?
 
-    if payload['identified_contact_id'].present?
-      @contact.id != payload['identified_contact_id']
-    else
-      payload['identifier'].present? && @contact.identifier != payload['identifier']
-    end
+    payload['identifier'].present? && @contact.identifier.present? && @contact.identifier != payload['identifier']
+  end
+
+  # WHAT COUNTS AS "already somebody", and why it is three fields rather than one.
+  #
+  # `ContactIdentifyAction` merges on identifier, email AND phone_number, so all three are identities
+  # this account already resolved — a pre-chat form leaves a contact carrying an email or a phone and
+  # no identifier at all. Asking only about the identifier read that contact as anonymous, and
+  # anonymous is the one thing the named-contact branch may consume, so a customer established by the
+  # pre-chat form had its conversations moved onto an unrelated contact and its own row destroyed.
+  #
+  # Only the named-contact branch asks this. The identifier-only path above keeps the exact predicate
+  # it always had: there, a contact carrying an email and no identifier is SUPPOSED to fall through to
+  # the action, which may then merge it by email.
+  def established_identity?
+    @contact.identifier.present? || @contact.email.present? || @contact.phone_number.present?
   end
 
   # THE VISITOR JOINS THE CONTACT THE TOKEN NAMES, and does not merely claim to be it.
