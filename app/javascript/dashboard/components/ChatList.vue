@@ -883,12 +883,29 @@ function toggleSelectAll(check) {
   selectAllConversations(check, conversationList);
 }
 
-// A conversation that is gone from the list must not stay in the bulk selection: the toolbar would
-// keep showing it as picked, and the next bulk assign or label would still be sent for it.
+// The bulk toolbar acts on ids, and the list it was built from moves under it: a conversation can
+// leave the tab through a cable event, through reconciliation, or by being deleted. Whatever is no
+// longer on the list has to leave the selection with it, or the next bulk assign or label would be
+// sent for a conversation the agent cannot see. `inboxId` is passed in because `selectedInboxes`
+// holds one entry per selected conversation, and a conversation already gone from the store cannot
+// answer for its own.
 function dropFromSelection(conversationId, inboxId) {
   if (!isConversationSelected(conversationId)) return;
   deSelectConversation(conversationId, inboxId);
 }
+
+// The invariant, covering every way a conversation leaves the list. Reconciliation handles its own
+// removals first, since only it still knows their inbox.
+watch(conversationList, list => {
+  if (!selectedConversations.value.length) return;
+
+  const visible = new Set(list.map(c => c.id));
+  [...selectedConversations.value]
+    .filter(id => !visible.has(id))
+    .forEach(id =>
+      dropFromSelection(id, getConversationById.value(id)?.inbox_id)
+    );
+});
 
 useEmitter('fetch_conversation_stats', () => {
   if (hasAppliedFiltersOrActiveFolders.value) return;

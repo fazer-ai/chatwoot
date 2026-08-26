@@ -651,13 +651,21 @@ describe('#deleteMessage', () => {
       { id: 2, inbox_id: 7 },
       { id: 3, inbox_id: 8 },
     ];
-    const fresh = id => ({ id, meta: { assignee: { id: 42 } } });
+    const fresh = (id, updatedAt = 200) => ({
+      id,
+      updated_at: updatedAt,
+      meta: { assignee: { id: 42 } },
+    });
+    const inStore = { 1: { id: 1, updated_at: 100 } };
 
-    const contextWith = (payload, chats = onScreen) => {
+    const contextWith = (payload, chats = onScreen, stored = inStore) => {
       axios.post.mockResolvedValue({ data: { payload } });
       return {
         commit,
-        getters: { getUnAssignedChats: () => chats },
+        getters: {
+          getUnAssignedChats: () => chats,
+          getConversationById: id => stored[id],
+        },
       };
     };
 
@@ -724,13 +732,40 @@ describe('#deleteMessage', () => {
       });
 
       const removed = await actions.reconcileConversationTab(
-        { commit, getters: { getUnAssignedChats: () => chats } },
+        {
+          commit,
+          getters: {
+            getUnAssignedChats: () => chats,
+            getConversationById: () => undefined,
+          },
+        },
         filters
       );
 
       expect(removed).toEqual([]);
       expect(commit.mock.calls).toEqual([
         [types.SET_ALL_CONVERSATION, [fresh(1), fresh(2), fresh(3)]],
+      ]);
+    });
+
+    // A cable event can beat the response home. Writing the older row back would regress the status
+    // or the assignee, and hide the conversation with nothing watching to bring it back.
+    it('drops a row the store already holds a newer copy of', async () => {
+      const payload = [fresh(1, 50), fresh(2, 300), fresh(3, 300)];
+      await actions.reconcileConversationTab(contextWith(payload), filters);
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(2, 300), fresh(3, 300)]],
+      ]);
+    });
+
+    it('keeps a row the store holds an older copy of', async () => {
+      const payload = [fresh(1, 500)];
+      await actions.reconcileConversationTab(contextWith(payload), filters);
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(1, 500)]],
+        [types.REMOVE_CONVERSATIONS, [2, 3]],
       ]);
     });
 
@@ -757,7 +792,13 @@ describe('#deleteMessage', () => {
     it('keeps the list as is when the request fails', async () => {
       axios.post.mockRejectedValue({ message: 'Network error' });
       const removed = await actions.reconcileConversationTab(
-        { commit, getters: { getUnAssignedChats: () => onScreen } },
+        {
+          commit,
+          getters: {
+            getUnAssignedChats: () => onScreen,
+            getConversationById: () => undefined,
+          },
+        },
         filters
       );
 

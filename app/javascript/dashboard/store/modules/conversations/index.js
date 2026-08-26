@@ -1,7 +1,7 @@
 import types from '../../mutation-types';
 import getters, { getSelectedChatConversation } from './getters';
 import actions from './actions';
-import { findPendingMessageIndex } from './helpers';
+import { findPendingMessageIndex, isStaleConversation } from './helpers';
 import { MESSAGE_STATUS } from 'shared/constants/messages';
 import wootConstants from 'dashboard/constants/globals';
 import { BUS_EVENTS } from '../../../../shared/constants/busEvents';
@@ -278,9 +278,7 @@ export const mutations = {
       const selectedConversation = allConversations[index];
 
       // ignore out of order events
-      if (conversation.updated_at < selectedConversation.updated_at) {
-        return;
-      }
+      if (isStaleConversation(conversation, selectedConversation)) return;
 
       const {
         messages,

@@ -7,6 +7,12 @@ export const findPendingMessageIndex = (chat, message) => {
   );
 };
 
+// A cable event can land while a list or sync response is in flight, so a response can carry an
+// older row than the one the store already holds. `updated_at` is a float epoch on both sides, and
+// this is the same comparison UPDATE_CONVERSATION makes for out-of-order cable events.
+export const isStaleConversation = (incoming, existing) =>
+  Boolean(existing) && incoming.updated_at < existing.updated_at;
+
 export const filterByStatus = (chatStatus, filterStatus) =>
   filterStatus === 'all' ? true : chatStatus === filterStatus;
 

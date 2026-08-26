@@ -3,6 +3,7 @@ import ConversationApi from '../../../api/inbox/conversation';
 import MessageApi from '../../../api/inbox/message';
 import { MESSAGE_STATUS, MESSAGE_TYPE } from 'shared/constants/messages';
 import { createPendingMessage } from 'dashboard/helper/commons';
+import { isStaleConversation } from './helpers';
 import {
   buildConversationList,
   isOnMentionsView,
@@ -123,9 +124,16 @@ const actions = {
         data: { payload },
       } = await ConversationApi.sync(candidates.map(c => c.id));
 
+      // A cable event can beat this response home, and SET_ALL_CONVERSATION replaces without
+      // looking at timestamps, so an older row is dropped here rather than written over a newer
+      // one. Regressing a status or an assignee would also hide the conversation with no way back:
+      // a list shorter than its badge is not a contradiction anything watches for.
+      const applicable = payload.filter(
+        c => !isStaleConversation(c, getters.getConversationById(c.id))
+      );
       // The open conversation keeps its messages and attachments through this mutation's own
       // selected-chat branch, so a refresh never empties the panel under the agent.
-      if (payload.length) commit(types.SET_ALL_CONVERSATION, payload);
+      if (applicable.length) commit(types.SET_ALL_CONVERSATION, applicable);
 
       const stillThere = new Set(payload.map(c => c.id));
       const removed = candidates.filter(c => !stillThere.has(c.id));

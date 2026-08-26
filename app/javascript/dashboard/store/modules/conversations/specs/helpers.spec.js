@@ -1,7 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { applyRoleFilter, sortComparator } from '../helpers';
+import {
+  applyRoleFilter,
+  isStaleConversation,
+  sortComparator,
+} from '../helpers';
 
 describe('Conversation Helpers', () => {
+  describe('#isStaleConversation', () => {
+    it('is stale when the incoming row is older than the stored one', () => {
+      expect(
+        isStaleConversation({ updated_at: 100 }, { updated_at: 200 })
+      ).toBe(true);
+    });
+
+    it('is not stale when the incoming row is newer or the same age', () => {
+      expect(
+        isStaleConversation({ updated_at: 300 }, { updated_at: 200 })
+      ).toBe(false);
+      expect(
+        isStaleConversation({ updated_at: 200 }, { updated_at: 200 })
+      ).toBe(false);
+    });
+
+    it('is not stale when nothing is stored yet', () => {
+      expect(isStaleConversation({ updated_at: 100 }, undefined)).toBe(false);
+    });
+  });
+
   describe('#sortComparator', () => {
     const older = { id: 1, last_activity_at: 1000 };
     const newer = { id: 2, last_activity_at: 2000 };
