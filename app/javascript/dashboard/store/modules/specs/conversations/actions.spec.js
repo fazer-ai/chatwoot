@@ -644,6 +644,70 @@ describe('#deleteMessage', () => {
     expect(commit.mock.calls).toEqual([]);
   });
 
+  describe('#reconcileConversationTab', () => {
+    const filters = { assigneeType: 'unassigned', status: 'open' };
+    const onScreen = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+    const contextWith = (ids, selectedChatId = null) => {
+      axios.get.mockResolvedValue({ data: { ids } });
+      return {
+        commit,
+        dispatch,
+        state: { selectedChatId },
+        getters: { getUnAssignedChats: () => onScreen },
+      };
+    };
+
+    beforeEach(() => {
+      commit.mockClear();
+      dispatch.mockClear();
+    });
+
+    it('drops what the server no longer lists in the tab', async () => {
+      await actions.reconcileConversationTab(contextWith([2]), filters);
+
+      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1, 3]]]);
+      expect(dispatch.mock.calls).toEqual([]);
+    });
+
+    it('commits nothing when the tab already matches', async () => {
+      await actions.reconcileConversationTab(contextWith([1, 2, 3]), filters);
+
+      expect(commit.mock.calls).toEqual([]);
+    });
+
+    it('reads the open conversation back instead of dropping it', async () => {
+      await actions.reconcileConversationTab(contextWith([2], 3), filters);
+
+      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1]]]);
+      expect(dispatch.mock.calls).toEqual([['getConversation', 3]]);
+    });
+
+    it('does nothing on a view that has no tab getter', async () => {
+      await actions.reconcileConversationTab(contextWith([]), {
+        assigneeType: 'appliedFilters',
+      });
+
+      expect(axios.get).not.toHaveBeenCalled();
+      expect(commit.mock.calls).toEqual([]);
+    });
+
+    it('keeps the list as is when the request fails', async () => {
+      axios.get.mockRejectedValue({ message: 'Network error' });
+      await actions.reconcileConversationTab(
+        {
+          commit,
+          dispatch,
+          state: { selectedChatId: null },
+          getters: { getUnAssignedChats: () => onScreen },
+        },
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([]);
+    });
+  });
+
   describe('#deleteConversation', () => {
     it('send correct actions if API is success', async () => {
       axios.delete.mockResolvedValue({

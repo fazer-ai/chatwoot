@@ -260,6 +260,16 @@ export const mutations = {
     );
   },
 
+  // Drops copies the server no longer lists in the tab they were shown under. The counterpart to
+  // SET_ALL_CONVERSATION, which only ever adds or replaces: a conversation that leaves a tab stops
+  // being sent to it, so nothing else would ever take it off the list.
+  [types.REMOVE_CONVERSATIONS](_state, conversationIds) {
+    const idsToRemove = new Set(conversationIds);
+    _state.allConversations = _state.allConversations.filter(
+      c => !idsToRemove.has(c.id)
+    );
+  },
+
   [types.UPDATE_CONVERSATION](_state, conversation) {
     const { allConversations } = _state;
     const index = allConversations.findIndex(c => c.id === conversation.id);

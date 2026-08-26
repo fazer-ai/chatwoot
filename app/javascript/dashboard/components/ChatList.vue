@@ -888,6 +888,27 @@ useEmitter('fetch_conversation_stats', () => {
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
+// The list can only ever be a subset of what the server counts for the tab, so a list longer than
+// the badge is a contradiction: the store is holding conversations that already left this tab, and
+// nothing in it would ever take them off the list. Watching both numbers covers the two ways the
+// contradiction surfaces, a list fetch and the debounced badge, including the agent who is just
+// sitting on the screen, which is how it was reported.
+//
+// Only the assignee tabs: the other views narrow the list with a rule the store does not reproduce
+// locally, so what is on screen there is not the tab the server would reconcile against.
+watch(
+  [() => conversationList.value.length, activeAssigneeTabCount],
+  ([listSize, tabCount]) => {
+    if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
+    if (listSize <= tabCount) return;
+
+    const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
+    if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
+
+    store.dispatch('reconcileConversationTab', conversationFilters.value);
+  }
+);
+
 let lastSubscribedIds = '';
 const subscribePresenceForTopChats = () => {
   const ids = conversationList.value.slice(0, 10).map(c => c.id);

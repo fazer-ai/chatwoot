@@ -162,6 +162,87 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
+  describe 'GET /api/v1/accounts/{account.id}/conversations/ids' do
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        get "/api/v1/accounts/#{account.id}/conversations/ids"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:inbox) { create(:inbox, account: account) }
+      let!(:unassigned) { create(:conversation, account: account, inbox: inbox, assignee: nil) }
+      let!(:mine) { create(:conversation, account: account, inbox: inbox, assignee: agent) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: inbox)
+      end
+
+      it 'returns every display_id in the tab the assignee_type names' do
+        get "/api/v1/accounts/#{account.id}/conversations/ids",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'unassigned' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['ids']).to contain_exactly(unassigned.display_id)
+        expect(response.parsed_body['ids']).not_to include(mine.display_id)
+      end
+
+      it 'counts a conversation an agent bot holds as assigned, the way the tab badge does' do
+        agent_bot = create(:agent_bot, account: account)
+        unassigned.update!(assignee_agent_bot: agent_bot)
+
+        get "/api/v1/accounts/#{account.id}/conversations/ids",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'unassigned' },
+            as: :json
+
+        expect(response.parsed_body['ids']).to be_empty
+      end
+
+      it 'applies the same status, group_type and inbox filters the list request uses' do
+        resolved = create(:conversation, account: account, inbox: inbox, assignee: nil, status: :resolved)
+        group = create(:conversation, account: account, inbox: inbox, assignee: nil, group_type: :group)
+        create(:conversation, account: account, assignee: nil)
+
+        get "/api/v1/accounts/#{account.id}/conversations/ids",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'unassigned', status: 'open', group_type: 'group', inbox_id: inbox.id },
+            as: :json
+
+        ids = response.parsed_body['ids']
+        expect(ids).to contain_exactly(group.display_id)
+        expect(ids).not_to include(resolved.display_id, unassigned.display_id)
+      end
+
+      it 'leaves out conversations in inboxes the agent has no access to' do
+        other_inbox_conversation = create(:conversation, account: account, assignee: nil)
+
+        get "/api/v1/accounts/#{account.id}/conversations/ids",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'unassigned' },
+            as: :json
+
+        expect(response.parsed_body['ids']).not_to include(other_inbox_conversation.display_id)
+      end
+
+      it 'returns the whole tab, past the page the list endpoint would stop at' do
+        create_list(:conversation, 26, account: account, inbox: inbox, assignee: nil)
+
+        get "/api/v1/accounts/#{account.id}/conversations/ids",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'unassigned' },
+            as: :json
+
+        expect(response.parsed_body['ids'].size).to eq(27)
+      end
+    end
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/conversations/unread_counts' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do

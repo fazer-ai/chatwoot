@@ -127,7 +127,15 @@ class ConversationApi extends ApiClient {
     return axios.get(`${this.url}/pins`);
   }
 
-  meta({ inboxId, status, assigneeType, labels, teamId, conversationType }) {
+  meta({
+    inboxId,
+    status,
+    assigneeType,
+    labels,
+    teamId,
+    conversationType,
+    groupType,
+  }) {
     return axios.get(`${this.url}/meta`, {
       params: {
         inbox_id: inboxId,
@@ -136,6 +144,32 @@ class ConversationApi extends ApiClient {
         labels,
         team_id: teamId,
         conversation_type: conversationType,
+        group_type: groupType,
+      },
+    });
+  }
+
+  // Every id the tab holds, as a set: no page, no sort. Used to reconcile a list that has grown
+  // longer than the tab's own count, which only happens when the store kept a conversation that
+  // left the tab. Takes the same filters as `get` so both sides describe the same tab.
+  ids({
+    inboxId,
+    status,
+    assigneeType,
+    labels,
+    teamId,
+    conversationType,
+    groupType,
+  }) {
+    return axios.get(`${this.url}/ids`, {
+      params: {
+        inbox_id: inboxId,
+        team_id: teamId,
+        status,
+        assignee_type: assigneeType,
+        labels,
+        conversation_type: conversationType,
+        group_type: groupType,
       },
     });
   }

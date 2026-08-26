@@ -35,8 +35,22 @@ export const filterByUnattended = (
     : shouldFilter;
 };
 
+// `all` is what the dropdown sends for "no preference", and the server treats it the same way
+// (`ConversationFinder#filter_by_group_type` returns early on it).
+export const filterByGroupType = (shouldFilter, groupType, chatGroupType) => {
+  if (!groupType || groupType === 'all') return shouldFilter;
+  return groupType === chatGroupType && shouldFilter;
+};
+
 export const applyPageFilters = (conversation, filters) => {
-  const { inboxId, status, labels = [], teamId, conversationType } = filters;
+  const {
+    inboxId,
+    status,
+    labels = [],
+    teamId,
+    conversationType,
+    groupType,
+  } = filters;
   const {
     status: chatStatus,
     inbox_id: chatInboxId,
@@ -44,6 +58,7 @@ export const applyPageFilters = (conversation, filters) => {
     meta = {},
     first_reply_created_at: firstReplyOn,
     waiting_since: waitingSince,
+    group_type: chatGroupType,
   } = conversation;
   const team = meta.team || {};
   const { id: chatTeamId } = team;
@@ -52,6 +67,7 @@ export const applyPageFilters = (conversation, filters) => {
   shouldFilter = filterByInbox(shouldFilter, inboxId, chatInboxId);
   shouldFilter = filterByTeam(shouldFilter, teamId, chatTeamId);
   shouldFilter = filterByLabel(shouldFilter, labels, chatLabels);
+  shouldFilter = filterByGroupType(shouldFilter, groupType, chatGroupType);
   shouldFilter = filterByUnattended(
     shouldFilter,
     conversationType,

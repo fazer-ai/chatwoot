@@ -4,7 +4,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include HmacConcern
   include ConversationCustomAttributesConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
+  before_action :conversation, except: [:index, :meta, :ids, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -18,6 +18,17 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def meta
     result = conversation_finder.perform_meta_only
     @conversations_count = result[:count]
+  end
+
+  # Every id the tab holds right now, under the same filters the list request used. The dashboard
+  # asks for this only when its own list is longer than the count the server reports for that tab,
+  # which is a contradiction it cannot resolve on its own: nothing in the store ever removes a
+  # conversation that left a tab, so a single missed cable event leaves a copy behind forever.
+  #
+  # The set is bounded by that trigger. It is asked for only when the count is smaller than what the
+  # client already holds in memory, so a large account never ships a large response here.
+  def ids
+    @conversation_ids = conversation_finder.perform_ids_only
   end
 
   def search

@@ -73,6 +73,16 @@ class ConversationFinder # rubocop:disable Metrics/ClassLength
     }
   end
 
+  # The display_ids of the whole tab, unordered and unpaginated: the caller reconciles its own list
+  # against this as a set, so a sort would only cost the query an index it does not need. Not the
+  # primary key, since display_id is what the API speaks everywhere else.
+  def perform_ids_only
+    set_up
+    filter_by_assignee_type
+
+    @conversations.unscope(:order).pluck(:display_id)
+  end
+
   private
 
   def set_up

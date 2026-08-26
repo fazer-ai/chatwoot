@@ -31,6 +31,19 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
   return status === MESSAGE_STATUS.FAILED && externalError !== '';
 };
 
+// The getter behind each assignee tab is the same predicate the list on screen uses, so what it
+// returns is exactly what the agent is looking at. The other views (mentions, participating, saved
+// filters, folders) narrow the list with a rule the store does not reproduce locally, so they are
+// left out: reconciling them would judge conversations against the wrong tab.
+const TAB_GETTERS = {
+  me: 'getMineChats',
+  unassigned: 'getUnAssignedChats',
+  all: 'getAllStatusChats',
+};
+
+// The trigger fires from a watcher, which can fire again while the request is still out.
+const tabsBeingReconciled = new Set();
+
 // actions
 const actions = {
   getConversation: async ({ commit }, conversationId) => {
@@ -74,6 +87,43 @@ const actions = {
     } catch (error) {
       commit(types.CLEAR_LIST_LOADING_STATUS);
       throw error;
+    }
+  },
+
+  // Puts a tab back in sync with the server. The store is a cache nothing invalidates:
+  // SET_ALL_CONVERSATION only adds or replaces, and a conversation that leaves a tab stops being
+  // sent to it, so one missed cable event leaves a copy on the list forever and the copies pile up.
+  //
+  // The server's id list is the authority here, not the count that triggered this. A count that is
+  // merely stale (the badge is debounced) costs one request and removes nothing.
+  reconcileConversationTab: async (
+    { commit, dispatch, getters, state },
+    filters
+  ) => {
+    const tabGetter = TAB_GETTERS[filters.assigneeType];
+    if (!tabGetter || tabsBeingReconciled.has(filters.assigneeType)) return;
+
+    tabsBeingReconciled.add(filters.assigneeType);
+    try {
+      const {
+        data: { ids },
+      } = await ConversationApi.ids(filters);
+      const liveIds = new Set(ids);
+      const stale = getters[tabGetter](filters).filter(c => !liveIds.has(c.id));
+      const staleIds = stale
+        .map(c => c.id)
+        .filter(id => id !== state.selectedChatId);
+
+      if (staleIds.length) commit(types.REMOVE_CONVERSATIONS, staleIds);
+      // Dropping the open conversation would empty the panel under the agent, so it gets read back
+      // instead. Its own fresh data is what takes it off the tab.
+      if (stale.length !== staleIds.length) {
+        dispatch('getConversation', state.selectedChatId);
+      }
+    } catch (error) {
+      // Handle error
+    } finally {
+      tabsBeingReconciled.delete(filters.assigneeType);
     }
   },
 
