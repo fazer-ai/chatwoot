@@ -883,6 +883,13 @@ function toggleSelectAll(check) {
   selectAllConversations(check, conversationList);
 }
 
+// A conversation that is gone from the list must not stay in the bulk selection: the toolbar would
+// keep showing it as picked, and the next bulk assign or label would still be sent for it.
+function dropFromSelection(conversationId, inboxId) {
+  if (!isConversationSelected(conversationId)) return;
+  deSelectConversation(conversationId, inboxId);
+}
+
 useEmitter('fetch_conversation_stats', () => {
   if (hasAppliedFiltersOrActiveFolders.value) return;
   store.dispatch('conversationStats/get', conversationFilters.value);
@@ -898,14 +905,18 @@ useEmitter('fetch_conversation_stats', () => {
 // locally, so what is on screen there is not the tab the server would reconcile against.
 watch(
   [() => conversationList.value.length, activeAssigneeTabCount],
-  ([listSize, tabCount]) => {
+  async ([listSize, tabCount]) => {
     if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
     if (listSize <= tabCount) return;
 
     const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
     if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
 
-    store.dispatch('reconcileConversationTab', conversationFilters.value);
+    const removed = await store.dispatch(
+      'reconcileConversationTab',
+      conversationFilters.value
+    );
+    removed.forEach(({ id, inboxId }) => dropFromSelection(id, inboxId));
   }
 );
 
@@ -947,8 +958,11 @@ const deleteConversationDialogRef = ref(null);
 const selectedConversationId = ref(null);
 
 async function deleteConversation() {
+  const { inbox_id: deletedInboxId } =
+    getConversationById.value(selectedConversationId.value) || {};
   try {
     await store.dispatch('deleteConversation', selectedConversationId.value);
+    dropFromSelection(selectedConversationId.value, deletedInboxId);
     redirectToConversationList();
     selectedConversationId.value = null;
     deleteConversationDialogRef.value.close();

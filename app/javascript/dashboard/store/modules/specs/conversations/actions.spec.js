@@ -646,28 +646,50 @@ describe('#deleteMessage', () => {
 
   describe('#reconcileConversationTab', () => {
     const filters = { assigneeType: 'unassigned', status: 'open' };
-    const onScreen = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const onScreen = [
+      { id: 1, inbox_id: 7 },
+      { id: 2, inbox_id: 7 },
+      { id: 3, inbox_id: 8 },
+    ];
 
-    const contextWith = (ids, selectedChatId = null) => {
-      axios.get.mockResolvedValue({ data: { ids } });
+    const contextWith = (ids, selectedChatId = null, chats = onScreen) => {
+      axios.post.mockResolvedValue({ data: { ids } });
       return {
         commit,
         dispatch,
         state: { selectedChatId },
-        getters: { getUnAssignedChats: () => onScreen },
+        getters: { getUnAssignedChats: () => chats },
       };
     };
 
     beforeEach(() => {
       commit.mockClear();
       dispatch.mockClear();
+      axios.post.mockReset();
     });
 
     it('drops what the server no longer lists in the tab', async () => {
-      await actions.reconcileConversationTab(contextWith([2]), filters);
+      const removed = await actions.reconcileConversationTab(
+        contextWith([2]),
+        filters
+      );
 
       expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1, 3]]]);
       expect(dispatch.mock.calls).toEqual([]);
+      expect(removed).toEqual([
+        { id: 1, inboxId: 7 },
+        { id: 3, inboxId: 8 },
+      ]);
+    });
+
+    it('asks only about the conversations on screen', async () => {
+      await actions.reconcileConversationTab(contextWith([1, 2, 3]), filters);
+
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/conversations/ids'),
+        { ids: [1, 2, 3] },
+        expect.anything()
+      );
     });
 
     it('commits nothing when the tab already matches', async () => {
@@ -676,25 +698,63 @@ describe('#deleteMessage', () => {
       expect(commit.mock.calls).toEqual([]);
     });
 
-    it('reads the open conversation back instead of dropping it', async () => {
-      await actions.reconcileConversationTab(contextWith([2], 3), filters);
-
-      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1]]]);
-      expect(dispatch.mock.calls).toEqual([['getConversation', 3]]);
-    });
-
-    it('does nothing on a view that has no tab getter', async () => {
-      await actions.reconcileConversationTab(contextWith([]), {
-        assigneeType: 'appliedFilters',
+    // The answer is about the list as it was when the request went out. A conversation that
+    // arrives over the cable mid-flight is missing from that answer because it was never asked
+    // about, and removing it would undo a live event.
+    it('leaves alone a conversation that arrived while the request was in flight', async () => {
+      const chats = [...onScreen];
+      axios.post.mockImplementation(() => {
+        chats.push({ id: 99, inbox_id: 7 });
+        return Promise.resolve({ data: { ids: [1, 2, 3] } });
       });
 
-      expect(axios.get).not.toHaveBeenCalled();
+      await actions.reconcileConversationTab(
+        {
+          commit,
+          dispatch,
+          state: { selectedChatId: null },
+          getters: { getUnAssignedChats: () => chats },
+        },
+        filters
+      );
+
       expect(commit.mock.calls).toEqual([]);
     });
 
+    it('reads the open conversation back instead of dropping it', async () => {
+      const removed = await actions.reconcileConversationTab(
+        contextWith([2], 3),
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1]]]);
+      expect(dispatch.mock.calls).toEqual([['getConversation', 3]]);
+      expect(removed).toEqual([{ id: 1, inboxId: 7 }]);
+    });
+
+    it('does not call out when the tab is empty on screen', async () => {
+      const removed = await actions.reconcileConversationTab(
+        contextWith([], null, []),
+        filters
+      );
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
+    });
+
+    it('does nothing on a view that has no tab getter', async () => {
+      const removed = await actions.reconcileConversationTab(contextWith([]), {
+        assigneeType: 'appliedFilters',
+      });
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(commit.mock.calls).toEqual([]);
+      expect(removed).toEqual([]);
+    });
+
     it('keeps the list as is when the request fails', async () => {
-      axios.get.mockRejectedValue({ message: 'Network error' });
-      await actions.reconcileConversationTab(
+      axios.post.mockRejectedValue({ message: 'Network error' });
+      const removed = await actions.reconcileConversationTab(
         {
           commit,
           dispatch,
@@ -705,6 +765,7 @@ describe('#deleteMessage', () => {
       );
 
       expect(commit.mock.calls).toEqual([]);
+      expect(removed).toEqual([]);
     });
   });
 

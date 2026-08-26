@@ -20,15 +20,17 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversations_count = result[:count]
   end
 
-  # Every id the tab holds right now, under the same filters the list request used. The dashboard
-  # asks for this only when its own list is longer than the count the server reports for that tab,
-  # which is a contradiction it cannot resolve on its own: nothing in the store ever removes a
-  # conversation that left a tab, so a single missed cable event leaves a copy behind forever.
+  # Which of the ids the caller sent still belong to the tab those same filters describe. The
+  # dashboard asks when its own list is longer than the count the server reports for that tab, a
+  # contradiction it cannot resolve on its own: nothing in the store ever removes a conversation
+  # that left a tab, so a single missed cable event leaves a copy behind forever.
   #
-  # The set is bounded by that trigger. It is asked for only when the count is smaller than what the
-  # client already holds in memory, so a large account never ships a large response here.
+  # POST, and answering only about the ids it was given, because the caller is the one who knows how
+  # small the question is. Returning the whole tab would be unbounded exactly when the count that
+  # triggered the ask is the stale one (a debounced meta answering for the filter before last), so
+  # the tab can be far larger than the handful the client has on screen.
   def ids
-    @conversation_ids = conversation_finder.perform_ids_only
+    @conversation_ids = conversation_finder.perform_ids_only(permitted_conversation_ids)
   end
 
   def search
@@ -333,6 +335,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def conversation_finder
     @conversation_finder ||= ConversationFinder.new(Current.user, params)
+  end
+
+  def permitted_conversation_ids
+    Array(params[:ids]).map(&:to_i)
   end
 
   def assignee?
