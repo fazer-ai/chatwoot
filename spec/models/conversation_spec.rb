@@ -809,7 +809,10 @@ RSpec.describe Conversation do
         waiting_since: conversation.waiting_since.to_i,
         priority: nil,
         unread_count: 0,
-        group_type: 'individual'
+        group_type: 'individual',
+        # Present on every conversation, nil included: its absence is what tells a consumer this
+        # Chatwoot does not speak about redirect pairings at all (fazer-ai/agents#222).
+        redirect_origin_display_id: nil
       }
     end
 

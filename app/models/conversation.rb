@@ -2,36 +2,37 @@
 #
 # Table name: conversations
 #
-#  id                     :integer          not null, primary key
-#  additional_attributes  :jsonb
-#  agent_last_seen_at     :datetime
-#  assignee_last_seen_at  :datetime
-#  cached_label_list      :text
-#  contact_last_seen_at   :datetime
-#  custom_attributes      :jsonb
-#  first_reply_created_at :datetime
-#  group_type             :integer          default("individual"), not null
-#  identifier             :string
-#  last_activity_at       :datetime         not null
-#  priority               :integer
-#  snoozed_until          :datetime
-#  status                 :integer          default("open"), not null
-#  status_changed_at      :datetime
-#  uuid                   :uuid             not null
-#  waiting_since          :datetime
-#  created_at             :datetime         not null
-#  updated_at             :datetime         not null
-#  account_id             :integer          not null
-#  assignee_agent_bot_id  :bigint
-#  assignee_id            :integer
-#  campaign_id            :bigint
-#  contact_id             :bigint           not null
-#  contact_inbox_id       :bigint
-#  display_id             :integer          not null
-#  inbox_id               :integer          not null
-#  kanban_task_id         :bigint
-#  sla_policy_id          :bigint
-#  team_id                :bigint
+#  id                         :integer          not null, primary key
+#  additional_attributes      :jsonb
+#  agent_last_seen_at         :datetime
+#  assignee_last_seen_at      :datetime
+#  cached_label_list          :text
+#  contact_last_seen_at       :datetime
+#  custom_attributes          :jsonb
+#  first_reply_created_at     :datetime
+#  group_type                 :integer          default("individual"), not null
+#  identifier                 :string
+#  last_activity_at           :datetime         not null
+#  priority                   :integer
+#  snoozed_until              :datetime
+#  status                     :integer          default("open"), not null
+#  status_changed_at          :datetime
+#  uuid                       :uuid             not null
+#  waiting_since              :datetime
+#  created_at                 :datetime         not null
+#  updated_at                 :datetime         not null
+#  account_id                 :integer          not null
+#  assignee_agent_bot_id      :bigint
+#  assignee_id                :integer
+#  campaign_id                :bigint
+#  contact_id                 :bigint           not null
+#  contact_inbox_id           :bigint
+#  display_id                 :integer          not null
+#  inbox_id                   :integer          not null
+#  kanban_task_id             :bigint
+#  redirect_origin_display_id :integer
+#  sla_policy_id              :bigint
+#  team_id                    :bigint
 #
 # Indexes
 #
@@ -410,9 +411,14 @@ class Conversation < ApplicationRecord
     dispatch_conversation_updated_event(previous_changes)
   end
 
+  # Every key here answers the same question: does a consumer of this conversation need to be TOLD
+  # when it changes? `redirect_origin_display_id` does, and only this list can say so. The pairing is
+  # written on an existing conversation whenever a message-less redirect token resumes one, and that
+  # write carries no message and creates nothing, so without an event of its own the change is
+  # invisible and the consumer keeps acting on the previous episode's origin (fazer-ai/agents#222).
   def list_of_keys
     %w[team_id assignee_id assignee_agent_bot_id status snoozed_until custom_attributes label_list waiting_since
-       first_reply_created_at priority]
+       first_reply_created_at priority redirect_origin_display_id]
   end
 
   def allowed_keys?

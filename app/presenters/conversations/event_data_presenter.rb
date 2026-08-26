@@ -65,7 +65,8 @@ class Conversations::EventDataPresenter < SimpleDelegator
       priority: priority,
       waiting_since: waiting_since.to_i,
       **push_timestamps,
-      **group_left_data
+      **group_left_data,
+      **redirect_origin_data
     }
   end
 
@@ -78,6 +79,23 @@ class Conversations::EventDataPresenter < SimpleDelegator
     return {} unless group_type_group?
 
     { group_left: contact_inbox&.group_left? }
+  end
+
+  # The WhatsApp entry conversation this widget thread was redirected from, as its display_id (the
+  # per-account number, the same one `id` above carries) — never the primary key, which is a
+  # different number for the same conversation and is what a consumer would silently mis-join on.
+  #
+  # ALWAYS present, nil included, and that is the opposite of group_left right above. The two look
+  # alike and are not: a conversation does not stop being a group, but a pairing IS cleared — by a
+  # re-entry whose token names no origin (see the widget controller). Omitting nil would make that
+  # clear indistinguishable from "this conversation was never part of an episode", and a consumer
+  # holding the previous pairing has no way to tell it to drop one. It kept acting on it.
+  #
+  # A Chatwoot without this change omits the key entirely, so absent still means "said nothing" — the
+  # distinction a consumer needs is between an instance that speaks about pairings and one that does
+  # not, and the key's presence is exactly that.
+  def redirect_origin_data
+    { redirect_origin_display_id: redirect_origin_display_id }
   end
 
   # Like #push_data but with message text normalized for external integrations (webhooks).
