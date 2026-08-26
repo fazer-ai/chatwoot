@@ -34,9 +34,9 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
 
   # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a
   # consumer receives for the cloned message is built INSIDE Message.create!, from the conversation as
-  # it stands at that moment. The pairing therefore has to be on the row before the message exists,
-  # and a later update would not correct it: `redirect_origin_display_id` is not in
-  # Conversation#list_of_keys, so it emits no conversation_updated of its own.
+  # it stands at that moment. The pairing therefore has to be on the row before the message exists:
+  # the conversation_updated that follows would be a second, weaker witness, and a consumer that acts
+  # on the first event it sees would have already acted on the previous episode's origin.
   def resume_or_start_conversation(payload)
     if payload['message'].present?
       @conversation = conversations.where.not(status: :resolved).last || start_conversation(payload)
@@ -56,6 +56,11 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # Last write wins: a token is burned by exactly one click, so the value is always the origin of the
   # redirect that just happened, which is the episode the follow-up ladder acts on. A re-entry with
   # no origin in the token leaves the previous one standing rather than clearing it.
+  #
+  # On the message-less path this update is the ONLY thing that happens, so it has to be observable on
+  # its own — nothing is created and no message is sent. That is why the column is in
+  # Conversation#list_of_keys: the update then emits its own conversation_updated, carrying the new
+  # pairing and a fresh `updated_at` for consumers to order it by.
   def record_redirect_origin(payload)
     origin = payload['origin_display_id']
     return if origin.blank? || @conversation.blank?

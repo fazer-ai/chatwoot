@@ -122,8 +122,8 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
 
       # The consumer acts on the FIRST event it receives, which is the cloned message. AgentBotListener
       # is on the SYNC dispatcher, so that payload is built inside Message.create!, and the pairing has
-      # to be on the row before the message exists — a later update carries no correcting event, since
-      # the column is not in Conversation#list_of_keys.
+      # to be on the row before the message exists. The conversation_updated that follows is a second
+      # witness, not a substitute: a consumer that answered the message already used the old pairing.
       it 'is already on the conversation the first webhook payload carries' do
         agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
         create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
@@ -142,6 +142,36 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         message_created = payloads.find { |pl| pl[:event] == 'message_created' }
         expect(message_created).to be_present
         expect(message_created[:conversation][:redirect_origin_display_id]).to eq(77)
+      end
+
+      # The message-less resume path (cloneWaMessage off, or a media-only WhatsApp message) writes the
+      # pairing onto a conversation that ALREADY exists, so neither a creation event nor a cloned
+      # message carries it. Unless that write is observable on its own, a consumer keeps the previous
+      # episode's origin and acts on the wrong WhatsApp conversation (fazer-ai/agents#355, round 1).
+      it 'emits an event carrying the new origin when a message-less token re-enters a conversation' do
+        agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
+        create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
+
+        first = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: first },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        payloads = []
+        allow(AgentBots::WebhookJob).to receive(:perform_later) { |_url, payload, *| payloads << payload }
+
+        second = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 91 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: second },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        updated = payloads.find { |pl| pl[:event] == 'conversation_updated' }
+        expect(updated).to be_present
+        expect(updated[:redirect_origin_display_id]).to eq(91)
       end
 
       it 'takes the newest origin on re-entry, and a token without one leaves the old standing' do
