@@ -259,6 +259,49 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(contact.reload.conversations.last.redirect_origin_display_id).to be_nil
       end
 
+      # Review round 7 of #418. "Last write wins" is the contract this endpoint states, and the guard
+      # below it was comparing against an ActiveRecord instance loaded before the token was even
+      # resolved. Two links clicked into the same widget conversation at once, and the request that
+      # finishes LAST can find its own origin already in memory, skip both the write and the event,
+      # and leave the other request's origin standing.
+      #
+      # The rendezvous is the row moving between the load and the guard, which is exactly what a
+      # concurrent resume does to it. `update_all` is the right tool: it changes the row without
+      # touching the instance the controller is holding.
+      it 'writes the origin its own token names even if the row moved under it' do
+        first = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: first },
+             headers: { 'X-Auth-Token' => token }, as: :json
+        conversation = contact.reload.conversations.last
+        expect(conversation.redirect_origin_display_id).to eq(77)
+
+        # any_instance because a request spec never holds the controller, and the rendezvous has to sit
+        # between the conversation load and the guard — the only two statements the window spans.
+        # update_all for the same reason it is the defect: it moves the ROW without telling the
+        # instance the controller is holding, which is exactly what a concurrent request does.
+        # rubocop:disable RSpec/AnyInstance, Rails/SkipsModelValidations
+        allow_any_instance_of(Api::V1::Widget::RedirectTokensController)
+          .to receive(:record_redirect_origin).and_wrap_original do |original, *args|
+          Conversation.where(id: conversation.id).update_all(redirect_origin_display_id: 91)
+          original.call(*args)
+        end
+        # rubocop:enable RSpec/AnyInstance, Rails/SkipsModelValidations
+
+        again = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: again },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        # This request's token named 77 and it ran last, so 77 is the pairing. Without the lock the
+        # stale instance answers "already 77" and 91 survives.
+        expect(conversation.reload.redirect_origin_display_id).to eq(77)
+      end
+
       # And the clear is announced, on the same terms as a change: it moves the column, so it emits
       # its own conversation_updated. A consumer that only ever hears about origins it can act on
       # would keep acting on the one this token just invalidated.

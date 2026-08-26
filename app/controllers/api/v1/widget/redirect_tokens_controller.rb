@@ -92,13 +92,30 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # to nil on assignment (measured), so a malformed token writes nil either way — but `nil == ''` is
   # false, so without it the guard would miss and spend an UPDATE that changes nothing. That is why
   # deleting it leaves the specs green.
+  #
+  # But it has to compare against the ROW, not against an instance loaded before the token was even
+  # resolved, and `with_lock` is what makes those the same thing: it reloads under SELECT ... FOR
+  # UPDATE, so the comparison sees whatever a concurrent resume committed and this request's own
+  # token still gets the last word. Removing the lock does not merely re-open a window — a stale
+  # instance holding this request's own origin makes the guard skip, and skipping is silent on both
+  # counts: no write, and no conversation_updated for the message-less path. Dropping the guard
+  # instead does not help either, because ActiveRecord issues no UPDATE for a value the instance
+  # already believes it has. The staleness is the defect; the guard only reads it out.
   def record_redirect_origin(payload)
     return if @conversation.blank?
+    # Born in this request, from start_conversation, which already wrote the origin from the same
+    # payload — there is no earlier value to reconcile and nothing could have raced a row that did
+    # not exist. Skipped rather than locked, and it has to be: a just-created Conversation still
+    # holds an unpersisted `display_id` change (Chatwoot assigns it around the insert), and
+    # `with_lock` refuses to lock a record with unpersisted changes rather than silently discard them.
+    return if @conversation.previously_new_record?
 
     origin = payload['origin_display_id'].presence
-    return if @conversation.redirect_origin_display_id == origin
+    @conversation.with_lock do
+      next if @conversation.redirect_origin_display_id == origin
 
-    @conversation.update!(redirect_origin_display_id: origin)
+      @conversation.update!(redirect_origin_display_id: origin)
+    end
   end
 
   # A brand-new conversation carries the pairing from birth, so even the conversation_created event
