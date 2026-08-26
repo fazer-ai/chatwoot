@@ -783,6 +783,27 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(conversation.contact.group_type).to eq('group')
     end
 
+    # The mirror of the shape above: a phone-addressed group carries the author's phone in
+    # `participant` and their LID in `participantAlt`. Reading the alt as a phone number
+    # because it is digits put the LID in the contact's phone field and left the LID field
+    # empty, swapping the two.
+    it 'reads the author of a phone-addressed group by the address that is a phone number' do
+      params = build_params(
+        build_group_raw_message(
+          id: 'grp_pn_001',
+          text: 'Hello from a phone-addressed group',
+          sender_participant: "#{sender_phone}@s.whatsapp.net",
+          sender_alt: "#{sender_lid}@lid"
+        )
+      )
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+
+      sender = inbox.messages.find_by(source_id: 'grp_pn_001').sender
+      expect(sender.phone_number).to eq("+#{sender_phone}")
+      expect(sender.identifier).to eq("#{sender_lid}@lid")
+    end
+
     it 'processes a group image message with attachment' do
       stub_request(:get, whatsapp_channel.media_url('grp_img_001'))
         .to_return(status: 200, body: 'fake image data')
