@@ -502,6 +502,56 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(squatter.reload.identifier).to eq('fzwa:77')
       end
 
+      # A SESSION ALREADY LOGGED IN AS SOMEBODY ELSE IS NOT THE MERGEE.
+      #
+      # The fresh-session guard above keys on the identifier, so a token that names a contact and
+      # carries no identifier walked straight past it: the browser's own identified customer became
+      # the mergee, and the merge moved ITS conversations, inboxes and messages onto the named target
+      # and destroyed it. Clicking a link meant for someone else would take a customer's history with
+      # it.
+      it 'does not swallow a customer who is already identified as somebody else' do
+        stranger = create(:contact, account: account, identifier: 'crm-stranger')
+        stranger_inbox = create(:contact_inbox, contact: stranger, inbox: web_widget.inbox)
+        stranger_token = Widget::TokenService.new(
+          payload: { source_id: stranger_inbox.source_id, inbox_id: web_widget.inbox.id }
+        ).generate_token
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => stranger_token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(stranger.id)).to be(true)
+        expect(stranger.reload.identifier).to eq('crm-stranger')
+      end
+
+      # The rejected value must not ride out on the cloned message either: `Message.create!` builds
+      # its payload from this very object, and the SYNC dispatcher hands it to agent bots and
+      # websockets before anything reloads.
+      it 'does not announce an identifier the database refused' do
+        lead.update!(identifier: nil)
+        create(:contact, account: account, identifier: 'fzwa:77')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77',
+            'identified_contact_id' => lead.id, 'message' => 'Hello' }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        conversation = Conversation.find_by(display_id: response.parsed_body['conversation_id'])
+        cloned = conversation.messages.find_by(content: 'Hello')
+        expect(cloned.sender.identifier).to be_nil
+      end
+
       it 'identifies nobody when the named contact is gone' do
         gone_id = lead.id
         lead.destroy!

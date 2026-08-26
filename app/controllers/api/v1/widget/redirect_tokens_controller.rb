@@ -18,7 +18,7 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   private
 
   def identify_from_token(payload)
-    if payload['identifier'].present? && @contact.identifier.present? && @contact.identifier != payload['identifier']
+    if another_identity?(payload)
       @contact_inbox, @widget_auth_token = build_contact_inbox_with_token(@web_widget)
       @contact = @contact_inbox.contact
     end
@@ -32,6 +32,25 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
       params: { identifier: payload['identifier'] },
       discard_invalid_attrs: true
     ).perform
+  end
+
+  # IS THIS BROWSER ALREADY SOMEBODY ELSE? If so the redirect starts a fresh session rather than
+  # writing over the identity sitting there.
+  #
+  # It has to ask BOTH ways the token can name an identity. Keying on the identifier alone was enough
+  # while that was the only one, and stopped being enough the moment a token could name a contact
+  # without carrying an identifier at all: an already-identified customer then walked past this guard
+  # and became the MERGEE below, so its conversations, inboxes and messages moved onto the named
+  # target and its contact was destroyed — a link meant for someone else taking a customer's history
+  # with it.
+  def another_identity?(payload)
+    return false if @contact.identifier.blank?
+
+    if payload['identified_contact_id'].present?
+      @contact.id != payload['identified_contact_id']
+    else
+      payload['identifier'].present? && @contact.identifier != payload['identifier']
+    end
   end
 
   # THE VISITOR JOINS THE CONTACT THE TOKEN NAMES, and does not merely claim to be it.
@@ -70,9 +89,14 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     # bang answers 422 out of the widget endpoint, which is worse than the state it was repairing:
     # the lead cannot enter the chat at all. The unification already happened above and stands either
     # way; the identifier is a convenience for the next mint, which settles it again anyway.
-    # rubocop:disable Rails/SaveBang
-    @contact.update(identifier: payload['identifier'])
-    # rubocop:enable Rails/SaveBang
+    return if @contact.update(identifier: payload['identifier'])
+
+    # A refused write leaves the attempted value DIRTY on this instance, and this instance is what
+    # the cloned message is created with. `Message.create!` builds its payload from it and the SYNC
+    # dispatcher hands that to agent bots and websockets, so the rejected identifier would be
+    # announced as though it had been stored — and the message's own save re-runs the uniqueness
+    # validation and answers 422, which is what the spec measured before this line existed.
+    @contact.restore_attributes
   end
 
   # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a
