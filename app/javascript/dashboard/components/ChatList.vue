@@ -887,25 +887,14 @@ function toggleSelectAll(check) {
 // The bulk toolbar acts on ids, and the list it was built from moves under it: a conversation can
 // leave the tab through a cable event, through reconciliation, or by being deleted. Whatever is no
 // longer on the list has to leave the selection with it, or the next bulk assign or label would be
-// sent for a conversation the agent cannot see. `inboxId` is passed in because `selectedInboxes`
-// holds one entry per selected conversation, and a conversation already gone from the store cannot
-// answer for its own.
-function dropFromSelection(conversationId, inboxId) {
-  if (!isConversationSelected(conversationId)) return;
-  deSelectConversation(conversationId, inboxId);
-}
-
-// The invariant, covering every way a conversation leaves the list. Reconciliation handles its own
-// removals first, since only it still knows their inbox.
+// sent for a conversation the agent cannot see.
 watch(conversationList, list => {
   if (!selectedConversations.value.length) return;
 
   const visible = new Set(list.map(c => c.id));
   [...selectedConversations.value]
     .filter(id => !visible.has(id))
-    .forEach(id =>
-      dropFromSelection(id, getConversationById.value(id)?.inbox_id)
-    );
+    .forEach(deSelectConversation);
 });
 
 useEmitter('fetch_conversation_stats', () => {
@@ -939,19 +928,30 @@ const reconcileTab = debounce(
     );
     if (!removed.length) return;
 
-    removed.forEach(({ id, inboxId }) => dropFromSelection(id, inboxId));
     // Removed means the server no longer serves it to this agent, deleted or no longer permitted,
     // so leaving it open would keep a panel the next action on it would fail against.
-    const openId = Number(route.params.conversation_id);
+    // Half the conversation routes name it `conversationId` (team, mentions, unattended,
+    // participating) and half `conversation_id`; reading one leaves the panel pointed at a
+    // conversation the store no longer has.
+    const openId = Number(
+      route.params.conversation_id ?? route.params.conversationId
+    );
     if (removed.some(({ id }) => id === openId)) redirectToConversationList();
   },
   2000,
   false
 );
 
+// A list that just grew is not evidence of a residue. The badge's own fetch is debounced (7.5s past
+// 100 conversations, 15s past 2000), so a conversation arriving over the cable, or a page loading,
+// puts the list ahead of the badge for seconds at a time and every intermediate size would read as
+// a divergence. Asking only when the excess predates the growth leaves the reported case intact:
+// there the list does not move at all, the badge is what drops.
 watch(
   [() => conversationList.value.length, activeAssigneeTabCount],
-  reconcileTab
+  ([, tabCount], [previousListSize]) => {
+    if (previousListSize > tabCount) reconcileTab();
+  }
 );
 
 let lastSubscribedIds = '';
@@ -992,11 +992,8 @@ const deleteConversationDialogRef = ref(null);
 const selectedConversationId = ref(null);
 
 async function deleteConversation() {
-  const { inbox_id: deletedInboxId } =
-    getConversationById.value(selectedConversationId.value) || {};
   try {
     await store.dispatch('deleteConversation', selectedConversationId.value);
-    dropFromSelection(selectedConversationId.value, deletedInboxId);
     redirectToConversationList();
     selectedConversationId.value = null;
     deleteConversationDialogRef.value.close();
