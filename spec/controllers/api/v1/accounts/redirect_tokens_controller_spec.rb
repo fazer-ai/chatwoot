@@ -84,14 +84,40 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
 
       # fazer-ai/agents#222: the origin conversation only exists as a fact at mint time.
       it 'carries the origin conversation into the token payload' do
+        origin = create(:conversation, account: account)
+
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
              headers: admin.create_new_auth_token,
-             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', origin_display_id: 77 },
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', origin_display_id: origin.display_id },
              as: :json
 
         expect(response).to have_http_status(:success)
         payload = Widget::RedirectToken.consume(response.parsed_body['token'])
-        expect(payload['origin_display_id']).to eq(77)
+        expect(payload['origin_display_id']).to eq(origin.display_id)
+      end
+
+      # A display_id is account-wide and guessable, and the consumer RESOLVES the conversation the
+      # pairing names, so the right to name it is settled at the mint.
+      it 'refuses an origin the caller cannot see' do
+        other_inbox = create(:inbox, account: account)
+        origin = create(:conversation, account: account, inbox: other_inbox)
+        create(:inbox_member, user: agent, inbox: web_widget.inbox)
+
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: agent.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', origin_display_id: origin.display_id },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'refuses an origin that does not exist' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', origin_display_id: 999_999 },
+             as: :json
+
+        expect(response).to have_http_status(:not_found)
       end
 
       it 'omits the origin when the caller sends none' do

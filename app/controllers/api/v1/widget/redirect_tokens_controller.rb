@@ -8,7 +8,6 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
 
     identify_from_token(payload)
     resume_or_start_conversation(payload)
-    record_redirect_origin(payload)
 
     render json: {
       widget_auth_token: @widget_auth_token,
@@ -33,12 +32,19 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     ).perform
   end
 
+  # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a
+  # consumer receives for the cloned message is built INSIDE Message.create!, from the conversation as
+  # it stands at that moment. The pairing therefore has to be on the row before the message exists,
+  # and a later update would not correct it: `redirect_origin_display_id` is not in
+  # Conversation#list_of_keys, so it emits no conversation_updated of its own.
   def resume_or_start_conversation(payload)
     if payload['message'].present?
-      @conversation = conversations.where.not(status: :resolved).last || start_conversation
+      @conversation = conversations.where.not(status: :resolved).last || start_conversation(payload)
+      record_redirect_origin(payload)
       inject_cloned_message(payload['message'])
     else
-      @conversation = conversations.last || start_conversation
+      @conversation = conversations.last || start_conversation(payload)
+      record_redirect_origin(payload)
     end
   end
 
@@ -58,12 +64,16 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     @conversation.update!(redirect_origin_display_id: origin)
   end
 
-  def start_conversation
+  # A brand-new conversation carries the pairing from birth, so even the conversation_created event
+  # names its origin — the same reason record_redirect_origin runs before the message on the resume
+  # path.
+  def start_conversation(payload)
     ::Conversation.create!(
       account_id: @web_widget.inbox.account_id,
       inbox_id: @web_widget.inbox.id,
       contact_id: @contact.id,
-      contact_inbox_id: @contact_inbox.id
+      contact_inbox_id: @contact_inbox.id,
+      redirect_origin_display_id: payload['origin_display_id'].presence
     )
   end
 

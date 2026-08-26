@@ -120,6 +120,30 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(create(:conversation, account: account).push_event_data).not_to have_key(:redirect_origin_display_id)
       end
 
+      # The consumer acts on the FIRST event it receives, which is the cloned message. AgentBotListener
+      # is on the SYNC dispatcher, so that payload is built inside Message.create!, and the pairing has
+      # to be on the row before the message exists — a later update carries no correcting event, since
+      # the column is not in Conversation#list_of_keys.
+      it 'is already on the conversation the first webhook payload carries' do
+        agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
+        create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'message' => 'Hello', 'origin_display_id' => 77 }
+        )
+
+        payloads = []
+        allow(AgentBots::WebhookJob).to receive(:perform_later) { |_url, payload, *| payloads << payload }
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        message_created = payloads.find { |pl| pl[:event] == 'message_created' }
+        expect(message_created).to be_present
+        expect(message_created[:conversation][:redirect_origin_display_id]).to eq(77)
+      end
+
       it 'takes the newest origin on re-entry, and a token without one leaves the old standing' do
         first = Widget::RedirectToken.generate(
           { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
