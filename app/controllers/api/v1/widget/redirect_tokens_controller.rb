@@ -24,12 +24,52 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     end
     @contact_inbox.update!(hmac_verified: true)
     return if payload['identifier'].blank?
+    return unless identity_claimable?(payload)
 
     @contact = ContactIdentifyAction.new(
       contact: @contact,
       params: { identifier: payload['identifier'] },
       discard_invalid_attrs: true
     ).perform
+  end
+
+  # WHOSE IDENTITY THIS TOKEN CARRIES, and the reason the question has to be asked at all.
+  #
+  # `ContactIdentifyAction` MERGES the visitor onto whoever holds the identifier and ASSIGNS the
+  # identifier to the visitor when nobody does. The assigning half is wrong for a redirect: the value
+  # belongs to the contact the link was minted for, so handing it to a browser session that merely
+  # presented a token leaves the lead with two contacts — the WhatsApp one it keeps writing on, and a
+  # widget one squatting its identifier, which every later redirect for that lead then collides with
+  # (fazer-ai/agents#286, and the orphan #269 measured in production).
+  #
+  # The mint names the contact, and it is the half of the flow that can: it is account-authenticated,
+  # so what it resolved is a fact, and it travels in a token that is single-use, server-side and never
+  # readable by the widget. So this asks the token, not the identifier.
+  #
+  # Restoring the value on the named contact is what lets the action take its merging branch, rather
+  # than duplicating the merge here: after this, somebody DOES hold the identifier, and it is the
+  # right somebody.
+  #
+  # An ABSENT key means a token minted before this field existed. Those stay live for up to their
+  # 24h TTL, and refusing them would break links already in customers' hands for a day, so they keep
+  # the old behaviour. A key present and nil is the opposite answer — this mint looked and found
+  # nobody — and it is refused, because that is the case that creates the orphan.
+  def identity_claimable?(payload)
+    return true unless payload.key?('identified_contact_id')
+
+    target = @web_widget.inbox.account.contacts.find_by(id: payload['identified_contact_id'])
+    return false if target.blank?
+
+    return true if target.identifier == payload['identifier']
+
+    # `update`, not `update!`: a THIRD contact can be holding the value right now — an earlier
+    # resolve of this same lead already created the orphan this change exists to prevent, and its
+    # token can still be live. `identifier` is unique per account, so restoring would raise, and a
+    # 422 out of this endpoint is worse than the state it was trying to repair: the lead cannot even
+    # enter the widget. Measured — without this the spec above answers 422 instead of 200.
+    return false unless target.update(identifier: payload['identifier'])
+
+    true
   end
 
   # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a

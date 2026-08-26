@@ -29,7 +29,8 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         expect(body['expires_in']).to eq(Widget::RedirectToken::DEFAULT_TTL)
         expect(body['website_url']).to eq(web_widget.website_url)
         expect(Widget::RedirectToken.consume(body['token']))
-          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'message' => 'Hi')
+          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'message' => 'Hi',
+                 'identified_contact_id' => nil)
       end
 
       it 'honours a custom ttl_seconds' do
@@ -67,7 +68,10 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
              as: :json
 
         token = response.parsed_body['token']
-        expect(Widget::RedirectToken.consume(token)).to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1')
+        # `identified_contact_id` is not one of them: a nil there is this endpoint's ANSWER, and the
+        # resolve side reads its absence as "minted before the field existed".
+        expect(Widget::RedirectToken.consume(token))
+          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'identified_contact_id' => nil)
       end
 
       it 'rejects a non web widget inbox' do
@@ -148,6 +152,57 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    # THE CONTACT THE LINK IS FOR, NAMED AT THE ONE MOMENT IT IS KNOWN (fazer-ai/agents#286).
+    #
+    # `identifier` is the only thing the resolve side had to go on, and it is derived from a
+    # sequential contact id, so it is guessable and it can move. The mint is the account-authenticated
+    # half of the flow: whoever calls it already proved they may act on this account, so the contact
+    # it resolves here is a fact the widget side can spend, and one nothing reaching the widget can
+    # forge.
+    context 'when the identifier belongs to a contact' do
+      let!(:holder) { create(:contact, account: account, identifier: 'fzwa:99') }
+
+      it 'names that contact in the token payload' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99' },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Widget::RedirectToken.consume(response.parsed_body['token'])['identified_contact_id'])
+          .to eq(holder.id)
+      end
+
+      it 'never names a contact from another account' do
+        other = create(:contact, account: create(:account), identifier: 'fzwa:99')
+
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99' },
+             as: :json
+
+        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
+        expect(payload['identified_contact_id']).to eq(holder.id)
+        expect(payload['identified_contact_id']).not_to eq(other.id)
+      end
+    end
+
+    context 'when no contact holds the identifier' do
+      # A nil, not an absent key: the resolve side has to tell "this mint looked and found nobody"
+      # from "this token predates the field", and only the second one may keep the old behaviour.
+      it 'says so with a nil, rather than leaving the question unasked' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:nobody' },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
+        expect(payload).to have_key('identified_contact_id')
+        expect(payload['identified_contact_id']).to be_nil
       end
     end
   end
