@@ -266,6 +266,58 @@ describe Whatsapp::Baileys::HistoryImporter do
     end
   end
 
+  # The shape every other example here skips: a history key is raw protobuf, four fields,
+  # and the addressing a live key carries is stamped by the decoder from a stanza a dump
+  # does not have. So on an account addressed by LID the chat arrives as `<lid>@lid` alone,
+  # and the LID is digits -- which is how it used to be filed as the contact's phone
+  # number. Reported at fazer-ai/chatwoot#408, with contacts created as `+235085806727321`.
+  describe 'a chat addressed by LID with no mapping alongside it' do
+    def bare_message(id, sent_at:)
+      {
+        key: { id: id, remoteJid: jid, fromMe: false },
+        messageTimestamp: sent_at.to_i,
+        message: { conversation: "message #{id}" }
+      }.with_indifferent_access
+    end
+
+    it 'files the chat without inventing a phone number for it' do
+      import([bare_message('RAW', sent_at: 10.days.ago)], watermark: 3.days.ago)
+
+      contact = inbox.messages.find_by(source_id: 'RAW').conversation.contact
+      expect(contact.phone_number).to be_nil
+      expect(contact.identifier).to eq("#{lid}@lid")
+    end
+
+    # The LID is still the address, so the chat is keyed by it and the import proceeds --
+    # only the phone number is withheld, and the first live message fills it in.
+    it 'keys the chat by its LID' do
+      import([bare_message('RAW', sent_at: 10.days.ago)], watermark: 3.days.ago)
+
+      expect(inbox.contact_inboxes.pluck(:source_id)).to eq([lid])
+    end
+  end
+
+  # Same class, one level down: a group's author is addressed the same two ways, and its
+  # LID is digits too.
+  describe 'a group author addressed by LID with no mapping alongside it' do
+    before { allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(true) }
+
+    it 'files the author without inventing a phone number for them' do
+      import(
+        [{
+          key: { id: 'GRP', remoteJid: '120363000000000000@g.us', participant: jid, fromMe: false },
+          messageTimestamp: 10.days.ago.to_i,
+          message: { conversation: 'hello group' }
+        }.with_indifferent_access],
+        watermark: 3.days.ago
+      )
+
+      sender = inbox.messages.find_by(source_id: 'GRP').sender
+      expect(sender.phone_number).to be_nil
+      expect(sender.identifier).to eq("#{lid}@lid")
+    end
+  end
+
   # Not filed: they mutate a row that has to exist, and replaying them out of a dump either
   # no-ops or acts on a row a later message in the same dump has not written yet.
   it 'skips the entries that are not messages' do

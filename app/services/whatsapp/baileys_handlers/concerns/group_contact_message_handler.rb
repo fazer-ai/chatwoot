@@ -181,30 +181,19 @@ module Whatsapp::BaileysHandlers::Concerns::GroupContactMessageHandler # rubocop
     @raw_message[:key][:participantAlt]
   end
 
+  # Whichever of the author's two addresses is the phone one. Which field holds it
+  # depends on how the group is addressed -- `participantAlt` for a LID-addressed group,
+  # `participant` for a phone-addressed one -- and neither may be read as a phone number
+  # on the strength of being digits, since a LID is digits too. See `phone_from_jid`.
   def baileys_sender_phone
-    alt_jid = extract_sender_jid_alt
-    if alt_jid.present?
-      phone = alt_jid.split('@').first
-      return phone if phone.match?(/^\d+$/)
-    end
-
-    sender_jid = extract_sender_jid
-    return if sender_jid.blank?
-
-    jid_part = sender_jid.split('@').first
-    parts = jid_part.split(':')
-    parts.first if parts.first.match?(/^\d+$/)
+    phone_from_jid(extract_sender_jid_alt) || phone_from_jid(extract_sender_jid)
   end
 
+  # The mirror of `baileys_sender_phone`: the author's other address, wherever the group's
+  # addressing put it. Read from `participant` first, since that is where a LID-addressed
+  # group carries it and where the alt field is the phone number.
   def baileys_sender_lid
-    sender_jid = extract_sender_jid
-    return if sender_jid.blank?
-
-    jid_part, jid_suffix = sender_jid.split('@')
-    return jid_part if jid_suffix == 'lid' && jid_part.match?(/^\d+$/)
-
-    parts = jid_part.split(':')
-    parts.last if parts.length > 1 && parts.last.match?(/^\d+$/)
+    lid_from_jid(extract_sender_jid) || lid_from_jid(extract_sender_jid_alt)
   end
 
   def baileys_sender_identifier

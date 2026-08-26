@@ -10,6 +10,11 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   # normalizeMessageContent).
   MESSAGE_WRAPPER_KEYS = %i[ephemeralMessage associatedChildMessage lottieStickerMessage].freeze
 
+  # The servers a phone-addressed jid lives on, `c.us` being the legacy form. The same
+  # pair `jid_type` reads as a `user` chat.
+  PHONE_JID_SERVERS = %w[s.whatsapp.net c.us].freeze
+  LID_JID_SERVER = 'lid'.freeze
+
   def unwrap_message_content(msg)
     5.times do
       wrapper_key = MESSAGE_WRAPPER_KEYS.find { |key| msg.key?(key) }
@@ -218,10 +223,40 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
 
     jid = @raw_message[:key][reference_field]
     return unless jid
+    return phone_from_jid(jid) if type == 'pn'
 
-    # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
-    # https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc.6/src/WABinary/jid-utils.ts#L52
+    jid_user(jid)
+  end
+
+  # The account a jid names, without the device and agent suffixes.
+  # NOTE: jid shape is `<user>_<agent>:<device>@<server>`
+  # https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc.6/src/WABinary/jid-utils.ts#L52
+  def jid_user(jid)
     jid.split('@').first.split(':').first.split('_').first
+  end
+
+  # The phone number a jid carries, or nothing when the jid is not a phone address.
+  # A LID is digits too, so `235085806727321@lid` reads as a phone number to anything
+  # that looks only at the part before the `@`: the server is the one thing that tells
+  # them apart. Live messages name the pair (`addressingMode` plus an alt jid) and the
+  # question rarely comes up, but a history message is raw protobuf -- four fields, no
+  # addressing mode -- so its chat arrives addressed by LID alone, and reading that as
+  # a phone number is how a contact ends up with `+235085806727321`.
+  def phone_from_jid(jid)
+    jid_user_on(jid, PHONE_JID_SERVERS)
+  end
+
+  # The LID a jid carries, asked the same way and for the same reason.
+  def lid_from_jid(jid)
+    jid_user_on(jid, [LID_JID_SERVER])
+  end
+
+  def jid_user_on(jid, servers)
+    return if jid.blank?
+    return unless jid.split('@').last.in?(servers)
+
+    user = jid_user(jid)
+    user if user.match?(/\A\d+\z/)
   end
 
   def contact_name
