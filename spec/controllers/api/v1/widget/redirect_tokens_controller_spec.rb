@@ -86,6 +86,64 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
       end
     end
 
+    # fazer-ai/agents#222: the two conversations of one redirect episode could not be paired from
+    # anything this side stores. The origin rides in the token because the mint is the only moment
+    # both halves are known together.
+    context 'when the token carries the origin conversation' do
+      it 'records it on the widget conversation, as the display_id' do
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'message' => 'Hello', 'origin_display_id' => 77 }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(contact.reload.conversations.last.redirect_origin_display_id).to eq(77)
+      end
+
+      it 'ships it to the consumers on push_data, and leaves it out when there is none' do
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'message' => 'Hello', 'origin_display_id' => 77 }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        redirected = contact.reload.conversations.last
+        expect(redirected.push_event_data[:redirect_origin_display_id]).to eq(77)
+        # A conversation outside a redirect episode does not carry the key at all.
+        expect(create(:conversation, account: account).push_event_data).not_to have_key(:redirect_origin_display_id)
+      end
+
+      it 'takes the newest origin on re-entry, and a token without one leaves the old standing' do
+        first = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: first },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        second = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 91 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: second },
+             headers: { 'X-Auth-Token' => token }, as: :json
+        expect(contact.reload.conversations.last.redirect_origin_display_id).to eq(91)
+
+        third = Widget::RedirectToken.generate({ 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42' })
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: third },
+             headers: { 'X-Auth-Token' => token }, as: :json
+        expect(contact.reload.conversations.last.redirect_origin_display_id).to eq(91)
+      end
+    end
+
     context 'when the token carries no identifier and the session contact is already identified' do
       let(:contact) { create(:contact, account: account, identifier: 'existing-id') }
 

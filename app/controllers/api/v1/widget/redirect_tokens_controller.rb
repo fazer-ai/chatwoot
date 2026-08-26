@@ -8,6 +8,7 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
 
     identify_from_token(payload)
     resume_or_start_conversation(payload)
+    record_redirect_origin(payload)
 
     render json: {
       widget_auth_token: @widget_auth_token,
@@ -39,6 +40,22 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     else
       @conversation = conversations.last || start_conversation
     end
+  end
+
+  # The pairing, written at the one moment it is a fact rather than an inference. Everything this
+  # side knows afterwards is about the CONTACT, and a contact carries neither the conversation the
+  # link was minted on nor which of its threads the lead came from — five different predicates over
+  # the mirrored rows were tried downstream and each is wrong in its own way (fazer-ai/agents#222).
+  #
+  # Last write wins: a token is burned by exactly one click, so the value is always the origin of the
+  # redirect that just happened, which is the episode the follow-up ladder acts on. A re-entry with
+  # no origin in the token leaves the previous one standing rather than clearing it.
+  def record_redirect_origin(payload)
+    origin = payload['origin_display_id']
+    return if origin.blank? || @conversation.blank?
+    return if @conversation.redirect_origin_display_id == origin
+
+    @conversation.update!(redirect_origin_display_id: origin)
   end
 
   def start_conversation

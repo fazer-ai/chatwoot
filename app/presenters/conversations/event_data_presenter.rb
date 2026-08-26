@@ -65,7 +65,8 @@ class Conversations::EventDataPresenter < SimpleDelegator
       priority: priority,
       waiting_since: waiting_since.to_i,
       **push_timestamps,
-      **group_left_data
+      **group_left_data,
+      **redirect_origin_data
     }
   end
 
@@ -78,6 +79,18 @@ class Conversations::EventDataPresenter < SimpleDelegator
     return {} unless group_type_group?
 
     { group_left: contact_inbox&.group_left? }
+  end
+
+  # The WhatsApp entry conversation this widget thread was redirected from, as its display_id (the
+  # per-account number, the same one `id` above carries) — never the primary key, which is a
+  # different number for the same conversation and is what a consumer would silently mis-join on.
+  #
+  # Absent, rather than nil, on every conversation that is not the widget half of a redirect episode,
+  # on the same terms as group_left above: the question does not arise there.
+  def redirect_origin_data
+    return {} if redirect_origin_display_id.blank?
+
+    { redirect_origin_display_id: redirect_origin_display_id }
   end
 
   # Like #push_data but with message text normalized for external integrations (webhooks).

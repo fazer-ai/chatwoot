@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_22_130100) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_26_130000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -908,6 +908,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_22_130100) do
     t.bigint "assignee_agent_bot_id"
     t.datetime "status_changed_at"
     t.integer "group_type", default: 0, null: false
+    t.integer "redirect_origin_display_id"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "group_type"], name: "index_conversations_on_account_id_and_group_type"
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"

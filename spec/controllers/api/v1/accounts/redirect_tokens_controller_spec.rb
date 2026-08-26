@@ -82,6 +82,28 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         expect(response.parsed_body['error']).to eq('not_a_web_widget')
       end
 
+      # fazer-ai/agents#222: the origin conversation only exists as a fact at mint time.
+      it 'carries the origin conversation into the token payload' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1', origin_display_id: 77 },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
+        expect(payload['origin_display_id']).to eq(77)
+      end
+
+      it 'omits the origin when the caller sends none' do
+        post "/api/v1/accounts/#{account.id}/redirect_tokens",
+             headers: admin.create_new_auth_token,
+             params: { inbox_id: web_widget.inbox.id, identifier: 'user-1' },
+             as: :json
+
+        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
+        expect(payload).not_to have_key('origin_display_id')
+      end
+
       it 'returns not found for an inbox from another account' do
         other_widget = create(:channel_widget)
 
