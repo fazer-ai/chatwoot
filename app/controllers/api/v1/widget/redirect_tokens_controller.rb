@@ -52,12 +52,33 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   def resume_or_start_conversation(payload)
     if payload['message'].present?
       @conversation = conversations.where.not(status: :resolved).last || start_conversation(payload)
-      record_redirect_origin(payload)
-      inject_cloned_message(payload['message'])
+      with_episode_lock do
+        record_redirect_origin(payload)
+        inject_cloned_message(payload['message'])
+      end
     else
       @conversation = conversations.last || start_conversation(payload)
-      record_redirect_origin(payload)
+      with_episode_lock { record_redirect_origin(payload) }
     end
+  end
+
+  # The pairing and the message it belongs to, under ONE lock, because the invariant above is about
+  # the two TOGETHER: the message's payload is built from the conversation as it stands when
+  # Message.create! runs, so the pairing has to still be this request's when it does. Two
+  # message-bearing redirects resuming the same conversation at once break that if the lock ends with
+  # the origin write — A writes 77 and releases, B writes 91 and finishes, then A's message goes out
+  # naming 77 while the row says 91, and a consumer mirroring that message disagrees with Chatwoot
+  # about which WhatsApp thread this episode has. Held across both, the two requests serialize whole:
+  # whichever commits last owns the row AND sent the last message, and they name the same origin.
+  #
+  # A conversation born in this request is not locked. start_conversation already wrote the origin
+  # from the same payload, nothing could have raced a row that did not exist, and a just-created
+  # Conversation still carries an unpersisted `display_id` change that `with_lock` refuses to lock
+  # over ("Locking a record with unpersisted changes is not supported").
+  def with_episode_lock(&)
+    return yield if @conversation.blank? || @conversation.previously_new_record?
+
+    @conversation.with_lock(&)
   end
 
   # The pairing, written at the one moment it is a fact rather than an inference. Everything this
@@ -94,28 +115,21 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # deleting it leaves the specs green.
   #
   # But it has to compare against the ROW, not against an instance loaded before the token was even
-  # resolved, and `with_lock` is what makes those the same thing: it reloads under SELECT ... FOR
-  # UPDATE, so the comparison sees whatever a concurrent resume committed and this request's own
-  # token still gets the last word. Removing the lock does not merely re-open a window — a stale
-  # instance holding this request's own origin makes the guard skip, and skipping is silent on both
-  # counts: no write, and no conversation_updated for the message-less path. Dropping the guard
-  # instead does not help either, because ActiveRecord issues no UPDATE for a value the instance
-  # already believes it has. The staleness is the defect; the guard only reads it out.
+  # resolved, and the lock its caller holds is what makes those the same thing: `with_lock` reloads
+  # under SELECT ... FOR UPDATE, so the comparison sees whatever a concurrent resume committed and
+  # this request's own token still gets the last word. Take that lock away and the window does not
+  # merely re-open — a stale instance holding this request's own origin makes the guard skip, and
+  # skipping is silent on both counts: no write, and no conversation_updated for the message-less
+  # path. Dropping the guard instead does not help either, because ActiveRecord issues no UPDATE for
+  # a value the instance already believes it has. The staleness is the defect; the guard only reads
+  # it out.
   def record_redirect_origin(payload)
     return if @conversation.blank?
-    # Born in this request, from start_conversation, which already wrote the origin from the same
-    # payload — there is no earlier value to reconcile and nothing could have raced a row that did
-    # not exist. Skipped rather than locked, and it has to be: a just-created Conversation still
-    # holds an unpersisted `display_id` change (Chatwoot assigns it around the insert), and
-    # `with_lock` refuses to lock a record with unpersisted changes rather than silently discard them.
-    return if @conversation.previously_new_record?
 
     origin = payload['origin_display_id'].presence
-    @conversation.with_lock do
-      next if @conversation.redirect_origin_display_id == origin
+    return if @conversation.redirect_origin_display_id == origin
 
-      @conversation.update!(redirect_origin_display_id: origin)
-    end
+    @conversation.update!(redirect_origin_display_id: origin)
   end
 
   # A brand-new conversation carries the pairing from birth, so even the conversation_created event

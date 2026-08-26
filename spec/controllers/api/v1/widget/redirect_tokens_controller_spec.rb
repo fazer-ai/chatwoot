@@ -279,14 +279,14 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(conversation.redirect_origin_display_id).to eq(77)
 
         # any_instance because a request spec never holds the controller, and the rendezvous has to sit
-        # between the conversation load and the guard — the only two statements the window spans.
-        # update_all for the same reason it is the defect: it moves the ROW without telling the
-        # instance the controller is holding, which is exactly what a concurrent request does.
+        # between the conversation LOAD and the lock that reloads it — the window a concurrent resume
+        # actually lands in. update_all for the same reason it is the defect: it moves the ROW without
+        # telling the instance the controller is holding.
         # rubocop:disable RSpec/AnyInstance, Rails/SkipsModelValidations
         allow_any_instance_of(Api::V1::Widget::RedirectTokensController)
-          .to receive(:record_redirect_origin).and_wrap_original do |original, *args|
+          .to receive(:with_episode_lock).and_wrap_original do |original, *args, &block|
           Conversation.where(id: conversation.id).update_all(redirect_origin_display_id: 91)
-          original.call(*args)
+          original.call(*args, &block)
         end
         # rubocop:enable RSpec/AnyInstance, Rails/SkipsModelValidations
 
