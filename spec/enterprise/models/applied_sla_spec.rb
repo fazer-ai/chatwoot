@@ -72,20 +72,24 @@ RSpec.describe AppliedSla, type: :model do
   end
 
   describe '.with_sla_applicable_conversation' do
-    # The contactless half of this used to live here, writing `contact_id: nil` straight past
-    # the model. `conversations.contact_id` is `null: false` since the orphan cleanup
-    # (20260422170000), so that state is no longer representable and the write raises. The
-    # scope's own `left_joins` and `blocked: [false, nil]` still tolerate a missing contact;
-    # nothing can produce one to test it with.
-    it 'excludes blocked contacts' do
+    # This used to reach the contactless case by writing `contact_id: nil`, which
+    # `null: false` has refused since the orphan cleanup (20260422170000). The case itself is
+    # still live, just shaped differently: `Contact has_many :conversations,
+    # dependent: :destroy_async` deletes the contact and cleans its conversations up in a job,
+    # and no foreign key closes that window -- one cannot exist, since it would make the
+    # contact's own delete raise. So the id stays, the row goes, and the scope's `left_joins`
+    # plus `blocked: [false, nil]` is what keeps those conversations in.
+    it 'excludes blocked contacts and keeps conversations whose contact row is gone' do
       applied_sla = create(:applied_sla)
       blocked_applied_sla = create(:applied_sla)
+      dangling_applied_sla = create(:applied_sla)
 
       blocked_applied_sla.conversation.contact.update!(blocked: true)
+      dangling_applied_sla.conversation.contact.delete
 
       applicable_sla_ids = described_class.with_sla_applicable_conversation.ids
 
-      expect(applicable_sla_ids).to include(applied_sla.id)
+      expect(applicable_sla_ids).to include(applied_sla.id, dangling_applied_sla.id)
       expect(applicable_sla_ids).not_to include(blocked_applied_sla.id)
     end
   end
