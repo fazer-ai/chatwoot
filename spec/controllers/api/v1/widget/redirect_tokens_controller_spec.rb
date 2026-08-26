@@ -302,6 +302,70 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(conversation.reload.redirect_origin_display_id).to eq(77)
       end
 
+      # The create path's event shape, pinned because a comment in this controller used to imply more
+      # than it should. The row carries the pairing from birth, but AgentBotListener has no
+      # conversation_created handler, so nothing reaches a bot at creation. Nothing is lost by it —
+      # the pairing is on the row, so the first event a bot DOES receive carries it — and widening
+      # that is a change to the agent-bot contract for every inbox, not this endpoint's to make.
+      it 'delivers no bot event on creation, and names the origin on the first one that follows' do
+        agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
+        create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
+        payloads = []
+        allow(AgentBots::WebhookJob).to receive(:perform_later) { |_url, pl, *| payloads << pl }
+
+        creating = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77 }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: creating },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        conversation = contact.reload.conversations.last
+        expect(conversation.redirect_origin_display_id).to eq(77)
+        expect(payloads).to be_empty
+
+        # The lead writes. That message is the first thing the bot hears about this conversation, and
+        # it names the pairing the creation recorded.
+        create(:message, account: account, inbox: web_widget.inbox, conversation: conversation,
+                         sender: contact, message_type: :incoming, content: 'oi')
+        first = payloads.find { |pl| pl[:event] == 'message_created' }
+        expect(first).to be_present
+        expect(first[:conversation][:redirect_origin_display_id]).to eq(77)
+      end
+
+      # Review round 9 of #418. The born-here skip was reasoned from "nothing could have raced a row
+      # that did not exist", and that is only true until the INSERT commits. After it, a second
+      # resume can load the same conversation and move its origin, and this request would then create
+      # its message from a cached origin the row no longer holds — the same incoherence the lock
+      # exists to prevent, on the one path that skipped the lock.
+      #
+      # The skip was never about the race anyway: it was about `with_lock` refusing to lock a record
+      # with an unpersisted `display_id`. A reload clears that, so the lock can be taken here too.
+      it 'locks a conversation it created itself' do
+        conversation = nil
+        # rubocop:disable RSpec/AnyInstance, Rails/SkipsModelValidations
+        allow_any_instance_of(Api::V1::Widget::RedirectTokensController)
+          .to receive(:with_episode_lock).and_wrap_original do |original, *args, &block|
+          conversation = contact.reload.conversations.last
+          Conversation.where(id: conversation.id).update_all(redirect_origin_display_id: 91)
+          original.call(*args, &block)
+        end
+        # rubocop:enable RSpec/AnyInstance, Rails/SkipsModelValidations
+
+        t = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'user-42', 'origin_display_id' => 77, 'message' => 'oi' }
+        )
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: t },
+             headers: { 'X-Auth-Token' => token }, as: :json
+
+        expect(response).to have_http_status(:success)
+        # This request's token named 77 and it is the one that ran, so the row is 77 — and the message
+        # it created belongs to the same episode.
+        expect(conversation.reload.redirect_origin_display_id).to eq(77)
+        expect(conversation.messages.where(message_type: :incoming).last.content).to eq('oi')
+      end
+
       # And the clear is announced, on the same terms as a change: it moves the column, so it emits
       # its own conversation_updated. A consumer that only ever hears about origins it can act on
       # would keep acting on the one this token just invalidated.

@@ -71,13 +71,18 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # about which WhatsApp thread this episode has. Held across both, the two requests serialize whole:
   # whichever commits last owns the row AND sent the last message, and they name the same origin.
   #
-  # A conversation born in this request is not locked. start_conversation already wrote the origin
-  # from the same payload, nothing could have raced a row that did not exist, and a just-created
-  # Conversation still carries an unpersisted `display_id` change that `with_lock` refuses to lock
-  # over ("Locking a record with unpersisted changes is not supported").
+  # A conversation born in this request is RELOADED first, then locked like any other. Skipping the
+  # lock there was reasoned from "nothing could have raced a row that did not exist", and that stops
+  # being true the moment the INSERT commits: a second resume can load the same conversation and move
+  # its origin, and this request would then build its message from a cached origin the row no longer
+  # holds. What the born-here case actually needs is only the reload — a just-created Conversation
+  # still carries an unpersisted `display_id` change (Chatwoot assigns it around the insert) and
+  # `with_lock` refuses to lock a record holding unpersisted changes rather than discard them
+  # silently. Reloading discards exactly that, and costs one SELECT on the path that creates a row.
   def with_episode_lock(&)
-    return yield if @conversation.blank? || @conversation.previously_new_record?
+    return yield if @conversation.blank?
 
+    @conversation.reload if @conversation.previously_new_record?
     @conversation.with_lock(&)
   end
 
@@ -132,9 +137,18 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     @conversation.update!(redirect_origin_display_id: origin)
   end
 
-  # A brand-new conversation carries the pairing from birth, so even the conversation_created event
-  # names its origin — the same reason record_redirect_origin runs before the message on the resume
-  # path.
+  # A brand-new conversation carries the pairing from birth, so the row is right from its first
+  # instant and every event that follows names the origin — the same reason record_redirect_origin
+  # runs before the message on the resume path.
+  #
+  # No agent bot hears about the creation itself, and that is upstream behaviour rather than
+  # something this change can set: AgentBotListener handles conversation_resolved, opened,
+  # status_changed, updated, message_created, message_updated and webwidget_triggered, and no
+  # conversation_created. Measured — a message-less token that creates the conversation delivers an
+  # empty list of bot events. Nothing is lost by it: the pairing is on the row, so the FIRST event a
+  # bot does receive for this conversation carries it, and until a message exists there is no episode
+  # for a consumer to act on. Making creation bot-visible would change the agent-bot contract for
+  # every inbox in the account, which is not this change's to make (fazer-ai/agents#222).
   def start_conversation(payload)
     ::Conversation.create!(
       account_id: @web_widget.inbox.account_id,

@@ -101,3 +101,12 @@ app/javascript/dashboard/routes/dashboard/settings/reports/components/OverviewRe
 # consumer that acts on it fences it as state, which is what fazer-ai/agents#355 does with a
 # version mark of its own.
 app/controllers/api/v1/widget/redirect_tokens_controller.rb: Snapshot the origin in async event payloads  # PR#418
+# PR#418: real, upstream, and not this change's to make. AgentBotListener handles
+# conversation_resolved / opened / status_changed / updated / message_created / message_updated /
+# webwidget_triggered and no conversation_created, so a message-less token that CREATES the
+# conversation delivers an empty list of bot events. Measured, and pinned by "delivers no bot event
+# on creation, and names the origin on the first one that follows" in the controller spec. Nothing is
+# lost by it: the pairing is on the row from the insert, so the first event a bot does receive
+# carries it, and until a message exists there is no episode for a consumer to act on. Making
+# creation bot-visible changes the agent-bot contract for every inbox in the account.
+app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bot on the first message-less redirect  # PR#418
