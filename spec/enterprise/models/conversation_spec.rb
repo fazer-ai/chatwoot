@@ -120,12 +120,6 @@ RSpec.describe Conversation, type: :model do
 
         expect(conversation.applied_sla.sla_policy_id).to eq(sla_policy.id)
       end
-
-      it 'keeps existing behavior when contact is missing' do
-        conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
-
-        expect(conversation.reload.sla_applicable?).to be true
-      end
     end
 
     context 'when conversation already has a different sla' do

@@ -72,17 +72,20 @@ RSpec.describe AppliedSla, type: :model do
   end
 
   describe '.with_sla_applicable_conversation' do
-    it 'excludes blocked contacts and keeps conversations with missing contacts' do
+    # The contactless half of this used to live here, writing `contact_id: nil` straight past
+    # the model. `conversations.contact_id` is `null: false` since the orphan cleanup
+    # (20260422170000), so that state is no longer representable and the write raises. The
+    # scope's own `left_joins` and `blocked: [false, nil]` still tolerate a missing contact;
+    # nothing can produce one to test it with.
+    it 'excludes blocked contacts' do
       applied_sla = create(:applied_sla)
       blocked_applied_sla = create(:applied_sla)
-      missing_contact_applied_sla = create(:applied_sla)
 
       blocked_applied_sla.conversation.contact.update!(blocked: true)
-      missing_contact_applied_sla.conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
 
       applicable_sla_ids = described_class.with_sla_applicable_conversation.ids
 
-      expect(applicable_sla_ids).to include(applied_sla.id, missing_contact_applied_sla.id)
+      expect(applicable_sla_ids).to include(applied_sla.id)
       expect(applicable_sla_ids).not_to include(blocked_applied_sla.id)
     end
   end
