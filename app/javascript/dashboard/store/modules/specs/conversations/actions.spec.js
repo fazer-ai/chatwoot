@@ -651,13 +651,12 @@ describe('#deleteMessage', () => {
       { id: 2, inbox_id: 7 },
       { id: 3, inbox_id: 8 },
     ];
+    const fresh = id => ({ id, meta: { assignee: { id: 42 } } });
 
-    const contextWith = (ids, selectedChatId = null, chats = onScreen) => {
-      axios.post.mockResolvedValue({ data: { ids } });
+    const contextWith = (payload, chats = onScreen) => {
+      axios.post.mockResolvedValue({ data: { payload } });
       return {
         commit,
-        dispatch,
-        state: { selectedChatId },
         getters: { getUnAssignedChats: () => chats },
       };
     };
@@ -668,14 +667,32 @@ describe('#deleteMessage', () => {
       axios.post.mockReset();
     });
 
-    it('drops what the server no longer lists in the tab', async () => {
+    // Evicting would take the conversation out of "all" and out of its new owner's "mine" too,
+    // since every tab reads the same cache.
+    it('refreshes the stale rows instead of evicting them', async () => {
+      const payload = [fresh(1), fresh(2), fresh(3)];
       const removed = await actions.reconcileConversationTab(
-        contextWith([2]),
+        contextWith(payload),
         filters
       );
 
-      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1, 3]]]);
-      expect(dispatch.mock.calls).toEqual([]);
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, payload],
+      ]);
+      expect(removed).toEqual([]);
+    });
+
+    it('removes only what the server did not return at all', async () => {
+      const payload = [fresh(2)];
+      const removed = await actions.reconcileConversationTab(
+        contextWith(payload),
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, payload],
+        [types.REMOVE_CONVERSATIONS, [1, 3]],
+      ]);
       expect(removed).toEqual([
         { id: 1, inboxId: 7 },
         { id: 3, inboxId: 8 },
@@ -683,19 +700,15 @@ describe('#deleteMessage', () => {
     });
 
     it('asks only about the conversations on screen', async () => {
-      await actions.reconcileConversationTab(contextWith([1, 2, 3]), filters);
+      await actions.reconcileConversationTab(
+        contextWith([fresh(1), fresh(2), fresh(3)]),
+        filters
+      );
 
       expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/conversations/ids'),
-        { ids: [1, 2, 3] },
-        expect.anything()
+        expect.stringContaining('/conversations/sync'),
+        { ids: [1, 2, 3] }
       );
-    });
-
-    it('commits nothing when the tab already matches', async () => {
-      await actions.reconcileConversationTab(contextWith([1, 2, 3]), filters);
-
-      expect(commit.mock.calls).toEqual([]);
     });
 
     // The answer is about the list as it was when the request went out. A conversation that
@@ -705,36 +718,25 @@ describe('#deleteMessage', () => {
       const chats = [...onScreen];
       axios.post.mockImplementation(() => {
         chats.push({ id: 99, inbox_id: 7 });
-        return Promise.resolve({ data: { ids: [1, 2, 3] } });
+        return Promise.resolve({
+          data: { payload: [fresh(1), fresh(2), fresh(3)] },
+        });
       });
 
-      await actions.reconcileConversationTab(
-        {
-          commit,
-          dispatch,
-          state: { selectedChatId: null },
-          getters: { getUnAssignedChats: () => chats },
-        },
-        filters
-      );
-
-      expect(commit.mock.calls).toEqual([]);
-    });
-
-    it('reads the open conversation back instead of dropping it', async () => {
       const removed = await actions.reconcileConversationTab(
-        contextWith([2], 3),
+        { commit, getters: { getUnAssignedChats: () => chats } },
         filters
       );
 
-      expect(commit.mock.calls).toEqual([[types.REMOVE_CONVERSATIONS, [1]]]);
-      expect(dispatch.mock.calls).toEqual([['getConversation', 3]]);
-      expect(removed).toEqual([{ id: 1, inboxId: 7 }]);
+      expect(removed).toEqual([]);
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(1), fresh(2), fresh(3)]],
+      ]);
     });
 
     it('does not call out when the tab is empty on screen', async () => {
       const removed = await actions.reconcileConversationTab(
-        contextWith([], null, []),
+        contextWith([], []),
         filters
       );
 
@@ -755,12 +757,7 @@ describe('#deleteMessage', () => {
     it('keeps the list as is when the request fails', async () => {
       axios.post.mockRejectedValue({ message: 'Network error' });
       const removed = await actions.reconcileConversationTab(
-        {
-          commit,
-          dispatch,
-          state: { selectedChatId: null },
-          getters: { getUnAssignedChats: () => onScreen },
-        },
+        { commit, getters: { getUnAssignedChats: () => onScreen } },
         filters
       );
 

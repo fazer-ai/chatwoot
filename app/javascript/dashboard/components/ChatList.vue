@@ -916,7 +916,13 @@ watch(
       'reconcileConversationTab',
       conversationFilters.value
     );
+    if (!removed.length) return;
+
     removed.forEach(({ id, inboxId }) => dropFromSelection(id, inboxId));
+    // Removed means the server no longer serves it to this agent, deleted or no longer permitted,
+    // so leaving it open would keep a panel the next action on it would fail against.
+    const openId = Number(route.params.conversation_id);
+    if (removed.some(({ id }) => id === openId)) redirectToConversationList();
   }
 );
 

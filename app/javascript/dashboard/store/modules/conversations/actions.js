@@ -94,8 +94,10 @@ const actions = {
   // SET_ALL_CONVERSATION only adds or replaces, and a conversation that leaves a tab stops being
   // sent to it, so one missed cable event leaves a copy on the list forever and the copies pile up.
   //
-  // The server's answer is the authority here, not the count that triggered this. A count that is
-  // merely stale (the badge is debounced) costs one request and removes nothing.
+  // Refreshes rather than evicts, because `allConversations` is shared by every tab: a conversation
+  // that left "unassigned" by gaining an assignee still belongs to "all", and very likely to
+  // someone's "mine". Fresh data takes it off this tab and keeps it on the others. Only what the
+  // server does not return at all is removed, which means deleted or no longer permitted.
   //
   // Only the conversations that were on screen when the request went out can be judged by its
   // answer, so the candidates are snapshotted here and both the question and the verdict are
@@ -105,10 +107,7 @@ const actions = {
   //
   // Returns what it removed, so the caller can drop the same conversations from anything keyed
   // by them.
-  reconcileConversationTab: async (
-    { commit, dispatch, getters, state },
-    filters
-  ) => {
+  reconcileConversationTab: async ({ commit, getters }, filters) => {
     const tabGetter = TAB_GETTERS[filters.assigneeType];
     if (!tabGetter || tabsBeingReconciled.has(filters.assigneeType)) return [];
 
@@ -121,25 +120,20 @@ const actions = {
       if (!candidates.length) return [];
 
       const {
-        data: { ids },
-      } = await ConversationApi.ids(
-        filters,
-        candidates.map(c => c.id)
-      );
-      const liveIds = new Set(ids);
-      const stale = candidates.filter(c => !liveIds.has(c.id));
-      const removed = stale.filter(c => c.id !== state.selectedChatId);
+        data: { payload },
+      } = await ConversationApi.sync(candidates.map(c => c.id));
 
+      // The open conversation keeps its messages and attachments through this mutation's own
+      // selected-chat branch, so a refresh never empties the panel under the agent.
+      if (payload.length) commit(types.SET_ALL_CONVERSATION, payload);
+
+      const stillThere = new Set(payload.map(c => c.id));
+      const removed = candidates.filter(c => !stillThere.has(c.id));
       if (removed.length) {
         commit(
           types.REMOVE_CONVERSATIONS,
           removed.map(c => c.id)
         );
-      }
-      // Dropping the open conversation would empty the panel under the agent, so it gets read back
-      // instead. Its own fresh data is what takes it off the tab.
-      if (stale.length !== removed.length) {
-        dispatch('getConversation', state.selectedChatId);
       }
       return removed;
     } catch (error) {

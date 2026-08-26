@@ -162,10 +162,10 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
-  describe 'POST /api/v1/accounts/{account.id}/conversations/ids' do
+  describe 'POST /api/v1/accounts/{account.id}/conversations/sync' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
-        post "/api/v1/accounts/#{account.id}/conversations/ids"
+        post "/api/v1/accounts/#{account.id}/conversations/sync"
 
         expect(response).to have_http_status(:unauthorized)
       end
@@ -175,80 +175,65 @@ RSpec.describe 'Conversations API', type: :request do
       let(:agent) { create(:user, account: account, role: :agent) }
       let(:inbox) { create(:inbox, account: account) }
       let!(:unassigned) { create(:conversation, account: account, inbox: inbox, assignee: nil) }
-      let!(:mine) { create(:conversation, account: account, inbox: inbox, assignee: agent) }
 
       before do
         create(:inbox_member, user: agent, inbox: inbox)
       end
 
-      it 'answers only about the ids it was asked about' do
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
+      def sync(ids)
+        post "/api/v1/accounts/#{account.id}/conversations/sync",
              headers: agent.create_new_auth_token,
-             params: { assignee_type: 'unassigned', ids: [unassigned.display_id, mine.display_id] },
+             params: { ids: ids },
              as: :json
-
-        expect(response).to have_http_status(:success)
-        expect(response.parsed_body['ids']).to contain_exactly(unassigned.display_id)
       end
 
-      it 'never answers about an id it was not given, however large the tab is' do
-        other_unassigned = create(:conversation, account: account, inbox: inbox, assignee: nil)
+      it 'returns the current state of the conversations it was asked about' do
+        unassigned.update!(assignee: agent)
+        sync([unassigned.display_id])
 
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
-             headers: agent.create_new_auth_token,
-             params: { assignee_type: 'unassigned', ids: [unassigned.display_id] },
-             as: :json
+        expect(response).to have_http_status(:success)
+        conversation = response.parsed_body['payload'].first
+        expect(conversation['id']).to eq(unassigned.display_id)
+        expect(conversation['meta']['assignee']['id']).to eq(agent.id)
+      end
 
-        expect(response.parsed_body['ids']).to contain_exactly(unassigned.display_id)
-        expect(response.parsed_body['ids']).not_to include(other_unassigned.display_id)
+      # The rows worth asking about are the ones that stopped matching the tab, so answering only
+      # about the ones that still match would say nothing about any of them.
+      it 'ignores the tab filters entirely' do
+        resolved = create(:conversation, account: account, inbox: inbox, assignee: nil, status: :resolved)
+        assigned = create(:conversation, account: account, inbox: inbox, assignee: agent)
+        group = create(:conversation, account: account, inbox: inbox, assignee: nil, group_type: :group)
+
+        sync([resolved.display_id, assigned.display_id, group.display_id])
+
+        expect(response.parsed_body['payload'].map { |c| c['id'] })
+          .to contain_exactly(resolved.display_id, assigned.display_id, group.display_id)
+      end
+
+      it 'never answers about an id it was not given' do
+        other = create(:conversation, account: account, inbox: inbox, assignee: nil)
+
+        sync([unassigned.display_id])
+
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).to contain_exactly(unassigned.display_id)
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).not_to include(other.display_id)
       end
 
       it 'returns nothing when asked about nothing' do
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
-             headers: agent.create_new_auth_token,
-             params: { assignee_type: 'unassigned' },
-             as: :json
+        sync(nil)
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['ids']).to be_empty
+        expect(response.parsed_body['payload']).to be_empty
       end
 
-      it 'counts a conversation an agent bot holds as assigned, the way the tab badge does' do
-        agent_bot = create(:agent_bot, account: account)
-        unassigned.update!(assignee_agent_bot: agent_bot)
-
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
-             headers: agent.create_new_auth_token,
-             params: { assignee_type: 'unassigned', ids: [unassigned.display_id] },
-             as: :json
-
-        expect(response.parsed_body['ids']).to be_empty
-      end
-
-      it 'applies the same status, group_type and inbox filters the list request uses' do
-        resolved = create(:conversation, account: account, inbox: inbox, assignee: nil, status: :resolved)
-        group = create(:conversation, account: account, inbox: inbox, assignee: nil, group_type: :group)
-
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
-             headers: agent.create_new_auth_token,
-             params: {
-               assignee_type: 'unassigned', status: 'open', group_type: 'group', inbox_id: inbox.id,
-               ids: [group.display_id, resolved.display_id, unassigned.display_id]
-             },
-             as: :json
-
-        expect(response.parsed_body['ids']).to contain_exactly(group.display_id)
-      end
-
+      # What does not come back is what the caller drops, so a conversation in an inbox the agent
+      # cannot reach has to be absent rather than merely filtered out of a later step.
       it 'leaves out conversations in inboxes the agent has no access to' do
         other_inbox_conversation = create(:conversation, account: account, assignee: nil)
 
-        post "/api/v1/accounts/#{account.id}/conversations/ids",
-             headers: agent.create_new_auth_token,
-             params: { assignee_type: 'unassigned', ids: [other_inbox_conversation.display_id] },
-             as: :json
+        sync([unassigned.display_id, other_inbox_conversation.display_id])
 
-        expect(response.parsed_body['ids']).to be_empty
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).to contain_exactly(unassigned.display_id)
       end
     end
   end

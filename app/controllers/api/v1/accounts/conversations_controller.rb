@@ -4,7 +4,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include HmacConcern
   include ConversationCustomAttributesConcern
 
-  before_action :conversation, except: [:index, :meta, :ids, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
+  before_action :conversation, except: [:index, :meta, :sync, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
@@ -20,17 +20,22 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversations_count = result[:count]
   end
 
-  # Which of the ids the caller sent still belong to the tab those same filters describe. The
-  # dashboard asks when its own list is longer than the count the server reports for that tab, a
-  # contradiction it cannot resolve on its own: nothing in the store ever removes a conversation
-  # that left a tab, so a single missed cable event leaves a copy behind forever.
+  # The current state of the conversations the caller names, and nothing else. The dashboard asks
+  # when its own list is longer than the count the server reports for a tab, a contradiction it
+  # cannot resolve on its own: nothing in the store ever removes a conversation that left a tab, so
+  # a single missed cable event leaves a stale copy behind forever.
   #
-  # POST, and answering only about the ids it was given, because the caller is the one who knows how
-  # small the question is. Returning the whole tab would be unbounded exactly when the count that
-  # triggered the ask is the stale one (a debounced meta answering for the filter before last), so
-  # the tab can be far larger than the handful the client has on screen.
-  def ids
-    @conversation_ids = conversation_finder.perform_ids_only(permitted_conversation_ids)
+  # Deliberately ignores every tab filter, and that is the whole point: the caller is asking what
+  # these conversations ARE, and the ones it is asking after are precisely the ones that stopped
+  # matching its filters. What comes back replaces the stale rows, so they leave the tab through
+  # their own data while keeping whatever other tab they still belong to. Whatever does not come
+  # back is gone for this agent, deleted or no longer permitted, and the caller drops it.
+  #
+  # POST, and scoped to the ids it was given, so the answer can never outgrow the question: the
+  # count that triggers the ask can itself be stale (a debounced meta answering for the filter
+  # before last), so the tab can be far larger than the handful the client has on screen.
+  def sync
+    @conversations = conversation_finder.perform_sync(permitted_conversation_ids)
   end
 
   def search

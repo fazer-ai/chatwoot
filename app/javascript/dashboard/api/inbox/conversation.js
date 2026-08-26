@@ -149,37 +149,13 @@ class ConversationApi extends ApiClient {
     });
   }
 
-  // Which of `conversationIds` are still in the tab, as a set: no page, no sort. Used to reconcile a
-  // list that has grown longer than the tab's own count, which only happens when the store kept a
-  // conversation that left the tab. Takes the same filters as `get` so both sides describe the same
-  // tab, and asks only about the ids on screen so the answer can never outgrow the question.
-  ids(
-    {
-      inboxId,
-      status,
-      assigneeType,
-      labels,
-      teamId,
-      conversationType,
-      groupType,
-    },
-    conversationIds
-  ) {
-    return axios.post(
-      `${this.url}/ids`,
-      { ids: conversationIds },
-      {
-        params: {
-          inbox_id: inboxId,
-          team_id: teamId,
-          status,
-          assignee_type: assigneeType,
-          labels,
-          conversation_type: conversationType,
-          group_type: groupType,
-        },
-      }
-    );
+  // The current state of `conversationIds`, whatever tab they now belong to: the caller reconciles
+  // its own list against what comes back, and treats what does not come back as gone for this
+  // agent. No filters travel with it on purpose, since the rows worth asking about are the ones
+  // that stopped matching. Asking only about the ids on screen keeps the answer from outgrowing
+  // the question.
+  sync(conversationIds) {
+    return axios.post(`${this.url}/sync`, { ids: conversationIds });
   }
 
   sendEmailTranscript({ conversationId, email }) {
