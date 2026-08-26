@@ -415,21 +415,35 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
 
     # THE ORPHAN THIS ENDPOINT USED TO CREATE (fazer-ai/agents#286, split out of #269).
     #
-    # `ContactIdentifyAction` MERGES when somebody already holds the identifier and ASSIGNS when
-    # nobody does. A `fzwa:` value belongs to one WhatsApp contact by construction, so the assigning
-    # half hands the widget visitor a value that is not its own: the lead ends up with two contacts,
-    # and every later redirect for it collides on an identifier its own earlier crossing is squatting.
+    # `ContactIdentifyAction` decides by the identifier: it MERGES the visitor onto whoever holds the
+    # value and ASSIGNS the value when nobody does. For a redirect minted FOR a contact, assigning is
+    # wrong — the value belongs to that contact by construction, so a browser session that merely
+    # presented a token walks away holding it, and the lead ends up with two contacts, the second
+    # squatting the identifier every later redirect for it needs.
     #
-    # Reproduced against this controller before the fix: with nobody holding the identifier, the
-    # resolve left 2 contacts, the WhatsApp one carrying no identifier and the visitor holding the
-    # `fzwa:` value derived from its id. That is the state the report measured in production and that
-    # #272 could not reproduce.
-    #
-    # The token is what closes it, because the mint is account-authenticated and names the contact.
+    # Reproduced against this controller before the fix: with nobody holding the identifier, a resolve
+    # left 2 contacts, the lead carrying none and the visitor holding the lead's `fzwa:` value. That is
+    # the production state #269 measured and #272 could not reproduce.
     context 'when the token names the contact it was minted for' do
       let(:lead) { create(:contact, account: account, identifier: 'fzwa:77') }
 
-      it 'unifies the visitor onto it even when the identifier is no longer there' do
+      it 'unifies the visitor onto it when the identifier is where it should be' do
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Contact.exists?(contact.id)).to be(false)
+        expect(account.contacts.count).to eq(1)
+      end
+
+      it 'unifies onto it even when the identifier is no longer there, and restores the value' do
         lead.update!(identifier: nil)
         contact_inbox
         redirect_token = Widget::RedirectToken.generate(
@@ -447,8 +461,28 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(lead.reload.identifier).to eq('fzwa:77')
       end
 
-      it 'still unifies on the ordinary path, where the identifier is where it should be' do
-        lead
+      # Identifiers are mutable through the contacts API and the ingestion services, and a link from
+      # yesterday is not evidence about who this contact says it is today.
+      it 'never overwrites an identifier the contact has since been given' do
+        lead.update!(identifier: 'crm-7788')
+        contact_inbox
+        redirect_token = Widget::RedirectToken.generate(
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
+        )
+
+        post '/api/v1/widget/redirect_token',
+             params: { website_token: web_widget.website_token, token: redirect_token },
+             headers: { 'X-Auth-Token' => token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(lead.reload.identifier).to eq('crm-7788')
+        expect(Contact.exists?(contact.id)).to be(false)
+      end
+
+      it 'unifies without raising when a third contact took the value meanwhile' do
+        lead.update!(identifier: nil)
+        squatter = create(:contact, account: account, identifier: 'fzwa:77')
         contact_inbox
         redirect_token = Widget::RedirectToken.generate(
           { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
@@ -461,10 +495,14 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(Contact.exists?(contact.id)).to be(false)
-        expect(account.contacts.count).to eq(1)
+        # WHERE the visitor landed is the whole assertion: identifying by the identifier would have
+        # merged it onto the squatter, which holds the value and is not this lead.
+        expect(contact_inbox.reload.contact_id).to eq(lead.id)
+        expect(lead.reload.identifier).to be_nil
+        expect(squatter.reload.identifier).to eq('fzwa:77')
       end
 
-      it 'leaves the visitor unidentified when the named contact is gone' do
+      it 'identifies nobody when the named contact is gone' do
         gone_id = lead.id
         lead.destroy!
         contact_inbox
@@ -480,31 +518,15 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(response).to have_http_status(:success)
         expect(contact.reload.identifier).to be_nil
       end
-
-      it 'refuses rather than raising when a third contact took the value meanwhile' do
-        lead.update!(identifier: nil)
-        create(:contact, account: account, identifier: 'fzwa:77')
-        contact_inbox
-        redirect_token = Widget::RedirectToken.generate(
-          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:77', 'identified_contact_id' => lead.id }
-        )
-
-        post '/api/v1/widget/redirect_token',
-             params: { website_token: web_widget.website_token, token: redirect_token },
-             headers: { 'X-Auth-Token' => token },
-             as: :json
-
-        expect(response).to have_http_status(:success)
-        expect(contact.reload.identifier).to be_nil
-        expect(lead.reload.identifier).to be_nil
-      end
     end
 
-    context 'when the mint found no contact holding the identifier' do
-      it 'does not hand the visitor an identifier nobody holds' do
+    # The older, looser contract, and it is the reason the field is optional: a deep link minted for
+    # an identity this account has never seen still creates it.
+    context 'when the token names no contact' do
+      it 'still establishes a brand-new identity on the visitor' do
         contact_inbox
         redirect_token = Widget::RedirectToken.generate(
-          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:404', 'identified_contact_id' => nil }
+          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'crm-user-42' }
         )
 
         post '/api/v1/widget/redirect_token',
@@ -513,28 +535,7 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
              as: :json
 
         expect(response).to have_http_status(:success)
-        expect(contact.reload.identifier).to be_nil
-        expect(account.contacts.where(identifier: 'fzwa:404')).to be_empty
-      end
-    end
-
-    # Tokens live up to 24h, so a deploy leaves links already in customers' hands carrying a payload
-    # minted before the field existed. Those keep identifying, because breaking a day of live links
-    # to close a hole is a worse trade than the hole staying open for that day.
-    context 'when the token predates the identified-contact field' do
-      it 'identifies the way it always did' do
-        contact_inbox
-        redirect_token = Widget::RedirectToken.generate(
-          { 'inbox_id' => web_widget.inbox.id, 'identifier' => 'fzwa:legacy' }
-        )
-
-        post '/api/v1/widget/redirect_token',
-             params: { website_token: web_widget.website_token, token: redirect_token },
-             headers: { 'X-Auth-Token' => token },
-             as: :json
-
-        expect(response).to have_http_status(:success)
-        expect(contact.reload.identifier).to eq('fzwa:legacy')
+        expect(contact.reload.identifier).to eq('crm-user-42')
       end
     end
   end

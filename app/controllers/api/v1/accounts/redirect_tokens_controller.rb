@@ -22,31 +22,37 @@ class Api::V1::Accounts::RedirectTokensController < Api::V1::Accounts::BaseContr
       inbox_id: inbox.id,
       identifier: permitted_params[:identifier],
       message: permitted_params[:message],
-      origin_display_id: origin&.display_id
-    }.compact.merge(identified_contact)
+      origin_display_id: origin&.display_id,
+      identified_contact_id: named_contact&.id
+    }.compact
   end
 
-  # WHICH CONTACT THIS LINK IS FOR, settled here because here is where it can be trusted.
+  # WHICH CONTACT THIS LINK IS FOR, named by the caller because only the caller knows.
   #
-  # The resolve side had only the `identifier` to go on, and that is not enough to say whose identity
-  # it is: the value is derived from a sequential contact id, so it is guessable, and it can move off
-  # the contact between the mint and the click a day later. When it has moved,
-  # `ContactIdentifyAction` finds nobody holding it and ASSIGNS it to the widget visitor instead of
-  # merging onto the lead — which is how a lead ends up with two contacts, one of them squatting the
-  # identifier of the other (fazer-ai/agents#286).
+  # `identifier` alone cannot answer it. The value the redirect funnel uses is derived from a
+  # sequential contact id, so it is guessable, and it can move off the contact between the mint and a
+  # click a day later. When it has moved, the resolve side finds nobody holding it and ASSIGNS it to
+  # the widget visitor instead of merging onto the lead — which is how a lead ends up with two
+  # contacts, one of them squatting the identifier of the other (fazer-ai/agents#286).
   #
-  # This endpoint is account-authenticated, so the contact it resolves is a fact rather than a claim,
-  # and it rides in the token, which is single-use, server-side and never seen by the widget.
+  # This endpoint is account-authenticated, so a contact it is told to name is a fact the widget side
+  # can spend, and one nothing reaching the widget can forge. It travels in a token that is
+  # single-use, server-side and never readable by the widget.
   #
-  # The key is written whenever an identifier is asked for, INCLUDING when nobody holds it — a nil
-  # says "the mint looked and found none", which is a different answer from a token minted before
-  # this existed, whose key is absent and which keeps the old behaviour for the day its TTL leaves it
-  # live.
-  def identified_contact
-    identifier = permitted_params[:identifier].presence
-    return {} if identifier.blank?
+  # OPTIONAL, and the omission is meaningful rather than a default. A caller minting a
+  # pre-authenticated deep link for an identity that has no contact yet (a CRM handing off a user
+  # this account has never seen) wants the resolve to CREATE it, which is what this endpoint has
+  # always done. Only a caller that names a contact is asking for the stricter rule, so an absent
+  # `contact_id` leaves that flow exactly as it was.
+  #
+  # `find` rather than `find_by`: a caller naming a contact that does not exist in this account has a
+  # bug, and a token minted with the field silently dropped would resolve as the loose flow without
+  # anything saying so.
+  def named_contact
+    id = permitted_params[:contact_id].presence
+    return if id.blank?
 
-    { identified_contact_id: Current.account.contacts.find_by(identifier: identifier)&.id }
+    Current.account.contacts.find(id)
   end
 
   # The mint is the earliest shared entry point for the pairing, so the caller's right to name that
@@ -65,6 +71,6 @@ class Api::V1::Accounts::RedirectTokensController < Api::V1::Accounts::BaseContr
   end
 
   def permitted_params
-    params.permit(:inbox_id, :identifier, :message, :ttl_seconds, :origin_display_id)
+    params.permit(:inbox_id, :identifier, :contact_id, :message, :ttl_seconds, :origin_display_id)
   end
 end

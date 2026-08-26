@@ -29,8 +29,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
         expect(body['expires_in']).to eq(Widget::RedirectToken::DEFAULT_TTL)
         expect(body['website_url']).to eq(web_widget.website_url)
         expect(Widget::RedirectToken.consume(body['token']))
-          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'message' => 'Hi',
-                 'identified_contact_id' => nil)
+          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'message' => 'Hi')
       end
 
       it 'honours a custom ttl_seconds' do
@@ -68,10 +67,7 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
              as: :json
 
         token = response.parsed_body['token']
-        # `identified_contact_id` is not one of them: a nil there is this endpoint's ANSWER, and the
-        # resolve side reads its absence as "minted before the field existed".
-        expect(Widget::RedirectToken.consume(token))
-          .to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1', 'identified_contact_id' => nil)
+        expect(Widget::RedirectToken.consume(token)).to eq('inbox_id' => web_widget.inbox.id, 'identifier' => 'user-1')
       end
 
       it 'rejects a non web widget inbox' do
@@ -155,54 +151,50 @@ RSpec.describe 'Api::V1::Accounts::RedirectTokensController', type: :request do
       end
     end
 
-    # THE CONTACT THE LINK IS FOR, NAMED AT THE ONE MOMENT IT IS KNOWN (fazer-ai/agents#286).
+    # THE CONTACT THE LINK IS FOR (fazer-ai/agents#286).
     #
-    # `identifier` is the only thing the resolve side had to go on, and it is derived from a
-    # sequential contact id, so it is guessable and it can move. The mint is the account-authenticated
-    # half of the flow: whoever calls it already proved they may act on this account, so the contact
-    # it resolves here is a fact the widget side can spend, and one nothing reaching the widget can
-    # forge.
-    context 'when the identifier belongs to a contact' do
-      let!(:holder) { create(:contact, account: account, identifier: 'fzwa:99') }
+    # Named by the caller, because only the caller knows: the resolve side had the `identifier` to go
+    # on, and that value is derived from a sequential contact id, so it is guessable and it can move.
+    # This endpoint is account-authenticated, so what it is told here is a fact the widget side can
+    # spend.
+    context 'when the caller names the contact the link is for' do
+      let(:lead) { create(:contact, account: account, identifier: 'fzwa:99') }
 
-      it 'names that contact in the token payload' do
+      it 'carries it in the token payload' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
              headers: admin.create_new_auth_token,
-             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99' },
+             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99', contact_id: lead.id },
              as: :json
 
         expect(response).to have_http_status(:success)
         expect(Widget::RedirectToken.consume(response.parsed_body['token'])['identified_contact_id'])
-          .to eq(holder.id)
+          .to eq(lead.id)
       end
 
-      it 'never names a contact from another account' do
-        other = create(:contact, account: create(:account), identifier: 'fzwa:99')
+      it 'refuses a contact from another account instead of naming it' do
+        theirs = create(:contact, account: create(:account))
 
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
              headers: admin.create_new_auth_token,
-             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99' },
+             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:99', contact_id: theirs.id },
              as: :json
 
-        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
-        expect(payload['identified_contact_id']).to eq(holder.id)
-        expect(payload['identified_contact_id']).not_to eq(other.id)
+        expect(response).to have_http_status(:not_found)
       end
     end
 
-    context 'when no contact holds the identifier' do
-      # A nil, not an absent key: the resolve side has to tell "this mint looked and found nobody"
-      # from "this token predates the field", and only the second one may keep the old behaviour.
-      it 'says so with a nil, rather than leaving the question unasked' do
+    # The omission is the older, looser contract and it stays: a caller minting a deep link for an
+    # identity this account has never seen wants the resolve to create it.
+    context 'when the caller names no contact' do
+      it 'leaves the key out of the payload' do
         post "/api/v1/accounts/#{account.id}/redirect_tokens",
              headers: admin.create_new_auth_token,
-             params: { inbox_id: web_widget.inbox.id, identifier: 'fzwa:nobody' },
+             params: { inbox_id: web_widget.inbox.id, identifier: 'crm-user-42' },
              as: :json
 
         expect(response).to have_http_status(:success)
-        payload = Widget::RedirectToken.consume(response.parsed_body['token'])
-        expect(payload).to have_key('identified_contact_id')
-        expect(payload['identified_contact_id']).to be_nil
+        expect(Widget::RedirectToken.consume(response.parsed_body['token']))
+          .not_to have_key('identified_contact_id')
       end
     end
   end

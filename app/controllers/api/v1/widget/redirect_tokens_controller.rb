@@ -23,8 +23,9 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
       @contact = @contact_inbox.contact
     end
     @contact_inbox.update!(hmac_verified: true)
+
+    return unify_with_named_contact(payload) if payload['identified_contact_id'].present?
     return if payload['identifier'].blank?
-    return unless identity_claimable?(payload)
 
     @contact = ContactIdentifyAction.new(
       contact: @contact,
@@ -33,43 +34,45 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
     ).perform
   end
 
-  # WHOSE IDENTITY THIS TOKEN CARRIES, and the reason the question has to be asked at all.
+  # THE VISITOR JOINS THE CONTACT THE TOKEN NAMES, and does not merely claim to be it.
   #
-  # `ContactIdentifyAction` MERGES the visitor onto whoever holds the identifier and ASSIGNS the
-  # identifier to the visitor when nobody does. The assigning half is wrong for a redirect: the value
-  # belongs to the contact the link was minted for, so handing it to a browser session that merely
-  # presented a token leaves the lead with two contacts — the WhatsApp one it keeps writing on, and a
-  # widget one squatting its identifier, which every later redirect for that lead then collides with
+  # `ContactIdentifyAction` decides by the identifier: it merges the visitor onto whoever holds the
+  # value and ASSIGNS the value when nobody does. Assigning is right for a self-declared `setUser`
+  # identity and wrong for a redirect a contact was named for — the value belongs to that contact by
+  # construction, so handing it to a browser session that merely presented a token leaves the lead
+  # with two contacts, the second squatting the identifier every later redirect for it needs
   # (fazer-ai/agents#286, and the orphan #269 measured in production).
   #
-  # The mint names the contact, and it is the half of the flow that can: it is account-authenticated,
-  # so what it resolved is a fact, and it travels in a token that is single-use, server-side and never
-  # readable by the widget. So this asks the token, not the identifier.
+  # So the merge is done against the NAMED contact rather than against whoever the identifier
+  # currently points at. A contact that is gone identifies nobody: the visitor stays anonymous, which
+  # is the same place a failed crossing already left it, rather than being handed a dead lead's value.
   #
-  # Restoring the value on the named contact is what lets the action take its merging branch, rather
-  # than duplicating the merge here: after this, somebody DOES hold the identifier, and it is the
-  # right somebody.
-  #
-  # An ABSENT key means a token minted before this field existed. Those stay live for up to their
-  # 24h TTL, and refusing them would break links already in customers' hands for a day, so they keep
-  # the old behaviour. A key present and nil is the opposite answer — this mint looked and found
-  # nobody — and it is refused, because that is the case that creates the orphan.
-  def identity_claimable?(payload)
-    return true unless payload.key?('identified_contact_id')
-
+  # The identifier is written only onto a contact that has NONE. A named contact carrying a different
+  # value has been re-identified since the token was minted — identifiers are mutable through the
+  # contacts API and the ingestion services — and a link from yesterday is not evidence about today,
+  # so it unifies without touching what the contact now says it is.
+  def unify_with_named_contact(payload)
     target = @web_widget.inbox.account.contacts.find_by(id: payload['identified_contact_id'])
-    return false if target.blank?
+    return if target.blank?
 
-    return true if target.identifier == payload['identifier']
+    if target.id != @contact.id
+      @contact = ContactMergeAction.new(
+        account: @web_widget.inbox.account,
+        base_contact: target,
+        mergee_contact: @contact
+      ).perform
+    end
+    return if payload['identifier'].blank? || @contact.identifier.present?
 
-    # `update`, not `update!`: a THIRD contact can be holding the value right now — an earlier
-    # resolve of this same lead already created the orphan this change exists to prevent, and its
-    # token can still be live. `identifier` is unique per account, so restoring would raise, and a
-    # 422 out of this endpoint is worse than the state it was trying to repair: the lead cannot even
-    # enter the widget. Measured — without this the spec above answers 422 instead of 200.
-    return false unless target.update(identifier: payload['identifier'])
-
-    true
+    # Deliberately not `update!`, and the result is deliberately not checked: a THIRD contact can be
+    # holding this value right now — an earlier resolve of this same lead may have created exactly the
+    # orphan this prevents, and its token can still be live. `identifier` is unique per account, so a
+    # bang answers 422 out of the widget endpoint, which is worse than the state it was repairing:
+    # the lead cannot enter the chat at all. The unification already happened above and stands either
+    # way; the identifier is a convenience for the next mint, which settles it again anyway.
+    # rubocop:disable Rails/SaveBang
+    @contact.update(identifier: payload['identifier'])
+    # rubocop:enable Rails/SaveBang
   end
 
   # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a
