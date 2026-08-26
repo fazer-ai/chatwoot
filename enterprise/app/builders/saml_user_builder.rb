@@ -64,6 +64,14 @@ class SamlUserBuilder
       password: SecureRandom.hex(32),
       confirmed_at: Time.current
     )
+  # The only attributes here that come from the assertion are the email and the name, so a
+  # record Rails refuses is the IdP sending something unusable -- a failed sign-in, which is
+  # what `AuthenticationFailed` already means. Deliberately narrow: `add_user_to_account`
+  # and the two existing-user updates raise the same class for reasons that are ours (a
+  # missing custom role, a callback, a user row that was already invalid), and those must
+  # keep failing loudly instead of being answered with a login error.
+  rescue ActiveRecord::RecordInvalid
+    raise AuthenticationFailed, I18n.t('auth.saml.authentication_failed')
   end
 
   def add_user_to_account

@@ -284,19 +284,31 @@ RSpec.describe SamlUserBuilder do
     end
 
     # `create_user` saves with `User.create!`, so a record Rails refuses raises instead of
-    # coming back unsaved. The controller turns that into the ordinary failed-sign-in
-    # redirect; see the omniauth callbacks spec.
+    # coming back unsaved. Reported as a rejected assertion, which is what it is; the
+    # controller answers that with the ordinary login error.
     context 'when the user cannot be created' do
       before { allow(User).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(User.new)) }
 
-      it 'raises instead of returning an unsaved user' do
-        expect { builder.perform }.to raise_error(ActiveRecord::RecordInvalid)
+      it 'reports a failed authentication instead of returning an unsaved user' do
+        expect { builder.perform }.to raise_error(described_class::AuthenticationFailed)
       end
 
       it 'does not create an account association' do
         expect do
-          expect { builder.perform }.to raise_error(ActiveRecord::RecordInvalid)
+          expect { builder.perform }.to raise_error(described_class::AuthenticationFailed)
         end.not_to change(AccountUser, :count)
+      end
+    end
+
+    # The mirror of the above, and the reason the rescue sits on `create_user` rather than
+    # around the whole builder: a failure here is ours, not the IdP's, and it happens after
+    # the user has already been committed. Answering it with a login error would hide a
+    # broken role mapping or a failing callback behind "authentication failed".
+    context 'when adding the user to the account fails' do
+      it 'lets the failure through instead of reporting a failed authentication' do
+        allow(AccountUser).to receive(:find_or_create_by!).and_raise(ActiveRecord::RecordInvalid.new(AccountUser.new))
+
+        expect { builder.perform }.to raise_error(ActiveRecord::RecordInvalid)
       end
     end
   end
