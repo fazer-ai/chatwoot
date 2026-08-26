@@ -34,9 +34,21 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
 
   # The order here is load-bearing. AgentBotListener is on the SYNC dispatcher, so the payload a
   # consumer receives for the cloned message is built INSIDE Message.create!, from the conversation as
-  # it stands at that moment. The pairing therefore has to be on the row before the message exists:
-  # the conversation_updated that follows would be a second, weaker witness, and a consumer that acts
-  # on the first event it sees would have already acted on the previous episode's origin.
+  # it stands at that moment. The pairing therefore has to be on the row before the message exists, or
+  # the message — the event a consumer actually acts on — carries the PREVIOUS episode's origin.
+  #
+  # Measured on a running instance, mint + resolve over HTTP with an agent bot on the widget inbox:
+  #
+  #   origin changes, cloned message   ->  1. conversation_updated (new origin)
+  #                                        2. message_created      (new origin)
+  #   origin changes, no message       ->  1. conversation_updated (new origin)
+  #   origin unchanged, cloned message ->  1. message_created      (new origin)
+  #   origin unchanged, no message     ->  nothing
+  #
+  # So the update PRECEDES the message rather than following it, and that is the point: every event a
+  # consumer can see already names the right origin. The standalone update is not a second trigger —
+  # it states a value, and a consumer that acts on episodes acts on the customer message, which is the
+  # only thing either path produces that is one.
   def resume_or_start_conversation(payload)
     if payload['message'].present?
       @conversation = conversations.where.not(status: :resolved).last || start_conversation(payload)
@@ -61,6 +73,11 @@ class Api::V1::Widget::RedirectTokensController < Api::V1::Widget::BaseControlle
   # its own — nothing is created and no message is sent. That is why the column is in
   # Conversation#list_of_keys: the update then emits its own conversation_updated, carrying the new
   # pairing and a fresh `updated_at` for consumers to order it by.
+  # The equality check is write avoidance and nothing more: ActiveRecord records no change for a write
+  # of the same value, so `previous_changes` comes back empty and notify_conversation_updation returns
+  # before dispatching anything. Removing this line leaves every event this endpoint emits identical
+  # and only adds an UPDATE per repeated click — measured, because a repeated link from ONE WhatsApp
+  # conversation is a supported flow and it would be easy to read the silence as this guard's doing.
   def record_redirect_origin(payload)
     origin = payload['origin_display_id']
     return if origin.blank? || @conversation.blank?

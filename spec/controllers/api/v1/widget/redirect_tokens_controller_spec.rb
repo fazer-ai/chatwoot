@@ -144,6 +144,52 @@ RSpec.describe 'Api::V1::Widget::RedirectTokensController', type: :request do
         expect(message_created[:conversation][:redirect_origin_display_id]).to eq(77)
       end
 
+      # The four event shapes this endpoint can produce, pinned together so no reordering can change
+      # one without showing up here. What every row has in common is the point: the origin a consumer
+      # reads is the NEW one, on every event either path emits.
+      it 'names the new origin on every event it emits, whichever path ran' do
+        agent_bot = create(:agent_bot, account: account, outgoing_url: 'https://bot.test/hook')
+        create(:agent_bot_inbox, inbox: web_widget.inbox, agent_bot: agent_bot, account: account)
+
+        redirect = lambda do |payload|
+          seen = []
+          allow(AgentBots::WebhookJob).to receive(:perform_later) { |_url, pl, *| seen << pl }
+          post '/api/v1/widget/redirect_token',
+               params: { website_token: web_widget.website_token,
+                         token: Widget::RedirectToken.generate({ 'inbox_id' => web_widget.inbox.id,
+                                                                 'identifier' => 'user-42' }.merge(payload)) },
+               headers: { 'X-Auth-Token' => token }, as: :json
+          # Every payload names the pairing, template messages included; the widget's email-collect
+          # templates ride along on the first inbound and say nothing about the episode, so the
+          # sequence below is the customer-visible one.
+          expect(seen.map { |pl| pl[:redirect_origin_display_id] || pl.dig(:conversation, :redirect_origin_display_id) }.uniq)
+            .to eq(seen.empty? ? [] : [payload['origin_display_id']])
+          seen.reject { |pl| pl[:message_type] == 'template' }.map do |pl|
+            [pl[:event], pl[:redirect_origin_display_id] || pl.dig(:conversation, :redirect_origin_display_id)]
+          end
+        end
+
+        # A first redirect creates the conversation, so its pairing rides on the creation itself.
+        redirect.call('origin_display_id' => 77)
+
+        # Origin changes, cloned message: the update states it, and the message a consumer acts on
+        # already carries it.
+        expect(redirect.call('origin_display_id' => 91, 'message' => 'oi'))
+          .to eq([%w[conversation_updated] << 91, %w[message_created] << 91].map(&:flatten))
+
+        # Origin changes, no message: the update is the only witness there is, which is why the column
+        # is in list_of_keys at all.
+        expect(redirect.call('origin_display_id' => 77)).to eq([['conversation_updated', 77]])
+
+        # Origin unchanged, cloned message: nothing to state, and the message still names it.
+        expect(redirect.call('origin_display_id' => 77, 'message' => 'de novo'))
+          .to eq([['message_created', 77]])
+
+        # Origin unchanged, no message: no row changed and no message exists, so there is nothing for
+        # an event to say. A repeated link from one WhatsApp conversation lands here.
+        expect(redirect.call('origin_display_id' => 77)).to eq([])
+      end
+
       # The message-less resume path (cloneWaMessage off, or a media-only WhatsApp message) writes the
       # pairing onto a conversation that ALREADY exists, so neither a creation event nor a cloned
       # message carries it. Unless that write is observable on its own, a consumer keeps the previous
