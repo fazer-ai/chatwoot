@@ -162,6 +162,96 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/{account.id}/conversations/sync' do
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/sync"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:inbox) { create(:inbox, account: account) }
+      let!(:unassigned) { create(:conversation, account: account, inbox: inbox, assignee: nil) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: inbox)
+      end
+
+      def sync(ids)
+        post "/api/v1/accounts/#{account.id}/conversations/sync",
+             headers: agent.create_new_auth_token,
+             params: { ids: ids },
+             as: :json
+      end
+
+      it 'returns the current state of the conversations it was asked about' do
+        unassigned.update!(assignee: agent)
+        sync([unassigned.display_id])
+
+        expect(response).to have_http_status(:success)
+        conversation = response.parsed_body['payload'].first
+        expect(conversation['id']).to eq(unassigned.display_id)
+        expect(conversation['meta']['assignee']['id']).to eq(agent.id)
+      end
+
+      # The rows worth asking about are the ones that stopped matching the tab, so answering only
+      # about the ones that still match would say nothing about any of them.
+      it 'ignores the tab filters entirely' do
+        resolved = create(:conversation, account: account, inbox: inbox, assignee: nil, status: :resolved)
+        assigned = create(:conversation, account: account, inbox: inbox, assignee: agent)
+        group = create(:conversation, account: account, inbox: inbox, assignee: nil, group_type: :group)
+
+        sync([resolved.display_id, assigned.display_id, group.display_id])
+
+        expect(response.parsed_body['payload'].map { |c| c['id'] })
+          .to contain_exactly(resolved.display_id, assigned.display_id, group.display_id)
+      end
+
+      it 'never answers about an id it was not given' do
+        other = create(:conversation, account: account, inbox: inbox, assignee: nil)
+
+        sync([unassigned.display_id])
+
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).to contain_exactly(unassigned.display_id)
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).not_to include(other.display_id)
+      end
+
+      it 'returns nothing when asked about nothing' do
+        sync(nil)
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload']).to be_empty
+      end
+
+      # What does not come back is what the caller drops, so a conversation in an inbox the agent
+      # cannot reach has to be absent rather than merely filtered out of a later step.
+      it 'leaves out conversations in inboxes the agent has no access to' do
+        other_inbox_conversation = create(:conversation, account: account, assignee: nil)
+
+        sync([unassigned.display_id, other_inbox_conversation.display_id])
+
+        expect(response.parsed_body['payload'].map { |c| c['id'] }).to contain_exactly(unassigned.display_id)
+      end
+
+      # Refused, not truncated: a short answer is indistinguishable from "these conversations are
+      # gone" to a caller that removes whatever does not come back.
+      it 'refuses a batch larger than one page instead of answering partially' do
+        sync((1..(Api::V1::Accounts::ConversationsController::SYNC_BATCH_SIZE + 1)).to_a)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'accepts a batch of exactly one page' do
+        sync((1..Api::V1::Accounts::ConversationsController::SYNC_BATCH_SIZE).to_a)
+
+        expect(response).to have_http_status(:success)
+      end
+    end
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/conversations/unread_counts' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do

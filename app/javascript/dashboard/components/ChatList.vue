@@ -35,6 +35,7 @@ import { useBulkActions } from 'dashboard/composables/chatlist/useBulkActions';
 import { useFilter } from 'shared/composables/useFilter';
 import { useTrack } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
+import { debounce } from '@chatwoot/utils';
 import {
   useCamelCase,
   useSnakeCase,
@@ -883,10 +884,75 @@ function toggleSelectAll(check) {
   selectAllConversations(check, conversationList);
 }
 
+// The bulk toolbar acts on ids, and the list it was built from moves under it: a conversation can
+// leave the tab through a cable event, through reconciliation, or by being deleted. Whatever is no
+// longer on the list has to leave the selection with it, or the next bulk assign or label would be
+// sent for a conversation the agent cannot see.
+watch(conversationList, list => {
+  if (!selectedConversations.value.length) return;
+
+  const visible = new Set(list.map(c => c.id));
+  [...selectedConversations.value]
+    .filter(id => !visible.has(id))
+    .forEach(deSelectConversation);
+});
+
 useEmitter('fetch_conversation_stats', () => {
   if (hasAppliedFiltersOrActiveFolders.value) return;
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
+
+// The list can only ever be a subset of what the server counts for the tab, so a list longer than
+// the badge is a contradiction: the store is holding conversations that already left this tab, and
+// nothing in it would ever take them off the list. Watching both numbers covers the two ways the
+// contradiction surfaces, a list fetch and the debounced badge, including the agent who is just
+// sitting on the screen, which is how it was reported.
+//
+// Only the assignee tabs: the other views narrow the list with a rule the store does not reproduce
+// locally, so what is on screen there is not the tab the server would reconcile against.
+// Debounced, and re-checked when it runs, because the contradiction has to persist to be worth a
+// question: while a page loads, the list grows several seconds ahead of the badge (whose own fetch
+// is debounced up to 15s on a large account), and every intermediate size would otherwise be read
+// as a divergence and asked about.
+const reconcileTab = debounce(
+  async () => {
+    if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
+    if (conversationList.value.length <= activeAssigneeTabCount.value) return;
+
+    const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
+    if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
+
+    const removed = await store.dispatch(
+      'reconcileConversationTab',
+      conversationFilters.value
+    );
+    if (!removed.length) return;
+
+    // Removed means the server no longer serves it to this agent, deleted or no longer permitted,
+    // so leaving it open would keep a panel the next action on it would fail against.
+    // Half the conversation routes name it `conversationId` (team, mentions, unattended,
+    // participating) and half `conversation_id`; reading one leaves the panel pointed at a
+    // conversation the store no longer has.
+    const openId = Number(
+      route.params.conversation_id ?? route.params.conversationId
+    );
+    if (removed.some(({ id }) => id === openId)) redirectToConversationList();
+  },
+  2000,
+  false
+);
+
+// A list that just grew is not evidence of a residue. The badge's own fetch is debounced (7.5s past
+// 100 conversations, 15s past 2000), so a conversation arriving over the cable, or a page loading,
+// puts the list ahead of the badge for seconds at a time and every intermediate size would read as
+// a divergence. Asking only when the excess predates the growth leaves the reported case intact:
+// there the list does not move at all, the badge is what drops.
+watch(
+  [() => conversationList.value.length, activeAssigneeTabCount],
+  ([, tabCount], [previousListSize]) => {
+    if (previousListSize > tabCount) reconcileTab();
+  }
+);
 
 let lastSubscribedIds = '';
 const subscribePresenceForTopChats = () => {

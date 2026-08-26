@@ -161,6 +161,7 @@ Rails.application.routes.draw do
           resources :conversations, only: [:index, :create, :show, :update, :destroy] do
             collection do
               get :meta
+              post :sync
               get :search
               get :unread_counts, to: 'conversations/unread_counts#index'
               get :pins

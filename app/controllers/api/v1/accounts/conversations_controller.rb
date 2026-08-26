@@ -4,10 +4,16 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include HmacConcern
   include ConversationCustomAttributesConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
+  before_action :conversation, except: [:index, :meta, :sync, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
+  # One page of conversations, the same unit the index endpoint serializes at. The partial does
+  # per-row work (unread counts, the last non-activity message), so an uncapped list would let any
+  # authenticated agent ask one worker to render the whole account. The dashboard chunks to match,
+  # and an oversized batch is refused rather than truncated: a truncated answer is indistinguishable
+  # from "these conversations are gone" to a caller that reconciles against it.
+  SYNC_BATCH_SIZE = 25
 
   def index
     result = conversation_finder.perform
@@ -18,6 +24,27 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def meta
     result = conversation_finder.perform_meta_only
     @conversations_count = result[:count]
+  end
+
+  # The current state of the conversations the caller names, and nothing else. The dashboard asks
+  # when its own list is longer than the count the server reports for a tab, a contradiction it
+  # cannot resolve on its own: nothing in the store ever removes a conversation that left a tab, so
+  # a single missed cable event leaves a stale copy behind forever.
+  #
+  # Deliberately ignores every tab filter, and that is the whole point: the caller is asking what
+  # these conversations ARE, and the ones it is asking after are precisely the ones that stopped
+  # matching its filters. What comes back replaces the stale rows, so they leave the tab through
+  # their own data while keeping whatever other tab they still belong to. Whatever does not come
+  # back is gone for this agent, deleted or no longer permitted, and the caller drops it.
+  #
+  # POST, and scoped to the ids it was given, so the answer can never outgrow the question: the
+  # count that triggers the ask can itself be stale (a debounced meta answering for the filter
+  # before last), so the tab can be far larger than the handful the client has on screen.
+  def sync
+    ids = permitted_conversation_ids
+    return render_could_not_create_error("ids must contain at most #{SYNC_BATCH_SIZE} entries") if ids.size > SYNC_BATCH_SIZE
+
+    @conversations = conversation_finder.perform_sync(ids)
   end
 
   def search
@@ -322,6 +349,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def conversation_finder
     @conversation_finder ||= ConversationFinder.new(Current.user, params)
+  end
+
+  def permitted_conversation_ids
+    Array(params[:ids]).map(&:to_i)
   end
 
   def assignee?

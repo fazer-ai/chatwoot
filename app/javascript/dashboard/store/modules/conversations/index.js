@@ -1,7 +1,7 @@
 import types from '../../mutation-types';
 import getters, { getSelectedChatConversation } from './getters';
 import actions from './actions';
-import { findPendingMessageIndex } from './helpers';
+import { findPendingMessageIndex, isStaleConversation } from './helpers';
 import { MESSAGE_STATUS } from 'shared/constants/messages';
 import wootConstants from 'dashboard/constants/globals';
 import { BUS_EVENTS } from '../../../../shared/constants/busEvents';
@@ -260,6 +260,16 @@ export const mutations = {
     );
   },
 
+  // Drops copies the server no longer lists in the tab they were shown under. The counterpart to
+  // SET_ALL_CONVERSATION, which only ever adds or replaces: a conversation that leaves a tab stops
+  // being sent to it, so nothing else would ever take it off the list.
+  [types.REMOVE_CONVERSATIONS](_state, conversationIds) {
+    const idsToRemove = new Set(conversationIds);
+    _state.allConversations = _state.allConversations.filter(
+      c => !idsToRemove.has(c.id)
+    );
+  },
+
   [types.UPDATE_CONVERSATION](_state, conversation) {
     const { allConversations } = _state;
     const index = allConversations.findIndex(c => c.id === conversation.id);
@@ -268,9 +278,7 @@ export const mutations = {
       const selectedConversation = allConversations[index];
 
       // ignore out of order events
-      if (conversation.updated_at < selectedConversation.updated_at) {
-        return;
-      }
+      if (isStaleConversation(conversation, selectedConversation)) return;
 
       const {
         messages,
