@@ -35,6 +35,7 @@ import { useBulkActions } from 'dashboard/composables/chatlist/useBulkActions';
 import { useFilter } from 'shared/composables/useFilter';
 import { useTrack } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
+import { debounce } from '@chatwoot/utils';
 import {
   useCamelCase,
   useSnakeCase,
@@ -920,11 +921,14 @@ useEmitter('fetch_conversation_stats', () => {
 //
 // Only the assignee tabs: the other views narrow the list with a rule the store does not reproduce
 // locally, so what is on screen there is not the tab the server would reconcile against.
-watch(
-  [() => conversationList.value.length, activeAssigneeTabCount],
-  async ([listSize, tabCount]) => {
+// Debounced, and re-checked when it runs, because the contradiction has to persist to be worth a
+// question: while a page loads, the list grows several seconds ahead of the badge (whose own fetch
+// is debounced up to 15s on a large account), and every intermediate size would otherwise be read
+// as a divergence and asked about.
+const reconcileTab = debounce(
+  async () => {
     if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
-    if (listSize <= tabCount) return;
+    if (conversationList.value.length <= activeAssigneeTabCount.value) return;
 
     const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
     if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
@@ -940,7 +944,14 @@ watch(
     // so leaving it open would keep a panel the next action on it would fail against.
     const openId = Number(route.params.conversation_id);
     if (removed.some(({ id }) => id === openId)) redirectToConversationList();
-  }
+  },
+  2000,
+  false
+);
+
+watch(
+  [() => conversationList.value.length, activeAssigneeTabCount],
+  reconcileTab
 );
 
 let lastSubscribedIds = '';

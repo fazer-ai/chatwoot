@@ -235,6 +235,20 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response.parsed_body['payload'].map { |c| c['id'] }).to contain_exactly(unassigned.display_id)
       end
+
+      # Refused, not truncated: a short answer is indistinguishable from "these conversations are
+      # gone" to a caller that removes whatever does not come back.
+      it 'refuses a batch larger than one page instead of answering partially' do
+        sync((1..(Api::V1::Accounts::ConversationsController::SYNC_BATCH_SIZE + 1)).to_a)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'accepts a batch of exactly one page' do
+        sync((1..Api::V1::Accounts::ConversationsController::SYNC_BATCH_SIZE).to_a)
+
+        expect(response).to have_http_status(:success)
+      end
     end
   end
 

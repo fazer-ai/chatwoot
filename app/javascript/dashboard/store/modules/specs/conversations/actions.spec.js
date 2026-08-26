@@ -707,6 +707,32 @@ describe('#deleteMessage', () => {
       ]);
     });
 
+    // The endpoint serializes full conversations and refuses an oversized batch, so a caller that
+    // scrolled through several pages has to split the question rather than have it rejected.
+    it('splits a list longer than one page into page-sized requests', async () => {
+      const many = Array.from({ length: 60 }, (_, i) => ({
+        id: i + 1,
+        inbox_id: 7,
+      }));
+      axios.post.mockResolvedValue({ data: { payload: [] } });
+
+      await actions.reconcileConversationTab(
+        {
+          commit,
+          getters: {
+            getUnAssignedChats: () => many,
+            getConversationById: () => undefined,
+          },
+        },
+        filters
+      );
+
+      expect(axios.post).toHaveBeenCalledTimes(3);
+      expect(axios.post.mock.calls.map(call => call[1].ids.length)).toEqual([
+        25, 25, 10,
+      ]);
+    });
+
     it('asks only about the conversations on screen', async () => {
       await actions.reconcileConversationTab(
         contextWith([fresh(1), fresh(2), fresh(3)]),

@@ -8,6 +8,12 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
+  # One page of conversations, the same unit the index endpoint serializes at. The partial does
+  # per-row work (unread counts, the last non-activity message), so an uncapped list would let any
+  # authenticated agent ask one worker to render the whole account. The dashboard chunks to match,
+  # and an oversized batch is refused rather than truncated: a truncated answer is indistinguishable
+  # from "these conversations are gone" to a caller that reconciles against it.
+  SYNC_BATCH_SIZE = 25
 
   def index
     result = conversation_finder.perform
@@ -35,7 +41,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # count that triggers the ask can itself be stale (a debounced meta answering for the filter
   # before last), so the tab can be far larger than the handful the client has on screen.
   def sync
-    @conversations = conversation_finder.perform_sync(permitted_conversation_ids)
+    ids = permitted_conversation_ids
+    return render_could_not_create_error("ids must contain at most #{SYNC_BATCH_SIZE} entries") if ids.size > SYNC_BATCH_SIZE
+
+    @conversations = conversation_finder.perform_sync(ids)
   end
 
   def search
