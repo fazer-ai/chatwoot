@@ -1,5 +1,6 @@
 require Rails.root.join('lib/redis/config')
 require Rails.root.join('lib/captain_response_dequeued_logger')
+require Rails.root.join('lib/current_reset_middleware')
 require Rails.root.join('lib/sidekiq_death_handler')
 
 schedule_file = 'config/schedule.yml'
@@ -26,6 +27,9 @@ Sidekiq.configure_server do |config|
   config.death_handlers << SidekiqDeathHandler.method(:call)
 
   config.server_middleware do |chain|
+    # Outermost, so Current is cleared after everything else in the chain has run.
+    chain.prepend CurrentResetMiddleware
+
     chain.add CaptainResponseDequeuedLogger
 
     chain.add ChatwootDequeuedLogger if ActiveModel::Type::Boolean.new.cast(ENV.fetch('ENABLE_SIDEKIQ_DEQUEUE_LOGGER', false))
