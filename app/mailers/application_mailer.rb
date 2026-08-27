@@ -2,7 +2,7 @@ class ApplicationMailer < ActionMailer::Base
   include ActionView::Helpers::SanitizeHelper
 
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
-  before_action { ensure_current_account(params.try(:[], :account)) }
+  around_action :with_isolated_current
   around_action :switch_locale
   layout 'mailer/base'
   # Fetch template from Database if available
@@ -73,9 +73,15 @@ class ApplicationMailer < ActionMailer::Base
     I18n.available_locales.map(&:to_s).include?(account.locale) ? account.locale : nil
   end
 
-  def ensure_current_account(account)
-    Current.reset
-    Current.account = account if account.present?
+  # Current is thread-local and nothing downstream resets it, so a mailer that left the
+  # account set would hand it to whatever ran next on the same thread -- the rest of an
+  # automation rule inline, or the next Sidekiq job on that worker thread.
+  def with_isolated_current
+    Current.isolate do
+      account = params.try(:[], :account)
+      Current.account = account if account.present?
+      yield
+    end
   end
 
   def switch_locale(&)

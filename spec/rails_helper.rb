@@ -81,6 +81,11 @@ RSpec.configure do |config|
   config.include ActionCable::TestHelper
   config.include ActiveJob::TestHelper
 
+  # Current is thread-local and lives for the whole process, so anything an example leaves
+  # behind is read by the next one -- usually as a record the transaction has since rolled
+  # back, which is far from where it was set.
+  config.before { Current.reset }
+
   # OpenAPI response validation via Skooma
   path_to_openapi = Rails.root.join('swagger/swagger.json')
   config.include Skooma::RSpec[path_to_openapi], type: :request
