@@ -44,6 +44,7 @@ import { useEmitter } from 'dashboard/composables/emitter';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
 
 import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 import ConversationAPI from 'dashboard/api/inbox/conversation';
 import wootConstants from 'dashboard/constants/globals';
@@ -897,6 +898,13 @@ watch(conversationList, list => {
     .forEach(deSelectConversation);
 });
 
+// Reconciliation removed the conversation the panel is showing: the server no longer serves it to
+// this agent, deleted or no longer permitted, so leaving it open would keep a panel the next action
+// on it would fail against.
+useEmitter(BUS_EVENTS.OPEN_CONVERSATION_GONE, () =>
+  redirectToConversationList()
+);
+
 useEmitter('fetch_conversation_stats', () => {
   if (hasAppliedFiltersOrActiveFolders.value) return;
   store.dispatch('conversationStats/get', conversationFilters.value);
@@ -919,24 +927,7 @@ const reconcileTab = debounce(
     if (chatListLoading.value || hasAppliedFiltersOrActiveFolders.value) return;
     if (conversationList.value.length <= activeAssigneeTabCount.value) return;
 
-    const { MENTION, PARTICIPATING } = wootConstants.CONVERSATION_TYPE;
-    if ([MENTION, PARTICIPATING].includes(props.conversationType)) return;
-
-    const removed = await store.dispatch(
-      'reconcileConversationTab',
-      conversationFilters.value
-    );
-    if (!removed.length) return;
-
-    // Removed means the server no longer serves it to this agent, deleted or no longer permitted,
-    // so leaving it open would keep a panel the next action on it would fail against.
-    // Half the conversation routes name it `conversationId` (team, mentions, unattended,
-    // participating) and half `conversation_id`; reading one leaves the panel pointed at a
-    // conversation the store no longer has.
-    const openId = Number(
-      route.params.conversation_id ?? route.params.conversationId
-    );
-    if (removed.some(({ id }) => id === openId)) redirectToConversationList();
+    await store.dispatch('reconcileConversationTab', conversationFilters.value);
   },
   2000,
   false

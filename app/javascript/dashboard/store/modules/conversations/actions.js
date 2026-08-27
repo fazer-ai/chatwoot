@@ -4,6 +4,9 @@ import MessageApi from '../../../api/inbox/message';
 import { MESSAGE_STATUS, MESSAGE_TYPE } from 'shared/constants/messages';
 import { createPendingMessage } from 'dashboard/helper/commons';
 import { isStaleConversation } from './helpers';
+import wootConstants from 'dashboard/constants/globals';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   buildConversationList,
   isOnMentionsView,
@@ -33,14 +36,21 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
 };
 
 // The getter behind each assignee tab is the same predicate the list on screen uses, so what it
-// returns is exactly what the agent is looking at. The other views (mentions, participating, saved
-// filters, folders) narrow the list with a rule the store does not reproduce locally, so they are
-// left out: reconciling them would judge conversations against the wrong tab.
+// returns is exactly what the agent is looking at. Saved filters and folders narrow the list with
+// a rule of their own and have no assigneeType, so they fall out here.
 const TAB_GETTERS = {
   me: 'getMineChats',
   unassigned: 'getUnAssignedChats',
   all: 'getAllStatusChats',
 };
+
+// Mentions and participating do carry an assigneeType, but the server narrows those lists by a
+// membership the store cannot reproduce, so what is on screen there is not the tab a reconciliation
+// would judge it against.
+const UNRECONCILABLE_VIEWS = [
+  wootConstants.CONVERSATION_TYPE.MENTION,
+  wootConstants.CONVERSATION_TYPE.PARTICIPATING,
+];
 
 // The trigger fires from a watcher, which can fire again while the request is still out.
 const tabsBeingReconciled = new Set();
@@ -108,9 +118,12 @@ const actions = {
   //
   // Returns what it removed, so the caller can drop the same conversations from anything keyed
   // by them.
-  reconcileConversationTab: async ({ commit, getters }, filters) => {
+  reconcileConversationTab: async ({ commit, getters, state }, filters) => {
     const tabGetter = TAB_GETTERS[filters.assigneeType];
-    if (!tabGetter || tabsBeingReconciled.has(filters.assigneeType)) return [];
+    if (!tabGetter || UNRECONCILABLE_VIEWS.includes(filters.conversationType)) {
+      return [];
+    }
+    if (tabsBeingReconciled.has(filters.assigneeType)) return [];
 
     tabsBeingReconciled.add(filters.assigneeType);
     try {
@@ -142,6 +155,12 @@ const actions = {
           types.REMOVE_CONVERSATIONS,
           removed.map(c => c.id)
         );
+      }
+      // The panel is showing a conversation the server just refused to serve. Announced rather
+      // than acted on here, because the store has no router, and announced from here rather than
+      // left to each caller, because it is a fact about the removal and not about who asked.
+      if (removed.some(c => c.id === state.selectedChatId)) {
+        emitter.emit(BUS_EVENTS.OPEN_CONVERSATION_GONE);
       }
       return removed;
     } catch (error) {

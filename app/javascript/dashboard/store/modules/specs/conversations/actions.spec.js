@@ -3,6 +3,8 @@ import actions, {
   hasMessageFailedWithExternalError,
 } from '../../conversations/actions';
 import types from '../../../mutation-types';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 const dataToSend = {
   payload: [
     {
@@ -19,6 +21,7 @@ const commit = vi.fn();
 const dispatch = vi.fn();
 global.axios = axios;
 vi.mock('axios');
+vi.mock('shared/helpers/mitt', () => ({ emitter: { emit: vi.fn() } }));
 
 describe('#hasMessageFailedWithExternalError', () => {
   it('returns false if message is sent', () => {
@@ -658,10 +661,16 @@ describe('#deleteMessage', () => {
     });
     const inStore = { 1: { id: 1, updated_at: 100 } };
 
-    const contextWith = (payload, chats = onScreen, stored = inStore) => {
+    const contextWith = (
+      payload,
+      chats = onScreen,
+      stored = inStore,
+      selectedChatId = null
+    ) => {
       axios.post.mockResolvedValue({ data: { payload } });
       return {
         commit,
+        state: { selectedChatId },
         getters: {
           getUnAssignedChats: () => chats,
           getConversationById: id => stored[id],
@@ -760,6 +769,7 @@ describe('#deleteMessage', () => {
       const removed = await actions.reconcileConversationTab(
         {
           commit,
+          state: { selectedChatId: null },
           getters: {
             getUnAssignedChats: () => chats,
             getConversationById: () => undefined,
@@ -795,11 +805,47 @@ describe('#deleteMessage', () => {
       ]);
     });
 
+    // The store has no router, so removing the conversation the panel is showing is announced and
+    // the component that owns the route acts on it.
+    it('announces when it removed the conversation the panel is showing', async () => {
+      await actions.reconcileConversationTab(
+        contextWith([fresh(2)], onScreen, inStore, 3),
+        filters
+      );
+
+      expect(emitter.emit).toHaveBeenCalledWith(
+        BUS_EVENTS.OPEN_CONVERSATION_GONE
+      );
+    });
+
+    it('stays quiet when the open conversation survived', async () => {
+      await actions.reconcileConversationTab(
+        contextWith([fresh(2), fresh(3)], onScreen, inStore, 3),
+        filters
+      );
+
+      expect(emitter.emit).not.toHaveBeenCalledWith(
+        BUS_EVENTS.OPEN_CONVERSATION_GONE
+      );
+    });
+
     it('does not call out when the tab is empty on screen', async () => {
       const removed = await actions.reconcileConversationTab(
         contextWith([], []),
         filters
       );
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
+    });
+
+    // Mentions and participating carry an assigneeType but are narrowed by a membership the store
+    // cannot reproduce, so what is on screen there is not the tab this would judge it against.
+    it('does nothing on a view the store cannot reproduce', async () => {
+      const removed = await actions.reconcileConversationTab(contextWith([]), {
+        ...filters,
+        conversationType: 'mention',
+      });
 
       expect(axios.post).not.toHaveBeenCalled();
       expect(removed).toEqual([]);
@@ -820,6 +866,7 @@ describe('#deleteMessage', () => {
       const removed = await actions.reconcileConversationTab(
         {
           commit,
+          state: { selectedChatId: null },
           getters: {
             getUnAssignedChats: () => onScreen,
             getConversationById: () => undefined,

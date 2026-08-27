@@ -30,6 +30,7 @@ const storeMock = {
     getAppliedConversationFiltersQuery: [],
     'customViews/getActiveConversationFolder': { query: {} },
     'notifications/getNotificationFilters': {},
+    getChatListFilters: { assigneeType: 'unassigned', status: 'open' },
   },
 };
 
@@ -153,6 +154,19 @@ describe('ReconnectService', () => {
       expect(storeMock.dispatch).toHaveBeenCalledWith('updateChatListFilters', {
         updatedWithin: null,
       });
+    });
+
+    // The fetch asks for one tab, so a conversation that left it while the socket was down is not
+    // in the answer and its stale copy survives the merge. A reconnect is the one moment we know
+    // events were missed, so the tab is reconciled outright rather than waiting for the list to
+    // outgrow its badge, which never happens on a tab of several pages.
+    it('should reconcile the current tab after refetching', async () => {
+      reconnectService.getSecondsSinceDisconnect = vi.fn().mockReturnValue(100);
+      await reconnectService.fetchConversations();
+      expect(storeMock.dispatch).toHaveBeenCalledWith(
+        'reconcileConversationTab',
+        storeMock.getters.getChatListFilters
+      );
     });
   });
 
