@@ -37,6 +37,53 @@
   }
 }
 
+// Standalone switches on the account form, as a checkbox list: box first, its
+// own label right after it, the whole run sitting in the input column. The
+// label gutter the rest of the form uses is too narrow for these names and
+// wraps them, and a full-height row each is mostly empty space. Scoped to that
+// form (both classes, which also puts it above the utility classes the view
+// applies to every field-unit) so no other dashboard changes.
+.main-content__body.account-form {
+  .field-unit--boolean,
+  .field-unit--hide-agent-all-tab-field {
+    // Width only, so the colour the view's utility class puts on every
+    // field-unit survives for the one row that keeps the rule.
+    border-bottom-width: 0;
+    margin-bottom: 0;
+    padding: 0.125rem 0 0.125rem calc(15% + 1.25rem);
+
+    .field-unit__label {
+      margin-left: $small-spacing;
+      order: 2;
+      text-align: left;
+      width: auto;
+    }
+
+    .field-unit__field {
+      margin-left: 0;
+      order: 1;
+      width: auto;
+    }
+  }
+
+  // The rule the rest of the form carries under every field belongs under the
+  // run as a whole rather than between its own rows, so the last switch keeps
+  // it and picks up the padding that goes with it. "Last" is whichever one no
+  // other switch follows.
+  .field-unit--boolean:not(:has(+ .field-unit--boolean)):not(:has(+ .field-unit--hide-agent-all-tab-field)),
+  .field-unit--hide-agent-all-tab-field:not(:has(+ .field-unit--boolean)):not(:has(+ .field-unit--hide-agent-all-tab-field)) {
+    border-bottom-width: 1px;
+    padding-bottom: $base-spacing;
+  }
+
+  // The run carries no gap between its own rows, so the gap goes back on
+  // whatever field follows it.
+  .field-unit--boolean + .field-unit:not(.field-unit--boolean):not(.field-unit--hide-agent-all-tab-field),
+  .field-unit--hide-agent-all-tab-field + .field-unit:not(.field-unit--boolean):not(.field-unit--hide-agent-all-tab-field) {
+    margin-top: $base-spacing;
+  }
+}
+
 .field-unit--required {
   label::after {
     color: $red;
