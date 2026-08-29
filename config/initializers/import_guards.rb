@@ -117,6 +117,24 @@ module ImportGuards
     end
   end
 
+  # A scheduled message with `hold_on_reply` is a promise an agent made about the future:
+  # if the customer writes back first, do not send it. An incoming row satisfying that test
+  # is the whole trigger, and an imported one satisfies it the same way a live one does.
+  #
+  # Archive only, and the level carries the whole argument. Under `:announce` the row is a
+  # real reply that arrived while the connection was down, and holding the follow-up is
+  # exactly right -- the customer did answer, we just learned about it late. Under
+  # `:archive` the row is years old, and `scheduled_at > created_at` is then true of every
+  # pending scheduled message in the account: importing one old ticket would hold every
+  # follow-up an agent has queued.
+  module SilentScheduledMessages
+    def hold_pending_scheduled_messages
+      return if Import::SilentWrite.archive?
+
+      super
+    end
+  end
+
   module SilentMessageCallbacks
     def execute_after_create_commit_callbacks
       return super unless Import::SilentWrite.on?
@@ -133,6 +151,7 @@ Rails.application.config.to_prepare do
   SyncDispatcher.prepend(ImportGuards::SilentSyncDispatch)
   AsyncDispatcher.prepend(ImportGuards::SilentAsyncDispatch)
   Message.prepend(ImportGuards::SilentMessageCallbacks)
+  Message.prepend(ImportGuards::SilentScheduledMessages)
   Conversation.prepend(ImportGuards::SilentAutoAssignment)
   Contact.prepend(ImportGuards::SilentGravatar)
 end

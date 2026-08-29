@@ -52,7 +52,7 @@ class Import::Email::Backfill
     @limit = limit
     @attachments = Import::Email::AttachmentPolicy.build(attachments)
     @importer = Import::Email::HistoryImporter.new(attachments: @attachments)
-    @cursor = Import::Email::Cursor.new(@channel)
+    @cursor = Import::Email::Cursor.new(@channel, selection: [@terms, @kinds.sort])
     @stats = Hash.new(0)
     @stopped_by = nil
   end

@@ -26,6 +26,14 @@ describe Import::Octadesk::AttachmentFetcher do
     expect(message.reload.attachments.first.file.filename.to_s).to eq('foto.png')
   end
 
+  # The filename cannot tell two objects apart, and a second pass has to. The source URL is
+  # the only key that is one-to-one with the object in the vendor's bucket.
+  it 'stamps where it came from, which is what a second pass keys on' do
+    stub_request(:get, url).to_return(status: 200, body: 'conteudo', headers: { 'content-type' => 'image/png' })
+    described_class.new(message: message, url: url, name: 'foto.png').perform
+    expect(message.reload.attachments.first.file.blob.metadata['import_source']).to eq(url)
+  end
+
   it 'answers nil when the object is gone, so the caller does not count it as mirrored' do
     stub_request(:get, url).to_return(status: 404)
     expect(described_class.new(message: message, url: url, name: 'foto.png').perform).to be_nil
