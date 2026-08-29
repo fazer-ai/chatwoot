@@ -84,31 +84,9 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     channel.inbox.messages.exists?(source_id: id)
   end
 
-  # When the mail was sent. A mail whose `Date` will not parse still says when it moved:
-  # every relay that touched it stamped a `Received` line on the way, and the oldest of
-  # those is the closest thing the message has to a send time. Falling back to now would be
-  # the bug this class exists to fix.
-  #
-  # `Mail` is not consistent about how it refuses a bad `Date`: an unreadable field comes
-  # back as the raw String, and one that parses into an impossible time raises from the
-  # reader itself. Both are the same thing here -- the header says nothing usable -- and
-  # neither is a reason to count the message as an error and retry it on every pass.
-  def occurred_at(mail)
-    sent_at(mail) || received_at(mail)
-  end
-
-  def sent_at(mail)
-    date = mail.date
-    date.to_time if date.respond_to?(:to_time)
-  rescue StandardError
-    nil
-  end
-
-  def received_at(mail)
-    Array(mail.received).filter_map { |field| field.date_time&.to_time }.min
-  rescue StandardError
-    nil
-  end
+  # Shared with the backfill, which reads it off the header alone to decide the attachment
+  # cutoff. Falling back to now would be the bug this class exists to fix.
+  def occurred_at(mail) = Import::Email::Timestamp.of(mail)
 
   # Resolved unconditionally, dated when there is a date. The two are separate decisions
   # and only one of them depends on the clock: a thread out of the archive is not somebody's
