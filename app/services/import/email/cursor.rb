@@ -25,8 +25,13 @@
 # lower UIDs: a pass restricted to recent mail leaves a high mark, and a later pass widened
 # to the whole mailbox would have every older UID filtered out by that mark and report the
 # folder exhausted without classifying one of them -- the silent version of the failure,
-# since nothing errors and the numbers look like a finished import. Change the search terms
-# or the kinds and the folder starts over.
+# since nothing errors and the numbers look like a finished import. Change the search
+# terms, the kinds or the attachment policy and the folder starts over.
+#
+# The attachment policy belongs in the selection even though it changes nothing about which
+# messages are imported. It changes which are *finished*: a row filed without its
+# attachments is work again once a run asks for them, and a mark left by the narrower pass
+# is what would keep every later pass from ever reaching it.
 class Import::Email::Cursor
   def initialize(channel, selection: nil)
     @channel = channel

@@ -186,6 +186,24 @@ describe Import::Email::HistoryImporter do
       expect(message.content_attributes['imported_text_only']).to be(true)
     end
 
+    # `text_only` returns nil when the structure names no text part worth taking, and the
+    # backfill then fetches the whole message. The attachments are in hand and dropped
+    # here, so this is the one path where the row's own writer is the one withholding.
+    it 'marks the row when the whole message was fetched and the attachments dropped here' do
+      described_class.new.import(with_attachment, channel)
+      expect(inbox.messages.last.content_attributes['imported_text_only']).to be(true)
+    end
+
+    it 'marks nothing when the message carries no attachments to withhold' do
+      plain = Mail.read_from_string(
+        "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: sem anexo\r\n" \
+        "Message-ID: <simples@example.com>\r\nDate: Mon, 1 May 2023 10:00:00 -0300\r\n\r\n" \
+        'Corpo com texto suficiente para o pipeline aceitar sem reclamar.'
+      )
+      described_class.new.import(plain, channel)
+      expect(inbox.messages.where(Import::TEXT_ONLY_SQL).count).to eq(0)
+    end
+
     it 'does not touch a row that was already complete' do
       described_class.new(attachments: :all).import(with_attachment, channel)
       again = described_class.new(attachments: :all)

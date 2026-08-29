@@ -58,4 +58,13 @@ class Import::Email::AttachmentPolicy
 
     "a partir de #{@value.to_date}"
   end
+
+  # What the policy is, for a caller that has to tell two of them apart and store the
+  # answer. Kept separate from `to_s`, which is a line an operator reads: rewording that
+  # line would otherwise invalidate every stored cursor.
+  def key
+    return @value.to_s if none? || all?
+
+    @value.utc.iso8601
+  end
 end

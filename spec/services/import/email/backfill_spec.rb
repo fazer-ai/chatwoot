@@ -105,6 +105,16 @@ describe Import::Email::Backfill do
         imap = instance_double(Net::IMAP, uid_fetch: fetched)
         expect(widened.send(:unstored, imap, [10, 11, 12])).to eq([10, 11])
       end
+
+      # `unstored` never runs on a uid the cursor filtered out first, so letting the row
+      # through here is worth nothing unless the mark is invalidated too.
+      it 'is reachable at all, because the mark from the narrower pass no longer applies' do
+        narrow = described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer)
+        narrow.cursor.advance('INBOX', 9, 100)
+        narrow.cursor.flush
+        widened = described_class.new(inbox: inbox.reload, kinds: [:customer], pacer: pacer, attachments: :all)
+        expect(widened.cursor.unseen('INBOX', 9, [10, 11])).to eq([10, 11])
+      end
     end
   end
 

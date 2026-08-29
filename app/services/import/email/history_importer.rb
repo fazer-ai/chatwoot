@@ -56,7 +56,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # attachments in the mailbox, which is recorded on the row. See Import::TEXT_ONLY_SQL.
   def import(mail, channel, text_only: false)
     @occurred_at = occurred_at(mail)
-    @text_only = text_only
+    @text_only = text_only || withholding?(mail)
     @outcome = nil
     existing = stored(mail, channel)
     return enrich(mail, channel, existing) if existing
@@ -234,6 +234,13 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   end
 
   def skip_attachments? = @attachments.skip?(@occurred_at)
+
+  # Whether this row is going in without attachments it actually has. Two ways to get
+  # there and both have to be recorded, or the row claims to be complete and no later pass
+  # goes back for it: the caller fetched a lean copy and says so, or it fetched the whole
+  # message -- because the structure named no text part worth taking -- and we are the ones
+  # dropping the attachments here.
+  def withholding?(mail) = skip_attachments? && mail.attachments.present?
 
   # `HistorySettlement` works a batch at a time because a WhatsApp dump arrives that way.
   # A mailbox arrives one message at a time, so the batch here is the single row just
