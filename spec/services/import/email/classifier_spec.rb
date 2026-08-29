@@ -70,4 +70,38 @@ describe Import::Email::Classifier do
                                   "Message-ID: <z@example.com>\r\n\r\nCorpo")
     expect(described_class.new(mail: plain, text: 'sobre o ticket 987 que abri ontem').ticket).to eq('987')
   end
+
+  # A customer answering machine mail quotes it. Read whole, the body carries the
+  # template's phrases and the reply is filed as the machine mail it answers -- which under
+  # the default `KINDS=customer` drops the customer's words and moves the cursor past them.
+  describe 'a customer answering machine mail' do
+    let(:quoted_receipt) do
+      "#{customer_text}\n\nEm 1 de maio, sac@example.com escreveu:\n" \
+        '> Mensagem automatica: sua solicitacao 123 foi recebida e esta sendo analisada por nossa equipe'
+    end
+
+    it 'is the customer, not the receipt underneath the reply' do
+      classifier = described_class.new(mail: from_customer, text: quoted_receipt, reply: customer_text)
+      expect(classifier.kind).to eq(:customer)
+    end
+
+    it 'still reads the ticket number out of the part that was quoted' do
+      body = "#{customer_text}\n\n> sobre o ticket 987 que abri ontem"
+      plain = Mail.read_from_string("From: c@example.com\r\nTo: #{own}\r\nSubject: sem numero\r\n" \
+                                    "Message-ID: <w@example.com>\r\n\r\nCorpo")
+      expect(described_class.new(mail: plain, text: body, reply: customer_text).ticket).to eq('987')
+    end
+
+    # A receipt's own fixed text is the unquoted top of it, so trimming changes nothing.
+    it 'leaves the machine mail itself classified as before' do
+      receipt = 'Mensagem automatica: sua solicitacao 123 foi recebida'
+      classifier = described_class.new(mail: from_customer, text: "#{receipt}\n\n> #{customer_text}", reply: receipt)
+      expect(classifier.kind).to eq(:receipt)
+    end
+
+    it 'falls back to the whole body when nothing survives the trim' do
+      receipt = 'Mensagem automatica: sua solicitacao 123 foi recebida'
+      expect(described_class.new(mail: from_customer, text: receipt, reply: '').kind).to eq(:receipt)
+    end
+  end
 end

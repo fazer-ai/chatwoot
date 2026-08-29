@@ -22,6 +22,18 @@ describe Import::Email::Backfill do
     it 'accepts the ordinary case' do
       expect { described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer) }.not_to raise_error
     end
+
+    # A typo matches nothing, imports nothing, and advances the cursor over the whole
+    # mailbox while the task reports it finished.
+    it 'refuses a kind the classifier does not answer' do
+      expect { described_class.new(inbox: inbox, kinds: %i[customer customers], pacer: pacer) }
+        .to raise_error(ArgumentError, /customers/)
+    end
+
+    # `imap:scan` classifies everything and imports none of it.
+    it 'accepts no kinds at all, which is what a scan asks for' do
+      expect { described_class.new(inbox: inbox, kinds: [], pacer: pacer) }.not_to raise_error
+    end
   end
 
   describe 'choosing folders' do

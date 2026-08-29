@@ -18,21 +18,7 @@ class Import::Email::Backfill
   SPECIAL_ATTRS = %i[All Junk].freeze
   HEADER_BATCH = 200
 
-  # Kinds a scan counts and a run may not take, because this importer files everything
-  # through the incoming mailbox pipeline and neither of these is incoming.
-  #
-  # `sent` is the mailbox's own outgoing mail. It matters more than it looks: Gmail's \All
-  # is the union of everything except Spam and Trash, so it contains the Sent folder
-  # whole, which on a long-lived support mailbox is a sizeable share of every message in it.
-  # Run through the pipeline each one invents a contact for the company's own address and
-  # files the company's own words as something a customer wrote.
-  #
-  # `relay` is the ticketing system writing to the mailbox about a reply it sent elsewhere.
-  # The words inside are typed by whoever spoke last: an agent on some threads, the customer
-  # on others, with nothing in the notification that separates the two.
-  #
-  # Both are recognised rather than hidden, so a scan reports what a run is leaving behind.
-  UNIMPORTABLE = %i[sent relay].freeze
+  UNIMPORTABLE = Import::Email::Classifier::UNIMPORTABLE
 
   attr_reader :stats, :pacer, :stopped_by, :cursor
 
@@ -42,10 +28,7 @@ class Import::Email::Backfill
   def initialize(inbox:, kinds:, pacer:, folders: nil, terms: ['ALL'], attachments: nil, limit: nil)
     @inbox = inbox
     @channel = inbox.channel
-    @kinds = Array(kinds).map(&:to_sym)
-    refused = @kinds & UNIMPORTABLE
-    raise ArgumentError, "these kinds cannot be imported: #{refused.join(', ')}" if refused.any?
-
+    @kinds = Import::Email::Classifier.importable!(kinds)
     @pacer = pacer
     @folders = folders
     @terms = terms
@@ -296,9 +279,9 @@ class Import::Email::Backfill
   end
 
   def classify(mail)
-    presenter = MailPresenter.new(mail, @channel.account)
-    text = (presenter.text_content.presence && presenter.text_content[:full]).presence ||
-           ActionView::Base.full_sanitizer.sanitize((presenter.html_content.presence && presenter.html_content[:full]).to_s)
-    Import::Email::Classifier.new(mail: mail, text: text, own_address: @channel.email).kind
+    body = Import::Email::Body.new(MailPresenter.new(mail, @channel.account))
+    Import::Email::Classifier.new(
+      mail: mail, text: body[:full], reply: body[:reply], own_address: @channel.email
+    ).kind
   end
 end

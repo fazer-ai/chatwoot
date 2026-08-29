@@ -63,9 +63,31 @@ describe 'the import rake tasks' do
       expect(channel.reload.import_cursor).to eq({})
     end
 
+    # `RESET_CURSOR=0` reads as "off" to whoever typed it. Honoured as "on" it throws away
+    # the resume point on every invocation, and each pass re-walks the declined mail it had
+    # already got past.
+    it 'keeps the mark when the setting says not to reset' do
+      Import::Email::Cursor.new(channel).tap { |cursor| cursor.advance('INBOX', 7, 42) }.flush
+      ENV['RESET_CURSOR'] = '0'
+      expect { Rake::Task['imap:import'].invoke }.to output(/Retoma:\s+INBOX>42/).to_stdout
+      expect(channel.reload.import_cursor).to be_present
+    end
+
     it 'refuses a kind it cannot file rather than filing it backwards' do
       ENV['KINDS'] = 'customer,sent'
       expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /sent/)
+    end
+
+    it 'refuses a kind the classifier does not answer, rather than importing nothing' do
+      ENV['KINDS'] = 'customers'
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /customers/)
+    end
+
+    # A setting somebody wrote on purpose that means nothing: the run would classify the
+    # whole mailbox, import none of it and report the folder finished.
+    it 'refuses an empty KINDS rather than defaulting around it' do
+      ENV['KINDS'] = ','
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
     end
   end
 
