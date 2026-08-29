@@ -103,6 +103,31 @@ describe Import::Email::HistoryImporter do
     end
   end
 
+  # Live traffic keeps this in `Message#update_contact_activity`, inside the after-create
+  # callbacks the import suppresses wholesale. Left null, a contact with a decade of mail
+  # sorts below one who has never written.
+  describe 'when the contact last said anything' do
+    it 'stamps it from the mail rather than from the clock' do
+      importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel)
+      expect(inbox.contacts.last.last_activity_at).to eq(Time.zone.parse('2023-05-01 10:00'))
+    end
+
+    it 'keeps the newest of the thread, whatever order the mail arrives in' do
+      importer.import(mail(date: Time.zone.parse('2023-06-10 10:00'), message_id: root_id), channel)
+      importer.import(mail(date: Time.zone.parse('2023-01-05 08:00'), reply_to_root: true), channel)
+      expect(inbox.contacts.last.last_activity_at).to eq(Time.zone.parse('2023-06-10 10:00'))
+    end
+
+    # A contact somebody is talking to now has a real clock, and history must not move it.
+    it 'never drags a live contact backwards' do
+      importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel)
+      contact = inbox.contacts.last
+      contact.update!(last_activity_at: Time.zone.parse('2026-01-01 09:00'))
+      described_class.new.import(mail(date: Time.zone.parse('2023-07-01 10:00'), reply_to_root: true), channel)
+      expect(contact.reload.last_activity_at).to eq(Time.zone.parse('2026-01-01 09:00'))
+    end
+  end
+
   describe 'attachments' do
     let(:with_attachment) do
       Mail.read_from_string(

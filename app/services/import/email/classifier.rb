@@ -53,15 +53,66 @@ class Import::Email::Classifier
   # A body this short says nothing a reader would want.
   MIN_CONTENT = 40
 
+  # Every answer this class gives. Exported so a caller can refuse a kind it does not
+  # recognise before it connects to anything: a typo in `KINDS` otherwise matches nothing,
+  # imports nothing, advances the cursor over the whole mailbox and reports it as done.
+  KINDS = %i[sent receipt csat alert relay empty customer].freeze
+
+  # Kinds a scan counts and a run may not take, because the importer files everything
+  # through the incoming mailbox pipeline and neither of these is incoming.
+  #
+  # `sent` is the mailbox's own outgoing mail. It matters more than it looks: Gmail's \All
+  # is the union of everything except Spam and Trash, so it contains the Sent folder whole,
+  # which on a long-lived support mailbox is a sizeable share of every message in it. Run
+  # through the pipeline each one invents a contact for the company's own address and files
+  # the company's own words as something a customer wrote.
+  #
+  # `relay` is the ticketing system writing to the mailbox about a reply it sent elsewhere.
+  # The words inside are typed by whoever spoke last: an agent on some threads, the
+  # customer on others, with nothing in the notification that separates the two.
+  #
+  # Both are recognised rather than hidden, so a scan reports what a run is leaving behind.
+  UNIMPORTABLE = %i[sent relay].freeze
+
+  # The kinds a run may take, or an exception naming what is wrong with the list. Refused
+  # before anything connects, because both mistakes are silent at run time: an unknown kind
+  # matches nothing, so the run downloads and classifies the whole mailbox, imports none of
+  # it, advances the cursor over all of it and reports the folder finished.
+  #
+  # An empty list is legitimate and means "classify, import nothing", which is what a scan
+  # asks for.
+  def self.importable!(kinds)
+    asked = Array(kinds).map(&:to_sym)
+    unknown = asked - KINDS
+    raise ArgumentError, "unknown kinds: #{unknown.join(', ')}" if unknown.any?
+
+    refused = asked & UNIMPORTABLE
+    raise ArgumentError, "these kinds cannot be imported: #{refused.join(', ')}" if refused.any?
+
+    asked
+  end
+
   attr_reader :kind, :ticket
 
   # `own_address` is the mailbox's own, and it is what separates a message the company
   # received from one it sent. Optional, because a caller that does not pass it simply
   # never sees the `sent` kind.
-  def initialize(mail:, text:, own_address: nil)
+  #
+  # `reply` is the body with the quoted history trimmed off, and the kind is read from it
+  # rather than from the whole. A customer answering a receipt, a CSAT request or an alert
+  # quotes the thing they are answering, so the whole body carries the template's own
+  # phrases and the message is classified as the machine mail it is a reply to -- which
+  # under the default `KINDS=customer` drops the customer's words and moves the cursor past
+  # them. The machine mail itself is unaffected: a receipt's fixed text is the unquoted top
+  # of it, which is exactly what survives the trim.
+  #
+  # The ticket number is still read from the whole body, because it usually lives in the
+  # part that was quoted.
+  def initialize(mail:, text:, reply: nil, own_address: nil)
     @mail = mail
     @own_address = own_address.to_s.downcase.strip.presence
     @text = self.class.fold(text)
+    @reply = self.class.fold(reply).presence || @text
     classify
   end
 
@@ -97,10 +148,10 @@ class Import::Email::Classifier
   # reply reads exactly like the customer mail it quotes.
   def kind_of_text
     return :sent if own_mail?
-    return :receipt if RECEIPT.match?(@text)
-    return :csat if CSAT.match?(@text)
-    return :alert if ALERT.match?(@text)
-    return :relay if RELAY.match?(@text)
+    return :receipt if RECEIPT.match?(@reply)
+    return :csat if CSAT.match?(@reply)
+    return :alert if ALERT.match?(@reply)
+    return :relay if RELAY.match?(@reply)
     return :empty if @text.length < MIN_CONTENT
 
     :customer

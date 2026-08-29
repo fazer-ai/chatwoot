@@ -28,6 +28,7 @@ module Import::HistorySettlement
       stamp_activity(conversation, rows)
       stamp_waiting(conversation, rows)
       stamp_seen(conversation, rows)
+      stamp_contact(conversation, rows)
       if announced.include?(conversation)
         announcing { Whatsapp::Session::Inbound::ChatList.refresh(conversation) }
       else
@@ -89,6 +90,26 @@ module Import::HistorySettlement
   #
   # Read off the thread rather than off `rows`, and never moved backwards, so frames may
   # land in any order and each one leaves the same answer.
+  # When the contact last said anything, which the dashboard sorts and filters contacts by.
+  # Live traffic keeps it in `Message#update_contact_activity`, inside the after-create
+  # callbacks the import suppresses wholesale -- so without this an imported contact has a
+  # decade of mail and a null clock, and sorts below people who have never written.
+  #
+  # Not the value the live path would have written, which is `DateTime.now`: on a replay
+  # that stamps every contact in the archive with the moment of the import. The row's own
+  # date is the true answer, taken only from incoming rows because it is the contact's
+  # activity and not ours, and only ever forwards -- a contact with live traffic has a real
+  # clock and history must not drag it backwards.
+  def stamp_contact(conversation, rows)
+    newest = rows.select(&:incoming?).filter_map(&:created_at).max
+    return if newest.blank?
+
+    contact = conversation.contact
+    return if contact.blank? || (contact.last_activity_at.present? && contact.last_activity_at >= newest)
+
+    contact.update_columns(last_activity_at: newest) # rubocop:disable Rails/SkipsModelValidations
+  end
+
   def stamp_seen(conversation, _rows)
     return unless conversation.resolved?
     return if conversation.messages.incoming.where.not(Import::IMPORTED_SQL).exists?

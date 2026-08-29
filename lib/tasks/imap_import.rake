@@ -29,7 +29,7 @@ require 'net/imap'
 #   BUDGET_MB          IMAP bytes to spend before stopping (default 2000 of the 2500 allowed)
 #   MAX_LOAD           pause while the host's 1-minute load is above this (default 2.5)
 #   LIMIT              stop after importing this many messages
-#   RESET_CURSOR       1 to forget how far previous passes got and walk from the start.
+#   RESET_CURSOR       true/1 to forget how far previous passes got and walk from the start.
 #                      The run is resumable because it remembers, per folder, the highest
 #                      UID it has already looked at -- the inbox alone cannot say, since
 #                      most of a support mailbox is read and declined rather than written
@@ -53,7 +53,23 @@ module ImapImportOptions
   end
 
   def folders = ENV['FOLDERS'].presence&.split(',')&.map(&:strip)
-  def kinds = (ENV['KINDS'] || 'customer').split(',').map(&:strip)
+
+  # Refused here rather than defaulted, because `KINDS=` is a setting somebody wrote on
+  # purpose and it means nothing: the run would download and classify the whole mailbox,
+  # import none of it, advance the cursor over all of it and report the folder finished.
+  # An empty list is legitimate for `imap:scan`, which builds its own.
+  def kinds
+    given = (ENV['KINDS'] || 'customer').split(',').map(&:strip).compact_blank
+    abort 'ERRO: KINDS esta vazio, nada seria importado' if given.empty?
+
+    given
+  end
+
+  # Cast rather than `present?`: `RESET_CURSOR=0` reads as "off" to whoever typed it and as
+  # "on" to a presence check, and getting it wrong throws away the resume point on every
+  # invocation -- so each pass re-walks and re-downloads the declined mail it had already
+  # got past, which on this mailbox is most of it.
+  def reset_cursor? = ActiveModel::Type::Boolean.new.cast(ENV.fetch('RESET_CURSOR', nil)).present?
 
   # `all`, a date, or nothing at all. Parsed here so a typo stops the run at the first line
   # instead of quietly reading as "none" and finishing without a single attachment.
@@ -205,7 +221,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms,
       attachments: attachments, limit: ImapImportOptions.limit
     )
-    run.cursor.reset if ENV['RESET_CURSOR'].present?
+    run.cursor.reset if ImapImportOptions.reset_cursor?
     puts "Retoma:  #{run.cursor}"
     puts '-' * 70
 
