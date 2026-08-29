@@ -43,7 +43,10 @@ class Import::Octadesk::TicketImporter
 
   def import(ticket)
     interactions = writable(ticket)
-    return @stats[:sem_conteudo] += 1 if interactions.empty?
+    # A ticket whose whole history is status changes is still history: it has a requester, a
+    # number, dates and a resolution, and the activity rows say where it went. Only a ticket
+    # that would produce neither a message nor an activity is empty.
+    return @stats[:sem_conteudo] += 1 if interactions.empty? && !any_activity?(ticket)
 
     Import::SilentWrite.wrap do
       contact_inbox = @contacts.perform(ticket, interactions)
@@ -111,6 +114,10 @@ class Import::Octadesk::TicketImporter
   # but not a message. Those are written separately by Import::Octadesk::ActivityWriter.
   def writable(ticket)
     Array(ticket['Interactions']).select { |i| Import::Octadesk::ActivityWriter.commented?(i) }
+  end
+
+  def any_activity?(ticket)
+    Array(ticket['Interactions']).any? { |i| Import::Octadesk::ActivityWriter.writable?(i) }
   end
 
   # Dated to the ticket and resolved from the start, never resolved afterwards: born in
