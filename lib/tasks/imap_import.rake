@@ -94,7 +94,8 @@ module ImapImportOptions
 
   def print_progress(stats, pacer, started)
     skipped = stats.sum { |key, value| key.to_s.start_with?('visto_') ? value : 0 } - stats[:importadas]
-    print "\r  #{stats[:importadas]} importadas | #{skipped} puladas | #{pacer.spent_mb}MB | " \
+    enriched = stats[:enriquecidas].positive? ? "#{stats[:enriquecidas]} anexadas | " : ''
+    print "\r  #{stats[:importadas]} importadas | #{enriched}#{skipped} puladas | #{pacer.spent_mb}MB | " \
           "load #{pacer.load_average} | #{duration(Time.zone.now - started)}        "
   end
 

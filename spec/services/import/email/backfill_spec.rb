@@ -85,6 +85,27 @@ describe Import::Email::Backfill do
       run.send(:unstored, imap, [10, 11, 12])
       expect(run.stats).to include(ja_importadas: 1, sem_message_id: 1)
     end
+
+    # "Stored" and "nothing left to do" are the same question only under the default. A row
+    # filed without its attachments is stored and incomplete, and skipping it here is what
+    # would put the attachments out of reach of every later pass.
+    describe 'a row a narrower pass filed without its attachments' do
+      before do
+        inbox.messages.find_by(source_id: stored_id)
+             .update!(content_attributes: { imported: true, imported_text_only: true })
+      end
+
+      it 'is still done when the run is not asking for attachments' do
+        imap = instance_double(Net::IMAP, uid_fetch: fetched)
+        expect(run.send(:unstored, imap, [10, 11, 12])).to eq([11])
+      end
+
+      it 'is work again when the run widens the cutoff' do
+        widened = described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer, attachments: :all)
+        imap = instance_double(Net::IMAP, uid_fetch: fetched)
+        expect(widened.send(:unstored, imap, [10, 11, 12])).to eq([10, 11])
+      end
+    end
   end
 
   # A message that raised is not settled. Marked as read it would be skipped by every later

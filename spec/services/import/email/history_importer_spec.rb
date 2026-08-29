@@ -131,4 +131,66 @@ describe Import::Email::HistoryImporter do
       expect(inbox.messages.last.attachments).to be_empty
     end
   end
+
+  # A first pass files a mailbox text-only to stay inside the provider budget; a later one
+  # widens the cutoff. Without an enrichment path the second pass finds the Message-ID
+  # stored, calls it done, and the attachments stay in a mailbox nobody reads again.
+  describe 'widening the cutoff over mail already filed' do
+    let(:with_attachment) do
+      Mail.read_from_string(
+        "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: com anexo\r\n" \
+        "Message-ID: <anexo@example.com>\r\nDate: Mon, 1 May 2023 10:00:00 -0300\r\nMIME-Version: 1.0\r\n" \
+        "Content-Type: multipart/mixed; boundary=\"limite\"\r\n\r\n" \
+        "--limite\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" \
+        "Corpo com texto suficiente para o pipeline aceitar sem reclamar.\r\n" \
+        "--limite\r\nContent-Type: text/plain; charset=UTF-8\r\n" \
+        "Content-Disposition: attachment; filename=\"nota.txt\"\r\n\r\nconteudo do anexo\r\n--limite--\r\n"
+      )
+    end
+
+    def file_text_only
+      described_class.new.import(with_attachment, channel, text_only: true)
+      inbox.messages.last
+    end
+
+    it 'says on the row that its attachments were left behind' do
+      expect(file_text_only.content_attributes['imported_text_only']).to be(true)
+      expect(inbox.messages.where(Import::TEXT_ONLY_SQL).count).to eq(1)
+    end
+
+    it 'says nothing when the pass fetched the whole message' do
+      described_class.new(attachments: :all).import(with_attachment, channel)
+      expect(inbox.messages.where(Import::TEXT_ONLY_SQL).count).to eq(0)
+    end
+
+    it 'fetches the attachments onto the row a narrower pass already filed' do
+      message = file_text_only
+      widened = described_class.new(attachments: :all)
+      expect { widened.import(with_attachment, channel) }.not_to change(inbox.messages, :count)
+      expect(message.reload.attachments.count).to eq(1)
+      expect(widened.outcome_kind).to eq(:enriquecidas)
+    end
+
+    it 'clears the flag, so a third pass has nothing left to do' do
+      file_text_only
+      described_class.new(attachments: :all).import(with_attachment, channel)
+      third = described_class.new(attachments: :all)
+      expect { third.import(with_attachment, channel) }.not_to change(Attachment, :count)
+      expect(third.outcome_kind).to eq(:inalteradas)
+    end
+
+    it 'leaves it alone when the widened cutoff still excludes the message' do
+      message = file_text_only
+      described_class.new(attachments: Time.zone.parse('2024-01-01')).import(with_attachment, channel)
+      expect(message.reload.attachments).to be_empty
+      expect(message.content_attributes['imported_text_only']).to be(true)
+    end
+
+    it 'does not touch a row that was already complete' do
+      described_class.new(attachments: :all).import(with_attachment, channel)
+      again = described_class.new(attachments: :all)
+      expect { again.import(with_attachment, channel) }.not_to change(Attachment, :count)
+      expect(again.outcome_kind).to eq(:inalteradas)
+    end
+  end
 end

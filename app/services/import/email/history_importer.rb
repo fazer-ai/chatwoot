@@ -40,7 +40,7 @@
 class Import::Email::HistoryImporter < Imap::ImapMailbox
   include Import::HistorySettlement
 
-  attr_reader :opened, :outcome
+  attr_reader :opened, :outcome, :outcome_kind
 
   def initialize(attachments: nil)
     @attachments = Import::Email::AttachmentPolicy.build(attachments)
@@ -51,11 +51,16 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
 
   # Returns the message it wrote, or nil when the pipeline declined the mail (an invalid
   # sender, a duplicate Message-ID, a notification of our own).
-  def import(mail, channel)
-    return if stored?(mail, channel)
-
+  #
+  # `text_only` is the caller saying it fetched a lean copy and left this message's
+  # attachments in the mailbox, which is recorded on the row. See Import::TEXT_ONLY_SQL.
+  def import(mail, channel, text_only: false)
     @occurred_at = occurred_at(mail)
+    @text_only = text_only
     @outcome = nil
+    existing = stored(mail, channel)
+    return enrich(mail, channel, existing) if existing
+
     # One transaction around the write and the settlement, because the dedupe key is the
     # row: a run that commits the message and then stops leaves stamps describing the
     # import, and the next pass skips that Message-ID in `unstored` and never comes back to
@@ -67,6 +72,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
         settle_thread
       end
     end
+    @outcome_kind = @outcome ? :importadas : :recusadas
     @outcome
   end
 
@@ -77,11 +83,54 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # whose References no longer resolve opens a fresh conversation, and the check then runs
   # against a thread that is empty by construction and passes. Measured on 29 real
   # messages, a second pass duplicated 25 of them.
-  def stored?(mail, channel)
+  def stored(mail, channel)
     id = sanitize_mailbox_value(mail.message_id)
-    return false if id.blank?
+    return if id.blank?
 
-    channel.inbox.messages.exists?(source_id: id)
+    channel.inbox.messages.find_by(source_id: id)
+  end
+
+  # The attachments a narrower pass left behind, fetched onto the row that is already
+  # filed.
+  #
+  # Without this the archive cannot be widened. A first pass under `ATTACHMENTS=none`
+  # files every message text-only; a second pass under a cutoff finds the Message-ID
+  # already stored, calls it done, and the attachments stay in a mailbox nobody will read
+  # again -- silently, and with no setting that recovers them, since resetting the cursor
+  # only re-walks UIDs the stored check will refuse a second time.
+  #
+  # It runs the same `add_attachments_to_message` over the same `MailPresenter` the live
+  # path runs, which is the whole reason this class subclasses the mailbox: an attachment
+  # filed here is the one the pipeline would have filed. Nothing else about the message is
+  # touched -- it already has its body, its date, its thread and its contact.
+  def enrich(mail, channel, message)
+    @outcome_kind = :inalteradas
+    return if skip_attachments? || !incomplete?(message)
+
+    @inbound_mail = mail
+    @channel = channel
+    load_account
+    load_inbox
+    decorate_mail
+    @message = message
+    @conversation = message.conversation
+    Import::SilentWrite.wrap { fill_attachments }
+    @outcome_kind = :enriquecidas
+    @outcome = @message
+  end
+
+  # The flag is cleared in the same transaction that writes the attachments, so a run that
+  # dies between them leaves the row still asking to be enriched rather than claiming to be
+  # complete while holding nothing.
+  def fill_attachments
+    ActiveRecord::Base.transaction do
+      add_attachments_to_message
+      @message.update!(content_attributes: @message.content_attributes.except('imported_text_only'))
+    end
+  end
+
+  def incomplete?(message)
+    ActiveModel::Type::Boolean.new.cast(message.content_attributes['imported_text_only']) == true
   end
 
   # Shared with the backfill, which reads it off the header alone to decide the attachment
@@ -160,7 +209,10 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # Says the row was filed after the fact. Read by Inbound::Coverage and HistorySettlement,
   # and by any report that means to exclude backfilled traffic. See Import::IMPORTED_SQL.
   def sanitized_content_attributes
-    super.merge(imported: true)
+    attributes = super.merge(imported: true)
+    return attributes unless @text_only
+
+    attributes.merge(imported_text_only: true)
   end
 
   def create_message

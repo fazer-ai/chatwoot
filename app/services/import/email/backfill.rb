@@ -174,9 +174,22 @@ class Import::Email::Backfill
     seen = heads.to_h { |data| [data.attr['UID'], message_id_of(data)] }
     @stats[:sem_message_id] += seen.count { |_, id| id.blank? }
     wanted = seen.compact_blank
-    stored = @inbox.messages.where(source_id: wanted.values).pluck(:source_id).to_set
+    stored = settled(wanted.values)
     @stats[:ja_importadas] += wanted.count { |_, id| stored.include?(id) }
     wanted.filter_map { |uid, id| uid unless stored.include?(id) }
+  end
+
+  # Which of these Message-IDs this run has nothing left to do about, which is not the same
+  # as which ones are stored. A row filed by a pass that left its attachments behind is
+  # stored and incomplete, and under a policy that now wants them it is work: skipping it
+  # here is what would make the attachments unreachable, since no later pass ever looks at
+  # a Message-ID this query has already answered for.
+  #
+  # Under the default the two questions coincide, and the query stays the one it was.
+  def settled(ids)
+    rows = @inbox.messages.where(source_id: ids)
+    rows = rows.where.not(Import::TEXT_ONLY_SQL) unless @attachments.none?
+    rows.pluck(:source_id).to_set
   end
 
   def message_id_of(data)
@@ -187,7 +200,7 @@ class Import::Email::Backfill
 
   def halt?
     @stopped_by = :orcamento if @pacer.over_budget?
-    @stopped_by = :limite if @limit && @stats[:importadas] >= @limit
+    @stopped_by = :limite if @limit && (@stats[:importadas] + @stats[:enriquecidas]) >= @limit
     @stopped_by.present?
   end
 
@@ -205,7 +218,8 @@ class Import::Email::Backfill
     @stats[:"visto_#{kind}"] += 1
     return true unless @kinds.include?(kind)
 
-    @stats[@importer.import(mail, @channel) ? :importadas : :recusadas] += 1
+    @importer.import(mail, @channel, text_only: @lean)
+    @stats[@importer.outcome_kind] += 1
     @progress.call(:imported, kind: kind, stats: @stats)
     true
   rescue StandardError => e
@@ -221,6 +235,7 @@ class Import::Email::Backfill
   # and the structure are a few kilobytes and answer both questions -- when the mail was
   # sent, and whether it carries anything besides text.
   def fetch(imap, uid)
+    @lean = false
     meta = imap.uid_fetch(uid, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])&.first
     return skip(:vazias) if meta.nil?
 
@@ -258,6 +273,7 @@ class Import::Email::Backfill
 
     @pacer.spend(body.bytesize)
     @stats[:sem_anexos] += 1
+    @lean = true
     lean.rebuild(header, body)
   end
 
