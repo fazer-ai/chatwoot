@@ -20,10 +20,14 @@ class Import::Octadesk::ActivityWriter
     @stats = stats
   end
 
+  # Returns the rows it wrote, because the settlement has to see them: an activity carries
+  # a date like any other row, and a settlement that took only the messages would put
+  # `last_activity_at` in a different place than one that reads the thread back off the
+  # database. The two must agree, or a re-run moves the stamp and the import stops being
+  # something that can be repeated.
   def perform(conversation, ticket)
-    Array(ticket['Interactions']).reject { |interaction| commented?(interaction) }.each do |interaction|
-      write(conversation, interaction)
-    end
+    Array(ticket['Interactions']).reject { |interaction| commented?(interaction) }
+                                 .filter_map { |interaction| write(conversation, interaction) }
   end
 
   # Shared with the message importer, which selects on the opposite answer.
@@ -48,12 +52,13 @@ class Import::Octadesk::ActivityWriter
     source_id = "#{Import::Octadesk::TicketImporter::SOURCE_PREFIX}:#{id}:act"
     return if conversation.messages.exists?(source_id: source_id)
 
-    conversation.messages.create!(
+    row = conversation.messages.create!(
       account_id: @account.id, inbox_id: @inbox.id, source_id: source_id,
       message_type: :activity, content: line, content_attributes: { imported: true },
       created_at: Import::Octadesk::Stream.time(interaction['DateCreation']) || conversation.created_at
     )
     @stats[:atividades] += 1
+    row
   end
 
   # Only the two changes a reader of an archive asks about: where the thread went and who

@@ -18,20 +18,31 @@ class Import::Email::Backfill
   SPECIAL_ATTRS = %i[All Junk].freeze
   HEADER_BATCH = 200
 
+  # `relay` is counted but never imported. The wrapper is the ticketing system writing to
+  # the mailbox, and the words inside it were typed by whoever spoke last: an agent on some
+  # threads, the customer on others, with nothing in the notification that separates the
+  # two. Filing them all in one direction would put words in somebody's mouth, so the kind
+  # exists to be seen in a scan and left out of a run.
+  UNIMPORTABLE = %i[relay].freeze
+
   attr_reader :stats, :pacer, :stopped_by
 
   # rubocop:disable Metrics/ParameterLists -- every one of these is an independent knob on
   # a run that is meant to be started, stopped and restarted with different settings; an
   # options object would only move the list one file over.
-  def initialize(inbox:, kinds:, pacer:, folders: nil, terms: ['ALL'], attachments_since: nil, limit: nil)
+  def initialize(inbox:, kinds:, pacer:, folders: nil, terms: ['ALL'], attachments: nil, limit: nil)
     @inbox = inbox
     @channel = inbox.channel
     @kinds = Array(kinds).map(&:to_sym)
+    refused = @kinds & UNIMPORTABLE
+    raise ArgumentError, "these kinds cannot be imported: #{refused.join(', ')}" if refused.any?
+
     @pacer = pacer
     @folders = folders
     @terms = terms
     @limit = limit
-    @importer = Import::Email::HistoryImporter.new(attachments_since: attachments_since)
+    @attachments = Import::Email::AttachmentPolicy.build(attachments)
+    @importer = Import::Email::HistoryImporter.new(attachments: @attachments)
     @stats = Hash.new(0)
     @stopped_by = nil
   end
@@ -57,19 +68,40 @@ class Import::Email::Backfill
     close(imap)
   end
 
+  # Gmail is found by attribute; an ordinary server that advertises no special use is
+  # walked from INBOX, which is the folder every server has. Without that fallback a
+  # perfectly valid channel scans nothing at all -- or, if it happens to flag only its spam
+  # folder, scans nothing but spam, which is worse because it looks like it worked.
   def folders(imap)
     return @folders if @folders.present?
 
     listed = imap.list('', '*') || []
-    @folders = SPECIAL_ATTRS.filter_map { |attr| listed.find { |f| f.attr.include?(attr) }&.name }
+    found = SPECIAL_ATTRS.index_with { |attr| listed.find { |f| f.attr.include?(attr) }&.name }
+    @folders = [found[:All] || 'INBOX', found[:Junk]].compact
   end
 
   # EXAMINE rather than SELECT everywhere: read-only, so nothing this runs can mark
   # somebody's unread mail as seen or expunge anything.
   def connect
     imap = Net::IMAP.new(@channel.imap_address, port: @channel.imap_port, ssl: @channel.imap_enable_ssl, open_timeout: 30)
-    Imap::Authentication.authenticate!(imap, @channel.imap_authentication || 'plain', @channel.imap_login, @channel.imap_password)
+    authenticate(imap)
     imap
+  end
+
+  # The same three cases the live fetch services split into, because a channel does not
+  # stop being an OAuth channel when a rake task is the one connecting: on Google and
+  # Microsoft the stored `imap_password` is empty or stale and only a refreshed XOAUTH2
+  # token authenticates, so reading the column would fail every run against those
+  # providers with nothing but a login error to say why.
+  def authenticate(imap)
+    case @channel.provider
+    when 'google'
+      imap.authenticate('XOAUTH2', @channel.imap_login, Google::RefreshOauthTokenService.new(channel: @channel).access_token)
+    when 'microsoft'
+      imap.authenticate('XOAUTH2', @channel.imap_login, Microsoft::RefreshOauthTokenService.new(channel: @channel).access_token)
+    else
+      Imap::Authentication.authenticate!(imap, @channel.imap_authentication, @channel.imap_login, @channel.imap_password)
+    end
   end
 
   def close(imap)
@@ -130,12 +162,57 @@ class Import::Email::Backfill
     @progress.call(:error, uid: uid, error: e)
   end
 
+  # The cutoff is decided before any of the message is downloaded, because the cost it
+  # exists to control is paid at the fetch and nowhere else: `BODY.PEEK[]` pulls the
+  # encoded attachments along with the words, so a run that decides afterwards has already
+  # spent its whole provider budget on the megabytes it then declines to keep. The header
+  # and the structure are a few kilobytes and answer both questions -- when the mail was
+  # sent, and whether it carries anything besides text.
   def fetch(imap, uid)
+    meta = imap.uid_fetch(uid, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])&.first
+    return skip(:vazias) if meta.nil?
+
+    header = meta.attr['BODY[HEADER]'].to_s
+    @pacer.spend(header.bytesize)
+    lean = Import::Email::TextOnly.new(meta.attr['BODYSTRUCTURE'])
+    return whole(imap, uid) unless text_only?(header, lean)
+
+    text_only(imap, uid, header, lean) || whole(imap, uid)
+  end
+
+  def whole(imap, uid)
     raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
     return skip(:vazias) if raw.blank?
 
     @pacer.spend(raw.bytesize)
     raw
+  end
+
+  # Worth a second round trip only when the cutoff excludes this message's attachments and
+  # it actually carries some.
+  def text_only?(header, lean)
+    @attachments.skip?(header_date(header)) && lean.attachments?
+  end
+
+  # Returns nil when the structure names no text part worth taking, and the caller falls
+  # back to the whole message: a body that cannot be located is not a body worth guessing.
+  def text_only(imap, uid, header, lean)
+    part = lean.part
+    return if part.nil?
+
+    section = part[:section]
+    body = imap.uid_fetch(uid, "BODY.PEEK[#{section}]")&.first&.attr&.dig("BODY[#{section}]").to_s
+    return if body.blank?
+
+    @pacer.spend(body.bytesize)
+    @stats[:sem_anexos] += 1
+    lean.rebuild(header, body)
+  end
+
+  def header_date(header)
+    Mail.read_from_string(header).date&.to_time
+  rescue StandardError
+    nil
   end
 
   # Counts a record the run declined to write and yields nil, so the caller's
