@@ -135,6 +135,23 @@ module ImportGuards
     end
   end
 
+  # A Company is created as a side effect of importing a contact with a business address,
+  # and its own after_create_commit fetches a favicon off the domain. Enterprise only, and
+  # reached through two callbacks in different models, so neither the dispatcher guards nor
+  # the two on Contact see it.
+  #
+  # The same shape as Gravatar and the same level: the association is real information
+  # about the contact and belongs in the archive, but one outbound request per company at a
+  # third party that never agreed to it is a flood when the archive is a decade of mail.
+  # A gap sync creating one company should fetch its favicon like any arrival.
+  module SilentFavicon
+    def fetch_favicon
+      return if Import::SilentWrite.archive?
+
+      super
+    end
+  end
+
   module SilentMessageCallbacks
     def execute_after_create_commit_callbacks
       return super unless Import::SilentWrite.on?
@@ -154,4 +171,5 @@ Rails.application.config.to_prepare do
   Message.prepend(ImportGuards::SilentScheduledMessages)
   Conversation.prepend(ImportGuards::SilentAutoAssignment)
   Contact.prepend(ImportGuards::SilentGravatar)
+  Company.prepend(ImportGuards::SilentFavicon) if ChatwootApp.enterprise?
 end
