@@ -9,6 +9,13 @@
 #
 # `content_attributes` is a text column holding JSON, hence the cast, and the key is absent
 # on every row written before imports existed, hence the default.
+#
+# `content_attributes.imported_text_only` says the row was filed from a lean fetch, with
+# its attachments deliberately left in the mailbox. It exists because "this Message-ID is
+# already stored" is not the same question as "this message is fully imported": without it
+# a first pass under a narrow cutoff makes every later pass skip the row, and the
+# attachments become unreachable on a mailbox the import exists to preserve.
 module Import
   IMPORTED_SQL = "COALESCE((content_attributes#>>'{}')::jsonb->>'imported', 'false') = 'true'".freeze
+  TEXT_ONLY_SQL = "COALESCE((content_attributes#>>'{}')::jsonb->>'imported_text_only', 'false') = 'true'".freeze
 end
