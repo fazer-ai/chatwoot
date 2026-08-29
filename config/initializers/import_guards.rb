@@ -58,39 +58,46 @@ module ImportGuards
   # this importer has taken over: the first-reply branch writes `first_reply_created_at` and
   # clears `waiting_since`, and the other branch recomputes `waiting_since` from a message
   # being written oldest first. Both would fight `settle` for the same columns.
-  # Assignment is the one side effect that does not travel through the dispatcher, so
-  # nothing above stops it. A backfilled thread is created resolved, and a status change to
-  # resolved is exactly what wakes the V2 assignment job -- once per conversation, half a
-  # million times over a full import, each one asking the inbox to redistribute capacity it
-  # has no reason to redistribute. The V1 path is worse: it assigns the thread outright, so
-  # a decade of somebody's history lands in a working agent's queue.
+  # The two things that decide where a conversation goes and what state it is in. Both are
+  # archive-only, and the level is the point: under `:announce` the thread is a gap somebody
+  # is waiting on, and a gap thread that is neither assigned nor statused is one nobody
+  # works until they happen to reload -- the exact failure the announcing level exists to
+  # prevent.
+  #
+  # Assignment does not travel through the dispatcher, so nothing above stops it. An archive
+  # thread is created resolved, and a status change to resolved is what wakes the V2
+  # assignment job: once per conversation, half a million times over a full import, each
+  # asking the inbox to redistribute capacity it has no reason to redistribute. The V1 path
+  # is worse -- it assigns the thread outright, so a decade of somebody's history lands in a
+  # working agent's queue.
+  #
+  # The bot override is narrower than the callback that carries it. `determine_conversation_status`
+  # also resolves a conversation whose contact is blocked, which is right at either level and
+  # is not the importer's business to undo, so only the bot half is stopped: an inbox with an
+  # agent bot starts its conversations `pending` and overrides the `resolved` an archive
+  # importer asked for on purpose.
   module SilentAutoAssignment
     def run_auto_assignment
-      return if Import::SilentWrite.on?
+      return if Import::SilentWrite.archive?
 
       super
     end
 
-    # An inbox with an agent bot starts its conversations `pending`, and the callback that
-    # does it overrides whatever status the creator asked for. An importer asks for
-    # `resolved` on purpose -- a thread born resolved fires no resolution event and files
-    # into no report -- so on an inbox that happens to have a bot the whole archive would
-    # land in the pending queue instead, assigned to the bot, with nothing in the importer
-    # to say why.
-    def determine_conversation_status
-      return if Import::SilentWrite.on?
+    def set_active_bot_conversation
+      return if Import::SilentWrite.archive?
 
       super
     end
   end
 
   # The two things a new contact does on its own, neither of which travels through the
-  # dispatcher, so nothing above stops them. Both are one job per contact created, which is
-  # ordinary at the rate people write in and half a million jobs when a mailbox is replayed.
+  # dispatcher, so nothing above stops them. Each is one job per contact created.
   #
-  # Gravatar is a queue flood aimed at a third party that never agreed to it, and the avatar
-  # is cosmetic: the next live message fills it in. The IP lookup is worse than useless --
-  # an imported contact carries no IP for it to look up.
+  # They sit at different levels because their reasons differ. Gravatar is a flood aimed at
+  # a third party that never agreed to it, and a flood is what half a million contacts make
+  # -- a gap sync creating one contact should fetch its avatar like any arrival, so that
+  # guard is archive-only. The IP lookup resolves an address an imported contact does not
+  # carry at either level, so it is stopped at both.
   #
   # `Message#reindex_for_search` is the one after-commit side effect deliberately left
   # alone. It is inert unless advanced search is configured, and guarding it would leave an
@@ -98,7 +105,7 @@ module ImportGuards
   # turns advanced search on wants one bulk reindex after the import, not a job per row.
   module SilentGravatar
     def fetch_avatar_from_gravatar
-      return if Import::SilentWrite.on?
+      return if Import::SilentWrite.archive?
 
       super
     end
