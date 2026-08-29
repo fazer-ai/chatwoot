@@ -39,17 +39,34 @@ class Import::Octadesk::AttachmentFetcher
 
   private
 
+  # Streamed and abandoned the moment it passes the cap, so an oversized object costs the
+  # cap rather than its own size. Reading the response whole and measuring afterwards would
+  # have the gigabyte in memory before the check could run, which is the failure the cap
+  # was written for and not a thing a cap can undo.
   def fetch(uri)
-    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: TIMEOUT, read_timeout: TIMEOUT) do |http|
-      http.get(uri.request_uri)
-    end
-    return unless response.is_a?(Net::HTTPSuccess)
-    # Capped rather than streamed: the largest measured is under 7 MB, and a cap keeps one
-    # malformed record from pulling a gigabyte into memory.
-    return if response.body.bytesize > MAX_BYTES
+    Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: TIMEOUT, read_timeout: TIMEOUT) do |http|
+      http.request(Net::HTTP::Get.new(uri.request_uri)) do |response|
+        return nil unless response.is_a?(Net::HTTPSuccess)
+        return nil if response['content-length'].to_i > MAX_BYTES
 
-    @content_type = response['content-type'].to_s.split(';').first
-    response.body
+        body = read_capped(response)
+        return nil if body.nil?
+
+        @content_type = response['content-type'].to_s.split(';').first
+        return body
+      end
+    end
+  end
+
+  # Binary from the start: chunks arrive as ASCII-8BIT and appending them to a UTF-8 buffer
+  # raises on the first byte that is not valid UTF-8, which for an image is immediately.
+  def read_capped(response)
+    body = String.new(encoding: Encoding::BINARY)
+    response.read_body do |chunk|
+      body << chunk
+      return nil if body.bytesize > MAX_BYTES
+    end
+    body
   end
 
   def filename(uri)

@@ -20,9 +20,12 @@ require 'net/imap'
 #   INBOX_ID           required
 #   FOLDERS            comma separated (default: the all-mail folder plus Spam)
 #   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023
-#   ATTACHMENTS_SINCE  YYYY-MM-DD; attachments fetched only on messages newer than this
-#                      (default: none, which is what keeps a first pass inside the budget)
-#   KINDS              comma separated, see Import::Email::Classifier (default: customer)
+#   ATTACHMENTS        `all`, or a YYYY-MM-DD to take attachments only on messages newer
+#                      than that date. Unset means none, which is what keeps a first pass
+#                      inside the budget: an attachment is never fetched, not fetched and
+#                      dropped, so the bytes are never spent
+#   KINDS              comma separated, see Import::Email::Classifier (default: customer).
+#                      `relay` can be scanned but not imported, see Backfill::UNIMPORTABLE
 #   BUDGET_MB          IMAP bytes to spend before stopping (default 2000 of the 2500 allowed)
 #   MAX_LOAD           pause while the host's 1-minute load is above this (default 2.5)
 #   LIMIT              stop after importing this many messages
@@ -47,7 +50,20 @@ module ImapImportOptions
 
   def folders = ENV['FOLDERS'].presence&.split(',')&.map(&:strip)
   def kinds = (ENV['KINDS'] || 'customer').split(',').map(&:strip)
-  def attachments_since = (Time.zone.parse(ENV.fetch('ATTACHMENTS_SINCE')) if ENV['ATTACHMENTS_SINCE'].present?)
+
+  # `all`, a date, or nothing at all. Parsed here so a typo stops the run at the first line
+  # instead of quietly reading as "none" and finishing without a single attachment.
+  def attachments
+    raw = ENV['ATTACHMENTS'].presence
+    return Import::Email::AttachmentPolicy.build(nil) if raw.nil?
+    return Import::Email::AttachmentPolicy.build(raw) if raw.casecmp('all').zero?
+
+    parsed = Time.zone.parse(raw)
+    raise ArgumentError, "ATTACHMENTS: use `all` or a date (YYYY-MM-DD), got #{raw.inspect}" if parsed.nil?
+
+    Import::Email::AttachmentPolicy.build(parsed)
+  end
+
   def limit = ENV['LIMIT'].presence&.to_i
   def pacer = Import::Email::Pacer.new(budget_mb: ENV['BUDGET_MB'] || 2000, max_load: ENV['MAX_LOAD'] || 2.5)
 
@@ -147,12 +163,12 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     inbox = ImapImportOptions.inbox!
     pacer = ImapImportOptions.pacer
     started = Time.zone.now
-    attachments = ImapImportOptions.attachments_since
+    attachments = ImapImportOptions.attachments
 
     ImapImportOptions.header(
       inbox,
       Tipos: ImapImportOptions.kinds.join(', '),
-      Anexos: attachments ? "a partir de #{attachments.to_date}" : 'nenhum',
+      Anexos: attachments.to_s,
       Teto: "#{pacer.budget_mb_left}MB, load maximo #{ENV['MAX_LOAD'] || 2.5}",
       Limite: ImapImportOptions.limit || 'sem limite'
     )
@@ -160,7 +176,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     run = Import::Email::Backfill.new(
       inbox: inbox, kinds: ImapImportOptions.kinds, pacer: pacer,
       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms,
-      attachments_since: attachments, limit: ImapImportOptions.limit
+      attachments: attachments, limit: ImapImportOptions.limit
     )
 
     run.perform(&ImapImportOptions.printer(pacer, started))

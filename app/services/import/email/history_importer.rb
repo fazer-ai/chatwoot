@@ -42,10 +42,8 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
 
   attr_reader :opened, :outcome
 
-  # `attachments_since` is nil to take every attachment, or a Time to take only those on
-  # messages newer than it.
-  def initialize(attachments_since: nil)
-    @attachments_since = attachments_since
+  def initialize(attachments: nil)
+    @attachments = attachments.is_a?(Import::Email::AttachmentPolicy) ? attachments : Import::Email::AttachmentPolicy.build(attachments)
     @opened = Set.new
     super()
   end
@@ -55,7 +53,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   def import(mail, channel)
     return if stored?(mail, channel)
 
-    @occurred_at = mail.date&.to_time
+    @occurred_at = occurred_at(mail)
     @outcome = nil
     Import::SilentWrite.wrap do
       process(mail, channel)
@@ -78,16 +76,34 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     channel.inbox.messages.exists?(source_id: id)
   end
 
-  # The two dates a conversation is asked for. `occurred_at` is when the mail was sent;
-  # falling back to now would be the bug this class exists to fix, so a mail without a
-  # parseable Date is filed at the epoch of its own thread instead of at today.
+  # When the mail was sent. A mail whose `Date` will not parse still says when it moved:
+  # every relay that touched it stamped a `Received` line on the way, and the oldest of
+  # those is the closest thing the message has to a send time. Falling back to now would be
+  # the bug this class exists to fix.
+  def occurred_at(mail)
+    mail.date&.to_time || received_at(mail)
+  end
+
+  def received_at(mail)
+    Array(mail.received).filter_map { |field| field.date_time&.to_time }.min
+  rescue StandardError
+    nil
+  end
+
+  # Resolved unconditionally, dated when there is a date. The two are separate decisions
+  # and only one of them depends on the clock: a thread out of the archive is not somebody's
+  # open work whatever its headers say, and leaving it open because its `Date` was
+  # unreadable would put it in the queue as live traffic -- which is the one outcome the
+  # whole import is built to avoid.
   def find_or_create_conversation
     super
     return if @conversation.blank?
 
     if @conversation.previously_new_record?
       @opened << @conversation.id
-      @conversation.update_columns(created_at: @occurred_at, status: :resolved) if @occurred_at # rubocop:disable Rails/SkipsModelValidations
+      stamps = { status: :resolved }
+      stamps[:created_at] = @occurred_at if @occurred_at
+      @conversation.update_columns(stamps) # rubocop:disable Rails/SkipsModelValidations
     end
     @conversation
   end
@@ -145,21 +161,23 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     super
   end
 
-  def skip_attachments?
-    return false if @attachments_since.blank?
-    return false if @occurred_at.blank?
-
-    @occurred_at < @attachments_since
-  end
+  def skip_attachments? = @attachments.skip?(@occurred_at)
 
   # `HistorySettlement` works a batch at a time because a WhatsApp dump arrives that way.
   # A mailbox arrives one message at a time, so the batch here is the single row just
   # written -- correct, and idempotent across the run: every stamp it sets only ever moves
   # in the direction the newest row justifies.
+  # Settled row by row, and the conversation leaves `opened` as soon as it has been: that
+  # set says "these stamps are the import's own artifacts, take the batch outright", which
+  # is true exactly once. IMAP hands out UIDs in arrival order and a thread is filed in the
+  # order its messages were sent, so the two disagree routinely -- and while a conversation
+  # stays in the set, a later UID carrying an older date bypasses the monotonic guard and
+  # drags `last_activity_at` backwards, one row at a time, for the whole run.
   def settle_thread
     return if @outcome.blank? || @conversation.blank?
 
     settle([@outcome], [])
+    @opened.delete(@conversation.id)
   end
 
   # Nothing about a bulk backfill is worth pushing to a screen. The level exists for the

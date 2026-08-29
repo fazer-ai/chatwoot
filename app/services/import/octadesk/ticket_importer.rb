@@ -57,13 +57,38 @@ class Import::Octadesk::TicketImporter
 
       conversation = conversation_for(ticket, contact_inbox)
       rows = interactions.filter_map { |interaction| write(conversation, contact_inbox.contact, interaction) }
-      activity_writer.perform(conversation, ticket)
-      settle(rows, []) if rows.any?
+      rows += activity_writer.perform(conversation, ticket)
+      settle_ticket(conversation, rows)
       @stats[:tickets] += 1
     end
   end
 
   private
+
+  # Settled from what the conversation holds, not from what this pass happened to write.
+  # A run that stops between the message insert and the settlement leaves the rows on disk
+  # and the stamps unset, and the next pass writes nothing because every source id is
+  # already there -- so keying the settlement on "did I write something" would leave that
+  # thread wrong forever, which is the one case resumability exists for.
+  #
+  # The conversation is put back in `opened` on that path, because it is: a thread carrying
+  # nothing but imported rows still wears the stamps its creation left behind, and those
+  # describe the interrupted run rather than the ticket. The test is the same one
+  # `stamp_seen` makes, and for the same reason -- a thread that ever took live traffic has
+  # real stamps, and overwriting those would be the worse error.
+  def settle_ticket(conversation, rows)
+    return settle(rows, []) if rows.any?
+
+    stored = conversation.messages.to_a
+    return if stored.empty?
+
+    @opened << conversation.id unless live_traffic?(conversation)
+    settle(stored, [])
+  end
+
+  def live_traffic?(conversation)
+    conversation.messages.where.not(Import::IMPORTED_SQL).exists?
+  end
 
   # Only the two changes a reader of an archive cares about. A person of type 3 is a
   # trigger, and "Gatilho executado: notificar o solicitante" is machinery, not an event.

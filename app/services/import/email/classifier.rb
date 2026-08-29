@@ -14,13 +14,15 @@
 #                  carries no reply -- but 3% of them quote a customer whose message came
 #                  in through another channel and exists nowhere else, which is why the
 #                  caller decides this one against the inbox rather than here.
-#   relay          the interesting one. "Por favor acesse o octadesk e verifique essa
-#                  solicitação. Seguem mais informações abaixo: <agente> 21/09/2023 13:30
-#                  Olá. Tudo bem? Para cancelamento...". The wrapper is machinery;
-#                  the payload is what the agent wrote, with a name and a timestamp. The
-#                  ticketing system sent that reply to the customer over its own SMTP, so
-#                  this notification is the only copy the mailbox holds of the agent's
-#                  half of the conversation.
+#   relay          "Por favor acesse o octadesk e verifique essa solicitação. Seguem mais
+#                  informações abaixo: <nome> 21/09/2023 13:30 Olá. Tudo bem? Para
+#                  cancelamento...". The wrapper is machinery and the payload is a reply
+#                  the ticketing system sent over its own SMTP, so for some threads this
+#                  notification is the only copy the mailbox holds of it. Recognised so a
+#                  scan can count it and a run can leave it out, and no further: the name
+#                  above the payload is whoever spoke last, an agent on some threads and
+#                  the customer on others, and nothing in the wrapper tells them apart.
+#                  See Import::Email::Backfill::UNIMPORTABLE.
 #
 # Everything else is a person writing to the company, which is the ordinary case and the
 # one the mail pipeline was built for.
@@ -43,16 +45,10 @@ class Import::Email::Classifier
   TICKET_SUBJECT = /#(\d{2,9})\s*\z/
   TICKET_BODY    = /\bticket\s+(\d{2,9})\b/i
 
-  # The line the relay puts above the agent's words: a display name, then a timestamp.
-  # Everything after it, up to the vendor's footer, is what the agent typed.
-  RELAY_PAYLOAD = /seguem mais informacoes abaixo:\s*(.*)/im
-  AGENT_LINE    = %r{\A\s*(.{2,60}?)\s+(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})\s+(.*)\z}m
-  FOOTER        = /powered by octadesk|EmailUniqueArgumentsDTO|--- Por favor, escreva acima desta linha ---/i
-
-  # A body this short after the wrapper is stripped says nothing a reader would want.
+  # A body this short says nothing a reader would want.
   MIN_CONTENT = 40
 
-  attr_reader :kind, :ticket, :agent_name, :agent_said, :agent_at
+  attr_reader :kind, :ticket
 
   def initialize(mail:, text:)
     @mail = mail
@@ -92,30 +88,10 @@ class Import::Email::Classifier
     return :receipt if RECEIPT.match?(@text)
     return :csat if CSAT.match?(@text)
     return :alert if ALERT.match?(@text)
-    return classify_relay if RELAY.match?(@text)
+    return :relay if RELAY.match?(@text)
     return :empty if @text.length < MIN_CONTENT
 
     :customer
-  end
-
-  # A relay whose payload will not come apart is filed as an alert instead of guessed at:
-  # both are wrappers around somebody else's words, and the caller already knows how to
-  # decide an alert against what the inbox holds.
-  def classify_relay
-    payload = @text[RELAY_PAYLOAD, 1].to_s.split(FOOTER).first.to_s.strip
-    return :alert if payload.length < MIN_CONTENT
-
-    name, at, said = payload.match(AGENT_LINE)&.captures
-    return :alert if said.to_s.strip.length < MIN_CONTENT
-
-    @agent_name = name.to_s.strip.presence
-    @agent_at   = (Time.zone.strptime(at, '%d/%m/%Y %H:%M') if at.present?)
-    @agent_said = said.strip
-    :relay
-  rescue ArgumentError
-    # An unparseable date is not a reason to drop what the agent wrote.
-    @agent_at = nil
-    :relay
   end
 
   def extract_ticket
