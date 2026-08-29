@@ -158,5 +158,16 @@ describe Import::Email::Backfill do
       run.send(:walk, instance_double(Net::IMAP), [10, 11])
       expect(channel.reload.import_cursor).to eq({})
     end
+
+    # The run carries on past a message it could not settle, and the batches after it are
+    # above the failure. Letting them advance buries the very uid the freeze exists to keep
+    # reachable, and every later pass then starts above it.
+    it 'keeps the mark frozen for the rest of the folder once a batch has failed' do
+      stub_const("#{described_class}::HEADER_BATCH", 2)
+      allow(run).to receive(:unstored) { |_, batch| batch }
+      allow(run).to receive(:handle).and_return(true, false, true, true)
+      run.send(:walk, instance_double(Net::IMAP), [10, 11, 12, 13])
+      expect(channel.reload.import_cursor.dig('INBOX', 'uid')).to eq(10)
+    end
   end
 end

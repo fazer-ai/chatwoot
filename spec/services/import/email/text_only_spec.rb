@@ -16,7 +16,7 @@ describe Import::Email::TextOnly do
       def size = 0
     end
   end
-  let(:disposition) { Struct.new(:dsp_type) }
+  let(:disposition) { Struct.new(:dsp_type, :param) }
 
   def text(subtype = 'PLAIN', size: 900, dsp: nil)
     leaf.new(media_type: 'TEXT', subtype: subtype, encoding: '7BIT',
@@ -41,6 +41,25 @@ describe Import::Email::TextOnly do
     it 'counts text offered as a file, which weighs the same as any other attachment' do
       csv = text('CSV', size: 9000, dsp: disposition.new('ATTACHMENT'))
       expect(described_class.new(multi.new(subtype: 'MIXED', parts: [text, csv]))).to be_attachments
+    end
+
+    # Legacy mail names a file without ever saying `attachment`. Read on the disposition
+    # alone the message looks free of attachments, so the whole of it is downloaded --
+    # which is the byte the cutoff exists to refuse.
+    it 'counts a text part named by its content type, with no disposition at all' do
+      csv = leaf.new(media_type: 'TEXT', subtype: 'CSV', encoding: '7BIT',
+                     param: { 'CHARSET' => 'UTF-8', 'NAME' => 'nota.csv' }, disposition: nil, size: 900_000)
+      expect(described_class.new(multi.new(subtype: 'MIXED', parts: [text, csv]))).to be_attachments
+    end
+
+    it 'counts a text part offered inline under a filename' do
+      csv = text('CSV', size: 900_000, dsp: disposition.new('INLINE', { 'FILENAME' => 'nota.csv' }))
+      expect(described_class.new(multi.new(subtype: 'MIXED', parts: [text, csv]))).to be_attachments
+    end
+
+    it 'leaves an ordinary inline body alone' do
+      body = text(dsp: disposition.new('INLINE', {}))
+      expect(described_class.new(multi.new(subtype: 'ALTERNATIVE', parts: [body, text('HTML')]))).not_to be_attachments
     end
   end
 
