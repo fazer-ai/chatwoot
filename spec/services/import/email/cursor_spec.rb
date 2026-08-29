@@ -91,6 +91,16 @@ describe Import::Email::Cursor do
       expect(widened.unseen(folder, 5, [10, 20, 30])).to eq([10, 20, 30])
     end
 
+    # The policy changes nothing about which messages are imported and everything about
+    # which are finished. Left out of the key, the mark from the narrow pass filters out
+    # every uid before the enrichment path is ever asked about them.
+    it 'starts the folder over when the attachment policy widens' do
+      cursor.advance(folder, 5, 100)
+      cursor.flush
+      widened = described_class.new(channel.reload, selection: [%w[SINCE 01-Jan-2024], [:customer], 'all'])
+      expect(widened.unseen(folder, 5, [10, 20, 30])).to eq([10, 20, 30])
+    end
+
     it 'resumes when the same selection comes back, whatever order the kinds arrived in' do
       cursor.advance(folder, 5, 100)
       cursor.flush
