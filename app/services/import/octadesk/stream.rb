@@ -1,3 +1,4 @@
+require 'English'
 require 'oj'
 require 'shellwords'
 
@@ -73,9 +74,16 @@ class Import::Octadesk::Stream
     @zip_path = zip_path
   end
 
-  # Member names in the archive, in order.
+  # Member names in the archive, in order. A listing that fails is a setup problem -- a
+  # corrupt archive, a path that is not one, no `unzip` on the box -- and raises, because
+  # the alternative is an empty list that walks nothing and reports the export exhausted.
   def parts
-    @parts ||= `unzip -Z1 #{Shellwords.escape(@zip_path)}`.split("\n").grep(/\.json\z/).sort
+    @parts ||= begin
+      listing = `unzip -Z1 #{Shellwords.escape(@zip_path)}`
+      raise "cannot read the archive at #{@zip_path}" unless $CHILD_STATUS.success?
+
+      listing.split("\n").grep(/\.json\z/).sort
+    end
   end
 
   # Yields every object in one member. `StopIteration` from the block ends the read

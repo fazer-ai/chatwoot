@@ -46,9 +46,15 @@ class Import::Octadesk::Backfill
     self
   end
 
+  # `from_part` names a member, and a name that is not one is a typo in the command that
+  # started the run. Left to `drop_while` it would silently begin at whatever sorts after
+  # it and skip everything between, then report the export exhausted -- the shape of a
+  # misconfiguration that looks like a completed import.
   def parts
     all = @stream.parts
     return all if @from_part.blank?
+
+    raise ArgumentError, "FROM_PART #{@from_part.inspect} is not a member of this export" if all.exclude?(@from_part)
 
     all.drop_while { |part| part < @from_part }
   end

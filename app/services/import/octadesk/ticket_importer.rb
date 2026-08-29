@@ -153,6 +153,14 @@ class Import::Octadesk::TicketImporter
     conversation.update_columns(status_changed_at: done) # rubocop:disable Rails/SkipsModelValidations
   end
 
+  # What is already on the row, by the same name the fetcher would give it. A message this
+  # pass just created has nothing, which is the ordinary path and costs no query.
+  def stored_filenames(message)
+    return Set.new if message.previously_new_record?
+
+    message.attachments.filter_map { |a| a.file.filename.to_s if a.file.attached? }.to_set
+  end
+
   # What the ticketing system knew about the thread and Chatwoot has no column for. Kept
   # as custom attributes rather than dropped, because this inbox exists to be searched: the
   # ticket number is what the operators looked things up by for four years, and the agent
@@ -206,7 +214,16 @@ class Import::Octadesk::TicketImporter
   def write(conversation, contact, interaction)
     source_id = message_source_id(interaction)
     return if source_id.blank?
-    return skip(:ja_tinha) if conversation.messages.exists?(source_id: source_id)
+
+    # A message whose attachments failed is still a message, so a later pass finds it here
+    # and would otherwise leave what it owes behind forever. The vendor's URLs die with the
+    # subscription, which makes a missed attachment permanent rather than late, so the
+    # existing row is offered to the fetcher again on the way past.
+    existing = conversation.messages.find_by(source_id: source_id)
+    if existing
+      attach(existing, interaction)
+      return skip(:ja_tinha)
+    end
 
     person = interaction['Person'] || {}
     message = conversation.messages.create!(message_attributes(conversation, contact, interaction, person, source_id))
@@ -271,9 +288,11 @@ class Import::Octadesk::TicketImporter
   def attach(message, interaction)
     return unless @attachments
 
+    held = stored_filenames(message)
     Array(interaction['Attachments']).each do |attachment|
       url = attachment['Url'].to_s
       next if url.blank?
+      next if held.include?(Import::Octadesk::AttachmentFetcher.filename_for(url, attachment['Name']))
 
       stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
       @stats[stored ? :anexos : :anexos_recusados] += 1

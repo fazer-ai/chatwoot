@@ -37,6 +37,15 @@ class Import::Octadesk::AttachmentFetcher
     @message.save!
   end
 
+  # The name an attachment is stored under. On the class because the importer needs the same
+  # answer without fetching anything: it is how a second pass tells an attachment it already
+  # stored from one it still owes.
+  def self.filename_for(url, name)
+    name.presence&.tr('/', '_') || File.basename(URI.parse(url.to_s).path)
+  rescue URI::InvalidURIError
+    name.to_s.tr('/', '_').presence
+  end
+
   private
 
   # Streamed and abandoned the moment it passes the cap, so an oversized object costs the
@@ -69,9 +78,7 @@ class Import::Octadesk::AttachmentFetcher
     body
   end
 
-  def filename(uri)
-    @name.presence&.tr('/', '_') || File.basename(uri.path)
-  end
+  def filename(uri) = self.class.filename_for(uri, @name)
 
   # Falls back on the declared type, then on the extension, which is what the mail
   # pipeline's FileTypeHelper does with an attachment whose headers say nothing useful.
