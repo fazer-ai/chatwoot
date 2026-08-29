@@ -23,7 +23,7 @@ class Import::Email::Backfill
   #
   # `sent` is the mailbox's own outgoing mail. It matters more than it looks: Gmail's \All
   # is the union of everything except Spam and Trash, so it contains the Sent folder
-  # whole -- measured on one support mailbox, about a fifth of it.
+  # whole, which on a long-lived support mailbox is a sizeable share of every message in it.
   # Run through the pipeline each one invents a contact for the company's own address and
   # files the company's own words as something a customer wrote.
   #
@@ -135,22 +135,31 @@ class Import::Email::Backfill
     uids.each_slice(HEADER_BATCH) do |batch|
       break if @stopped_by
 
-      finished = true
-      last = nil
-      unstored(imap, batch).each do |uid|
-        if halt?
-          finished = false
-          break
-        end
-
-        @pacer.wait_for_room { |load| @progress.call(:paused, load: load) }
-        handle(imap, uid)
-        last = uid
-      end
-      mark = finished ? batch.last : last
-      @cursor.advance(@folder, @uidvalidity, mark) if mark
+      finished, mark = consume(imap, batch)
+      at = finished ? batch.last : mark
+      @cursor.advance(@folder, @uidvalidity, at) if at
       @cursor.flush
     end
+  end
+
+  # How far a batch got: the last UID it settled, and whether it settled all of them. The
+  # mark freezes at the first message it could not settle, so nothing above that is ever
+  # marked as read even though the run carries on past it.
+  def consume(imap, batch)
+    finished = true
+    mark = nil
+    unstored(imap, batch).each do |uid|
+      if halt?
+        finished = false
+        break
+      end
+
+      @pacer.wait_for_room { |load| @progress.call(:paused, load: load) }
+      handled = handle(imap, uid)
+      mark = uid if handled && finished
+      finished &&= handled
+    end
+    [finished, mark]
   end
 
   # Headers first, and cheap: a mailbox this size is walked many times over a run, and a
@@ -182,20 +191,27 @@ class Import::Email::Backfill
     @stopped_by.present?
   end
 
+  # Answers whether the message was settled one way or the other, which is what the cursor
+  # is allowed to move past. A message that raised is not settled: left marked as read it
+  # would be skipped by every later pass, so a transient failure -- a timeout, a malformed
+  # part, a lock -- would quietly cost a message forever. The run keeps going past it; only
+  # the mark stops.
   def handle(imap, uid)
     raw = fetch(imap, uid)
-    return if raw.blank?
+    return true if raw.blank?
 
     mail = Mail.read_from_string(raw)
     kind = classify(mail)
     @stats[:"visto_#{kind}"] += 1
-    return unless @kinds.include?(kind)
+    return true unless @kinds.include?(kind)
 
     @stats[@importer.import(mail, @channel) ? :importadas : :recusadas] += 1
     @progress.call(:imported, kind: kind, stats: @stats)
+    true
   rescue StandardError => e
     @stats[:erros] += 1
     @progress.call(:error, uid: uid, error: e)
+    false
   end
 
   # The cutoff is decided before any of the message is downloaded, because the cost it

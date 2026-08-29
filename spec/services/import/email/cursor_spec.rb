@@ -54,10 +54,20 @@ describe Import::Email::Cursor do
     expect(described_class.new(channel.reload).unseen(folder, 5, [1, 2])).to eq([1, 2])
   end
 
-  it 'leaves the rest of the provider config alone' do
-    channel.update!(provider_config: { 'keep' => 'me' })
+  # The OAuth refresh services replace `provider_config` wholesale on every token renewal,
+  # and an access token expires long before a multi-day import finishes. A cursor kept
+  # there is deleted mid-run, and the run starts the mailbox over.
+  it 'survives an OAuth token refresh, which replaces the provider config wholesale' do
     cursor.advance(folder, 5, 10)
     cursor.flush
-    expect(channel.reload.provider_config['keep']).to eq('me')
+    channel.update!(provider_config: { access_token: 'novo', refresh_token: 'novo', expires_on: 1.hour.from_now.to_s })
+    expect(described_class.new(channel.reload).unseen(folder, 5, [9, 10, 11])).to eq([11])
+  end
+
+  it 'does not write over the credentials while saving its own mark' do
+    channel.update!(provider_config: { access_token: 'guardado' })
+    cursor.advance(folder, 5, 10)
+    cursor.flush
+    expect(channel.reload.provider_config['access_token']).to eq('guardado')
   end
 end

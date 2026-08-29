@@ -7,9 +7,9 @@
 #
 # What the export settles that a mailbox could not:
 #
-#   direction     `Person.Type == 1` is an agent. Measured over the export: nearly all of those
-#                 carry the company's own mail domain, and the rest are an escalation bot
-#                 plus a handful of individual senders. Everything else is the
+#   direction     `Person.Type == 1` is an agent. Measured over a whole export, the vast
+#                 majority of those carry the company's own mail domain and the rest are
+#                 automation and agents on personal addresses. Everything else is the
 #                 customer. Reconstructing this from the mailbox meant reading
 #                 notification wrappers and guessing from name frequency.
 #   who wrote it  `Person.Name` and `Person.Email`, so an agent reply carries the agent.

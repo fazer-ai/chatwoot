@@ -11,13 +11,15 @@
 # out, so a stretch of excluded traffic wider than one day's budget is a wall no number of
 # passes crosses.
 #
-# Kept on the channel, which already carries a JSON column for provider state, so this
-# needs no table of its own. Keyed by folder and stamped with `UIDVALIDITY`: a provider
-# that renumbers a folder invalidates its own cursor, and the run starts that folder over
-# rather than skipping into the middle of it.
+# Kept in a column of its own, and not in `provider_config`: the OAuth refresh services
+# replace that hash wholesale on every token renewal, so a Google or Microsoft inbox would
+# delete its own cursor long before a multi-day import finished -- and writing the cursor
+# back over the same hash could clobber credentials that had just been refreshed.
+#
+# Keyed by folder and stamped with `UIDVALIDITY`: a provider that renumbers a folder
+# invalidates its own cursor, and the run starts that folder over rather than skipping
+# into the middle of it.
 class Import::Email::Cursor
-  KEY = 'import_cursor'.freeze
-
   def initialize(channel)
     @channel = channel
   end
@@ -42,34 +44,32 @@ class Import::Email::Cursor
   def flush
     return if pending.empty?
 
-    config = @channel.provider_config.presence || {}
-    config[KEY] = (config[KEY] || {}).merge(pending)
-    @channel.update_column(:provider_config, config) # rubocop:disable Rails/SkipsModelValidations
+    @channel.update_column(:import_cursor, stored.merge(pending)) # rubocop:disable Rails/SkipsModelValidations
     @pending = {}
   end
 
   def reset
-    config = @channel.provider_config.presence || {}
-    return if config[KEY].blank?
+    @pending = {}
+    return if stored.blank?
 
-    @channel.update_column(:provider_config, config.except(KEY)) # rubocop:disable Rails/SkipsModelValidations
+    @channel.update_column(:import_cursor, {}) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def to_s
-    stored = (@channel.provider_config.presence || {})[KEY] || {}
-    return 'do inicio' if stored.empty?
+    return 'do inicio' if stored.blank?
 
     stored.map { |folder, at| "#{folder}>#{at['uid']}" }.join(', ')
   end
 
   private
 
+  def stored = @channel.import_cursor.presence || {}
   def pending = @pending ||= {}
 
   def mark_for(folder, uidvalidity)
-    stored = ((@channel.provider_config.presence || {})[KEY] || {})[folder]
-    return 0 if stored.blank? || stored['uidvalidity'] != uidvalidity
+    at = stored[folder]
+    return 0 if at.blank? || at['uidvalidity'] != uidvalidity
 
-    stored['uid'].to_i
+    at['uid'].to_i
   end
 end

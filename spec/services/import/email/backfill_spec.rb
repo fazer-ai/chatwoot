@@ -86,4 +86,34 @@ describe Import::Email::Backfill do
       expect(run.stats).to include(ja_importadas: 1, sem_message_id: 1)
     end
   end
+
+  # A message that raised is not settled. Marked as read it would be skipped by every later
+  # pass, so a timeout or a malformed part would quietly cost a message forever.
+  describe 'how far the cursor is allowed to move' do
+    let(:run) { described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer) }
+
+    before do
+      run.instance_variable_set(:@folder, 'INBOX')
+      run.instance_variable_set(:@uidvalidity, 7)
+    end
+
+    it 'marks the whole batch when every message was settled' do
+      allow(run).to receive_messages(unstored: [10, 11, 12], handle: true)
+      run.send(:walk, instance_double(Net::IMAP), [10, 11, 12])
+      expect(channel.reload.import_cursor.dig('INBOX', 'uid')).to eq(12)
+    end
+
+    it 'stops the mark below the first message it could not settle' do
+      allow(run).to receive(:unstored).and_return([10, 11, 12])
+      allow(run).to receive(:handle).and_return(true, false, true)
+      run.send(:walk, instance_double(Net::IMAP), [10, 11, 12])
+      expect(channel.reload.import_cursor.dig('INBOX', 'uid')).to eq(10)
+    end
+
+    it 'writes no mark at all when the first message already failed' do
+      allow(run).to receive_messages(unstored: [10, 11], handle: false)
+      run.send(:walk, instance_double(Net::IMAP), [10, 11])
+      expect(channel.reload.import_cursor).to eq({})
+    end
+  end
 end
