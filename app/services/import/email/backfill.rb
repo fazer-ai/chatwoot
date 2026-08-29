@@ -34,7 +34,7 @@ class Import::Email::Backfill
   # Both are recognised rather than hidden, so a scan reports what a run is leaving behind.
   UNIMPORTABLE = %i[sent relay].freeze
 
-  attr_reader :stats, :pacer, :stopped_by
+  attr_reader :stats, :pacer, :stopped_by, :cursor
 
   # rubocop:disable Metrics/ParameterLists -- every one of these is an independent knob on
   # a run that is meant to be started, stopped and restarted with different settings; an
@@ -52,6 +52,7 @@ class Import::Email::Backfill
     @limit = limit
     @attachments = Import::Email::AttachmentPolicy.build(attachments)
     @importer = Import::Email::HistoryImporter.new(attachments: @attachments)
+    @cursor = Import::Email::Cursor.new(@channel)
     @stats = Hash.new(0)
     @stopped_by = nil
   end
@@ -68,12 +69,15 @@ class Import::Email::Backfill
       break if @stopped_by
 
       imap.examine(folder)
-      uids = imap.uid_search(@terms)
+      @folder = folder
+      @uidvalidity = imap.responses('UIDVALIDITY', &:last)
+      uids = @cursor.unseen(folder, @uidvalidity, imap.uid_search(@terms))
       @progress.call(:folder, folder: folder, total: uids.length)
       walk(imap, uids)
     end
     self
   ensure
+    @cursor.flush
     close(imap)
   end
 
@@ -123,16 +127,29 @@ class Import::Email::Backfill
 
   private
 
+  # The cursor moves to the highest UID this pass is done with, and no further. A batch
+  # the loop ran out is considered whole, including the messages `unstored` filtered on the
+  # way; a batch it stopped inside is considered only up to the last message handled, so
+  # nothing above the stopping point is ever marked as read.
   def walk(imap, uids)
     uids.each_slice(HEADER_BATCH) do |batch|
       break if @stopped_by
 
+      finished = true
+      last = nil
       unstored(imap, batch).each do |uid|
-        break if halt?
+        if halt?
+          finished = false
+          break
+        end
 
         @pacer.wait_for_room { |load| @progress.call(:paused, load: load) }
         handle(imap, uid)
+        last = uid
       end
+      mark = finished ? batch.last : last
+      @cursor.advance(@folder, @uidvalidity, mark) if mark
+      @cursor.flush
     end
   end
 
