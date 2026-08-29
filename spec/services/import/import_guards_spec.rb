@@ -70,6 +70,46 @@ describe 'ImportGuards' do
     end
   end
 
+  # `hold_on_reply` means "if the customer writes back first, do not send this". A row that
+  # is incoming, public and not a reaction is the whole trigger, and an imported row passes
+  # that test the same way a live one does.
+  describe 'a scheduled message waiting on the customer to reply' do
+    let(:conversation) { new_conversation }
+    let(:scheduled) do
+      create(:scheduled_message, account: account, inbox: inbox, conversation: conversation,
+                                 scheduled_at: 2.days.from_now, hold_on_reply: true, status: :pending)
+    end
+
+    def import(created_at, **level)
+      Import::SilentWrite.wrap(**level) do
+        create(:message, account: account, inbox: inbox, conversation: conversation,
+                         message_type: :incoming, content: 'historia', created_at: created_at)
+      end
+    end
+
+    it 'holds it when a live reply arrives, which is what the flag is for' do
+      scheduled
+      create(:message, account: account, inbox: inbox, conversation: conversation,
+                       message_type: :incoming, content: 'oi')
+      expect(scheduled.reload.status).to eq('held')
+    end
+
+    # The archive row is years old, so `scheduled_at > created_at` is true of every pending
+    # scheduled message in the account: one imported ticket would hold the lot.
+    it 'leaves it alone while writing an archive' do
+      scheduled
+      import(3.years.ago)
+      expect(scheduled.reload.status).to eq('pending')
+    end
+
+    # A gap row is a reply that did arrive, just late. Holding is the right answer there.
+    it 'holds it for a gap row, which is a real reply we learned about late' do
+      scheduled
+      import(1.minute.ago, announce: true)
+      expect(scheduled.reload.status).to eq('held')
+    end
+  end
+
   describe 'the fan-out around a written message' do
     it 'reaches nothing at either level' do
       conversation = Import::SilentWrite.wrap { new_conversation }

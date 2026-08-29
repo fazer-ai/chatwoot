@@ -70,4 +70,32 @@ describe Import::Email::Cursor do
     cursor.flush
     expect(channel.reload.provider_config['access_token']).to eq('guardado')
   end
+
+  # UIDs rise with arrival, so widening the window asks for LOWER uids -- every one of them
+  # below the mark a narrower pass left behind. Honoured, that mark reports the folder
+  # exhausted while the older mail is still sitting there unread.
+  describe 'when the selection changes' do
+    let(:cursor) { described_class.new(channel, selection: [%w[SINCE 01-Jan-2024], [:customer]]) }
+
+    it 'starts the folder over when the search widens to older mail' do
+      cursor.advance(folder, 5, 100)
+      cursor.flush
+      widened = described_class.new(channel.reload, selection: [['ALL'], [:customer]])
+      expect(widened.unseen(folder, 5, [10, 20, 30])).to eq([10, 20, 30])
+    end
+
+    it 'starts the folder over when the kinds widen, since declined mail was walked past' do
+      cursor.advance(folder, 5, 100)
+      cursor.flush
+      widened = described_class.new(channel.reload, selection: [%w[SINCE 01-Jan-2024], [:customer, :receipt]])
+      expect(widened.unseen(folder, 5, [10, 20, 30])).to eq([10, 20, 30])
+    end
+
+    it 'resumes when the same selection comes back, whatever order the kinds arrived in' do
+      cursor.advance(folder, 5, 100)
+      cursor.flush
+      same = described_class.new(channel.reload, selection: [%w[SINCE 01-Jan-2024], [:customer]])
+      expect(same.unseen(folder, 5, [99, 100, 101])).to eq([101])
+    end
+  end
 end

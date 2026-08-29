@@ -68,13 +68,21 @@ class Import::Octadesk::TicketImporter
   # already there -- so keying the settlement on "did I write something" would leave that
   # thread wrong forever, which is the one case resumability exists for.
   #
+  # "Wrote nothing" is not the only interrupted shape, which is why the test is whether
+  # this pass created the thread rather than whether it wrote a row. A run that stops
+  # between the comments and the activity rows leaves the next pass writing only the
+  # activities: a non-empty batch that is a fraction of the thread, and settling from it
+  # would stamp `last_activity_at` from an old status change while a newer message sits
+  # right there. This pass created the thread or it did not; only in the first case are the
+  # rows in hand the whole of it.
+  #
   # The conversation is put back in `opened` on that path, because it is: a thread carrying
   # nothing but imported rows still wears the stamps its creation left behind, and those
   # describe the interrupted run rather than the ticket. The test is the same one
   # `stamp_seen` makes, and for the same reason -- a thread that ever took live traffic has
   # real stamps, and overwriting those would be the worse error.
   def settle_ticket(conversation, rows)
-    stored = rows.presence || conversation.messages.to_a
+    stored = @opened.include?(conversation.id) ? rows : conversation.messages.to_a
     return if stored.empty?
 
     @opened << conversation.id if resumed?(conversation)
@@ -153,12 +161,19 @@ class Import::Octadesk::TicketImporter
     conversation.update_columns(status_changed_at: done) # rubocop:disable Rails/SkipsModelValidations
   end
 
-  # What is already on the row, by the same name the fetcher would give it. A message this
-  # pass just created has nothing, which is the ordinary path and costs no query.
-  def stored_filenames(message)
+  # Which of an interaction's attachments are already on the row, keyed by where each came
+  # from. The filename cannot answer this: one interaction can carry two different files
+  # under one name, and if the first is stored and the second is not, a filename test calls
+  # both of them done and the missing one is never fetched again. The fetcher stamps the
+  # source URL on the blob for exactly this, and that is the only key that is one-to-one
+  # with the object in the vendor's bucket.
+  #
+  # A message this pass just created has nothing, which is the ordinary path and costs no
+  # query.
+  def stored_sources(message)
     return Set.new if message.previously_new_record?
 
-    message.attachments.filter_map { |a| a.file.filename.to_s if a.file.attached? }.to_set
+    message.attachments.filter_map { |a| a.file.blob&.metadata&.dig('import_source') if a.file.attached? }.to_set
   end
 
   # What the ticketing system knew about the thread and Chatwoot has no column for. Kept
@@ -288,11 +303,11 @@ class Import::Octadesk::TicketImporter
   def attach(message, interaction)
     return unless @attachments
 
-    held = stored_filenames(message)
+    held = stored_sources(message)
     Array(interaction['Attachments']).each do |attachment|
       url = attachment['Url'].to_s
       next if url.blank?
-      next if held.include?(Import::Octadesk::AttachmentFetcher.filename_for(url, attachment['Name']))
+      next if held.include?(url)
 
       stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
       @stats[stored ? :anexos : :anexos_recusados] += 1

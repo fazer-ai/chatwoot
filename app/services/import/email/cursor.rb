@@ -19,9 +19,18 @@
 # Keyed by folder and stamped with `UIDVALIDITY`: a provider that renumbers a folder
 # invalidates its own cursor, and the run starts that folder over rather than skipping
 # into the middle of it.
+#
+# Stamped with the selection for the same reason, because a mark only means anything
+# against the question that produced it. UIDs rise with arrival, so older mail carries
+# lower UIDs: a pass restricted to recent mail leaves a high mark, and a later pass widened
+# to the whole mailbox would have every older UID filtered out by that mark and report the
+# folder exhausted without classifying one of them -- the silent version of the failure,
+# since nothing errors and the numbers look like a finished import. Change the search terms
+# or the kinds and the folder starts over.
 class Import::Email::Cursor
-  def initialize(channel)
+  def initialize(channel, selection: nil)
     @channel = channel
+    @selection = Digest::SHA256.hexdigest(selection.to_json)[0, 16]
   end
 
   # UIDs above the mark, in the order the caller gave them.
@@ -38,7 +47,7 @@ class Import::Email::Cursor
     current = pending[folder]
     return if current && current['uidvalidity'] == uidvalidity && current['uid'] >= uid
 
-    pending[folder] = { 'uidvalidity' => uidvalidity, 'uid' => uid }
+    pending[folder] = { 'uidvalidity' => uidvalidity, 'uid' => uid, 'selection' => @selection }
   end
 
   def flush
@@ -68,7 +77,7 @@ class Import::Email::Cursor
 
   def mark_for(folder, uidvalidity)
     at = stored[folder]
-    return 0 if at.blank? || at['uidvalidity'] != uidvalidity
+    return 0 if at.blank? || at['uidvalidity'] != uidvalidity || at['selection'] != @selection
 
     at['uid'].to_i
   end

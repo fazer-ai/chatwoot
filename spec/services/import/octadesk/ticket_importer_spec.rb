@@ -112,6 +112,75 @@ describe Import::Octadesk::TicketImporter do
       described_class.new(inbox: inbox).import(ticket)
       expect(conversation.reload.last_activity_at).to eq(conversation.messages.maximum(:created_at))
     end
+
+    # The third interruption point, and the one a "did I write anything" test gets wrong:
+    # the comments landed and the activity rows did not. The next pass writes a batch that
+    # is real but partial, and settling from it alone drags the thread back to whichever
+    # row happened to be missing.
+    it 'settles from the whole thread when the pass only wrote the rows that were missing' do
+      partial = ticket.merge(
+        'Number' => 4326,
+        'Interactions' => ticket['Interactions'] + [
+          { '_id' => { '$binary' => { 'base64' => 'AAAAAAAAAAAAAAAD' } }, 'Comments' => [],
+            'PropertiesChanges' => { 'Status' => 'Resolvido' },
+            'Person' => { 'Type' => 1, 'Name' => 'Atendente Dois' },
+            'DateCreation' => { '$date' => '2023-05-10T13:00:00Z' } }
+        ]
+      )
+      importer.import(partial)
+      conversation = inbox.conversations.find_by(identifier: 'octadesk:4326')
+      newest = conversation.messages.maximum(:created_at)
+      conversation.messages.where(message_type: :activity).destroy_all
+      conversation.update_columns(last_activity_at: Time.current) # rubocop:disable Rails/SkipsModelValidations -- ditto
+
+      described_class.new(inbox: inbox).import(partial)
+      expect(conversation.reload.last_activity_at).to eq(newest)
+    end
+  end
+
+  # The vendor's bucket stops existing when the subscription does, so an attachment a run
+  # failed to fetch has to still be owed on the next pass. Which means the test for "already
+  # stored" has to be exact.
+  describe 'attachments a pass could not finish' do
+    let(:with_attachments) do
+      ticket.merge(
+        'Number' => 4327,
+        'Interactions' => [ticket['Interactions'].first.merge(
+          'Attachments' => [
+            { 'Url' => 'https://storage.googleapis.com/tenant/a/foto.png', 'Name' => 'foto.png' },
+            { 'Url' => 'https://storage.googleapis.com/tenant/b/foto.png', 'Name' => 'foto.png' }
+          ]
+        )]
+      )
+    end
+
+    before do
+      stub_request(:get, 'https://storage.googleapis.com/tenant/a/foto.png')
+        .to_return(status: 200, body: 'primeiro', headers: { 'content-type' => 'image/png' })
+    end
+
+    # Two different files under one name is ordinary: a customer sends a photo, an agent
+    # sends another, and the vendor names both after the camera. Keyed on the filename, the
+    # one that got through calls the one that did not done, and it is never fetched again.
+    it 'still owes the copy that failed, even under a name that is already stored' do
+      stub_request(:get, 'https://storage.googleapis.com/tenant/b/foto.png').to_return(status: 500)
+      described_class.new(inbox: inbox, attachments: true).import(with_attachments)
+      message = inbox.messages.find_by(message_type: :incoming)
+      expect(message.attachments.count).to eq(1)
+
+      stub_request(:get, 'https://storage.googleapis.com/tenant/b/foto.png')
+        .to_return(status: 200, body: 'segundo', headers: { 'content-type' => 'image/png' })
+      described_class.new(inbox: inbox, attachments: true).import(with_attachments)
+      expect(message.reload.attachments.count).to eq(2)
+    end
+
+    it 'does not fetch one twice when both are already stored' do
+      stub_request(:get, 'https://storage.googleapis.com/tenant/b/foto.png')
+        .to_return(status: 200, body: 'segundo', headers: { 'content-type' => 'image/png' })
+      described_class.new(inbox: inbox, attachments: true).import(with_attachments)
+      described_class.new(inbox: inbox, attachments: true).import(with_attachments)
+      expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(2)
+    end
   end
 
   describe 'the website form, which posts as the company' do

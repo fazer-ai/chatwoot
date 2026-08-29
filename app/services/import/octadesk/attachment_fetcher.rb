@@ -33,13 +33,17 @@ class Import::Octadesk::AttachmentFetcher
     return if body.blank?
 
     attachment = @message.attachments.new(account_id: @message.account_id, file_type: file_type(uri))
-    attachment.file.attach(io: StringIO.new(body), filename: filename(uri), content_type: @content_type)
+    attachment.file.attach(
+      io: StringIO.new(body), filename: filename(uri), content_type: @content_type,
+      metadata: { 'import_source' => @url }
+    )
     @message.save!
   end
 
-  # The name an attachment is stored under. On the class because the importer needs the same
-  # answer without fetching anything: it is how a second pass tells an attachment it already
-  # stored from one it still owes.
+  # The name an attachment is stored under. Public because the specs pin it and because the
+  # rule -- the vendor's name if there is one, the tail of the URL otherwise -- is worth
+  # asserting on its own. It is deliberately NOT what a second pass keys on: two files can
+  # share a name and only the source URL is one-to-one with the object.
   def self.filename_for(url, name)
     name.presence&.tr('/', '_') || File.basename(URI.parse(url.to_s).path)
   rescue URI::InvalidURIError
