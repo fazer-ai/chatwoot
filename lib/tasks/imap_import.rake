@@ -106,26 +106,38 @@ module ImapImportOptions
     puts "  #{'tempo'.ljust(20)} #{duration(Time.zone.now - started)} (pausado #{duration(pacer.paused_for)})"
   end
 
-  # Classifies a uniform slice of a folder. Uniform rather than the newest N, because the
-  # shape of this mailbox changed over four years and the tail would not describe it.
+  # Classifies a sample of a folder.
   # Charged against the same budget the import spends, and stopped by it. A scan reads whole
   # messages to classify them, so a sample that lands on attachments costs gigabytes -- and
   # the provider lockout a dry run triggers is the same one `BUDGET_MB` exists to avoid,
   # only harder to explain because nothing was written.
+  # One message at a time, and the budget asked before each. A scan reads whole messages to
+  # classify them, so a batch of fifty lands fifty complete bodies -- attachments and all --
+  # before anything can be charged for them, which on this mailbox is the difference between
+  # a margin and a lockout. The sample is a few hundred messages, so the round trips cost
+  # nothing worth the risk.
   def sample_kinds(imap, run, uids, sample, pacer)
     kinds = Hash.new(0)
-    uids.each_slice([uids.length / sample, 1].max).map(&:first).each_slice(50) do |batch|
+    spread(uids, sample).each do |uid|
       break if pacer.over_budget?
 
-      (imap.uid_fetch(batch, 'BODY.PEEK[]') || []).each do |data|
-        raw = data.attr['BODY[]'].to_s
-        pacer.spend(raw.bytesize)
-        kinds[run.send(:classify, Mail.read_from_string(raw))] += 1
-      rescue StandardError
-        kinds[:erro] += 1
-      end
+      kinds[sample_kind(imap, run, uid, pacer)] += 1
     end
     kinds
+  end
+
+  # Spread across the folder rather than the newest N, because the shape of a mailbox
+  # changes over years and its tail does not describe it.
+  def spread(uids, sample) = uids.each_slice([uids.length / sample, 1].max).map(&:first)
+
+  def sample_kind(imap, run, uid, pacer)
+    raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
+    return :vazia if raw.blank?
+
+    pacer.spend(raw.bytesize)
+    run.send(:classify, Mail.read_from_string(raw))
+  rescue StandardError
+    :erro
   end
 
   def header(inbox, extra = {})

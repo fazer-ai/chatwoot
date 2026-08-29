@@ -35,12 +35,35 @@ class Import::Octadesk::ActivityWriter
     Array(interaction['Comments']).any? { |comment| comment['Content'].to_s.strip.present? }
   end
 
+  # Whether this interaction would become an activity row, answered without writing one, so
+  # a caller can tell a ticket carrying only status changes from one carrying nothing at
+  # all. The first is history and belongs in the archive; only the second is empty.
+  def self.writable?(interaction)
+    !commented?(interaction) &&
+      line_for(interaction['PropertiesChanges'] || {}, interaction['Person'] || {}).present?
+  end
+
+  # Only the two changes a reader of an archive asks about: where the thread went and who
+  # took it. The rest of `PropertiesChanges` restates fields the conversation already
+  # carries. On the class because it reads nothing but its arguments.
+  def self.line_for(changes, person)
+    return if person['Type'] == TRIGGER
+
+    parts = []
+    parts << "Status: #{changes['Status']}" if changes['Status'].present?
+    parts << "Atribuido a #{changes['AssignedName']}" if changes['AssignedName'].present?
+    return if parts.empty?
+
+    who = person['Name'].to_s.squish.presence
+    [parts.join(' - '), who && "(por #{who})"].compact.join(' ')
+  end
+
   private
 
   def commented?(interaction) = self.class.commented?(interaction)
 
   def write(conversation, interaction)
-    line = line_for(interaction['PropertiesChanges'] || {}, interaction['Person'] || {})
+    line = self.class.line_for(interaction['PropertiesChanges'] || {}, interaction['Person'] || {})
     return if line.blank?
 
     # One value, built once and used for both the check and the write: computing it twice
@@ -59,20 +82,5 @@ class Import::Octadesk::ActivityWriter
     )
     @stats[:atividades] += 1
     row
-  end
-
-  # Only the two changes a reader of an archive asks about: where the thread went and who
-  # took it. The rest of `PropertiesChanges` restates fields the conversation already
-  # carries.
-  def line_for(changes, person)
-    return if person['Type'] == TRIGGER
-
-    parts = []
-    parts << "Status: #{changes['Status']}" if changes['Status'].present?
-    parts << "Atribuido a #{changes['AssignedName']}" if changes['AssignedName'].present?
-    return if parts.empty?
-
-    who = person['Name'].to_s.squish.presence
-    [parts.join(' - '), who && "(por #{who})"].compact.join(' ')
   end
 end

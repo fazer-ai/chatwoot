@@ -195,8 +195,20 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   def settle_thread
     return if @outcome.blank? || @conversation.blank?
 
-    settle([@outcome], [])
+    settle(settleable, [])
     @opened.delete(@conversation.id)
+  end
+
+  # A resolved thread runs no waiting clock, so the row just written is the whole story and
+  # the batch is that row. An open one is somebody's live queue, and there `first_unanswered`
+  # has to see the replies already stored after this message: settled on the new row alone it
+  # reads an answered conversation as pending and moves `waiting_since` back to a date in the
+  # archive, which files a thread somebody already handled into the unattended and SLA
+  # reports. Only that path pays for the extra read, and only that path needs it.
+  def settleable
+    return [@outcome] if @conversation.resolved?
+
+    @conversation.messages.to_a
   end
 
   # Nothing about a bulk backfill is worth pushing to a screen. The level exists for the
