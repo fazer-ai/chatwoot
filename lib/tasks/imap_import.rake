@@ -1,284 +1,169 @@
 # frozen_string_literal: true
 
 require 'net/imap'
-require 'concurrent'
 
-def connect_imap(channel, folder)
-  imap = Net::IMAP.new(channel.imap_address, port: channel.imap_port, ssl: channel.imap_enable_ssl, open_timeout: 30)
+# Backfills an email inbox from IMAP. The loop lives in Import::Email::Backfill; this is
+# the option parsing and the report around it.
+#
+# Written for a mailbox too big to take in one sitting: hundreds of thousands of messages
+# and hundreds of gigabytes of attachments, behind a provider that allows 2.5 GB of IMAP
+# download a day. So
+# the run is resumable (it re-scans headers and skips what the inbox holds, keyed on
+# Message-ID), paced (against a byte budget and the host's load average) and silent (every
+# write inside Import::SilentWrite: no dashboard push, no automations, no outgoing
+# webhooks, no notifications, so agents working the inbox see nothing appear).
+#
+#   INBOX_ID=1 bundle exec rails imap:scan               # dry run, writes nothing
+#   INBOX_ID=1 LIMIT=200 bundle exec rails imap:import   # first real batch
+#
+# Options, all through the environment:
+#   INBOX_ID           required
+#   FOLDERS            comma separated (default: the all-mail folder plus Spam)
+#   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023
+#   ATTACHMENTS_SINCE  YYYY-MM-DD; attachments fetched only on messages newer than this
+#                      (default: none, which is what keeps a first pass inside the budget)
+#   KINDS              comma separated, see Import::Email::Classifier (default: customer)
+#   BUDGET_MB          IMAP bytes to spend before stopping (default 2000 of the 2500 allowed)
+#   MAX_LOAD           pause while the host's 1-minute load is above this (default 2.5)
+#   LIMIT              stop after importing this many messages
+#   SAMPLE             imap:scan only, messages to classify per folder (default 400)
+module ImapImportOptions
+  module_function
 
-  if channel.google?
-    token = Google::RefreshOauthTokenService.new(channel: channel).access_token
-    imap.authenticate('XOAUTH2', channel.imap_login, token)
-  elsif channel.microsoft?
-    token = Microsoft::RefreshOauthTokenService.new(channel: channel).access_token
-    imap.authenticate('XOAUTH2', channel.imap_login, token)
-  else
-    imap.authenticate('PLAIN', channel.imap_login, channel.imap_password)
+  def inbox!
+    inbox = Inbox.find_by(id: ENV.fetch('INBOX_ID', nil))
+    abort 'ERRO: defina INBOX_ID' if inbox.nil?
+    abort "ERRO: inbox #{inbox.id} nao e um canal de e-mail" unless inbox.channel.is_a?(Channel::Email)
+
+    inbox
   end
 
-  imap.select(folder)
-  imap
-end
+  def terms
+    terms = ['ALL']
+    terms = ['SINCE', ENV.fetch('SINCE')] if ENV['SINCE'].present?
+    terms += ['BEFORE', ENV.fetch('UNTIL')] if ENV['UNTIL'].present?
+    terms
+  end
 
-# Logout can raise Net::IMAP::Error when the server has already closed the
-# connection (eg. a transient network blip mid-scan). Mirror the
-# `terminate_imap_connection` pattern used by the IMAP fetch service: log and
-# fall back to a plain disconnect so ensure blocks never fail the whole task.
-def safe_close_imap(imap)
-  return if imap.nil?
+  def folders = ENV['FOLDERS'].presence&.split(',')&.map(&:strip)
+  def kinds = (ENV['KINDS'] || 'customer').split(',').map(&:strip)
+  def attachments_since = (Time.zone.parse(ENV.fetch('ATTACHMENTS_SINCE')) if ENV['ATTACHMENTS_SINCE'].present?)
+  def limit = ENV['LIMIT'].presence&.to_i
+  def pacer = Import::Email::Pacer.new(budget_mb: ENV['BUDGET_MB'] || 2000, max_load: ENV['MAX_LOAD'] || 2.5)
 
-  imap.logout
-rescue Net::IMAP::Error => e
-  warn "  [IMAP] logout failed: #{e.message}; disconnecting"
-  imap.disconnect
-end
+  def duration(seconds)
+    seconds = seconds.to_i
+    return "#{seconds}s" if seconds < 60
+    return "#{seconds / 60}m#{seconds % 60}s" if seconds < 3600
 
-def format_duration(seconds)
-  seconds = seconds.to_i
-  if seconds < 60
-    "#{seconds}s"
-  elsif seconds < 3600
-    "#{seconds / 60}m#{seconds % 60}s"
-  else
     "#{seconds / 3600}h#{(seconds % 3600) / 60}m"
   end
-end
 
-def validate_inbox(inbox_id)
-  inbox = Inbox.find_by(id: inbox_id)
-  abort "ERROR: Inbox #{inbox_id} not found." unless inbox
-
-  channel = inbox.channel
-  abort "ERROR: Inbox #{inbox_id} is not an email channel." unless channel.is_a?(Channel::Email)
-  abort "ERROR: IMAP is not enabled for inbox #{inbox_id}." unless channel.imap_enabled?
-
-  [inbox, channel]
-end
-
-def scan_new_email_uids(imap, channel, uids)
-  new_uids = []
-  skipped = 0
-
-  uids.each_slice(100) do |batch|
-    headers = imap.uid_fetch(batch, 'BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)]')
-    next if headers.blank?
-
-    headers.each do |data|
-      msg_id = Mail.read_from_string(data.attr['BODY[HEADER.FIELDS (MESSAGE-ID)]']).message_id
-      if msg_id.blank? || channel.inbox.messages.exists?(source_id: msg_id)
-        skipped += 1
-      else
-        new_uids << data.attr['UID']
+  # The one-line progress display, and the summary after it. Here rather than inside the
+  # task body so the tasks stay short enough to read in one screen.
+  def printer(pacer, started)
+    lambda do |event, payload|
+      case event
+      when :folder then puts "\n#{payload[:folder]}: #{payload[:total]} candidatas"
+      when :paused then print "\r  [pausa] load #{payload[:load]} acima do teto, aguardando...            "
+      when :error then warn "\n  [ERRO] uid #{payload[:uid]}: #{payload[:error].class} #{payload[:error].message}"
+      when :imported then print_progress(payload[:stats], pacer, started)
       end
     end
-
-    print "\r  Scanning headers... #{new_uids.size} new, #{skipped} skipped (#{new_uids.size + skipped}/#{uids.size})   "
   end
 
-  puts ''
-  [new_uids, skipped]
+  def print_progress(stats, pacer, started)
+    skipped = stats.sum { |key, value| key.to_s.start_with?('visto_') ? value : 0 } - stats[:importadas]
+    print "\r  #{stats[:importadas]} importadas | #{skipped} puladas | #{pacer.spent_mb}MB | " \
+          "load #{pacer.load_average} | #{duration(Time.zone.now - started)}        "
+  end
+
+  def report(run, pacer, started)
+    puts "\n#{'=' * 70}"
+    puts case run.stopped_by
+         when :orcamento then 'Parou no teto de bytes. Rode de novo amanha para continuar.'
+         when :limite then 'Parou no LIMIT. Rode de novo para continuar.'
+         else 'Pastas esgotadas.'
+         end
+    run.stats.sort.each { |key, value| puts "  #{key.to_s.ljust(20)} #{value}" }
+    puts "  #{'baixado'.ljust(20)} #{pacer.spent_mb} MB"
+    puts "  #{'tempo'.ljust(20)} #{duration(Time.zone.now - started)} (pausado #{duration(pacer.paused_for)})"
+  end
+
+  # Classifies a uniform slice of a folder. Uniform rather than the newest N, because the
+  # shape of this mailbox changed over four years and the tail would not describe it.
+  def sample_kinds(imap, run, uids, sample)
+    kinds = Hash.new(0)
+    uids.each_slice([uids.length / sample, 1].max).map(&:first).each_slice(50) do |batch|
+      (imap.uid_fetch(batch, 'BODY.PEEK[]') || []).each do |data|
+        kinds[run.send(:classify, Mail.read_from_string(data.attr['BODY[]'].to_s))] += 1
+      rescue StandardError
+        kinds[:erro] += 1
+      end
+    end
+    kinds
+  end
+
+  def header(inbox, extra = {})
+    puts "Inbox:   #{inbox.name} (##{inbox.id})  #{inbox.channel.email}"
+    extra.each { |k, v| puts "#{"#{k}:".ljust(9)}#{v}" }
+    puts '-' * 70
+  end
 end
 
-def import_single_email(imap, channel, uid)
-  mail_data = imap.uid_fetch(uid, 'RFC822')
-  return false if mail_data.blank?
+namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in one namespace
+  desc 'Dry run: classifica uma amostra do que imap:import faria, sem escrever nada'
+  task scan: :environment do
+    inbox = ImapImportOptions.inbox!
+    sample = (ENV['SAMPLE'] || 400).to_i
+    run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: ImapImportOptions.pacer,
+                                      folders: ImapImportOptions.folders, terms: ImapImportOptions.terms)
+    imap = run.connect
+    ImapImportOptions.header(inbox, Pastas: run.folders(imap).join(', '), Amostra: "#{sample} por pasta")
 
-  mail_str = mail_data[0].attr['RFC822']
-  return false if mail_str.blank?
+    totals = Hash.new(0)
+    run.folders(imap).each do |folder|
+      imap.examine(folder)
+      uids = imap.uid_search(ImapImportOptions.terms)
+      puts "\n#{folder}: #{uids.length} mensagens"
+      next if uids.empty?
 
-  inbound_mail = Mail.read_from_string(mail_str)
-  Imap::ImapMailbox.new.process(inbound_mail, channel)
+      kinds = ImapImportOptions.sample_kinds(imap, run, uids, sample)
+      seen = kinds.values.sum
+      kinds.sort_by { |_, v| -v }.each do |kind, count|
+        projected = (uids.length * count / seen.to_f).round
+        totals[kind] += projected
+        puts "   #{kind.to_s.ljust(10)} #{count}/#{seen} (#{(100.0 * count / seen).round(1)}%)  -> ~#{projected}"
+      end
+    end
+    run.close(imap)
 
-  # Backdate message created_at to the original email date
-  backdate_message(channel, inbound_mail) if inbound_mail.date.present?
-  true
-end
+    puts "\n#{'=' * 70}\nPROJECAO GERAL"
+    totals.sort_by { |_, v| -v }.each { |kind, count| puts "  #{kind.to_s.ljust(12)} ~#{count}" }
+  end
 
-def backdate_message(channel, inbound_mail)
-  message = channel.inbox.messages.find_by(source_id: inbound_mail.message_id)
-  return unless message
+  desc 'Importa historico de e-mails do IMAP para uma inbox do Chatwoot'
+  task import: :environment do
+    inbox = ImapImportOptions.inbox!
+    pacer = ImapImportOptions.pacer
+    started = Time.zone.now
+    attachments = ImapImportOptions.attachments_since
 
-  original_date = inbound_mail.date.to_datetime
-  message.update_columns(created_at: original_date) # rubocop:disable Rails/SkipsModelValidations
-end
-
-# Fixes conversation timestamps after all messages are imported.
-# Must run after import to avoid after_create_commit callbacks overwriting values.
-def backdate_conversations(inbox)
-  puts 'Backdating conversation timestamps...'
-  count = 0
-
-  inbox.conversations.find_each do |conversation|
-    oldest = conversation.messages.minimum(:created_at)
-    newest = conversation.messages.maximum(:created_at)
-    next unless oldest
-
-    conversation.update_columns( # rubocop:disable Rails/SkipsModelValidations
-      created_at: oldest,
-      last_activity_at: newest,
-      agent_last_seen_at: newest,
-      status: :resolved
+    ImapImportOptions.header(
+      inbox,
+      Tipos: ImapImportOptions.kinds.join(', '),
+      Anexos: attachments ? "a partir de #{attachments.to_date}" : 'nenhum',
+      Teto: "#{pacer.budget_mb_left}MB, load maximo #{ENV['MAX_LOAD'] || 2.5}",
+      Limite: ImapImportOptions.limit || 'sem limite'
     )
-    count += 1
-  end
 
-  puts "  Updated #{count} conversations."
-end
+    run = Import::Email::Backfill.new(
+      inbox: inbox, kinds: ImapImportOptions.kinds, pacer: pacer,
+      folders: ImapImportOptions.folders, terms: ImapImportOptions.terms,
+      attachments_since: attachments, limit: ImapImportOptions.limit
+    )
 
-def import_worker(channel, folder, uid_batch, progress) # rubocop:disable Metrics/MethodLength
-  ActiveRecord::Base.connection_pool.with_connection do
-    imap = connect_imap(channel, folder)
-    begin
-      uid_batch.each do |uid|
-        import_single_email(imap, channel, uid)
-
-        progress[:mutex].synchronize do
-          progress[:imported] += 1
-          print_import_progress(progress)
-        end
-      rescue StandardError => e
-        progress[:mutex].synchronize do
-          progress[:errors] += 1
-          print_import_progress(progress)
-        end
-        warn "\n  [ERROR] uid #{uid}: #{e.message}"
-      end
-    ensure
-      safe_close_imap(imap)
-    end
-  end
-rescue StandardError => e
-  warn "\n  [WORKER ERROR] #{e.message}"
-end
-
-def print_import_progress(progress)
-  processed = progress[:imported] + progress[:skipped] + progress[:errors]
-  total = progress[:total]
-  pct = ((processed.to_f / total) * 100).round(1)
-  elapsed = Time.zone.now - progress[:started_at]
-  rate = processed.positive? ? (elapsed / processed) : 0
-  eta = rate.positive? ? ((total - processed) * rate) : 0
-
-  print "\r  [#{pct}%] #{processed}/#{total} | imported: #{progress[:imported]} | " \
-        "skipped: #{progress[:skipped]} | errors: #{progress[:errors]} | " \
-        "elapsed: #{format_duration(elapsed)} | ETA: #{format_duration(eta)}   "
-end
-
-namespace :imap do # rubocop:disable Metrics/BlockLength
-  desc 'Import all historical emails from IMAP into a Chatwoot inbox'
-  task :import, %i[inbox_id days folder workers] => :environment do |_task, args| # rubocop:disable Metrics/BlockLength
-    inbox_id = args[:inbox_id]
-    days = (args[:days] || 7).to_i
-    folder = args[:folder] || 'INBOX'
-    workers = (args[:workers] || 4).to_i
-
-    if inbox_id.blank?
-      puts 'Usage: rails imap:import[<inbox_id>,<days>,<folder>,<workers>]'
-      puts '  days:    how far back to look (default: 7)'
-      puts '  folder:  IMAP folder (default: INBOX)'
-      puts '  workers: parallel connections (default: 4)'
-      puts ''
-      puts 'Tip: set RAILS_MAX_THREADS above worker count to avoid DB pool exhaustion:'
-      puts '  RAILS_MAX_THREADS=10 bundle exec rails imap:import[81,3650,INBOX,8]'
-      next
-    end
-
-    inbox, channel = validate_inbox(inbox_id)
-
-    puts "Inbox:    #{inbox.name} (ID: #{inbox.id})"
-    puts "Email:    #{channel.email}"
-    puts "Server:   #{channel.imap_address}:#{channel.imap_port}"
-    puts "Folder:   #{folder}"
-    puts "Lookback: #{days} days"
-    puts "Workers:  #{workers}"
-    puts '-' * 60
-
-    # Phase 1: scan headers with a single connection to find new emails
-    imap = connect_imap(channel, folder)
-    begin
-      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
-
-      puts "Searching emails since #{since_date}..."
-      uids = imap.uid_search(['SINCE', since_date])
-      puts "Found #{uids.length} emails in #{folder}."
-
-      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
-    ensure
-      safe_close_imap(imap)
-    end
-
-    if new_uids.empty?
-      puts 'Nothing new to import.'
-      next
-    end
-
-    puts "Importing #{new_uids.size} emails with #{workers} parallel workers..."
-    progress = {
-      imported: 0, skipped: skipped, errors: 0,
-      total: new_uids.size + skipped, mutex: Mutex.new, started_at: Time.zone.now
-    }
-
-    # Phase 2: split work across N threads, each with its own IMAP connection
-    chunks = new_uids.each_slice((new_uids.size.to_f / workers).ceil).to_a
-    threads = chunks.map do |chunk|
-      Thread.new { import_worker(channel, folder, chunk, progress) }
-    end
-    threads.each(&:join)
-
-    # Phase 3: fix conversation timestamps after all callbacks have settled
-    backdate_conversations(inbox)
-
-    elapsed = Time.zone.now - progress[:started_at]
-
-    puts ''
-    puts '=' * 60
-    puts 'Import complete!'
-    puts "  Imported: #{progress[:imported]}"
-    puts "  Skipped:  #{progress[:skipped]} (already present)"
-    puts "  Errors:   #{progress[:errors]}"
-    puts "  Time:     #{format_duration(elapsed)}"
-    puts '=' * 60
-  end
-
-  desc 'Dry-run: count how many emails imap:import would import (no changes)'
-  task :scan, %i[inbox_id days folder] => :environment do |_task, args| # rubocop:disable Metrics/BlockLength
-    inbox_id = args[:inbox_id]
-    days = (args[:days] || 7).to_i
-    folder = args[:folder] || 'INBOX'
-
-    if inbox_id.blank?
-      puts 'Usage: rails imap:scan[<inbox_id>,<days>,<folder>]'
-      puts '  days:   how far back to look (default: 7)'
-      puts '  folder: IMAP folder (default: INBOX)'
-      next
-    end
-
-    inbox, channel = validate_inbox(inbox_id)
-
-    puts "Inbox:    #{inbox.name} (ID: #{inbox.id})"
-    puts "Email:    #{channel.email}"
-    puts "Folder:   #{folder}"
-    puts "Lookback: #{days} days"
-    puts '-' * 60
-
-    imap = connect_imap(channel, folder)
-    begin
-      since_date = (Time.zone.today - days).strftime('%d-%b-%Y')
-
-      puts "Searching emails since #{since_date}..."
-      uids = imap.uid_search(['SINCE', since_date])
-      puts "Found #{uids.length} emails in #{folder}."
-
-      new_uids, skipped = scan_new_email_uids(imap, channel, uids)
-    ensure
-      safe_close_imap(imap)
-    end
-
-    puts ''
-    puts '=' * 60
-    puts 'Scan complete (no changes made).'
-    puts "  Would import: #{new_uids.size}"
-    puts "  Would skip:   #{skipped} (already present)"
-    puts '=' * 60
+    run.perform(&ImapImportOptions.printer(pacer, started))
+    ImapImportOptions.report(run, pacer, started)
   end
 end
