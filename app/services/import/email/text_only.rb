@@ -30,13 +30,17 @@ class Import::Email::TextOnly
     leaves.any? { |part, _| !text?(part) }
   end
 
-  # Plain when it says anything, the largest text part otherwise, and nil when even that is
-  # under the floor -- the caller then takes the whole message, which is cheap to do and
-  # always holds the words somewhere.
+  # Plain when it says anything, the largest text part otherwise, and nil only when the
+  # structure names no text part at all.
+  #
+  # The floor decides the preference and nothing else. Applied to the result it would send
+  # "See attached" back to the whole message, attachment and all -- the exact download the
+  # cutoff exists to refuse, on precisely the messages where the text is small and the
+  # attachment is not. A short body is the message's own text, and taking it is honest.
   def part
     @part ||= begin
       chosen = preferred_plain || texts.max_by { |candidate, _| candidate.size.to_i }
-      describe(*chosen) if chosen && chosen.first.size.to_i >= MIN_PART_OCTETS
+      describe(*chosen) if chosen
     end
   end
 

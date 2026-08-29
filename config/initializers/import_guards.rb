@@ -72,12 +72,26 @@ module ImportGuards
     end
   end
 
-  # A contact is created per correspondent, and each one asks Gravatar for a picture.
-  # Ordinary at the rate people write in; half a million outbound HTTP requests when a
-  # mailbox is replayed, which is a queue flood aimed at a third party that never agreed to
-  # it. The avatar is cosmetic and the next live message fills it in.
+  # The two things a new contact does on its own, neither of which travels through the
+  # dispatcher, so nothing above stops them. Both are one job per contact created, which is
+  # ordinary at the rate people write in and half a million jobs when a mailbox is replayed.
+  #
+  # Gravatar is a queue flood aimed at a third party that never agreed to it, and the avatar
+  # is cosmetic: the next live message fills it in. The IP lookup is worse than useless --
+  # an imported contact carries no IP for it to look up.
+  #
+  # `Message#reindex_for_search` is the one after-commit side effect deliberately left
+  # alone. It is inert unless advanced search is configured, and guarding it would leave an
+  # archive that exists to be searched silently absent from the index. A deployment that
+  # turns advanced search on wants one bulk reindex after the import, not a job per row.
   module SilentGravatar
     def fetch_avatar_from_gravatar
+      return if Import::SilentWrite.on?
+
+      super
+    end
+
+    def ip_lookup
       return if Import::SilentWrite.on?
 
       super

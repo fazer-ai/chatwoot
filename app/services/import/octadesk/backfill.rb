@@ -10,7 +10,13 @@
 # resumed from a part rather than from the beginning. That is a convenience, not a
 # correctness requirement: starting over writes nothing twice, it only re-reads.
 class Import::Octadesk::Backfill
-  attr_reader :stats, :stopped_by
+  attr_reader :stopped_by
+
+  # The importer keeps the tally of what it wrote and the walker the tally of what it read,
+  # and a report showing only one of them would say a run of half a million tickets read
+  # them and leave out what it filed. Merged here rather than at each call site, so a caller
+  # asking a run how it went cannot get the half answer.
+  def stats = @stats.merge(@importer.stats)
 
   # rubocop:disable Metrics/ParameterLists -- independent knobs on a run meant to be
   # started and restarted with different settings; an options object only moves the list.
@@ -66,14 +72,9 @@ class Import::Octadesk::Backfill
   def handle(ticket)
     @stats[:lidos] += 1
     @importer.import(ticket)
-    @progress.call(:ticket, stats: merged_stats)
+    @progress.call(:ticket, stats: stats)
   rescue StandardError => e
     @stats[:erros] += 1
     @progress.call(:error, ticket: ticket['Number'], error: e)
   end
-
-  # The importer keeps its own tally of what it wrote; the walker keeps the tally of what
-  # it read. Reported as one thing because the difference between them is the interesting
-  # number: tickets read that produced nothing.
-  def merged_stats = @stats.merge(@importer.stats)
 end
