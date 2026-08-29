@@ -24,6 +24,7 @@ class Import::Email::AttachmentPolicy
   # policy that is neither none, all, nor a cutoff -- and fails much later, at the first
   # message it is asked about.
   def self.build(value)
+    return value if value.is_a?(self)
     return new(NONE) if value.blank?
     return new(ALL) if value.to_s.casecmp(ALL.to_s).zero?
     return new(NONE) if value.to_s.casecmp(NONE.to_s).zero?

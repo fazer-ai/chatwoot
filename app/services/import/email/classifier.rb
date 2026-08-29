@@ -1,7 +1,7 @@
 # What a message in an imported mailbox actually is.
 #
 # A support mailbox that sat behind a ticketing system is not a transcript. Measured on
-# one such mailbox of some 800k messages, 27% of it was written by the ticketing system
+# one such mailbox, better than a quarter of it was written by the ticketing system
 # rather than by a person, in three shapes that want three different answers, and the
 # shapes are not separable by sender: the same `From` carries a receipt, an alert and an
 # agent's reply.

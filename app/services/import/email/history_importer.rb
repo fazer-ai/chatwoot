@@ -43,7 +43,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   attr_reader :opened, :outcome
 
   def initialize(attachments: nil)
-    @attachments = attachments.is_a?(Import::Email::AttachmentPolicy) ? attachments : Import::Email::AttachmentPolicy.build(attachments)
+    @attachments = Import::Email::AttachmentPolicy.build(attachments)
     @opened = Set.new
     @created = Set.new
     super()

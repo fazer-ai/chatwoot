@@ -198,8 +198,6 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       Teto: "#{pacer.budget_mb_left}MB, load maximo #{ENV['MAX_LOAD'] || 2.5}",
       Limite: ImapImportOptions.limit || 'sem limite'
     )
-    puts "Retoma:  #{run.cursor}"
-    puts '-' * 70
 
     run = Import::Email::Backfill.new(
       inbox: inbox, kinds: ImapImportOptions.kinds, pacer: pacer,
@@ -207,6 +205,8 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       attachments: attachments, limit: ImapImportOptions.limit
     )
     run.cursor.reset if ENV['RESET_CURSOR'].present?
+    puts "Retoma:  #{run.cursor}"
+    puts '-' * 70
 
     run.perform(&ImapImportOptions.printer(pacer, started))
     ImapImportOptions.report(run, pacer, started)
