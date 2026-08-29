@@ -12,7 +12,8 @@
 #   INBOX_ID          required
 #   ZIP               required, the *_ticket_ticket_*.zip
 #   ATTACHMENTS       1 to also mirror the attachments off the vendor bucket
-#   LIMIT             stop after this many tickets
+#   LIMIT             stop after this many newly imported tickets, so running again
+#                     continues rather than re-reading the same ones
 #   FROM_PART         resume from a part name, e.g. part_0007.json
 #   MAX_LOAD          pause while the host's 1-minute load is above this (default 2.5)
 #   FORM_ADDRESS      address the company's website form posts as, so the customer's own

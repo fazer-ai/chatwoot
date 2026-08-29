@@ -17,17 +17,25 @@ class Import::Email::AttachmentPolicy
   ALL = :all
 
   # Accepts what a caller naturally has: a symbol, a Time, or nil for the default.
+  #
+  # The time is converted here rather than trusted, because `respond_to?(:to_time)` is not
+  # the test it looks like: ActiveSupport puts `to_time` on String, so any word at all
+  # answers to it and answers nil, and a typo in the setting would otherwise become a
+  # policy that is neither none, all, nor a cutoff -- and fails much later, at the first
+  # message it is asked about.
   def self.build(value)
     return new(NONE) if value.blank?
     return new(ALL) if value.to_s.casecmp(ALL.to_s).zero?
     return new(NONE) if value.to_s.casecmp(NONE.to_s).zero?
-    return new(value) if value.respond_to?(:to_time)
 
-    raise ArgumentError, "attachments must be :none, :all or a time, got #{value.inspect}"
+    at = value.try(:to_time)
+    raise ArgumentError, "attachments must be :none, :all or a time, got #{value.inspect}" if at.nil?
+
+    new(at)
   end
 
   def initialize(value)
-    @value = value.is_a?(Symbol) ? value : value.to_time
+    @value = value
   end
 
   def none? = @value == NONE

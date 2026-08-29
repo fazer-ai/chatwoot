@@ -29,6 +29,10 @@ require 'net/imap'
 #   BUDGET_MB          IMAP bytes to spend before stopping (default 2000 of the 2500 allowed)
 #   MAX_LOAD           pause while the host's 1-minute load is above this (default 2.5)
 #   LIMIT              stop after importing this many messages
+#   RESET_CURSOR       1 to forget how far previous passes got and walk from the start.
+#                      The run is resumable because it remembers, per folder, the highest
+#                      UID it has already looked at -- the inbox alone cannot say, since
+#                      most of a support mailbox is read and declined rather than written
 #   SAMPLE             imap:scan only, messages to classify per folder (default 400)
 module ImapImportOptions
   module_function
@@ -194,12 +198,15 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       Teto: "#{pacer.budget_mb_left}MB, load maximo #{ENV['MAX_LOAD'] || 2.5}",
       Limite: ImapImportOptions.limit || 'sem limite'
     )
+    puts "Retoma:  #{run.cursor}"
+    puts '-' * 70
 
     run = Import::Email::Backfill.new(
       inbox: inbox, kinds: ImapImportOptions.kinds, pacer: pacer,
       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms,
       attachments: attachments, limit: ImapImportOptions.limit
     )
+    run.cursor.reset if ENV['RESET_CURSOR'].present?
 
     run.perform(&ImapImportOptions.printer(pacer, started))
     ImapImportOptions.report(run, pacer, started)

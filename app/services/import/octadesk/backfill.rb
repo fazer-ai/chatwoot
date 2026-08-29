@@ -70,17 +70,28 @@ class Import::Octadesk::Backfill
     end
   end
 
+  # Counted against what the pass actually filed, not against what it read. A limit on
+  # reads cannot advance: the next run starts at the same part, re-reads the same first
+  # `LIMIT` tickets -- already imported, so they write nothing -- and stops before reaching
+  # anything new, which makes "run it again to continue" a loop that never moves. Reading
+  # past what is already filed costs an indexed lookup each and is the cheap half.
   def halt?
-    @stopped_by = :limite if @limit && @stats[:lidos] >= @limit
+    @stopped_by = :limite if @limit && @stats[:novos] >= @limit
     @stopped_by.present?
   end
 
+  WRITTEN = %i[mensagens respostas atividades].freeze
+
   def handle(ticket)
     @stats[:lidos] += 1
+    before = filed
     @importer.import(ticket)
+    @stats[:novos] += 1 if filed > before
     @progress.call(:ticket, stats: stats)
   rescue StandardError => e
     @stats[:erros] += 1
     @progress.call(:error, ticket: ticket['Number'], error: e)
   end
+
+  def filed = WRITTEN.sum { |key| @importer.stats[key] }
 end
