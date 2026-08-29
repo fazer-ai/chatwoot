@@ -21,6 +21,10 @@
 module OctadeskImportOptions
   module_function
 
+  # Cast rather than `present?`: mirroring is hundreds of gigabytes, and `ATTACHMENTS=0`
+  # reads as "off" to whoever typed it and as "on" to a presence check.
+  def attachments? = ActiveModel::Type::Boolean.new.cast(ENV.fetch('ATTACHMENTS', nil)).present?
+
   def printer(pacer, started)
     lambda do |event, payload|
       case event
@@ -63,14 +67,14 @@ namespace :octadesk do
     started = Time.zone.now
     run = Import::Octadesk::Backfill.new(
       inbox: inbox, zip_path: zip, pacer: pacer,
-      attachments: ENV['ATTACHMENTS'].present?, limit: ENV['LIMIT'].presence&.to_i,
+      attachments: OctadeskImportOptions.attachments?, limit: ENV['LIMIT'].presence&.to_i,
       from_part: ENV['FROM_PART'].presence,
       form_address: ENV['FORM_ADDRESS'].presence, form_sender_name: ENV['FORM_SENDER_NAME'].presence
     )
 
     puts "Inbox:   #{inbox.name} (##{inbox.id})  #{inbox.channel.email}"
     puts "Export:  #{File.basename(zip)}  (#{run.parts.size} partes)"
-    puts "Anexos:  #{ENV['ATTACHMENTS'].present? ? 'sim, espelhando para o S3' : 'nao'}"
+    puts "Anexos:  #{OctadeskImportOptions.attachments? ? 'sim, espelhando para o S3' : 'nao'}"
     puts '-' * 70
 
     run.perform(&OctadeskImportOptions.printer(pacer, started))

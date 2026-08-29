@@ -17,7 +17,16 @@
 # have nothing to tell an operator now, and pushing one cable frame per row would be a
 # flood aimed at every agent in the account.
 #
-# Three guards read this flag, all declared in config/initializers/import_guards.rb:
+# Which level a guard reads is the whole design, and getting it wrong is quiet in both
+# directions. A guard that suppresses *fan-out* -- work aimed at the world, or at a queue,
+# that a backdated row has no business doing -- belongs at `on?`, because that is true of
+# history however it arrived. A guard that suppresses *routing or status* belongs at
+# `archive?` alone: under `:announce` the thread is somebody's live work, recovered a
+# minute late, and it has to be assigned and statused the way any other arrival would be.
+# Suppressing those there leaves the gap thread sitting unrouted, which is the same "nobody
+# works it until they reload" failure the level was invented to avoid.
+#
+# The guards, all declared in config/initializers/import_guards.rb:
 #
 #   AsyncDispatcher#dispatch                 the listeners that act on the world:
 #                                            automations, campaigns, CSAT, webhooks,
@@ -33,6 +42,17 @@
 #                                            Under `:announce` it re-emits `message.created`
 #                                            on its own, so the thread an operator has open
 #                                            fills in rather than only the list card
+#   Contact#ip_lookup                        a job to resolve an address an imported contact
+#                                            does not carry. Useless at either level
+#   Conversation#run_auto_assignment         archive only: half a million archived threads
+#                                            asking the inbox to redistribute capacity, or
+#                                            landing outright in a working agent's queue
+#   Conversation#set_active_bot_conversation archive only: an inbox with a bot starts its
+#                                            conversations `pending` and overrides the
+#                                            status the importer asked for
+#   Contact#fetch_avatar_from_gravatar       archive only: one outbound request per contact
+#                                            created, which is a flood only when the
+#                                            contacts arrive by the hundred thousand
 #
 # Scoped to the thread rather than to a request: the importer runs inside a Sidekiq job,
 # and the flag must not leak into whatever that worker picks up next.
@@ -62,5 +82,12 @@ module Import::SilentWrite
   # "not importing at all", which is the ordinary case and must go through untouched.
   def announce?
     ActiveSupport::IsolatedExecutionState[KEY] == :announce
+  end
+
+  # Writing history nobody is waiting on. The level a guard should read when what it
+  # suppresses would change where a conversation goes or what state it is in, rather than
+  # merely stopping a side effect.
+  def archive?
+    ActiveSupport::IsolatedExecutionState[KEY] == :silent
   end
 end

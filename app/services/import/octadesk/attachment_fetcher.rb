@@ -32,7 +32,7 @@ class Import::Octadesk::AttachmentFetcher
     body = fetch(uri)
     return if body.blank?
 
-    attachment = @message.attachments.new(account_id: @message.account_id, file_type: file_type(body))
+    attachment = @message.attachments.new(account_id: @message.account_id, file_type: file_type(uri))
     attachment.file.attach(io: StringIO.new(body), filename: filename(uri), content_type: @content_type)
     @message.save!
   end
@@ -80,10 +80,16 @@ class Import::Octadesk::AttachmentFetcher
 
   def filename(uri) = self.class.filename_for(uri, @name)
 
-  # Falls back on the declared type, then on the extension, which is what the mail
-  # pipeline's FileTypeHelper does with an attachment whose headers say nothing useful.
-  def file_type(_body)
+  # The declared type, then the extension. A bucket that answers `application/octet-stream`
+  # or nothing at all is answering about every file the same way, and taken at its word it
+  # files images, audio and video as `:file` -- which is the one thing the dashboard will
+  # not preview. The name is right there and says more than the header does.
+  GENERIC_TYPES = ['', 'application/octet-stream', 'binary/octet-stream'].freeze
+
+  def file_type(uri)
     helper = Class.new { include FileTypeHelper }.new
-    helper.file_type(@content_type)
+    return helper.file_type(@content_type) unless GENERIC_TYPES.include?(@content_type.to_s.downcase)
+
+    helper.file_type(Rack::Mime.mime_type(File.extname(filename(uri)), nil))
   end
 end
