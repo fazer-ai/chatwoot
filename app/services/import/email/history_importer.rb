@@ -45,6 +45,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   def initialize(attachments: nil)
     @attachments = attachments.is_a?(Import::Email::AttachmentPolicy) ? attachments : Import::Email::AttachmentPolicy.build(attachments)
     @opened = Set.new
+    @created = Set.new
     super()
   end
 
@@ -120,11 +121,33 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
 
     if @conversation.previously_new_record?
       @opened << @conversation.id
+      @created << @conversation.id
       stamps = { status: :resolved }
       stamps[:created_at] = @occurred_at if @occurred_at
       @conversation.update_columns(stamps) # rubocop:disable Rails/SkipsModelValidations
+    else
+      backdate_conversation
     end
     @conversation
+  end
+
+  # A thread opens on the first of its messages this run happens to see, and IMAP hands
+  # them out in arrival order rather than in the order they were written -- so the message
+  # that opens a conversation is routinely not its oldest, and the thread ends up dated
+  # after mail it contains. Only ever moved earlier, and only on a thread with no live
+  # traffic in it: on one somebody is working, the creation date is real.
+  #
+  # `@created` rather than `@opened`, which the settlement empties as it goes. The query is
+  # the resume path only, and reached only when there is actually a date to correct.
+  def backdate_conversation
+    return if @occurred_at.blank? || @conversation.created_at <= @occurred_at
+    return unless @created.include?(@conversation.id) || imported_only?(@conversation)
+
+    @conversation.update_columns(created_at: @occurred_at) # rubocop:disable Rails/SkipsModelValidations
+  end
+
+  def imported_only?(conversation)
+    conversation.messages.where.not(Import::IMPORTED_SQL).none?
   end
 
   # Address from `Reply-To`, name from `From`. See the class comment.
