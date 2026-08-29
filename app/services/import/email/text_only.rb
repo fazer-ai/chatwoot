@@ -70,10 +70,21 @@ class Import::Email::TextOnly
 
   # Text offered as a file is an attachment whatever its media type says: a .csv or a
   # quoted .eml is exactly the weight the cutoff means to leave behind.
+  #
+  # A name is enough to say so, and the disposition is not required to agree. Legacy mail
+  # routinely offers a file as `Content-Type: text/plain; name="nota.csv"` with no
+  # disposition at all, or as `inline; filename=...`. Read on `dsp_type` alone those come
+  # back as ordinary text, which costs twice: the message looks free of attachments so the
+  # whole of it is downloaded, and the file can win `part` and stand in for the body.
   def text?(candidate)
     return false unless candidate.media_type.to_s.casecmp('TEXT').zero?
+    return false if named?(candidate)
 
     (candidate.disposition&.dsp_type).to_s.casecmp('ATTACHMENT') != 0
+  end
+
+  def named?(candidate)
+    candidate.param&.[]('NAME').present? || candidate.disposition&.param&.[]('FILENAME').present?
   end
 
   # `BODYSTRUCTURE` is a tree: a multipart carries `parts`, a leaf carries its own media

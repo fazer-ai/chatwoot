@@ -80,24 +80,8 @@ class Import::Email::Backfill
   # somebody's unread mail as seen or expunge anything.
   def connect
     imap = Net::IMAP.new(@channel.imap_address, port: @channel.imap_port, ssl: @channel.imap_enable_ssl, open_timeout: 30)
-    authenticate(imap)
+    Import::Email::Authentication.perform(imap, @channel)
     imap
-  end
-
-  # The same three cases the live fetch services split into, because a channel does not
-  # stop being an OAuth channel when a rake task is the one connecting: on Google and
-  # Microsoft the stored `imap_password` is empty or stale and only a refreshed XOAUTH2
-  # token authenticates, so reading the column would fail every run against those
-  # providers with nothing but a login error to say why.
-  def authenticate(imap)
-    case @channel.provider
-    when 'google'
-      imap.authenticate('XOAUTH2', @channel.imap_login, Google::RefreshOauthTokenService.new(channel: @channel).access_token)
-    when 'microsoft'
-      imap.authenticate('XOAUTH2', @channel.imap_login, Microsoft::RefreshOauthTokenService.new(channel: @channel).access_token)
-    else
-      Imap::Authentication.authenticate!(imap, @channel.imap_authentication, @channel.imap_login, @channel.imap_password)
-    end
   end
 
   def close(imap)
@@ -114,14 +98,26 @@ class Import::Email::Backfill
   # the loop ran out is considered whole, including the messages `unstored` filtered on the
   # way; a batch it stopped inside is considered only up to the last message handled, so
   # nothing above the stopping point is ever marked as read.
+  #
+  # And the mark stays there for the rest of the folder. The run carries on past a message
+  # it could not settle, which is right -- one malformed part should not end a pass over
+  # hundreds of thousands of messages -- but the batches after it are above the failure, so
+  # letting them advance would bury the very UID the freeze exists to keep reachable. Every
+  # later pass would then start above it and the message would be lost without an error
+  # anywhere. The cost of freezing is re-reading headers already walked, which is cheap;
+  # the cost of not freezing is a message.
   def walk(imap, uids)
+    frozen = false
     uids.each_slice(HEADER_BATCH) do |batch|
       break if @stopped_by
 
       finished, mark = consume(imap, batch)
       at = finished ? batch.last : mark
-      @cursor.advance(@folder, @uidvalidity, at) if at
-      @cursor.flush
+      unless frozen
+        @cursor.advance(@folder, @uidvalidity, at) if at
+        @cursor.flush
+      end
+      frozen ||= !finished
     end
   end
 
