@@ -70,6 +70,18 @@ module ImportGuards
 
       super
     end
+
+    # An inbox with an agent bot starts its conversations `pending`, and the callback that
+    # does it overrides whatever status the creator asked for. An importer asks for
+    # `resolved` on purpose -- a thread born resolved fires no resolution event and files
+    # into no report -- so on an inbox that happens to have a bot the whole archive would
+    # land in the pending queue instead, assigned to the bot, with nothing in the importer
+    # to say why.
+    def determine_conversation_status
+      return if Import::SilentWrite.on?
+
+      super
+    end
   end
 
   # The two things a new contact does on its own, neither of which travels through the

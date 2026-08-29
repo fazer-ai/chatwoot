@@ -228,8 +228,12 @@ class Import::Email::Backfill
     lean.rebuild(header, body)
   end
 
+  # The same reading the importer will take of the same message. A header carries its
+  # `Received` lines too, so the fallback is available here and has to be used: deciding the
+  # cutoff on `Date` alone strips the attachments off every mail with an unreadable one,
+  # including the mail the fallback would have placed inside the window.
   def header_date(header)
-    Mail.read_from_string(header).date&.to_time
+    Import::Email::Timestamp.of(Mail.read_from_string(header))
   rescue StandardError
     nil
   end
