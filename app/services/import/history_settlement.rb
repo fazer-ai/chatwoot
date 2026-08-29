@@ -6,14 +6,16 @@
 # once per conversation instead of once per message, and only in the direction that is
 # true.
 #
-# Shared because there are two importers and only one correct answer: the session layer
-# files the canonical providers, and the Baileys one runs the legacy pipeline for the
-# frozen provider. A copy in each would drift, and the drift would show up as a thread
-# sorted to the wrong place in the list, which nobody reads as a bug in an importer.
+# Shared because there are several importers and only one correct answer: the session
+# layer files the canonical WhatsApp providers, the Baileys one runs the legacy pipeline
+# for the frozen provider, and the IMAP one files a mailbox. None of this is channel
+# specific -- it is Conversation and Message bookkeeping -- so a copy in each would drift,
+# and the drift would show up as a thread sorted to the wrong place in the list, which
+# nobody reads as a bug in an importer.
 #
 # The includer provides two things: `opened`, the ids of conversations this run created,
 # and `announcing`, the block wrapper that lets the dashboard push through.
-module Whatsapp::Session::Inbound::HistorySettlement
+module Import::HistorySettlement
   private
 
   # Both halves are settled together rather than one after the other, because a chat can
@@ -89,7 +91,7 @@ module Whatsapp::Session::Inbound::HistorySettlement
   # land in any order and each one leaves the same answer.
   def stamp_seen(conversation, _rows)
     return unless conversation.resolved?
-    return if conversation.messages.incoming.where.not(Whatsapp::Session::Inbound::Coverage::IMPORTED_SQL).exists?
+    return if conversation.messages.incoming.where.not(Import::IMPORTED_SQL).exists?
 
     newest = conversation.messages.maximum(:created_at)
     return if newest.blank?

@@ -132,7 +132,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # writer stands down on its own (`MessageWriter#acknowledge`), so this is the only check
   # the Baileys import gets and it costs the live path a thread-local read.
   def received_messages(messages, conversation)
-    return if Whatsapp::Session::SilentWrite.on?
+    return if Import::SilentWrite.on?
 
     super
   end

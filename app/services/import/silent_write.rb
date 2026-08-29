@@ -8,7 +8,8 @@
 # replies for messages that were answered long ago.
 #
 # One thing does have to run, though, and it is why this has two levels rather than a
-# boolean. Somebody pressed a button and is watching a screen. A gap thread that lands in
+# boolean. Somebody pressed a button and is watching a screen. An unattended bulk import
+# never wants this and stays `:silent` throughout; the level exists for the on-demand case. A gap thread that lands in
 # the queue while the list shows the queue from before the import is a thread nobody works
 # until they happen to reload, which defeats the point of importing it. So the gap half of
 # a run is written in `:announce`, where the dashboard push survives and everything else
@@ -16,7 +17,7 @@
 # have nothing to tell an operator now, and pushing one cable frame per row would be a
 # flood aimed at every agent in the account.
 #
-# Three guards read this flag, all declared in config/initializers/whatsapp_session_import.rb:
+# Three guards read this flag, all declared in config/initializers/import_guards.rb:
 #
 #   AsyncDispatcher#dispatch                 the listeners that act on the world:
 #                                            automations, campaigns, CSAT, webhooks,
@@ -35,8 +36,8 @@
 #
 # Scoped to the thread rather than to a request: the importer runs inside a Sidekiq job,
 # and the flag must not leak into whatever that worker picks up next.
-module Whatsapp::Session::SilentWrite
-  KEY = :whatsapp_session_silent_write
+module Import::SilentWrite
+  KEY = :import_silent_write
 
   module_function
 

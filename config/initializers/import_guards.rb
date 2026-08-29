@@ -1,4 +1,4 @@
-# The three guards that make Whatsapp::Session::SilentWrite mean something.
+# The guards that make Import::SilentWrite mean something.
 #
 # Declared here, and not as autoloaded classes, on purpose: a reloadable module handed to
 # `prepend` is a new object after every reload, so the ancestor chain would grow one copy
@@ -8,7 +8,7 @@
 #
 # Prepended rather than edited into the classes themselves: all three are files the
 # upstream sync rewrites, and a guard clause inside them is a conflict on every merge.
-module WhatsappSessionImportGuards
+module ImportGuards
   # Everything that acts on the world outside this request. An imported message may never
   # reach any of it, at either level of the flag: history that fires an automation, posts
   # an outgoing webhook or notifies an agent is history pretending to be an arrival.
@@ -17,7 +17,7 @@ module WhatsappSessionImportGuards
   # to the importing thread and the job runs on another one, where it would read as unset.
   module SilentAsyncDispatch
     def dispatch(event_name, timestamp, data)
-      return if Whatsapp::Session::SilentWrite.on?
+      return if Import::SilentWrite.on?
 
       super
     end
@@ -34,8 +34,8 @@ module WhatsappSessionImportGuards
   # implements the events it cares about, which is the check Wisper itself makes.
   module SilentSyncDispatch
     def dispatch(event_name, timestamp, data)
-      return super unless Whatsapp::Session::SilentWrite.on?
-      return unless Whatsapp::Session::SilentWrite.announce?
+      return super unless Import::SilentWrite.on?
+      return unless Import::SilentWrite.announce?
 
       event = Events::Base.new(event_name, timestamp, data)
       listener = ActionCableListener.instance
@@ -58,10 +58,36 @@ module WhatsappSessionImportGuards
   # this importer has taken over: the first-reply branch writes `first_reply_created_at` and
   # clears `waiting_since`, and the other branch recomputes `waiting_since` from a message
   # being written oldest first. Both would fight `settle` for the same columns.
+  # Assignment is the one side effect that does not travel through the dispatcher, so
+  # nothing above stops it. A backfilled thread is created resolved, and a status change to
+  # resolved is exactly what wakes the V2 assignment job -- once per conversation, half a
+  # million times over a full import, each one asking the inbox to redistribute capacity it
+  # has no reason to redistribute. The V1 path is worse: it assigns the thread outright, so
+  # a decade of somebody's history lands in a working agent's queue.
+  module SilentAutoAssignment
+    def run_auto_assignment
+      return if Import::SilentWrite.on?
+
+      super
+    end
+  end
+
+  # A contact is created per correspondent, and each one asks Gravatar for a picture.
+  # Ordinary at the rate people write in; half a million outbound HTTP requests when a
+  # mailbox is replayed, which is a queue flood aimed at a third party that never agreed to
+  # it. The avatar is cosmetic and the next live message fills it in.
+  module SilentGravatar
+    def fetch_avatar_from_gravatar
+      return if Import::SilentWrite.on?
+
+      super
+    end
+  end
+
   module SilentMessageCallbacks
     def execute_after_create_commit_callbacks
-      return super unless Whatsapp::Session::SilentWrite.on?
-      return unless Whatsapp::Session::SilentWrite.announce?
+      return super unless Import::SilentWrite.on?
+      return unless Import::SilentWrite.announce?
 
       Rails.configuration.dispatcher.dispatch(
         Events::Types::MESSAGE_CREATED, Time.zone.now, message: self, performed_by: Current.executed_by
@@ -71,7 +97,9 @@ module WhatsappSessionImportGuards
 end
 
 Rails.application.config.to_prepare do
-  SyncDispatcher.prepend(WhatsappSessionImportGuards::SilentSyncDispatch)
-  AsyncDispatcher.prepend(WhatsappSessionImportGuards::SilentAsyncDispatch)
-  Message.prepend(WhatsappSessionImportGuards::SilentMessageCallbacks)
+  SyncDispatcher.prepend(ImportGuards::SilentSyncDispatch)
+  AsyncDispatcher.prepend(ImportGuards::SilentAsyncDispatch)
+  Message.prepend(ImportGuards::SilentMessageCallbacks)
+  Conversation.prepend(ImportGuards::SilentAutoAssignment)
+  Contact.prepend(ImportGuards::SilentGravatar)
 end

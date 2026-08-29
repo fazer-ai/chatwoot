@@ -12,7 +12,7 @@
 #                    was known to be receiving. Newer means nobody has had the chance to
 #                    read it: that is late mail and it belongs in the queue. Older is
 #                    history and it belongs in the archive, filed resolved.
-#   what it may do   almost nothing. Whatsapp::Session::SilentWrite holds for the whole
+#   what it may do   almost nothing. Import::SilentWrite holds for the whole
 #                    run, so no imported message notifies, automates, posts a webhook,
 #                    wakes a bot or answers with a template, whichever half it lands in.
 #                    The one exception follows the same split: the gap half is written
@@ -20,7 +20,7 @@
 #                    while the archive stays silent because a reader has nothing to gain
 #                    from eight hundred backdated rows arriving one cable frame at a time.
 class Whatsapp::Session::Inbound::HistoryImporter
-  include Whatsapp::Session::Inbound::HistorySettlement
+  include Import::HistorySettlement
 
   # A chat's whole batch is written under one lock, and a batch can be two hundred
   # messages with an avatar lookup and a contact resolution behind the first of them. The
@@ -56,7 +56,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
     # against the same boundary, or the first imported message would move the line the
     # rest of its own batch is measured against.
     watermark = inbound::Coverage.watermark(inbox)
-    Whatsapp::Session::SilentWrite.wrap do
+    Import::SilentWrite.wrap do
       batches.each_value { |batch| import_chat(batch, watermark) }
     end
     :handled
@@ -184,6 +184,6 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # What the suppressed callbacks would have kept up to date, applied once per
   # conversation instead of once per message, and only in the direction that is true.
   # Raises the flag for the stretch it wraps. Only the gap ever asks for it, and only the
-  # dashboard push gets through: see Whatsapp::Session::SilentWrite.
-  def announcing(&) = Whatsapp::Session::SilentWrite.wrap(announce: true, &)
+  # dashboard push gets through: see Import::SilentWrite.
+  def announcing(&) = Import::SilentWrite.wrap(announce: true, &)
 end
