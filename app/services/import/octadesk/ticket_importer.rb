@@ -27,22 +27,16 @@ class Import::Octadesk::TicketImporter
   include Import::HistorySettlement
 
   SOURCE_PREFIX = 'octadesk'.freeze
-  EMAIL_IN_BODY = /(?:^|\s)e-?mail:\s*([^\s,;<>()]+@[^\s,;<>()]+)/i
-  NAME_IN_BODY = /(?:^|\s)nome:\s*(.{2,80}?)\s*(?:\n|e-?mail:|fone:|telefone:|cidade:|\z)/i
 
   attr_reader :opened, :stats
 
-  # `form_address` and `form_sender_name` are the address and display name the company's
-  # website form posts as. They are deployment-specific, so they are given rather than
-  # assumed: with neither set, every ticket is taken at its stated requester and the
-  # recovery below simply never fires.
   def initialize(inbox:, attachments: false, form_address: nil, form_sender_name: nil)
     @inbox = inbox
     @account = inbox.account
     @attachments = attachments
-    @form_address = form_address.to_s.downcase.strip.presence
-    @form_local = @form_address&.split('@')&.first
-    @form_sender_name = form_sender_name.to_s.strip.presence
+    @contacts = Import::Octadesk::ContactResolver.new(
+      inbox: inbox, form_address: form_address, form_sender_name: form_sender_name
+    )
     @opened = Set.new
     @stats = Hash.new(0)
   end
@@ -52,7 +46,7 @@ class Import::Octadesk::TicketImporter
     return @stats[:sem_conteudo] += 1 if interactions.empty?
 
     Import::SilentWrite.wrap do
-      contact_inbox = resolve_contact(ticket, interactions)
+      contact_inbox = @contacts.perform(ticket, interactions)
       return @stats[:sem_contato] += 1 if contact_inbox.nil?
 
       conversation = conversation_for(ticket, contact_inbox)
@@ -77,17 +71,26 @@ class Import::Octadesk::TicketImporter
   # `stamp_seen` makes, and for the same reason -- a thread that ever took live traffic has
   # real stamps, and overwriting those would be the worse error.
   def settle_ticket(conversation, rows)
-    return settle(rows, []) if rows.any?
-
-    stored = conversation.messages.to_a
+    stored = rows.presence || conversation.messages.to_a
     return if stored.empty?
 
-    @opened << conversation.id unless live_traffic?(conversation)
+    @opened << conversation.id if resumed?(conversation)
     settle(stored, [])
   end
 
-  def live_traffic?(conversation)
-    conversation.messages.where.not(Import::IMPORTED_SQL).exists?
+  # A conversation this run did not create still wears the stamps of the run that did, and
+  # those describe the import rather than the ticket -- so it has to take the batch outright
+  # the same way a new one does. This covers both interruption points: after the rows were
+  # written and before they were, since a run that stops between `conversation_for` and the
+  # first insert leaves a thread whose `last_activity_at` is newer than every row the next
+  # pass writes, which the monotonic guard would then refuse to move.
+  #
+  # The test is the one `stamp_seen` makes: a thread that ever took live traffic has real
+  # stamps, and overwriting those would be the worse error.
+  def resumed?(conversation)
+    return false if @opened.include?(conversation.id)
+
+    conversation.messages.where.not(Import::IMPORTED_SQL).none?
   end
 
   # Only the two changes a reader of an archive cares about. A person of type 3 is a
@@ -110,54 +113,6 @@ class Import::Octadesk::TicketImporter
     Array(ticket['Interactions']).select { |i| Import::Octadesk::ActivityWriter.commented?(i) }
   end
 
-  def resolve_contact(ticket, interactions)
-    email = customer_email(ticket, interactions)
-    return if email.blank?
-
-    name = contact_name(ticket, email, interactions)
-    existing = @inbox.contacts.from_email(email)
-    return ContactInbox.find_by(inbox: @inbox, contact: existing) || build_contact(email, name) if existing
-
-    build_contact(email, name)
-  end
-
-  # The website form posts as the company with the customer named in the body. Same shape
-  # the mailbox showed, and the same fix: take the address out of the text.
-  def customer_email(ticket, interactions)
-    stated = ticket['RequesterMail'].to_s.downcase.strip
-    return stated if stated.present? && stated != @form_address
-
-    from_body = interactions.first(2).flat_map { |i| Array(i['Comments']).map { |c| c['Content'].to_s } }
-                            .join(' ')[EMAIL_IN_BODY, 1].to_s.downcase
-    from_body.presence || stated.presence
-  end
-
-  def build_contact(email, name)
-    ::ContactInboxWithContactBuilder.new(
-      source_id: email, inbox: @inbox, contact_attributes: { name: name, email: email }
-    ).perform
-  end
-
-  # The form tickets name the company rather than the person, so the requester name is
-  # only trusted when it is not that. What the form does carry is a `Nome:` line in the
-  # body beside the `Email:` one, which is the person's own name and better than the local
-  # part of their address.
-  def contact_name(ticket, email, interactions)
-    stated = ticket['RequesterName'].to_s.strip
-    return stated if stated.present? && !form_sender?(stated)
-
-    body(interactions.first).to_s[NAME_IN_BODY, 1].to_s.squish.presence || email.split('@').first
-  end
-
-  # The two ways an export spells "this is the form, not the person": the display name the
-  # form posts under, and the local part of the address it posts from, which the exporter
-  # also uses as a name on its own.
-  def form_sender?(stated)
-    return true if @form_sender_name && stated.casecmp(@form_sender_name).zero?
-
-    @form_local.present? && stated.downcase.include?(@form_local)
-  end
-
   # Dated to the ticket and resolved from the start, never resolved afterwards: born in
   # that state it fires no resolution event and writes no "resolved by" line, where a
   # transition would do both and file every imported thread into today's figures.
@@ -170,7 +125,7 @@ class Import::Octadesk::TicketImporter
     conversation = ::Conversation.create!(
       account_id: @account.id, inbox_id: @inbox.id,
       contact_id: contact_inbox.contact_id, contact_inbox_id: contact_inbox.id,
-      status: :resolved, created_at: opened_at || Time.current,
+      status: :resolved, created_at: opened_at || Time.current, identifier: identifier_for(number),
       additional_attributes: { source: 'email', mail_subject: subject(ticket) }.compact,
       custom_attributes: ticket_attributes(ticket, number)
     )
@@ -219,10 +174,19 @@ class Import::Octadesk::TicketImporter
 
   # The number the operators searched by for four years, and the only key that ties a
   # thread here back to a row in the export.
+  #
+  # Read off `identifier`, which is indexed, rather than out of the JSON column, which is
+  # not: at half a million tickets an unindexed expression lookup once per record scans an
+  # inbox that grows as the run goes, and the import turns quadratic somewhere in the
+  # middle of it. The number is written to both -- `custom_attributes` is what an operator
+  # searches and a report groups by, `identifier` is what this lookup needs. The column is
+  # otherwise unused on an email inbox.
+  def identifier_for(number) = "#{SOURCE_PREFIX}:#{number}"
+
   def find_by_ticket(number)
     return if number.blank?
 
-    @inbox.conversations.where('custom_attributes ->> ? = ?', SOURCE_PREFIX, number).first
+    @inbox.conversations.find_by(identifier: identifier_for(number))
   end
 
   def apply_tags(conversation, ticket)
@@ -252,8 +216,18 @@ class Import::Octadesk::TicketImporter
       content: body(interaction), content_type: :incoming_email,
       sender: agent ? nil : contact,
       created_at: Import::Octadesk::Stream.time(interaction['DateCreation']) || conversation.created_at,
-      content_attributes: content_attributes(person, agent)
+      content_attributes: content_attributes(person, agent),
+      additional_attributes: agent ? sender_name(person) : {}
     }
+  end
+
+  # An outgoing message with no sender and no `sender_name` renders as the bot, so every
+  # agent reply in the archive would be attributed to one. `additional_attributes` is the
+  # contract the message component already reads for exactly this case, which is what makes
+  # it right here: the agent is a name on a historical row, not a seat somebody holds.
+  def sender_name(person)
+    name = person['Name'].to_s.squish.presence
+    name ? { sender_name: name } : {}
   end
 
   def message_source_id(interaction)
@@ -294,8 +268,8 @@ class Import::Octadesk::TicketImporter
       url = attachment['Url'].to_s
       next if url.blank?
 
-      Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
-      @stats[:anexos] += 1
+      stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
+      @stats[stored ? :anexos : :anexos_recusados] += 1
     rescue StandardError
       @stats[:anexos_falharam] += 1
     end

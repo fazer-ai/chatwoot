@@ -18,12 +18,21 @@ class Import::Email::Backfill
   SPECIAL_ATTRS = %i[All Junk].freeze
   HEADER_BATCH = 200
 
-  # `relay` is counted but never imported. The wrapper is the ticketing system writing to
-  # the mailbox, and the words inside it were typed by whoever spoke last: an agent on some
-  # threads, the customer on others, with nothing in the notification that separates the
-  # two. Filing them all in one direction would put words in somebody's mouth, so the kind
-  # exists to be seen in a scan and left out of a run.
-  UNIMPORTABLE = %i[relay].freeze
+  # Kinds a scan counts and a run may not take, because this importer files everything
+  # through the incoming mailbox pipeline and neither of these is incoming.
+  #
+  # `sent` is the mailbox's own outgoing mail. It matters more than it looks: Gmail's \All
+  # is the union of everything except Spam and Trash, so it contains the Sent folder
+  # whole -- measured on one support mailbox, about a fifth of it.
+  # Run through the pipeline each one invents a contact for the company's own address and
+  # files the company's own words as something a customer wrote.
+  #
+  # `relay` is the ticketing system writing to the mailbox about a reply it sent elsewhere.
+  # The words inside are typed by whoever spoke last: an agent on some threads, the customer
+  # on others, with nothing in the notification that separates the two.
+  #
+  # Both are recognised rather than hidden, so a scan reports what a run is leaving behind.
+  UNIMPORTABLE = %i[sent relay].freeze
 
   attr_reader :stats, :pacer, :stopped_by
 
@@ -129,15 +138,25 @@ class Import::Email::Backfill
 
   # Headers first, and cheap: a mailbox this size is walked many times over a run, and a
   # message the inbox already holds must not be paid for twice at full size.
+  #
+  # One query per batch rather than one per header. Every pass re-walks the whole mailbox
+  # and asks about everything it has already filed, so an `exists?` per message is a round
+  # trip per message for the life of the import -- hundreds of thousands of them before a
+  # single byte is fetched, and they grow as the inbox fills.
   def unstored(imap, batch)
     heads = imap.uid_fetch(batch, 'BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)]') || []
-    heads.filter_map do |data|
-      id = Mail.read_from_string(data.attr['BODY[HEADER.FIELDS (MESSAGE-ID)]'].to_s).message_id
-      next skip(:sem_message_id) if id.blank?
-      next skip(:ja_importadas) if @inbox.messages.exists?(source_id: id)
+    seen = heads.to_h { |data| [data.attr['UID'], message_id_of(data)] }
+    @stats[:sem_message_id] += seen.count { |_, id| id.blank? }
+    wanted = seen.compact_blank
+    stored = @inbox.messages.where(source_id: wanted.values).pluck(:source_id).to_set
+    @stats[:ja_importadas] += wanted.count { |_, id| stored.include?(id) }
+    wanted.filter_map { |uid, id| uid unless stored.include?(id) }
+  end
 
-      data.attr['UID']
-    end
+  def message_id_of(data)
+    Mail.read_from_string(data.attr['BODY[HEADER.FIELDS (MESSAGE-ID)]'].to_s).message_id
+  rescue StandardError
+    nil
   end
 
   def halt?
@@ -227,6 +246,6 @@ class Import::Email::Backfill
     presenter = MailPresenter.new(mail, @channel.account)
     text = (presenter.text_content.presence && presenter.text_content[:full]).presence ||
            ActionView::Base.full_sanitizer.sanitize((presenter.html_content.presence && presenter.html_content[:full]).to_s)
-    Import::Email::Classifier.new(mail: mail, text: text).kind
+    Import::Email::Classifier.new(mail: mail, text: text, own_address: @channel.email).kind
   end
 end

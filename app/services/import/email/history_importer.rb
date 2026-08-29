@@ -55,9 +55,16 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
 
     @occurred_at = occurred_at(mail)
     @outcome = nil
+    # One transaction around the write and the settlement, because the dedupe key is the
+    # row: a run that commits the message and then stops leaves stamps describing the
+    # import, and the next pass skips that Message-ID in `unstored` and never comes back to
+    # it. Together they either both land or neither does, and neither leaves a row the
+    # resume cannot see.
     Import::SilentWrite.wrap do
-      process(mail, channel)
-      settle_thread
+      ActiveRecord::Base.transaction do
+        process(mail, channel)
+        settle_thread
+      end
     end
     @outcome
   end
@@ -80,8 +87,20 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # every relay that touched it stamped a `Received` line on the way, and the oldest of
   # those is the closest thing the message has to a send time. Falling back to now would be
   # the bug this class exists to fix.
+  #
+  # `Mail` is not consistent about how it refuses a bad `Date`: an unreadable field comes
+  # back as the raw String, and one that parses into an impossible time raises from the
+  # reader itself. Both are the same thing here -- the header says nothing usable -- and
+  # neither is a reason to count the message as an error and retry it on every pass.
   def occurred_at(mail)
-    mail.date&.to_time || received_at(mail)
+    sent_at(mail) || received_at(mail)
+  end
+
+  def sent_at(mail)
+    date = mail.date
+    date.to_time if date.respond_to?(:to_time)
+  rescue StandardError
+    nil
   end
 
   def received_at(mail)

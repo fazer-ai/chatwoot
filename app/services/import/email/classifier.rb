@@ -14,6 +14,11 @@
 #                  carries no reply -- but 3% of them quote a customer whose message came
 #                  in through another channel and exists nowhere else, which is why the
 #                  caller decides this one against the inbox rather than here.
+#   sent           the mailbox writing, not being written to. Not a shape at all -- it is
+#                  read off `From` -- but it belongs in the same answer, because Gmail's
+#                  \All folder is the union of everything except Spam and Trash and
+#                  therefore holds the Sent folder whole. A fifth of the messages on this
+#                  mailbox are its own.
 #   relay          "Por favor acesse o octadesk e verifique essa solicitação. Seguem mais
 #                  informações abaixo: <nome> 21/09/2023 13:30 Olá. Tudo bem? Para
 #                  cancelamento...". The wrapper is machinery and the payload is a reply
@@ -50,8 +55,12 @@ class Import::Email::Classifier
 
   attr_reader :kind, :ticket
 
-  def initialize(mail:, text:)
+  # `own_address` is the mailbox's own, and it is what separates a message the company
+  # received from one it sent. Optional, because a caller that does not pass it simply
+  # never sees the `sent` kind.
+  def initialize(mail:, text:, own_address: nil)
     @mail = mail
+    @own_address = own_address.to_s.downcase.strip.presence
     @text = self.class.fold(text)
     classify
   end
@@ -84,7 +93,10 @@ class Import::Email::Classifier
     @kind = kind_of_text
   end
 
+  # Sender first, because it settles the question the text cannot: a copy of an outgoing
+  # reply reads exactly like the customer mail it quotes.
   def kind_of_text
+    return :sent if own_mail?
     return :receipt if RECEIPT.match?(@text)
     return :csat if CSAT.match?(@text)
     return :alert if ALERT.match?(@text)
@@ -92,6 +104,12 @@ class Import::Email::Classifier
     return :empty if @text.length < MIN_CONTENT
 
     :customer
+  end
+
+  def own_mail?
+    return false if @own_address.blank?
+
+    Array(@mail.from).any? { |address| address.to_s.downcase.strip == @own_address }
   end
 
   def extract_ticket

@@ -108,11 +108,19 @@ module ImapImportOptions
 
   # Classifies a uniform slice of a folder. Uniform rather than the newest N, because the
   # shape of this mailbox changed over four years and the tail would not describe it.
-  def sample_kinds(imap, run, uids, sample)
+  # Charged against the same budget the import spends, and stopped by it. A scan reads whole
+  # messages to classify them, so a sample that lands on attachments costs gigabytes -- and
+  # the provider lockout a dry run triggers is the same one `BUDGET_MB` exists to avoid,
+  # only harder to explain because nothing was written.
+  def sample_kinds(imap, run, uids, sample, pacer)
     kinds = Hash.new(0)
     uids.each_slice([uids.length / sample, 1].max).map(&:first).each_slice(50) do |batch|
+      break if pacer.over_budget?
+
       (imap.uid_fetch(batch, 'BODY.PEEK[]') || []).each do |data|
-        kinds[run.send(:classify, Mail.read_from_string(data.attr['BODY[]'].to_s))] += 1
+        raw = data.attr['BODY[]'].to_s
+        pacer.spend(raw.bytesize)
+        kinds[run.send(:classify, Mail.read_from_string(raw))] += 1
       rescue StandardError
         kinds[:erro] += 1
       end
@@ -132,10 +140,12 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
   task scan: :environment do
     inbox = ImapImportOptions.inbox!
     sample = (ENV['SAMPLE'] || 400).to_i
-    run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: ImapImportOptions.pacer,
+    pacer = ImapImportOptions.pacer
+    run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: pacer,
                                       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms)
     imap = run.connect
-    ImapImportOptions.header(inbox, Pastas: run.folders(imap).join(', '), Amostra: "#{sample} por pasta")
+    ImapImportOptions.header(inbox, Pastas: run.folders(imap).join(', '), Amostra: "#{sample} por pasta",
+                                    Teto: "#{pacer.budget_mb_left}MB")
 
     totals = Hash.new(0)
     run.folders(imap).each do |folder|
@@ -144,7 +154,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       puts "\n#{folder}: #{uids.length} mensagens"
       next if uids.empty?
 
-      kinds = ImapImportOptions.sample_kinds(imap, run, uids, sample)
+      kinds = ImapImportOptions.sample_kinds(imap, run, uids, sample, pacer)
       seen = kinds.values.sum
       kinds.sort_by { |_, v| -v }.each do |kind, count|
         projected = (uids.length * count / seen.to_f).round
