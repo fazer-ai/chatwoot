@@ -37,8 +37,17 @@ describe Import::Email::Classifier do
     expect([alert.kind, relay.kind, csat.kind]).to eq(%i[alert relay csat])
   end
 
-  it 'reads a body with nothing in it as empty' do
-    expect(described_class.new(mail: from_customer, text: 'ok').kind).to eq(:empty)
+  # The test is for a blank message rather than a short one, and it is taken over the
+  # subject and the body together: `from_customer` carries a subject, so `ok` under it is a
+  # customer answering a thread and not a message saying nothing.
+  it 'reads a message with nothing on either line as empty' do
+    blank = Mail.read_from_string("From: cliente@example.com\r\nTo: #{own}\r\nSubject: \r\n" \
+                                  "Message-ID: <y@example.com>\r\nDate: Mon, 1 May 2023 10:00:00 -0300\r\n\r\n")
+    expect(described_class.new(mail: blank, text: '').kind).to eq(:empty)
+  end
+
+  it 'keeps a short answer under a subject of its own' do
+    expect(described_class.new(mail: from_customer, text: 'ok').kind).to eq(:customer)
   end
 
   # Gmail's \All holds the Sent folder, so a fifth of a support mailbox is its own outgoing
@@ -168,6 +177,44 @@ describe Import::Email::Classifier do
     it 'falls back to the whole body when nothing survives the trim' do
       receipt = 'Mensagem automatica: sua solicitacao 123 foi recebida'
       expect(described_class.new(mail: from_customer, text: receipt, reply: '').kind).to eq(:receipt)
+    end
+  end
+
+  # A support mailbox is written from phones, and a phone puts the whole request on the
+  # subject line and leaves the body to its own signature. Judged on the body alone the
+  # message reads as empty, `skip?` drops it, and the cursor moves past a customer's
+  # question with no error anywhere.
+  describe 'a request that lives on the subject line' do
+    def kind_of(subject, body)
+      mail = Mail.new(from: 'cliente@example.com', to: 'sac@example.com', subject: subject, body: body)
+      described_class.new(mail: mail, text: body, own_addresses: ['sac@example.com']).kind
+    end
+
+    it 'reads the subject as part of what the message says' do
+      expect(kind_of('Como faco para entrar com pessoas menores de idade', 'Enviado do meu iPhone')).to eq(:customer)
+    end
+
+    it 'still calls a message with nothing on either line empty' do
+      expect(kind_of('Re:', '')).to eq(:empty)
+    end
+
+    # The side to err on, and it is a choice rather than an oversight: a signature with no
+    # subject over it comes in as a thin row. An archive pays for that once. It pays for a
+    # dropped request forever, and silently, because `skip?` moves the cursor past it.
+    it 'lets a bare signature through rather than risk the request beside it' do
+      expect(kind_of('', 'Enviado do meu iPhone')).to eq(:customer)
+    end
+
+    # `Re: Fwd:` is nine characters that would rescue a message saying nothing.
+    it 'does not count the reply prefixes as content' do
+      expect(kind_of('Re: Fwd: Enc: ok', '')).to eq(:empty)
+    end
+
+    # Every kind above the emptiness test is decided by who sent the message or by a
+    # template's fixed phrases, and both live in the body.
+    it 'leaves a message the sender already settled alone' do
+      mail = Mail.new(from: 'sac@example.com', to: 'cliente@example.com', subject: 'Uma pergunta bem comprida do cliente', body: '')
+      expect(described_class.new(mail: mail, text: '', own_addresses: ['sac@example.com']).kind).to eq(:sent)
     end
   end
 end

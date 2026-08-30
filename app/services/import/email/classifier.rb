@@ -50,8 +50,22 @@ class Import::Email::Classifier
   TICKET_SUBJECT = /#(\d{2,9})\s*\z/
   TICKET_BODY    = /\bticket\s+(\d{2,9})\b/i
 
-  # A body this short says nothing a reader would want.
-  MIN_CONTENT = 40
+  # Below this a message says nothing a reader would want -- counted over `said`, which is
+  # the subject and the body together.
+  #
+  # Low on purpose, and it used to be high. Read against the body alone a threshold has to
+  # be generous, because a phone's signature is the whole body of a message whose request
+  # is on the subject line. Counting the subject removes that reason, and what a sample of
+  # a real support mailbox then shows is that there is no band of noise to cut: nothing at
+  # all lands in the first few characters, and every message under the old threshold is a
+  # legible request -- "Ingresso", "Nao chegou o codigo", "Quero cancela meu ingresso".
+  #
+  # So the floor sits just under the shortest thing anyone actually wrote. It still exists,
+  # because a bounce with no subject and no body is not archive and the guard is free, but
+  # it is a test for a blank message rather than for a short one. An archive pays for a thin
+  # row once; it pays for a dropped request forever, and silently -- `skip?` moves the cursor
+  # past it and no later pass looks again.
+  MIN_CONTENT = 6
 
   # Every answer this class gives. Exported so a caller can refuse a kind it does not
   # recognise before it connects to anything: a typo in `KINDS` otherwise matches nothing,
@@ -158,9 +172,34 @@ class Import::Email::Classifier
     return :csat if CSAT.match?(@reply)
     return :alert if ALERT.match?(@reply)
     return :relay if RELAY.match?(@reply)
-    return :empty if @text.length < MIN_CONTENT
+    return :empty if said.length < MIN_CONTENT
 
     :customer
+  end
+
+  # What the message actually says, which is not only its body.
+  #
+  # A support mailbox is written from phones, and a phone puts the whole request on the
+  # subject line and leaves the body to its own signature: "Enviado do meu iPhone" is
+  # twenty-one characters of nothing, and judged on the body alone the message reads as
+  # empty. `skip?` then drops it and the cursor moves past, so the customer's question is
+  # gone with no error anywhere, and on a mailbox written from phones that is a large share
+  # of what a first pass would have thrown away.
+  #
+  # Only the emptiness test reads this. Every kind above it is decided by who sent the
+  # message or by a template's fixed phrases, and both live in the body: a receipt whose
+  # subject happens to quote the customer is still a receipt.
+  def said
+    @said ||= [subject, @text].compact_blank.join(' ')
+  end
+
+  # The reply prefixes come off first because they are the one part of a subject that is
+  # never content: `Re: Fwd:` is nine characters that would rescue a message saying nothing.
+  # Folded like the body so the length being measured is the same kind of length.
+  def subject
+    self.class.fold(@mail.subject.to_s.sub(/\A(\s*(re|res|enc|fwd|fw)\s*:\s*)+/i, ''))
+  rescue StandardError
+    ''
   end
 
   # From one of our addresses, and not sent on somebody else's behalf.
