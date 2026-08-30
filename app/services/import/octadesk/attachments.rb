@@ -17,18 +17,10 @@ class Import::Octadesk::Attachments
   def perform(message, interaction)
     return unless @enabled
 
-    # Seeded from what is already on the message and added to as the loop goes, because an
-    # interaction can list the same URL twice: read only from the snapshot, every copy after
-    # the first is another download of a file we have just stored, on a run whose cost is
-    # the downloads.
-    held = stored_sources(message)
-    permitted(interaction).each do |attachment|
-      url = attachment['Url'].to_s
-      next if url.blank?
-      next if held.include?(url)
-
-      stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
-      held << url
+    wanted(interaction, stored_sources(message)).each do |attachment|
+      stored = Import::Octadesk::AttachmentFetcher.new(
+        message: message, url: attachment['Url'].to_s, name: attachment['Name']
+      ).perform
       @stats[stored ? :anexos : :anexos_recusados] += 1
     rescue StandardError
       @stats[:anexos_falharam] += 1
@@ -37,17 +29,28 @@ class Import::Octadesk::Attachments
 
   private
 
-  # `Message` refuses more than fifteen and the mail pipeline trims to that before it
-  # attaches anything; this had no cap at all. Trimmed before the fetch rather than left to
-  # the model, because the cap is cheap to apply and expensive to hit: past the sixteenth
-  # the bytes are spent on a download that produces a message the dashboard will not render.
-  # The count is kept so a run says out loud what it left behind.
-  def permitted(interaction)
+  # The files this message still needs, in the order the vendor listed them, and no more of
+  # them than it has room for.
+  #
+  # Everything that is not a candidate is dropped before the cap rather than after, which is
+  # the whole of the ordering here. A blank entry or a URL listed twice among the first
+  # fifteen would otherwise spend a slot, and the real file sitting at position sixteen is
+  # then never attempted -- not on this pass and not on any later one, because every pass
+  # reads the same list the same way. The message ends up holding fewer than the permitted
+  # number and still missing a file, which is the shape of a bug nobody goes looking for.
+  #
+  # `held` is both the filter and the arithmetic: what a previous pass already stored is not
+  # work, and it is also room already spent.
+  def wanted(interaction, held)
     listed = Array(interaction['Attachments'])
-    return listed if listed.length <= Message::NUMBER_OF_PERMITTED_ATTACHMENTS
+             .select { |attachment| attachment['Url'].to_s.present? }
+             .uniq { |attachment| attachment['Url'].to_s }
+             .reject { |attachment| held.include?(attachment['Url'].to_s) }
+    room = [Message::NUMBER_OF_PERMITTED_ATTACHMENTS - held.size, 0].max
+    return listed if listed.length <= room
 
-    @stats[:anexos_acima_do_teto] += listed.length - Message::NUMBER_OF_PERMITTED_ATTACHMENTS
-    listed.first(Message::NUMBER_OF_PERMITTED_ATTACHMENTS)
+    @stats[:anexos_acima_do_teto] += listed.length - room
+    listed.first(room)
   end
 
   # Keyed on the source URL kept in the blob's metadata rather than on the filename: two

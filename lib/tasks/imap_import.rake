@@ -19,7 +19,10 @@ require 'net/imap'
 # Options, all through the environment:
 #   INBOX_ID           required
 #   FOLDERS            comma separated (default: the all-mail folder plus Spam)
-#   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023
+#   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023. UNTIL defaults to today, so a run never
+#                      takes mail the live fetch job has not had its turn at -- filed here
+#                      it would be born resolved and silent, and the poller would then skip
+#                      it as already stored
 #   ATTACHMENTS        `all`, or a YYYY-MM-DD to take attachments only on messages newer
 #                      than that date. Unset means none, which is what keeps a first pass
 #                      inside the budget: an attachment is never fetched, not fetched and
@@ -67,12 +70,26 @@ module ImapImportOptions
           'IMAP_DISABLED_OK=1 se a caixa e so de arquivo e o fetch do Chatwoot nao pode toca-la.'
   end
 
+  # A cutoff, and by default today's date, which is the difference between a history import
+  # and a second poller.
+  #
+  # On an inbox whose IMAP is enabled the live fetch job is working the same mailbox, and an
+  # `ALL` search happily selects a message that arrived a minute ago and has not been polled
+  # yet. Filed here it is written under `SilentWrite`, so its conversation is born resolved,
+  # nothing is dispatched and nobody is notified -- and the poller then finds the source id
+  # already stored and skips it. A customer who wrote this morning is filed as history and
+  # never reaches an agent, with no error anywhere.
+  #
+  # `BEFORE` reads the message's arrival date, so today's mail is left to the poller whose
+  # job it is. An operator who means to take it says so with `UNTIL`, which is the ordinary
+  # way to move the line and is now the only way to move it forward.
   def terms
     terms = ['ALL']
     terms = ['SINCE', ENV.fetch('SINCE')] if ENV['SINCE'].present?
-    terms += ['BEFORE', ENV.fetch('UNTIL')] if ENV['UNTIL'].present?
-    terms
+    terms + ['BEFORE', until_date]
   end
+
+  def until_date = ENV['UNTIL'].presence || Date.current.strftime('%d-%b-%Y')
 
   def folders = ENV['FOLDERS'].presence&.split(',')&.map(&:strip)
 
@@ -282,6 +299,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       inbox,
       Tipos: ImapImportOptions.kinds.join(', '),
       Anexos: attachments.to_s,
+      Ate: "antes de #{ImapImportOptions.until_date}",
       Teto: "#{pacer.budget_mb_left}MB, load maximo #{ENV['MAX_LOAD'] || 2.5}",
       Limite: ImapImportOptions.limit || 'sem limite'
     )

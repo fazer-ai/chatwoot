@@ -26,13 +26,37 @@ describe 'the import rake tasks' do
 
   after do
     %w[INBOX_ID ZIP LIMIT ATTACHMENTS KINDS FOLDERS MAX_LOAD BUDGET_MB RESET_CURSOR
-       SAMPLE FROM_PART FORM_ADDRESS FORM_SENDER_NAME IMAP_DISABLED_OK].each { |key| ENV.delete(key) }
+       SAMPLE FROM_PART FORM_ADDRESS FORM_SENDER_NAME IMAP_DISABLED_OK SINCE UNTIL].each { |key| ENV.delete(key) }
   end
 
   # `imap_enabled` is what stops Chatwoot polling a mailbox. A task that connects anyway is
   # spending credentials somebody turned off, and the settings behind a disabled channel are
   # nobody's job to keep current -- which arrives as a login error rather than as a line
   # saying what is wrong.
+  # An `ALL` search on an inbox the live job is also polling selects mail that arrived a
+  # minute ago. Filed here it is written silently, its conversation is born resolved, and the
+  # poller then skips the source id as already stored: a customer who wrote this morning is
+  # filed as history and never reaches an agent, with no error anywhere.
+  describe 'the line between a history import and a second poller' do
+    it 'stops before today unless told otherwise' do
+      expect(ImapImportOptions.terms).to eq(['ALL', 'BEFORE', Date.current.strftime('%d-%b-%Y')])
+    end
+
+    it 'keeps the cutoff beside SINCE rather than replacing it' do
+      ENV['SINCE'] = '01-Jan-2023'
+      expect(ImapImportOptions.terms).to eq(['SINCE', '01-Jan-2023', 'BEFORE', Date.current.strftime('%d-%b-%Y')])
+    end
+
+    it 'moves the line where the operator asks for it' do
+      ENV['UNTIL'] = '01-Jun-2024'
+      expect(ImapImportOptions.terms).to eq(%w[ALL BEFORE 01-Jun-2024])
+    end
+
+    it 'tells the operator where the line is' do
+      expect { Rake::Task['imap:import'].invoke }.to output(/Ate:\s+antes de/).to_stdout
+    end
+  end
+
   describe 'a channel whose IMAP integration is off' do
     let(:channel) { create(:channel_email, account: account) }
 

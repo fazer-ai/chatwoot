@@ -299,6 +299,25 @@ describe Import::Octadesk::TicketImporter do
     expect(a_request(:get, urls.last)).not_to have_been_made
   end
 
+  # A blank entry or a URL listed twice among the first fifteen would spend a slot, and the
+  # real file at position sixteen is then never attempted -- not on this pass and not on any
+  # later one, because every pass reads the same list the same way. The message ends up
+  # holding fewer than the permitted number and still missing a file.
+  it 'spends the cap on candidates rather than on blanks and repeats' do
+    real = Array.new(15) { |i| "https://storage.googleapis.com/t/#{i}/f.png" }
+    real.each { |url| stub_request(:get, url).to_return(status: 200, body: url, headers: { 'content-type' => 'image/png' }) }
+    listed = [{ 'Url' => '', 'Name' => 'vazio' },
+              { 'Url' => real.first, 'Name' => 'f.png' }] + real.map { |url| { 'Url' => url, 'Name' => 'f.png' } }
+    mixed = ticket.merge('Number' => 4332,
+                         'Interactions' => [ticket['Interactions'].first.merge('Attachments' => listed)])
+
+    run = described_class.new(inbox: inbox, attachments: true)
+    run.import(mixed)
+    expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(15)
+    expect(run.stats[:anexos_acima_do_teto]).to eq(0)
+    expect(a_request(:get, real.last)).to have_been_made.once
+  end
+
   # Like the mail importer, this one batches its own reindexes, so the per-row callback has
   # to be off while it writes or every row is indexed twice. The guard reads this flag
   # rather than the level.
