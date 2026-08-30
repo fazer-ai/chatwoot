@@ -259,4 +259,45 @@ RSpec.describe MailPresenter do
       end
     end
   end
+
+  # iOS Mail composes a `multipart/alternative` whose one child is a `multipart/mixed`: a
+  # stub that renders to nothing, then the attachment, then the part the customer wrote.
+  # The mail gem answers `html_part` with the first `text/html` it meets, so the message
+  # reached the agent as an empty bubble under a subject.
+  describe 'a message whose first html part is a stub' do
+    def nested(first_html, second_html)
+      inner = Mail::Part.new
+      inner.content_type = 'multipart/mixed'
+      [first_html, second_html].each do |html|
+        part = Mail::Part.new
+        part.content_type = 'text/html; charset=utf-8'
+        part.body = html
+        inner.add_part(part)
+      end
+      mail = Mail.new(from: 'cliente@example.com', to: 'sac@example.com', subject: 'Pedido')
+      mail.content_type = 'multipart/alternative'
+      mail.add_part(inner)
+      mail
+    end
+
+    let(:stub_html) { '<html><body dir="auto"><br></body></html>' }
+    let(:real_html) { '<html><body>Bom dia, preciso cancelar o pedido e receber o estorno.</body></html>' }
+
+    it 'reads the part that carries the message instead of the stub above it' do
+      presenter = described_class.new(nested(stub_html, real_html))
+      expect(presenter.html_content[:full]).to include('preciso cancelar o pedido')
+    end
+
+    # The restraint is the point. Taking the largest outright would prefer a quoted forward
+    # over the short reply written above it, which is a worse failure and a commoner shape.
+    it 'leaves a first part that says something alone, however short' do
+      presenter = described_class.new(nested('<html><body>Ok, obrigado.</body></html>', real_html))
+      expect(presenter.html_content[:full]).to include('Ok, obrigado.')
+    end
+
+    it 'still answers nothing when no part says anything' do
+      presenter = described_class.new(nested(stub_html, '<html><body><br></body></html>'))
+      expect(presenter.html_content).to eq({})
+    end
+  end
 end
