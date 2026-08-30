@@ -38,11 +38,20 @@ class Import::Octadesk::ContactResolver
   def customer_email(ticket, interactions)
     stated = ticket['RequesterMail'].to_s.downcase.strip
     return stated if stated.present? && stated != @form_address
+    return stated.presence unless configured?
 
     from_body = interactions.first(2).flat_map { |i| Array(i['Comments']).map { |c| c['Content'].to_s } }
                             .join(' ')[EMAIL_IN_BODY, 1].to_s.downcase
     from_body.presence || stated.presence
   end
+
+  # Reading an address out of a comment is only ever right for a deployment that has a form
+  # posting as itself. Ungated it fires on any ticket with no stated requester, and an
+  # `Email: ...` line in the text is as likely to be somebody the customer is writing
+  # about -- a colleague, a supplier, the address on an invoice -- as the customer. Filing
+  # the thread under that person is worse than filing it under nobody, which is what the
+  # caller counts and reports.
+  def configured? = @form_address.present? || @form_sender_name.present?
 
   # Form tickets name the company rather than the person, so the stated name is trusted
   # only when it is not that. What the form does carry is a `Nome:` line beside the

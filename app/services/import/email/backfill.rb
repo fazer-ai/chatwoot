@@ -282,7 +282,7 @@ class Import::Email::Backfill
   def classify(mail)
     body = Import::Email::Body.new(MailPresenter.new(mail, @channel.account))
     Import::Email::Classifier.new(
-      mail: mail, text: body[:full], reply: body[:reply], own_address: @channel.email
+      mail: mail, text: body[:full], reply: body[:reply], own_addresses: [@channel.email, @channel.imap_login]
     ).kind
   end
 end

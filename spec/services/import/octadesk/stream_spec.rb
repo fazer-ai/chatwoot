@@ -40,6 +40,24 @@ describe Import::Octadesk::Stream do
     expect(yielded).to eq([{ 'Number' => 2 }])
   end
 
+  # A member that lists but will not extract leaves stdout empty, which Oj accepts as a
+  # well-formed nothing -- so the part reports zero tickets and the run moves on with every
+  # number on the screen looking right.
+  it 'raises rather than reporting an unextractable member as an empty one' do
+    expect { described_class.new(zip_path).each_object('nao-esta-no-zip.json') { |_| nil } }
+      .to raise_error(RuntimeError, /cannot read nao-esta-no-zip.json/)
+  end
+
+  # Stopping early closes the pipe and unzip dies of SIGPIPE, which is the caller getting
+  # what it asked for rather than a failure.
+  it 'does not mistake a caller that stopped early for a broken member' do
+    expect do
+      described_class.new(zip_path).each_object('part_0002.json') do |_| # rubocop:disable Lint/UnreachableLoop -- that is the point
+        raise StopIteration
+      end
+    end.not_to raise_error
+  end
+
   describe 'the shapes Mongo extended JSON wraps its scalars in' do
     it 'reads an id from either spelling' do
       expect(described_class.oid({ '$binary' => { 'base64' => 'QUJD' } })).to eq('QUJD')

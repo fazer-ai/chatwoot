@@ -205,5 +205,21 @@ describe Import::Octadesk::TicketImporter do
       importer.import(form_ticket)
       expect(inbox.conversations.find_by(identifier: 'octadesk:4325').contact.email).to eq('contato@empresa.example.com')
     end
+
+    # An `Email:` line in a comment is as likely to be somebody the customer is writing
+    # about -- a colleague, a supplier, the address on an invoice -- as the customer.
+    # Filing the thread under that person is worse than filing it under nobody.
+    it 'does not take an address out of the body when no form is configured' do
+      orphan = form_ticket.merge('Number' => 4328, 'RequesterMail' => nil)
+      importer.import(orphan)
+      expect(inbox.conversations.find_by(identifier: 'octadesk:4328')).to be_nil
+      expect(importer.stats[:sem_contato]).to eq(1)
+    end
+
+    it 'takes it when the caller did configure a form' do
+      orphan = form_ticket.merge('Number' => 4329, 'RequesterMail' => nil)
+      described_class.new(inbox: inbox, form_address: 'contato@empresa.example.com').import(orphan)
+      expect(inbox.conversations.find_by(identifier: 'octadesk:4329').contact.email).to eq('maria@example.com')
+    end
   end
 end
