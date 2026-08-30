@@ -65,11 +65,10 @@ module ImapImportOptions
     given
   end
 
-  # Cast rather than `present?`: `RESET_CURSOR=0` reads as "off" to whoever typed it and as
-  # "on" to a presence check, and getting it wrong throws away the resume point on every
-  # invocation -- so each pass re-walks and re-downloads the declined mail it had already
-  # got past, which on this mailbox is most of it.
-  def reset_cursor? = ActiveModel::Type::Boolean.new.cast(ENV.fetch('RESET_CURSOR', nil)).present?
+  # Read strictly rather than cast: getting this wrong throws away the resume point on every
+  # invocation, so each pass re-walks and re-downloads the declined mail it had already got
+  # past, which on this mailbox is most of it.
+  def reset_cursor? = Import::Options.boolean('RESET_CURSOR')
 
   # `all`, a date, or nothing at all. Parsed here so a typo stops the run at the first line
   # instead of quietly reading as "none" and finishing without a single attachment.
@@ -84,23 +83,15 @@ module ImapImportOptions
     Import::Email::AttachmentPolicy.build(parsed)
   end
 
-  def limit = number('LIMIT', nil)
-  def sample = number('SAMPLE', 400)
-  def pacer = Import::Email::Pacer.new(budget_mb: number('BUDGET_MB', 2000), max_load: number('MAX_LOAD', 2.5))
+  # Counts are integers and measurements are not: `SAMPLE=0.5` truncates to zero at the call
+  # site and the scan classifies nothing while printing a finished projection. See
+  # Import::Options for why none of these is read leniently.
+  def limit = Import::Options.integer('LIMIT')
+  def sample = Import::Options.integer('SAMPLE', default: 400)
 
-  # Strict, because `to_f` and `to_i` turn a typo into zero and every one of these settings
-  # fails silently in the expensive direction when it is zero: a zero budget stops before
-  # importing anything, a zero `LIMIT` stops at the first message, and a zero load ceiling
-  # never finds room -- so the run stands still forever against a host that always reports
-  # some load, with no error and nothing on the screen but a pause.
-  def number(key, default)
-    raw = ENV[key].presence
-    return default if raw.nil?
-
-    value = Float(raw, exception: false)
-    abort "ERRO: #{key} deve ser um numero positivo, veio #{raw.inspect}" if value.nil? || !value.positive?
-
-    value
+  def pacer
+    Import::Email::Pacer.new(budget_mb: Import::Options.decimal('BUDGET_MB', default: 2000),
+                             max_load: Import::Options.decimal('MAX_LOAD', default: 2.5))
   end
 
   def duration(seconds)
@@ -202,7 +193,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
   desc 'Dry run: classifica uma amostra do que imap:import faria, sem escrever nada'
   task scan: :environment do
     inbox = ImapImportOptions.inbox!
-    sample = ImapImportOptions.sample.to_i
+    sample = ImapImportOptions.sample
     pacer = ImapImportOptions.pacer
     run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: pacer,
                                       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms)
