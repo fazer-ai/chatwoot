@@ -176,6 +176,37 @@ describe Import::Email::Backfill do
     end
   end
 
+  # The download is a collaborator now, and its own spec builds it by hand with a hash that
+  # is certainly there. What no spec of that class can see is whether the walker handed it
+  # the run's own tallies, so this exercises the wiring on the path the default setting
+  # takes: every message carrying an attachment goes through it.
+  it 'counts a lean fetch into the tallies the run reports' do
+    run = described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer)
+    run.instance_variable_set(:@progress, ->(*) {}) # `perform` sets this; `handle` is called here on its own
+    leaf = Struct.new(:media_type, :subtype, :encoding, :param, :disposition, :size, keyword_init: true) # rubocop:disable Lint/StructNewOverride
+    structure = Struct.new(:subtype, :parts, keyword_init: true) do
+      def media_type = 'MULTIPART'
+      def encoding = nil
+      def param = nil
+      def disposition = nil
+      def size = 0
+    end.new(subtype: 'MIXED',
+            parts: [leaf.new(media_type: 'TEXT', subtype: 'PLAIN', encoding: '7BIT',
+                             param: { 'CHARSET' => 'UTF-8' }, disposition: nil, size: 900),
+                    leaf.new(media_type: 'IMAGE', subtype: 'PNG', encoding: 'BASE64', param: {},
+                             disposition: Struct.new(:dsp_type, :param).new('ATTACHMENT'), size: 3_000_000)])
+    header = "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: com foto\r\n" \
+             "Message-ID: <foto@example.com>\r\nDate: #{Time.zone.parse('2023-05-01 10:00').rfc2822}\r\n"
+    imap = instance_double(Net::IMAP)
+    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])
+                                      .and_return([Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure })])
+    allow(imap).to receive(:uid_fetch).with(10, 'BODY.PEEK[1]')
+                                      .and_return([Struct.new(:attr).new({ 'BODY[1]' => 'Segue a foto do ingresso que comprei ontem.' })])
+
+    expect(run.send(:handle, imap, 10)).to be(true)
+    expect(run.stats[:sem_anexos]).to eq(1)
+  end
+
   # A mark only means anything against the question that produced it, and the question is
   # narrower than the search terms.
   describe 'what invalidates a stored mark' do

@@ -35,9 +35,11 @@ class Import::Email::Backfill
     @limit = limit
     @attachments = Import::Email::AttachmentPolicy.build(attachments)
     @importer = Import::Email::HistoryImporter.new(attachments: @attachments)
-    @download = Import::Email::Download.new(pacer: @pacer, attachments: @attachments, stats: @stats)
     @cursor = Import::Email::Cursor.new(@channel, selection: selection)
     @stats = Hash.new(0)
+    # After `@stats`, which it shares rather than copies: a run's tallies are one hash and
+    # the collaborators write into it.
+    @download = Import::Email::Download.new(pacer: @pacer, attachments: @attachments, stats: @stats)
     @stopped_by = nil
   end
   # rubocop:enable Metrics/ParameterLists
