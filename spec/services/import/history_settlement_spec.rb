@@ -122,6 +122,9 @@ describe Import::HistorySettlement do
 
       let(:ana) { create(:contact, account: account, name: 'Ana') }
 
+      # Turned on only once the rows exist. An importer that has not taken the index on
+      # itself keeps Message's own per-row callback, which is the point of the guard now, so
+      # writing the fixtures under the stub would be exercising that callback instead.
       def watch
         relation = double('Message relation') # rubocop:disable RSpec/VerifiedDoubles
         allow(relation).to receive(:reindex)
@@ -135,18 +138,18 @@ describe Import::HistorySettlement do
       end
 
       it 'sends one pass for the batch instead of one per settlement' do
+        written = Array.new(3) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
         calls = watch
         importer = buffering.new
-        written = Array.new(3) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
         written.each { |row| importer.run([row]) }
 
         expect(calls).to eq([written.map(&:id)])
       end
 
       it 'sends what is still owed when the run says it is over' do
+        written = Array.new(2) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
         calls = watch
         importer = buffering.new
-        written = Array.new(2) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
         written.each { |row| importer.run([row]) }
         expect(calls).to be_empty
 
@@ -157,9 +160,9 @@ describe Import::HistorySettlement do
       # A resumed OctaDesk ticket settles from the whole conversation, so the same row is
       # offered again by the next settlement in the same batch.
       it 'asks for a row once however many settlements named it' do
+        row = incoming(ana, Time.zone.parse('2023-05-01 10:00'))
         calls = watch
         importer = buffering.new
-        row = incoming(ana, Time.zone.parse('2023-05-01 10:00'))
         3.times { importer.run([row]) }
 
         expect(calls).to eq([[row.id]])
@@ -179,9 +182,10 @@ describe Import::HistorySettlement do
         def announcing(&) = yield
         def run(rows) = settle(rows, [])
       end
+      written = rows
       allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
       expect(Message).not_to receive(:where)
-      passive.new.run(rows)
+      passive.new.run(written)
     end
 
     # `reindex` is not defined at all unless `searchkick` was declared, which is itself

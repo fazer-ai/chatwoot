@@ -57,9 +57,13 @@ describe Import::Email::HistoryImporter do
     # silence and give nothing back.
     it 'owes the index the row a later pass enriched, not only the ones it created' do
       allow(importer).to receive_messages(skip_attachments?: false, incomplete?: true, fill_attachments: nil)
-      stored = create(:message, account: account, inbox: inbox,
-                                conversation: create(:conversation, account: account, inbox: inbox),
-                                content_attributes: { imported: true, imported_text_only: true })
+      # Written the way the earlier pass wrote it, which is what silences the per-row
+      # callback: outside the wrap this fixture would exercise that callback instead.
+      stored = Import::SilentWrite.wrap(indexing: true) do
+        create(:message, account: account, inbox: inbox,
+                         conversation: create(:conversation, account: account, inbox: inbox),
+                         content_attributes: { imported: true, imported_text_only: true })
+      end
       importer.send(:enrich, mail(date: Time.zone.parse('2023-05-01 10:00')), channel, stored)
       importer.flush_search_index
 
