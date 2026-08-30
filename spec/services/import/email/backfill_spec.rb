@@ -107,6 +107,15 @@ describe Import::Email::Backfill do
              .update!(content_attributes: { imported: true, imported_text_only: true })
       end
 
+      def stored_row_dated(at)
+        inbox.messages.find_by(source_id: stored_id).update_column(:created_at, at) # rubocop:disable Rails/SkipsModelValidations
+      end
+
+      def from_2024
+        described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer,
+                            attachments: Time.zone.parse('2024-01-01'))
+      end
+
       it 'is still done when the run is not asking for attachments' do
         imap = instance_double(Net::IMAP, uid_fetch: fetched)
         expect(run.send(:unstored, imap, [10, 11, 12])).to eq([11])
@@ -116,6 +125,22 @@ describe Import::Email::Backfill do
         widened = described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer, attachments: :all)
         imap = instance_double(Net::IMAP, uid_fetch: fetched)
         expect(widened.send(:unstored, imap, [10, 11, 12])).to eq([10, 11])
+      end
+
+      # A cutoff is not `all`. An incomplete row below it is not work -- the importer
+      # declines it at `skip_attachments?` -- so re-offering it buys nothing and costs a
+      # full re-fetch of the message, on a run the byte budget is what ends. A decade of a
+      # support mailbox sits below any cutoff worth setting.
+      it 'stays done under a cutoff it sits below' do
+        stored_row_dated(Time.zone.parse('2020-01-01'))
+        imap = instance_double(Net::IMAP, uid_fetch: fetched)
+        expect(from_2024.send(:unstored, imap, [10, 11, 12])).to eq([11])
+      end
+
+      it 'is work again when it sits above the cutoff' do
+        stored_row_dated(Time.zone.parse('2025-06-01'))
+        imap = instance_double(Net::IMAP, uid_fetch: fetched)
+        expect(from_2024.send(:unstored, imap, [10, 11, 12])).to eq([10, 11])
       end
 
       # `unstored` never runs on a uid the cursor filtered out first, so letting the row

@@ -78,6 +78,14 @@ describe 'the import rake tasks' do
       expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /ATTACHMENTS/)
     end
 
+    # `Time.zone.parse` reads this as the year 1, which is a cutoff below every message in
+    # the mailbox: the setting `ATTACHMENTS=all`, arrived at by typo, and the whole provider
+    # budget spent on it.
+    it 'refuses an ambiguous date rather than reading it as some other date' do
+      ENV['ATTACHMENTS'] = '01/02/03'
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /ATTACHMENTS/)
+    end
+
     it 'reports where a previous pass got to' do
       Import::Email::Cursor.new(channel).tap { |cursor| cursor.advance('INBOX', 7, 42) }.flush
       expect { Rake::Task['imap:import'].invoke }.to output(/Retoma:\s+INBOX>42/).to_stdout

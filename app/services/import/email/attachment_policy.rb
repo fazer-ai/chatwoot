@@ -35,12 +35,42 @@ class Import::Email::AttachmentPolicy
     new(at)
   end
 
+  # What an operator wrote in `ATTACHMENTS`: `all`, an ISO date, or nothing at all. Read
+  # here rather than in the task, next to the three states it produces.
+  #
+  # ISO strictly, not `Time.zone.parse`, which reads far more than the documented format and
+  # reads some of it as something else: `01/02/03` parses without complaint into the year 1,
+  # a cutoff below every message in the mailbox -- which is `all`, arrived at by typo, and
+  # hundreds of gigabytes of provider budget. A setting this expensive to get wrong is one
+  # to refuse rather than interpret.
+  def self.from_setting(raw)
+    return build(nil) if raw.blank?
+    return build(ALL) if raw.to_s.casecmp(ALL.to_s).zero?
+
+    build(iso_date(raw).in_time_zone)
+  end
+
+  def self.iso_date(raw)
+    Date.iso8601(raw.to_s)
+  rescue Date::Error
+    raise ArgumentError, "ATTACHMENTS: use `all` ou uma data ISO (YYYY-MM-DD), veio #{raw.inspect}"
+  end
+  private_class_method :iso_date
+
   def initialize(value)
     @value = value
   end
 
   def none? = @value == NONE
   def all? = @value == ALL
+
+  # The cutoff itself, for the one caller that has to ask the database the question `skip?`
+  # answers per message: which stored rows a further pass would still do something with.
+  def cutoff
+    return if none? || all?
+
+    @value
+  end
 
   # An unknown date is treated as out of scope under a cutoff: the message is older than
   # nothing that can be checked, and spending the budget on a maybe is the expensive way

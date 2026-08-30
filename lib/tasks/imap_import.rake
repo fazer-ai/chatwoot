@@ -92,18 +92,9 @@ module ImapImportOptions
   # past, which on this mailbox is most of it.
   def reset_cursor? = Import::Options.boolean('RESET_CURSOR')
 
-  # `all`, a date, or nothing at all. Parsed here so a typo stops the run at the first line
-  # instead of quietly reading as "none" and finishing without a single attachment.
-  def attachments
-    raw = ENV['ATTACHMENTS'].presence
-    return Import::Email::AttachmentPolicy.build(nil) if raw.nil?
-    return Import::Email::AttachmentPolicy.build(raw) if raw.casecmp('all').zero?
-
-    parsed = Time.zone.parse(raw)
-    raise ArgumentError, "ATTACHMENTS: use `all` or a date (YYYY-MM-DD), got #{raw.inspect}" if parsed.nil?
-
-    Import::Email::AttachmentPolicy.build(parsed)
-  end
+  # Read strictly, and read in the policy: a typo stops the run at the first line instead of
+  # quietly reading as "none" and finishing without a single attachment.
+  def attachments = Import::Email::AttachmentPolicy.from_setting(ENV['ATTACHMENTS'].presence)
 
   # Counts are integers and measurements are not: `SAMPLE=0.5` truncates to zero at the call
   # site and the scan classifies nothing while printing a finished projection. See

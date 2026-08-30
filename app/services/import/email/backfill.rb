@@ -172,8 +172,27 @@ class Import::Email::Backfill
   # Under the default the two questions coincide, and the query stays the one it was.
   def settled(ids)
     rows = @inbox.messages.where(source_id: ids)
-    rows = rows.where.not(Import::TEXT_ONLY_SQL) unless @attachments.none?
-    rows.pluck(:source_id).to_set
+    return rows.pluck(:source_id).to_set if @attachments.none?
+
+    (rows.pluck(:source_id) - rework(rows).pluck(:source_id)).to_set
+  end
+
+  # Of the incomplete rows, the ones this run's policy would actually take attachments for.
+  # Under a cutoff the older ones are not work: the importer declines them at
+  # `skip_attachments?`, so calling them unsettled buys nothing and costs a full re-fetch of
+  # the message -- on a mailbox where the byte budget is what ends the run, and where a
+  # decade sits below any cutoff worth setting.
+  #
+  # `created_at` is the mail's own date, which `HistoryImporter` writes onto the row, so
+  # this is the same comparison `skip?` makes. The one row the two read differently is one
+  # whose headers carried no date at all: it is stored at the time of the import, which is
+  # newer than any cutoff, so it is re-offered and declined on every pass. That was already
+  # true before this and is bounded by how rare a mail with no Date header is.
+  def rework(rows)
+    incomplete = rows.where(Import::TEXT_ONLY_SQL)
+    return incomplete if @attachments.all?
+
+    incomplete.where(created_at: @attachments.cutoff..)
   end
 
   def message_id_of(data)
