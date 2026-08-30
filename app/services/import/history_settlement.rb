@@ -100,14 +100,33 @@ module Import::HistorySettlement
   # date is the true answer, taken only from incoming rows because it is the contact's
   # activity and not ours, and only ever forwards -- a contact with live traffic has a real
   # clock and history must not drag it backwards.
-  def stamp_contact(conversation, rows)
-    newest = rows.select(&:incoming?).filter_map(&:created_at).max
-    return if newest.blank?
+  #
+  # Grouped by the row's own sender rather than taken from the conversation, because on a
+  # group chat those are different people: the conversation's contact is the group and each
+  # incoming row was written by a participant. Stamping the conversation's contact gives
+  # the group a clock it never earned and leaves every participant at null. Read off
+  # `sender_id` rather than `sender`, so the resume path -- which reads the thread back off
+  # the database -- costs one query for the batch instead of one per row.
+  def stamp_contact(_conversation, rows)
+    newest = newest_per_contact(rows)
+    return if newest.empty?
 
-    contact = conversation.contact
-    return if contact.blank? || (contact.last_activity_at.present? && contact.last_activity_at >= newest)
+    ::Contact.where(id: newest.keys).find_each do |contact|
+      at = newest[contact.id]
+      next if contact.last_activity_at.present? && contact.last_activity_at >= at
 
-    contact.update_columns(last_activity_at: newest) # rubocop:disable Rails/SkipsModelValidations
+      contact.update_columns(last_activity_at: at) # rubocop:disable Rails/SkipsModelValidations
+    end
+  end
+
+  def newest_per_contact(rows)
+    written_by_contacts(rows).group_by(&:sender_id)
+                             .transform_values { |sent| sent.filter_map(&:created_at).max }
+                             .compact_blank
+  end
+
+  def written_by_contacts(rows)
+    rows.select { |row| row.incoming? && row.sender_type == 'Contact' && row.sender_id.present? }
   end
 
   def stamp_seen(conversation, _rows)

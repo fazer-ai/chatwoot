@@ -37,7 +37,7 @@ class Import::Octadesk::ContactResolver
   # it is taken from.
   def customer_email(ticket, interactions)
     stated = ticket['RequesterMail'].to_s.downcase.strip
-    return stated if stated.present? && stated != @form_address
+    return stated if stated.present? && !from_form?(ticket, stated)
     return stated.presence unless configured?
 
     from_body = interactions.first(2).flat_map { |i| Array(i['Comments']).map { |c| c['Content'].to_s } }
@@ -62,6 +62,17 @@ class Import::Octadesk::ContactResolver
     return stated if stated.present? && !form_sender?(stated)
 
     body(interactions.first).to_s[NAME_IN_BODY, 1].to_s.squish.presence || email.split('@').first
+  end
+
+  # Whether the stated requester is the form rather than a person. Either configured value
+  # answers it on its own, which is the point of accepting either: a deployment that knows
+  # only the display name would otherwise take the company's address at face value on every
+  # form ticket and merge all of them into one contact -- the exact failure the recovery
+  # exists to prevent, with the setting for it switched on.
+  def from_form?(ticket, stated)
+    return true if @form_address.present? && stated == @form_address
+
+    @form_sender_name.present? && form_sender?(ticket['RequesterName'].to_s.strip)
   end
 
   # The two ways an export spells "this is the form, not the person": the display name the

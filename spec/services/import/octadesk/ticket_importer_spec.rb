@@ -221,5 +221,14 @@ describe Import::Octadesk::TicketImporter do
       described_class.new(inbox: inbox, form_address: 'contato@empresa.example.com').import(orphan)
       expect(inbox.conversations.find_by(identifier: 'octadesk:4329').contact.email).to eq('maria@example.com')
     end
+
+    # Either configured value identifies the form on its own. Keyed on the address alone, a
+    # deployment that knows only the display name takes the company address at face value
+    # and merges every form ticket into one contact.
+    it 'recognises the form by the name it posts under, with no address configured' do
+      named = form_ticket.merge('Number' => 4330, 'RequesterName' => 'Formulario do Site')
+      described_class.new(inbox: inbox, form_sender_name: 'Formulario do Site').import(named)
+      expect(inbox.conversations.find_by(identifier: 'octadesk:4330').contact.email).to eq('maria@example.com')
+    end
   end
 end

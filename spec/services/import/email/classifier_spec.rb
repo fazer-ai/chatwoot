@@ -69,6 +69,22 @@ describe Import::Email::Classifier do
     expect(classifier.kind).to eq(:sent)
   end
 
+  # The website form posts as the company and points Reply-To at the customer, so `From` is
+  # ours and the message is inbound. Read as sent it is refused outright and the cursor
+  # moves past it -- every message the form ever generated, gone.
+  it 'reads mail sent on somebody else behalf as customer, whatever the From says' do
+    form = Mail.read_from_string("From: #{own}\r\nReply-To: cliente@example.com\r\nTo: #{own}\r\n" \
+                                 "Subject: contato pelo site\r\nMessage-ID: <f@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: form, text: customer_text, own_addresses: own).kind).to eq(:customer)
+  end
+
+  # A Reply-To that is also ours is an ordinary outgoing mail carrying a routing header.
+  it 'still reads our own reply as sent when the Reply-To is also ours' do
+    routed = Mail.read_from_string("From: #{own}\r\nReply-To: #{own}\r\nTo: cliente@example.com\r\n" \
+                                   "Subject: Re: assunto\r\nMessage-ID: <r@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: routed, text: customer_text, own_addresses: own).kind).to eq(:sent)
+  end
+
   it 'ignores a blank second address rather than matching everything' do
     expect(described_class.new(mail: from_customer, text: customer_text, own_addresses: [own, nil]).kind)
       .to eq(:customer)
