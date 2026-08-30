@@ -335,6 +335,25 @@ RSpec.describe MailPresenter do
       expect(presenter.html_content[:full]).to include('Preciso do reembolso')
     end
 
+    # A `multipart/related` carries one body and a set of resources it points at by
+    # `Content-ID`. A `text/html` resource is not a candidate, however long it is, and the
+    # gem only avoids it by accident of ordering: it answers with the first part it meets,
+    # and the root comes first.
+    it 'does not take the body from a resource the body points at' do
+      raw = +"From: cliente@example.com\r\nTo: sac@example.com\r\nSubject: Pedido\r\n"
+      raw << "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"A\"\r\n\r\n"
+      raw << "--A\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\r\n"
+      raw << "--A\r\nContent-Type: multipart/related; boundary=\"R\"; start=\"<raiz@ex>\"\r\n\r\n"
+      raw << "--R\r\nContent-Type: text/html; charset=utf-8\r\nContent-ID: <raiz@ex>\r\n\r\n"
+      raw << "<html><body><br></body></html>\r\n"
+      raw << "--R\r\nContent-Type: text/html; charset=utf-8\r\nContent-ID: <recurso@ex>\r\n\r\n"
+      raw << "<html><body>#{'Rodape institucional da empresa. ' * 20}</body></html>\r\n--R--\r\n--A--\r\n"
+
+      chosen = HtmlPartChooser.for(Mail.read_from_string(raw))
+
+      expect(chosen.content_id).to eq('<raiz@ex>')
+    end
+
     # This sits on every inbound email and `html_content` asks for it twice, so the parse
     # has to be reached only by a message that actually carries rival parts.
     it 'does not parse anything to answer a message with one html part' do

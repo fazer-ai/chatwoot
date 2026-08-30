@@ -44,13 +44,46 @@ class HtmlPartChooser
   # leaf under it is attached content. Reading the disposition as well is what makes the
   # walk stop at the top of that subtree rather than one level inside it.
   def body_parts(part = @mail, found = [])
-    part.parts.each do |child|
+    body_children(part).each do |child|
       next if attached?(child)
 
       found << child
       body_parts(child, found) if child.multipart?
     end
     found
+  end
+
+  # Which children of a container are the message. Under `multipart/alternative` and
+  # `multipart/mixed` all of them are. Under `multipart/related` only one is: the rest are
+  # resources the body points at by `Content-ID`, an image almost always, but a `text/html`
+  # fragment reads to a flat walk exactly like a candidate and is not one. RFC 2387 names
+  # that one in `start`, and means the first child when it says nothing.
+  #
+  # The gem gets this right by accident -- its answer is the first `text/html` in order, and
+  # the root comes first -- so looking past an empty body without this would be a new way to
+  # be wrong, not a fix.
+  def body_children(part)
+    children = part.parts
+    return children unless part.mime_type == 'multipart/related'
+
+    [root_of(part, children)].compact
+  end
+
+  def root_of(part, children)
+    named = part.content_type_parameters.to_h['start'].to_s
+    return children.first if named.blank?
+
+    children.find { |child| cid(child) == unbracket(named) } || children.first
+  end
+
+  def cid(part)
+    unbracket(part.content_id.to_s)
+  rescue StandardError
+    ''
+  end
+
+  def unbracket(value)
+    value.strip.delete_prefix('<').delete_suffix('>')
   end
 
   def attached?(part)
