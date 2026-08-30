@@ -69,6 +69,31 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # A file whose bytes never came with the message has no ref to carry, and the provider
+  # is asked by message id alone. Refusing it for having no ref -- which is what reading
+  # `ref&.served_by?` as false did -- is refusing exactly the fetch this exists for.
+  context 'when the message never had a reference to its file' do
+    let(:media) { model::Content::Media.new(kind: 'image', mime: 'image/jpeg', filename: 'foto.jpg') }
+
+    it 'asks the provider by message id and attaches what comes back' do
+      described_class.perform_now(message, media.to_h)
+
+      expect(backend.commands.last).to have_attributes(message_id: '3EB0AAAA0001', ref: nil)
+      expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
+    end
+
+    # The inbox left the session layer while this sat in the queue, which the first half
+    # of the refusal still catches: no ref does not mean no guard.
+    it 'still gives up when the inbox has left the session layer' do
+      channel.update_columns(provider: 'whatsapp_cloud') # rubocop:disable Rails/SkipsModelValidations
+
+      described_class.perform_now(message, media.to_h)
+
+      expect(message.reload.content_attributes['is_unsupported']).to be(true)
+      expect(backend.commands).to be_empty
+    end
+  end
+
   # A native inbox whose config is broken is a deployment bug, not media that is gone:
   # marking the bubble unsupported would hide it.
   it 'lets a genuine misconfiguration fail loudly' do

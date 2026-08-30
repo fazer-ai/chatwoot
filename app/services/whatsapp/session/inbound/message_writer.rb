@@ -18,12 +18,14 @@ class Whatsapp::Session::Inbound::MessageWriter
     @imported = imported
   end
 
-  # The media an inbound message carries, whichever shape holds it, or nil.
+  # The media an inbound message carries, whichever shape holds it, or nil. Says nothing
+  # about whether its bytes are reachable: a media message published with no `ref` is one
+  # whose file did not come with it, and `media.download_failed` is what explains that.
   def self.media_in(inbound)
     content = inbound.content
     media = content if content&.wire_type == 'media'
     media ||= content.media if content&.wire_type == 'rich'
-    media if media.present? && media.ref.present?
+    media.presence
   end
 
   # Queues the fetch for a message that is already stored.
@@ -35,7 +37,12 @@ class Whatsapp::Session::Inbound::MessageWriter
   # stands down when the bytes are already attached or the fetch has given up.
   def self.fetch_media_for(message, inbound)
     media = media_in(inbound)
-    return if media.nil? || message.attachments.any? || message.content_attributes['is_unsupported']
+    # A media message with no reference has no bytes to collect yet, and asking for them
+    # here would ask on behalf of every file that is gone for good as well. The failure
+    # that follows this message is what knows the difference, and Handlers::
+    # MediaDownloadFailed queues the fetch for the one file worth asking about.
+    return if media.nil? || media.ref.blank?
+    return if message.attachments.any? || message.content_attributes['is_unsupported']
 
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end
@@ -104,12 +111,33 @@ class Whatsapp::Session::Inbound::MessageWriter
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,
       is_unsupported: (true if unsupported?),
+      pending_media: pending_media,
       # Not the same statement as `external_created_at`, which every session message
       # carries: this one says the row was filed after the fact, which is what a report
       # excluding backfilled traffic, or a bubble explaining an old date, has to read.
       imported: (true if imported),
       rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
+  end
+
+  # What the file was, for a media message whose bytes did not come with it.
+  #
+  # The provider says on the `media.download_failed` that follows whether they can still
+  # be fetched, and by then this row is the only place the file's own description
+  # survives: the event that carried it does not come again, and there is no attachment
+  # to read it off. Without it a recoverable file could be asked for and then not
+  # attached, because nothing would know what kind of attachment to build.
+  #
+  # Only what a later fetch reads. The caption is already this message's content and the
+  # preview is a data URI worth kilobytes, so neither is copied into a column nothing
+  # renders from.
+  def pending_media
+    media = self.class.media_in(inbound)
+    return if media.nil? || media.ref.present?
+
+    Whatsapp::Session::Model::Content::Media.new(
+      kind: media.kind, mime: media.mime, filename: media.filename, voice_note: media.voice_note
+    ).to_h
   end
 
   # A rich card with no text and no media header renders as an empty bubble, which is
