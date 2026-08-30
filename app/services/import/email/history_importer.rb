@@ -116,6 +116,13 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     @message = message
     @conversation = message.conversation
     Import::SilentWrite.wrap(indexing: true) { fill_attachments }
+    # The enrichment is a write like any other and the index has to hear about it: the row
+    # gains attachments, which `Messages::SearchDataPresenter` reads. `indexing: true` above
+    # silences the per-row callback the update would otherwise fire, and this path settles
+    # nothing -- the stamps are already right, only the row changed -- so the backlog is
+    # asked for by hand. Without it the flag buys silence and gives nothing back, and the
+    # indexed document keeps describing a message that no longer exists.
+    index_for_search([@message])
     @outcome_kind = :enriquecidas
     @outcome = @message
   end

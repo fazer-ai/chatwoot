@@ -51,6 +51,21 @@ describe Import::Email::HistoryImporter do
       expect(seen).to be(true)
     end
 
+    # A later pass that fills in the attachments changes what the row is, and
+    # `Messages::SearchDataPresenter` reads them. The flag silences the callback the update
+    # would fire and this path settles nothing, so without asking by hand the flag would buy
+    # silence and give nothing back.
+    it 'owes the index the row a later pass enriched, not only the ones it created' do
+      allow(importer).to receive_messages(skip_attachments?: false, incomplete?: true, fill_attachments: nil)
+      stored = create(:message, account: account, inbox: inbox,
+                                conversation: create(:conversation, account: account, inbox: inbox),
+                                content_attributes: { imported: true, imported_text_only: true })
+      importer.send(:enrich, mail(date: Time.zone.parse('2023-05-01 10:00')), channel, stored)
+      importer.flush_search_index
+
+      expect(asked).to eq([[stored.id]])
+    end
+
     it 'hands over everything it held when the walk empties it' do
       2.times { importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel) }
       importer.flush_search_index
