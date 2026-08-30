@@ -99,19 +99,6 @@ module ImapImportOptions
   # Counts are integers and measurements are not: `SAMPLE=0.5` truncates to zero at the call
   # site and the scan classifies nothing while printing a finished projection. See
   # Import::Options for why none of these is read leniently.
-  # A projection built on the folders that fit is not a smaller projection, it is a wrong
-  # one: the folder with the attachments is the one that exhausts the budget, and the one
-  # whose absence the total does not show. So the gap is named rather than left to a reader
-  # of a table that looks complete.
-  def projection(totals, unsampled)
-    puts "\n#{'=' * 70}\nPROJECAO GERAL#{unsampled.any? ? ' (PARCIAL)' : ''}"
-    totals.sort_by { |_, count| -count }.each { |kind, count| puts "  #{kind.to_s.ljust(12)} ~#{count}" }
-    return if unsampled.empty?
-
-    puts "\nORCAMENTO ESGOTADO: nenhuma amostra de #{unsampled.join(', ')}."
-    puts 'A projecao acima nao inclui essas pastas. Rode de novo amanha ou com BUDGET_MB maior.'
-  end
-
   def limit = Import::Options.integer('LIMIT')
   def sample = Import::Options.integer('SAMPLE', default: 400)
 
@@ -170,14 +157,19 @@ module ImapImportOptions
   # before anything can be charged for them, which on this mailbox is the difference between
   # a margin and a lockout. The sample is a few hundred messages, so the round trips cost
   # nothing worth the risk.
+  # Returns the tally and whether it is the tally that was asked for. A sample cut short by
+  # the budget is not a smaller sample, it is a different claim: the projection multiplies
+  # it out over the whole folder either way, and one large first message can end up
+  # describing a mailbox from a single result.
   def sample_kinds(imap, run, uids, sample, pacer)
     kinds = Hash.new(0)
-    spread(uids, sample).each do |uid|
+    wanted = spread(uids, sample)
+    wanted.each do |uid|
       break if pacer.over_budget?
 
       kinds[sample_kind(imap, run, uid, pacer)] += 1
     end
-    kinds
+    [kinds, kinds.values.sum == wanted.length]
   end
 
   # Spread across the folder rather than the newest N, because the shape of a mailbox
@@ -207,11 +199,32 @@ module ImapImportOptions
   rescue StandardError
     :erro
   end
+end
+
+# What the two tasks print. Its own module because a report is not a setting: these read
+# nothing from the environment and decide nothing about the run, and keeping them beside
+# the option readers was what pushed that module past its size.
+module ImapImportReport
+  module_function
 
   def header(inbox, extra = {})
     puts "Inbox:   #{inbox.name} (##{inbox.id})  #{inbox.channel.email}"
     extra.each { |k, v| puts "#{"#{k}:".ljust(9)}#{v}" }
     puts '-' * 70
+  end
+
+  # A projection built on the folders that fit is not a smaller projection, it is a wrong
+  # one: the folder with the attachments is the one that exhausts the budget, and the one
+  # whose absence the total does not show. So the gap is named rather than left to a reader
+  # of a table that looks complete.
+  def projection(totals, unsampled)
+    puts "\n#{'=' * 70}\nPROJECAO GERAL#{unsampled.any? ? ' (PARCIAL)' : ''}"
+    totals.sort_by { |_, count| -count }.each { |kind, count| puts "  #{kind.to_s.ljust(12)} ~#{count}" }
+    return if unsampled.empty?
+
+    puts "\nORCAMENTO ESGOTADO em: #{unsampled.map { |folder, how| "#{folder} (#{how})" }.join(', ')}."
+    puts 'A projecao acima extrapola de menos amostra do que foi pedida, ou de nenhuma.'
+    puts 'Rode de novo amanha ou com BUDGET_MB maior.'
   end
 end
 
@@ -224,8 +237,8 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: pacer,
                                       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms)
     imap = run.connect
-    ImapImportOptions.header(inbox, Pastas: run.folders(imap).join(', '), Amostra: "#{sample} por pasta",
-                                    Teto: "#{pacer.budget_mb_left}MB")
+    ImapImportReport.header(inbox, Pastas: run.folders(imap).join(', '), Amostra: "#{sample} por pasta",
+                                   Teto: "#{pacer.budget_mb_left}MB")
 
     totals = Hash.new(0)
     unsampled = []
@@ -235,15 +248,18 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
       # folder with the attachments is exactly the one that exhausts the budget, and exactly
       # the one whose absence the total does not show. Named here rather than left to the
       # reader of a table that looks complete.
-      next unsampled << folder if pacer.over_budget?
+      next unsampled << [folder, 'nenhuma amostra'] if pacer.over_budget?
 
       imap.examine(folder)
       uids = Array(imap.uid_search(ImapImportOptions.terms))
       puts "\n#{folder}: #{uids.length} mensagens"
       next if uids.empty?
 
-      kinds = ImapImportOptions.sample_kinds(imap, run, uids, sample, pacer)
+      kinds, whole = ImapImportOptions.sample_kinds(imap, run, uids, sample, pacer)
+      unsampled << [folder, 'amostra parcial'] unless whole
       seen = kinds.values.sum
+      next if seen.zero?
+
       kinds.sort_by { |_, v| -v }.each do |kind, count|
         projected = (uids.length * count / seen.to_f).round
         totals[kind] += projected
@@ -252,7 +268,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     end
     run.close(imap)
 
-    ImapImportOptions.projection(totals, unsampled)
+    ImapImportReport.projection(totals, unsampled)
   end
 
   desc 'Importa historico de e-mails do IMAP para uma inbox do Chatwoot'
@@ -262,7 +278,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     started = Time.zone.now
     attachments = ImapImportOptions.attachments
 
-    ImapImportOptions.header(
+    ImapImportReport.header(
       inbox,
       Tipos: ImapImportOptions.kinds.join(', '),
       Anexos: attachments.to_s,

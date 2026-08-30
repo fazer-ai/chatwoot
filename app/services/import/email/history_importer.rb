@@ -59,6 +59,14 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     @text_only = text_only || withholding?(mail)
     promote_delegated(mail, channel)
     @outcome = nil
+    # The mailbox this subclasses keeps the row it wrote in `@message`, and this instance is
+    # reused for every mail of the run. `create_message` returns early on a source id it
+    # already holds without clearing it -- so if the live poller files this mail between the
+    # check below and the write, the previous mail's row is still sitting there and takes
+    # this one's attachments and date. Minutes pass inside a batch of two hundred and the
+    # inbox goes on being polled the whole time, so the window is real rather than notional.
+    @message = nil
+    @conversation = nil
     existing = stored(mail, channel)
     return enrich(mail, channel, existing) if existing
 

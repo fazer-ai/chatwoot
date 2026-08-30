@@ -186,21 +186,6 @@ class Import::Octadesk::TicketImporter
     conversation.update_columns(status_changed_at: done) # rubocop:disable Rails/SkipsModelValidations
   end
 
-  # Which of an interaction's attachments are already on the row, keyed by where each came
-  # from. The filename cannot answer this: one interaction can carry two different files
-  # under one name, and if the first is stored and the second is not, a filename test calls
-  # both of them done and the missing one is never fetched again. The fetcher stamps the
-  # source URL on the blob for exactly this, and that is the only key that is one-to-one
-  # with the object in the vendor's bucket.
-  #
-  # A message this pass just created has nothing, which is the ordinary path and costs no
-  # query.
-  def stored_sources(message)
-    return Set.new if message.previously_new_record?
-
-    message.attachments.filter_map { |a| a.file.blob&.metadata&.dig('import_source') if a.file.attached? }.to_set
-  end
-
   # What the ticketing system knew about the thread and Chatwoot has no column for. Kept
   # as custom attributes rather than dropped, because this inbox exists to be searched: the
   # ticket number is what the operators looked things up by for four years, and the agent
@@ -263,13 +248,13 @@ class Import::Octadesk::TicketImporter
     # existing row is offered to the fetcher again on the way past.
     existing = conversation.messages.find_by(source_id: source_id)
     if existing
-      attach(existing, interaction)
+      files.perform(existing, interaction)
       return skip(:ja_tinha)
     end
 
     person = interaction['Person'] || {}
     message = conversation.messages.create!(message_attributes(conversation, contact, interaction, person, source_id))
-    attach(message, interaction)
+    files.perform(message, interaction)
     @stats[person['Type'] == 1 ? :respostas : :mensagens] += 1
     message
   end
@@ -331,28 +316,10 @@ class Import::Octadesk::TicketImporter
     attributes.merge(imported_agent: { name: person['Name'], email: person['Email'] }.compact_blank)
   end
 
-  # Attachments live as public URLs on the vendor's bucket, which stops existing when the
-  # subscription does. Fetching them here is both the import and the mirror: Active Storage
-  # writes the copy to our own S3.
-  def attach(message, interaction)
-    return unless @attachments
-
-    # Seeded from what is already on the message and added to as the loop goes, because an
-    # interaction can list the same URL twice: read only from the snapshot, every copy after
-    # the first is another download of a file we have just stored, on a run whose cost is
-    # the downloads.
-    held = stored_sources(message)
-    Array(interaction['Attachments']).each do |attachment|
-      url = attachment['Url'].to_s
-      next if url.blank?
-      next if held.include?(url)
-
-      stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
-      held << url
-      @stats[stored ? :anexos : :anexos_recusados] += 1
-    rescue StandardError
-      @stats[:anexos_falharam] += 1
-    end
+  # `@attachments` is the operator's yes-or-no and `@files` is what acts on it; the writer
+  # is asked for by name so the two do not share one.
+  def files
+    @files ||= Import::Octadesk::Attachments.new(enabled: @attachments, stats: @stats)
   end
 
   # No screen is watching a bulk backfill, so the settlement's announce hook is a plain

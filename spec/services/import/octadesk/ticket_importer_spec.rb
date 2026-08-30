@@ -279,6 +279,26 @@ describe Import::Octadesk::TicketImporter do
     end
   end
 
+  # `Message` refuses more than fifteen and the mail pipeline trims to that before it
+  # attaches anything. Past the sixteenth the bytes are spent on a download that produces a
+  # message the dashboard will not render.
+  it 'stops at the attachment cap rather than downloading past it' do
+    urls = Array.new(18) { |i| "https://storage.googleapis.com/t/#{i}/f.png" }
+    urls.each do |url|
+      stub_request(:get, url).to_return(status: 200, body: url, headers: { 'content-type' => 'image/png' })
+    end
+    many = ticket.merge('Number' => 4331,
+                        'Interactions' => [ticket['Interactions'].first.merge(
+                          'Attachments' => urls.map { |url| { 'Url' => url, 'Name' => 'f.png' } }
+                        )])
+
+    run = described_class.new(inbox: inbox, attachments: true)
+    run.import(many)
+    expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(Message::NUMBER_OF_PERMITTED_ATTACHMENTS)
+    expect(run.stats[:anexos_acima_do_teto]).to eq(3)
+    expect(a_request(:get, urls.last)).not_to have_been_made
+  end
+
   # Like the mail importer, this one batches its own reindexes, so the per-row callback has
   # to be off while it writes or every row is indexed twice. The guard reads this flag
   # rather than the level.

@@ -77,6 +77,24 @@ describe Import::Email::HistoryImporter do
     end
   end
 
+  # One instance files every mail of the run, and the mailbox it subclasses keeps the row it
+  # wrote in `@message`. `create_message` returns early on a source id it already holds
+  # without clearing that, so a mail the live poller files between the check and the write
+  # would otherwise hand its attachments and its date to the previous mail's row -- and a
+  # batch of two hundred takes minutes, with the inbox polled throughout.
+  it 'does not hand a mail its predecessor row when the poller got there first' do
+    first = mail(date: Time.zone.parse('2023-05-01 10:00'), message_id: 'um@example.com')
+    importer.import(first, channel)
+    written = inbox.messages.find_by(source_id: 'um@example.com')
+
+    second = mail(date: Time.zone.parse('2024-09-09 09:00'), message_id: 'dois@example.com')
+    allow(importer).to receive(:stored).and_return(nil)
+    allow_any_instance_of(Conversation).to receive_message_chain(:messages, :find_by).and_return(written) # rubocop:disable RSpec/AnyInstance,RSpec/MessageChain
+    importer.import(second, channel)
+
+    expect(written.reload.created_at).to eq(Time.zone.parse('2023-05-01 10:00'))
+  end
+
   it 'files the message at the date it was sent, not at the date it was imported' do
     importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel)
     expect(inbox.messages.first.created_at).to eq(Time.zone.parse('2023-05-01 10:00'))

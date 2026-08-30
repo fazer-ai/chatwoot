@@ -198,6 +198,16 @@ describe 'the import rake tasks' do
         .to output(/PROJECAO GERAL \(PARCIAL\).*ORCAMENTO ESGOTADO.*Spam/m).to_stdout
     end
 
+    # A sample cut short is not a smaller sample, it is a different claim: the projection
+    # multiplies it out over the whole folder either way, so one large first message can end
+    # up describing a mailbox from a single result.
+    it 'marks a folder whose sample the budget cut short' do
+      allow(imap).to receive(:uid_search).and_return([1, 2, 3])
+      allow(ImapImportOptions).to receive(:sample_kinds).and_return([{ customer: 1 }, false])
+      expect { Rake::Task['imap:scan'].invoke }
+        .to output(/PROJECAO GERAL \(PARCIAL\).*amostra parcial/m).to_stdout
+    end
+
     it 'survives a server that answers the search with something other than an array' do
       esearch = Class.new do
         def initialize(uids) = @uids = uids
