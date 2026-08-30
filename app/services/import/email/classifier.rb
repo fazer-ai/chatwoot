@@ -94,9 +94,15 @@ class Import::Email::Classifier
 
   attr_reader :kind, :ticket
 
-  # `own_address` is the mailbox's own, and it is what separates a message the company
-  # received from one it sent. Optional, because a caller that does not pass it simply
+  # `own_addresses` are the mailbox's own, and they are what separates a message the company
+  # received from one it sent. Optional, because a caller that does not pass any simply
   # never sees the `sent` kind.
+  #
+  # Plural because a channel routinely has two. The address the inbox publishes and the one
+  # it authenticates as are separate columns and differ on legacy Google aliases and on
+  # Microsoft UPN setups, and it is the login that owns the Sent copies. Matching on the
+  # published address alone reads those as customer mail -- and since \All contains Sent
+  # whole, a default run would file the company's own replies as things customers wrote.
   #
   # `reply` is the body with the quoted history trimmed off, and the kind is read from it
   # rather than from the whole. A customer answering a receipt, a CSAT request or an alert
@@ -108,9 +114,9 @@ class Import::Email::Classifier
   #
   # The ticket number is still read from the whole body, because it usually lives in the
   # part that was quoted.
-  def initialize(mail:, text:, reply: nil, own_address: nil)
+  def initialize(mail:, text:, reply: nil, own_addresses: nil)
     @mail = mail
-    @own_address = own_address.to_s.downcase.strip.presence
+    @own_addresses = Array(own_addresses).map { |address| address.to_s.downcase.strip }.compact_blank.to_set
     @text = self.class.fold(text)
     @reply = self.class.fold(reply).presence || @text
     classify
@@ -158,9 +164,9 @@ class Import::Email::Classifier
   end
 
   def own_mail?
-    return false if @own_address.blank?
+    return false if @own_addresses.empty?
 
-    Array(@mail.from).any? { |address| address.to_s.downcase.strip == @own_address }
+    Array(@mail.from).any? { |address| @own_addresses.include?(address.to_s.downcase.strip) }
   end
 
   def extract_ticket

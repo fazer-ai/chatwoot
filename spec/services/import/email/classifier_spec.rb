@@ -44,17 +44,34 @@ describe Import::Email::Classifier do
   # Gmail's \All holds the Sent folder, so a fifth of a support mailbox is its own outgoing
   # mail. Read as customer it would invent a contact for the company's own address.
   it 'reads the mailbox own mail as sent' do
-    expect(described_class.new(mail: from_mailbox, text: customer_text, own_address: own).kind).to eq(:sent)
+    expect(described_class.new(mail: from_mailbox, text: customer_text, own_addresses: own).kind).to eq(:sent)
   end
 
   it 'decides sent by the sender before the text, since a reply quotes the mail it answers' do
-    classifier = described_class.new(mail: from_mailbox, own_address: own,
+    classifier = described_class.new(mail: from_mailbox, own_addresses: own,
                                      text: 'Chegou um novo ticket 456 que nao foi atribuido para nenhum agente')
     expect(classifier.kind).to eq(:sent)
   end
 
   it 'reads mail from somebody else as customer even when told the mailbox address' do
-    expect(described_class.new(mail: from_customer, text: customer_text, own_address: own).kind).to eq(:customer)
+    expect(described_class.new(mail: from_customer, text: customer_text, own_addresses: own).kind).to eq(:customer)
+  end
+
+  # A channel has two: the address the inbox publishes and the one it authenticates as.
+  # They differ on legacy Google aliases and on Microsoft UPN setups, and it is the login
+  # that owns the Sent copies -- read as customer they would be filed as things customers
+  # wrote, on a fifth of the mailbox.
+  it 'reads mail from the login as sent, even when it is not the published address' do
+    alias_mail = Mail.read_from_string("From: sac.antigo@example.com\r\nTo: cliente@example.com\r\n" \
+                                       "Subject: Re: assunto\r\nMessage-ID: <a@example.com>\r\n\r\nCorpo")
+    classifier = described_class.new(mail: alias_mail, text: customer_text,
+                                     own_addresses: [own, 'sac.antigo@example.com'])
+    expect(classifier.kind).to eq(:sent)
+  end
+
+  it 'ignores a blank second address rather than matching everything' do
+    expect(described_class.new(mail: from_customer, text: customer_text, own_addresses: [own, nil]).kind)
+      .to eq(:customer)
   end
 
   it 'never answers sent when the caller does not say what the mailbox is' do

@@ -88,12 +88,25 @@ class Import::Octadesk::Stream
 
   # Yields every object in one member. `StopIteration` from the block ends the read
   # cleanly, which is what a `LIMIT` on the task raises.
+  #
+  # The exit status is checked for the same reason the listing checks it, and the failure
+  # is quieter here: a member that lists but will not extract -- encrypted, or truncated --
+  # sends `unzip` away with an error and leaves stdout empty, which Oj accepts as a
+  # well-formed nothing. The part is then reported as holding no tickets and the run moves
+  # on, so a whole gigabyte of the export goes missing with every number on the screen
+  # looking right.
+  #
+  # Only when the read ran to the end: a `StopIteration` closes the pipe early and `unzip`
+  # dies of SIGPIPE, which is the caller getting what it asked for rather than a failure.
   def each_object(part, &)
+    stopped = false
     IO.popen(['unzip', '-p', @zip_path, part], 'rb') do |io|
       Oj.saj_parse(Builder.new(&), io)
     rescue StopIteration
-      nil
+      stopped = true
     end
+    return if stopped
+    raise "cannot read #{part} in #{@zip_path}" unless $CHILD_STATUS.success?
   end
 
   # Mongo extended JSON wraps its scalars. These are the two shapes this export uses.
