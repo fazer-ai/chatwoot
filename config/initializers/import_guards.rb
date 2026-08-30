@@ -9,6 +9,13 @@
 # Prepended rather than edited into the classes themselves: all three are files the
 # upstream sync rewrites, and a guard clause inside them is a conflict on every merge.
 module ImportGuards
+  # A prepended module publishes whatever it defines, and every callback below except
+  # `fetch_avatar_from_gravatar` is private on the model it guards. Left alone, a guard
+  # would widen the model's public surface as a side effect of narrowing its behaviour --
+  # `conversation.run_auto_assignment` and `message.execute_after_create_commit_callbacks`
+  # callable from anywhere, on a fork whose whole premise is that the diff stays small.
+  # Each guard restates the visibility the method already had; Rails invokes callbacks
+  # through `send`, so private costs nothing.
   # Everything that acts on the world outside this request. An imported message may never
   # reach any of it, at either level of the flag: history that fires an automation, posts
   # an outgoing webhook or notifies an agent is history pretending to be an arrival.
@@ -77,6 +84,8 @@ module ImportGuards
   # agent bot starts its conversations `pending` and overrides the `resolved` an archive
   # importer asked for on purpose.
   module SilentAutoAssignment
+    private
+
     def run_auto_assignment
       return if Import::SilentWrite.archive?
 
@@ -99,16 +108,14 @@ module ImportGuards
   # guard is archive-only. The IP lookup resolves an address an imported contact does not
   # carry at either level, so it is stopped at both.
   #
-  # `Message#reindex_for_search` is the one after-commit side effect deliberately left
-  # alone. It is inert unless advanced search is configured, and guarding it would leave an
-  # archive that exists to be searched silently absent from the index. A deployment that
-  # turns advanced search on wants one bulk reindex after the import, not a job per row.
   module SilentGravatar
     def fetch_avatar_from_gravatar
       return if Import::SilentWrite.archive?
 
       super
     end
+
+    private
 
     def ip_lookup
       return if Import::SilentWrite.on?
@@ -128,6 +135,8 @@ module ImportGuards
   # pending scheduled message in the account: importing one old ticket would hold every
   # follow-up an agent has queued.
   module SilentScheduledMessages
+    private
+
     def hold_pending_scheduled_messages
       return if Import::SilentWrite.archive?
 
@@ -145,6 +154,8 @@ module ImportGuards
   # third party that never agreed to it is a flood when the archive is a decade of mail.
   # A gap sync creating one company should fetch its favicon like any arrival.
   module SilentFavicon
+    private
+
     def fetch_favicon
       return if Import::SilentWrite.archive?
 
@@ -162,6 +173,8 @@ module ImportGuards
   # closed before the feature existed -- and crowds out the live traffic waiting behind it.
   # A gap sync recovering one voice note wants it transcribed like any arrival.
   module SilentTranscription
+    private
+
     def enqueue_audio_transcription
       return if Import::SilentWrite.archive?
 
@@ -169,7 +182,35 @@ module ImportGuards
     end
   end
 
+  # One `Searchkick::ReindexV2Job` per row, enqueued from Message's own `after_commit` on
+  # any installation that has advanced search configured. It reaches neither the dispatcher
+  # guards nor the callbacks below: it is not an event, and it is a separate callback that
+  # `execute_after_create_commit_callbacks` does not carry.
+  #
+  # Stopped so the archive can be indexed properly, not so it can go unindexed -- being
+  # searchable is most of why history is imported at all. `Import::HistorySettlement` hands
+  # each settled batch to the index in one bulk pass instead, which Searchkick splits into
+  # a job per thousand rows rather than a job per row. Half a million jobs is not a slower
+  # import, it is a queue the live traffic is now standing behind: Sidekiq drains in the
+  # order it received, and the reply an agent just sent waits for the archive.
+  #
+  # Both levels rather than archive-only, unlike the other floods here. The batch pass
+  # covers both and is cheaper at both, and `settle` runs outside the flag in one of the
+  # four importers -- a guard that read the level would have to be read back there, where
+  # it is unset, and the archive would be indexed nowhere.
+  module SilentSearchIndex
+    private
+
+    def reindex_for_search
+      return if Import::SilentWrite.on?
+
+      super
+    end
+  end
+
   module SilentMessageCallbacks
+    private
+
     def execute_after_create_commit_callbacks
       return super unless Import::SilentWrite.on?
       return unless Import::SilentWrite.announce?
@@ -186,6 +227,7 @@ Rails.application.config.to_prepare do
   AsyncDispatcher.prepend(ImportGuards::SilentAsyncDispatch)
   Message.prepend(ImportGuards::SilentMessageCallbacks)
   Message.prepend(ImportGuards::SilentScheduledMessages)
+  Message.prepend(ImportGuards::SilentSearchIndex)
   Conversation.prepend(ImportGuards::SilentAutoAssignment)
   Contact.prepend(ImportGuards::SilentGravatar)
   if ChatwootApp.enterprise?

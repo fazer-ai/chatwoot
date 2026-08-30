@@ -46,6 +46,20 @@ describe Enterprise::Import::HistorySettlement do # rubocop:disable RSpec/SpecFi
     expect(company.reload.last_activity_at).to eq(Time.zone.parse('2026-01-01 09:00'))
   end
 
+  # The clock and the roll-up are two writes with nothing holding them together. A run that
+  # stops between them leaves the contact stamped and the company stale, and the retry
+  # finds a contact already reading the batch's newest date: if that skipped the pair, the
+  # company would never be asked for again.
+  it 'still rolls the company up when the contact clock already reads what it would write' do
+    at = Time.zone.parse('2023-05-01 10:00')
+    row = incoming(at)
+    contact.update_columns(last_activity_at: at) # rubocop:disable Rails/SkipsModelValidations
+    expect(company.reload.last_activity_at).to be_nil
+
+    settler.new.run([row])
+    expect(company.reload.last_activity_at).to eq(at)
+  end
+
   it 'leaves a contact with no company alone rather than raising' do
     contact.update!(company: nil)
     expect { settler.new.run([incoming(Time.zone.parse('2023-05-01 10:00'))]) }.not_to raise_error

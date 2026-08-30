@@ -52,6 +52,48 @@ describe 'ImportGuards' do
     end
   end
 
+  # Not exercised through Message: `should_index?` is false unless advanced search is
+  # configured at boot, so a create-a-message test would pass with the guard deleted. What
+  # is checkable without a cluster is that the guard is on the method Message actually
+  # defines, and that it reads both levels.
+  describe 'the per-row search index job' do
+    it 'is prepended over the callback Message defines' do
+      expect(Message.private_method_defined?(:reindex_for_search)).to be(true)
+      expect(Message.ancestors.index(ImportGuards::SilentSearchIndex))
+        .to be < Message.ancestors.index(Message)
+    end
+
+    it 'stops the per-row reindex at both levels, where the batch pass takes over' do
+      indexed = Class.new { def reindex_for_search = :indexed }
+      indexed.prepend(ImportGuards::SilentSearchIndex)
+      row = indexed.new
+
+      expect(row.send(:reindex_for_search)).to eq(:indexed)
+      expect(Import::SilentWrite.wrap { row.send(:reindex_for_search) }).to be_nil
+      expect(Import::SilentWrite.wrap(announce: true) { row.send(:reindex_for_search) }).to be_nil
+    end
+  end
+
+  # A prepended module publishes what it defines, so a guard that forgot to restate the
+  # visibility would widen the model's public surface as a side effect of narrowing its
+  # behaviour. Read off the models rather than off the modules, because it is the model's
+  # surface that is the claim.
+  describe 'the public surface of the guarded models' do
+    it 'leaves every guarded callback as private as it was' do
+      surface = {
+        Message => %i[execute_after_create_commit_callbacks hold_pending_scheduled_messages reindex_for_search],
+        Conversation => %i[run_auto_assignment set_active_bot_conversation],
+        Contact => %i[ip_lookup]
+      }
+      leaked = surface.flat_map { |klass, names| names.reject { |name| klass.private_method_defined?(name) } }
+      expect(leaked).to be_empty
+    end
+
+    it 'leaves the one that was already public alone' do
+      expect(Contact.public_method_defined?(:fetch_avatar_from_gravatar)).to be(true)
+    end
+  end
+
   describe 'the jobs a new contact would start on its own' do
     it 'skips the Gravatar fetch for an archive, where one request per contact is a flood' do
       expect do

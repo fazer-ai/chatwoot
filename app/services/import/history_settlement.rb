@@ -24,7 +24,8 @@ module Import::HistorySettlement
   # Which conversations may announce is therefore carried separately from the rows.
   def settle(archived, gap)
     announced = gap.compact.filter_map(&:conversation).uniq
-    (archived + gap).compact.group_by(&:conversation).each do |conversation, rows|
+    settled = (archived + gap).compact
+    settled.group_by(&:conversation).each do |conversation, rows|
       stamp_activity(conversation, rows)
       stamp_waiting(conversation, rows)
       stamp_seen(conversation, rows)
@@ -35,6 +36,27 @@ module Import::HistorySettlement
         Whatsapp::Session::Inbound::ChatList.refresh(conversation)
       end
     end
+    index_for_search(settled)
+  end
+
+  # The archive's half of advanced search. `Message#reindex_for_search` fires per record
+  # and enqueues a Searchkick job for each, which the guards stop precisely so this can
+  # happen instead: the batch goes over whole, and Searchkick splits it into a bulk job per
+  # thousand rows. What that buys is not import speed, it is the live queue -- half a
+  # million single-row jobs sit ahead of the reply an agent sends while the import runs.
+  #
+  # Async rather than inline, so an import does not fail because the search cluster is
+  # having a bad afternoon. Per batch rather than once at the end, so an interrupted run
+  # leaves indexed everything it settled. `should_index?` is Searchkick's own per-record
+  # hook and Message defines it, so the relation form drops exactly the rows the callback
+  # would have -- activity messages and, on cloud, an account without the flag.
+  def index_for_search(rows)
+    return unless ChatwootApp.advanced_search_allowed?
+
+    ids = rows.filter_map(&:id)
+    return if ids.empty?
+
+    ::Message.where(id: ids).reindex(mode: :async)
   end
 
   # Where the inbox sorts, and where a thread appears in the list. `set_conversation_activity`
@@ -107,13 +129,20 @@ module Import::HistorySettlement
   # the group a clock it never earned and leaves every participant at null. Read off
   # `sender_id` rather than `sender`, so the resume path -- which reads the thread back off
   # the database -- costs one query for the batch instead of one per row.
+  #
+  # Strictly greater rather than greater-or-equal, because the clock and the roll-up under
+  # it are two writes with nothing holding them together: a run that stops between them
+  # leaves the contact stamped and the company stale, and `>=` would then make every retry
+  # skip both -- the contact is already current, so the roll-up it never got is never asked
+  # for again. Falling through costs a write of the value already there and a company rule
+  # that refuses to move backwards; skipping costs a company clock wrong forever.
   def stamp_contact(_conversation, rows)
     newest = newest_per_contact(rows)
     return if newest.empty?
 
     ::Contact.where(id: newest.keys).find_each do |contact|
       at = newest[contact.id]
-      next if contact.last_activity_at.present? && contact.last_activity_at >= at
+      next if contact.last_activity_at.present? && contact.last_activity_at > at
 
       contact.update_columns(last_activity_at: at) # rubocop:disable Rails/SkipsModelValidations
       roll_up(contact, at)

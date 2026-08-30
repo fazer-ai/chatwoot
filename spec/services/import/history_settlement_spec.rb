@@ -62,6 +62,35 @@ describe Import::HistorySettlement do
     expect(ana.reload.last_activity_at).to eq(Time.zone.parse('2026-01-01 09:00'))
   end
 
+  # Being searchable is most of why an archive is imported. The per-row callback is stopped
+  # in the guards precisely so the batch can go over in one pass, so the pass has to exist.
+  describe 'handing the batch to the search index' do
+    let(:ana) { create(:contact, account: account, name: 'Ana') }
+    let(:rows) do
+      [incoming(ana, Time.zone.parse('2023-05-01 10:00')),
+       incoming(ana, Time.zone.parse('2023-05-02 10:00'))]
+    end
+
+    it 'asks for one bulk pass over the whole batch, not one job per row' do
+      # `reindex` reaches a relation through ActiveRecord's delegation to the class, so a
+      # verifying double refuses it: the method is not defined on Relation.
+      relation = double('Message relation') # rubocop:disable RSpec/VerifiedDoubles
+      written = rows
+      allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+      allow(Message).to receive(:where).with(id: written.map(&:id)).and_return(relation)
+      expect(relation).to receive(:reindex).with(mode: :async)
+      settler.new.run(written)
+    end
+
+    # `reindex` is not defined at all unless `searchkick` was declared, which is itself
+    # conditional on the same test.
+    it 'leaves the index alone where advanced search is not configured' do
+      allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(false)
+      expect(Message).not_to receive(:where)
+      settler.new.run(rows)
+    end
+  end
+
   # The resume path reads the thread back off the database, where `sender` on every row is
   # a query. Read off `sender_id` the batch costs one.
   it 'asks for the contacts once for the whole batch' do
