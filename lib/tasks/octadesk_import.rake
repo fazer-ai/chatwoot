@@ -22,21 +22,10 @@
 module OctadeskImportOptions
   module_function
 
-  # Cast rather than `present?`: mirroring is hundreds of gigabytes, and `ATTACHMENTS=0`
-  # reads as "off" to whoever typed it and as "on" to a presence check.
-  def attachments? = ActiveModel::Type::Boolean.new.cast(ENV.fetch('ATTACHMENTS', nil)).present?
-
-  # Strict for the same reason the IMAP task is: `to_i` turns a typo into zero, and a zero
-  # `LIMIT` stops at the first ticket while looking like a finished run.
-  def limit
-    raw = ENV['LIMIT'].presence
-    return if raw.nil?
-
-    value = Integer(raw, exception: false)
-    abort "ERRO: LIMIT deve ser um inteiro positivo, veio #{raw.inspect}" if value.nil? || !value.positive?
-
-    value
-  end
+  # Read strictly rather than cast: mirroring is hundreds of gigabytes, and every lenient
+  # reading of this setting errs towards spending them. See Import::Options.
+  def attachments? = Import::Options.boolean('ATTACHMENTS')
+  def limit = Import::Options.integer('LIMIT')
 
   def printer(pacer, started)
     lambda do |event, payload|

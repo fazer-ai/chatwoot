@@ -85,13 +85,35 @@ describe 'the import rake tasks' do
     %w[MAX_LOAD BUDGET_MB LIMIT].each do |key|
       it "refuses a #{key} that is not a number" do
         ENV[key] = 'muito'
-        expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
+        expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /#{key}/)
       end
 
       it "refuses a #{key} of zero, which reads as a setting and means a stopped run" do
         ENV[key] = '0'
-        expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
+        expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /#{key}/)
       end
+    end
+
+    # A count truncated to zero is worse than a rejected one: `LIMIT=0.5` would stop the run
+    # at the first message while looking like the operator asked for it.
+    it 'refuses a fractional LIMIT rather than truncating it' do
+      ENV['LIMIT'] = '0.5'
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /LIMIT/)
+    end
+
+    # Rails' caster answers anything outside its own false list with true, `no` included, so
+    # a lenient reading throws the resume point away while doing the opposite of what was
+    # typed. `no` is a word an operator means, so it is honoured rather than refused.
+    it 'reads a RESET_CURSOR of no as no' do
+      Import::Email::Cursor.new(channel).tap { |cursor| cursor.advance('INBOX', 7, 42) }.flush
+      ENV['RESET_CURSOR'] = 'no'
+      expect { Rake::Task['imap:import'].invoke }.to output(/Retoma:\s+INBOX>42/).to_stdout
+      expect(channel.reload.import_cursor).to be_present
+    end
+
+    it 'refuses a RESET_CURSOR it cannot read rather than guessing' do
+      ENV['RESET_CURSOR'] = 'talvez'
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /RESET_CURSOR/)
     end
 
     it 'refuses a kind the classifier does not answer, rather than importing nothing' do
@@ -117,7 +139,14 @@ describe 'the import rake tasks' do
     # and no `length`. The scan reads `length` on the line after the search.
     it 'refuses a SAMPLE that is not a number, which would otherwise read as zero' do
       ENV['SAMPLE'] = 'muito'
-      expect { Rake::Task['imap:scan'].invoke }.to raise_error(SystemExit)
+      expect { Rake::Task['imap:scan'].invoke }.to raise_error(ArgumentError, /SAMPLE/)
+    end
+
+    # `SAMPLE=0.5` truncates to zero at the call site and the scan classifies nothing while
+    # printing a finished projection.
+    it 'refuses a fractional SAMPLE rather than truncating it to nothing' do
+      ENV['SAMPLE'] = '0.5'
+      expect { Rake::Task['imap:scan'].invoke }.to raise_error(ArgumentError, /SAMPLE/)
     end
 
     it 'survives a server that answers the search with something other than an array' do
