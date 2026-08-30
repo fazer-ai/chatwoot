@@ -198,13 +198,33 @@ describe Import::Email::Backfill do
     header = "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: com foto\r\n" \
              "Message-ID: <foto@example.com>\r\nDate: #{Time.zone.parse('2023-05-01 10:00').rfc2822}\r\n"
     imap = instance_double(Net::IMAP)
-    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])
-                                      .and_return([Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure })])
+    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE', 'RFC822.SIZE'])
+                                      .and_return([Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure,
+                                                                           'RFC822.SIZE' => 3_100_000 })])
     allow(imap).to receive(:uid_fetch).with(10, 'BODY.PEEK[1]')
                                       .and_return([Struct.new(:attr).new({ 'BODY[1]' => 'Segue a foto do ingresso que comprei ontem.' })])
 
     expect(run.send(:handle, imap, 10)).to be(true)
     expect(run.stats[:sem_anexos]).to eq(1)
+  end
+
+  # A refused message is not a settled one. Marked as read it would be skipped by every
+  # later pass, so the run that could not afford it is the run that has to leave its mark
+  # below it -- and end there, because ending a pass is what the budget is for.
+  it 'ends the pass below a message it cannot afford, without settling it' do
+    tight = Import::Email::Pacer.new(budget_mb: 1, max_load: 99)
+    run = described_class.new(inbox: inbox, kinds: [:customer], pacer: tight, attachments: :all)
+    run.instance_variable_set(:@progress, ->(*) {})
+    header = "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: gigante\r\n" \
+             "Message-ID: <gigante@example.com>\r\nDate: #{Time.zone.parse('2023-05-01 10:00').rfc2822}\r\n"
+    imap = instance_double(Net::IMAP)
+    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE', 'RFC822.SIZE'])
+                                      .and_return([Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => nil,
+                                                                           'RFC822.SIZE' => 5.megabytes })])
+
+    expect(run.send(:handle, imap, 10)).to be(false)
+    expect(run.stopped_by).to eq(:orcamento)
+    expect(imap).not_to have_received(:uid_fetch).with(10, 'BODY.PEEK[]')
   end
 
   # A mark only means anything against the question that produced it, and the question is

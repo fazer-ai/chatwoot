@@ -253,6 +253,7 @@ class Import::Email::Backfill
   # the mark stops.
   def handle(imap, uid)
     raw = @download.perform(imap, uid)
+    return out_of_budget if @download.declined?
     return skip_empty if raw.blank?
 
     mail = Mail.read_from_string(raw)
@@ -267,6 +268,16 @@ class Import::Email::Backfill
   rescue StandardError => e
     @stats[:erros] += 1
     @progress.call(:error, uid: uid, error: e)
+    false
+  end
+
+  # A message larger than what is left of the budget. Not settled, so the mark stays below
+  # it and the next run reaches it first; and the pass ends here rather than walking on in
+  # search of something smaller, because ending a pass is what the budget is for. A run
+  # that skipped every message it could not afford would spend the rest of a mailbox on
+  # header fetches it has to repeat tomorrow anyway.
+  def out_of_budget
+    @stopped_by = :orcamento
     false
   end
 

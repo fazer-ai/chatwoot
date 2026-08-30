@@ -99,6 +99,38 @@ module ImportGuards
     end
   end
 
+  # The line a conversation writes about itself when one of its own columns moves, and the
+  # one guard here that stops work rather than noise. `create_activity` does not act: it
+  # enqueues `Conversations::ActivityMessageJob`, which creates a real Message on a Sidekiq
+  # thread long after this one returned -- somewhere the flag is unset, so everything below
+  # runs live. The dispatcher fires `message.created`, an agent bot answers it, the row
+  # enqueues its own index job, and `set_conversation_activity` drags `last_activity_at` to
+  # the time of the import. A thread from 2021 arrives at the top of the inbox wearing
+  # today's date and a line nobody wrote.
+  #
+  # Stopped at both levels, unlike the guards around it, and the reason is not how loud the
+  # write is: the job runs where no level reaches. Under `:announce` the sync dispatcher
+  # lets exactly one listener through, and this path would hand the same event to all of
+  # them a second later.
+  #
+  # Nothing reaches it as the import is driven today, and it is worth saying why the guard
+  # is here anyway. One line comes close -- `apply_tags` calls `add_labels`, the single
+  # `save` in an importer that writes everything else with `update_columns` -- and it stops
+  # at `create_label_change`, which returns unless something named an actor. A rake task
+  # names none. But that is ambient state the import does not own: the same importer driven
+  # from a request carries the operator in `Current.user`, and then every tagged ticket
+  # fires. The guard costs an early return on a callback that would not have run; not having
+  # it costs an archive of activity lines nobody can take back.
+  module SilentActivityMessages
+    private
+
+    def create_activity
+      return if Import::SilentWrite.on?
+
+      super
+    end
+  end
+
   # The two things a new contact does on its own, neither of which travels through the
   # dispatcher, so nothing above stops them. Each is one job per contact created.
   #
@@ -232,6 +264,7 @@ Rails.application.config.to_prepare do
   Message.prepend(ImportGuards::SilentScheduledMessages)
   Message.prepend(ImportGuards::SilentSearchIndex)
   Conversation.prepend(ImportGuards::SilentAutoAssignment)
+  Conversation.prepend(ImportGuards::SilentActivityMessages)
   Contact.prepend(ImportGuards::SilentGravatar)
   if ChatwootApp.enterprise?
     Company.prepend(ImportGuards::SilentFavicon)

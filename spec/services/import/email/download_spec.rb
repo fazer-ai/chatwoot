@@ -23,11 +23,13 @@ describe Import::Email::Download do
     "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: fotos\r\n" \
       "Message-ID: <so-anexo@example.com>\r\nDate: #{Time.zone.parse('2023-05-01 10:00').rfc2822}\r\n"
   end
-  let(:meta) { Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure }) }
+  let(:meta) do
+    Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure, 'RFC822.SIZE' => 3_100_000 })
+  end
   let(:imap) { instance_double(Net::IMAP) }
 
   before do
-    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE']).and_return([meta])
+    allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE', 'RFC822.SIZE']).and_return([meta])
   end
 
   def download(attachments)
@@ -62,5 +64,18 @@ describe Import::Email::Download do
 
     expect(run.perform(imap, 10)).to include('corpo')
     expect(run).not_to be_lean
+    expect(run).not_to be_declined
+  end
+
+  # The ceiling sits under a provider limit whose answer to an overdraft is locking IMAP
+  # for the whole account, live fetch included. Noticing after the transfer is a ceiling
+  # plus one message, and the message that crosses it is the one carrying the attachments.
+  it 'refuses a message larger than what is left of the budget' do
+    tight = Import::Email::Pacer.new(budget_mb: 1, max_load: 99)
+    run = described_class.new(pacer: tight, attachments: Import::Email::AttachmentPolicy.build(:all), stats: stats)
+
+    expect(run.perform(imap, 10)).to be_nil
+    expect(run).to be_declined
+    expect(imap).not_to have_received(:uid_fetch).with(10, 'BODY.PEEK[]')
   end
 end

@@ -26,6 +26,13 @@ class Import::Email::Pacer
   end
 
   def spend(count) = @bytes += count.to_i
+
+  # Whether a transfer of this size still fits. Asked before a fetch, because
+  # `over_budget?` can only ever be true of bytes already on the wire: a run that only
+  # looks back overshoots the ceiling by whatever it just pulled down, and the ceiling is
+  # there to sit under a provider limit whose answer to an overdraft is locking IMAP for
+  # the account.
+  def room_for?(count) = @bytes + count.to_i <= @budget
   def budget_mb_left = ((@budget - @bytes) / 1.megabyte).round
   def spent_mb = (@bytes / 1.megabyte.to_f).round(1)
   def over_budget? = @bytes >= @budget

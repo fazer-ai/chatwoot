@@ -198,7 +198,12 @@ module ImapImportOptions
     wanted.each do |uid|
       break if pacer.over_budget?
 
-      kinds[sample_kind(imap, run, uid, pacer)] += 1
+      kind = sample_kind(imap, run, uid, pacer)
+      # A message that did not fit is not a result, and counting it as one would let a
+      # sample cut short by the budget report itself as the sample that was asked for.
+      break if kind.nil?
+
+      kinds[kind] += 1
     end
     [kinds, kinds.values.sum == wanted.length]
   end
@@ -221,7 +226,13 @@ module ImapImportOptions
     Array.new(sample) { |index| uids[(index * step).floor] }
   end
 
+  # `nil` when the message is larger than what is left, which ends the sample. The size is
+  # a round trip of its own here, unlike in the import, and worth it for the same reason
+  # the one-at-a-time fetch above is: a scan pulls whole bodies to classify them, so the
+  # first message it cannot afford is the one that would have crossed the provider's limit.
   def sample_kind(imap, run, uid, pacer)
+    return nil unless room_for_message?(imap, uid, pacer)
+
     raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
     return :vazia if raw.blank?
 
@@ -229,6 +240,13 @@ module ImapImportOptions
     run.send(:classify, Mail.read_from_string(raw))
   rescue StandardError
     :erro
+  end
+
+  # A server that reports no size is sampled as it was: this sharpens the ceiling, it is
+  # not a precondition for having one.
+  def room_for_message?(imap, uid, pacer)
+    size = imap.uid_fetch(uid, 'RFC822.SIZE')&.first&.attr&.dig('RFC822.SIZE').to_i
+    size.zero? || pacer.room_for?(size)
   end
 end
 

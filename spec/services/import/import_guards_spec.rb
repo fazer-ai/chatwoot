@@ -52,6 +52,47 @@ describe 'ImportGuards' do
     end
   end
 
+  # `create_activity` does not act, it enqueues: the job creates a real Message on a Sidekiq
+  # thread, where the flag is gone and every callback runs live -- the dispatcher, the bot,
+  # the index, and `last_activity_at` moved to the time of the import. A thread from 2021
+  # would arrive at the top of the inbox wearing today's date and a line nobody wrote.
+  describe 'the activity line a conversation writes about itself' do
+    # Reached at all only because these examples name an actor. Nothing in the import does:
+    # `create_label_change` returns unless something named one, and a rake task leaves
+    # `Current` empty. That is ambient state the import does not control -- the same importer
+    # driven from a request carries the operator in `Current.user` -- so the guard is written
+    # against the callback rather than against the one call that reaches it today.
+    let(:operator) { create(:user, account: account) }
+
+    before { Current.user = operator }
+
+    after { Current.reset }
+
+    it 'is enqueued outside an import, as it always has been' do
+      conversation = new_conversation
+      expect { conversation.add_labels(['suporte']) }.to have_enqueued_job(Conversations::ActivityMessageJob)
+    end
+
+    # Both levels, unlike the guards around it: the job runs where no level reaches, so an
+    # announcing run would hand the event to every listener a second after the sync
+    # dispatcher let exactly one of them through.
+    it 'is not enqueued at either level of the flag' do
+      archived = new_conversation
+      announced = new_conversation
+
+      expect { Import::SilentWrite.wrap { archived.add_labels(['suporte']) } }
+        .not_to have_enqueued_job(Conversations::ActivityMessageJob)
+      expect { Import::SilentWrite.wrap(announce: true) { announced.add_labels(['suporte']) } }
+        .not_to have_enqueued_job(Conversations::ActivityMessageJob)
+    end
+
+    it 'still writes the labels it was asked for' do
+      conversation = new_conversation
+      Import::SilentWrite.wrap { conversation.add_labels(%w[suporte reembolso]) }
+      expect(conversation.reload.label_list).to match_array(%w[suporte reembolso])
+    end
+  end
+
   # Not exercised through Message: `should_index?` is false unless advanced search is
   # configured at boot, so a create-a-message test would pass with the guard deleted. What
   # is checkable without a cluster is that the guard is on the method Message actually

@@ -14,6 +14,13 @@ class Import::Email::Download
 
   alias lean? lean
 
+  # `declined?` answers the message just refused: too large for what is left of the budget,
+  # so nothing was transferred and nothing was decided about it. The caller ends the pass
+  # there and leaves its mark below the message, which is the whole point of refusing.
+  attr_reader :declined
+
+  alias declined? declined
+
   def initialize(pacer:, attachments:, stats:)
     @pacer = pacer
     @attachments = attachments
@@ -27,25 +34,41 @@ class Import::Email::Download
   # mail was sent, and whether it carries anything besides text.
   def perform(imap, uid)
     @lean = false
-    meta = imap.uid_fetch(uid, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])&.first
+    @declined = false
+    meta = imap.uid_fetch(uid, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE', 'RFC822.SIZE'])&.first
     return if meta.nil?
 
     header = meta.attr['BODY[HEADER]'].to_s
     @pacer.spend(header.bytesize)
     lean = Import::Email::TextOnly.new(meta.attr['BODYSTRUCTURE'])
-    return whole(imap, uid) unless text_only?(header, lean)
+    return whole(imap, uid, meta.attr['RFC822.SIZE']) unless text_only?(header, lean)
 
     text_only(imap, uid, header, lean)
   end
 
   private
 
-  def whole(imap, uid)
+  # The size arrives with the header and the structure, in the round trip already being
+  # made, so asking what a message weighs costs nothing. Refusing here rather than letting
+  # `over_budget?` notice afterwards is the difference between a ceiling and a ceiling plus
+  # one message -- and the message that crosses it is exactly the kind this branch exists
+  # for, the one carrying the attachments.
+  #
+  # A server that reports no size is fetched as it was. This sharpens the ceiling; it is
+  # not a precondition for having one, and no mailbox is worth refusing to walk over it.
+  def whole(imap, uid, size)
+    return decline if size.to_i.positive? && !@pacer.room_for?(size.to_i)
+
     raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
     return if raw.blank?
 
     @pacer.spend(raw.bytesize)
     raw
+  end
+
+  def decline
+    @declined = true
+    nil
   end
 
   # Worth a second round trip only when the cutoff excludes this message's attachments and

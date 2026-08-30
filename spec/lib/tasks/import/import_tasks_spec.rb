@@ -249,6 +249,33 @@ describe 'the import rake tasks' do
 
   # The scan downloads each sampled message whole, so the cap is a byte budget and not a
   # preference.
+  # The scan pulls whole bodies to classify them, so the first message it cannot afford is
+  # the one that would have crossed the provider's limit. `over_budget?` only ever answers
+  # for bytes already on the wire.
+  describe 'ImapImportOptions.sample_kind' do
+    let(:tight) { Import::Email::Pacer.new(budget_mb: 1, max_load: 99) }
+    let(:imap) { instance_double(Net::IMAP) }
+
+    it 'refuses a message larger than what is left, without downloading it' do
+      allow(imap).to receive(:uid_fetch).with(7, 'RFC822.SIZE')
+                                        .and_return([Struct.new(:attr).new({ 'RFC822.SIZE' => 5.megabytes })])
+
+      expect(ImapImportOptions.sample_kind(imap, nil, 7, tight)).to be_nil
+      expect(imap).not_to have_received(:uid_fetch).with(7, 'BODY.PEEK[]')
+    end
+
+    # Counting the refusal as a result would let a sample the budget cut short report itself
+    # as the sample that was asked for, and the projection multiplies it out either way.
+    it 'ends the sample there rather than counting it as a result' do
+      allow(ImapImportOptions).to receive(:sample_kind).and_return(:customer, nil, :customer)
+
+      kinds, whole = ImapImportOptions.sample_kinds(imap, nil, [1, 2, 3], 3, tight)
+
+      expect(kinds).to eq({ customer: 1 })
+      expect(whole).to be(false)
+    end
+  end
+
   describe 'ImapImportOptions.spread' do
     it 'takes everything when the folder is smaller than the sample' do
       expect(ImapImportOptions.spread((1..10).to_a, 400).length).to eq(10)

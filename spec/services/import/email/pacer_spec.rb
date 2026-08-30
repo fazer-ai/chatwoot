@@ -17,6 +17,15 @@ describe Import::Email::Pacer do
     expect(pacer.budget_mb_left).to be_within(0.1).of(6)
   end
 
+  # Asked before a fetch, because the bytes that would break the ceiling are the ones that
+  # have not been spent yet.
+  it 'answers whether a transfer still fits under the ceiling' do
+    pacer = described_class.new(budget_mb: 10, max_load: 99)
+    pacer.spend(9.megabytes)
+    expect(pacer.room_for?(1.megabyte)).to be(true)
+    expect(pacer.room_for?(2.megabytes)).to be(false)
+  end
+
   it 'does not pause a machine that is idle' do
     pacer = described_class.new(budget_mb: 10, max_load: 99)
     paused = false
