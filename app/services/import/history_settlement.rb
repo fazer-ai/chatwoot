@@ -50,13 +50,20 @@ module Import::HistorySettlement
   # leaves indexed everything it settled. `should_index?` is Searchkick's own per-record
   # hook and Message defines it, so the relation form drops exactly the rows the callback
   # would have -- activity messages and, on cloud, an account without the flag.
+  #
+  # After the transaction commits, and that is the whole of why this is not a one-liner.
+  # The IMAP importer settles inside a transaction with the write, and this app does not
+  # run `enqueue_after_transaction_commit`: a Sidekiq worker is free to pick the job up
+  # before the rows exist, find nothing, and leave them out of the index for good, since
+  # the per-row callback that would have caught it later is the one this replaced. Outside
+  # a transaction the block runs immediately, which is the other three importers.
   def index_for_search(rows)
     return unless ChatwootApp.advanced_search_allowed?
 
     ids = rows.filter_map(&:id)
     return if ids.empty?
 
-    ::Message.where(id: ids).reindex(mode: :async)
+    ActiveRecord.after_all_transactions_commit { ::Message.where(id: ids).reindex(mode: :async) }
   end
 
   # Where the inbox sorts, and where a thread appears in the list. `set_conversation_activity`

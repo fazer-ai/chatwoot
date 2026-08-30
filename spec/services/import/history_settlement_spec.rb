@@ -82,6 +82,25 @@ describe Import::HistorySettlement do
       settler.new.run(written)
     end
 
+    # The IMAP importer settles inside the transaction that writes the row. Enqueued there,
+    # a worker is free to run the job before the row exists, find nothing, and leave it out
+    # of the index for good -- the per-row callback that would have caught it later is the
+    # one this replaced.
+    it 'waits for the transaction the importer settles inside to commit' do
+      relation = double('Message relation') # rubocop:disable RSpec/VerifiedDoubles
+      written = rows
+      indexed = false
+      allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+      allow(Message).to receive(:where).with(id: written.map(&:id)).and_return(relation)
+      allow(relation).to receive(:reindex) { indexed = true }
+
+      ActiveRecord::Base.transaction do
+        settler.new.run(written)
+        expect(indexed).to be(false)
+      end
+      expect(indexed).to be(true)
+    end
+
     # `reindex` is not defined at all unless `searchkick` was declared, which is itself
     # conditional on the same test.
     it 'leaves the index alone where advanced search is not configured' do

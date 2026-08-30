@@ -34,6 +34,9 @@ require 'net/imap'
 #                      UID it has already looked at -- the inbox alone cannot say, since
 #                      most of a support mailbox is read and declined rather than written
 #   SAMPLE             imap:scan only, messages to classify per folder (default 400)
+#   IMAP_DISABLED_OK   true/1 to run against a channel whose IMAP integration is off. Only
+#                      for an archive inbox: it holds credentials on purpose and the live
+#                      fetch job must stay away from the mailbox they open
 module ImapImportOptions
   module_function
 
@@ -41,8 +44,27 @@ module ImapImportOptions
     inbox = Inbox.find_by(id: ENV.fetch('INBOX_ID', nil))
     abort 'ERRO: defina INBOX_ID' if inbox.nil?
     abort "ERRO: inbox #{inbox.id} nao e um canal de e-mail" unless inbox.channel.is_a?(Channel::Email)
+    imap!(inbox)
 
     inbox
+  end
+
+  # `imap_enabled` is the switch that stops Chatwoot from polling a mailbox, and connecting
+  # anyway is spending credentials somebody turned off. Refused by default, the way the task
+  # this replaces refused it: a disabled channel also carries settings nobody has kept
+  # current, so what the run gets instead of a clear line here is a login error.
+  #
+  # Overridable, because an archive inbox is the one configuration where the switch and the
+  # credentials mean different things. It holds real credentials for a mailbox the live
+  # fetch job must never touch -- enabled, `Inboxes::FetchImapEmailsJob` would pull the same
+  # mailbox into the same inbox alongside the import, and the history would arrive twice.
+  # `IMAP_DISABLED_OK=1` is that setup stated out loud rather than assumed by an importer.
+  def imap!(inbox)
+    return if inbox.channel.imap_enabled?
+    return if Import::Options.boolean('IMAP_DISABLED_OK')
+
+    abort "ERRO: IMAP esta desligado no inbox #{inbox.id}. Ligue a integracao, ou passe " \
+          'IMAP_DISABLED_OK=1 se a caixa e so de arquivo e o fetch do Chatwoot nao pode toca-la.'
   end
 
   def terms

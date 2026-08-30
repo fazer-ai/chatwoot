@@ -8,7 +8,9 @@ require 'rake'
 # rubocop:disable RSpec/DescribeClass -- the subject is two rake tasks, not a class
 describe 'the import rake tasks' do
   let(:account) { create(:account) }
-  let(:channel) { create(:channel_email, account: account) }
+  # The trait, not the bare factory: the tasks refuse a channel whose IMAP is off, which
+  # is what the bare factory builds.
+  let(:channel) { create(:channel_email, :imap_email, account: account) }
   let(:inbox) { channel.inbox }
   let(:imap) { instance_double(Net::IMAP) }
   let(:folder) { Struct.new(:name, :attr).new('INBOX', [:Hasnochildren]) }
@@ -24,7 +26,32 @@ describe 'the import rake tasks' do
 
   after do
     %w[INBOX_ID ZIP LIMIT ATTACHMENTS KINDS FOLDERS MAX_LOAD BUDGET_MB RESET_CURSOR
-       SAMPLE FROM_PART FORM_ADDRESS FORM_SENDER_NAME].each { |key| ENV.delete(key) }
+       SAMPLE FROM_PART FORM_ADDRESS FORM_SENDER_NAME IMAP_DISABLED_OK].each { |key| ENV.delete(key) }
+  end
+
+  # `imap_enabled` is what stops Chatwoot polling a mailbox. A task that connects anyway is
+  # spending credentials somebody turned off, and the settings behind a disabled channel are
+  # nobody's job to keep current -- which arrives as a login error rather than as a line
+  # saying what is wrong.
+  describe 'a channel whose IMAP integration is off' do
+    let(:channel) { create(:channel_email, account: account) }
+
+    it 'is refused by imap:import' do
+      expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
+        .and output(/IMAP esta desligado/).to_stderr
+    end
+
+    it 'is refused by imap:scan too, which connects the same way' do
+      expect { Rake::Task['imap:scan'].invoke }.to raise_error(SystemExit)
+        .and output(/IMAP esta desligado/).to_stderr
+    end
+
+    # An archive inbox holds credentials on purpose and the live fetch job must stay away
+    # from the mailbox they open, or the history arrives twice.
+    it 'runs when the archive setup is stated out loud' do
+      ENV['IMAP_DISABLED_OK'] = '1'
+      expect { Rake::Task['imap:import'].invoke }.to output(/Retoma:/).to_stdout
+    end
   end
 
   describe 'imap:import' do
