@@ -173,13 +173,14 @@ class Import::Email::Classifier
   # those messages never reach the importer at all.
   #
   # A `Reply-To` that is also ours is a real outgoing mail with a routing header, so the
-  # test is that it points somewhere else.
+  # test is that it points somewhere else. `all?` and not `any?`: a form that lists both
+  # its own routing address and the customer is still delegating, and one owned address in
+  # the list would otherwise be enough to have the message refused.
   def own_mail?
     return false if @own_addresses.empty?
     return false unless Array(@mail.from).any? { |address| ours?(address) }
 
-    reply_to = Array(@mail.reply_to)
-    reply_to.empty? || reply_to.any? { |address| ours?(address) }
+    Array(@mail.reply_to).all? { |address| ours?(address) }
   end
 
   def ours?(address) = @own_addresses.include?(address.to_s.downcase.strip)
