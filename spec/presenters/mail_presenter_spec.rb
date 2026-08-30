@@ -317,6 +317,24 @@ RSpec.describe MailPresenter do
       expect(described_class.new(mail).html_content[:full]).to include('Segue em anexo.')
     end
 
+    # Scoring a part means rendering it, and rendering it means decoding it the way the
+    # reader will. `body.decoded` stops at the transfer encoding and hands back bytes
+    # tagged binary, which on UTF-16 parse to nothing: the part that says something scores
+    # zero and loses to a one-word rival.
+    it 'reads a part in a charset a byte does not fit' do
+      written = '<html><body>Preciso do reembolso, o evento foi cancelado.</body></html>'
+      payload = [written.encode('UTF-16LE').force_encoding('BINARY')].pack('m0')
+      raw = +"From: cliente@example.com\r\nTo: sac@example.com\r\nSubject: Reembolso\r\n"
+      raw << "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"B\"\r\n\r\n"
+      raw << "--B\r\nContent-Type: text/html; charset=UTF-16LE\r\n"
+      raw << "Content-Transfer-Encoding: base64\r\n\r\n#{payload}\r\n"
+      raw << "--B\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body>ok</body></html>\r\n--B--\r\n"
+
+      presenter = described_class.new(Mail.read_from_string(raw))
+
+      expect(presenter.html_content[:full]).to include('Preciso do reembolso')
+    end
+
     # This sits on every inbound email and `html_content` asks for it twice, so the parse
     # has to be reached only by a message that actually carries rival parts.
     it 'does not parse anything to answer a message with one html part' do

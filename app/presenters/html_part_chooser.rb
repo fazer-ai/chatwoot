@@ -61,8 +61,16 @@ class HtmlPartChooser
 
   # What a part is worth to a reader, which is the same question the caller asks of it a
   # moment later. A part that is only markup answers with nothing.
+  #
+  # `decoded` and not `body.decoded`, because they are different questions and only the
+  # first is the one being asked. `body.decoded` undoes the transfer encoding and stops,
+  # handing back bytes tagged binary; `decoded` goes on to transcode the charset the part
+  # declares, which is what the presenter renders a moment later. On any charset a byte
+  # wide the two agree, so the gap only opens on UTF-16 and its family -- where the raw
+  # bytes parse to nothing at all, a part that says something scores zero, and a one-word
+  # rival wins on length.
   def rendered(part)
-    ::HtmlParser.parse_reply(part.body.decoded.to_s).to_s
+    ::HtmlParser.parse_reply(part.decoded.to_s).to_s
   rescue StandardError
     ''
   end
