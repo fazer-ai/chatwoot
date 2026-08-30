@@ -128,6 +128,36 @@ describe Import::Email::HistoryImporter do
     end
   end
 
+  # A form posts as the company and names the customer in `Reply-To`. `MailPresenter`
+  # takes the first address there is, so a form that lists its own routing address first
+  # files the thread under the company -- and the dedupe is by Message-ID, so no later pass
+  # revisits it.
+  describe 'mail sent on somebody else behalf' do
+    def delegated(reply_to)
+      Mail.read_from_string(
+        "From: #{channel.email}\r\nReply-To: #{reply_to}\r\nTo: #{channel.email}\r\n" \
+        "Subject: contato pelo site\r\nMessage-ID: <#{SecureRandom.hex(6)}@example.com>\r\n" \
+        "Date: Mon, 1 May 2023 10:00:00 -0300\r\n\r\n" \
+        'Uma mensagem com corpo suficiente para o pipeline aceitar sem reclamar de nada.'
+      )
+    end
+
+    it 'files it under the customer when the routing header names us first' do
+      importer.import(delegated("#{channel.email}, cliente@example.com"), channel)
+      expect(inbox.conversations.last.contact.email).to eq('cliente@example.com')
+    end
+
+    it 'files it under the customer when the routing header names only them' do
+      importer.import(delegated('cliente@example.com'), channel)
+      expect(inbox.conversations.last.contact.email).to eq('cliente@example.com')
+    end
+
+    it 'leaves an ordinary reply of ours alone' do
+      importer.import(delegated(channel.email), channel)
+      expect(inbox.conversations.last.contact.email).to eq(channel.email)
+    end
+  end
+
   describe 'attachments' do
     let(:with_attachment) do
       Mail.read_from_string(

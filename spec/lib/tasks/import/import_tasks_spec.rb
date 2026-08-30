@@ -78,6 +78,22 @@ describe 'the import rake tasks' do
       expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /sent/)
     end
 
+    # `to_f` turns a typo into zero, and every one of these fails silently in the expensive
+    # direction when it is zero: no budget stops before importing anything, no load ceiling
+    # never finds room, so the run stands still forever against a host that always reports
+    # some load.
+    %w[MAX_LOAD BUDGET_MB LIMIT].each do |key|
+      it "refuses a #{key} that is not a number" do
+        ENV[key] = 'muito'
+        expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
+      end
+
+      it "refuses a #{key} of zero, which reads as a setting and means a stopped run" do
+        ENV[key] = '0'
+        expect { Rake::Task['imap:import'].invoke }.to raise_error(SystemExit)
+      end
+    end
+
     it 'refuses a kind the classifier does not answer, rather than importing nothing' do
       ENV['KINDS'] = 'customers'
       expect { Rake::Task['imap:import'].invoke }.to raise_error(ArgumentError, /customers/)
@@ -99,6 +115,11 @@ describe 'the import rake tasks' do
 
     # net-imap 0.6 answers a rev2-capable server with an ESearchResult, which has `to_a`
     # and no `length`. The scan reads `length` on the line after the search.
+    it 'refuses a SAMPLE that is not a number, which would otherwise read as zero' do
+      ENV['SAMPLE'] = 'muito'
+      expect { Rake::Task['imap:scan'].invoke }.to raise_error(SystemExit)
+    end
+
     it 'survives a server that answers the search with something other than an array' do
       esearch = Class.new do
         def initialize(uids) = @uids = uids

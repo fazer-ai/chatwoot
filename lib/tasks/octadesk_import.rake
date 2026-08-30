@@ -26,6 +26,18 @@ module OctadeskImportOptions
   # reads as "off" to whoever typed it and as "on" to a presence check.
   def attachments? = ActiveModel::Type::Boolean.new.cast(ENV.fetch('ATTACHMENTS', nil)).present?
 
+  # Strict for the same reason the IMAP task is: `to_i` turns a typo into zero, and a zero
+  # `LIMIT` stops at the first ticket while looking like a finished run.
+  def limit
+    raw = ENV['LIMIT'].presence
+    return if raw.nil?
+
+    value = Integer(raw, exception: false)
+    abort "ERRO: LIMIT deve ser um inteiro positivo, veio #{raw.inspect}" if value.nil? || !value.positive?
+
+    value
+  end
+
   def printer(pacer, started)
     lambda do |event, payload|
       case event
@@ -68,7 +80,7 @@ namespace :octadesk do
     started = Time.zone.now
     run = Import::Octadesk::Backfill.new(
       inbox: inbox, zip_path: zip, pacer: pacer,
-      attachments: OctadeskImportOptions.attachments?, limit: ENV['LIMIT'].presence&.to_i,
+      attachments: OctadeskImportOptions.attachments?, limit: OctadeskImportOptions.limit,
       from_part: ENV['FROM_PART'].presence,
       form_address: ENV['FORM_ADDRESS'].presence, form_sender_name: ENV['FORM_SENDER_NAME'].presence
     )

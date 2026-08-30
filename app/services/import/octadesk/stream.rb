@@ -75,12 +75,17 @@ class Import::Octadesk::Stream
   end
 
   # Member names in the archive, in order. A listing that fails is a setup problem -- a
-  # corrupt archive, a path that is not one, no `unzip` on the box -- and raises, because
-  # the alternative is an empty list that walks nothing and reports the export exhausted.
+  # corrupt archive, a path that is not one, no Info-ZIP `unzip` on the box -- and raises,
+  # because the alternative is an empty list that walks nothing and reports the export
+  # exhausted.
+  #
+  # `-Z1` is Info-ZIP's, and BusyBox's applet does not have it, so an image that ships only
+  # BusyBox fails here rather than half-reading the export. The production image installs
+  # the package for exactly this; see docker/Dockerfile.
   def parts
     @parts ||= begin
       listing = `unzip -Z1 #{Shellwords.escape(@zip_path)}`
-      raise "cannot read the archive at #{@zip_path}" unless $CHILD_STATUS.success?
+      raise "cannot read the archive at #{@zip_path} (is Info-ZIP `unzip` installed?)" unless $CHILD_STATUS.success?
 
       listing.split("\n").grep(/\.json\z/).sort
     end
