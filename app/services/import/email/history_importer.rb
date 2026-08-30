@@ -67,7 +67,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     # import, and the next pass skips that Message-ID in `unstored` and never comes back to
     # it. Together they either both land or neither does, and neither leaves a row the
     # resume cannot see.
-    Import::SilentWrite.wrap do
+    Import::SilentWrite.wrap(indexing: true) do
       ActiveRecord::Base.transaction do
         process(mail, channel)
         settle_thread
@@ -115,7 +115,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
     decorate_mail
     @message = message
     @conversation = message.conversation
-    Import::SilentWrite.wrap { fill_attachments }
+    Import::SilentWrite.wrap(indexing: true) { fill_attachments }
     @outcome_kind = :enriquecidas
     @outcome = @message
   end

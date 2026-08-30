@@ -194,15 +194,18 @@ module ImportGuards
   # import, it is a queue the live traffic is now standing behind: Sidekiq drains in the
   # order it received, and the reply an agent just sent waits for the archive.
   #
-  # Both levels rather than archive-only, unlike the other floods here. The batch pass
-  # covers both and is cheaper at both, and `settle` runs outside the flag in one of the
-  # four importers -- a guard that read the level would have to be read back there, where
-  # it is unset, and the archive would be indexed nowhere.
+  # The one guard here that does not read the level, because the level is the wrong
+  # question: what matters is whether the writer has taken the index on itself. Only the two
+  # backfills have, and only they can afford to -- they outlive their settlements and end
+  # somewhere they can flush. An importer handed a webhook's worth of rows and thrown away
+  # keeps the per-row callback, and needs it: a batch of its that raised after some rows
+  # committed never reaches `settle`, and the retry filters those rows out as already
+  # stored, so the callback is the only thing that would ever index them.
   module SilentSearchIndex
     private
 
     def reindex_for_search
-      return if Import::SilentWrite.on?
+      return if Import::SilentWrite.indexing?
 
       super
     end

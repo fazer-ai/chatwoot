@@ -85,6 +85,31 @@ describe Import::Email::Classifier do
     expect(described_class.new(mail: routed, text: customer_text, own_addresses: own).kind).to eq(:sent)
   end
 
+  # A list or a forwarder puts our own address in `From` and the customer in
+  # `X-Original-Sender`, with no `Reply-To` at all. `MailPresenter#original_sender` reads
+  # that header ahead of `From`, so the importer would file the message as inbound from the
+  # customer -- but only if the classifier lets it through, and read on `From` alone the
+  # whole class answers `:sent`, which a run refuses outright.
+  it 'reads X-Original-Sender the way the presenter does when there is no Reply-To' do
+    forwarded = Mail.read_from_string("From: #{own}\r\nX-Original-Sender: Cliente <cliente@example.com>\r\n" \
+                                      "To: #{own}\r\nSubject: pergunta\r\nMessage-ID: <x@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: forwarded, text: customer_text, own_addresses: own).kind).to eq(:customer)
+  end
+
+  # `Reply-To` comes first in that order, so it decides on its own and the other header is
+  # not consulted -- the same precedence the presenter applies.
+  it 'lets our own Reply-To settle it even when X-Original-Sender points elsewhere' do
+    routed = Mail.read_from_string("From: #{own}\r\nReply-To: #{own}\r\nX-Original-Sender: cliente@example.com\r\n" \
+                                   "To: cliente@example.com\r\nSubject: Re: assunto\r\nMessage-ID: <y@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: routed, text: customer_text, own_addresses: own).kind).to eq(:sent)
+  end
+
+  it 'reads our own outgoing mail as sent when it carries neither header' do
+    plain = Mail.read_from_string("From: #{own}\r\nTo: cliente@example.com\r\n" \
+                                  "Subject: Re: assunto\r\nMessage-ID: <z@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: plain, text: customer_text, own_addresses: own).kind).to eq(:sent)
+  end
+
   # A form that lists its own routing address beside the customer is still delegating, and
   # one owned address in the list would be enough to have the message refused.
   it 'reads a mixed Reply-To as delegated rather than as our own' do

@@ -81,19 +81,23 @@ module Import::HistorySettlement
   # callback that would have caught it later is the one this replaced. Outside a transaction
   # the block runs immediately.
   def index_for_search(rows)
+    return if search_index_batch.nil?
     return unless ChatwootApp.advanced_search_allowed?
 
     @search_backlog = Array(@search_backlog).concat(rows.filter_map(&:id))
     flush_search_index if @search_backlog.length >= search_index_batch
   end
 
-  # How much to let pile up, and a knob rather than a number because the two shapes of
-  # importer want opposite answers. A WhatsApp importer is handed a webhook's worth of rows
-  # and thrown away, so a buffer there holds the tail of every batch until a request that
-  # may never come: it sends immediately, which is this default. A backfill outlives every
-  # settlement it makes and ends somewhere it can empty the buffer, so it raises this and
-  # takes on the flush.
-  def search_index_batch = 1
+  # How much to let pile up, and `nil` for an importer that does not index at all. The two
+  # shapes want opposite answers. A WhatsApp importer is handed a webhook's worth of rows
+  # and thrown away: a buffer there would hold the tail of every batch until a request that
+  # may never come, and a batch that raised after some rows committed would lose them
+  # entirely -- they never reach here, and the retry filters them out as already stored. So
+  # it indexes nothing and keeps Message's own per-row callback, which is what the guard
+  # leaves alone for it. A backfill outlives every settlement it makes and ends somewhere it
+  # can empty the buffer, so it names a size, wraps its writes with `indexing: true` and
+  # takes on both the batching and the flush.
+  def search_index_batch = nil
 
   # Where the inbox sorts, and where a thread appears in the list. `set_conversation_activity`
   # assigns whatever row it has just written, unconditionally: left to run over history it

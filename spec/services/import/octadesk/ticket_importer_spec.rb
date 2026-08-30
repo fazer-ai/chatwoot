@@ -237,6 +237,20 @@ describe Import::Octadesk::TicketImporter do
     end
   end
 
+  # Like the mail importer, this one batches its own reindexes, so the per-row callback has
+  # to be off while it writes or every row is indexed twice. The guard reads this flag
+  # rather than the level.
+  it 'takes the search index on itself while it writes' do
+    seen = nil
+    importer = described_class.new(inbox: inbox)
+    allow(importer).to receive(:settle_ticket).and_wrap_original do |original, *args|
+      seen = Import::SilentWrite.indexing?
+      original.call(*args)
+    end
+    importer.import(ticket)
+    expect(seen).to be(true)
+  end
+
   # `Message` validates content at 150,000 and the mail path never reaches it, because
   # `MailboxSanitizer` truncates first. Left whole here, `create!` raises and the ticket is
   # abandoned where it stands: the interactions before it stay committed, so every retry

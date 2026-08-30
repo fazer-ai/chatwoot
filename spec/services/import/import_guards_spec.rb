@@ -63,14 +63,20 @@ describe 'ImportGuards' do
         .to be < Message.ancestors.index(Message)
     end
 
-    it 'stops the per-row reindex at both levels, where the batch pass takes over' do
+    # Not the level: the question is who indexes, not how loud the write is. A writer that
+    # has not taken it on keeps the callback, and needs it -- a batch of its that raised
+    # after some rows committed never reaches a settlement, and the retry filters those rows
+    # out as already stored, so this is the only thing that would ever index them.
+    it 'stops the per-row reindex only for a writer that indexes its own rows' do
       indexed = Class.new { def reindex_for_search = :indexed }
       indexed.prepend(ImportGuards::SilentSearchIndex)
       row = indexed.new
 
       expect(row.send(:reindex_for_search)).to eq(:indexed)
-      expect(Import::SilentWrite.wrap { row.send(:reindex_for_search) }).to be_nil
-      expect(Import::SilentWrite.wrap(announce: true) { row.send(:reindex_for_search) }).to be_nil
+      expect(Import::SilentWrite.wrap { row.send(:reindex_for_search) }).to eq(:indexed)
+      expect(Import::SilentWrite.wrap(announce: true) { row.send(:reindex_for_search) }).to eq(:indexed)
+      expect(Import::SilentWrite.wrap(indexing: true) { row.send(:reindex_for_search) }).to be_nil
+      expect(Import::SilentWrite.wrap(announce: true, indexing: true) { row.send(:reindex_for_search) }).to be_nil
     end
   end
 

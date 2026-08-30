@@ -39,6 +39,18 @@ describe Import::Email::HistoryImporter do
       expect(asked).to be_empty
     end
 
+    # The buffer only makes sense if the per-row callback is off while it writes, and the
+    # guard reads this rather than the level. Left unset, every row would be indexed twice.
+    it 'takes the index on itself while it writes, which is what silences the callback' do
+      seen = nil
+      allow(importer).to receive(:settle_thread).and_wrap_original do |original|
+        seen = Import::SilentWrite.indexing?
+        original.call
+      end
+      importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel)
+      expect(seen).to be(true)
+    end
+
     it 'hands over everything it held when the walk empties it' do
       2.times { importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel) }
       importer.flush_search_index

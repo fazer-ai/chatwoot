@@ -12,6 +12,8 @@ describe Import::HistorySettlement do
     create(:conversation, account: account, inbox: inbox, contact: group, contact_inbox: contact_inbox)
   end
 
+  # A backfill's shape: it names a batch size, which is how it says it has taken the search
+  # index on itself. An importer that has not is covered separately below.
   let(:settler) do
     Class.new do
       include Import::HistorySettlement
@@ -21,6 +23,7 @@ describe Import::HistorySettlement do
       def announcing(&) = yield
       def run(rows) = settle(rows, [])
       def run_contacts(conversation, rows) = stamp_contact(conversation, rows)
+      def search_index_batch = 1
     end
   end
 
@@ -161,6 +164,24 @@ describe Import::HistorySettlement do
 
         expect(calls).to eq([[row.id]])
       end
+    end
+
+    # An importer handed a webhook's worth of rows and thrown away keeps Message's own
+    # per-row callback, which the guard leaves alone for it. Indexing here as well would be
+    # the same rows twice, and buffering here would lose the ones a batch committed before
+    # it raised: they never reach a settlement, and the retry filters them out as stored.
+    it 'leaves it to the callback for an importer that has not taken it on' do
+      passive = Class.new do
+        include Import::HistorySettlement
+        attr_reader :opened
+
+        def initialize = @opened = Set.new
+        def announcing(&) = yield
+        def run(rows) = settle(rows, [])
+      end
+      allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+      expect(Message).not_to receive(:where)
+      passive.new.run(rows)
     end
 
     # `reindex` is not defined at all unless `searchkick` was declared, which is itself

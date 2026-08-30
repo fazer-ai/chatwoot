@@ -53,11 +53,31 @@
 #   Contact#fetch_avatar_from_gravatar       archive only: one outbound request per contact
 #                                            created, which is a flood only when the
 #                                            contacts arrive by the hundred thousand
+#   Message#hold_pending_scheduled_messages  archive only: an old incoming row satisfies
+#                                            `hold_on_reply` the way a live one does, and
+#                                            would hold every follow-up in the account
+#   Company#fetch_favicon                    archive only, Enterprise: Gravatar's shape,
+#                                            one request per company at a third party
+#   Attachment#enqueue_audio_transcription   archive only, Enterprise: Captain credits per
+#                                            file, spent on conversations closed before the
+#                                            feature existed
+#   Message#reindex_for_search               only where the writer says it indexes its own
+#                                            rows, which is the second flag below
 #
 # Scoped to the thread rather than to a request: the importer runs inside a Sidekiq job,
 # and the flag must not leak into whatever that worker picks up next.
+# The second flag is orthogonal to the level and answers a different question: not "how
+# loud is this write" but "who is going to index it". `Message#reindex_for_search` enqueues
+# one Searchkick job per row, which a backfill cannot afford and which
+# `Import::HistorySettlement` takes over in batches. So it is suppressed only for a writer
+# that has said it will do that, and left alone for one that has not -- the WhatsApp
+# importers, which are handed a webhook's worth of rows and thrown away. Read off the level
+# instead, a batch of theirs that raised after some rows committed would lose those rows
+# from the index for good: they never reach `settle`, and the retry filters them out as
+# already stored.
 module Import::SilentWrite
   KEY = :import_silent_write
+  INDEXING_KEY = :import_indexes_its_own_rows
 
   module_function
 
@@ -65,12 +85,15 @@ module Import::SilentWrite
   # importer running inside another silenced block does not un-silence it on the way out.
   # That restore is what lets the gap run raise the level for its own stretch and hand the
   # archive level back afterwards, inside one enclosing `wrap`.
-  def wrap(announce: false)
+  def wrap(announce: false, indexing: false)
     previous = ActiveSupport::IsolatedExecutionState[KEY]
+    previously_indexing = ActiveSupport::IsolatedExecutionState[INDEXING_KEY]
     ActiveSupport::IsolatedExecutionState[KEY] = announce ? :announce : :silent
+    ActiveSupport::IsolatedExecutionState[INDEXING_KEY] = true if indexing
     yield
   ensure
     ActiveSupport::IsolatedExecutionState[KEY] = previous
+    ActiveSupport::IsolatedExecutionState[INDEXING_KEY] = previously_indexing
   end
 
   def on?
@@ -89,5 +112,13 @@ module Import::SilentWrite
   # merely stopping a side effect.
   def archive?
     ActiveSupport::IsolatedExecutionState[KEY] == :silent
+  end
+
+  # Whether the writer has taken the search index on itself. Only the guard on
+  # `Message#reindex_for_search` reads this, and only a writer that batches sets it: an
+  # importer that does not is left with the ordinary per-row callback, which is the only
+  # thing that would index a row committed by a batch that then raised.
+  def indexing?
+    ActiveSupport::IsolatedExecutionState[INDEXING_KEY].present?
   end
 end

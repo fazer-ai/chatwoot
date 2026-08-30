@@ -51,7 +51,7 @@ class Import::Octadesk::TicketImporter
     # that would produce neither a message nor an activity is empty.
     return @stats[:sem_conteudo] += 1 if interactions.empty? && !any_activity?(ticket)
 
-    Import::SilentWrite.wrap do
+    Import::SilentWrite.wrap(indexing: true) do
       contact_inbox = @contacts.perform(ticket, interactions)
       return @stats[:sem_contato] += 1 if contact_inbox.nil?
 

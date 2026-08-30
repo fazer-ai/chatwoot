@@ -180,7 +180,29 @@ class Import::Email::Classifier
     return false if @own_addresses.empty?
     return false unless Array(@mail.from).any? { |address| ours?(address) }
 
-    Array(@mail.reply_to).all? { |address| ours?(address) }
+    delegated_to.all? { |address| ours?(address) }
+  end
+
+  # Who the mail is really from, read in the order `MailPresenter#original_sender` reads it:
+  # `Reply-To`, then `X-Original-Sender`, then `From`. Anything ahead of `From` is the
+  # sender saying the message belongs to somebody else, and a list or a forwarder says it
+  # that way -- our own address in `From`, the customer in `X-Original-Sender`. The
+  # classifier has to read the same order the importer will, or it answers `:sent` for a
+  # whole class of mail the importer would have filed as inbound from that customer, and a
+  # run refuses `:sent` outright and moves the cursor past it.
+  #
+  # Empty when the mail carries neither, which is an ordinary outgoing message: `all?` on
+  # nothing is true and it stays `:sent`.
+  def delegated_to
+    Array(@mail.reply_to).presence || Array(address_of(@mail['X-Original-Sender']))
+  end
+
+  def address_of(field)
+    return if field.nil?
+
+    Mail::Address.new(field.value).address
+  rescue StandardError
+    nil
   end
 
   def ours?(address) = @own_addresses.include?(address.to_s.downcase.strip)
