@@ -113,6 +113,45 @@ describe Import::Octadesk::TicketImporter do
       expect(conversation.reload.last_activity_at).to eq(conversation.messages.maximum(:created_at))
     end
 
+    # A run that stops between the insert and the metadata leaves a thread with no labels and
+    # a resolution stamped at the moment of the import, and the next pass finds it, returns
+    # it and writes nothing.
+    it 'reapplies the labels a stopped run never got to' do
+      tagged = ticket.merge('Number' => 4331, 'Tags' => [{ 'Name' => 'cancelamento' }, 'urgente'])
+      importer.import(tagged)
+      conversation = inbox.conversations.find_by(identifier: 'octadesk:4331')
+      conversation.update!(label_list: [])
+
+      described_class.new(inbox: inbox).import(tagged)
+      expect(conversation.reload.label_list).to contain_exactly('cancelamento', 'urgente')
+    end
+
+    it 'restamps a resolution a stopped run never got to' do
+      importer.import(ticket)
+      conversation = inbox.conversations.last
+      conversation.update_columns(status_changed_at: Time.current) # rubocop:disable Rails/SkipsModelValidations -- the state an interrupted run leaves
+
+      described_class.new(inbox: inbox).import(ticket)
+      expect(conversation.reload.status_changed_at).to eq(Time.zone.parse('2023-05-11T09:00:00Z'))
+    end
+
+    # A pass over an archive that is already right should cost a read and no label writes:
+    # reapplying every label on every resume is a write per ticket over the whole export.
+    it 'does not rewrite the labels that are already there' do
+      tagged = ticket.merge('Number' => 4332, 'Tags' => [{ 'Name' => 'cancelamento' }])
+      importer.import(tagged)
+      conversation = inbox.conversations.find_by(identifier: 'octadesk:4332')
+
+      writes = 0
+      subscription = ActiveSupport::Notifications.subscribe('sql.active_record') do |*, payload|
+        writes += 1 if payload[:sql].start_with?('INSERT', 'UPDATE') && payload[:sql].include?('taggings')
+      end
+      described_class.new(inbox: inbox).import(tagged)
+      ActiveSupport::Notifications.unsubscribe(subscription)
+      expect(conversation.reload.label_list).to eq(['cancelamento'])
+      expect(writes).to eq(0)
+    end
+
     # The third interruption point, and the one a "did I write anything" test gets wrong:
     # the comments landed and the activity rows did not. The next pass writes a batch that
     # is real but partial, and settling from it alone drags the thread back to whichever

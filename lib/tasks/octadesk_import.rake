@@ -65,7 +65,8 @@ namespace :octadesk do
     zip = ENV.fetch('ZIP', nil)
     abort 'ERRO: defina ZIP com o caminho do *_ticket_ticket_*.zip' if zip.blank? || !File.exist?(zip)
 
-    pacer = Import::Email::Pacer.new(budget_mb: Float::INFINITY, max_load: ENV['MAX_LOAD'] || 2.5)
+    pacer = Import::Email::Pacer.new(budget_mb: Float::INFINITY,
+                                     max_load: Import::Options.decimal('MAX_LOAD', default: 2.5))
     started = Time.zone.now
     run = Import::Octadesk::Backfill.new(
       inbox: inbox, zip_path: zip, pacer: pacer,

@@ -186,8 +186,8 @@ describe 'the import rake tasks' do
   end
 
   describe 'octadesk:import' do
-    let(:dir) { Dir.mktmpdir }
-    let(:zip_path) { File.join(dir, 'export.zip') }
+    # The same trap as the IMAP task: zero against a load average that is never zero means
+    # the run pauses and stands there with nothing on the screen but a pause.
     let(:ticket) do
       { 'Number' => 1, 'RequesterMail' => 'cliente@example.com',
         'DateCreation' => { '$date' => '2023-05-10T12:00:00Z' },
@@ -196,6 +196,10 @@ describe 'the import rake tasks' do
                              'Person' => { 'Type' => 0, 'Name' => 'Cliente' },
                              'DateCreation' => { '$date' => '2023-05-10T12:00:00Z' } }] }
     end
+    let(:zip_path) { File.join(dir, 'export.zip') }
+    let(:dir) { Dir.mktmpdir }
+
+    after { FileUtils.remove_entry(dir) }
 
     before do
       File.write(File.join(dir, 'part_0001.json'), [ticket].to_json)
@@ -203,7 +207,10 @@ describe 'the import rake tasks' do
       ENV['ZIP'] = zip_path
     end
 
-    after { FileUtils.remove_entry(dir) }
+    it 'refuses a MAX_LOAD it cannot read, the same as the IMAP task does' do
+      ENV['MAX_LOAD'] = 'muito'
+      expect { Rake::Task['octadesk:import'].invoke }.to raise_error(ArgumentError, /MAX_LOAD/)
+    end
 
     it 'imports the export and reports what it filed rather than only what it read' do
       expect { Rake::Task['octadesk:import'].invoke }.to output(/tickets\s+1/).to_stdout

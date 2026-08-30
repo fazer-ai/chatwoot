@@ -134,7 +134,7 @@ class Import::Octadesk::TicketImporter
   def conversation_for(ticket, contact_inbox)
     number = ticket['Number'].to_s
     existing = find_by_ticket(number)
-    return existing if existing
+    return reconcile(existing, ticket) if existing
 
     opened_at = Import::Octadesk::Stream.time(ticket['DateCreation'])
     conversation = ::Conversation.create!(
@@ -154,9 +154,22 @@ class Import::Octadesk::TicketImporter
   # would normally record when that happened is stamped by hand. Written with
   # `update_columns` for the same reason everything else here is: a save would wake the
   # callbacks the import exists to keep quiet.
+  # Everything a thread carries that is not a message, applied on the resumed path as well.
+  #
+  # A run that stops between the insert and these leaves a conversation with no labels and a
+  # resolution stamped at the moment of the import, and the next pass finds it, returns it
+  # and writes nothing -- the same resume hole `settle_ticket` closes for the clocks, two
+  # fields over. Both are idempotent and both compare before writing, so a pass over an
+  # archive that is already right costs a read and no writes.
+  def reconcile(conversation, ticket)
+    apply_tags(conversation, ticket)
+    stamp_resolution(conversation, ticket)
+    conversation
+  end
+
   def stamp_resolution(conversation, ticket)
     done = Import::Octadesk::Stream.time(ticket['DoneDate'])
-    return if done.blank?
+    return if done.blank? || conversation.status_changed_at == done
 
     conversation.update_columns(status_changed_at: done) # rubocop:disable Rails/SkipsModelValidations
   end
@@ -221,7 +234,9 @@ class Import::Octadesk::TicketImporter
 
   def apply_tags(conversation, ticket)
     tags = Array(ticket['Tags']).filter_map { |tag| tag.is_a?(Hash) ? tag['Name'] : tag }.compact_blank
-    conversation.add_labels(tags) if tags.any?
+    return if tags.empty? || (tags - conversation.label_list).empty?
+
+    conversation.add_labels(tags)
   rescue StandardError
     @stats[:tags_recusadas] += 1
   end
