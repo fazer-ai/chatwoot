@@ -84,8 +84,24 @@ module ImapImportOptions
     Import::Email::AttachmentPolicy.build(parsed)
   end
 
-  def limit = ENV['LIMIT'].presence&.to_i
-  def pacer = Import::Email::Pacer.new(budget_mb: ENV['BUDGET_MB'] || 2000, max_load: ENV['MAX_LOAD'] || 2.5)
+  def limit = number('LIMIT', nil)
+  def sample = number('SAMPLE', 400)
+  def pacer = Import::Email::Pacer.new(budget_mb: number('BUDGET_MB', 2000), max_load: number('MAX_LOAD', 2.5))
+
+  # Strict, because `to_f` and `to_i` turn a typo into zero and every one of these settings
+  # fails silently in the expensive direction when it is zero: a zero budget stops before
+  # importing anything, a zero `LIMIT` stops at the first message, and a zero load ceiling
+  # never finds room -- so the run stands still forever against a host that always reports
+  # some load, with no error and nothing on the screen but a pause.
+  def number(key, default)
+    raw = ENV[key].presence
+    return default if raw.nil?
+
+    value = Float(raw, exception: false)
+    abort "ERRO: #{key} deve ser um numero positivo, veio #{raw.inspect}" if value.nil? || !value.positive?
+
+    value
+  end
 
   def duration(seconds)
     seconds = seconds.to_i
@@ -186,7 +202,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
   desc 'Dry run: classifica uma amostra do que imap:import faria, sem escrever nada'
   task scan: :environment do
     inbox = ImapImportOptions.inbox!
-    sample = (ENV['SAMPLE'] || 400).to_i
+    sample = ImapImportOptions.sample.to_i
     pacer = ImapImportOptions.pacer
     run = Import::Email::Backfill.new(inbox: inbox, kinds: [], pacer: pacer,
                                       folders: ImapImportOptions.folders, terms: ImapImportOptions.terms)

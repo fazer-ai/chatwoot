@@ -57,6 +57,7 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   def import(mail, channel, text_only: false)
     @occurred_at = occurred_at(mail)
     @text_only = text_only || withholding?(mail)
+    promote_delegated(mail, channel)
     @outcome = nil
     existing = stored(mail, channel)
     return enrich(mail, channel, existing) if existing
@@ -136,6 +137,32 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # Shared with the backfill, which reads it off the header alone to decide the attachment
   # cutoff. Falling back to now would be the bug this class exists to fix.
   def occurred_at(mail) = Import::Email::Timestamp.of(mail)
+
+  # Puts the party actually being written to first in `Reply-To`.
+  #
+  # A website form posts as the company and names the customer in the routing header, and
+  # some of them list their own address there as well. Every reader downstream takes the
+  # first address it finds -- `MailPresenter#original_sender`, which the contact lookup and
+  # the contact creation both go through, and `redirected_reply_to?`, which decides where
+  # the display name comes from -- so with ours listed first the whole thread is filed under
+  # the company's own contact. There is no second chance at it either: the dedupe is by
+  # Message-ID, so every later pass sees the row and skips it.
+  #
+  # Reordered once, here, rather than overridden in each reader: an override would fix the
+  # one that was overridden and leave the others answering something else about the same
+  # message, which is the disagreement this class exists to avoid.
+  def promote_delegated(mail, channel)
+    addresses = Array(mail.reply_to).map { |address| address.to_s.downcase.strip }.compact_blank
+    delegated = addresses.find { |address| !own_address?(address, channel) }
+    return if delegated.blank? || addresses.first == delegated
+
+    mail.reply_to = [delegated] + (addresses - [delegated])
+  end
+
+  def own_address?(address, channel)
+    [channel.email, channel.imap_login].compact_blank
+                                       .map { |own| own.to_s.downcase.strip }.include?(address)
+  end
 
   # Resolved unconditionally, dated when there is a date. The two are separate decisions
   # and only one of them depends on the clock: a thread out of the archive is not somebody's
