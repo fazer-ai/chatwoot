@@ -116,8 +116,17 @@ module Import::HistorySettlement
       next if contact.last_activity_at.present? && contact.last_activity_at >= at
 
       contact.update_columns(last_activity_at: at) # rubocop:disable Rails/SkipsModelValidations
+      roll_up(contact, at)
     end
   end
+
+  # A contact rolls its activity up to its company, on installations that have companies.
+  # `update_columns` skips the callback that would do it, which is the point everywhere
+  # else -- the import writes clocks without firing the machinery around them -- so the one
+  # part of that machinery which is itself a clock is asked for explicitly.
+  #
+  # A no-op here and overridden in the Enterprise tree, where `Company` exists.
+  def roll_up(contact, at); end
 
   def newest_per_contact(rows)
     written_by_contacts(rows).group_by(&:sender_id)
@@ -158,3 +167,5 @@ module Import::HistorySettlement
     pending.first&.created_at
   end
 end
+
+Import::HistorySettlement.prepend_mod_with('Import::HistorySettlement')

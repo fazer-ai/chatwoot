@@ -85,6 +85,14 @@ describe Import::Email::Classifier do
     expect(described_class.new(mail: routed, text: customer_text, own_addresses: own).kind).to eq(:sent)
   end
 
+  # A form that lists its own routing address beside the customer is still delegating, and
+  # one owned address in the list would be enough to have the message refused.
+  it 'reads a mixed Reply-To as delegated rather than as our own' do
+    mixed = Mail.read_from_string("From: #{own}\r\nReply-To: #{own}, cliente@example.com\r\n" \
+                                  "To: #{own}\r\nSubject: contato\r\nMessage-ID: <m@example.com>\r\n\r\nCorpo")
+    expect(described_class.new(mail: mixed, text: customer_text, own_addresses: own).kind).to eq(:customer)
+  end
+
   it 'ignores a blank second address rather than matching everything' do
     expect(described_class.new(mail: from_customer, text: customer_text, own_addresses: [own, nil]).kind)
       .to eq(:customer)
