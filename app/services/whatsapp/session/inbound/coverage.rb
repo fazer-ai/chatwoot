@@ -16,11 +16,6 @@
 # bootstrap dump. Uazapi does not pass the type through (the frames carry `messages`,
 # `chats` or `labels` and nothing else), so the line is redrawn here from what we hold.
 module Whatsapp::Session::Inbound::Coverage
-  # A row this inbox filed after the fact rather than received. `content_attributes` is a
-  # text column holding JSON, hence the cast, and the key is absent on every row written
-  # before imports existed, hence the default.
-  IMPORTED_SQL = "COALESCE((content_attributes#>>'{}')::jsonb->>'imported', 'false') = 'true'".freeze
-
   module_function
 
   # Nil when the inbox has never stored a provider message, which is a first connection:
@@ -46,7 +41,7 @@ module Whatsapp::Session::Inbound::Coverage
   def watermark(inbox)
     inbox.messages
          .where.not(source_id: nil)
-         .where.not(IMPORTED_SQL)
+         .where.not(Import::IMPORTED_SQL)
          .maximum(:created_at)
   end
 

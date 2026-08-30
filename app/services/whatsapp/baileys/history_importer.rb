@@ -25,13 +25,13 @@
 #                          archive: a message from last year must not reopen work, and the
 #                          reopen policy the live path follows would do exactly that.
 #
-# Everything the import may set off is suppressed by Whatsapp::Session::SilentWrite for the
+# Everything the import may set off is suppressed by Import::SilentWrite for the
 # whole run: no notifications, no automations, no outgoing webhooks, no bots, no
 # out-of-office replies, no read receipts on the contact's phone. The gap half runs one
 # level down, where the dashboard push survives, because somebody is watching the queue it
 # lands in.
 class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysService
-  include Whatsapp::Session::Inbound::HistorySettlement
+  include Import::HistorySettlement
 
   # A batch is up to a few hundred messages with a contact resolution behind the first of
   # them. The ordinary thirty seconds is a lease that would expire mid-import, and a lease
@@ -57,7 +57,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
       next if pending.empty?
 
       runs = pending.group_by { |raw| gap?(raw) }
-      Whatsapp::Session::SilentWrite.wrap do
+      Import::SilentWrite.wrap do
         # Archive first: the two halves land in different threads, and the older one has
         # to exist before the reopen policy is asked which thread is current.
         # An unrequested pile keeps only its gap. The phone offers its whole history at
@@ -238,6 +238,6 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   def try_update_contact_avatar(contact = nil); end
 
   # Raises the flag for the stretch it wraps. Only the gap ever asks for it, and only the
-  # dashboard push gets through: see Whatsapp::Session::SilentWrite.
-  def announcing(&) = Whatsapp::Session::SilentWrite.wrap(announce: true, &)
+  # dashboard push gets through: see Import::SilentWrite.
+  def announcing(&) = Import::SilentWrite.wrap(announce: true, &)
 end
