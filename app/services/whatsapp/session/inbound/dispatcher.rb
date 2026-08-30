@@ -44,6 +44,7 @@ class Whatsapp::Session::Inbound::Dispatcher
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
     call.offer call.terminate
+    session.offline_sync_preview session.offline_sync_completed
   ].freeze
 
   attr_reader :channel, :event, :instance

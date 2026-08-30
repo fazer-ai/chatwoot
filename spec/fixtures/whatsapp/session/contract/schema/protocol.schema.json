@@ -206,7 +206,7 @@
       "type": "object",
       "properties": {
         "type": { "const": "unsupported" },
-        "reason": { "enum": ["unknown_type", "undecryptable", "protocol", "empty"] }
+        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "protocol", "empty"] }
       },
       "required": ["type", "reason"],
       "additionalProperties": true
@@ -282,7 +282,7 @@
         "invalid_payload", "unsupported", "session_not_found", "not_connected", "not_paired",
         "owned_elsewhere", "quarantined", "client_outdated", "rate_limited", "expired", "timeout",
         "media_too_large", "media_unavailable", "recipient_not_on_whatsapp", "group_participant_not_allowed",
-        "wa_error", "internal"
+        "wa_error", "provider_unavailable", "internal"
       ]
     },
 
@@ -358,6 +358,8 @@
             { "properties": { "type": { "const": "session.temporary_ban" }, "payload": { "$ref": "#/definitions/event_session_temporary_ban" } }, "required": ["type"] },
             { "properties": { "type": { "const": "session.client_outdated" }, "payload": { "type": "object" } }, "required": ["type"] },
             { "properties": { "type": { "const": "session.connect_failure" }, "payload": { "$ref": "#/definitions/event_session_connect_failure" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.offline_sync_preview" }, "payload": { "$ref": "#/definitions/event_session_offline_sync_preview" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.offline_sync_completed" }, "payload": { "$ref": "#/definitions/event_session_offline_sync_completed" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.qr" }, "payload": { "$ref": "#/definitions/event_pairing_qr" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.code" }, "payload": { "$ref": "#/definitions/event_pairing_code" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.success" }, "payload": { "$ref": "#/definitions/event_pairing_success" } }, "required": ["type"] },
@@ -401,6 +403,28 @@
         "ban": { "oneOf": [{ "$ref": "#/definitions/ban" }, { "type": "null" }] }
       },
       "required": ["state"],
+      "additionalProperties": true
+    },
+    "event_session_offline_sync_preview": {
+      "description": "The server is about to replay what this session missed while it was down. Counts are the server's own, sent before the events themselves, so a reader can say how much is coming instead of watching the queue move on its own. The messages arrive afterwards as ordinary message.received.",
+      "type": "object",
+      "properties": {
+        "messages": { "type": "integer", "minimum": 0 },
+        "receipts": { "type": "integer", "minimum": 0 },
+        "notifications": { "type": "integer", "minimum": 0 },
+        "app_data_changes": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["total"],
+      "additionalProperties": true
+    },
+    "event_session_offline_sync_completed": {
+      "description": "The replay is over. What did not arrive by now is not coming, so this is where a reader stops waiting.",
+      "type": "object",
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["count"],
       "additionalProperties": true
     },
     "event_session_logged_out": {
@@ -473,7 +497,10 @@
     },
     "event_pairing_passkey_confirmation": {
       "type": "object",
-      "properties": { "code": { "type": "string" } },
+      "properties": {
+        "request_id": { "type": "string" },
+        "code": { "type": "string" }
+      },
       "required": ["code"],
       "additionalProperties": true
     },
@@ -540,7 +567,8 @@
       "properties": {
         "chat": { "$ref": "#/definitions/address" },
         "message_id": { "$ref": "#/definitions/message_id" },
-        "reason": { "type": "string" }
+        "reason": { "type": "string" },
+        "recoverable": { "type": "boolean" }
       },
       "required": ["message_id", "reason"],
       "additionalProperties": true
