@@ -45,6 +45,11 @@ class Import::Email::Backfill
   # :imported, :error. Held on the instance rather than threaded through every frame,
   # because the loop is three levels deep and passing a block down all of them says
   # nothing about what the loop does.
+  # `Array(...)` around the search rather than trusting it to be one: net-imap 0.6 answers
+  # a rev2-capable server with an `ESearchResult`, which carries `each` and `to_a` and none
+  # of `length`, `select` or `each_slice`. Gmail is rev1 so today it is a plain Array, but
+  # the walk would break on the first server that is not -- at the progress line, before
+  # anything it could report.
   def perform(&progress)
     @progress = progress || ->(*) {}
     imap = connect
@@ -54,7 +59,7 @@ class Import::Email::Backfill
       imap.examine(folder)
       @folder = folder
       @uidvalidity = imap.responses('UIDVALIDITY', &:last)
-      uids = @cursor.unseen(folder, @uidvalidity, imap.uid_search(@terms))
+      uids = @cursor.unseen(folder, @uidvalidity, Array(imap.uid_search(@terms)))
       @progress.call(:folder, folder: folder, total: uids.length)
       walk(imap, uids)
     end
