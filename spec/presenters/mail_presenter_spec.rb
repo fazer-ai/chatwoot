@@ -299,5 +299,43 @@ RSpec.describe MailPresenter do
       presenter = described_class.new(nested(stub_html, '<html><body><br></body></html>'))
       expect(presenter.html_content).to eq({})
     end
+
+    # An attached document has parts of its own, and `attachment?` does not answer where the
+    # message stops: it is a question about a file, and the container holding an attached
+    # document has no filename, so it answers false while everything under it is attached.
+    it 'does not take the body out of an attached document' do
+      mail = nested(stub_html, '<html><body>Segue em anexo.</body></html>')
+      attached = Mail::Part.new
+      attached.content_type = 'multipart/related'
+      attached.content_disposition = 'attachment'
+      inner = Mail::Part.new
+      inner.content_type = 'text/html; charset=utf-8'
+      inner.body = "<html><body>#{'Texto de uma nota fiscal encaminhada. ' * 40}</body></html>"
+      attached.add_part(inner)
+      mail.parts.first.add_part(attached)
+
+      expect(described_class.new(mail).html_content[:full]).to include('Segue em anexo.')
+    end
+
+    # This sits on every inbound email and `html_content` asks for it twice, so the parse
+    # has to be reached only by a message that actually carries rival parts.
+    it 'does not parse anything to answer a message with one html part' do
+      mail = Mail.new(from: 'cliente@example.com', to: 'sac@example.com', subject: 'Oi')
+      mail.content_type = 'multipart/alternative'
+      text = Mail::Part.new
+      text.content_type = 'text/plain; charset=utf-8'
+      text.body = 'Bom dia'
+      html = Mail::Part.new
+      html.content_type = 'text/html; charset=utf-8'
+      html.body = '<html><body>Bom dia</body></html>'
+      [text, html].each { |part| mail.add_part(part) }
+
+      presenter = described_class.new(mail)
+      allow(HtmlParser).to receive(:parse_reply).and_call_original
+      presenter.html_part
+      presenter.html_part
+
+      expect(HtmlParser).not_to have_received(:parse_reply)
+    end
   end
 end

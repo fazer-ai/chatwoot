@@ -11,25 +11,12 @@ class MailPresenter < SimpleDelegator
     encode_to_unicode(@mail.subject)
   end
 
-  # Which `text/html` part carries the message, when there is more than one.
-  #
-  # The mail gem answers with the first it meets in a depth-first walk, which is right
-  # almost always and silently wrong on a shape iOS Mail produces: a `multipart/alternative`
-  # whose one child is a `multipart/mixed`, holding a stub of a hundred-odd bytes, then the
-  # attachment, then the `text/html` the customer actually wrote. The stub renders to
-  # nothing, so the message reaches the agent as an empty bubble under a subject -- no
-  # error, no attachment missing, just no words.
-  #
-  # Only consulted when the gem's own answer renders to nothing, so every message whose
-  # first part is the real one keeps the part it has today. That restraint is the point:
-  # taking the largest outright would prefer a quoted forward over the short reply written
-  # above it, which is a worse failure than the one being fixed and a far more common shape.
+  # See HtmlPartChooser: the gem's own answer is the first `text/html` in a depth-first
+  # walk, which on one shape iOS Mail produces is a stub that renders to nothing.
   def html_part
-    chosen = @mail.html_part
-    return chosen if chosen.nil? || rendered(chosen).present?
+    return @html_part if defined?(@html_part)
 
-    candidates = @mail.all_parts.select { |part| part.mime_type == 'text/html' && !part.attachment? }
-    candidates.max_by { |part| rendered(part).length } || chosen
+    @html_part = HtmlPartChooser.for(@mail)
   end
 
   # encode decoded mail text_part or html_part if mail is multipart email
@@ -226,14 +213,6 @@ class MailPresenter < SimpleDelegator
     return str if current_encoding == 'UTF-8'
 
     str.encode(current_encoding, 'UTF-8', invalid: :replace, undef: :replace, replace: '?')
-  rescue StandardError
-    ''
-  end
-
-  # What a part is worth to a reader, which is the same question the caller asks of it a
-  # moment later. A part that is only markup answers zero.
-  def rendered(part)
-    ::HtmlParser.parse_reply(part.body.decoded.to_s).to_s
   rescue StandardError
     ''
   end
