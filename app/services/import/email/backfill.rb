@@ -35,7 +35,8 @@ class Import::Email::Backfill
     @limit = limit
     @attachments = Import::Email::AttachmentPolicy.build(attachments)
     @importer = Import::Email::HistoryImporter.new(attachments: @attachments)
-    @cursor = Import::Email::Cursor.new(@channel, selection: [@terms, @kinds.sort, @attachments.key])
+    @download = Import::Email::Download.new(pacer: @pacer, attachments: @attachments, stats: @stats)
+    @cursor = Import::Email::Cursor.new(@channel, selection: selection)
     @stats = Hash.new(0)
     @stopped_by = nil
   end
@@ -68,6 +69,37 @@ class Import::Email::Backfill
     @cursor.flush
     @importer.flush_search_index
     close(imap)
+  end
+
+  # What a stored mark means, and therefore what invalidates it.
+  #
+  # `BEFORE` is left out, and that is the whole of why this is not just `@terms`. It cuts
+  # the newer end, so moving it in either direction never makes an older message newly
+  # eligible -- and an older message hidden behind the mark is the only failure the stamp
+  # exists to prevent. Left in, it would be worse than useless: the default cutoff is a
+  # date, so it moves every midnight, and a run resumed the next day would find every mark
+  # stale, start each folder at UID 0 and spend the whole day's provider budget re-walking
+  # mail it has already declined. On a mailbox that takes weeks that is not a slow import,
+  # it is an import that never finishes.
+  #
+  # `SINCE` is the opposite and stays: widening it backwards is exactly how older, lower
+  # numbered mail becomes eligible under a mark that would hide it.
+  #
+  # The mailbox is part of the question too. `UIDVALIDITY` is unique inside one mailbox and
+  # commonly starts at 1, so a channel repointed at a different account can present a fresh
+  # folder whose stamp matches an old mark, and everything below it is filtered out before
+  # the Message-ID check ever runs -- silently, since nothing errors.
+  def selection
+    [without_before(@terms), @kinds.sort, @attachments.key, @channel.imap_address, @channel.imap_login]
+  end
+
+  # The keyword and the date after it. `ALL` stands alone in the same list, so the pairs
+  # cannot be sliced off blindly.
+  def without_before(terms)
+    at = terms.index('BEFORE')
+    return terms if at.nil?
+
+    terms[0...at] + terms[(at + 2)..].to_a
   end
 
   # Gmail is found by attribute; an ordinary server that advertises no special use is
@@ -218,15 +250,15 @@ class Import::Email::Backfill
   # part, a lock -- would quietly cost a message forever. The run keeps going past it; only
   # the mark stops.
   def handle(imap, uid)
-    raw = fetch(imap, uid)
-    return true if raw.blank?
+    raw = @download.perform(imap, uid)
+    return skip_empty if raw.blank?
 
     mail = Mail.read_from_string(raw)
     kind = classify(mail)
     @stats[:"visto_#{kind}"] += 1
     return true unless @kinds.include?(kind)
 
-    @importer.import(mail, @channel, text_only: @lean)
+    @importer.import(mail, @channel, text_only: @download.lean?)
     @stats[@importer.outcome_kind] += 1
     @progress.call(:imported, kind: kind, stats: @stats)
     true
@@ -236,77 +268,11 @@ class Import::Email::Backfill
     false
   end
 
-  # The cutoff is decided before any of the message is downloaded, because the cost it
-  # exists to control is paid at the fetch and nowhere else: `BODY.PEEK[]` pulls the
-  # encoded attachments along with the words, so a run that decides afterwards has already
-  # spent its whole provider budget on the megabytes it then declines to keep. The header
-  # and the structure are a few kilobytes and answer both questions -- when the mail was
-  # sent, and whether it carries anything besides text.
-  def fetch(imap, uid)
-    @lean = false
-    meta = imap.uid_fetch(uid, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE'])&.first
-    return skip(:vazias) if meta.nil?
-
-    header = meta.attr['BODY[HEADER]'].to_s
-    @pacer.spend(header.bytesize)
-    lean = Import::Email::TextOnly.new(meta.attr['BODYSTRUCTURE'])
-    return whole(imap, uid) unless text_only?(header, lean)
-
-    text_only(imap, uid, header, lean)
-  end
-
-  def whole(imap, uid)
-    raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
-    return skip(:vazias) if raw.blank?
-
-    @pacer.spend(raw.bytesize)
-    raw
-  end
-
-  # Worth a second round trip only when the cutoff excludes this message's attachments and
-  # it actually carries some.
-  def text_only?(header, lean)
-    @attachments.skip?(header_date(header)) && lean.attachments?
-  end
-
-  # Only ever reached when the cutoff excludes this message's attachments, which decides
-  # what to do about a body it cannot find: nothing. Falling back to the whole message here
-  # would download every attachment the policy just excluded and then discard them, which is
-  # the one thing the lean path exists to prevent -- and on a message that is nothing but
-  # attachments, the fallback is the entire message. The row goes in on its header alone,
-  # marked as withholding what it has, so the pass that wants the files finds it and fills
-  # it in.
-  def text_only(imap, uid, header, lean)
-    @stats[:sem_anexos] += 1
-    @lean = true
-    lean.rebuild(header, body_of(imap, uid, lean))
-  end
-
-  def body_of(imap, uid, lean)
-    section = lean.part&.fetch(:section, nil)
-    return '' if section.nil?
-
-    body = imap.uid_fetch(uid, "BODY.PEEK[#{section}]")&.first&.attr&.dig("BODY[#{section}]").to_s
-    @pacer.spend(body.bytesize)
-    body
-  end
-
-  # The same reading the importer will take of the same message. A header carries its
-  # `Received` lines too, so the fallback is available here and has to be used: deciding the
-  # cutoff on `Date` alone strips the attachments off every mail with an unreadable one,
-  # including the mail the fallback would have placed inside the window.
-  def header_date(header)
-    Import::Email::Timestamp.of(Mail.read_from_string(header))
-  rescue StandardError
-    nil
-  end
-
-  # Counts a record the run declined to write and yields nil, so the caller's
-  # `filter_map` drops it. Written out because `stats[key] += 1 && nil` reads like it
-  # does this and does not: `&&` binds tighter than `+=`, so it adds nil and raises.
-  def skip(key)
-    @stats[key] += 1
-    nil
+  # A message the server had nothing to give for is settled, not failed: the mark may pass
+  # it, and every later run would ask the same question and get the same nothing.
+  def skip_empty
+    @stats[:vazias] += 1
+    true
   end
 
   def classify(mail)
