@@ -25,6 +25,17 @@ describe Import::Octadesk::Backfill do
 
   after { FileUtils.remove_entry(dir) }
 
+  # A ticket is a real batch, but a job per ticket is still tens of thousands of them over
+  # an export, so the importer buffers and this has to empty it -- including when a run ends
+  # because something raised, or the tail is missing from the index with nothing to say so.
+  it 'empties what the importer owes the index when the run ends' do
+    run = described_class.new(inbox: inbox, zip_path: zip_path, pacer: pacer)
+    importer = run.send(:instance_variable_get, :@importer)
+    allow(run).to receive(:parts).and_raise(ArgumentError)
+    expect(importer).to receive(:flush_search_index)
+    expect { run.perform }.to raise_error(ArgumentError)
+  end
+
   it 'walks every part and files what it finds' do
     run = described_class.new(inbox: inbox, zip_path: zip_path, pacer: pacer).perform
     expect(inbox.conversations.count).to eq(6)

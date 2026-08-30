@@ -66,6 +66,7 @@ class Import::Email::Backfill
     self
   ensure
     @cursor.flush
+    @importer.flush_search_index
     close(imap)
   end
 
@@ -117,6 +118,10 @@ class Import::Email::Backfill
       break if @stopped_by
 
       finished, mark = consume(imap, batch)
+      # The batch boundary the walk already has is the one the index wants too: the
+      # importer buffers a settlement at a time and something has to say when a run of them
+      # is a batch.
+      @importer.flush_search_index
       at = finished ? batch.last : mark
       unless frozen
         @cursor.advance(@folder, @uidvalidity, at) if at

@@ -279,6 +279,10 @@ class Import::Email::HistoryImporter < Imap::ImapMailbox
   # order its messages were sent, so the two disagree routinely -- and while a conversation
   # stays in the set, a later UID carrying an older date bypasses the monotonic guard and
   # drags `last_activity_at` backwards, one row at a time, for the whole run.
+  # A backfill outlives its settlements, so it buffers and the walker empties it. The size
+  # only bounds the buffer: the flush happens at the batch boundary the walk already has.
+  def search_index_batch = SEARCH_INDEX_BATCH
+
   def settle_thread
     return if @outcome.blank? || @conversation.blank?
 

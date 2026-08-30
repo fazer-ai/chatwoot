@@ -44,6 +44,8 @@ class Import::Octadesk::Backfill
       walk(part)
     end
     self
+  ensure
+    @importer.flush_search_index
   end
 
   # `from_part` names a member, and a name that is not one is a typo in the command that

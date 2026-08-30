@@ -176,6 +176,28 @@ describe Import::Email::Backfill do
     end
   end
 
+  # The importer buffers a settlement at a time and something has to say when a run of them
+  # is a batch. Wired here rather than asserted on the buffer, because what the buffer needs
+  # is that somebody empties it.
+  describe 'emptying what the importer owes the index' do
+    let(:run) { described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer) }
+    let(:importer) { run.send(:instance_variable_get, :@importer) }
+
+    it 'empties it at the batch boundary the walk already has' do
+      imap = instance_double(Net::IMAP, uid_fetch: [])
+      expect(importer).to receive(:flush_search_index).at_least(:once)
+      run.send(:walk, imap, [10, 11])
+    end
+
+    # An interrupted run leaves at most one batch buffered; a run that ends normally must
+    # leave none, or the tail is missing from the index with nothing to say so.
+    it 'empties it when the run ends, whatever ended it' do
+      allow(run).to receive(:connect).and_raise(Net::IMAP::Error)
+      expect(importer).to receive(:flush_search_index)
+      expect { run.perform }.to raise_error(Net::IMAP::Error)
+    end
+  end
+
   # A message that raised is not settled. Marked as read it would be skipped by every later
   # pass, so a timeout or a malformed part would quietly cost a message forever.
   describe 'how far the cursor is allowed to move' do

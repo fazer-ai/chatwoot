@@ -17,6 +17,35 @@ describe Import::Email::HistoryImporter do
     )
   end
 
+  # The buffer exists for exactly this path, and every spec of the buffer itself exercises a
+  # stand-in: left at the default this importer would send one bulk job per mail, which is
+  # the flood the per-row guard was put in to stop wearing a different job class, and not
+  # one of those specs would notice.
+  describe 'what it owes the search index' do
+    let(:relation) { double('Message relation') } # rubocop:disable RSpec/VerifiedDoubles
+    let(:asked) { [] }
+
+    before do
+      allow(relation).to receive(:reindex)
+      allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+      allow(Message).to receive(:where) do |args|
+        asked << args[:id]
+        relation
+      end
+    end
+
+    it 'holds the mail back rather than asking per message' do
+      2.times { importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel) }
+      expect(asked).to be_empty
+    end
+
+    it 'hands over everything it held when the walk empties it' do
+      2.times { importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel) }
+      importer.flush_search_index
+      expect(asked).to eq([inbox.messages.pluck(:id)])
+    end
+  end
+
   it 'files the message at the date it was sent, not at the date it was imported' do
     importer.import(mail(date: Time.zone.parse('2023-05-01 10:00')), channel)
     expect(inbox.messages.first.created_at).to eq(Time.zone.parse('2023-05-01 10:00'))

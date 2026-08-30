@@ -16,6 +16,24 @@
 # The includer provides two things: `opened`, the ids of conversations this run created,
 # and `announcing`, the block wrapper that lets the dashboard push through.
 module Import::HistorySettlement
+  # What a buffering importer lets pile up before it sends. Big enough that the job count
+  # is a thousandth of the message count, small enough that an interrupted run leaves at
+  # most this many rows for the next pass -- which finds them stored and re-settles them,
+  # so nothing is lost either way.
+  SEARCH_INDEX_BATCH = 500
+
+  # Everything still owed to the index, handed over. Public because it is a contract with
+  # whatever runs the import rather than a step inside a settlement: an importer that
+  # buffers has to be emptied by the thing that knows the run is over, and a buffer left
+  # unflushed is a row missing from the index with nothing anywhere to say so.
+  def flush_search_index
+    ids = @search_backlog.presence&.uniq
+    @search_backlog = []
+    return if ids.blank?
+
+    ActiveRecord.after_all_transactions_commit { ::Message.where(id: ids).reindex(mode: :async) }
+  end
+
   private
 
   # Both halves are settled together rather than one after the other, because a chat can
@@ -51,20 +69,31 @@ module Import::HistorySettlement
   # hook and Message defines it, so the relation form drops exactly the rows the callback
   # would have -- activity messages and, on cloud, an account without the flag.
   #
-  # After the transaction commits, and that is the whole of why this is not a one-liner.
-  # The IMAP importer settles inside a transaction with the write, and this app does not
-  # run `enqueue_after_transaction_commit`: a Sidekiq worker is free to pick the job up
-  # before the rows exist, find nothing, and leave them out of the index for good, since
-  # the per-row callback that would have caught it later is the one this replaced. Outside
-  # a transaction the block runs immediately, which is the other three importers.
+  # Buffered, because a settlement is not a batch. Searchkick splits rows within one
+  # `reindex` call and not across calls, so a job per settlement is a job per *message* on
+  # the IMAP path, which settles one mail at a time -- exactly the flood the guard was put
+  # in to stop, wearing a different job class.
+  #
+  # After the transaction commits, and that is the whole of why the send is not a one-liner.
+  # The IMAP importer settles inside a transaction with the write, and this app does not run
+  # `enqueue_after_transaction_commit`: a worker is free to pick the job up before the rows
+  # exist, find nothing, and leave them out of the index for good, since the per-row
+  # callback that would have caught it later is the one this replaced. Outside a transaction
+  # the block runs immediately.
   def index_for_search(rows)
     return unless ChatwootApp.advanced_search_allowed?
 
-    ids = rows.filter_map(&:id)
-    return if ids.empty?
-
-    ActiveRecord.after_all_transactions_commit { ::Message.where(id: ids).reindex(mode: :async) }
+    @search_backlog = Array(@search_backlog).concat(rows.filter_map(&:id))
+    flush_search_index if @search_backlog.length >= search_index_batch
   end
+
+  # How much to let pile up, and a knob rather than a number because the two shapes of
+  # importer want opposite answers. A WhatsApp importer is handed a webhook's worth of rows
+  # and thrown away, so a buffer there holds the tail of every batch until a request that
+  # may never come: it sends immediately, which is this default. A backfill outlives every
+  # settlement it makes and ends somewhere it can empty the buffer, so it raises this and
+  # takes on the flush.
+  def search_index_batch = 1
 
   # Where the inbox sorts, and where a thread appears in the list. `set_conversation_activity`
   # assigns whatever row it has just written, unconditionally: left to run over history it

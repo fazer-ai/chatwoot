@@ -81,6 +81,10 @@ class Import::Octadesk::TicketImporter
   # describe the interrupted run rather than the ticket. The test is the same one
   # `stamp_seen` makes, and for the same reason -- a thread that ever took live traffic has
   # real stamps, and overwriting those would be the worse error.
+  # A ticket is a real batch, but a job per ticket is still tens of thousands of them over
+  # an export. Buffered like the IMAP side; the walker empties it.
+  def search_index_batch = SEARCH_INDEX_BATCH
+
   def settle_ticket(conversation, rows)
     stored = @opened.include?(conversation.id) ? rows : conversation.messages.to_a
     return if stored.empty?

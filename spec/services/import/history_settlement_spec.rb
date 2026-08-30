@@ -101,6 +101,68 @@ describe Import::HistorySettlement do
       expect(indexed).to be(true)
     end
 
+    # Searchkick splits rows within one `reindex` call and not across calls, so a job per
+    # settlement is a job per message wherever a settlement is one message -- which is the
+    # IMAP path, and which is the flood the guard was put in to stop.
+    describe 'an importer that outlives its settlements' do
+      let(:buffering) do
+        Class.new do
+          include Import::HistorySettlement
+          attr_reader :opened
+
+          def initialize = @opened = Set.new
+          def announcing(&) = yield
+          def run(rows) = settle(rows, [])
+          def search_index_batch = 3
+        end
+      end
+
+      let(:ana) { create(:contact, account: account, name: 'Ana') }
+
+      def watch
+        relation = double('Message relation') # rubocop:disable RSpec/VerifiedDoubles
+        allow(relation).to receive(:reindex)
+        allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+        calls = []
+        allow(Message).to receive(:where) do |args|
+          calls << args[:id]
+          relation
+        end
+        calls
+      end
+
+      it 'sends one pass for the batch instead of one per settlement' do
+        calls = watch
+        importer = buffering.new
+        written = Array.new(3) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
+        written.each { |row| importer.run([row]) }
+
+        expect(calls).to eq([written.map(&:id)])
+      end
+
+      it 'sends what is still owed when the run says it is over' do
+        calls = watch
+        importer = buffering.new
+        written = Array.new(2) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
+        written.each { |row| importer.run([row]) }
+        expect(calls).to be_empty
+
+        importer.flush_search_index
+        expect(calls).to eq([written.map(&:id)])
+      end
+
+      # A resumed OctaDesk ticket settles from the whole conversation, so the same row is
+      # offered again by the next settlement in the same batch.
+      it 'asks for a row once however many settlements named it' do
+        calls = watch
+        importer = buffering.new
+        row = incoming(ana, Time.zone.parse('2023-05-01 10:00'))
+        3.times { importer.run([row]) }
+
+        expect(calls).to eq([[row.id]])
+      end
+    end
+
     # `reindex` is not defined at all unless `searchkick` was declared, which is itself
     # conditional on the same test.
     it 'leaves the index alone where advanced search is not configured' do
