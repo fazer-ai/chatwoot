@@ -96,6 +96,43 @@ describe 'the import rake tasks' do
       expect { Rake::Task['imap:scan'].invoke }.to output(/PROJECAO GERAL/).to_stdout
       expect(inbox.messages.count).to eq(0)
     end
+
+    # net-imap 0.6 answers a rev2-capable server with an ESearchResult, which has `to_a`
+    # and no `length`. The scan reads `length` on the line after the search.
+    it 'survives a server that answers the search with something other than an array' do
+      esearch = Class.new do
+        def initialize(uids) = @uids = uids
+        def to_a = @uids
+        def each(&) = @uids.each(&)
+      end
+      allow(imap).to receive(:uid_search).and_return(esearch.new([]))
+      expect { Rake::Task['imap:scan'].invoke }.to output(/PROJECAO GERAL/).to_stdout
+    end
+  end
+
+  # The scan downloads each sampled message whole, so the cap is a byte budget and not a
+  # preference.
+  describe 'ImapImportOptions.spread' do
+    it 'takes everything when the folder is smaller than the sample' do
+      expect(ImapImportOptions.spread((1..10).to_a, 400).length).to eq(10)
+    end
+
+    # Integer division makes the stride 1 for any folder between sample+1 and 2*sample-1,
+    # so `SAMPLE=400` over 799 messages downloaded 799 of them.
+    it 'never takes more than the sample it was given' do
+      expect(ImapImportOptions.spread((1..799).to_a, 400).length).to eq(400)
+    end
+
+    it 'picks no uid twice' do
+      picked = ImapImportOptions.spread((1..799).to_a, 400)
+      expect(picked.uniq.length).to eq(picked.length)
+    end
+
+    it 'spreads them across the folder rather than taking the head' do
+      picked = ImapImportOptions.spread((1..10_000).to_a, 10)
+      expect(picked.first).to eq(1)
+      expect(picked.last).to be > 9000
+    end
   end
 
   describe 'octadesk:import' do

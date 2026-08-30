@@ -149,7 +149,21 @@ module ImapImportOptions
 
   # Spread across the folder rather than the newest N, because the shape of a mailbox
   # changes over years and its tail does not describe it.
-  def spread(uids, sample) = uids.each_slice([uids.length / sample, 1].max).map(&:first)
+  # `sample` uids spread evenly across the folder, and never more than `sample`.
+  #
+  # Not `each_slice(length / sample)`: integer division makes that stride 1 for any folder
+  # between `sample + 1` and `2 * sample - 1` messages, so the scan takes every uid in it --
+  # `SAMPLE=400` over 799 messages downloads 799 whole messages, close to double the cap it
+  # was given, against the same byte budget the import is rationing.
+  #
+  # Stepping by a float keeps the count exact. The step is at least 1 whenever the folder is
+  # larger than the sample, so the indices strictly increase and no uid is picked twice.
+  def spread(uids, sample)
+    return uids if uids.length <= sample
+
+    step = uids.length / sample.to_f
+    Array.new(sample) { |index| uids[(index * step).floor] }
+  end
 
   def sample_kind(imap, run, uid, pacer)
     raw = imap.uid_fetch(uid, 'BODY.PEEK[]')&.first&.attr&.dig('BODY[]').to_s
@@ -183,7 +197,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     totals = Hash.new(0)
     run.folders(imap).each do |folder|
       imap.examine(folder)
-      uids = imap.uid_search(ImapImportOptions.terms)
+      uids = Array(imap.uid_search(ImapImportOptions.terms))
       puts "\n#{folder}: #{uids.length} mensagens"
       next if uids.empty?
 
