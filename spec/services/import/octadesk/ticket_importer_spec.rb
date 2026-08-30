@@ -213,12 +213,49 @@ describe Import::Octadesk::TicketImporter do
       expect(message.reload.attachments.count).to eq(2)
     end
 
+    # An interaction listing the same URL twice is the vendor's business, not ours. Read
+    # only from the snapshot taken before the loop, the second copy is another download of a
+    # file just stored -- on a run whose cost is the downloads.
+    it 'fetches a url listed twice in the same interaction once' do
+      repeated = ticket.merge(
+        'Number' => 4328,
+        'Interactions' => [ticket['Interactions'].first.merge(
+          'Attachments' => Array.new(2) { { 'Url' => 'https://storage.googleapis.com/tenant/a/foto.png', 'Name' => 'foto.png' } }
+        )]
+      )
+      described_class.new(inbox: inbox, attachments: true).import(repeated)
+      expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(1)
+      expect(a_request(:get, 'https://storage.googleapis.com/tenant/a/foto.png')).to have_been_made.once
+    end
+
     it 'does not fetch one twice when both are already stored' do
       stub_request(:get, 'https://storage.googleapis.com/tenant/b/foto.png')
         .to_return(status: 200, body: 'segundo', headers: { 'content-type' => 'image/png' })
       described_class.new(inbox: inbox, attachments: true).import(with_attachments)
       described_class.new(inbox: inbox, attachments: true).import(with_attachments)
       expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(2)
+    end
+  end
+
+  # `Message` validates content at 150,000 and the mail path never reaches it, because
+  # `MailboxSanitizer` truncates first. Left whole here, `create!` raises and the ticket is
+  # abandoned where it stands: the interactions before it stay committed, so every retry
+  # files nothing new, hits the same comment and gives up again.
+  describe 'a comment longer than a message may be' do
+    let(:enormous) do
+      ticket.merge('Number' => 4329,
+                   'Interactions' => [ticket['Interactions'].first.merge('Comments' => [{ 'Content' => 'a' * 160_000 }]),
+                                      ticket['Interactions'].last])
+    end
+
+    it 'files it truncated rather than losing the rest of the ticket' do
+      expect { described_class.new(inbox: inbox).import(enormous) }.not_to raise_error
+      expect(inbox.messages.where(message_type: :incoming).first.content.length).to eq(150_000)
+    end
+
+    it 'still files the interactions after it' do
+      described_class.new(inbox: inbox).import(enormous)
+      expect(inbox.messages.where(message_type: :outgoing).count).to eq(1)
     end
   end
 

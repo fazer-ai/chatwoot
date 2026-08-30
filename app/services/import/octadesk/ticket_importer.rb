@@ -27,6 +27,9 @@ class Import::Octadesk::TicketImporter
   include Import::HistorySettlement
 
   SOURCE_PREFIX = 'octadesk'.freeze
+  # `Message` validates `content` at this, and the mail path is truncated to it by
+  # `MailboxSanitizer` before it ever reaches the model.
+  CONTENT_LIMIT = 150_000
 
   attr_reader :opened, :stats
 
@@ -301,8 +304,15 @@ class Import::Octadesk::TicketImporter
     nil
   end
 
+  # Truncated to what `Message` will accept, which is what the mail path gets for free from
+  # `MailboxSanitizer` and this one has to ask for. Over the limit `create!` raises, and the
+  # ticket is abandoned where it stands: the interactions before it stay committed, so every
+  # retry files nothing new, hits the same comment and gives up again -- the rest of that
+  # ticket lost for good, quietly, in a run whose whole point is completeness. A tail nobody
+  # would have read is the cheaper loss.
   def body(interaction)
-    Array(interaction['Comments']).filter_map { |comment| comment['Content'].to_s.strip.presence }.join("\n\n")
+    joined = Array(interaction['Comments']).filter_map { |comment| comment['Content'].to_s.strip.presence }.join("\n\n")
+    joined.truncate(CONTENT_LIMIT)
   end
 
   # `imported` is what Inbound::Coverage and HistorySettlement read, and what a report
@@ -322,6 +332,10 @@ class Import::Octadesk::TicketImporter
   def attach(message, interaction)
     return unless @attachments
 
+    # Seeded from what is already on the message and added to as the loop goes, because an
+    # interaction can list the same URL twice: read only from the snapshot, every copy after
+    # the first is another download of a file we have just stored, on a run whose cost is
+    # the downloads.
     held = stored_sources(message)
     Array(interaction['Attachments']).each do |attachment|
       url = attachment['Url'].to_s
@@ -329,6 +343,7 @@ class Import::Octadesk::TicketImporter
       next if held.include?(url)
 
       stored = Import::Octadesk::AttachmentFetcher.new(message: message, url: url, name: attachment['Name']).perform
+      held << url
       @stats[stored ? :anexos : :anexos_recusados] += 1
     rescue StandardError
       @stats[:anexos_falharam] += 1
