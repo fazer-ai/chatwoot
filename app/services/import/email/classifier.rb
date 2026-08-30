@@ -163,11 +163,26 @@ class Import::Email::Classifier
     :customer
   end
 
+  # From one of our addresses, and not sent on somebody else's behalf.
+  #
+  # The exception is not exotic: a website form posts as the company and points `Reply-To`
+  # at the customer, so `From` is ours and the message is inbound. Read on `From` alone it
+  # answers `:sent`, which a run refuses outright -- so every message the form ever
+  # generated is dropped and the cursor moves past it. `HistoryImporter#redirected_reply_to?`
+  # already reads this shape to name the contact; the classifier has to agree with it or
+  # those messages never reach the importer at all.
+  #
+  # A `Reply-To` that is also ours is a real outgoing mail with a routing header, so the
+  # test is that it points somewhere else.
   def own_mail?
     return false if @own_addresses.empty?
+    return false unless Array(@mail.from).any? { |address| ours?(address) }
 
-    Array(@mail.from).any? { |address| @own_addresses.include?(address.to_s.downcase.strip) }
+    reply_to = Array(@mail.reply_to)
+    reply_to.empty? || reply_to.any? { |address| ours?(address) }
   end
+
+  def ours?(address) = @own_addresses.include?(address.to_s.downcase.strip)
 
   def extract_ticket
     @mail.subject.to_s[TICKET_SUBJECT, 1] || @text[TICKET_BODY, 1]
