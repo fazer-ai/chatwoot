@@ -125,10 +125,15 @@ class Import::Octadesk::TicketImporter
     [parts.join(' · '), who && "(por #{who})"].compact.join(' ')
   end
 
-  # An interaction with no comment is a status change or a trigger firing: real history,
-  # but not a message. Those are written separately by Import::Octadesk::ActivityWriter.
+  # An interaction with nothing said and nothing attached is a status change or a trigger
+  # firing: real history, but not a message. Those are written separately by
+  # Import::Octadesk::ActivityWriter, which draws the line in the same place.
+  #
+  # The row is written even on a pass that is not fetching attachments: it has the sender,
+  # the date and its place in the thread, and the pass that does fetch finds it by
+  # interaction id and fills it in.
   def writable(ticket)
-    Array(ticket['Interactions']).select { |i| Import::Octadesk::ActivityWriter.commented?(i) }
+    Array(ticket['Interactions']).select { |i| Import::Octadesk::ActivityWriter.message?(i) }
   end
 
   def any_activity?(ticket)

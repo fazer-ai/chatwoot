@@ -237,6 +237,48 @@ describe Import::Octadesk::TicketImporter do
     end
   end
 
+  # A reply that is only a photo is an ordinary thing for a customer to send. Read as "no
+  # comment" the interaction is a status change at best and nothing at all at worst, and it
+  # takes the attachment with it -- to a bucket that stops existing when the subscription
+  # does, which makes that loss permanent rather than late.
+  describe 'an interaction that is only an attachment' do
+    let(:only_a_file) do
+      ticket.merge('Number' => 4330,
+                   'Interactions' => [ticket['Interactions'].first.merge(
+                     'Comments' => [], 'Attachments' => [{ 'Url' => 'https://storage.googleapis.com/t/a/foto.png', 'Name' => 'foto.png' }]
+                   )])
+    end
+
+    before do
+      stub_request(:get, 'https://storage.googleapis.com/t/a/foto.png')
+        .to_return(status: 200, body: 'foto', headers: { 'content-type' => 'image/png' })
+    end
+
+    it 'files it as a message rather than dropping the whole interaction' do
+      described_class.new(inbox: inbox, attachments: true).import(only_a_file)
+      message = inbox.messages.find_by(message_type: :incoming)
+      expect(message).to be_present
+      expect(message.attachments.count).to eq(1)
+    end
+
+    # The row carries the sender, the date and its place in the thread whether or not this
+    # pass is fetching files, and the pass that does finds it by interaction id.
+    it 'files the row even on a pass that is not fetching attachments' do
+      described_class.new(inbox: inbox).import(only_a_file)
+      expect(inbox.messages.where(message_type: :incoming).count).to eq(1)
+
+      described_class.new(inbox: inbox, attachments: true).import(only_a_file)
+      expect(inbox.messages.find_by(message_type: :incoming).attachments.count).to eq(1)
+    end
+
+    it 'does not also write it as an activity line' do
+      described_class.new(inbox: inbox).import(
+        only_a_file.merge('Interactions' => [only_a_file['Interactions'].first.merge('PropertiesChanges' => { 'Status' => 'Resolvido' })])
+      )
+      expect(inbox.messages.where(message_type: :activity).count).to eq(0)
+    end
+  end
+
   # Like the mail importer, this one batches its own reindexes, so the per-row callback has
   # to be off while it writes or every row is indexed twice. The guard reads this flag
   # rather than the level.

@@ -184,6 +184,20 @@ describe 'the import rake tasks' do
       expect { Rake::Task['imap:scan'].invoke }.to raise_error(ArgumentError, /SAMPLE/)
     end
 
+    # The folder with the attachments is the one that exhausts the budget, and the one whose
+    # absence the total does not show: a projection built on the folders that fit is not a
+    # smaller projection, it is a wrong one.
+    it 'says which folders it never sampled rather than printing a table that looks whole' do
+      allow(imap).to receive(:list).and_return([Struct.new(:name, :attr).new('[Gmail]/Todos', [:All]),
+                                                Struct.new(:name, :attr).new('[Gmail]/Spam', [:Junk])])
+      spent = Import::Email::Pacer.new(budget_mb: 1, max_load: 99)
+      allow(Import::Email::Pacer).to receive(:new).and_return(spent)
+      allow(spent).to receive(:over_budget?).and_return(false, true)
+
+      expect { Rake::Task['imap:scan'].invoke }
+        .to output(/PROJECAO GERAL \(PARCIAL\).*ORCAMENTO ESGOTADO.*Spam/m).to_stdout
+    end
+
     it 'survives a server that answers the search with something other than an array' do
       esearch = Class.new do
         def initialize(uids) = @uids = uids

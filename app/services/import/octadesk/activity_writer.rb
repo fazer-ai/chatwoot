@@ -26,20 +26,35 @@ class Import::Octadesk::ActivityWriter
   # database. The two must agree, or a re-run moves the stamp and the import stops being
   # something that can be repeated.
   def perform(conversation, ticket)
-    Array(ticket['Interactions']).reject { |interaction| commented?(interaction) }
+    Array(ticket['Interactions']).reject { |interaction| message?(interaction) }
                                  .filter_map { |interaction| write(conversation, interaction) }
   end
 
-  # Shared with the message importer, which selects on the opposite answer.
+  # Whether the interaction is somebody saying something, which is the line between the two
+  # writers: a message row or an activity row, never both. Shared with the message importer,
+  # which selects on the same answer from the other side.
+  #
+  # Files count. A reply that is only a photo is an ordinary thing for a customer to send,
+  # and read as "no comment" it becomes a status line at best and nothing at all at worst --
+  # taking the attachment with it, to a bucket that stops existing when the subscription
+  # does, which makes that loss permanent rather than late.
+  def self.message?(interaction)
+    commented?(interaction) || attached?(interaction)
+  end
+
   def self.commented?(interaction)
     Array(interaction['Comments']).any? { |comment| comment['Content'].to_s.strip.present? }
+  end
+
+  def self.attached?(interaction)
+    Array(interaction['Attachments']).any? { |attachment| attachment['Url'].to_s.strip.present? }
   end
 
   # Whether this interaction would become an activity row, answered without writing one, so
   # a caller can tell a ticket carrying only status changes from one carrying nothing at
   # all. The first is history and belongs in the archive; only the second is empty.
   def self.writable?(interaction)
-    !commented?(interaction) &&
+    !message?(interaction) &&
       line_for(interaction['PropertiesChanges'] || {}, interaction['Person'] || {}).present?
   end
 
@@ -60,7 +75,7 @@ class Import::Octadesk::ActivityWriter
 
   private
 
-  def commented?(interaction) = self.class.commented?(interaction)
+  def message?(interaction) = self.class.message?(interaction)
 
   def write(conversation, interaction)
     line = self.class.line_for(interaction['PropertiesChanges'] || {}, interaction['Person'] || {})

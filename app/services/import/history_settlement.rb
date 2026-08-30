@@ -28,10 +28,20 @@ module Import::HistorySettlement
   # unflushed is a row missing from the index with nothing anywhere to say so.
   def flush_search_index
     ids = @search_backlog.presence&.uniq
-    @search_backlog = []
     return if ids.blank?
 
-    ActiveRecord.after_all_transactions_commit { ::Message.where(id: ids).reindex(mode: :async) }
+    @search_backlog = []
+    ActiveRecord.after_all_transactions_commit do
+      ::Message.where(id: ids).reindex(mode: :async)
+    rescue StandardError
+      # Put back and re-raise, rather than swallow: the rows are committed, and the next
+      # pass will skip them as already stored, so a batch dropped here is a batch nothing
+      # ever indexes again. Whatever stops the handoff -- Redis away, Sidekiq away -- is
+      # also a reason for the run to stop rather than carry on writing history it can no
+      # longer file.
+      @search_backlog = ids + Array(@search_backlog)
+      raise
+    end
   end
 
   private

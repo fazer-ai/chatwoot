@@ -99,6 +99,19 @@ module ImapImportOptions
   # Counts are integers and measurements are not: `SAMPLE=0.5` truncates to zero at the call
   # site and the scan classifies nothing while printing a finished projection. See
   # Import::Options for why none of these is read leniently.
+  # A projection built on the folders that fit is not a smaller projection, it is a wrong
+  # one: the folder with the attachments is the one that exhausts the budget, and the one
+  # whose absence the total does not show. So the gap is named rather than left to a reader
+  # of a table that looks complete.
+  def projection(totals, unsampled)
+    puts "\n#{'=' * 70}\nPROJECAO GERAL#{unsampled.any? ? ' (PARCIAL)' : ''}"
+    totals.sort_by { |_, count| -count }.each { |kind, count| puts "  #{kind.to_s.ljust(12)} ~#{count}" }
+    return if unsampled.empty?
+
+    puts "\nORCAMENTO ESGOTADO: nenhuma amostra de #{unsampled.join(', ')}."
+    puts 'A projecao acima nao inclui essas pastas. Rode de novo amanha ou com BUDGET_MB maior.'
+  end
+
   def limit = Import::Options.integer('LIMIT')
   def sample = Import::Options.integer('SAMPLE', default: 400)
 
@@ -215,7 +228,15 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
                                     Teto: "#{pacer.budget_mb_left}MB")
 
     totals = Hash.new(0)
+    unsampled = []
     run.folders(imap).each do |folder|
+      # A scan that ran out of budget in an early folder samples nothing in the later ones,
+      # and a projection built on that is not a smaller projection, it is a wrong one: the
+      # folder with the attachments is exactly the one that exhausts the budget, and exactly
+      # the one whose absence the total does not show. Named here rather than left to the
+      # reader of a table that looks complete.
+      next unsampled << folder if pacer.over_budget?
+
       imap.examine(folder)
       uids = Array(imap.uid_search(ImapImportOptions.terms))
       puts "\n#{folder}: #{uids.length} mensagens"
@@ -231,8 +252,7 @@ namespace :imap do # rubocop:disable Metrics/BlockLength -- two task bodies in o
     end
     run.close(imap)
 
-    puts "\n#{'=' * 70}\nPROJECAO GERAL"
-    totals.sort_by { |_, v| -v }.each { |kind, count| puts "  #{kind.to_s.ljust(12)} ~#{count}" }
+    ImapImportOptions.projection(totals, unsampled)
   end
 
   desc 'Importa historico de e-mails do IMAP para uma inbox do Chatwoot'

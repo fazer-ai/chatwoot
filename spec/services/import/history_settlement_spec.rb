@@ -157,6 +157,23 @@ describe Import::HistorySettlement do
         expect(calls).to eq([written.map(&:id)])
       end
 
+      # The rows are committed and the next pass skips them as already stored, so a batch
+      # dropped on a failed handoff is a batch nothing ever indexes again.
+      it 'keeps what it could not hand over' do
+        written = Array.new(2) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
+        relation = double('Message relation') # rubocop:disable RSpec/VerifiedDoubles
+        allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+        allow(Message).to receive(:where).and_return(relation)
+        allow(relation).to receive(:reindex).and_raise(Redis::CannotConnectError)
+        importer = buffering.new
+        written.each { |row| importer.run([row]) }
+
+        expect { importer.flush_search_index }.to raise_error(Redis::CannotConnectError)
+        allow(relation).to receive(:reindex)
+        importer.flush_search_index
+        expect(relation).to have_received(:reindex).twice
+      end
+
       # A resumed OctaDesk ticket settles from the whole conversation, so the same row is
       # offered again by the next settlement in the same batch.
       it 'asks for a row once however many settlements named it' do
