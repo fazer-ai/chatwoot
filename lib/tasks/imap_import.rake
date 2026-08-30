@@ -16,13 +16,20 @@ require 'net/imap'
 #   INBOX_ID=1 bundle exec rails imap:scan               # dry run, writes nothing
 #   INBOX_ID=1 LIMIT=200 bundle exec rails imap:import   # first real batch
 #
+# On an installation with advanced search, run one bulk reindex when the import is done.
+# The rows go to the index a batch at a time, and a batch is in memory until the walk hands
+# it over: a run killed between a commit and that handoff leaves those rows stored and
+# unindexed, and no later pass offers them again -- they are already stored, which is the
+# only question the resume asks. Nothing here can see that gap, so it is closed from
+# outside, once, by the thing that would want a reindex after a bulk import anyway.
+#
 # Options, all through the environment:
 #   INBOX_ID           required
 #   FOLDERS            comma separated (default: the all-mail folder plus Spam)
-#   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023. UNTIL defaults to today, so a run never
-#                      takes mail the live fetch job has not had its turn at -- filed here
-#                      it would be born resolved and silent, and the poller would then skip
-#                      it as already stored
+#   SINCE / UNTIL      IMAP dates, e.g. 01-Jan-2023. UNTIL defaults to yesterday, which is
+#                      as far back as the live fetch job reads: a run never touches a day
+#                      that job is also working. Filed here, live mail would be born
+#                      resolved and silent and the poller would then skip it as stored
 #   ATTACHMENTS        `all`, or a YYYY-MM-DD to take attachments only on messages newer
 #                      than that date. Unset means none, which is what keeps a first pass
 #                      inside the budget: an attachment is never fetched, not fetched and
@@ -89,7 +96,14 @@ module ImapImportOptions
     terms + ['BEFORE', until_date]
   end
 
-  def until_date = ENV['UNTIL'].presence || Date.current.strftime('%d-%b-%Y')
+  # `Imap::BaseFetchEmailService#since` searches from `today - interval`, and the job passes
+  # 1 unless told otherwise, so the poller owns yesterday and today. Stopping before
+  # yesterday leaves no day that both would read: two writers on one message can each pass
+  # their own existence check, since nothing here is a lock or a unique index, and the mail
+  # arrives twice in two conversations.
+  POLLER_DAYS = 1
+
+  def until_date = ENV['UNTIL'].presence || (Date.current - POLLER_DAYS).strftime('%d-%b-%Y')
 
   def folders = ENV['FOLDERS'].presence&.split(',')&.map(&:strip)
 

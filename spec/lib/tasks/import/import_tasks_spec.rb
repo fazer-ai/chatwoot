@@ -38,13 +38,17 @@ describe 'the import rake tasks' do
   # poller then skips the source id as already stored: a customer who wrote this morning is
   # filed as history and never reaches an agent, with no error anywhere.
   describe 'the line between a history import and a second poller' do
-    it 'stops before today unless told otherwise' do
-      expect(ImapImportOptions.terms).to eq(['ALL', 'BEFORE', Date.current.strftime('%d-%b-%Y')])
+    # The poller searches from `today - interval` and the job passes 1, so it owns yesterday
+    # and today. Stopping before yesterday leaves no day both would read: nothing here is a
+    # lock or a unique index, so two writers on one message each pass their own existence
+    # check and it arrives twice, in two conversations.
+    it 'stops before the day the poller is already working' do
+      expect(ImapImportOptions.terms).to eq(['ALL', 'BEFORE', 1.day.ago.to_date.strftime('%d-%b-%Y')])
     end
 
     it 'keeps the cutoff beside SINCE rather than replacing it' do
       ENV['SINCE'] = '01-Jan-2023'
-      expect(ImapImportOptions.terms).to eq(['SINCE', '01-Jan-2023', 'BEFORE', Date.current.strftime('%d-%b-%Y')])
+      expect(ImapImportOptions.terms).to eq(['SINCE', '01-Jan-2023', 'BEFORE', 1.day.ago.to_date.strftime('%d-%b-%Y')])
     end
 
     it 'moves the line where the operator asks for it' do

@@ -47,11 +47,23 @@ class Import::Email::TextOnly
   # The message's own headers with the two that described the multipart envelope replaced.
   # Split on a newline that no whitespace follows, so a folded header stays one entry and
   # is dropped or kept whole.
+  # `body` may be empty, and on a message that is nothing but attachments it always is:
+  # there is no text part to name, and under a cutoff that excludes the files there is
+  # nothing to fetch. What comes back is the message's own headers announcing an empty
+  # `text/plain`, which is a true copy of what this pass is keeping. The row goes in with a
+  # date, a sender and a thread, and marked as withholding what it has, so the pass that
+  # wants the files finds it.
   def rebuild(header, body)
     kept = header.split(/\r?\n(?![ \t])/).grep_v(DROPPED_HEADERS)
-    kept << "Content-Type: #{[part[:type], part[:charset] && "charset=#{part[:charset]}"].compact.join('; ')}"
-    kept << "Content-Transfer-Encoding: #{part[:encoding]}" if part[:encoding].present?
+    kept << "Content-Type: #{content_type}"
+    kept << "Content-Transfer-Encoding: #{part[:encoding]}" if part && part[:encoding].present?
     "#{kept.join("\r\n").rstrip}\r\n\r\n#{body}"
+  end
+
+  def content_type
+    return 'text/plain' if part.nil?
+
+    [part[:type], part[:charset] && "charset=#{part[:charset]}"].compact.join('; ')
   end
 
   private

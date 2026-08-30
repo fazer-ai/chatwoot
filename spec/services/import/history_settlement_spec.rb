@@ -174,6 +174,27 @@ describe Import::HistorySettlement do
         expect(relation).to have_received(:reindex).twice
       end
 
+      # The threshold flush fires inside the mail importer's transaction, carrying ids from
+      # hundreds of messages that committed long before it. Rails discards an after_commit
+      # callback when the transaction rolls back, so clearing the backlog up front would
+      # lose every one of them -- their per-row callback was suppressed and every later pass
+      # skips them as already stored.
+      it 'keeps what a rolled back transaction never handed over' do
+        written = Array.new(2) { |i| incoming(ana, Time.zone.parse('2023-05-01 10:00') + i.days) }
+        calls = watch
+        importer = buffering.new
+        written.each { |row| importer.run([row]) }
+
+        ActiveRecord::Base.transaction do
+          importer.flush_search_index
+          raise ActiveRecord::Rollback
+        end
+        expect(calls).to be_empty
+
+        importer.flush_search_index
+        expect(calls).to eq([written.map(&:id)])
+      end
+
       # A resumed OctaDesk ticket settles from the whole conversation, so the same row is
       # offered again by the next settlement in the same batch.
       it 'asks for a row once however many settlements named it' do

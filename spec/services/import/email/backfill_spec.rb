@@ -176,6 +176,50 @@ describe Import::Email::Backfill do
     end
   end
 
+  # `BODY.PEEK[]` pulls the encoded attachments along with the words, which is the download
+  # the cutoff exists to refuse. A message that is nothing but attachments has no text part
+  # to name, and falling back to the whole message there fetches every file the policy just
+  # excluded and then discards them -- on exactly the messages where the fallback is the
+  # entire message.
+  describe 'a message under the cutoff whose structure names no text part' do
+    let(:run) { described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer) }
+    let(:leaf) do
+      Struct.new(:media_type, :subtype, :encoding, :param, :disposition, :size, keyword_init: true) # rubocop:disable Lint/StructNewOverride
+    end
+    let(:structure) do
+      Struct.new(:subtype, :parts, keyword_init: true) do
+        def media_type = 'MULTIPART'
+        def encoding = nil
+        def param = nil
+        def disposition = nil
+        def size = 0
+      end.new(subtype: 'MIXED',
+              parts: [leaf.new(media_type: 'IMAGE', subtype: 'PNG', encoding: 'BASE64', param: {},
+                               disposition: Struct.new(:dsp_type, :param).new('ATTACHMENT'), size: 3_000_000)])
+    end
+    let(:header) do
+      "From: cliente@example.com\r\nTo: #{channel.email}\r\nSubject: fotos\r\n" \
+        "Message-ID: <so-anexo@example.com>\r\nDate: #{Time.zone.parse('2023-05-01 10:00').rfc2822}\r\n"
+    end
+    let(:meta) { Struct.new(:attr).new({ 'BODY[HEADER]' => header, 'BODYSTRUCTURE' => structure }) }
+
+    it 'files it from the header rather than downloading what it will not keep' do
+      imap = instance_double(Net::IMAP)
+      allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE']).and_return([meta])
+
+      expect(run.send(:fetch, imap, 10)).to include('so-anexo@example.com')
+      expect(imap).not_to have_received(:uid_fetch).with(10, 'BODY.PEEK[]')
+    end
+
+    it 'records it as a row still owed its attachments' do
+      imap = instance_double(Net::IMAP)
+      allow(imap).to receive(:uid_fetch).with(10, ['BODY.PEEK[HEADER]', 'BODYSTRUCTURE']).and_return([meta])
+
+      run.send(:fetch, imap, 10)
+      expect(run.stats[:sem_anexos]).to eq(1)
+    end
+  end
+
   # The importer buffers a settlement at a time and something has to say when a run of them
   # is a batch. Wired here rather than asserted on the buffer, because what the buffer needs
   # is that somebody empties it.

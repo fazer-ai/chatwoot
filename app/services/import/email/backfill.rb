@@ -252,7 +252,7 @@ class Import::Email::Backfill
     lean = Import::Email::TextOnly.new(meta.attr['BODYSTRUCTURE'])
     return whole(imap, uid) unless text_only?(header, lean)
 
-    text_only(imap, uid, header, lean) || whole(imap, uid)
+    text_only(imap, uid, header, lean)
   end
 
   def whole(imap, uid)
@@ -269,20 +269,26 @@ class Import::Email::Backfill
     @attachments.skip?(header_date(header)) && lean.attachments?
   end
 
-  # Returns nil when the structure names no text part worth taking, and the caller falls
-  # back to the whole message: a body that cannot be located is not a body worth guessing.
+  # Only ever reached when the cutoff excludes this message's attachments, which decides
+  # what to do about a body it cannot find: nothing. Falling back to the whole message here
+  # would download every attachment the policy just excluded and then discard them, which is
+  # the one thing the lean path exists to prevent -- and on a message that is nothing but
+  # attachments, the fallback is the entire message. The row goes in on its header alone,
+  # marked as withholding what it has, so the pass that wants the files finds it and fills
+  # it in.
   def text_only(imap, uid, header, lean)
-    part = lean.part
-    return if part.nil?
-
-    section = part[:section]
-    body = imap.uid_fetch(uid, "BODY.PEEK[#{section}]")&.first&.attr&.dig("BODY[#{section}]").to_s
-    return if body.blank?
-
-    @pacer.spend(body.bytesize)
     @stats[:sem_anexos] += 1
     @lean = true
-    lean.rebuild(header, body)
+    lean.rebuild(header, body_of(imap, uid, lean))
+  end
+
+  def body_of(imap, uid, lean)
+    section = lean.part&.fetch(:section, nil)
+    return '' if section.nil?
+
+    body = imap.uid_fetch(uid, "BODY.PEEK[#{section}]")&.first&.attr&.dig("BODY[#{section}]").to_s
+    @pacer.spend(body.bytesize)
+    body
   end
 
   # The same reading the importer will take of the same message. A header carries its

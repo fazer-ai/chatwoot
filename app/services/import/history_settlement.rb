@@ -30,17 +30,18 @@ module Import::HistorySettlement
     ids = @search_backlog.presence&.uniq
     return if ids.blank?
 
-    @search_backlog = []
+    # Dropped from the backlog inside the handoff and nowhere else, which covers the two
+    # ways it can fail to happen. The enqueue can raise -- Redis away, Sidekiq away -- and
+    # the transaction this is called from can roll back, and Rails then discards the
+    # callback without running it. Cleared up front, either would take the ids with it: the
+    # rows are committed, their per-row callback was suppressed, and every later pass skips
+    # them as already stored, so a batch lost here is a batch nothing indexes again. The
+    # threshold flush makes that a live case rather than a careful one -- it fires inside
+    # the mail importer's transaction, carrying ids from hundreds of messages that
+    # committed long before it.
     ActiveRecord.after_all_transactions_commit do
       ::Message.where(id: ids).reindex(mode: :async)
-    rescue StandardError
-      # Put back and re-raise, rather than swallow: the rows are committed, and the next
-      # pass will skip them as already stored, so a batch dropped here is a batch nothing
-      # ever indexes again. Whatever stops the handoff -- Redis away, Sidekiq away -- is
-      # also a reason for the run to stop rather than carry on writing history it can no
-      # longer file.
-      @search_backlog = ids + Array(@search_backlog)
-      raise
+      @search_backlog -= ids
     end
   end
 
