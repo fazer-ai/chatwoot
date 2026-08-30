@@ -152,6 +152,23 @@ module ImportGuards
     end
   end
 
+  # One transcription job per audio attachment, enqueued straight from the Attachment's own
+  # after_create_commit. Enterprise only, and it reaches neither the dispatcher guards nor
+  # the ones on Message: the job is not an event and the attachment is not the message.
+  #
+  # Archive only, and the reason is money rather than noise. Transcription spends Captain
+  # credits per file and rides the low-priority queue, so an archive carrying years of
+  # forwarded voice notes drains the account's balance transcribing conversations that were
+  # closed before the feature existed -- and crowds out the live traffic waiting behind it.
+  # A gap sync recovering one voice note wants it transcribed like any arrival.
+  module SilentTranscription
+    def enqueue_audio_transcription
+      return if Import::SilentWrite.archive?
+
+      super
+    end
+  end
+
   module SilentMessageCallbacks
     def execute_after_create_commit_callbacks
       return super unless Import::SilentWrite.on?
@@ -171,5 +188,8 @@ Rails.application.config.to_prepare do
   Message.prepend(ImportGuards::SilentScheduledMessages)
   Conversation.prepend(ImportGuards::SilentAutoAssignment)
   Contact.prepend(ImportGuards::SilentGravatar)
-  Company.prepend(ImportGuards::SilentFavicon) if ChatwootApp.enterprise?
+  if ChatwootApp.enterprise?
+    Company.prepend(ImportGuards::SilentFavicon)
+    Attachment.prepend(ImportGuards::SilentTranscription)
+  end
 end

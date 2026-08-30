@@ -23,4 +23,32 @@ describe 'ImportGuards' do
     expect { Import::SilentWrite.wrap(announce: true) { create(:company, account: account, domain: 'empresa.example.com') } }
       .to have_enqueued_job(Avatar::AvatarFromFaviconJob)
   end
+
+  # Transcription spends Captain credits per file. An archive of forwarded voice notes
+  # drains the balance transcribing conversations closed before the feature existed.
+  describe 'an audio attachment' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+
+    def attach_audio
+      message = create(:message, account: account, inbox: inbox, conversation: conversation)
+      attachment = message.attachments.new(account_id: account.id, file_type: :audio)
+      attachment.file.attach(io: StringIO.new('audio'), filename: 'nota.ogg', content_type: 'audio/ogg')
+      message.save!
+    end
+
+    def audio(**level) = Import::SilentWrite.wrap(**level) { attach_audio }
+
+    it 'is transcribed outside an import, as it always has been' do
+      expect { attach_audio }.to have_enqueued_job(Messages::AudioTranscriptionJob)
+    end
+
+    it 'is not transcribed while writing an archive' do
+      expect { audio }.not_to have_enqueued_job(Messages::AudioTranscriptionJob)
+    end
+
+    it 'is transcribed for a gap row, where it is one file like any arrival' do
+      expect { audio(announce: true) }.to have_enqueued_job(Messages::AudioTranscriptionJob)
+    end
+  end
 end

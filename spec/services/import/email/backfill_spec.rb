@@ -130,6 +130,27 @@ describe Import::Email::Backfill do
     end
   end
 
+  # net-imap 0.6 answers a rev2-capable server with an ESearchResult rather than an Array.
+  # It carries `each` and `to_a` and none of `length`, `select` or `each_slice`, so the walk
+  # breaks at the progress line, before it can report anything.
+  describe 'a server that answers the search with something other than an array' do
+    let(:run) { described_class.new(inbox: inbox, kinds: [:customer], pacer: pacer) }
+    let(:esearch) do
+      Class.new do
+        def initialize(uids) = @uids = uids
+        def to_a = @uids
+        def each(&) = @uids.each(&)
+      end
+    end
+
+    it 'walks it the same as an array' do
+      imap = instance_double(Net::IMAP, list: [Struct.new(:name, :attr).new('INBOX', [:Hasnochildren])],
+                                        examine: nil, responses: 7, uid_search: esearch.new([10, 11]), logout: nil)
+      allow(run).to receive_messages(connect: imap, unstored: [], close: nil)
+      expect { run.perform }.not_to raise_error
+    end
+  end
+
   # A message that raised is not settled. Marked as read it would be skipped by every later
   # pass, so a timeout or a malformed part would quietly cost a message forever.
   describe 'how far the cursor is allowed to move' do
