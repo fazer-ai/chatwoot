@@ -146,6 +146,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
       message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
       expect(message.content).to eq('olha isso')
+      expect(message.content_attributes).not_to have_key('pending_media')
       expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
         .with(message, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
     end
@@ -173,6 +174,29 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
       expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
 
+      expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+    end
+  end
+
+  # The file did not come with the message. Nothing is queued here, because at this point
+  # nothing knows whether the bytes are reachable at all -- `media.download_failed` is
+  # what says so, and it arrives next. What this has to leave behind is the file's own
+  # description, which lives on the event and nowhere else once it has gone by.
+  context 'with media whose bytes did not come with it' do
+    let(:content) do
+      model::Content::Media.new(
+        kind: 'audio', mime: 'audio/ogg', caption: 'ouve isso', voice_note: true,
+        thumbnail: "data:image/jpeg;base64,#{'A' * 128}"
+      )
+    end
+
+    it 'keeps what the file was, and asks nobody for it yet' do
+      expect(dispatch).to eq(:handled)
+
+      message = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+      expect(message.content_attributes['pending_media']).to eq(
+        'type' => 'media', 'kind' => 'audio', 'mime' => 'audio/ogg', 'voice_note' => true
+      )
       expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
     end
   end

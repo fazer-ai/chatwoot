@@ -66,9 +66,23 @@ module Whatsapp::Session::Model::Events
     wire_type 'pairing.passkey_request'
   end
 
-  class PairingPasskeyConfirmation < Data.define(:code)
+  class PairingPasskeyConfirmation < Data.define(:request_id, :code)
     include Serializable
     wire_type 'pairing.passkey_confirmation'
+  end
+
+  # What the session missed while it was down, counted by the server before it replays
+  # any of it, so a reader can say how much is coming instead of watching a queue move.
+  # The messages themselves arrive afterwards as ordinary `message.received`.
+  class SessionOfflineSyncPreview < Data.define(:messages, :receipts, :notifications, :app_data_changes, :total)
+    include Serializable
+    wire_type 'session.offline_sync_preview'
+  end
+
+  # The replay is over: what has not arrived by now is not coming.
+  class SessionOfflineSyncCompleted < Data.define(:count)
+    include Serializable
+    wire_type 'session.offline_sync_completed'
   end
 
   class MessageReceived < Data.define(:message)
@@ -113,10 +127,19 @@ module Whatsapp::Session::Model::Events
     end
   end
 
-  class MediaDownloadFailed < Data.define(:chat, :message_id, :reason)
+  class MediaDownloadFailed < Data.define(:chat, :message_id, :reason, :recoverable)
     include Serializable
     wire_type 'media.download_failed'
     coerce chat: Address
+    # Whether the file may still be somewhere the provider can reach: WhatsApp drops a
+    # file off its CDN long before the sender's phone forgets it, and asking for it again
+    # is what recovers a message that sat in a backlog. Everything else here is the file
+    # being gone.
+    #
+    # False is what a provider that predates the field says by saying nothing, and it is
+    # the half that changes nothing: the bubble is flagged and nobody comes back for the
+    # bytes, which is what this event has always meant.
+    defaults recoverable: false
   end
 
   class CommandFailed < Data.define(:command_id, :command_type, :message_id, :error)
@@ -241,7 +264,8 @@ module Whatsapp::Session::Model::Events
 
   CLASSES = [
     SessionState, SessionLoggedOut, SessionStreamReplaced, SessionTemporaryBan, SessionClientOutdated,
-    SessionConnectFailure, PairingQr, PairingCode, PairingSuccess, PairingError, PairingPasskeyRequest,
+    SessionConnectFailure, SessionOfflineSyncPreview, SessionOfflineSyncCompleted,
+    PairingQr, PairingCode, PairingSuccess, PairingError, PairingPasskeyRequest,
     PairingPasskeyConfirmation, MessageReceived, MessageReceipt, MessageEdited, MessageRevoked, MessageReaction,
     MediaDownloadFailed, CommandFailed, ChatPresence, PresenceUpdate, ContactPictureChanged, ContactIdentityChanged,
     GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity, AccountReachoutTimelock, AccountNewChatCap,

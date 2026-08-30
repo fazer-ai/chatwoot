@@ -8,6 +8,7 @@
   "ts": 1755440000123,
   "inst": "connector-a1b2c3",
   "payload": {
+    "request_id": "pk_01j9y0",
     "code": "4821"
   }
 }
