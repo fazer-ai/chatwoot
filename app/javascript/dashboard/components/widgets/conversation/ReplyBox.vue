@@ -705,6 +705,18 @@ export default {
         mode: updatedReplyType,
       });
       this.switchDraftContext(this.conversationIdByRoute, updatedReplyType);
+      // The composer can leave note mode without the agent touching anything: a
+      // bot releases the pending conversation it owned, the messaging window
+      // reopens, an Instagram restriction lifts. Whatever is staged was produced
+      // under the old privacy but would be sent under the new one, so a voice
+      // note recorded for the team could reach the contact. The draft survives
+      // because switchDraftContext keeps one per mode; attachments and a cited
+      // private note have no such split, so they go.
+      if (this.isRecordingAudio) this.onTypingOff();
+      this.resetRecorderAndClearAttachments();
+      if (this.inReplyTo?.private && !this.isOnPrivateNote) {
+        this.resetReplyToMessage();
+      }
     },
   },
 

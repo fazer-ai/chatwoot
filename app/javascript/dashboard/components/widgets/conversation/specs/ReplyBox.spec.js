@@ -482,6 +482,59 @@ describe('ReplyBox', () => {
     expect(payload.isVoiceMessage).toBe(true);
   });
 
+  it('drops a note recording when the bot hands the conversation back', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    expect(wrapper.vm.isOnPrivateNote).toBe(true);
+
+    wrapper.vm.attachedFiles = [
+      { isVoiceMessage: true, resource: { file: new Blob(['audio']) } },
+    ];
+    wrapper.vm.isRecordingAudio = true;
+
+    // The bot releases the conversation: nobody switched the composer, but it is
+    // no longer on a note, and the recording was made for the team.
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    expect(wrapper.vm.isOnPrivateNote).toBe(false);
+    expect(wrapper.vm.attachedFiles).toEqual([]);
+    expect(wrapper.vm.isRecordingAudio).toBe(false);
+  });
+
+  it('drops a cited private note when the composer stops being internal', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    wrapper.vm.inReplyTo = { id: 99, private: true };
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    // Left in place, the note's id would ride along in the outbound message's
+    // in_reply_to and its preview would be quoted to the contact.
+    expect(wrapper.vm.inReplyTo).toEqual({});
+  });
+
   describe('recording format in reply mode', () => {
     it.each([
       [
