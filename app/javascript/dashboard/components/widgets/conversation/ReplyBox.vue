@@ -1276,14 +1276,15 @@ export default {
 
       // Added a new key isVoiceMessage to the file to identify recorded audio
       // Because to filter and show only non recorded audio and other attachments
-      const autoRecordedFile = {
-        ...file,
-        isVoiceMessage: true,
-      };
       // Stamped with what the composer was when the mic was armed — the agent
       // spoke and the audio was converted since, and either could have outlasted
       // the mode the recording was meant for.
-      return file && this.stageFile(autoRecordedFile, this.recordingGeneration);
+      const autoRecordedFile = {
+        ...file,
+        isVoiceMessage: true,
+        composerGeneration: this.recordingGeneration,
+      };
+      return file && this.stageFile(autoRecordedFile);
     },
     onRecordError() {
       this.toggleAudioRecorder();
@@ -1308,8 +1309,16 @@ export default {
     // the composer can move to a public reply — or to another conversation —
     // before the file ever arrives, and attachFile would then stage it under a
     // privacy the agent never chose.
-    stageFile(file, generation = this.composerGeneration) {
-      if (file) file.composerGeneration = generation;
+    stageFile(file) {
+      if (!file) return;
+
+      // Never a positional second argument here: this is wired straight to the
+      // uploader's `input-file`, which emits (newFile, oldFile) and re-emits on
+      // every progress update. A recorder capture arrives already stamped, from
+      // when the mic was armed.
+      if (file.composerGeneration === undefined) {
+        file.composerGeneration = this.composerGeneration;
+      }
       this.onFileUpload(file);
     },
     attachFile({ blob, file }) {

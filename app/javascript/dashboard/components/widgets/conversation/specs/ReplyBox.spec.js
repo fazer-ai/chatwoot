@@ -600,6 +600,27 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
   });
 
+  it('stages a file the uploader hands over with its (newFile, oldFile) pair', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    // vue-upload-component emits input-file with two arguments and re-emits on
+    // every progress update. stageFile is wired straight to it, so a second
+    // positional parameter there would silently read oldFile.
+    const newFile = { name: 'doc.pdf', file: new Blob(['pdf']) };
+    const oldFile = {
+      name: 'doc.pdf',
+      file: new Blob(['pdf']),
+      progress: '0.00',
+    };
+    wrapper.vm.stageFile(newFile, oldFile);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+  });
+
   describe('recording format in reply mode', () => {
     it.each([
       [
