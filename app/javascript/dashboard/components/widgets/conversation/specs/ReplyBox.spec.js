@@ -89,6 +89,14 @@ const buildStore = ({
     },
   });
 
+// Every mount subscribes to the global reply-to bus in mounted(). Left alive,
+// they all answer an emit from whichever test fires one, and each one reaches
+// for an editor method the stub doesn't have.
+const mounted = [];
+afterEach(() => {
+  while (mounted.length) mounted.pop().unmount();
+});
+
 const mountWith = ({
   inbox,
   chat,
@@ -111,9 +119,21 @@ const mountWith = ({
       mocks: { $t: key => key },
       // The bottom panel sits inside a <Transition>, which shallowMount stubs
       // without rendering its children.
-      stubs: { transition: false },
+      stubs: {
+        transition: false,
+        // Same name and props the auto-stub would carry, so findComponent and
+        // props() keep working, plus the one method the composer calls on the
+        // editor ref after a reply-to reset.
+        WootMessageEditor: {
+          name: 'WootMessageEditor',
+          props: ['editorId', 'modelValue', 'isPrivate', 'placeholder'],
+          template: '<div />',
+          methods: { focusEditorInputField: () => {} },
+        },
+      },
     },
   });
+  mounted.push(wrapper);
   return { wrapper, store };
 };
 
