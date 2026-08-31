@@ -4,6 +4,19 @@
       "ALL_INBOXES": "All inboxes",
       "ALL_AGENTS": "All agents",
       "NO_RESULTS": "No activity for this filter in the selected period."
+    },
+    "DISTRIBUTION": {
+      "TITLE": {
+        "AGENT": "Distribution by agent",
+        "INBOX": "Distribution by inbox",
+        "TEAM": "Distribution by team"
+      },
+      "METRIC": {
+        "CONVERSATIONS": "Conversations",
+        "RESOLUTIONS": "Resolved"
+      },
+      "OTHERS": "Others ({count})",
+      "ASSIGNED_ONLY": "Counts only conversations that have an assignee."
     }
   }
 }

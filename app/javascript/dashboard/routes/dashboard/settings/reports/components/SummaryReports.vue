@@ -1,5 +1,6 @@
 <script setup>
 import OverviewReportFilters from './OverviewReportFilters.vue';
+import SummaryDistribution from './SummaryDistribution.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import { formatTime } from '@chatwoot/utils';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
@@ -148,6 +149,27 @@ const tableData = computed(() =>
   })
 );
 
+// The chart reads the same rows as the table, but needs the numbers unformatted.
+// Labels are left out: a conversation carries several of them, so the shares
+// would add up past the total.
+const distributionType = computed(() =>
+  ['agent', 'inbox', 'team'].includes(props.type) ? props.type : ''
+);
+
+const distributionRows = computed(() =>
+  visibleRowItems.value.map(row => {
+    const { conversationsCount, resolvedConversationsCount } = getMetrics(
+      row.id
+    );
+    return {
+      id: row.id,
+      name: row.name ?? row.title,
+      conversationsCount: conversationsCount ?? 0,
+      resolvedConversationsCount: resolvedConversationsCount ?? 0,
+    };
+  })
+);
+
 // Names the downloaded file, so the same report filtered two ways lands in two
 // files instead of overwriting itself.
 const crossFilterName = computed(() => {
@@ -249,6 +271,12 @@ defineExpose({ downloadReports });
     :disabled="isLoading"
     :cross-filter-type="crossFilterType"
     @filter-change="onFilterChange"
+  />
+  <SummaryDistribution
+    v-if="distributionType"
+    :type="distributionType"
+    :rows="distributionRows"
+    :is-loading="isLoading"
   />
   <div
     class="relative flex-1 overflow-auto px-2 py-2 mt-5 shadow outline-1 outline outline-n-container rounded-xl bg-n-solid-2"

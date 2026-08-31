@@ -4,6 +4,19 @@
       "ALL_INBOXES": "Todas las bandejas de entrada",
       "ALL_AGENTS": "Todos los agentes",
       "NO_RESULTS": "Sin actividad para este filtro en el período seleccionado."
+    },
+    "DISTRIBUTION": {
+      "TITLE": {
+        "AGENT": "Distribución por agente",
+        "INBOX": "Distribución por bandeja de entrada",
+        "TEAM": "Distribución por equipo"
+      },
+      "METRIC": {
+        "CONVERSATIONS": "Conversaciones",
+        "RESOLUTIONS": "Resueltas"
+      },
+      "OTHERS": "Otros ({count})",
+      "ASSIGNED_ONLY": "Solo cuenta las conversaciones con responsable asignado."
     }
   }
 }
