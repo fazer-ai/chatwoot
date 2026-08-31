@@ -621,6 +621,25 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.attachedFiles).toHaveLength(1);
   });
 
+  it('drops a capture still uploading when the message it belonged to is sent', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+    // The agent sends the typed note without waiting for the upload.
+    wrapper.vm.clearMessage();
+
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
   describe('recording format in reply mode', () => {
     it.each([
       [

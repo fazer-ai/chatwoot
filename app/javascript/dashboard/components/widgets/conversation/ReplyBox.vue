@@ -1210,6 +1210,10 @@ export default {
       this.copilot.execute(action, data);
     },
     clearMessage() {
+      // Sending consumes the composer as much as switching mode does: a capture
+      // still uploading belongs to the message that just left, and would
+      // otherwise land in the empty composer and ride along with the next one.
+      this.composerGeneration += 1;
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
