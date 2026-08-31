@@ -465,7 +465,9 @@ export default {
       return this.attachedFiles.some(file => file.isVoiceMessage);
     },
     showAudioRecorder() {
-      return !this.isOnPrivateNote && this.showFileUpload;
+      // A private note never reaches the channel, so the channel's upload
+      // support doesn't gate it — same rule the attach button already follows.
+      return this.showFileUpload || this.isOnPrivateNote;
     },
     showAudioRecorderEditor() {
       return this.showAudioRecorder && this.isRecordingAudio;
@@ -518,6 +520,13 @@ export default {
       return `draft-${this.conversationIdByRoute}-${this.effectiveReplyMode}`;
     },
     audioRecordFormat() {
+      // Notes stay inside Chatwoot, so the channel's preferred container is
+      // irrelevant. MP3 is the one format every browser and both mobile apps
+      // play, and it keeps long notes under the 25 MB transcription ceiling
+      // that uncompressed WAV would blow past in ~5 minutes.
+      if (this.isOnPrivateNote) {
+        return AUDIO_FORMATS.MP3;
+      }
       if (this.isAWhatsAppCloudChannel) {
         return AUDIO_FORMATS.OGG;
       }

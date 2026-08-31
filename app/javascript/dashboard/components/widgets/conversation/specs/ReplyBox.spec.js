@@ -1,5 +1,6 @@
 import { shallowMount } from '@vue/test-utils';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
+import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import ReplyBox from '../ReplyBox.vue';
@@ -212,6 +213,19 @@ describe('ReplyBox', () => {
         REPLY_EDITOR_MODES.NOTE
       );
       expect(topPanel(wrapper).isEditorDisabled).toBe(false);
+    });
+
+    it('offers the voice recorder once the agent switches to a note', async () => {
+      const { wrapper } = mountWith({ inbox });
+      wrapper
+        .findComponent({ name: 'ReplyTopPanel' })
+        .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+      await nextTick();
+
+      expect(bottomPanel(wrapper).showAudioRecorder).toBe(true);
+      // A note never leaves Chatwoot, so it records in the one container every
+      // browser and both mobile apps play, whatever the channel accepts.
+      expect(wrapper.vm.audioRecordFormat).toBe(AUDIO_FORMATS.MP3);
     });
 
     it('opens in reply mode for every other conversation', () => {
@@ -430,5 +444,66 @@ describe('ReplyBox', () => {
         REPLY_EDITOR_MODES.NOTE
       );
     });
+  });
+
+  it('unlocks the recorder on a note in an inbox that takes no uploads', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Tiktok' },
+      chat: {
+        additional_attributes: { tiktok_capabilities: { image_send: false } },
+      },
+    });
+
+    expect(wrapper.vm.showAudioRecorder).toBe(false);
+
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+
+    expect(wrapper.vm.showAudioRecorder).toBe(true);
+  });
+
+  it('sends a recorded note as a private voice message', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    wrapper.vm.attachedFiles = [
+      { isVoiceMessage: true, resource: { file: new Blob(['audio']) } },
+    ];
+
+    const payload = wrapper.vm.getMessagePayload('');
+
+    expect(payload.private).toBe(true);
+    expect(payload.isVoiceMessage).toBe(true);
+  });
+
+  describe('recording format in reply mode', () => {
+    it.each([
+      [
+        'WhatsApp Cloud',
+        { channel_type: 'Channel::Whatsapp', provider: 'whatsapp_cloud' },
+        AUDIO_FORMATS.OGG,
+      ],
+      [
+        'Twilio WhatsApp',
+        { channel_type: 'Channel::TwilioSms', medium: 'whatsapp' },
+        AUDIO_FORMATS.MP3,
+      ],
+      ['Telegram', { channel_type: 'Channel::Telegram' }, AUDIO_FORMATS.MP3],
+      ['API', { channel_type: 'Channel::Api' }, AUDIO_FORMATS.MP3],
+      ['Web widget', { channel_type: 'Channel::WebWidget' }, AUDIO_FORMATS.WAV],
+    ])(
+      'keeps %s on the container the channel accepts',
+      (_name, inbox, format) => {
+        const { wrapper } = mountWith({ inbox });
+
+        expect(wrapper.vm.audioRecordFormat).toBe(format);
+      }
+    );
   });
 });
