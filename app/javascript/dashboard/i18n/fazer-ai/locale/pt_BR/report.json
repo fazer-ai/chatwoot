@@ -4,6 +4,20 @@
       "ALL_INBOXES": "Todas as caixas de entrada",
       "ALL_AGENTS": "Todos os agentes",
       "NO_RESULTS": "Nenhuma atividade para este filtro no período selecionado."
+    },
+    "DISTRIBUTION": {
+      "TITLE": {
+        "AGENT": "Distribuição por agente",
+        "INBOX": "Distribuição por caixa de entrada",
+        "TEAM": "Distribuição por time"
+      },
+      "METRIC": {
+        "CONVERSATIONS": "Conversas",
+        "RESOLUTIONS": "Resolvidas"
+      },
+      "OTHERS": "Outros ({count})",
+      "ASSIGNED_ONLY": "Conta apenas conversas com responsável atribuído.",
+      "EMPTY_METRIC": "Sem dados suficientes para comparar nesta métrica."
     }
   }
 }
