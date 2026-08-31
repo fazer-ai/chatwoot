@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_29_180000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -618,7 +618,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_29_180000) do
     t.string "provider"
     t.boolean "verified_for_sending", default: false, null: false
     t.string "imap_authentication", default: "plain"
-    t.jsonb "import_cursor", default: {}, null: false
     t.index ["email"], name: "index_channel_email_on_email", unique: true
     t.index ["forward_to_email"], name: "index_channel_email_on_forward_to_email", unique: true
   end

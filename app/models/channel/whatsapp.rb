@@ -20,10 +20,10 @@
 #
 # Indexes
 #
+#  index_channel_whatsapp_connection_state                   (((provider_connection ->> 'connection'::text))) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))
 #  index_channel_whatsapp_on_phone_number                    (phone_number) UNIQUE
 #  index_channel_whatsapp_on_phone_number_health_checked_at  (phone_number_health_checked_at)
-#  index_channel_whatsapp_connection_state                   (((provider_connection ->> 'connection'::text))) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))
-#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text])) USING gin
+#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[])) USING gin
 #  index_channel_whatsapp_session_id                         (((provider_config ->> 'session_id'::text))) UNIQUE WHERE ((provider)::text = ANY ((ARRAY['native'::character varying, 'uazapi'::character varying])::text[]))
 #
 # rubocop:enable Layout/LineLength
