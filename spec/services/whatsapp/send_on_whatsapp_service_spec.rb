@@ -72,6 +72,22 @@ describe Whatsapp::SendOnWhatsappService do
         expect(message.reload.source_id).to eq('123456789')
       end
 
+      it 'keeps a private note off the channel, attachment and all' do
+        create(:message, message_type: :incoming, content: 'test',
+                         conversation: conversation, account: conversation.account)
+        message = create(:message, message_type: :outgoing, private: true, content: 'heads up',
+                                   conversation: conversation, account: conversation.account)
+        message.attachments.create!(
+          account_id: message.account_id,
+          file_type: :audio,
+          file: fixture_file_upload('public/audio/widget/ding.mp3')
+        )
+
+        described_class.new(message: message).perform
+
+        expect(a_request(:post, 'https://waba.360dialog.io/v1/messages')).not_to have_been_made
+      end
+
       it 'fails a free-form message without contacting the provider when outside the 24 hour limit' do
         create(:message, message_type: :incoming, content: 'test', created_at: 25.hours.ago,
                          conversation: conversation, account: conversation.account)

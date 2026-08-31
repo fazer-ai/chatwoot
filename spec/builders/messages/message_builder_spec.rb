@@ -260,6 +260,24 @@ describe Messages::MessageBuilder do
       end
     end
 
+    context 'when the voice message is a private note' do
+      let(:params) do
+        ActionController::Parameters.new({
+                                           attachments: [Rack::Test::UploadedFile.new('spec/assets/sample.ogg', 'audio/ogg')],
+                                           is_voice_message: true,
+                                           private: true
+                                         })
+      end
+
+      it 'attaches the recording to the note like any other message' do
+        message = message_builder
+
+        expect(message).to be_private
+        expect(message.attachments.first.file_type).to eq 'audio'
+        expect(message.attachments.first.meta).to include('is_voice_message' => true)
+      end
+    end
+
     context 'when is_voice_message is not provided' do
       let(:params) do
         ActionController::Parameters.new({

@@ -1,5 +1,6 @@
 import { shallowMount } from '@vue/test-utils';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
+import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import ReplyBox from '../ReplyBox.vue';
@@ -88,6 +89,14 @@ const buildStore = ({
     },
   });
 
+// Every mount subscribes to the global reply-to bus in mounted(). Left alive,
+// they all answer an emit from whichever test fires one, and each one reaches
+// for an editor method the stub doesn't have.
+const mounted = [];
+afterEach(() => {
+  while (mounted.length) mounted.pop().unmount();
+});
+
 const mountWith = ({
   inbox,
   chat,
@@ -110,9 +119,21 @@ const mountWith = ({
       mocks: { $t: key => key },
       // The bottom panel sits inside a <Transition>, which shallowMount stubs
       // without rendering its children.
-      stubs: { transition: false },
+      stubs: {
+        transition: false,
+        // Same name and props the auto-stub would carry, so findComponent and
+        // props() keep working, plus the one method the composer calls on the
+        // editor ref after a reply-to reset.
+        WootMessageEditor: {
+          name: 'WootMessageEditor',
+          props: ['editorId', 'modelValue', 'isPrivate', 'placeholder'],
+          template: '<div />',
+          methods: { focusEditorInputField: () => {} },
+        },
+      },
     },
   });
+  mounted.push(wrapper);
   return { wrapper, store };
 };
 
@@ -212,6 +233,19 @@ describe('ReplyBox', () => {
         REPLY_EDITOR_MODES.NOTE
       );
       expect(topPanel(wrapper).isEditorDisabled).toBe(false);
+    });
+
+    it('offers the voice recorder once the agent switches to a note', async () => {
+      const { wrapper } = mountWith({ inbox });
+      wrapper
+        .findComponent({ name: 'ReplyTopPanel' })
+        .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+      await nextTick();
+
+      expect(bottomPanel(wrapper).showAudioRecorder).toBe(true);
+      // A note never leaves Chatwoot, so it records in the one container every
+      // browser and both mobile apps play, whatever the channel accepts.
+      expect(wrapper.vm.audioRecordFormat).toBe(AUDIO_FORMATS.MP3);
     });
 
     it('opens in reply mode for every other conversation', () => {
@@ -430,5 +464,224 @@ describe('ReplyBox', () => {
         REPLY_EDITOR_MODES.NOTE
       );
     });
+  });
+
+  it('unlocks the recorder on a note in an inbox that takes no uploads', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Tiktok' },
+      chat: {
+        additional_attributes: { tiktok_capabilities: { image_send: false } },
+      },
+    });
+
+    expect(wrapper.vm.showAudioRecorder).toBe(false);
+
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+
+    expect(wrapper.vm.showAudioRecorder).toBe(true);
+  });
+
+  it('sends a recorded note as a private voice message', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    wrapper.vm.attachedFiles = [
+      { isVoiceMessage: true, resource: { file: new Blob(['audio']) } },
+    ];
+
+    const payload = wrapper.vm.getMessagePayload('');
+
+    expect(payload.private).toBe(true);
+    expect(payload.isVoiceMessage).toBe(true);
+  });
+
+  it('drops a note recording when the bot hands the conversation back', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    expect(wrapper.vm.isOnPrivateNote).toBe(true);
+
+    wrapper.vm.attachedFiles = [
+      { isVoiceMessage: true, resource: { file: new Blob(['audio']) } },
+    ];
+    wrapper.vm.isRecordingAudio = true;
+
+    // The bot releases the conversation: nobody switched the composer, but it is
+    // no longer on a note, and the recording was made for the team.
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    expect(wrapper.vm.isOnPrivateNote).toBe(false);
+    expect(wrapper.vm.attachedFiles).toEqual([]);
+    expect(wrapper.vm.isRecordingAudio).toBe(false);
+  });
+
+  it('drops a cited private note when the composer stops being internal', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    wrapper.vm.inReplyTo = { id: 99, private: true };
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    // Left in place, the note's id would ride along in the outbound message's
+    // in_reply_to and its preview would be quoted to the contact.
+    expect(wrapper.vm.inReplyTo).toEqual({});
+  });
+
+  it('drops an upload that lands after the composer stopped being internal', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    // The agent stops the recorder: MP3 conversion and the upload start here,
+    // and attachFile only runs once they finish.
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    // Staged after the switch, so this one is legitimate. Waiting for it is what
+    // makes the recording's absence a result rather than a race: both go through
+    // the same async FileReader, and this one was queued second.
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
+  it('drops a recording whose conversion outlived the note it was made on', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    // Mic armed on a note. Talking and the MP3 conversion that follows both
+    // happen before onFinishRecorder ever runs.
+    wrapper.vm.toggleAudioRecorder();
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    wrapper.vm.onFinishRecorder({
+      name: 'nota.mp3',
+      file: new Blob(['audio']),
+    });
+
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
+  it('stages a file the uploader hands over with its (newFile, oldFile) pair', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    // vue-upload-component emits input-file with two arguments and re-emits on
+    // every progress update. stageFile is wired straight to it, so a second
+    // positional parameter there would silently read oldFile.
+    const newFile = { name: 'doc.pdf', file: new Blob(['pdf']) };
+    const oldFile = {
+      name: 'doc.pdf',
+      file: new Blob(['pdf']),
+      progress: '0.00',
+    };
+    wrapper.vm.stageFile(newFile, oldFile);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+  });
+
+  it('drops a capture still uploading when the message it belonged to is sent', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+    // The agent sends the typed note without waiting for the upload.
+    wrapper.vm.clearMessage();
+
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
+  describe('recording format in reply mode', () => {
+    it.each([
+      [
+        'WhatsApp Cloud',
+        { channel_type: 'Channel::Whatsapp', provider: 'whatsapp_cloud' },
+        AUDIO_FORMATS.OGG,
+      ],
+      [
+        'Twilio WhatsApp',
+        { channel_type: 'Channel::TwilioSms', medium: 'whatsapp' },
+        AUDIO_FORMATS.MP3,
+      ],
+      ['Telegram', { channel_type: 'Channel::Telegram' }, AUDIO_FORMATS.MP3],
+      ['API', { channel_type: 'Channel::Api' }, AUDIO_FORMATS.MP3],
+      ['Web widget', { channel_type: 'Channel::WebWidget' }, AUDIO_FORMATS.WAV],
+    ])(
+      'keeps %s on the container the channel accepts',
+      (_name, inbox, format) => {
+        const { wrapper } = mountWith({ inbox });
+
+        expect(wrapper.vm.audioRecordFormat).toBe(format);
+      }
+    );
   });
 });
