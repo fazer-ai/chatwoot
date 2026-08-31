@@ -22,6 +22,7 @@ const buildI18n = () =>
             },
             METRIC: { CONVERSATIONS: 'Conversations', RESOLUTIONS: 'Resolved' },
             OTHERS: 'Others ({count})',
+            EMPTY_METRIC: 'Not enough data to compare on this metric.',
             ASSIGNED_ONLY: 'Counts only conversations that have an assignee.',
           },
         },
@@ -113,6 +114,36 @@ describe('SummaryDistribution.vue', () => {
     });
 
     expect(wrapper.find('h3').exists()).toBe(false);
+  });
+
+  it('keeps the card up for a metric with no activity, so the tabs survive', () => {
+    // Two agents took conversations, neither resolved one.
+    const wrapper = mountComponent({
+      rows: [
+        {
+          id: 1,
+          name: 'Alice',
+          conversationsCount: 5,
+          resolvedConversationsCount: 0,
+        },
+        {
+          id: 2,
+          name: 'Bob',
+          conversationsCount: 3,
+          resolvedConversationsCount: 0,
+        },
+      ],
+    });
+    // Switch to the empty metric the way the tab bar does.
+    wrapper
+      .findComponent({ name: 'TabBar' })
+      .vm.$emit('tabChanged', { index: 1 });
+
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.find('h3').exists()).toBe(true);
+      expect(wrapper.text()).toContain('Not enough data to compare');
+      expect(wrapper.findAll('li')).toHaveLength(0);
+    });
   });
 
   it('opens the report of the row that was clicked', async () => {

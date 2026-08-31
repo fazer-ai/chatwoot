@@ -16,7 +16,8 @@
         "RESOLUTIONS": "Resolvidas"
       },
       "OTHERS": "Outros ({count})",
-      "ASSIGNED_ONLY": "Conta apenas conversas com responsável atribuído."
+      "ASSIGNED_ONLY": "Conta apenas conversas com responsável atribuído.",
+      "EMPTY_METRIC": "Sem dados suficientes para comparar nesta métrica."
     }
   }
 }

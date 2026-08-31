@@ -110,3 +110,12 @@ app/controllers/api/v1/widget/redirect_tokens_controller.rb: Snapshot the origin
 # carries it, and until a message exists there is no episode for a consumer to act on. Making
 # creation bot-visible changes the agent-bot contract for every inbox in the account.
 app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bot on the first message-less redirect  # PR#418
+# PR#448: the rule is real and this is not what it is about. AGENTS.md bans inline styles
+# so that appearance lives in Tailwind, and every colour, radius, height and state here is
+# a utility class. What `:style` carries is one data-driven length, which no utility can
+# express: a bar is 25.9% wide because an agent holds 25.9% of the period. The repo already
+# does exactly this wherever a proportion is drawn — BillingMeter.vue, ImportProgress.vue,
+# KnowledgeCard.vue, PollDisplay.vue — and the alternatives are worse: snapping to w-1/12
+# steps lies about the number, and an SVG rect moves fill and radius out of Tailwind to
+# avoid a single width.
+app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDistribution.vue: Render distribution widths without inline styles  # PR#448

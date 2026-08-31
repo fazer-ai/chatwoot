@@ -16,7 +16,8 @@
         "RESOLUTIONS": "Resolved"
       },
       "OTHERS": "Others ({count})",
-      "ASSIGNED_ONLY": "Counts only conversations that have an assignee."
+      "ASSIGNED_ONLY": "Counts only conversations that have an assignee.",
+      "EMPTY_METRIC": "Not enough data to compare on this metric."
     }
   }
 }

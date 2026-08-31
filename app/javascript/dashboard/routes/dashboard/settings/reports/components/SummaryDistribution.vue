@@ -52,16 +52,17 @@ const onTabChange = tab => {
   activeMetricIndex.value = tab.index;
 };
 
-const rankedRows = computed(() =>
+const rankBy = metricKey =>
   props.rows
     .map(row => ({
       id: row.id,
       name: row.name,
-      value: Number(row[activeMetric.value.key]) || 0,
+      value: Number(row[metricKey]) || 0,
     }))
     .filter(row => row.value > 0)
-    .sort((a, b) => b.value - a.value)
-);
+    .sort((a, b) => b.value - a.value);
+
+const rankedRows = computed(() => rankBy(activeMetric.value.key));
 
 const total = computed(() =>
   rankedRows.value.reduce((sum, row) => sum + row.value, 0)
@@ -120,7 +121,14 @@ const formatShare = value =>
 
 // One row is not a distribution: a single full-width bar says nothing the table
 // does not already say.
-const hasData = computed(() => rankedRows.value.length > 1);
+const hasMetricData = computed(() => rankedRows.value.length > 1);
+
+// Visibility follows every metric, not the selected one. Tying it to the
+// selection means picking a metric with no activity takes the tabs down with the
+// card, and nothing is left to switch back with.
+const hasData = computed(() =>
+  METRICS.some(metric => rankBy(metric.key).length > 1)
+);
 
 // Agents and teams only account for conversations that carry an assignee, so the
 // total here is not the account's conversation count and should not claim to be.
@@ -163,6 +171,13 @@ const openRow = segment => {
       <div class="w-5/12 h-5 rounded bg-n-slate-3 animate-pulse" />
     </div>
 
+    <p
+      v-else-if="!hasMetricData"
+      class="py-8 mb-0 text-sm text-center text-n-slate-11"
+    >
+      {{ $t('REPORT.DISTRIBUTION.EMPTY_METRIC') }}
+    </p>
+
     <template v-else>
       <div class="flex items-baseline gap-2 mt-4">
         <span class="text-2xl font-semibold tabular-nums text-n-slate-12">
@@ -178,7 +193,7 @@ const openRow = segment => {
           <component
             :is="segment.linked ? 'button' : 'div'"
             :type="segment.linked ? 'button' : undefined"
-            class="grid items-center w-full grid-cols-[minmax(5rem,11rem)_minmax(0,1fr)_3rem_3.25rem] gap-4 px-2 py-1.5 -mx-2 text-left rounded-lg"
+            class="grid items-center w-full grid-cols-[minmax(0,1fr)_3rem_3.25rem] sm:grid-cols-[minmax(5rem,11rem)_minmax(0,1fr)_3rem_3.25rem] gap-4 px-2 py-1.5 -mx-2 text-left rounded-lg"
             :class="segment.linked ? 'hover:bg-n-alpha-1' : 'cursor-default'"
             @click="openRow(segment)"
           >
@@ -188,7 +203,9 @@ const openRow = segment => {
             >
               {{ segment.name }}
             </span>
-            <span class="h-2 overflow-hidden rounded-full bg-n-alpha-1">
+            <span
+              class="hidden h-2 overflow-hidden rounded-full sm:block bg-n-alpha-1"
+            >
               <!-- data-driven width, the one thing a utility class cannot carry -->
               <span
                 class="block h-2 rounded-full"
