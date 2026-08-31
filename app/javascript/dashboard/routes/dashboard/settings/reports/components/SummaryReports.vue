@@ -82,6 +82,13 @@ const spanRender = format => cellProps => {
   return h('span', { class: value ? '' : 'text-n-slate-12' }, format(value));
 };
 
+// Named rather than inferred: TanStack picks the comparator by sampling
+// `flatRows.slice(10)`, which is empty on a roster of ten or fewer and lands on
+// a lexicographic compare. It happens to read these floats correctly today, and
+// would stop the day the API sends `"600.0"` instead of `600`.
+const byNumber = (rowA, rowB, columnId) =>
+  Number(rowA.getValue(columnId)) - Number(rowB.getValue(columnId));
+
 // A row with nothing to show stays at the bottom either way round: it is the
 // absence of a measurement, not a measurement of zero.
 const metricColumn = (key, headerKey, format) =>
@@ -91,6 +98,7 @@ const metricColumn = (key, headerKey, format) =>
     cell: spanRender(format),
     sortDescFirst: true,
     sortUndefined: 'last',
+    sortingFn: byNumber,
   });
 
 const columns = computed(() => [

@@ -9,11 +9,13 @@ const agents = [
   { id: 2, name: 'Bob' },
 ];
 
-// Bob replies fastest and takes the fewest; Dave has no activity at all.
+// Bob replies fastest and takes the fewest; Dave has no activity at all. The
+// durations arrive as strings on purpose: they are floats over the wire today,
+// and sorting must not depend on that.
 const metrics = [
-  { id: 1, conversationsCount: 9, avgFirstResponseTime: 600 },
-  { id: 2, conversationsCount: 10, avgFirstResponseTime: 120 },
-  { id: 3, conversationsCount: 2, avgFirstResponseTime: 3600 },
+  { id: 1, conversationsCount: 9, avgFirstResponseTime: '600.0' },
+  { id: 2, conversationsCount: 10, avgFirstResponseTime: '120.0' },
+  { id: 3, conversationsCount: 2, avgFirstResponseTime: '3600.0' },
   { id: 4 },
 ];
 
@@ -68,7 +70,7 @@ describe('SummaryReports.vue', () => {
     expect(columnOf(wrapper, 1)).toEqual(['10', '9', '2', '--']);
   });
 
-  it('sorts a duration column by its seconds', async () => {
+  it('sorts a duration column by its seconds, even when they arrive as strings', async () => {
     const wrapper = mountReports();
     await sortBy(wrapper, 2);
 
