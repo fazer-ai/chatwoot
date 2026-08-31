@@ -99,6 +99,11 @@ const columns = computed(() => [
     width: 300,
     cell: cellProps => h(SummaryReportLink, cellProps),
     sortDescFirst: false,
+    // Without this the comparator is inferred, and 8.20.5 infers it from
+    // `flatRows.slice(10)` — empty on a roster of ten or fewer, which falls back
+    // to a case-sensitive compare that puts `VIP` above `billing`. Alphanumeric
+    // also reads the digits in names like `Suporte 10` as numbers.
+    sortingFn: 'alphanumeric',
   }),
   metricColumn(
     'conversationsCount',

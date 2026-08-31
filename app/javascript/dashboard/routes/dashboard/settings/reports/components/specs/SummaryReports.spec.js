@@ -3,10 +3,10 @@ import { ref } from 'vue';
 import SummaryReports from '../SummaryReports.vue';
 
 const agents = [
-  { id: 1, name: 'Alice' },
-  { id: 2, name: 'Bob' },
   { id: 3, name: 'Carol' },
+  { id: 1, name: 'alice' },
   { id: 4, name: 'Dave' },
+  { id: 2, name: 'Bob' },
 ];
 
 // Bob replies fastest and takes the fewest; Dave has no activity at all.
@@ -57,7 +57,7 @@ const columnOf = (wrapper, index) =>
   wrapper.findAll('tbody tr').map(row => row.findAll('td')[index].text());
 
 const sortBy = (wrapper, headerIndex) =>
-  wrapper.findAll('th')[headerIndex].trigger('click');
+  wrapper.findAll('th')[headerIndex].find('button').trigger('click');
 
 describe('SummaryReports.vue', () => {
   it('sorts a count column by its number, not by the formatted string', async () => {
@@ -72,7 +72,28 @@ describe('SummaryReports.vue', () => {
     const wrapper = mountReports();
     await sortBy(wrapper, 2);
 
-    expect(columnOf(wrapper, 0)).toEqual(['Carol', 'Alice', 'Bob', 'Dave']);
+    expect(columnOf(wrapper, 0)).toEqual(['Carol', 'alice', 'Bob', 'Dave']);
+  });
+
+  it('sorts names case-insensitively, whatever the size of the roster', async () => {
+    // TanStack 8.20.5 infers the comparator from `flatRows.slice(10)`, which is
+    // empty here and falls back to a case-sensitive compare that would put every
+    // capitalised name above `alice`.
+    const wrapper = mountReports();
+    await sortBy(wrapper, 0);
+
+    expect(columnOf(wrapper, 0)).toEqual(['alice', 'Bob', 'Carol', 'Dave']);
+  });
+
+  it('exposes each sortable header as a button, so it works without a pointer', async () => {
+    const wrapper = mountReports();
+    const header = wrapper.findAll('th')[1];
+
+    expect(header.find('button').exists()).toBe(true);
+    expect(header.attributes('aria-sort')).toBe('none');
+
+    await header.find('button').trigger('click');
+    expect(wrapper.findAll('th')[1].attributes('aria-sort')).toBe('descending');
   });
 
   it('keeps rows with no measurement at the bottom in both directions', async () => {
@@ -82,6 +103,6 @@ describe('SummaryReports.vue', () => {
     expect(columnOf(wrapper, 0).at(-1)).toBe('Dave');
 
     await sortBy(wrapper, 2);
-    expect(columnOf(wrapper, 0)).toEqual(['Bob', 'Alice', 'Carol', 'Dave']);
+    expect(columnOf(wrapper, 0)).toEqual(['Bob', 'alice', 'Carol', 'Dave']);
   });
 });
