@@ -12,7 +12,6 @@
 #  imap_login                :string           default("")
 #  imap_password             :string           default("")
 #  imap_port                 :integer          default(0)
-#  import_cursor             :jsonb            not null
 #  provider                  :string
 #  provider_config           :jsonb
 #  smtp_address              :string           default("")
