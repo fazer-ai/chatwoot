@@ -535,6 +535,39 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.inReplyTo).toEqual({});
   });
 
+  it('drops an upload that lands after the composer stopped being internal', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    // The agent stops the recorder: MP3 conversion and the upload start here,
+    // and attachFile only runs once they finish.
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    // Staged after the switch, so this one is legitimate. Waiting for it is what
+    // makes the recording's absence a result rather than a race: both go through
+    // the same async FileReader, and this one was queued second.
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
   describe('recording format in reply mode', () => {
     it.each([
       [
