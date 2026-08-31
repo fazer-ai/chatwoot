@@ -568,6 +568,35 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
   });
 
+  it('drops a recording whose conversion outlived the note it was made on', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    // Mic armed on a note. Talking and the MP3 conversion that follows both
+    // happen before onFinishRecorder ever runs.
+    wrapper.vm.toggleAudioRecorder();
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    wrapper.vm.onFinishRecorder({ name: 'nota.mp3', file: new Blob(['audio']) });
+
+    const current = { name: 'current.png', file: new Blob(['image']) };
+    wrapper.vm.stageFile(current);
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.attachedFiles[0].isVoiceMessage).toBe(false);
+  });
+
   describe('recording format in reply mode', () => {
     it.each([
       [

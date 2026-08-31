@@ -145,6 +145,9 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
+      // The recorder's capture starts when the mic is armed, not when the file
+      // shows up: talking and then converting to MP3 both happen in between.
+      recordingGeneration: 0,
       isRecordingAudio: false,
       recordingAudioState: '',
       recordingAudioDurationText: '',
@@ -1229,6 +1232,7 @@ export default {
         this.resetAudioRecorderInput();
         this.onTypingOff();
       } else {
+        this.recordingGeneration = this.composerGeneration;
         this.onRecording();
       }
     },
@@ -1276,7 +1280,10 @@ export default {
         ...file,
         isVoiceMessage: true,
       };
-      return file && this.stageFile(autoRecordedFile);
+      // Stamped with what the composer was when the mic was armed — the agent
+      // spoke and the audio was converted since, and either could have outlasted
+      // the mode the recording was meant for.
+      return file && this.stageFile(autoRecordedFile, this.recordingGeneration);
     },
     onRecordError() {
       this.toggleAudioRecorder();
@@ -1301,8 +1308,8 @@ export default {
     // the composer can move to a public reply — or to another conversation —
     // before the file ever arrives, and attachFile would then stage it under a
     // privacy the agent never chose.
-    stageFile(file) {
-      if (file) file.composerGeneration = this.composerGeneration;
+    stageFile(file, generation = this.composerGeneration) {
+      if (file) file.composerGeneration = generation;
       this.onFileUpload(file);
     },
     attachFile({ blob, file }) {
