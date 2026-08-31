@@ -11,6 +11,7 @@ import {
   useVueTable,
   createColumnHelper,
   getCoreRowModel,
+  getSortedRowModel,
 } from '@tanstack/vue-table';
 import { computed, onMounted, ref, h } from 'vue';
 
@@ -70,51 +71,70 @@ const getMetrics = id =>
 const columnHelper = createColumnHelper();
 const { t } = useI18n();
 
-const defaulSpanRender = cellProps =>
-  h(
-    'span',
-    {
-      class: cellProps.getValue() ? '' : 'text-n-slate-12',
-    },
-    cellProps.getValue()
-  );
+// The row carries the raw number so sorting compares numbers; the cell is what
+// turns it into "28 Min 40 Sec" or "--".
+const renderAvgTime = value => (value ? formatTime(value) : '--');
+
+const renderCount = value => (value ? value.toLocaleString() : '--');
+
+const spanRender = format => cellProps => {
+  const value = cellProps.getValue();
+  return h('span', { class: value ? '' : 'text-n-slate-12' }, format(value));
+};
+
+// Named rather than inferred: TanStack picks the comparator by sampling
+// `flatRows.slice(10)`, which is empty on a roster of ten or fewer and lands on
+// a lexicographic compare. It happens to read these floats correctly today, and
+// would stop the day the API sends `"600.0"` instead of `600`.
+const byNumber = (rowA, rowB, columnId) =>
+  Number(rowA.getValue(columnId)) - Number(rowB.getValue(columnId));
+
+// A row with nothing to show stays at the bottom either way round: it is the
+// absence of a measurement, not a measurement of zero.
+const metricColumn = (key, headerKey, format) =>
+  columnHelper.accessor(key, {
+    header: t(headerKey),
+    width: 200,
+    cell: spanRender(format),
+    sortDescFirst: true,
+    sortUndefined: 'last',
+    sortingFn: byNumber,
+  });
 
 const columns = computed(() => [
   columnHelper.accessor('name', {
     header: t(`SUMMARY_REPORTS.${props.type.toUpperCase()}`),
     width: 300,
     cell: cellProps => h(SummaryReportLink, cellProps),
+    sortDescFirst: false,
+    // Without this the comparator is inferred, and 8.20.5 infers it from
+    // `flatRows.slice(10)` — empty on a roster of ten or fewer, which falls back
+    // to a case-sensitive compare that puts `VIP` above `billing`. Alphanumeric
+    // also reads the digits in names like `Suporte 10` as numbers.
+    sortingFn: 'alphanumeric',
   }),
-  columnHelper.accessor('conversationsCount', {
-    header: t('SUMMARY_REPORTS.CONVERSATIONS'),
-    width: 200,
-    cell: defaulSpanRender,
-  }),
-  columnHelper.accessor('avgFirstResponseTime', {
-    header: t('SUMMARY_REPORTS.AVG_FIRST_RESPONSE_TIME'),
-    width: 200,
-    cell: defaulSpanRender,
-  }),
-  columnHelper.accessor('avgResolutionTime', {
-    header: t('SUMMARY_REPORTS.AVG_RESOLUTION_TIME'),
-    width: 200,
-    cell: defaulSpanRender,
-  }),
-  columnHelper.accessor('avgReplyTime', {
-    header: t('SUMMARY_REPORTS.AVG_REPLY_TIME'),
-    width: 200,
-    cell: defaulSpanRender,
-  }),
-  columnHelper.accessor('resolutionsCount', {
-    header: t('SUMMARY_REPORTS.RESOLUTION_COUNT'),
-    width: 200,
-    cell: defaulSpanRender,
-  }),
+  metricColumn(
+    'conversationsCount',
+    'SUMMARY_REPORTS.CONVERSATIONS',
+    renderCount
+  ),
+  metricColumn(
+    'avgFirstResponseTime',
+    'SUMMARY_REPORTS.AVG_FIRST_RESPONSE_TIME',
+    renderAvgTime
+  ),
+  metricColumn(
+    'avgResolutionTime',
+    'SUMMARY_REPORTS.AVG_RESOLUTION_TIME',
+    renderAvgTime
+  ),
+  metricColumn('avgReplyTime', 'SUMMARY_REPORTS.AVG_REPLY_TIME', renderAvgTime),
+  metricColumn(
+    'resolutionsCount',
+    'SUMMARY_REPORTS.RESOLUTION_COUNT',
+    renderCount
+  ),
 ]);
-
-const renderAvgTime = value => (value ? formatTime(value) : '--');
-
-const renderCount = value => (value ? value.toLocaleString() : '--');
 
 // Once the report is narrowed to a single inbox (or agent), the backend only
 // returns the rows that took part in it, so the roster is trimmed to match.
@@ -140,11 +160,11 @@ const tableData = computed(() =>
       // we fallback on title, label for instance does not have a name property
       name: row.name ?? row.title,
       type: props.type,
-      conversationsCount: renderCount(conversationsCount),
-      avgFirstResponseTime: renderAvgTime(avgFirstResponseTime),
-      avgReplyTime: renderAvgTime(avgReplyTime),
-      avgResolutionTime: renderAvgTime(avgResolutionTime),
-      resolutionsCount: renderCount(resolvedConversationsCount),
+      conversationsCount: conversationsCount || undefined,
+      avgFirstResponseTime: avgFirstResponseTime || undefined,
+      avgReplyTime: avgReplyTime || undefined,
+      avgResolutionTime: avgResolutionTime || undefined,
+      resolutionsCount: resolvedConversationsCount || undefined,
     };
   })
 );
@@ -231,8 +251,9 @@ const table = useVueTable({
   get columns() {
     return columns.value;
   },
-  enableSorting: false,
+  enableSorting: true,
   getCoreRowModel: getCoreRowModel(),
+  getSortedRowModel: getSortedRowModel(),
 });
 
 // downloadReports method is not used in this component
