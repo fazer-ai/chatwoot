@@ -587,7 +587,10 @@ describe('ReplyBox', () => {
       meta: { sender: { id: 2 } },
     });
     await nextTick();
-    wrapper.vm.onFinishRecorder({ name: 'nota.mp3', file: new Blob(['audio']) });
+    wrapper.vm.onFinishRecorder({
+      name: 'nota.mp3',
+      file: new Blob(['audio']),
+    });
 
     const current = { name: 'current.png', file: new Blob(['image']) };
     wrapper.vm.stageFile(current);
