@@ -77,8 +77,8 @@ module Redis::RedisKeys
   OPENAI_CONVERSATION_KEY = 'OPEN_AI_CONVERSATION_KEY::V1::%<event_name>s::%<conversation_id>d::%<updated_at>d'.freeze
   # Bridges a WhatsApp call `terminate` that overtook its `connect` so the later connect can finalize it.
   WHATSAPP_CALL_TERMINATE_TOMBSTONE = 'WHATSAPP_CALL_TERMINATE_TOMBSTONE::%<call_id>s'.freeze
-  # Marks a conversation this app has just acknowledged to WhatsApp, so the provider's echo of that
-  # receipt is not read back as a device of this account opening the chat.
+  # The provider message ids this app has just acknowledged to WhatsApp, per conversation, so the
+  # provider's echo of that receipt is not read back as a device of this account opening the chat.
   WHATSAPP_SELF_READ_RECEIPT = 'WHATSAPP_SELF_READ_RECEIPT::%<conversation_id>s'.freeze
 
   ## Sempahores / Locks

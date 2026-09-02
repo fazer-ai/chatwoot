@@ -93,6 +93,17 @@ RSpec.describe ConversationPolicy, type: :policy do
       end
     end
 
+    # An operator switching the bot off must stop it putting blue ticks on the contact's
+    # phone, which is what `active?` means everywhere else the codebase asks whether a bot
+    # serves an inbox.
+    context 'when the association is inactive' do
+      before { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot, status: :inactive) }
+
+      it 'denies the receipt' do
+        expect(subject).not_to permit(agent_bot_context, conversation)
+      end
+    end
+
     context 'when the bot serves no inbox on the conversation' do
       it 'denies the receipt even though show? allows it' do
         expect(subject).not_to permit(agent_bot_context, conversation)

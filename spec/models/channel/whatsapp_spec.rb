@@ -346,7 +346,7 @@ RSpec.describe Channel::Whatsapp do
       create(:channel_whatsapp, provider: 'baileys', provider_config: { mark_as_read: true }, validate_provider_config: false, sync_templates: false)
     end
     let(:conversation) { create(:conversation) }
-    let(:message) { create(:message, conversation: conversation) }
+    let(:message) { create(:message, conversation: conversation, source_id: '3EB0READ0001') }
 
     it 'calls provider service method' do
       provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, read_messages: nil)
@@ -381,7 +381,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.echo?(conversation)).to be(true)
+      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(true)
       Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation))
     end
 
@@ -390,7 +390,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.echo?(conversation)).to be(false)
+      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(false)
     end
 
     it 'does not call method if provider service does not implement it' do

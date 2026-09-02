@@ -38,7 +38,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   # nobody here has read -- which is exactly what an agent bot's provider-only receipt is
   # not allowed to do.
   def own_receipt?(message)
-    Whatsapp::SelfReadReceipts.echo?(message.conversation)
+    Whatsapp::SelfReadReceipts.echo?(message)
   end
 
   # The receipt says the chat was read *at that moment*, not now. Unread counts compare

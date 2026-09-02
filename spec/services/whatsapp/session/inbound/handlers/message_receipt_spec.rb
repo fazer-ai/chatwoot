@@ -163,7 +163,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
                        message_type: :incoming, status: :sent, source_id: '3EB0AAAA0003')
     end
 
-    before { Whatsapp::SelfReadReceipts.record(conversation) }
+    before { Whatsapp::SelfReadReceipts.record(conversation, [message]) }
 
     after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation)) }
 
@@ -191,6 +191,25 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
       dispatch
 
       expect(conversation.reload.agent_last_seen_at).to be_nil
+    end
+
+    # The marker answers for the ids this app acknowledged and for nothing else. Anchored to
+    # the conversation instead, it would swallow every later read the paired phone reports,
+    # and each new bot receipt would push that window out again.
+    it 'lets a device read of another message in the chat through' do
+      other = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                               message_type: :incoming, status: :sent, source_id: '3EB0AAAA0004')
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(
+          model::Events::MessageReceipt.new(chat: model::Address.phone('5541999990000'),
+                                            message_ids: [other.source_id], type: 'read')
+        )
+      )
+
+      expect(conversation.reload.agent_last_seen_at).to be_present
     end
   end
 

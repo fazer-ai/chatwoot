@@ -1317,6 +1317,18 @@ RSpec.describe 'Conversations API', type: :request do
         expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
       end
 
+      it 'denies a bot whose inbox association was switched off' do
+        inactive_bot = create(:agent_bot, account: account)
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: inactive_bot, status: :inactive)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: inactive_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
       it 'denies a bot that serves no inbox on the conversation' do
         other_bot = create(:agent_bot, account: account)
 

@@ -251,7 +251,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     # Marked before the send: the provider echoes this receipt back as an inbound one, and
     # the handlers that read it must not take it for a device of this account opening the
     # chat. See Whatsapp::SelfReadReceipts.
-    Whatsapp::SelfReadReceipts.record(conversation)
+    Whatsapp::SelfReadReceipts.record(conversation, messages)
     provider_service.read_messages(messages, recipient_id: recipient_id)
   end
 

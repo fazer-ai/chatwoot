@@ -22,8 +22,14 @@ class ConversationPolicy < ApplicationPolicy
 
   private
 
+  # `user.inboxes` spans every association, disabled ones included, and a bot an operator
+  # switched off must not go on putting blue ticks on the contact's phone. Active is what
+  # `AgentBotListener#active_inbox_agent_bot` and `Conversation#set_active_bot_conversation`
+  # both mean by a bot serving an inbox.
   def agent_bot_serves_conversation?
-    record.assignee_agent_bot_id == user.id || user.inboxes.exists?(id: record.inbox_id)
+    return true if record.assignee_agent_bot_id == user.id
+
+    user.agent_bot_inboxes.active.exists?(inbox_id: record.inbox_id)
   end
 
   def agent_can_view_conversation?
