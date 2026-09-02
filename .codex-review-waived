@@ -119,4 +119,3 @@ app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bo
 # steps lies about the number, and an SVG rect moves fill and radius out of Tailwind to
 # avoid a single width.
 app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDistribution.vue: Render distribution widths without inline styles  # PR#448
-app/controllers/api/v1/accounts/conversations_controller.rb: Require the bot to identify processed messages  # PR#450
