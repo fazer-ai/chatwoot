@@ -1349,6 +1349,30 @@ RSpec.describe 'Conversations API', type: :request do
           .and(not_change { conversation.reload.assignee_last_seen_at })
       end
 
+      # An imported row carries WhatsApp's own timestamp, which has second precision, so a
+      # burst inside one second ties. Ordered by time alone the window is free to land on a
+      # different subset of the tied rows each call, which walks past the cap over time.
+      it 'picks the same window when the timestamps tie' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 2)
+        tied = Time.zone.parse('2026-01-01 10:00:00')
+        [first_message, last_message].each { |m| m.update!(created_at: tied) }
+        extra = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming,
+                                 created_at: tied)
+
+        dispatched = []
+        allow(Rails.configuration.dispatcher).to receive(:dispatch) do |event, _time, payload|
+          dispatched << payload[:message_ids] if event == Events::Types::MESSAGES_READ
+        end
+
+        3.times do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: { api_access_token: agent_bot.access_token.token },
+               as: :json
+        end
+
+        expect(dispatched).to eq(Array.new(3) { [last_message.id, extra.id] })
+      end
+
       it 'refuses a batch larger than the cap' do
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
              params: { message_ids: (1..51).to_a },

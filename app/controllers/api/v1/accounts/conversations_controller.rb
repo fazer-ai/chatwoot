@@ -409,11 +409,18 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   #
   # Same size as the cap a caller-named list is held to: a default that reaches further than
   # a caller is allowed to name would be the wrong way round.
+  #
+  # Ordered by id as well as time, because the window is only fixed if it is deterministic.
+  # Message's default scope orders by `created_at` alone, and an imported row carries the
+  # timestamp WhatsApp gave it, which has second precision (`MessageWriter#build`): a burst
+  # inside one second ties, Postgres is free to break the tie differently on the next call,
+  # and the window drifts onto rows it had excluded -- the same walk backwards through
+  # history the thread anchor exists to prevent, entered through the sort instead.
   def receipt_messages(ids)
     scope = @conversation.messages.incoming
     return scope.where.not(status: :read).where(id: ids).to_a if ids.any?
 
-    scope.last(READ_RECEIPT_BATCH_SIZE).reject { |message| message.status == 'read' }
+    scope.reorder(created_at: :asc, id: :asc).last(READ_RECEIPT_BATCH_SIZE).reject { |message| message.status == 'read' }
   end
 
   def assignee?
