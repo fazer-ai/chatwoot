@@ -165,7 +165,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
 
     before { Whatsapp::SelfReadReceipts.record(conversation, [message]) }
 
-    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation)) }
+    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id)) }
 
     it 'leaves the unread markers alone' do
       conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations

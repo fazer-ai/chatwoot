@@ -1425,7 +1425,22 @@ describe Whatsapp::IncomingMessageBaileysService do
             described_class.new(inbox: inbox, params: params).perform
           end.to(not_change { conversation.reload.agent_last_seen_at })
 
-          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation))
+          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id))
+        end
+
+        # `messages.update` is a batch, so a lookup per update would put a Redis round trip on
+        # each one; the ids of the whole webhook are asked for once, as the session handler does.
+        it 'reads the acknowledged ids once for the whole batch' do
+          second = create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_124', status: 'sent')
+          params[:data] = [
+            { key: { id: message.source_id, fromMe: false }, update: { status: 4 } },
+            { key: { id: second.source_id, fromMe: false }, update: { status: 4 } }
+          ]
+          allow(Whatsapp::SelfReadReceipts).to receive(:acknowledged).and_call_original
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Whatsapp::SelfReadReceipts).to have_received(:acknowledged).with(conversation, %w[msg_123 msg_124]).once
         end
 
         it "does not downgrade a 'read' message to delivered" do

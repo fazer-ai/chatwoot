@@ -45,7 +45,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   # in one query on purpose, and asking Redis per message would undo that.
   def acknowledged_in(conversation)
     @acknowledged_in ||= {}
-    @acknowledged_in[conversation.id] ||= Whatsapp::SelfReadReceipts.acknowledged(conversation)
+    @acknowledged_in[conversation.id] ||= Whatsapp::SelfReadReceipts.acknowledged(conversation, payload.message_ids)
   end
 
   # The receipt says the chat was read *at that moment*, not now. Unread counts compare

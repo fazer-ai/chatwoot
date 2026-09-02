@@ -76,12 +76,25 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
   # Whatsapp::SelfReadReceipts.
   def update_last_seen_at
     conversation = @message.conversation
-    return if Whatsapp::SelfReadReceipts.acknowledged(conversation).include?(@message.source_id)
+    return if acknowledged_in(conversation).include?(raw_message_id)
 
     to_update = { agent_last_seen_at: Time.current }
     to_update[:assignee_last_seen_at] = Time.current if conversation.assignee_id.present?
 
     conversation.update_columns(to_update) # rubocop:disable Rails/SkipsModelValidations
+  end
+
+  # Asked for the whole webhook at once, like the session handler does for a receipt: this
+  # payload is a batch too, and a lookup per update would put a Redis round trip on each one.
+  def acknowledged_in(conversation)
+    @acknowledged_in ||= {}
+    @acknowledged_in[conversation.id] ||= Whatsapp::SelfReadReceipts.acknowledged(conversation, read_receipt_ids)
+  end
+
+  def read_receipt_ids
+    @read_receipt_ids ||= Array(processed_params[:data]).filter_map do |update|
+      update.dig(:key, :id) if update.dig(:key, :fromMe).blank? && update.dig(:update, :status) == 4
+    end
   end
 
   def status_transition_allowed?(new_status)

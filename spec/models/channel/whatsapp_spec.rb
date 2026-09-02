@@ -381,8 +381,8 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation)).to include(message.source_id)
-      Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation))
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to include(message.source_id)
+      Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id))
     end
 
     it 'leaves no marker when the inbox has mark_as_read off' do
@@ -390,7 +390,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation)).to be_empty
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
     end
 
     it 'does not call method if provider service does not implement it' do

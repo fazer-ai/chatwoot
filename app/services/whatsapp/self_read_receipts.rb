@@ -22,9 +22,12 @@ module Whatsapp::SelfReadReceipts
   # from the paired phone for every *other* message in the chat, and since each receipt
   # refreshes the key, a busy bot thread would never let a device read through again.
   #
-  # The ids live in one set per conversation so the cost is a round trip per receipt rather
-  # than per message: an assignee opening a long backlog acknowledges the whole thing in one
-  # call, on the worker the event dispatcher shares.
+  # One key per id, each with its own expiry, rather than a set per conversation: a thread
+  # answered by a bot takes a receipt every few seconds, and a set whose TTL is pushed out
+  # by every write never ages anything out -- it grows for as long as the conversation is
+  # active, and every read transfers the whole of it. The batching that a set was there for
+  # is a pipeline on the write and an `MGET` on the read, so the cost is still one round
+  # trip each way, and the read now carries only the ids the receipt names.
   #
   # Held far longer than the echo takes to arrive (seconds), because the failure is
   # asymmetric. The inbound path defers and retries on its own ladder --
@@ -44,29 +47,31 @@ module Whatsapp::SelfReadReceipts
     return if ids.empty?
 
     Redis::Alfred.with do |conn|
-      conn.sadd(key(conversation), ids)
-      conn.expire(key(conversation), TTL.to_i)
+      conn.pipelined { |pipe| ids.each { |id| pipe.setex(key(conversation, id), TTL.to_i, '1') } }
     end
   end
 
-  # The whole set, not a membership test per message. A receipt is a batch by nature and a
-  # large one by habit -- opening a chat produced one read event naming 246 messages -- and
-  # the session handler resolves all of them in a single query for exactly that reason; a
-  # test per message would put 246 sequential Redis round trips back on the queue inbound
-  # messages share. The payload is short ids, bounded by what this app acknowledged inside
-  # the TTL window.
-  def acknowledged(conversation)
-    Set.new(Redis::Alfred.with { |conn| conn.smembers(key(conversation)) })
+  # The ids of `source_ids` this app acknowledged, as a Set. Asked for a whole receipt at a
+  # time: one is a batch by nature and a large one by habit -- opening a chat produced a
+  # single read event naming 246 messages -- and the handlers resolve all of them in one
+  # query for that reason, so a lookup per message would put that many round trips back on
+  # the queue inbound messages share.
+  def acknowledged(conversation, source_ids)
+    ids = Array(source_ids).compact_blank.uniq
+    return Set.new if ids.empty?
+
+    values = Redis::Alfred.with { |conn| conn.mget(*ids.map { |id| key(conversation, id) }) }
+    Set.new(ids.zip(values).filter_map { |id, value| id if value })
   end
 
-  def key(conversation)
-    format(Redis::Alfred::WHATSAPP_SELF_READ_RECEIPT, conversation_id: conversation.id)
+  def key(conversation, source_id)
+    format(Redis::Alfred::WHATSAPP_SELF_READ_RECEIPT, conversation_id: conversation.id, source_id: source_id)
   end
 
   # `pluck` on a relation so a backlog is one column of strings rather than a row each; the
   # providers materialize what they need on their own terms.
   def source_ids(messages)
-    ids = messages.respond_to?(:pluck) && messages.is_a?(ActiveRecord::Relation) ? messages.pluck(:source_id) : messages.map(&:source_id)
-    ids.compact_blank
+    ids = messages.is_a?(ActiveRecord::Relation) ? messages.pluck(:source_id) : messages.map(&:source_id)
+    ids.compact_blank.uniq
   end
 end
