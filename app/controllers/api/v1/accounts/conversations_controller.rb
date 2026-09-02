@@ -14,6 +14,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # and an oversized batch is refused rather than truncated: a truncated answer is indistinguishable
   # from "these conversations are gone" to a caller that reconciles against it.
   SYNC_BATCH_SIZE = 25
+  # One debounced batch of inbound messages, generously. The caller names what it read, so
+  # this only refuses a list no conversation flow produces; the whole thread is never the
+  # answer, since a receipt per message of history empties a year of unread badges on the
+  # contact's phone.
+  READ_RECEIPT_BATCH_SIZE = 50
 
   def index
     result = conversation_finder.perform
@@ -203,6 +208,30 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     update_last_seen_on_conversation(DateTime.now.utc, assignee?)
   end
 
+  # Tells WhatsApp the contact's messages were read, and touches nothing else.
+  #
+  # Deliberately not `update_last_seen`. There the receipt is a side effect of a person
+  # opening the thread, so it comes with `agent_last_seen_at`, the stamp that draws the
+  # unread badge. An agent bot is not a person reading the thread: `bot_handoff!` hands
+  # the conversation back to a human without rewinding that stamp, and one written here
+  # would put it in their queue already looking read.
+  #
+  # The inbox's `mark_as_read` toggle still wins, downstream in Channel::Whatsapp, and a
+  # channel with nothing to send a receipt through is a no-op, both as on the human path.
+  def read_receipt
+    authorize @conversation, :read_receipt?
+
+    ids = permitted_message_ids
+    return render_could_not_create_error("message_ids must contain at most #{READ_RECEIPT_BATCH_SIZE} entries") if ids.size > READ_RECEIPT_BATCH_SIZE
+
+    messages = receipt_messages(ids)
+    return head :ok if messages.empty?
+
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGES_READ, Time.zone.now,
+                                            conversation: @conversation, message_ids: messages.map(&:id))
+    head :ok
+  end
+
   def unread
     Rails.configuration.dispatcher.dispatch(Events::Types::CONVERSATION_UNREAD, Time.zone.now, conversation: @conversation)
 
@@ -353,6 +382,17 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def permitted_conversation_ids
     Array(params[:ids]).map(&:to_i)
+  end
+
+  def permitted_message_ids
+    Array(params[:message_ids]).map(&:to_i)
+  end
+
+  # The bot names the messages it processed -- a debounced batch is several -- or nothing,
+  # and then it is the newest inbound message, which is the one it is answering.
+  def receipt_messages(ids)
+    scope = @conversation.messages.incoming
+    ids.empty? ? scope.last(1) : scope.where(id: ids).to_a
   end
 
   def assignee?

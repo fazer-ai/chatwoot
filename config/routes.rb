@@ -200,6 +200,7 @@ Rails.application.routes.draw do
               post :presence_subscribe
               post :update_last_seen
               post :unread
+              post :read_receipt
               post :custom_attributes
               post :destroy_custom_attributes
               get :attachments

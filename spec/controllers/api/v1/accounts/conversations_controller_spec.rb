@@ -1242,6 +1242,128 @@ RSpec.describe 'Conversations API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/read_receipt' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox) }
+    let(:agent_bot) { create(:agent_bot, account: account) }
+
+    before { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an agent bot' do
+      let!(:first_message) { create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming) }
+      let!(:last_message) { create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming) }
+
+      before { allow(Rails.configuration.dispatcher).to receive(:dispatch) }
+
+      it 'dispatches messages.read for the latest incoming message' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
+      end
+
+      it 'dispatches messages.read for the message ids it was given' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [first_message.id] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [first_message.id])
+      end
+
+      it 'ignores message ids belonging to another conversation' do
+        other_message = create(:message, account: account, message_type: :incoming)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [other_message.id] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'leaves the dashboard read state untouched' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: { api_access_token: agent_bot.access_token.token },
+               as: :json
+        end.to not_change { conversation.reload.agent_last_seen_at }
+          .and(not_change { conversation.reload.assignee_last_seen_at })
+      end
+
+      it 'refuses a batch larger than the cap' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: (1..51).to_a },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
+      it 'denies a bot that serves no inbox on the conversation' do
+        other_bot = create(:agent_bot, account: account)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: other_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(response.parsed_body['error']).to eq('You are not authorized to do this action')
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: inbox)
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+      end
+
+      it 'dispatches messages.read without touching the last seen timestamps' do
+        message = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :incoming)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end.to(not_change { conversation.reload.agent_last_seen_at })
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [message.id])
+      end
+
+      it 'does not dispatch when the conversation has no incoming message' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/conversations/:id/unread' do
     let(:conversation) { create(:conversation, account: account) }
 
