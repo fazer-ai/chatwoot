@@ -88,6 +88,8 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       'location'
     elsif msg.key?(:protocolMessage)
       'protocol'
+    elsif msg.key?(:secretEncryptedMessage)
+      'secret'
     elsif msg.key?(:albumMessage)
       'album'
     elsif msg.key?(:messageContextInfo) && msg.keys.count == 1
@@ -312,8 +314,14 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   # An albumMessage is only the marker announcing a media group; each item
   # arrives as its own associatedChildMessage upsert, so the marker itself
   # renders nothing.
+  #
+  # A secretEncryptedMessage is an edit of an existing message, encrypted under
+  # that message's secret. The provider is the only side that can decrypt it and
+  # it delivers the result as a messages.update; anything still arriving here is
+  # a blob we have no key for, and rendering it as an unsupported message is
+  # worse than dropping it.
   def ignore_message?
-    message_type.in?(%w[protocol context edited album])
+    message_type.in?(%w[protocol context edited album secret])
   end
 
   # A protocolMessage of type REVOKE is the contact deleting a message for everyone.

@@ -429,6 +429,40 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       end
     end
 
+    # WhatsApp stopped sending message edits as a plaintext protocolMessage and
+    # now encrypts them under the original message's secret. Only the provider
+    # can decrypt one, and it delivers the result as a messages.update; a blob
+    # that still reaches here has no key and rendering it told the agent the
+    # contact had sent an unsupported message.
+    context 'when receiving an encrypted message edit the provider could not decrypt' do
+      it 'ignores it and creates no message' do
+        raw_message = {
+          key: { id: 'msg_secret_edit', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            secretEncryptedMessage: {
+              targetMessageKey: { id: 'msg_original', remoteJid: "#{lid}@lid", fromMe: true },
+              encPayload: 'ZW5jcnlwdGVk',
+              encIv: 'aXY=',
+              secretEncType: 2
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.not_to change(Message, :count)
+      end
+    end
+
     context 'when receiving an album child image message' do
       it 'unwraps the wrapper and processes the message with media' do
         raw_message = {
