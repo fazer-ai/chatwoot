@@ -134,6 +134,33 @@ describe Webhooks::Trigger do
       end
     end
 
+    context 'when webhook type is agent bot observer' do
+      let(:webhook_type) { :agent_bot_observer_webhook }
+      let!(:pending_conversation) { create(:conversation, inbox: inbox, status: :pending, account: account) }
+      let!(:pending_message) { create(:message, account: account, inbox: inbox, conversation: pending_conversation) }
+
+      it 'retries a 500 the way the responder does' do
+        payload = { event: 'message_created', id: pending_message.id }
+
+        expect(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('500 Internal Server Error'))
+
+        expect { trigger.execute(url, payload, webhook_type) }
+          .to(raise_error do |error|
+            expect(error.class.name).to eq('Webhooks::Trigger::RetryableError')
+            expect(error.status).to eq(500)
+          end)
+      end
+
+      it 'never hands a pending conversation to a human when its retries are gone' do
+        payload = { event: 'message_created', id: pending_message.id }
+
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('observer down'))
+
+        expect(pending_conversation.reload.status).to eq('pending')
+        expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
+      end
+    end
+
     it 'raises RetriableError for non-agent webhooks on 500 without marking the message failed' do
       payload = { event: 'message_created', conversation: { id: conversation.id }, id: message.id }
 
