@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
+ActiveRecord::Schema[7.1].define(version: 2026_09_02_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -129,6 +129,18 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_31_010000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "account_id"
+  end
+
+  create_table "agent_bot_observers", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "agent_bot_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_agent_bot_observers_on_account_id"
+    t.index ["agent_bot_id"], name: "index_agent_bot_observers_on_agent_bot_id"
+    t.index ["inbox_id", "agent_bot_id"], name: "index_agent_bot_observers_on_inbox_id_and_agent_bot_id", unique: true
   end
 
   create_table "agent_bots", force: :cascade do |t|
