@@ -251,7 +251,13 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     # Marked before the send: the provider echoes this receipt back as an inbound one, and
     # the handlers that read it must not take it for a device of this account opening the
     # chat. See Whatsapp::SelfReadReceipts.
-    Whatsapp::SelfReadReceipts.record(conversation, messages)
+    #
+    # Only for a paired phone, which is what `session_family?` asks. The echo is a
+    # multi-device artifact -- WhatsApp tells the account's other devices what one of them
+    # read -- so an inbox that is a business API has no device to hear it from and no
+    # inbound handler that would act on one. Marking there writes a key per message that
+    # nothing ever reads.
+    Whatsapp::SelfReadReceipts.record(conversation, messages) if session_family?
     provider_service.read_messages(messages, recipient_id: recipient_id)
   end
 
