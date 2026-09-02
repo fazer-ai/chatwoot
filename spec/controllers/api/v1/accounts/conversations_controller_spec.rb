@@ -1328,6 +1328,18 @@ RSpec.describe 'Conversations API', type: :request do
           .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [first_message.id])
       end
 
+      # An empty list is a caller saying it processed nothing, not a caller saying nothing.
+      # Read as the latter it would acknowledge the whole window on its own initiative.
+      it 'sends no receipt when the caller names an empty list' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             params: { message_ids: [] },
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+      end
+
       it 'ignores message ids belonging to another conversation' do
         other_message = create(:message, account: account, message_type: :incoming)
 

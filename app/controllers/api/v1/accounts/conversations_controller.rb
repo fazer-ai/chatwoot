@@ -226,7 +226,9 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     authorize @conversation, :read_receipt?
 
     ids = permitted_message_ids
-    return render_could_not_create_error("message_ids must contain at most #{READ_RECEIPT_BATCH_SIZE} entries") if ids.size > READ_RECEIPT_BATCH_SIZE
+    if ids && ids.size > READ_RECEIPT_BATCH_SIZE
+      return render_could_not_create_error("message_ids must contain at most #{READ_RECEIPT_BATCH_SIZE} entries")
+    end
 
     messages = receipt_messages(ids)
     return head :ok if messages.empty?
@@ -388,7 +390,13 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     Array(params[:ids]).map(&:to_i)
   end
 
+  # nil when the caller said nothing, which is what asks for the default window. An empty
+  # array is not that: it is a caller naming no messages, and the answer to it is no receipt.
+  # Collapsing the two acknowledges fifty messages for a debounced batch that came up empty,
+  # which is the one thing this endpoint must never do on its own initiative.
   def permitted_message_ids
+    return unless params.key?(:message_ids)
+
     Array(params[:message_ids]).map(&:to_i)
   end
 
@@ -418,7 +426,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # history the thread anchor exists to prevent, entered through the sort instead.
   def receipt_messages(ids)
     scope = @conversation.messages.incoming
-    return scope.where.not(status: :read).where(id: ids).to_a if ids.any?
+    return scope.where.not(status: :read).where(id: ids).to_a if ids
 
     scope.reorder(created_at: :asc, id: :asc).last(READ_RECEIPT_BATCH_SIZE).reject { |message| message.status == 'read' }
   end
