@@ -1288,7 +1288,7 @@ RSpec.describe 'Conversations API', type: :request do
           .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
       end
 
-      it 'keeps only the newest of an unacknowledged backlog larger than the cap' do
+      it 'keeps only the newest of a backlog larger than the cap' do
         stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 1)
 
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
@@ -1299,6 +1299,21 @@ RSpec.describe 'Conversations API', type: :request do
         expect(Rails.configuration.dispatcher)
           .to have_received(:dispatch)
           .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
+      end
+
+      # The window is over the thread, not over its unread messages. Anchored to the unread ones
+      # instead, the echo that marks this call's batch read hands the next call the batch before
+      # it, and a bot answering every message pages backwards through the whole history.
+      it 'never reaches past the window once the newest messages are acknowledged' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 1)
+        last_message.update!(status: :read)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
       end
 
       it 'dispatches messages.read for the message ids it was given' do

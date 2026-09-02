@@ -251,13 +251,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     # Marked before the send: the provider echoes this receipt back as an inbound one, and
     # the handlers that read it must not take it for a device of this account opening the
     # chat. See Whatsapp::SelfReadReceipts.
-    #
-    # Only for a paired phone, which is what `session_family?` asks. The echo is a
-    # multi-device artifact -- WhatsApp tells the account's other devices what one of them
-    # read -- so an inbox that is a business API has no device to hear it from and no
-    # inbound handler that would act on one. Marking there writes a key per message that
-    # nothing ever reads.
-    Whatsapp::SelfReadReceipts.record(conversation, messages) if session_family?
+    Whatsapp::SelfReadReceipts.record(conversation, messages) if marker_read_back?
     provider_service.read_messages(messages, recipient_id: recipient_id)
   end
 
@@ -442,6 +436,19 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   private
+
+  # Whether anything on the way in will read the marker back. Written by exactly the two
+  # inbound paths that can mistake our own receipt for a device read: the canonical session
+  # handler, which covers every session provider, and the legacy Baileys one.
+  #
+  # Not `session_family?`, though it is nearly the same set. That asks "is this a paired
+  # phone", and the echo does need one -- a business API has no second device to hear it
+  # from. But Z-API is a paired phone whose status callback only moves a message's status
+  # and never `agent_last_seen_at`, so it has nothing to be misled about, and a marker
+  # written for it is a key per message that expires without ever being read.
+  def marker_read_back?
+    session_provider? || provider == 'baileys'
+  end
 
   # Pushes the connection status to the account's agents over the websocket without
   # going through the full dispatcher, which would always enqueue an EventDispatcherJob

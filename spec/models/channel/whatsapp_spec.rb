@@ -399,6 +399,19 @@ RSpec.describe Channel::Whatsapp do
       expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
     end
 
+    # Z-API is a paired phone, so the echo does reach it, but its status callback only moves a
+    # message's status and never `agent_last_seen_at`. Nothing reads the marker back, so every
+    # key written for it expires unread.
+    it 'leaves no marker for a paired phone whose inbound path never reads it' do
+      channel.update!(provider: 'zapi', provider_config: { mark_as_read: true, api_key: 'k', instance_id: '1', token: 't' })
+      provider_double = instance_double(Whatsapp::Providers::WhatsappZapiService, read_messages: nil)
+      allow(Whatsapp::Providers::WhatsappZapiService).to receive(:new).and_return(provider_double)
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
+    end
+
     it 'leaves no marker when the inbox has mark_as_read off' do
       channel.update!(provider_config: { mark_as_read: false })
 

@@ -393,21 +393,27 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   # The bot names the messages it processed -- a debounced batch is several -- or nothing, and
-  # then the set is the one `update_last_seen` acknowledges: everything inbound this account
-  # has not acknowledged yet. The human path narrows that by the watermark it is about to
-  # move, and a bot has no watermark by design, so what is left is the other half of the same
-  # rule. That half closes the loop on its own: the provider echoes our receipt back and the
-  # echo writes `read` on the row, so the next call no longer names the same message.
+  # then the set is the unacknowledged part of a fixed window: the newest
+  # READ_RECEIPT_BATCH_SIZE inbound messages of the thread, minus the ones already read.
   #
-  # Capped at the newest, the cap the caller-named branch is held to as well. A default that
-  # reaches further than a caller is allowed to name would be the wrong way round, and the
-  # first call on an inbox that has just been paired would otherwise acknowledge the whole
-  # history the provider dumped into it, emptying a year of unread badges on the contact's
-  # phone. A person opening that thread has the same reach, but only if somebody opens it; a
-  # bot answers every message, so eventual becomes certain.
+  # The window is over the thread, NOT over the unread ones, and that distinction is the
+  # whole safety property. Taking the newest N *unread* rows looks equivalent and walks
+  # backwards through history instead: the provider echoes each receipt back, the echo writes
+  # `read` on those rows, and the next call's newest-N-unread is then the fifty before them.
+  # A bot answers every message, so a thread with a year of history behind it gets paged
+  # through fifty at a time until every badge on the contact's phone is gone. Anchored to the
+  # thread, a message that was already old on the first call is never named on any call.
+  #
+  # The human path is not exposed to this because its watermark only moves forward. A bot
+  # writes no watermark by design, so the window is what replaces it.
+  #
+  # Same size as the cap a caller-named list is held to: a default that reaches further than
+  # a caller is allowed to name would be the wrong way round.
   def receipt_messages(ids)
-    scope = @conversation.messages.incoming.where.not(status: :read)
-    ids.empty? ? scope.last(READ_RECEIPT_BATCH_SIZE) : scope.where(id: ids).to_a
+    scope = @conversation.messages.incoming
+    return scope.where.not(status: :read).where(id: ids).to_a if ids.any?
+
+    scope.last(READ_RECEIPT_BATCH_SIZE).reject { |message| message.status == 'read' }
   end
 
   def assignee?
