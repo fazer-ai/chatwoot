@@ -1413,6 +1413,21 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(conversation.assignee_last_seen_at).to eq(Time.current)
         end
 
+        # The provider echoes back the receipt this app sent, and taking it for a device of
+        # this account clears the unread badge of a conversation nobody here has opened.
+        it 'leaves the markers alone when the read receipt is our own echoed back' do
+          update_payload[:key][:fromMe] = false
+          update_payload[:update][:status] = 4
+          conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
+          Whatsapp::SelfReadReceipts.record([message])
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.to(not_change { conversation.reload.agent_last_seen_at })
+
+          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(message))
+        end
+
         it "does not downgrade a 'read' message to delivered" do
           message.update!(status: 'read')
 

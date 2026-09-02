@@ -72,7 +72,11 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
     end
   end
 
+  # Skipped for this app's own receipt echoed back by the provider: see
+  # Whatsapp::SelfReadReceipts.
   def update_last_seen_at
+    return if Whatsapp::SelfReadReceipts.echo?(@message)
+
     conversation = @message.conversation
     to_update = { agent_last_seen_at: Time.current }
     to_update[:assignee_last_seen_at] = Time.current if conversation.assignee_id.present?

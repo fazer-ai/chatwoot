@@ -153,6 +153,34 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     end
   end
 
+  # Uazapi answers our own `/message/markread` with a `read` webhook naming the messages we
+  # just acknowledged. Taken for a device of this account, it would clear the unread badge of
+  # a conversation an agent bot read on the provider only and no human has opened.
+  context 'when the receipt is this app echoed back' do
+    let(:type) { 'read' }
+    let(:message) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: '3EB0AAAA0003')
+    end
+
+    before { Whatsapp::SelfReadReceipts.record([message]) }
+
+    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(message)) }
+
+    it 'leaves the unread markers alone' do
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      dispatch
+
+      expect(conversation.reload.agent_last_seen_at).to be_nil
+    end
+
+    it 'still marks the message read' do
+      expect(dispatch).to eq(:handled)
+      expect(message.reload.status).to eq('read')
+    end
+  end
+
   context 'when a weaker receipt arrives late' do
     let(:type) { 'delivered' }
 

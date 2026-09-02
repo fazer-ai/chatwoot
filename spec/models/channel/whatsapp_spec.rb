@@ -373,6 +373,26 @@ RSpec.describe Channel::Whatsapp do
       expect(provider_double).to have_received(:read_messages)
     end
 
+    # The provider echoes this receipt back as an inbound one, and the marker is what stops
+    # the inbound handlers from reading it as a device of this account opening the chat.
+    it 'marks the messages so the provider echo is not read back as a device read' do
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, read_messages: nil)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).and_return(provider_double)
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(true)
+      Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(message))
+    end
+
+    it 'leaves no marker when the inbox has mark_as_read off' do
+      channel.update!(provider_config: { mark_as_read: false })
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(false)
+    end
+
     it 'does not call method if provider service does not implement it' do
       channel.update!(provider: 'default')
 

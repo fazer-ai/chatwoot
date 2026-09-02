@@ -389,7 +389,15 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   # The bot names the messages it processed -- a debounced batch is several -- or nothing,
-  # and then it is the newest inbound message, which is the one it is answering.
+  # and then it is the newest inbound message at the moment of the call.
+  #
+  # That default is a convenience and it is deliberately not a guess about what the caller
+  # read: a message arriving between the webhook and this request becomes the newest one, and
+  # acknowledging a turn it has not handled is then the caller's doing, not this endpoint's.
+  # A caller that cares about the distinction has the ids -- the webhook handed them to it --
+  # and passing them is the whole point of the parameter. The human path is no more precise:
+  # `update_last_seen` acknowledges everything inbound since the watermark, including what
+  # landed a moment before the tab came into focus.
   def receipt_messages(ids)
     scope = @conversation.messages.incoming
     ids.empty? ? scope.last(1) : scope.where(id: ids).to_a
