@@ -58,6 +58,19 @@ RSpec.describe 'Inbox Agent Bot Observers API', type: :request do
       expect(response).to have_http_status(:success)
     end
 
+    it 'never renders the token of a bot that belongs to no account' do
+      global_bot = create(:agent_bot)
+
+      post base_url, headers: admin.create_new_auth_token, params: { agent_bot: global_bot.id }, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).not_to include(global_bot.access_token.token)
+
+      get base_url, headers: admin.create_new_auth_token, as: :json
+
+      expect(response.body).not_to include(global_bot.access_token.token)
+    end
+
     it 'does not accept a bot from another account' do
       foreign_bot = create(:agent_bot, account: create(:account))
 
