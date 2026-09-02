@@ -1419,13 +1419,13 @@ describe Whatsapp::IncomingMessageBaileysService do
           update_payload[:key][:fromMe] = false
           update_payload[:update][:status] = 4
           conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
-          Whatsapp::SelfReadReceipts.record([message])
+          Whatsapp::SelfReadReceipts.record(conversation)
 
           expect do
             described_class.new(inbox: inbox, params: params).perform
           end.to(not_change { conversation.reload.agent_last_seen_at })
 
-          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(message))
+          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation))
         end
 
         it "does not downgrade a 'read' message to delivered" do

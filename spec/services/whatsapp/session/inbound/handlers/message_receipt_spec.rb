@@ -163,9 +163,9 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
                        message_type: :incoming, status: :sent, source_id: '3EB0AAAA0003')
     end
 
-    before { Whatsapp::SelfReadReceipts.record([message]) }
+    before { Whatsapp::SelfReadReceipts.record(conversation) }
 
-    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(message)) }
+    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation)) }
 
     it 'leaves the unread markers alone' do
       conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
@@ -178,6 +178,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     it 'still marks the message read' do
       expect(dispatch).to eq(:handled)
       expect(message.reload.status).to eq('read')
+    end
+
+    # One `source_id` can name several rows -- a shared-contact payload stores a card each
+    # -- and the handler applies the receipt to all of them. A marker on the row the sender
+    # happened to name would let a sibling clear the badge anyway.
+    it 'covers every card the id resolves to' do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: message.source_id)
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      dispatch
+
+      expect(conversation.reload.agent_last_seen_at).to be_nil
     end
   end
 
