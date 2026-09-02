@@ -38,7 +38,14 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   # nobody here has read -- which is exactly what an agent bot's provider-only receipt is
   # not allowed to do.
   def own_receipt?(message)
-    Whatsapp::SelfReadReceipts.echo?(message)
+    acknowledged_in(message.conversation).include?(message.source_id)
+  end
+
+  # Read once per conversation, not once per message: this handler resolves a whole receipt
+  # in one query on purpose, and asking Redis per message would undo that.
+  def acknowledged_in(conversation)
+    @acknowledged_in ||= {}
+    @acknowledged_in[conversation.id] ||= Whatsapp::SelfReadReceipts.acknowledged(conversation)
   end
 
   # The receipt says the chat was read *at that moment*, not now. Unread counts compare

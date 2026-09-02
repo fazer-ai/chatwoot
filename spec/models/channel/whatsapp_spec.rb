@@ -381,7 +381,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(true)
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation)).to include(message.source_id)
       Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation))
     end
 
@@ -390,7 +390,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.read_messages([message], conversation: conversation)
 
-      expect(Whatsapp::SelfReadReceipts.echo?(message)).to be(false)
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation)).to be_empty
     end
 
     it 'does not call method if provider service does not implement it' do

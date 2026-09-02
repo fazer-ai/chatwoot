@@ -196,6 +196,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     # The marker answers for the ids this app acknowledged and for nothing else. Anchored to
     # the conversation instead, it would swallow every later read the paired phone reports,
     # and each new bot receipt would push that window out again.
+    # The handler resolves a whole receipt in one query on purpose; asking Redis per message
+    # would put a round trip back per id, which is hundreds on a receipt naming a whole chat.
+    it 'reads the acknowledged ids once for the whole batch' do
+      allow(Whatsapp::SelfReadReceipts).to receive(:acknowledged).and_call_original
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: message.source_id)
+
+      dispatch
+
+      expect(Whatsapp::SelfReadReceipts).to have_received(:acknowledged).once
+    end
+
     it 'lets a device read of another message in the chat through' do
       other = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
                                message_type: :incoming, status: :sent, source_id: '3EB0AAAA0004')

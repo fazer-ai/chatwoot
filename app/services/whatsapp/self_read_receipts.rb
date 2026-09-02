@@ -49,10 +49,14 @@ module Whatsapp::SelfReadReceipts
     end
   end
 
-  def echo?(message)
-    return false if message.source_id.blank?
-
-    Redis::Alfred.with { |conn| conn.sismember(key(message.conversation), message.source_id) }
+  # The whole set, not a membership test per message. A receipt is a batch by nature and a
+  # large one by habit -- opening a chat produced one read event naming 246 messages -- and
+  # the session handler resolves all of them in a single query for exactly that reason; a
+  # test per message would put 246 sequential Redis round trips back on the queue inbound
+  # messages share. The payload is short ids, bounded by what this app acknowledged inside
+  # the TTL window.
+  def acknowledged(conversation)
+    Set.new(Redis::Alfred.with { |conn| conn.smembers(key(conversation)) })
   end
 
   def key(conversation)
