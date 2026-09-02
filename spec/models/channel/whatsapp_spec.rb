@@ -346,7 +346,7 @@ RSpec.describe Channel::Whatsapp do
       create(:channel_whatsapp, provider: 'baileys', provider_config: { mark_as_read: true }, validate_provider_config: false, sync_templates: false)
     end
     let(:conversation) { create(:conversation) }
-    let(:message) { create(:message, conversation: conversation) }
+    let(:message) { create(:message, conversation: conversation, source_id: '3EB0READ0001') }
 
     it 'calls provider service method' do
       provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, read_messages: nil)
@@ -371,6 +371,53 @@ RSpec.describe Channel::Whatsapp do
       channel.read_messages([message], conversation: conversation)
 
       expect(provider_double).to have_received(:read_messages)
+    end
+
+    # The provider echoes this receipt back as an inbound one, and the marker is what stops
+    # the inbound handlers from reading it as a device of this account opening the chat.
+    it 'marks the messages so the provider echo is not read back as a device read' do
+      provider_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, read_messages: nil)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).and_return(provider_double)
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to include(message.source_id)
+      Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id))
+    end
+
+    # The echo is a multi-device artifact, so a business-API inbox has no device to hear it
+    # from and no inbound handler that reads the marker. Writing one per message there is a
+    # Redis key per message of a backlog that nothing ever looks at.
+    it 'leaves no marker for a provider that is not a paired phone' do
+      channel.update!(provider: 'whatsapp_cloud',
+                      provider_config: { mark_as_read: true, api_key: 'k', phone_number_id: '1', business_account_id: '2' })
+      provider_double = instance_double(Whatsapp::Providers::WhatsappCloudService, read_messages: nil)
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(provider_double)
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
+    end
+
+    # Z-API is a paired phone, so the echo does reach it, but its status callback only moves a
+    # message's status and never `agent_last_seen_at`. Nothing reads the marker back, so every
+    # key written for it expires unread.
+    it 'leaves no marker for a paired phone whose inbound path never reads it' do
+      channel.update!(provider: 'zapi', provider_config: { mark_as_read: true, api_key: 'k', instance_id: '1', token: 't' })
+      provider_double = instance_double(Whatsapp::Providers::WhatsappZapiService, read_messages: nil)
+      allow(Whatsapp::Providers::WhatsappZapiService).to receive(:new).and_return(provider_double)
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
+    end
+
+    it 'leaves no marker when the inbox has mark_as_read off' do
+      channel.update!(provider_config: { mark_as_read: false })
+
+      channel.read_messages([message], conversation: conversation)
+
+      expect(Whatsapp::SelfReadReceipts.acknowledged(conversation, [message.source_id])).to be_empty
     end
 
     it 'does not call method if provider service does not implement it' do

@@ -20,7 +20,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   private
 
   def apply(message)
-    seen = mark_conversation_seen(message) if read_on_our_side?(message)
+    seen = mark_conversation_seen(message) if read_on_our_side?(message) && !own_receipt?(message)
     changed = inbound::StatusTransition.apply(message, payload.type, error: payload.error)
     changed || seen.present?
   end
@@ -31,6 +31,21 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceipt < Whatsapp::Session::
   # counting it would clear the unread badge for incoming messages nobody here opened.
   def read_on_our_side?(message)
     payload.type == 'read' && message.incoming?
+  end
+
+  # This app's own receipt, echoed back by the provider. It is not a device of this account
+  # opening the chat, and treating it as one clears the unread badge for a conversation
+  # nobody here has read -- which is exactly what an agent bot's provider-only receipt is
+  # not allowed to do.
+  def own_receipt?(message)
+    acknowledged_in(message.conversation).include?(message.source_id)
+  end
+
+  # Read once per conversation, not once per message: this handler resolves a whole receipt
+  # in one query on purpose, and asking Redis per message would undo that.
+  def acknowledged_in(conversation)
+    @acknowledged_in ||= {}
+    @acknowledged_in[conversation.id] ||= Whatsapp::SelfReadReceipts.acknowledged(conversation, payload.message_ids)
   end
 
   # The receipt says the chat was read *at that moment*, not now. Unread counts compare
