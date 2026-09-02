@@ -14,10 +14,14 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # and an oversized batch is refused rather than truncated: a truncated answer is indistinguishable
   # from "these conversations are gone" to a caller that reconciles against it.
   SYNC_BATCH_SIZE = 25
-  # One debounced batch of inbound messages, generously. The caller names what it read, so
-  # this only refuses a list no conversation flow produces; the whole thread is never the
-  # answer, since a receipt per message of history empties a year of unread badges on the
-  # contact's phone.
+  # One debounced batch of inbound messages, generously. The whole thread is never the answer,
+  # since a receipt per message of history empties a year of unread badges on the contact's
+  # phone, so this holds both branches of the endpoint to the same reach.
+  #
+  # A named list over it is refused and a resolved one is truncated, which is not a
+  # contradiction: naming 51 ids is a claim about what the caller processed, and no
+  # conversation flow produces it, so answering it at all would be answering a mistake. The
+  # default names nothing, and the newest is then the only sensible part to keep.
   READ_RECEIPT_BATCH_SIZE = 50
 
   def index
@@ -388,19 +392,22 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     Array(params[:message_ids]).map(&:to_i)
   end
 
-  # The bot names the messages it processed -- a debounced batch is several -- or nothing,
-  # and then it is the newest inbound message at the moment of the call.
+  # The bot names the messages it processed -- a debounced batch is several -- or nothing, and
+  # then the set is the one `update_last_seen` acknowledges: everything inbound this account
+  # has not acknowledged yet. The human path narrows that by the watermark it is about to
+  # move, and a bot has no watermark by design, so what is left is the other half of the same
+  # rule. That half closes the loop on its own: the provider echoes our receipt back and the
+  # echo writes `read` on the row, so the next call no longer names the same message.
   #
-  # That default is a convenience and it is deliberately not a guess about what the caller
-  # read: a message arriving between the webhook and this request becomes the newest one, and
-  # acknowledging a turn it has not handled is then the caller's doing, not this endpoint's.
-  # A caller that cares about the distinction has the ids -- the webhook handed them to it --
-  # and passing them is the whole point of the parameter. The human path is no more precise:
-  # `update_last_seen` acknowledges everything inbound since the watermark, including what
-  # landed a moment before the tab came into focus.
+  # Capped at the newest, the cap the caller-named branch is held to as well. A default that
+  # reaches further than a caller is allowed to name would be the wrong way round, and the
+  # first call on an inbox that has just been paired would otherwise acknowledge the whole
+  # history the provider dumped into it, emptying a year of unread badges on the contact's
+  # phone. A person opening that thread has the same reach, but only if somebody opens it; a
+  # bot answers every message, so eventual becomes certain.
   def receipt_messages(ids)
-    scope = @conversation.messages.incoming
-    ids.empty? ? scope.last(1) : scope.where(id: ids).to_a
+    scope = @conversation.messages.incoming.where.not(status: :read)
+    ids.empty? ? scope.last(READ_RECEIPT_BATCH_SIZE) : scope.where(id: ids).to_a
   end
 
   def assignee?

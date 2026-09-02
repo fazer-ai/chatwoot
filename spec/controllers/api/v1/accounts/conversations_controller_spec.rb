@@ -1263,7 +1263,34 @@ RSpec.describe 'Conversations API', type: :request do
 
       before { allow(Rails.configuration.dispatcher).to receive(:dispatch) }
 
-      it 'dispatches messages.read for the latest incoming message' do
+      it 'dispatches messages.read for every unacknowledged incoming message' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation,
+                                                             message_ids: [first_message.id, last_message.id])
+      end
+
+      it 'leaves out the messages the provider has already echoed a receipt for' do
+        first_message.update!(status: :read)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher)
+          .to have_received(:dispatch)
+          .with(Events::Types::MESSAGES_READ, kind_of(Time), conversation: conversation, message_ids: [last_message.id])
+      end
+
+      it 'keeps only the newest of an unacknowledged backlog larger than the cap' do
+        stub_const('Api::V1::Accounts::ConversationsController::READ_RECEIPT_BATCH_SIZE', 1)
+
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/read_receipt",
              headers: { api_access_token: agent_bot.access_token.token },
              as: :json
