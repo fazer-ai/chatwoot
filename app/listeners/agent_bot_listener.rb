@@ -74,8 +74,10 @@ class AgentBotListener < BaseListener
     inbox.agent_bot
   end
 
+  # Through the join, so an observer row whose bot is already gone (AgentBot#agent_bot_observers is
+  # destroyed asynchronously) is not delivered to as a nil.
   def observer_agent_bots_for(inbox)
-    inbox.agent_bot_observers.active.includes(:agent_bot).map(&:agent_bot)
+    inbox.observer_agent_bots.merge(AgentBotObserver.active).to_a
   end
 
   def process_webhook_bot_event(agent_bot, payload, webhook_type)

@@ -256,6 +256,13 @@ describe AgentBotListener do
       listener.message_created(event)
     end
 
+    it 'skips an observer whose bot was deleted and not yet cleaned up' do
+      observer_bot.delete
+      expect(AgentBots::WebhookJob).not_to receive(:perform_later)
+
+      expect { listener.message_created(event) }.not_to raise_error
+    end
+
     it 'delivers conversation events too' do
       resolved_event = Events::Base.new('conversation.resolved', Time.zone.now, conversation: conversation)
       expect(AgentBots::WebhookJob).to receive(:perform_later).with(
