@@ -106,7 +106,7 @@ RSpec.describe 'Inbox Agent Bot Observers API', type: :request do
   end
 
   describe 'bot token access' do
-    it 'lets a bot without an account of its own act on the account it observes' do
+    it 'grants a bot without an account of its own nothing on the account it merely observes' do
       global_bot = create(:agent_bot)
       create(:agent_bot_observer, inbox: inbox, agent_bot: global_bot)
       conversation = create(:conversation, account: account, inbox: inbox)
@@ -115,7 +115,7 @@ RSpec.describe 'Inbox Agent Bot Observers API', type: :request do
           headers: { api_access_token: global_bot.access_token.token },
           as: :json
 
-      expect(response).to have_http_status(:success)
+      expect(response).to have_http_status(:unauthorized)
     end
   end
 end

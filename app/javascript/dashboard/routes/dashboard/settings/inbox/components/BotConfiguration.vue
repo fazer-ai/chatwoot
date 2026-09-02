@@ -131,7 +131,13 @@ export default {
 
 <template>
   <div class="mx-6 max-w-4xl">
-    <LoadingState v-if="uiFlags.isFetching || uiFlags.isFetchingAgentBot" />
+    <LoadingState
+      v-if="
+        uiFlags.isFetching ||
+        uiFlags.isFetchingAgentBot ||
+        uiFlags.isFetchingObservers
+      "
+    />
     <form v-else @submit.prevent="updateActiveAgentBot">
       <SettingsFieldSection
         :label="$t('AGENT_BOTS.BOT_CONFIGURATION.TITLE')"
