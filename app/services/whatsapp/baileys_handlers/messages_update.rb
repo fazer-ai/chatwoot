@@ -1,5 +1,6 @@
 module Whatsapp::BaileysHandlers::MessagesUpdate
   include Whatsapp::BaileysHandlers::Helpers
+  include BaileysHelper
 
   class MessageNotFoundError < StandardError; end
 
@@ -109,7 +110,9 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
     @raw_message = @raw_message.dig(:update, :message, :editedMessage)
     content = message_content
 
-    if content.blank?
+    # `nil` means no readable content; an empty string is a real edit that cleared
+    # a media caption, and dropping it would leave the old caption on screen.
+    if content.nil?
       Rails.logger.warn 'No valid message content found in the edit event'
       return
     end
@@ -125,7 +128,11 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
 
       # Preserve original previous_content if message was already edited
       previous_content_to_save = @message.is_edited ? @message.previous_content : @message.content
-      @message.update!(content: content, is_edited: true, previous_content: previous_content_to_save, edited_at: edited_at)
+      attrs = { content: content, is_edited: true, previous_content: previous_content_to_save }
+      # Only when this edit carries one: writing nil would erase the watermark a
+      # later out-of-order edit is checked against.
+      attrs[:edited_at] = edited_at if edited_at.present?
+      @message.update!(attrs)
     end
   end
 
@@ -140,12 +147,14 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
   end
 
   # The provider stamps edits in whole seconds, on both the encrypted and the
-  # plaintext path. `edited_at` holds milliseconds, which is what the session layer
-  # writes and what the model documents, so the two providers stay comparable.
+  # plaintext path, and a protobuf 64-bit field reaches us either as a number or as
+  # a `{ low, high }` hash — which is what the shared helper is for. `edited_at`
+  # holds milliseconds, which is what the session layer writes and what the model
+  # documents, so the two providers stay comparable.
   def edit_timestamp_ms
     timestamp = @raw_message.dig(:update, :messageTimestamp)
     return if timestamp.blank?
 
-    timestamp.to_i * 1000
+    baileys_extract_message_timestamp(timestamp) * 1000
   end
 end
