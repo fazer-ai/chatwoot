@@ -8,9 +8,12 @@ class Api::V1::Accounts::Inboxes::AgentBotObserversController < Api::V1::Account
   end
 
   # Idempotent: adding a bot that already observes the inbox answers with it, the way set_agent_bot
-  # reuses the responder's row.
+  # reuses the responder's row. Adding always leaves the row active, so a row someone had switched
+  # off does not answer the request with a success the deliveries then ignore.
   def create
-    @inbox.agent_bot_observers.find_or_create_by!(agent_bot: @agent_bot)
+    observer = @inbox.agent_bot_observers.find_or_initialize_by(agent_bot: @agent_bot)
+    observer.status = :active
+    observer.save!
   end
 
   def destroy
