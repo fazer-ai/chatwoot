@@ -58,6 +58,17 @@ RSpec.describe 'Inbox Agent Bot Observers API', type: :request do
       expect(response).to have_http_status(:success)
     end
 
+    it 'switches an observer that was turned off back on' do
+      observer = create(:agent_bot_observer, inbox: inbox, agent_bot: agent_bot, status: :inactive)
+
+      expect do
+        post base_url, headers: admin.create_new_auth_token, params: { agent_bot: agent_bot.id }, as: :json
+      end.not_to(change(AgentBotObserver, :count))
+      expect(response).to have_http_status(:success)
+      expect(observer.reload).to be_active
+      expect(inbox.reload.observer_agent_bots.merge(AgentBotObserver.active)).to eq([agent_bot])
+    end
+
     it 'never renders the token of a bot that belongs to no account' do
       global_bot = create(:agent_bot)
 
