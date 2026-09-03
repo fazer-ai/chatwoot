@@ -58,15 +58,19 @@ RSpec.describe 'Inbox Agent Bot Observers API', type: :request do
       expect(response).to have_http_status(:success)
     end
 
-    it 'switches an observer that was turned off back on' do
-      observer = create(:agent_bot_observer, inbox: inbox, agent_bot: agent_bot, status: :inactive)
+    # Two adds that overlap both pass the uniqueness validation and race to the unique index; the
+    # loser reads the winner's row instead of answering an error for a bot that is observing.
+    it 'answers with the row an overlapping add committed first' do
+      create(:agent_bot_observer, inbox: inbox, agent_bot: agent_bot)
+      allow_any_instance_of(AgentBotObserver).to receive(:save!).and_raise( # rubocop:disable RSpec/AnyInstance
+        ActiveRecord::RecordNotUnique.new('duplicate key value violates unique constraint')
+      )
 
-      expect do
-        post base_url, headers: admin.create_new_auth_token, params: { agent_bot: agent_bot.id }, as: :json
-      end.not_to(change(AgentBotObserver, :count))
+      post base_url, headers: admin.create_new_auth_token, params: { agent_bot: agent_bot.id }, as: :json
+
       expect(response).to have_http_status(:success)
-      expect(observer.reload).to be_active
-      expect(inbox.reload.observer_agent_bots.merge(AgentBotObserver.active)).to eq([agent_bot])
+      expect(AgentBotObserver.count).to eq(1)
+      expect(inbox.reload.observer_agent_bots).to eq([agent_bot])
     end
 
     it 'never renders the token of a bot that belongs to no account' do

@@ -75,9 +75,10 @@ class AgentBotListener < BaseListener
   end
 
   # Through the join, so an observer row whose bot is already gone (AgentBot#agent_bot_observers is
-  # destroyed asynchronously) is not delivered to as a nil.
+  # destroyed asynchronously) is not delivered to as a nil. Queried rather than read off the
+  # association, which an earlier read in the same request may have cached before the row existed.
   def observer_agent_bots_for(inbox)
-    inbox.observer_agent_bots.merge(AgentBotObserver.active).to_a
+    AgentBot.joins(:agent_bot_observers).where(agent_bot_observers: { inbox_id: inbox.id }).to_a
   end
 
   def process_webhook_bot_event(agent_bot, payload, webhook_type)

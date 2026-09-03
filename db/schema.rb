@@ -135,7 +135,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_09_02_120000) do
     t.bigint "account_id", null: false
     t.bigint "inbox_id", null: false
     t.bigint "agent_bot_id", null: false
-    t.integer "status", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_agent_bot_observers_on_account_id"
