@@ -1516,6 +1516,109 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.is_edited).to be(true)
           expect(message.previous_content).to eq(original_content)
         end
+
+        it 'records the edit timestamp in milliseconds so a later update can be ordered against it' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'New message content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.edited_at).to eq(1_700_000_000_000)
+        end
+
+        # A force restart or a cluster handoff leaves the discarded connection
+        # draining its webhooks while the replacement already handles new events,
+        # so an older edit retrying on the old one can land after a newer one.
+        it 'ignores an edit older than the one already applied' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Stale message content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).not_to eq('Stale message content')
+          expect(message.is_edited).to be_falsey
+        end
+
+        it 'applies an edit newer than the one already applied' do
+          message.update!(edited_at: 1_700_000_000_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Newer message content' } } },
+            messageTimestamp: 1_700_000_060
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Newer message content')
+          expect(message.edited_at).to eq(1_700_000_060_000)
+        end
+
+        # Equal timestamps carry no order to respect, and WhatsApp stamps edits in
+        # whole seconds.
+        it 'applies an edit stamped in the same second as the one already applied' do
+          message.update!(edited_at: 1_700_000_000_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Same second content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Same second content')
+        end
+
+        # Refusing it would drop the edit outright, which is worse than applying
+        # it out of order.
+        it 'applies an edit that carries no timestamp' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'Undated content' } } } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Undated content')
+        end
+
+        # Writing nil would erase what a later out-of-order edit is checked against.
+        it 'keeps the stored timestamp when an undated edit is applied' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'Undated content' } } } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.edited_at).to eq(1_700_000_060_000)
+        end
+
+        # A protobuf 64-bit field reaches us either as a number or as a { low, high }
+        # hash, and calling to_i on the hash would raise and drop the edit.
+        it 'reads a timestamp that arrives as a structured protobuf long' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Structured stamp' } } },
+            messageTimestamp: { 'low' => 1_700_000_000, 'high' => 0, 'unsigned' => true }
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Structured stamp')
+          expect(message.edited_at).to eq(1_700_000_000_000)
+        end
+
+        # An edit that clears an image caption sends an empty string, and dropping it
+        # would leave the old caption on screen.
+        it 'applies an edit that clears the content' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { imageMessage: { caption: '' } } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('')
+          expect(message.is_edited).to be(true)
+        end
       end
     end
 
