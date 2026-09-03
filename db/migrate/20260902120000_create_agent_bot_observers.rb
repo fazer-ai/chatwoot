@@ -4,7 +4,6 @@ class CreateAgentBotObservers < ActiveRecord::Migration[7.1]
       t.references :account, null: false, index: true
       t.references :inbox, null: false, index: false
       t.references :agent_bot, null: false, index: true
-      t.integer :status, default: 0, null: false
       t.timestamps
     end
     add_index :agent_bot_observers, [:inbox_id, :agent_bot_id], unique: true

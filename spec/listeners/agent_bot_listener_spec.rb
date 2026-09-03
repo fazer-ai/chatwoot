@@ -249,13 +249,6 @@ describe AgentBotListener do
       listener.message_created(event)
     end
 
-    it 'skips an inactive observer' do
-      AgentBotObserver.find_by!(inbox: inbox, agent_bot: observer_bot).update!(status: :inactive)
-      expect(AgentBots::WebhookJob).not_to receive(:perform_later)
-
-      listener.message_created(event)
-    end
-
     it 'skips an observer whose bot was deleted and not yet cleaned up' do
       observer_bot.delete
       expect(AgentBots::WebhookJob).not_to receive(:perform_later)
