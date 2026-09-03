@@ -119,3 +119,11 @@ app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bo
 # steps lies about the number, and an SVG rect moves fill and radius out of Tailwind to
 # avoid a single width.
 app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDistribution.vue: Render distribution widths without inline styles  # PR#448
+# PR#453: real, upstream, and not this binding's to change. A bot with `account_id` has had the
+# whole account's API since long before this PR (`account_accessible_for_bot?`), whether or not it
+# is set on any inbox: it can post, resolve and assign anywhere. The observer binding widens
+# nothing there — it changes what the fork DELIVERS and what conversations start as (`pending`,
+# assigned), which is the role's promise. Gating reply/ownership calls on "does this bot serve
+# this conversation" is a per-conversation authorization scheme bots do not have today, for
+# every account bot (Captain included), and belongs to its own issue.
+app/controllers/api/v1/accounts/inboxes/agent_bot_observers_controller.rb: Enforce the observer role on bot API mutations  # PR#453
