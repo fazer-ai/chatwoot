@@ -92,6 +92,12 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
       'secret'
     elsif msg.key?(:albumMessage)
       'album'
+    # WhatsApp withholds authentication-template messages (verification codes) from
+    # linked devices and delivers a placeholder in their place, so the content never
+    # reaches the connector. Classified apart from `unsupported` because there is
+    # nothing to parse here: the bubble has to explain the masking, not a missing type.
+    elsif msg.key?(:placeholderMessage)
+      'masked'
     elsif msg.key?(:messageContextInfo) && msg.keys.count == 1
       'context'
     elsif Whatsapp::Baileys::RichMessageParser.rich?(msg)

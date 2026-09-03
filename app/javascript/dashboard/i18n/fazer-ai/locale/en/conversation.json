@@ -25,6 +25,7 @@
     },
     "CHANGE_TEAM_FAILED": "Team change failed",
     "MESSAGE_DELETED_BY_CONTACT": "Deleted by the contact",
+    "MASKED_MESSAGE_WHATSAPP": "WhatsApp does not deliver verification codes to linked devices. This message can only be read on the paired phone.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {

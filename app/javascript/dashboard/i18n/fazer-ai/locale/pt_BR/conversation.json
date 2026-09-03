@@ -25,6 +25,7 @@
     },
     "CHANGE_TEAM_FAILED": "Falha ao alterar o time",
     "MESSAGE_DELETED_BY_CONTACT": "Apagada pelo contato",
+    "MASKED_MESSAGE_WHATSAPP": "O WhatsApp não entrega códigos de verificação a dispositivos conectados. Esta mensagem só pode ser lida no celular pareado.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {
