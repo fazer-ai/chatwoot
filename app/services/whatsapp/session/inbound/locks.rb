@@ -40,6 +40,11 @@ module Whatsapp::Session::Inbound::Locks
   # Long enough to cover one processing pass, short enough that a marker orphaned by a
   # killed worker heals on its own within the job's retry budget.
   MESSAGE_LOCK_TTL = 30.seconds
+  # How often a caller that was given a `wait` looks again. Waiting at all is the exception
+  # here -- everything else answers Busy and lets the job retry, so a Sidekiq thread is
+  # never parked on Redis -- and it is granted only for the seconds an album takes to
+  # finish arriving, where a retry a quarter of a minute later is worse than a short park.
+  SPIN_INTERVAL = 0.1
 
   module_function
 
@@ -80,6 +85,12 @@ module Whatsapp::Session::Inbound::Locks
   # operation that outran the TTL (syncing a large group roster is the realistic one)
   # would delete a lock a second worker had already taken.
   #
+  # `ttl` and `wait` are the two numbers a lock has, and conflating them is the failure this
+  # signature exists to prevent: `ttl` is how long the work behind the key may run, `wait`
+  # is how long it is worth standing here to get the key. A `ttl` sized by somebody's
+  # patience expires mid-block, and from there the guarded work runs unguarded. `wait` is
+  # nil by default, so the answer is Busy and the job retries.
+  #
   # `defer_to_waiters` marks the caller as the one that gives way, which an import is and
   # nothing else is. Two things follow from it, and they are the same rule read from both
   # ends: it stands aside while somebody is waiting, and it does not register itself as a
@@ -90,14 +101,15 @@ module Whatsapp::Session::Inbound::Locks
   # that is never free at the moment it looks -- a retry budget covers one holder, and what
   # it is really up against is a queue of them. And an import that noted itself would be
   # standing aside for its own siblings, which is a deadlock spelled differently.
-  def with_chat_lock(inbox, *chats, ttl: CHAT_LOCK_TTL, defer_to_waiters: false)
+  def with_chat_lock(inbox, *chats, ttl: CHAT_LOCK_TTL, wait: nil, defer_to_waiters: false)
     keys = chats.flatten.compact_blank.uniq.sort.map { |chat| chat_key(inbox, chat) }
     return yield if keys.empty?
     raise Busy, "#{keys.first} of inbox #{inbox.id} has a caller waiting on it" if defer_to_waiters && waiting?(inbox, chats)
 
     held = {}
+    note = defer_to_waiters ? nil : waiter_keys(inbox, chats)
     begin
-      take(keys, inbox, ttl, held, note: defer_to_waiters ? nil : chats)
+      take(keys, held, ttl: ttl, deadline: deadline_for(wait), note: note)
       yield
     ensure
       held.each { |key, token| Redis::Alfred.delete_if_equals(key, token) }
@@ -111,7 +123,7 @@ module Whatsapp::Session::Inbound::Locks
   end
 
   def note_waiter(inbox, *chats)
-    waiter_keys(inbox, chats).each { |key| Redis::Alfred.set(key, 1, ex: WAITER_TTL) }
+    mark_waiting(waiter_keys(inbox, chats))
   end
 
   # Kept to the claiming, not wrapped around the block: a Busy raised by something the
@@ -119,18 +131,34 @@ module Whatsapp::Session::Inbound::Locks
   # a chat nobody is actually waiting for.
   #
   # `note` carries the chats to record against, or nil for the caller that gives way.
-  def take(keys, inbox, ttl, held, note:)
-    keys.each { |key| held[key] = claim(key, inbox, ttl) }
+  # nil means take it or answer Busy, which is what every caller but the live inbound path
+  # wants: a Sidekiq thread that parks on Redis is a thread not processing anything else.
+  def deadline_for(wait) = wait && (Time.now.to_f + wait)
+
+  def take(keys, held, ttl:, deadline:, note:)
+    keys.each { |key| held[key] = claim(key, ttl, deadline) }
   rescue Busy
-    note_waiter(inbox, note) if note
+    mark_waiting(note) if note
     raise
   end
 
-  def claim(key, inbox, ttl)
+  # `ttl` is how long the work behind the lock may take; `deadline` is how long it is worth
+  # standing here to get it. They are unrelated numbers, and the one bug this module exists
+  # to not have is a lock that expires while the block it guards is still running.
+  def claim(key, ttl, deadline)
     token = SecureRandom.uuid
-    raise Busy, "#{key} of inbox #{inbox.id} is locked" unless Redis::Alfred.set(key, token, nx: true, ex: ttl)
+    loop do
+      return token if Redis::Alfred.set(key, token, nx: true, ex: ttl)
+      break if deadline.nil? || Time.now.to_f >= deadline
 
-    token
+      sleep(SPIN_INTERVAL)
+    end
+
+    raise Busy, "#{key} is locked"
+  end
+
+  def mark_waiting(keys)
+    keys.each { |key| Redis::Alfred.set(key, 1, ex: WAITER_TTL) }
   end
 
   def processing?(inbox, message_id)

@@ -237,7 +237,37 @@ describe Whatsapp::IncomingMessageService do
 
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
 
-        expect(Redis::Alfred).to have_received(:set).with(contact_lock_key, 1, nx: true, ex: 5.seconds)
+        expect(Redis::Alfred).to have_received(:set).with(contact_lock_key, anything, nx: true, ex: 30.seconds)
+      end
+
+      # The two numbers used to be one, and five seconds was the wait: a message with an
+      # attachment to download outran its own lock and the block went on running unguarded,
+      # which is the race the lock exists for happening inside it.
+      it 'holds the chat for the work and not for the wait' do
+        phone_number = '2423423243'
+        service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+
+        service.with_contact_lock(phone_number, wait: 0.2.seconds) do
+          expect(Redis::Alfred.ttl("WHATSAPP::CONTACT_LOCK::#{whatsapp_channel.inbox.id}_#{phone_number}"))
+            .to be > 0.2
+        end
+      end
+
+      # And the release is by token, so a block that did outrun its lock cannot free the key
+      # a second worker already holds -- an import's five-minute lease being the one that
+      # matters, since deleting it lets a live message open a conversation beside the one
+      # being filled.
+      it 'leaves a lock another worker took over in place' do
+        phone_number = '2423423243'
+        key = "WHATSAPP::CONTACT_LOCK::#{whatsapp_channel.inbox.id}_#{phone_number}"
+        service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+
+        service.with_contact_lock(phone_number) do
+          Redis::Alfred.delete(key)
+          Redis::Alfred.set(key, 'another-worker', ex: 30)
+        end
+
+        expect(Redis::Alfred.get(key)).to eq('another-worker')
       end
 
       it 'gives up on a held contact lock with an error the job retries' do
@@ -249,7 +279,7 @@ describe Whatsapp::IncomingMessageService do
         Redis::Alfred.set("WHATSAPP::CONTACT_LOCK::#{whatsapp_channel.inbox.id}_#{phone_number}", 1)
         service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
 
-        expect { service.with_contact_lock(phone_number, timeout: 0.2.seconds) { raise 'ran the block' } }
+        expect { service.with_contact_lock(phone_number, wait: 0.2.seconds) { raise 'ran the block' } }
           .to raise_error(Whatsapp::Session::Inbound::Locks::Busy)
       end
 
