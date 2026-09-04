@@ -210,27 +210,44 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
   # Lock by contact phone to prevent race conditions when multiple messages
   # from the same contact arrive simultaneously (e.g., WhatsApp albums).
   # Without this, each message could create its own conversation.
+  #
+  # The spin covers what this lock was built for: two messages of the same chat landing
+  # together, where the first is done in well under a second. It does not cover the other
+  # holder of the same key. A history import leases the chat for a whole batch
+  # (`Locks::IMPORT_CHAT_LOCK_TTL`), which is two orders of magnitude longer than any wait
+  # a worker thread should sit through, so giving up is the right answer there -- as long
+  # as giving up means the job comes back. Hence `Locks::Busy`, which the caller retries,
+  # rather than a Timeout::Error nothing was listening for: that one took the message down
+  # with it, and an import runs precisely when a reconnected inbox is receiving again.
   def with_contact_lock(phone, timeout: 5.seconds)
     raise ArgumentError, 'A block is required for with_contact_lock' unless block_given?
     return yield if phone.blank?
 
     key = "WHATSAPP::CONTACT_LOCK::#{inbox.id}_#{phone}"
-    start_time = Time.now.to_i
-    lock_acquired = false
+    lock_acquired = spin_for_contact_lock(key, timeout)
 
-    while (Time.now.to_i - start_time) < timeout
-      if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
-        lock_acquired = true
-        break
-      end
-
-      sleep(0.1)
+    unless lock_acquired
+      # Said out loud, so the import standing between this message and the chat gives way
+      # rather than handing the key to the next batch of its own dump. Without it the
+      # retry budget below is up against a queue of holders and not one.
+      Whatsapp::Session::Inbound::Locks.note_waiter(inbox, phone)
+      raise Whatsapp::Session::Inbound::Locks::Busy, "contact lock for #{phone} of inbox #{inbox.id} is held"
     end
-
-    raise Timeout::Error, "Timeout acquiring contact lock for #{phone}" unless lock_acquired
 
     yield
   ensure
     Redis::Alfred.delete(key) if lock_acquired
+  end
+
+  def spin_for_contact_lock(key, timeout)
+    start_time = Time.now.to_i
+
+    while (Time.now.to_i - start_time) < timeout
+      return true if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
+
+      sleep(0.1)
+    end
+
+    false
   end
 end

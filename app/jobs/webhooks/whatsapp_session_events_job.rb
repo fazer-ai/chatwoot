@@ -21,7 +21,19 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
 
   # Another worker holds the chat or the message: retried rather than waited on, so a
   # Sidekiq thread is never parked on Redis.
-  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: :polynomially_longer, attempts: 6
+  #
+  # A flat wait rather than a growing one, and the value is not free. The note this job
+  # leaves on a chat it could not have is what makes an import stand aside for it, and the
+  # note expires: a gap wider than `WAITER_TTL` leaves the job queued with nothing on the
+  # chat saying so, and the import it was waiting out takes the key again. The polynomial
+  # ladder reached 81 seconds on its third step and 625 on its fifth.
+  #
+  # The budget has to outlast the longest anything holds a chat, which is the import lease,
+  # for the same reason the Cloud/Baileys webhook job's does: running out of attempts while
+  # the holder is still writing loses the message this job is carrying.
+  CHAT_LOCK_RETRY_WAIT = (Whatsapp::Session::Inbound::Locks::WAITER_TTL / 4)
+  CHAT_LOCK_RETRY_ATTEMPTS = (Whatsapp::Session::Inbound::Locks::IMPORT_CHAT_LOCK_TTL.to_i / CHAT_LOCK_RETRY_WAIT.to_i * 1.5).ceil
+  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: CHAT_LOCK_RETRY_WAIT, attempts: CHAT_LOCK_RETRY_ATTEMPTS
 
   # The wait for a message that has not arrived yet. Bounded, and dropped at the end
   # rather than re-raised: the target of a revoke or an edit can legitimately be a

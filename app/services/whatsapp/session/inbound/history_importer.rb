@@ -22,13 +22,6 @@
 class Whatsapp::Session::Inbound::HistoryImporter
   include Import::HistorySettlement
 
-  # A chat's whole batch is written under one lock, and a batch can be two hundred
-  # messages with an avatar lookup and a contact resolution behind the first of them. The
-  # ordinary thirty seconds is a lease that would expire mid-import, and a lease that
-  # expires is not a lock: a live message for the same chat would take the key and open a
-  # second conversation alongside the one being filled.
-  CHAT_LOCK_TTL = 5.minutes
-
   attr_reader :channel, :messages
 
   # Threads this run created, which is what tells an artifact from a fact. A new
@@ -89,7 +82,8 @@ class Whatsapp::Session::Inbound::HistoryImporter
   def import_chat(batch, watermark)
     ordered = batch.sort_by { |message| message.timestamp.to_i }
 
-    inbound::Locks.with_chat_lock(inbox, inbound::ChatIdentity.lock_ids(ordered.first), ttl: CHAT_LOCK_TTL) do
+    lock_ids = inbound::ChatIdentity.lock_ids(ordered.first)
+    inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true) do
       pending = unstored(ordered)
       next if pending.empty?
 

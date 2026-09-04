@@ -95,4 +95,64 @@ RSpec.describe Whatsapp::Session::Inbound::Locks do
       expect(described_class.with_message_lock(inbox, nil) { :ran }).to eq(:ran)
     end
   end
+
+  # An import holds a chat for a whole batch, and one dump is a dozen batches: they hand
+  # the key to each other, so a live message beside them can lose every attempt it has
+  # against a lock that is never free at the moment it looks. Retrying harder does not fix
+  # that -- a budget covers one holder, and this is a queue of them.
+  describe 'giving way to a caller that is waiting' do
+    it 'stands aside for a chat somebody said they wanted' do
+      described_class.note_waiter(inbox, chat)
+
+      expect { described_class.with_chat_lock(inbox, chat, defer_to_waiters: true) { :imported } }
+        .to raise_error(described_class::Busy)
+    end
+
+    it 'takes a free chat nobody is waiting for' do
+      expect(described_class.with_chat_lock(inbox, chat, defer_to_waiters: true) { :imported }).to eq(:imported)
+    end
+
+    # Otherwise the batches of one dump stand aside for each other and the import never
+    # runs, which is a deadlock wearing the fix's clothes.
+    it 'does not register itself as waiting when it is refused' do
+      described_class.with_chat_lock(inbox, chat) do
+        expect { described_class.with_chat_lock(inbox, chat, defer_to_waiters: true) { :imported } }
+          .to raise_error(described_class::Busy)
+      end
+
+      expect(described_class.waiting?(inbox, chat)).to be(false)
+    end
+
+    it 'says it is waiting when it is refused a chat' do
+      described_class.with_chat_lock(inbox, chat) do
+        expect { described_class.with_chat_lock(inbox, chat) { :live } }.to raise_error(described_class::Busy)
+      end
+
+      expect(described_class.waiting?(inbox, chat)).to be(true)
+    end
+
+    # Nothing clears the note, and that is the point: it is shared by everybody waiting on
+    # the chat, so the first caller to be served would be deleting a claim the others still
+    # hold and an import could cut in ahead of them. It ends by expiring.
+    it 'keeps standing aside while a second caller is still waiting' do
+      described_class.with_chat_lock(inbox, chat) do
+        expect { described_class.with_chat_lock(inbox, chat) { :live_one } }.to raise_error(described_class::Busy)
+        expect { described_class.with_chat_lock(inbox, chat) { :live_two } }.to raise_error(described_class::Busy)
+      end
+
+      described_class.with_chat_lock(inbox, chat) { :live_one_served }
+
+      expect(described_class.waiting?(inbox, chat)).to be(true)
+    end
+
+    # And it is a claim on the next turn rather than a standing one, so an import is held
+    # off for one window and not forever.
+    it 'stops standing aside once the note has expired' do
+      described_class.note_waiter(inbox, chat)
+
+      travel(described_class::WAITER_TTL + 1.second) do
+        expect(described_class.with_chat_lock(inbox, chat, defer_to_waiters: true) { :imported }).to eq(:imported)
+      end
+    end
+  end
 end
