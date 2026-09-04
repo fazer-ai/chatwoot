@@ -47,7 +47,9 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     @opened = Set.new
     return if batch.empty?
 
-    Whatsapp::Session::Inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL) do
+    Whatsapp::Session::Inbound::Locks.with_chat_lock(
+      inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true
+    ) do
       pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
       next if pending.empty?
 

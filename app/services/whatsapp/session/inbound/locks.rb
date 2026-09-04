@@ -20,6 +20,11 @@ module Whatsapp::Session::Inbound::Locks
   # retry budget of whoever might be waiting on one -- and a copy per importer is how those
   # two drift until a live message gives up on a lock that was going to be released.
   IMPORT_CHAT_LOCK_TTL = 5.minutes
+  # How long a note that somebody wanted a chat and could not have it outlives the attempt
+  # that left it. It has to cover the gap between two of that caller's retries, and no more:
+  # a worker killed between noting it and taking the key would otherwise hold an import off
+  # for as long as the note lived.
+  WAITER_TTL = 1.minute
   # Reading a group's whole roster is the one guarded operation that can run for minutes:
   # each participant is resolved, and a large group has hundreds. A lease that expires
   # mid-way is not a lock at all, because a second worker takes the key and the two
@@ -68,17 +73,56 @@ module Whatsapp::Session::Inbound::Locks
   # is released by token: `Redis::LockManager#unlock` deletes unconditionally, so an
   # operation that outran the TTL (syncing a large group roster is the realistic one)
   # would delete a lock a second worker had already taken.
-  def with_chat_lock(inbox, *chats, ttl: CHAT_LOCK_TTL)
+  #
+  # `defer_to_waiters` marks the caller as the one that gives way, which an import is and
+  # nothing else is. Two things follow from it, and they are the same rule read from both
+  # ends: it stands aside while somebody is waiting, and it does not register itself as a
+  # waiter when it cannot have the key.
+  #
+  # Without that the batches of one dump hand the chat to each other for as long as the dump
+  # is long, and a live message beside them can lose every attempt it has against a lock
+  # that is never free at the moment it looks -- a retry budget covers one holder, and what
+  # it is really up against is a queue of them. And an import that noted itself would be
+  # standing aside for its own siblings, which is a deadlock spelled differently.
+  def with_chat_lock(inbox, *chats, ttl: CHAT_LOCK_TTL, defer_to_waiters: false)
     keys = chats.flatten.compact_blank.uniq.sort.map { |chat| chat_key(inbox, chat) }
     return yield if keys.empty?
+    raise Busy, "#{keys.first} of inbox #{inbox.id} has a caller waiting on it" if defer_to_waiters && waiting?(inbox, chats)
 
     held = {}
     begin
-      keys.each { |key| held[key] = claim(key, inbox, ttl) }
+      take(keys, inbox, ttl, held, note: defer_to_waiters ? nil : chats)
       yield
     ensure
       held.each { |key, token| Redis::Alfred.delete_if_equals(key, token) }
     end
+  end
+
+  # Whether anybody has said they want one of these chats and could not have it. Read by
+  # the callers that give way, and by nothing else.
+  def waiting?(inbox, *chats)
+    waiter_keys(inbox, chats).any? { |key| Redis::Alfred.get(key).present? }
+  end
+
+  def note_waiter(inbox, *chats)
+    waiter_keys(inbox, chats).each { |key| Redis::Alfred.set(key, 1, ex: WAITER_TTL) }
+  end
+
+  def clear_waiter(inbox, *chats)
+    waiter_keys(inbox, chats).each { |key| Redis::Alfred.delete(key) }
+  end
+
+  # Kept to the claiming, not wrapped around the block: a Busy raised by something the
+  # block itself locks says nothing about this chat, and noting it would hold imports off
+  # a chat nobody is actually waiting for.
+  #
+  # `note` carries the chats to record against, or nil for the caller that gives way.
+  def take(keys, inbox, ttl, held, note:)
+    keys.each { |key| held[key] = claim(key, inbox, ttl) }
+    clear_waiter(inbox, note) if note
+  rescue Busy
+    note_waiter(inbox, note) if note
+    raise
   end
 
   def claim(key, inbox, ttl)
@@ -98,5 +142,9 @@ module Whatsapp::Session::Inbound::Locks
 
   def chat_key(inbox, chat)
     "WHATSAPP::CONTACT_LOCK::#{inbox.id}_#{chat}"
+  end
+
+  def waiter_keys(inbox, chats)
+    chats.flatten.compact_blank.uniq.map { |chat| "#{chat_key(inbox, chat)}::WAITING" }
   end
 end

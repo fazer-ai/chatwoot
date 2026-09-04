@@ -83,7 +83,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
     ordered = batch.sort_by { |message| message.timestamp.to_i }
 
     lock_ids = inbound::ChatIdentity.lock_ids(ordered.first)
-    inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL) do
+    inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true) do
       pending = unstored(ordered)
       next if pending.empty?
 

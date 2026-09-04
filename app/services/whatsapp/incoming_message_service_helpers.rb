@@ -224,22 +224,31 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
     return yield if phone.blank?
 
     key = "WHATSAPP::CONTACT_LOCK::#{inbox.id}_#{phone}"
+    lock_acquired = spin_for_contact_lock(key, timeout)
+
+    unless lock_acquired
+      # Said out loud, so the import standing between this message and the chat gives way
+      # rather than handing the key to the next batch of its own dump. Without it the
+      # retry budget below is up against a queue of holders and not one.
+      Whatsapp::Session::Inbound::Locks.note_waiter(inbox, phone)
+      raise Whatsapp::Session::Inbound::Locks::Busy, "contact lock for #{phone} of inbox #{inbox.id} is held"
+    end
+
+    Whatsapp::Session::Inbound::Locks.clear_waiter(inbox, phone)
+    yield
+  ensure
+    Redis::Alfred.delete(key) if lock_acquired
+  end
+
+  def spin_for_contact_lock(key, timeout)
     start_time = Time.now.to_i
-    lock_acquired = false
 
     while (Time.now.to_i - start_time) < timeout
-      if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
-        lock_acquired = true
-        break
-      end
+      return true if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
 
       sleep(0.1)
     end
 
-    raise Whatsapp::Session::Inbound::Locks::Busy, "contact lock for #{phone} of inbox #{inbox.id} is held" unless lock_acquired
-
-    yield
-  ensure
-    Redis::Alfred.delete(key) if lock_acquired
+    false
   end
 end
