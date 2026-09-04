@@ -1343,14 +1343,12 @@ export default {
       // it is said now. Waiting for an upload callback loses every capture that had already
       // finished, which is the ordinary shape of this: the recording is sitting in the
       // composer when the bot hands the conversation back.
-      // Only a capture still uploading needs the marker, and only until it lands. A routine
-      // transition leaves it where it is: a capture staged before the note ended and landing
-      // after the agent has moved on twice is still owed the answer the first of those
-      // transitions owes it.
-      if (announceable) {
-        this.composerDropGeneration = this.announceVisibleDiscard()
-          ? null
-          : this.composerGeneration;
+      // Only a capture still uploading needs the marker, and only until it lands, so an
+      // unconsumed one is never replaced or cleared: it belongs to a capture that has not
+      // landed yet, and any later transition -- routine, or one that announced something
+      // visible of its own -- would otherwise take that capture's message away.
+      if (announceable && !this.announceVisibleDiscard()) {
+        this.composerDropGeneration ??= this.composerGeneration;
       }
       this.composerGeneration += 1;
     },

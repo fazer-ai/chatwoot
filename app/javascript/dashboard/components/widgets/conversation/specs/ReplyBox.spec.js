@@ -786,6 +786,29 @@ describe('ReplyBox', () => {
     expect(mockAlert).toHaveBeenCalledTimes(1);
   });
 
+  // A slow upload can span more than one switch. The message belongs to the capture that
+  // has not landed yet, so a later transition must not take it: overwriting the marker
+  // loses it, and so does clearing it after announcing something else visible.
+  it('keeps the message for an upload that outlived two switches', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'lento.pdf', file: new Blob(['pdf']) });
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.REPLY);
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
   // ReplyBox stays mounted for the whole session, so a map that recorded every navigation
   // and every send would only ever grow: nothing consumes an entry that is never announced.
   it('records nothing for the transitions it does not announce', async () => {

@@ -129,12 +129,3 @@ app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDis
 # `Attachment#normalize_opus_blob_content_type!` on `download_url`, at the moment the file
 # is sent back out, which is the path #439 is about and is covered in attachment_spec.
 config/initializers/active_storage_opus_fix.rb: Update the Baileys inbound MIME contract  # PR#469
-# PR#470: real, and the two rounds before this one pushed the state in opposite directions
-# over exactly this. A map keyed by generation loses nothing here, and round 2 rejected it
-# for growing without bound while ReplyBox stays mounted; the scalar that replaced it cannot
-# hold two outstanding markers. Both complaints are correct, and the case this one names --
-# a bot releasing, retaking and releasing a conversation inside one upload -- costs silence,
-# which is the behaviour before this PR, on a coincidence of two rare events. A bounded ring
-# would trade a measured objection for a speculative one and is a third shape to get wrong
-# in a fourth round. Revisit if the alert ever proves it earns its keep.
-app/javascript/dashboard/components/widgets/conversation/ReplyBox.vue: Preserve markers for concurrent discarded generations  # PR#470
