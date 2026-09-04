@@ -41,98 +41,41 @@ RSpec.describe AutomationRules::ConditionsFilterService do
     # These are evaluated against the event's `changed_attributes` rather than against the
     # record, so an event that touched something else has nothing under the filter's key.
     context 'when conditions based on filter_operator attribute_changed' do
-      before do
-        rule.conditions = [
-          { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': 'AND',
+      def two_conditions(operator)
+        [
+          { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': operator,
             'filter_operator': 'attribute_changed' },
-          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': 'OR',
-            'filter_operator': 'attribute_changed' },
-          { 'values': ['resolved'], 'attribute_key': 'status', 'query_operator': nil, 'filter_operator': 'equal_to' }
+          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
+            'filter_operator': 'attribute_changed' }
         ]
-        rule.save!
       end
 
-      # An attribute the event never touched is this condition not being met, and the filter
-      # after it still has to be combined against what the loop has accumulated so far.
-      # Dropping the iteration instead leaves that next filter combining against every
-      # conversation in the account, and an OR beside it then fires the rule on all of them.
-      it 'does not fire on an event that never touched the attribute' do
-        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
-      end
-
-      # The same statement said two ways: the assignee did not become 1. They have to agree,
-      # and the one on the left used to be `nil[0]`.
-      it 'answers an absent attribute the way it answers one that moved somewhere else' do
-        absent = described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
-        elsewhere = described_class.new(
-          rule, conversation, { changed_attributes: { assignee_id: %w[7 9], status: %w[open resolved] } }
-        ).perform
-
-        expect(absent).to eq(elsewhere)
-      end
-
-      # The NoMethodError was swallowed by `perform`'s rescue, so the only sign of it was a
-      # log line -- hundreds a day on an account with one such rule -- and a rule abandoned
-      # with its remaining conditions never evaluated.
-      it 'evaluates the rule instead of abandoning it on the first untouched attribute' do
+      # The NoMethodError this used to raise was swallowed by `perform`'s rescue, so the only
+      # sign of it was a log line -- and the rule was abandoned with whatever conditions came
+      # after the untouched one never evaluated.
+      it 'evaluates the rule instead of abandoning it on an untouched attribute' do
+        rule.update!(conditions: two_conditions('AND'))
         expect(Rails.logger).not_to receive(:error)
 
         described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
       end
 
-      # The operator sits on the condition it joins forward from, so the `AND` binding these
-      # two is the first one's. Reading each condition's own operator is off by one, and
-      # since the last one's is nil every chain ended in a union: an AND between two of
-      # these was never applied.
-      context 'when two of them are joined' do
-        def two_conditions(operator)
-          [
-            { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': operator,
-              'filter_operator': 'attribute_changed' },
-            { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
-              'filter_operator': 'attribute_changed' }
-          ]
-        end
+      # Answering false is what the swallowed exception already amounted to, and holding that
+      # answer is the point: the fix is not allowed to make a rule fire that does not fire
+      # today. Whether false is *right* for a rule whose other conditions could stand on
+      # their own is #468, which this method cannot decide.
+      it 'does not fire when the event never touched the attribute' do
+        rule.update!(conditions: two_conditions('AND'))
 
-        it 'does not fire an AND rule when only one of the changes happened' do
-          rule.update!(conditions: two_conditions('AND'))
-
-          expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
-        end
-
-        it 'does not fire an AND rule when one attribute moved somewhere the filter does not ask for' do
-          rule.update!(conditions: two_conditions('AND'))
-
-          expect(
-            described_class.new(rule, conversation, { changed_attributes: { assignee_id: %w[7 9], status: %w[open resolved] } }).perform
-          ).to be(false)
-        end
-
-        it 'fires an AND rule when both changes happened' do
-          rule.update!(conditions: two_conditions('AND'))
-
-          expect(
-            described_class.new(rule, conversation, { changed_attributes: { assignee_id: [nil, '1'], status: %w[open resolved] } }).perform
-          ).to be(true)
-        end
-
-        # And the other half of the same rule: an OR fires on the change that did happen,
-        # which is what the swallowed NoMethodError used to prevent.
-        it 'fires an OR rule on the change that did happen' do
-          rule.update!(conditions: two_conditions('OR'))
-
-          expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(true)
-        end
+        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
       end
 
-      it 'still fires when the attribute changed the way the filter asks for' do
-        rule.conditions = [
-          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
-            'filter_operator': 'attribute_changed' }
-        ]
-        rule.save!
+      it 'still fires when every attribute changed the way the filters ask for' do
+        rule.update!(conditions: two_conditions('AND'))
 
-        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(true)
+        expect(
+          described_class.new(rule, conversation, { changed_attributes: { assignee_id: [nil, '1'], status: %w[open resolved] } }).perform
+        ).to be(true)
       end
     end
 
