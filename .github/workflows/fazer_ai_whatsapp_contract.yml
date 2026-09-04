@@ -22,8 +22,10 @@ on:
     - cron: '17 6 * * 1'
   workflow_dispatch:
     inputs:
+      # Blank means main: the drift job exists to compare, and the local-only check runs
+      # in the job above on every dispatch anyway.
       ref:
-        description: 'Connector ref to compare against (blank checks only the local copy)'
+        description: 'Connector ref to compare against (branch, tag or commit)'
         required: false
         default: 'main'
 
