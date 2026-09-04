@@ -20,6 +20,11 @@ import MessageSignatureMissingAlert from './MessageSignatureMissingAlert.vue';
 import ReplyBoxBanner from './ReplyBoxBanner.vue';
 import QuotedEmailPreview from './QuotedEmailPreview.vue';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
+
+// How many mode switches a capture may still be uploading across before the composer stops
+// holding an explanation for it. Nothing survives five, and the cap is what keeps a marker
+// nobody claims from sitting in a component that stays mounted all day.
+const MAX_PENDING_DISCARD_MARKERS = 5;
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vue';
 import AudioRecorder from 'dashboard/components/widgets/WootWriter/AudioRecorder.vue';
 import { AUDIO_FORMATS } from 'shared/constants/messages';
@@ -145,12 +150,15 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
-      // The generation whose end the agent is still owed an explanation for, or null. One
-      // number rather than a map: a capture carries the generation it was staged under, and
-      // anything older than this was invalidated by an earlier transition, so nothing older
-      // is ever owed an answer -- and a scalar cannot accumulate for the life of a mounted
-      // composer.
-      composerDropGeneration: null,
+      // The generations ended by a mode change that nobody has been told about yet. A
+      // capture carries the generation it was staged under, so the answer it is owed is a
+      // fact about that generation and not about the latest one -- one slot cannot hold two
+      // outstanding captures, and cannot tell an unanswered marker from a stale one.
+      //
+      // Bounded, because ReplyBox stays mounted for the whole session and an entry nothing
+      // ever claims would otherwise sit here for good: past a handful of mode switches a
+      // capture is not still uploading.
+      composerDropGenerations: [],
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -1343,12 +1351,15 @@ export default {
       // it is said now. Waiting for an upload callback loses every capture that had already
       // finished, which is the ordinary shape of this: the recording is sitting in the
       // composer when the bot hands the conversation back.
-      // Only a capture still uploading needs the marker, and only until it lands, so an
-      // unconsumed one is never replaced or cleared: it belongs to a capture that has not
-      // landed yet, and any later transition -- routine, or one that announced something
-      // visible of its own -- would otherwise take that capture's message away.
+      // Only a capture still uploading needs a marker, and only until it lands. Each is
+      // kept beside the others rather than replacing them: a marker belongs to whatever was
+      // staged under that generation, and a later transition has no business answering, or
+      // silencing, an earlier one.
       if (announceable && !this.announceVisibleDiscard()) {
-        this.composerDropGeneration ??= this.composerGeneration;
+        this.composerDropGenerations.push(this.composerGeneration);
+        if (this.composerDropGenerations.length > MAX_PENDING_DISCARD_MARKERS) {
+          this.composerDropGenerations.shift();
+        }
       }
       this.composerGeneration += 1;
     },
@@ -1373,9 +1384,10 @@ export default {
     // The marker is consumed, so a batch staged together and invalidated by one transition
     // is one message rather than a stack of identical ones.
     discardStagedCapture(file, generation) {
-      if (generation !== this.composerDropGeneration) return;
+      const marker = this.composerDropGenerations.indexOf(generation);
+      if (marker === -1) return;
 
-      this.composerDropGeneration = null;
+      this.composerDropGenerations.splice(marker, 1);
       this.announceDiscard(Boolean(file?.isVoiceMessage));
     },
     announceDiscard(isRecording) {

@@ -809,6 +809,53 @@ describe('ReplyBox', () => {
     );
   });
 
+  // An empty switch marks a generation nobody will ever claim. Keeping it was harmless on
+  // its own and fatal next to a rule that never replaced a marker: the real loss that came
+  // afterwards found the slot taken and said nothing.
+  it('still speaks for a later capture after empty mode switches', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.REPLY);
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'depois.pdf', file: new Blob(['pdf']) });
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // And the list is bounded, since ReplyBox stays mounted all day and a switch with nothing
+  // staged leaves an entry no capture will ever claim.
+  it('does not accumulate markers across a day of switching', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+
+    for (let i = 0; i < 20; i += 1) {
+      panel.vm.$emit(
+        'setReplyMode',
+        i % 2 ? REPLY_EDITOR_MODES.REPLY : REPLY_EDITOR_MODES.NOTE
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await nextTick();
+    }
+
+    expect(wrapper.vm.composerDropGenerations.length).toBeLessThanOrEqual(5);
+  });
+
   // ReplyBox stays mounted for the whole session, so a map that recorded every navigation
   // and every send would only ever grow: nothing consumes an entry that is never announced.
   it('records nothing for the transitions it does not announce', async () => {
@@ -823,7 +870,7 @@ describe('ReplyBox', () => {
     store.commit('selectChat', { ...REPLIABLE, id: 43 });
     await nextTick();
 
-    expect(wrapper.vm.composerDropGeneration).toBeNull();
+    expect(wrapper.vm.composerDropGenerations).toHaveLength(0);
   });
 
   // A capture carries the generation it was staged under, and by the time it lands the
