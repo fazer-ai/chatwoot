@@ -22,10 +22,10 @@ describe Whatsapp::Baileys::HistoryImporter do
     }.with_indifferent_access
   end
 
-  def import(messages, watermark: nil, requested: true)
+  def import(messages, watermark: nil, requested: true, group_names: {})
     described_class.new(
       inbox: inbox,
-      params: { messages: messages, watermark: watermark, requested: requested }
+      params: { messages: messages, watermark: watermark, requested: requested, group_names: group_names }
     ).perform
   end
 
@@ -315,6 +315,46 @@ describe Whatsapp::Baileys::HistoryImporter do
       sender = inbox.messages.find_by(source_id: 'GRP').sender
       expect(sender.phone_number).to be_nil
       expect(sender.identifier).to eq("#{lid}@lid")
+    end
+  end
+
+  # A dump strips `groupName` from every message, and no `groups.update` follows it, so
+  # before this an imported group was filed under its own jid and only a later live event
+  # ever fixed it: 34 of 46 groups on a real pairing.
+  describe 'what an imported group is called' do
+    let(:group_jid) { '120363000000000000@g.us' }
+
+    before { allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(true) }
+
+    def group_message(id)
+      {
+        key: { id: id, remoteJid: group_jid, participant: jid, fromMe: false },
+        messageTimestamp: 10.days.ago.to_i,
+        message: { conversation: "in the group, #{id}" }
+      }.with_indifferent_access
+    end
+
+    it 'takes the subject the dump carries' do
+      import([group_message('GRP')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+
+      expect(inbox.messages.find_by(source_id: 'GRP').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # What a bridge too old to send the subjects produces, and what every import did before
+    # this: the group is still filed, it just has nothing to be called by.
+    it 'falls back to the jid when the dump names no group' do
+      import([group_message('GRP')], watermark: 3.days.ago)
+
+      expect(inbox.messages.find_by(source_id: 'GRP').conversation.contact.name).to eq('120363000000000000')
+    end
+
+    # The frames of one dump are separate jobs, and the groups already sitting under a jid
+    # from an earlier pairing are the whole backlog this has to clear.
+    it 'renames a group an earlier import left under its jid' do
+      import([group_message('FIRST')], watermark: 3.days.ago)
+      import([group_message('SECOND')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+
+      expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('Obra da casa')
     end
   end
 

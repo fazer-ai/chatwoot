@@ -59,8 +59,14 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     # announced rather than filed in silence -- otherwise the press does nothing visible
     # until the page is reloaded. Every other type is the phone volunteering.
     announce = sync_type.to_i == ON_DEMAND
+    # What the groups in this dump are called. A dump strips `groupName` from the messages,
+    # so without this an imported group is filed under its own jid and stays that way until
+    # somebody writes in it: 34 of 46 groups on a real pairing.
+    group_names = Array(data[:groupNames]).to_h
     batches.each_value do |batch|
-      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, announce: announce)
+      Whatsapp::Baileys::HistoryImportJob.perform_later(
+        inbox, batch, watermark, requested, announce: announce, group_names: group_names
+      )
     end
   end
 

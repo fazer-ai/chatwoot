@@ -81,6 +81,19 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   def watermark = processed_params[:watermark]
   def inbound = Whatsapp::Session::Inbound
 
+  # The live path answers this with nil -- a `messages.upsert` says nothing about what the
+  # group is called, and the subject arrives on its own through `groups.update`. A dump has
+  # no such event behind it, so an imported group was filed under its own jid and only a
+  # later live event ever fixed it: 34 of 46 groups on a real pairing, and the twelve that
+  # escaped were the ones somebody happened to write in afterwards.
+  #
+  # The subject rides on the frame (see the bridge's `groupNames`). Absent, this returns
+  # nil and the jid is used exactly as before, which is also what a bridge too old to send
+  # it produces.
+  def extract_group_name = group_names[extract_group_jid]
+
+  def group_names = @group_names ||= (processed_params[:group_names] || {}).with_indifferent_access
+
   # A row that will never become a message: a system marker (`messageStubType`), a revoke
   # or a reaction removal, which mutate a row that has to exist rather than adding one and
   # replayed out of a dump would either no-op or act on a row a later message in the same

@@ -20,15 +20,24 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
   # group of 8,545 messages lost eleven batches to its own siblings.
   retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 40
 
-  # `announce` defaults for the jobs already queued when this shipped, and for every dump
-  # the phone volunteers, which is all of them but the answer to a press.
-  def perform(inbox, messages, watermark, requested, announce: false)
+  # Everything past `requested` says how to file this dump rather than what is in it, and
+  # it is collected rather than listed because the list grows: each entry has to keep a
+  # default for the jobs already queued when it shipped, and a job argument list is a
+  # serialization contract that outlives the deploy that changed it.
+  #
+  # `announce` is false for every dump the phone volunteers, which is all of them but the
+  # answer to a press. `group_names` is empty for a bridge too old to send it, and then the
+  # importer falls back to naming a group by its jid, exactly as before.
+  def perform(inbox, messages, watermark, requested, **filing)
     channel = inbox&.channel
     return unless channel.is_a?(Channel::Whatsapp) && channel.provider == 'baileys'
 
     Whatsapp::Baileys::HistoryImporter.new(
       inbox: inbox,
-      params: { messages: messages, watermark: watermark, requested: requested, announce: announce }
+      params: {
+        messages: messages, watermark: watermark, requested: requested,
+        announce: filing.fetch(:announce, false), group_names: filing.fetch(:group_names, {})
+      }
     ).perform
   end
 end
