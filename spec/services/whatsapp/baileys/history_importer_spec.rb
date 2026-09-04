@@ -22,10 +22,10 @@ describe Whatsapp::Baileys::HistoryImporter do
     }.with_indifferent_access
   end
 
-  def import(messages, watermark: nil, requested: true, group_names: {})
+  def import(messages, watermark: nil, requested: true, group_name: nil)
     described_class.new(
       inbox: inbox,
-      params: { messages: messages, watermark: watermark, requested: requested, group_names: group_names }
+      params: { messages: messages, watermark: watermark, requested: requested, group_name: group_name }
     ).perform
   end
 
@@ -335,7 +335,7 @@ describe Whatsapp::Baileys::HistoryImporter do
     end
 
     it 'takes the subject the dump carries' do
-      import([group_message('GRP')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+      import([group_message('GRP')], watermark: 3.days.ago, group_name: 'Obra da casa')
 
       expect(inbox.messages.find_by(source_id: 'GRP').conversation.contact.name).to eq('Obra da casa')
     end
@@ -352,7 +352,7 @@ describe Whatsapp::Baileys::HistoryImporter do
     # from an earlier pairing are the whole backlog this has to clear.
     it 'renames a group an earlier import left under its jid' do
       import([group_message('FIRST')], watermark: 3.days.ago)
-      import([group_message('SECOND')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+      import([group_message('SECOND')], watermark: 3.days.ago, group_name: 'Obra da casa')
 
       expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('Obra da casa')
     end
@@ -362,9 +362,34 @@ describe Whatsapp::Baileys::HistoryImporter do
     # has nothing new to file. Renaming only alongside a write would skip every one of them.
     it 'renames a group whose dump carries nothing it has not already stored' do
       import([group_message('ONLY')], watermark: 3.days.ago)
-      import([group_message('ONLY')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+      import([group_message('ONLY')], watermark: 3.days.ago, group_name: 'Obra da casa')
 
       expect(inbox.messages.find_by(source_id: 'ONLY').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # Markers are the ordinary content of a numbered group's slice, not an exception: 519 of
+    # 614 threads on a real pairing had nothing else. A rename that waited for something
+    # writable would skip most of the backlog it exists to clear.
+    it 'renames a group whose whole slice is markers' do
+      import([group_message('REAL')], watermark: 3.days.ago)
+      marker = group_message('STUB').merge('messageStubType' => 2)
+
+      import([marker], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # The subject was read when the frame was queued, and the frames carry no ordering: a
+    # `groups.update` may have renamed the group in between, and this has no way to tell.
+    # So it only ever replaces the placeholder -- a group that already has a name has the
+    # live path keeping it current, and a blind second writer on that field would undo it.
+    it 'leaves a group that already has a name alone' do
+      import([group_message('REAL')], watermark: 3.days.ago, group_name: 'Nome atual')
+      marker = group_message('STUB').merge('messageStubType' => 2)
+
+      import([marker], watermark: 3.days.ago, group_name: 'Nome de ontem')
+
+      expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Nome atual')
     end
   end
 

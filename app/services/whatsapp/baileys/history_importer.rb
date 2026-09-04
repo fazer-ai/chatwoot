@@ -45,37 +45,51 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
 
   def perform
     @opened = Set.new
-    return if batch.empty?
+    return if messages.empty?
 
     Whatsapp::Session::Inbound::Locks.with_chat_lock(
       inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true
     ) do
-      pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
-      runs = pending.group_by { |raw| gap?(raw) }
       Import::SilentWrite.wrap do
         rename_group
-        next if pending.empty?
-
-        # Archive first: the two halves land in different threads, and the older one has
-        # to exist before the reopen policy is asked which thread is current.
-        # An unrequested pile keeps only its gap. The phone offers its whole history at
-        # every pairing, and an inbox nobody asked would otherwise fill with a year of
-        # somebody's conversations. A first pairing has no coverage at all, so `gap?` calls
-        # the whole pile archive and this drops all of it, which is the privacy protection
-        # the old outright refusal was standing in for.
-        # The archive is silent because a pairing dump is a year of somebody else's
-        # conversations arriving at once, and nobody asked to watch that. An answer to a
-        # press is the opposite: the operator is looking at the thread it lands in.
-        archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
-        gap = announcing { import_run(runs[true], archived: false) }
-        settle(archived, gap)
+        file
       end
     end
   end
 
   private
 
-  def batch = @batch ||= Array(processed_params[:messages]).select { |raw| writable?(raw) }
+  # `batch` and not `messages`: what survives the filter is what there is to file, and a
+  # chat whose whole slice is markers must not leave a contact and an empty resolved
+  # conversation behind. The rename above it runs either way, because a numbered group's
+  # slice being all markers is the ordinary case rather than an exception -- 519 of 614
+  # threads on a real pairing.
+  def file
+    return if batch.empty?
+
+    pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
+    return if pending.empty?
+
+    runs = pending.group_by { |raw| gap?(raw) }
+    # Archive first: the two halves land in different threads, and the older one has to
+    # exist before the reopen policy is asked which thread is current.
+    #
+    # An unrequested pile keeps only its gap. The phone offers its whole history at every
+    # pairing, and an inbox nobody asked would otherwise fill with a year of somebody's
+    # conversations. A first pairing has no coverage at all, so `gap?` calls the whole pile
+    # archive and this drops all of it, which is the privacy protection the old outright
+    # refusal was standing in for.
+    #
+    # The archive is silent because a pairing dump is a year of somebody else's
+    # conversations arriving at once, and nobody asked to watch that. An answer to a press
+    # is the opposite: the operator is looking at the thread it lands in.
+    archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
+    gap = announcing { import_run(runs[true], archived: false) }
+    settle(archived, gap)
+  end
+
+  def messages = @messages ||= Array(processed_params[:messages])
+  def batch = @batch ||= messages.select { |raw| writable?(raw) }
   def requested = processed_params[:requested]
   def announce = processed_params[:announce]
   def maybe_announcing(&) = announce ? announcing(&) : yield
@@ -91,29 +105,33 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # The subject rides on the frame (see the bridge's `groupNames`). Absent, this returns
   # nil and the jid is used exactly as before, which is also what a bridge too old to send
   # it produces.
-  def extract_group_name = group_names[extract_group_jid]
+  def extract_group_name = processed_params[:group_name]
 
-  # Renaming is not part of writing rows, and tying it to them would leave numbered
-  # exactly the groups this exists for: their messages are already stored, so the dump that
-  # finally carries their subject has nothing new to file and would stop above this. Ahead
-  # of the write for the same reason -- a batch that turns out to be all duplicates still
-  # got here holding the name.
+  # Clearing the backlog of groups filed under their own jid, which is a different job from
+  # naming the group a dump is currently filing messages for and follows different rules.
   #
-  # Only an existing contact, because that is the whole of what this adds: a group with new
-  # messages is named by `find_or_create_group_contact` on the way in, and one with neither
-  # rows nor a contact has nothing to rename. Silent like the rest of the import, so a
-  # backdated archive does not wake automations by changing a name.
+  # It cannot be tied to writing rows, because the groups it exists for are numbered exactly
+  # when their messages are already stored: the dump that finally carries a subject has
+  # nothing new to file, and every slice of it may be markers besides.
+  #
+  # And it only ever replaces the placeholder. A subject captured when the frame was queued
+  # is not news about a group somebody has already named -- a `groups.update` may have
+  # landed in between, and the frames carry no ordering to tell the two apart, so writing
+  # over a real name here would be a blind second writer on the field. A group that has one
+  # already has the live path keeping it current.
+  #
+  # Silent like the rest of the import, so a backdated archive does not wake automations by
+  # changing a name.
   def rename_group
-    @raw_message = batch.first
+    @raw_message = messages.first
     return unless jid_type == 'group'
+    return if extract_group_name.blank?
 
     contact = inbox.contact_inboxes.find_by(source_id: extract_group_source_id)&.contact
-    return if contact.nil?
+    return if contact.nil? || contact.name != extract_group_source_id
 
     update_group_contact_info(contact)
   end
-
-  def group_names = @group_names ||= (processed_params[:group_names] || {}).with_indifferent_access
 
   # A row that will never become a message: a system marker (`messageStubType`), a revoke
   # or a reaction removal, which mutate a row that has to exist rather than adding one and
@@ -136,7 +154,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # in one message and by LID in the next, and the live path locks by whichever one its
   # message happened to carry.
   def lock_ids
-    @raw_message = batch.first
+    @raw_message = messages.first
     return [extract_group_jid] if jid_type == 'group'
 
     [extract_from_jid(type: 'pn'), extract_from_jid(type: 'lid')]

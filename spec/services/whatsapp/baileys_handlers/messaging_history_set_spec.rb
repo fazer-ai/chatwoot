@@ -59,7 +59,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
               groupNames: { group_jid => 'Obra da casa' } })
 
     expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(
-      inbox, anything, anything, anything, hash_including(group_names: { group_jid => 'Obra da casa' })
+      inbox, anything, anything, anything, hash_including(group_name: 'Obra da casa')
     )
   end
 

@@ -63,15 +63,23 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     # so without this an imported group is filed under its own jid and stays that way until
     # somebody writes in it: 34 of 46 groups on a real pairing.
     group_names = Array(data[:groupNames]).to_h
-    # Left off the payload when it is empty, which is every dump from a bridge that does not
-    # send subjects yet -- the two ship separately, so that is a period and not a corner.
-    # A worker from before this keyword raises ArgumentError on it, and the deploy that
-    # replaces it does not empty the queue first.
-    filing = { announce: announce }
-    filing[:group_names] = group_names if group_names.present?
-    batches.each_value do |batch|
-      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, **filing)
+    batches.each do |jid, batch|
+      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, **filing(announce, group_names[jid]))
     end
+  end
+
+  # One chat's name and not the dump's whole map: a job is enqueued per chat per frame, so
+  # the map would be serialized into Redis once per batch, and most of those batches are
+  # not even groups.
+  #
+  # Left off entirely when there is nothing to say, which is every dump from a bridge that
+  # does not send subjects yet -- the two ship separately, so that is a period and not a
+  # corner. A worker from before this keyword raises ArgumentError on it, and the deploy
+  # that replaces it does not empty the queue first.
+  def filing(announce, group_name)
+    filing = { announce: announce }
+    filing[:group_name] = group_name if group_name.present?
+    filing
   end
 
   # WhatsApp saying a chat has nothing older left, which it says on the answer to a

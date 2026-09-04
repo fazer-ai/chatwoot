@@ -26,7 +26,7 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
   # serialization contract that outlives the deploy that changed it.
   #
   # `announce` is false for every dump the phone volunteers, which is all of them but the
-  # answer to a press. `group_names` is empty for a bridge too old to send it, and then the
+  # answer to a press. `group_name` is absent for a bridge too old to send it, and then the
   # importer falls back to naming a group by its jid, exactly as before.
   def perform(inbox, messages, watermark, requested, **filing)
     channel = inbox&.channel
@@ -36,7 +36,7 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
       inbox: inbox,
       params: {
         messages: messages, watermark: watermark, requested: requested,
-        announce: filing.fetch(:announce, false), group_names: filing.fetch(:group_names, {})
+        announce: filing.fetch(:announce, false), group_name: filing[:group_name]
       }
     ).perform
   end
