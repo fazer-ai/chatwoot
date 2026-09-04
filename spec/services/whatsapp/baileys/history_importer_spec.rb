@@ -392,6 +392,20 @@ describe Whatsapp::Baileys::HistoryImporter do
       expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Nome atual')
     end
 
+    # The kill switch is about the subsystem and not about writing rows. A dump reaches a
+    # build that handles no groups either way -- the bridge filters live traffic, not
+    # history -- and renaming the contact an earlier pairing left behind is as much group
+    # processing as filing the messages is.
+    it 'leaves the group alone when the build handles no groups' do
+      import([group_message('FIRST')], watermark: 3.days.ago)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(false)
+
+      import([group_message('SECOND')], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('120363000000000000')
+      expect(inbox.messages.pluck(:source_id)).to eq(%w[FIRST])
+    end
+
     # The same rule on the other path in: a frame that does have messages to file goes
     # through `find_or_create_group_contact`, which renames unconditionally. An import must
     # not overwrite a name there either, and the stale subject is just as stale.

@@ -46,6 +46,12 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   def perform
     @opened = Set.new
     return if messages.empty?
+    # The kill switch, asked once for the whole batch rather than at each write. A dump is
+    # not filtered by the bridge the way live traffic is, so a build that handles no groups
+    # is still sent theirs -- and everything this class would do with them, filing rows and
+    # naming the chat alike, is group processing. Asked here so there is one answer: the
+    # rename below is a write of its own and would otherwise reach a subsystem that is off.
+    return if group? && !Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
 
     Whatsapp::Session::Inbound::Locks.with_chat_lock(
       inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true
@@ -134,8 +140,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # Silent like the rest of the import, so a backdated archive does not wake automations by
   # changing a name.
   def rename_group
-    @raw_message = messages.first
-    return unless jid_type == 'group'
+    return unless group?
     return if extract_group_name.blank?
 
     contact = inbox.contact_inboxes.find_by(source_id: extract_group_source_id)&.contact
@@ -165,10 +170,16 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # in one message and by LID in the next, and the live path locks by whichever one its
   # message happened to carry.
   def lock_ids
-    @raw_message = messages.first
-    return [extract_group_jid] if jid_type == 'group'
+    return [extract_group_jid] if group?
 
     [extract_from_jid(type: 'pn'), extract_from_jid(type: 'lid')]
+  end
+
+  # One batch is one chat: the handler groups a frame by `remoteJid` before enqueueing it,
+  # so the first message answers this for all of them.
+  def group?
+    @raw_message = messages.first
+    jid_type == 'group'
   end
 
   # One query for the chat rather than one per message, and inside the lock, so a
@@ -220,8 +231,6 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # A group is the one chat whose author changes from message to message, so its sender is
   # resolved per message while the group contact and its thread are resolved once.
   def import_group_run(run, archived)
-    return [] unless Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
-
     @group_contact_inbox, @group_contact = find_or_create_group_contact
     conversation = track(conversation_for(@group_contact_inbox, run.first, archived))
 
