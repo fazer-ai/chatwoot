@@ -391,6 +391,17 @@ describe Whatsapp::Baileys::HistoryImporter do
 
       expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Nome atual')
     end
+
+    # The same rule on the other path in: a frame that does have messages to file goes
+    # through `find_or_create_group_contact`, which renames unconditionally. An import must
+    # not overwrite a name there either, and the stale subject is just as stale.
+    it 'leaves a named group alone even when the frame has messages to file' do
+      import([group_message('REAL')], watermark: 3.days.ago, group_name: 'Nome atual')
+
+      import([group_message('NOVA')], watermark: 3.days.ago, group_name: 'Nome de ontem')
+
+      expect(inbox.messages.find_by(source_id: 'NOVA').conversation.contact.name).to eq('Nome atual')
+    end
   end
 
   # Not filed: they mutate a row that has to exist, and replaying them out of a dump either

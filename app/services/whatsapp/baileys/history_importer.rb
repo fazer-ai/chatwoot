@@ -107,18 +107,29 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # it produces.
   def extract_group_name = processed_params[:group_name]
 
+  # What an import may do to a group's name, and it is the same answer on both paths that
+  # reach here: name a group that has none, and leave alone one that has.
+  #
+  # The subject was read when the frame was queued, and the frames carry no ordering. A
+  # `groups.update` may have landed in between and is then the fresher fact, which this has
+  # no way to see -- so writing over a real name would make the import a second writer on
+  # the field, blind to the first. A group that has a name has the live path keeping it
+  # current; a group that has only its jid has nobody.
+  #
+  # Only the name is withheld. `group_type` is a fact about the chat rather than a race.
+  def update_group_contact_info(contact)
+    return super if contact.name.blank? || contact.name == extract_group_source_id
+
+    contact.update!(group_type: :group) unless contact.group_type_group?
+  end
+
   # Clearing the backlog of groups filed under their own jid, which is a different job from
-  # naming the group a dump is currently filing messages for and follows different rules.
+  # naming the group a dump is currently filing messages for, even though the rule above is
+  # shared.
   #
   # It cannot be tied to writing rows, because the groups it exists for are numbered exactly
   # when their messages are already stored: the dump that finally carries a subject has
   # nothing new to file, and every slice of it may be markers besides.
-  #
-  # And it only ever replaces the placeholder. A subject captured when the frame was queued
-  # is not news about a group somebody has already named -- a `groups.update` may have
-  # landed in between, and the frames carry no ordering to tell the two apart, so writing
-  # over a real name here would be a blind second writer on the field. A group that has one
-  # already has the live path keeping it current.
   #
   # Silent like the rest of the import, so a backdated archive does not wake automations by
   # changing a name.
@@ -128,7 +139,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     return if extract_group_name.blank?
 
     contact = inbox.contact_inboxes.find_by(source_id: extract_group_source_id)&.contact
-    return if contact.nil? || contact.name != extract_group_source_id
+    return if contact.nil?
 
     update_group_contact_info(contact)
   end
