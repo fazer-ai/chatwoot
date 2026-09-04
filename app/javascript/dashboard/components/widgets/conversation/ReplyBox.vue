@@ -1201,10 +1201,10 @@ export default {
       }, 100);
     },
     setReplyMode(mode = REPLY_EDITOR_MODES.REPLY) {
-      // Clear attachments when switching between private note and reply modes
-      // This is to prevent from breaking the upload rules
-      if (this.attachedFiles.length > 0) this.attachedFiles = [];
-
+      // The clearing lives in the effectiveReplyMode watcher and only there. It ran here
+      // too, ahead of the mode actually changing, so by the time the watcher looked there
+      // was nothing left to report -- and it ran even when the mode did not change at all,
+      // since `replyType` is only assigned below when a public reply is possible.
       this.$store.dispatch('draftMessages/setReplyEditorMode', { mode });
       if (this.canSendPublicReply) this.replyType = mode;
       if (this.isRecordingAudio) {

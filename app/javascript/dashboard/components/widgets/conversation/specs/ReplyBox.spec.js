@@ -825,9 +825,15 @@ describe('ReplyBox', () => {
     mockAlert.mockClear();
 
     wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
-    wrapper.vm.replyType = REPLY_EDITOR_MODES.NOTE;
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    mockAlert.mockClear();
+
+    // Through the panel the agent actually clicks, not by assigning replyType: setReplyMode
+    // used to empty the composer before the watcher could see what it was emptying.
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
     await nextTick();
-    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
 
     expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
