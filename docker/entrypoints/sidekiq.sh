@@ -20,8 +20,10 @@ set -x
 #
 # The Rails container owns the migrations; this one only waits for them. A worker that
 # comes up alone against a database nobody is migrating waits forever, on purpose: the
-# healthcheck greps for a sidekiq process, so the wait shows up as an unhealthy container
-# instead of as a worker quietly writing against the wrong schema.
+# wait shows up as an unhealthy container instead of as a worker quietly writing against
+# the wrong schema. That only holds because the healthcheck drops this script from its
+# match -- while the wait runs, PID 1 is still `sh docker/entrypoints/sidekiq.sh bundle
+# exec sidekiq ...`, which a plain grep for sidekiq is happy to call a worker.
 
 # Let DATABASE_URL env take presedence over individual connection params.
 $(docker/entrypoints/helpers/pg_database_url.rb)
