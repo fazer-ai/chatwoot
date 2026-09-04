@@ -89,8 +89,21 @@ class AutomationRules::ConditionsFilterService < FilterService
   # Loop through attribute_changed_query_filter
   def filter_based_on_attribute_change(records, current_attribute_changed_record)
     @attribute_changed_query_filter.each do |filter|
-      @changed_attributes = @changed_attributes.with_indifferent_access
-      changed_attribute = @changed_attributes[filter['attribute_key']].presence
+      changed_attribute = @changed_attributes.with_indifferent_access[filter['attribute_key']].presence
+      # An event that changed something else carries nothing under this filter's key, and
+      # the line below used to index that nil. `perform`'s rescue swallowed the
+      # NoMethodError, so the rule was abandoned here with its remaining conditions never
+      # evaluated and the whole evaluation answered false -- hundreds of times a day on an
+      # account with one such rule, with a log line the only thing to show for it.
+      #
+      # Answering false directly is what that exception already amounted to, and it is
+      # deliberately all this does: it is not the right answer for a rule whose other
+      # conditions could still be met on their own, but working that out is not something
+      # this method can do. It folds the two halves of a rule -- the conditions that became
+      # SQL and the ones that can only be asked of the event -- after `perform` has already
+      # dropped where each sat in the chain, so `A AND B OR C` cannot be told from
+      # `A AND (B OR C)` here. See #468.
+      return @attribute_changed_records = [] if changed_attribute.blank?
 
       if changed_attribute[0].in?(filter['values']['from']) && changed_attribute[1].in?(filter['values']['to'])
         @attribute_changed_records = attribute_changed_filter_query(filter, records, current_attribute_changed_record)

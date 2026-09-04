@@ -38,6 +38,47 @@ RSpec.describe AutomationRules::ConditionsFilterService do
       end
     end
 
+    # These are evaluated against the event's `changed_attributes` rather than against the
+    # record, so an event that touched something else has nothing under the filter's key.
+    context 'when conditions based on filter_operator attribute_changed' do
+      def two_conditions(operator)
+        [
+          { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': operator,
+            'filter_operator': 'attribute_changed' },
+          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
+            'filter_operator': 'attribute_changed' }
+        ]
+      end
+
+      # The NoMethodError this used to raise was swallowed by `perform`'s rescue, so the only
+      # sign of it was a log line -- and the rule was abandoned with whatever conditions came
+      # after the untouched one never evaluated.
+      it 'evaluates the rule instead of abandoning it on an untouched attribute' do
+        rule.update!(conditions: two_conditions('AND'))
+        expect(Rails.logger).not_to receive(:error)
+
+        described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
+      end
+
+      # Answering false is what the swallowed exception already amounted to, and holding that
+      # answer is the point: the fix is not allowed to make a rule fire that does not fire
+      # today. Whether false is *right* for a rule whose other conditions could stand on
+      # their own is #468, which this method cannot decide.
+      it 'does not fire when the event never touched the attribute' do
+        rule.update!(conditions: two_conditions('AND'))
+
+        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
+      end
+
+      it 'still fires when every attribute changed the way the filters ask for' do
+        rule.update!(conditions: two_conditions('AND'))
+
+        expect(
+          described_class.new(rule, conversation, { changed_attributes: { assignee_id: [nil, '1'], status: %w[open resolved] } }).perform
+        ).to be(true)
+      end
+    end
+
     context 'when conditions based on filter_operator start_with' do
       before do
         contact = conversation.contact
