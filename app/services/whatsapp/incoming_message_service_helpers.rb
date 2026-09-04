@@ -234,7 +234,6 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
       raise Whatsapp::Session::Inbound::Locks::Busy, "contact lock for #{phone} of inbox #{inbox.id} is held"
     end
 
-    Whatsapp::Session::Inbound::Locks.clear_waiter(inbox, phone)
     yield
   ensure
     Redis::Alfred.delete(key) if lock_acquired

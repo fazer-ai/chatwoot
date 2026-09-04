@@ -131,14 +131,28 @@ RSpec.describe Whatsapp::Session::Inbound::Locks do
       expect(described_class.waiting?(inbox, chat)).to be(true)
     end
 
-    # The note is a claim on the next turn, not a standing one: left behind, it would hold
-    # every later import off the chat until the TTL ran out.
-    it 'stops waiting once it has the chat' do
+    # Nothing clears the note, and that is the point: it is shared by everybody waiting on
+    # the chat, so the first caller to be served would be deleting a claim the others still
+    # hold and an import could cut in ahead of them. It ends by expiring.
+    it 'keeps standing aside while a second caller is still waiting' do
+      described_class.with_chat_lock(inbox, chat) do
+        expect { described_class.with_chat_lock(inbox, chat) { :live_one } }.to raise_error(described_class::Busy)
+        expect { described_class.with_chat_lock(inbox, chat) { :live_two } }.to raise_error(described_class::Busy)
+      end
+
+      described_class.with_chat_lock(inbox, chat) { :live_one_served }
+
+      expect(described_class.waiting?(inbox, chat)).to be(true)
+    end
+
+    # And it is a claim on the next turn rather than a standing one, so an import is held
+    # off for one window and not forever.
+    it 'stops standing aside once the note has expired' do
       described_class.note_waiter(inbox, chat)
 
-      described_class.with_chat_lock(inbox, chat) { :live }
-
-      expect(described_class.waiting?(inbox, chat)).to be(false)
+      travel(described_class::WAITER_TTL + 1.second) do
+        expect(described_class.with_chat_lock(inbox, chat, defer_to_waiters: true) { :imported }).to eq(:imported)
+      end
     end
   end
 end

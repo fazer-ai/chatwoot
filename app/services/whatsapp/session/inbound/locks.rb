@@ -21,9 +21,15 @@ module Whatsapp::Session::Inbound::Locks
   # two drift until a live message gives up on a lock that was going to be released.
   IMPORT_CHAT_LOCK_TTL = 5.minutes
   # How long a note that somebody wanted a chat and could not have it outlives the attempt
-  # that left it. It has to cover the gap between two of that caller's retries, and no more:
-  # a worker killed between noting it and taking the key would otherwise hold an import off
-  # for as long as the note lived.
+  # that left it, and the only thing that ends it. Nobody clears it: the note is shared by
+  # every caller waiting on that chat, so the first one to be served would be deleting a
+  # claim the others still hold, and an import could cut back in ahead of them.
+  #
+  # Expiry therefore has to outlast the gap between two attempts by the same caller, or the
+  # note is gone while its author is still queued -- which is why the live retry waits below
+  # are stated in terms of it rather than chosen. The cost of the other end is one window of
+  # imports held off a chat after the last live message was served, which an import can
+  # afford and a message cannot.
   WAITER_TTL = 1.minute
   # Reading a group's whole roster is the one guarded operation that can run for minutes:
   # each participant is resolved, and a large group has hundreds. A lease that expires
@@ -108,10 +114,6 @@ module Whatsapp::Session::Inbound::Locks
     waiter_keys(inbox, chats).each { |key| Redis::Alfred.set(key, 1, ex: WAITER_TTL) }
   end
 
-  def clear_waiter(inbox, *chats)
-    waiter_keys(inbox, chats).each { |key| Redis::Alfred.delete(key) }
-  end
-
   # Kept to the claiming, not wrapped around the block: a Busy raised by something the
   # block itself locks says nothing about this chat, and noting it would hold imports off
   # a chat nobody is actually waiting for.
@@ -119,7 +121,6 @@ module Whatsapp::Session::Inbound::Locks
   # `note` carries the chats to record against, or nil for the caller that gives way.
   def take(keys, inbox, ttl, held, note:)
     keys.each { |key| held[key] = claim(key, inbox, ttl) }
-    clear_waiter(inbox, note) if note
   rescue Busy
     note_waiter(inbox, note) if note
     raise
