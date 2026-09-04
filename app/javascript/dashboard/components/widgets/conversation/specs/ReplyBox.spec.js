@@ -708,6 +708,30 @@ describe('ReplyBox', () => {
     );
   });
 
+  // The recorder is the other thing setReplyMode used to tear down ahead of the mode
+  // actually changing, and a finished recording has no upload callback left to speak for it.
+  it('says so when a recording was going when the mode switched', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    wrapper.vm.toggleAudioRecorder();
+    await nextTick();
+    expect(wrapper.vm.isRecordingAudio).toBe(true);
+    mockAlert.mockClear();
+
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+
+    expect(wrapper.vm.isRecordingAudio).toBe(false);
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
   // stageFile is also the clip button, drag and drop, and paste. Telling an agent their
   // recording was discarded when what they dropped was a PDF is a message they cannot act
   // on, and one wrong message is enough to stop the right ones being read.

@@ -719,21 +719,25 @@ export default {
         mode: updatedReplyType,
       });
       this.switchDraftContext(this.conversationIdByRoute, updatedReplyType);
-      // The composer can leave note mode without the agent touching anything: a
-      // bot releases the pending conversation it owned, the messaging window
-      // reopens, an Instagram restriction lifts. Whatever is staged was produced
-      // under the old privacy but would be sent under the new one, so a voice
-      // note recorded for the team could reach the contact. The draft survives
-      // because switchDraftContext keeps one per mode; attachments and a cited
-      // private note have no such split, so they go.
-      // Any switch between note and reply, in either direction and whoever caused it. The
-      // composer cannot tell the agent picking Reply from a bot releasing the conversation
-      // under them -- both arrive here as the same watcher firing -- and the message is
-      // worth having either way: what it reports is a file that will not be sent, which is
-      // news even to the agent who clicked. What it must not do is claim the contact was
-      // about to receive it, which is false in one of the two directions.
+      // The composer can change mode without the agent touching anything: a bot releases
+      // the pending conversation it owned, the messaging window reopens, an Instagram
+      // restriction lifts. Whatever is staged was produced under the old privacy but would
+      // be sent under the new one, so a voice note recorded for the team could reach the
+      // contact. The draft survives because switchDraftContext keeps one per mode;
+      // attachments and a cited private note have no such split, so they go.
+      //
+      // Every path arrives here, whoever caused it: the composer cannot tell the agent
+      // picking Reply from a bot releasing the conversation under them, and the message is
+      // worth having either way, since what it reports is a file that will not be sent.
+      // What it must not do is claim the contact was about to receive it, which is false in
+      // one of the two directions.
+      //
+      // The announcement comes first, and the clearing is all done here rather than by the
+      // callers: emptying the composer before the mode changes leaves this with nothing to
+      // report, which is how a staged attachment and then a recording each stayed silent.
       this.advanceComposerGeneration(true);
       if (this.isRecordingAudio) this.onTypingOff();
+      this.isRecordingAudio = false;
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {
         this.resetReplyToMessage();
@@ -1207,9 +1211,6 @@ export default {
       // since `replyType` is only assigned below when a public reply is possible.
       this.$store.dispatch('draftMessages/setReplyEditorMode', { mode });
       if (this.canSendPublicReply) this.replyType = mode;
-      if (this.isRecordingAudio) {
-        this.toggleAudioRecorder();
-      }
     },
     clearEditorSelection() {
       this.updateEditorSelectionWith = '';
