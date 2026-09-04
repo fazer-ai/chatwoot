@@ -13,7 +13,19 @@ on:
       - 'spec/fixtures/whatsapp/session/contract/**'
       - 'lib/whatsapp/session_contract.rb'
       - 'lib/tasks/whatsapp_session.rake'
+  # Weekly, because the drift this catches is not caused by anything happening in this
+  # repository: the connector ships an event or changes a payload and nothing here moves,
+  # so there is no push and no pull request for a check to hang off. Found the hard way at
+  # CONTRACT_REF 2c8da96, older than half the contract's own history, hiding a field the
+  # passkey flow needs and two event types with no model at all.
+  schedule:
+    - cron: '17 6 * * 1'
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Connector ref to compare against (blank checks only the local copy)'
+        required: false
+        default: 'main'
 
 jobs:
   contract:
@@ -26,3 +38,21 @@ jobs:
       # No database or Redis: the task only reads the vendored files.
       - name: Verify the vendored contract
         run: bundle exec rails whatsapp:contract:verify
+
+  # Split from the job above so a pull request never reaches for the network, and so a
+  # connector that has moved ahead reads as its own failing check rather than as the
+  # contract job failing for a reason it does not own.
+  drift:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      # Never re-vendors on its own. A type the connector added needs a model and a
+      # decision about whether this side handles it or ignores it, and IGNORED is where
+      # that decision is recorded: a green sync would put the file in place and leave the
+      # decision unmade, which is the failure this check exists to make visible.
+      - name: Compare the vendored contract against the connector
+        run: bundle exec rails "whatsapp:contract:verify[${{ inputs.ref || 'main' }}]"
