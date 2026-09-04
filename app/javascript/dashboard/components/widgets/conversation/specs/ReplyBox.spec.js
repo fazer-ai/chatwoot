@@ -674,8 +674,116 @@ describe('ReplyBox', () => {
     await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
 
     expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // stageFile is also the clip button, drag and drop, and paste. Telling an agent their
+  // recording was discarded when what they dropped was a PDF is a message they cannot act
+  // on, and one wrong message is enough to stop the right ones being read.
+  it('names what was actually discarded', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'contrato.pdf', file: new Blob(['pdf']) });
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
     );
+  });
+
+  // One transition, one message. With several files staged together every completion runs
+  // this, and a stack of identical toasts for a single event is its own kind of unreadable.
+  it('says it once for a batch discarded by one transition', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'um.png', file: new Blob(['a']) });
+    wrapper.vm.stageFile({ name: 'dois.png', file: new Blob(['b']) });
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+  });
+
+  // A capture carries the generation it was staged under, and by the time it lands the
+  // composer may have moved on twice more. What invalidated it is the first transition past
+  // it, not the last one overall: reading only the latest reason loses the message here, and
+  // hands it to the wrong capture in the mirror case.
+  it('blames the transition that discarded the capture, not the last one', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    // The bot hands the conversation back: this is what the recording is lost to.
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    // And the agent moves on before the upload lands.
+    store.commit('selectChat', { ...REPLIABLE, id: 99 });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // The watcher runs in both directions. Going into note mode is the agent choosing it, and
+  // the sentence would be false as well: nothing was about to reach the contact.
+  it('stays quiet when the agent switched into note mode', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
+    wrapper.vm.replyType = REPLY_EDITOR_MODES.NOTE;
+    await nextTick();
+
+    wrapper.vm.stageFile({ name: 'current.png', file: new Blob(['image']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(mockAlert).not.toHaveBeenCalled();
   });
 
   // Moving to another conversation is the agent's own action, with the composer resetting in

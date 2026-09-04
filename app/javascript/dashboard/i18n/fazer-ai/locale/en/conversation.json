@@ -16,7 +16,8 @@
     },
     "REPLYBOX": {
       "SCHEDULE_SEND": "Schedule send",
-      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The recording was discarded: the conversation left note mode, and it would have been sent to the contact."
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The attachment was discarded: the conversation left note mode, and it would have been sent to the contact.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "The recording was discarded: the conversation left note mode, and it would have been sent to the contact."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversation already assigned",

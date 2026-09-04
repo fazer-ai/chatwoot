@@ -145,9 +145,12 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
-      // Why the composer last moved on. Only a privacy change is announced when it
-      // discards a capture: see discardStagedCapture.
-      composerDropReason: null,
+      // Which generations ended in a way worth telling the agent about, keyed by the
+      // generation that ended. Per generation and not one latest-reason slot: a capture
+      // carries the generation it was staged under, and by the time it lands the composer
+      // may have moved on twice more -- the transition that invalidated it is the first one
+      // past it, not the last one overall.
+      composerDropReasons: {},
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -711,7 +714,7 @@ export default {
     showContentTemplates(isAvailable) {
       if (!isAvailable) this.hideContentTemplatesModal();
     },
-    effectiveReplyMode(updatedReplyType) {
+    effectiveReplyMode(updatedReplyType, previousReplyType) {
       this.$store.dispatch('draftMessages/setReplyEditorMode', {
         mode: updatedReplyType,
       });
@@ -723,7 +726,16 @@ export default {
       // note recorded for the team could reach the contact. The draft survives
       // because switchDraftContext keeps one per mode; attachments and a cited
       // private note have no such split, so they go.
-      this.advanceComposerGeneration('privacy');
+      // Only leaving note mode is announced, and only that direction is the one the agent
+      // cannot account for. Going the other way is the agent picking Note, with the
+      // composer changing under their hands, and telling them their file would have
+      // reached the contact would be false besides.
+      this.advanceComposerGeneration(
+        previousReplyType === REPLY_EDITOR_MODES.NOTE &&
+          updatedReplyType !== REPLY_EDITOR_MODES.NOTE
+          ? 'privacy'
+          : null
+      );
       if (this.isRecordingAudio) this.onTypingOff();
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {
@@ -1328,30 +1340,38 @@ export default {
       }
       this.onFileUpload(file);
     },
+    // Only a reason worth announcing is recorded, so the map holds one entry per rare
+    // transition rather than one per navigation for the life of the session.
     advanceComposerGeneration(reason) {
-      this.composerDropReason = reason;
+      if (reason) this.composerDropReasons[this.composerGeneration] = reason;
       this.composerGeneration += 1;
     },
-    // A capture that arrives for a composer that has moved on is thrown away, and the
-    // agent is told only when they have no way of working out why on their own.
+    // A capture that arrives for a composer that has moved on is thrown away, and the agent
+    // is told only when they have no way of working out why on their own.
     //
-    // Leaving note mode is the case: nothing the agent did causes it — a bot releases the
+    // Leaving note mode is that case: nothing the agent did causes it — a bot releases the
     // conversation it owned, the messaging window reopens, an Instagram restriction lifts —
-    // so a recording they made for the team disappears with the composer looking untouched.
-    // Navigating away and sending are their own actions, with the composer visibly resetting
-    // in front of them, and an alert on those is noise on the ordinary case.
-    discardStagedCapture() {
-      if (this.composerDropReason === 'privacy') {
-        useAlert(
-          this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
-        );
-      }
+    // so what they staged disappears with the composer looking untouched. Navigating away
+    // and sending are their own actions, with the composer visibly resetting in front of
+    // them, and an alert on those is noise on the ordinary case.
+    //
+    // The entry is consumed, so a batch of files staged together and invalidated by one
+    // transition is one message rather than a stack of identical ones.
+    discardStagedCapture(file, generation) {
+      if (this.composerDropReasons[generation] !== 'privacy') return;
+
+      delete this.composerDropReasons[generation];
+      useAlert(
+        file?.isVoiceMessage
+          ? this.$t('CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE')
+          : this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
+      );
     },
     attachFile({ blob, file }) {
       const generation = file?.composerGeneration;
       // Checked here so a stale recording can't clear a newer one below.
       if (generation !== this.composerGeneration) {
-        this.discardStagedCapture();
+        this.discardStagedCapture(file, generation);
         return;
       }
 
@@ -1368,7 +1388,7 @@ export default {
         // two. The push is the only moment that decides what gets sent, so it is
         // where the capture has to still be current.
         if (generation !== this.composerGeneration) {
-          this.discardStagedCapture();
+          this.discardStagedCapture(file, generation);
           return;
         }
 
