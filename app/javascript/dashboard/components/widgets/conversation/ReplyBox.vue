@@ -714,7 +714,7 @@ export default {
     showContentTemplates(isAvailable) {
       if (!isAvailable) this.hideContentTemplatesModal();
     },
-    effectiveReplyMode(updatedReplyType, previousReplyType) {
+    effectiveReplyMode(updatedReplyType) {
       this.$store.dispatch('draftMessages/setReplyEditorMode', {
         mode: updatedReplyType,
       });
@@ -726,14 +726,13 @@ export default {
       // note recorded for the team could reach the contact. The draft survives
       // because switchDraftContext keeps one per mode; attachments and a cited
       // private note have no such split, so they go.
-      // Only leaving note mode is announced, and only that direction is the one the agent
-      // cannot account for. Going the other way is the agent picking Note, with the
-      // composer changing under their hands, and telling them their file would have
-      // reached the contact would be false besides.
-      this.advanceComposerGeneration(
-        previousReplyType === REPLY_EDITOR_MODES.NOTE &&
-          updatedReplyType !== REPLY_EDITOR_MODES.NOTE
-      );
+      // Any switch between note and reply, in either direction and whoever caused it. The
+      // composer cannot tell the agent picking Reply from a bot releasing the conversation
+      // under them -- both arrive here as the same watcher firing -- and the message is
+      // worth having either way: what it reports is a file that will not be sent, which is
+      // news even to the agent who clicked. What it must not do is claim the contact was
+      // about to receive it, which is false in one of the two directions.
+      this.advanceComposerGeneration(true);
       if (this.isRecordingAudio) this.onTypingOff();
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {

@@ -16,8 +16,8 @@
     },
     "REPLYBOX": {
       "SCHEDULE_SEND": "Agendar envio",
-      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "O anexo foi descartado: a conversa saiu do modo nota e ele iria para o contato.",
-      "RECORDING_DISCARDED_ON_MODE_CHANGE": "A gravação foi descartada: a conversa saiu do modo nota e ela iria para o contato."
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "O anexo foi descartado porque a conversa alternou entre nota e resposta.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "A gravação foi descartada porque a conversa alternou entre nota e resposta."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversa já atribuída",

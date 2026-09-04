@@ -814,9 +814,10 @@ describe('ReplyBox', () => {
     );
   });
 
-  // The watcher runs in both directions. Going into note mode is the agent choosing it, and
-  // the sentence would be false as well: nothing was about to reach the contact.
-  it('stays quiet when the agent switched into note mode', async () => {
+  // Both directions are worth reporting: what the agent loses is a file that will not be
+  // sent, which is news whoever caused the switch. Only the claim about the contact
+  // receiving it would have been direction-specific, and the wording does not make it.
+  it('says so when the agent switched into note mode', async () => {
     const { wrapper } = mountWith({
       inbox: { channel_type: 'Channel::Whatsapp' },
     });
@@ -826,11 +827,11 @@ describe('ReplyBox', () => {
     wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
     wrapper.vm.replyType = REPLY_EDITOR_MODES.NOTE;
     await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
 
-    wrapper.vm.stageFile({ name: 'current.png', file: new Blob(['image']) });
-    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
-
-    expect(mockAlert).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
   });
 
   // Moving to another conversation is the agent's own action, with the composer resetting in
