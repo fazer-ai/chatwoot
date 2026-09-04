@@ -240,6 +240,19 @@ describe Whatsapp::IncomingMessageService do
         expect(Redis::Alfred).to have_received(:set).with(contact_lock_key, 1, nx: true, ex: 5.seconds)
       end
 
+      it 'gives up on a held contact lock with an error the job retries' do
+        # The history import leases the same key for a whole batch, which is minutes. What
+        # matters here is the class: a Timeout::Error nothing was listening for took the
+        # message down with it, and an import runs exactly when a reconnected inbox is
+        # receiving again.
+        phone_number = '2423423243'
+        Redis::Alfred.set("WHATSAPP::CONTACT_LOCK::#{whatsapp_channel.inbox.id}_#{phone_number}", 1)
+        service = described_class.new(inbox: whatsapp_channel.inbox, params: params)
+
+        expect { service.with_contact_lock(phone_number, timeout: 0.2.seconds) { raise 'ran the block' } }
+          .to raise_error(Whatsapp::Session::Inbound::Locks::Busy)
+      end
+
       it 'creates a contact and conversation when only BSUID is present' do
         params = {
           'contacts' => [{

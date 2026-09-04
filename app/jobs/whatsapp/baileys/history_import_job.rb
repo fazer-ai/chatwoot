@@ -13,7 +13,12 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
   # Live traffic for the same chat holds the same lock, and it is the shorter of the two:
   # waiting is the right answer, and the budget is sized so an import that lands mid-burst
   # still gets its turn.
-  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 10.seconds, attempts: 10
+  #
+  # The other holder is this chat's own dump. A mature chat arrives in a dozen frames, each
+  # one a separate job filed under the same key, so what a batch waits out is the batches
+  # queued ahead of it and not a single hold. Ten ten-second retries covered neither: a
+  # group of 8,545 messages lost eleven batches to its own siblings.
+  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 40
 
   # `announce` defaults for the jobs already queued when this shipped, and for every dump
   # the phone volunteers, which is all of them but the answer to a press.

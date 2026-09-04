@@ -10,6 +10,16 @@ module Whatsapp::Session::Inbound::Locks
   class Busy < StandardError; end
 
   CHAT_LOCK_TTL = 30.seconds
+  # What a history import leases the chat for. A batch is a few hundred messages with a
+  # contact resolution behind the first of them, and a lease that expires mid-import is not
+  # a lock: a live message for the same chat would take the key and open a second
+  # conversation beside the one being filled.
+  #
+  # It lives here rather than in either importer because it is not only the importer's
+  # business. It is the longest anything holds a chat key, so it is also the floor for the
+  # retry budget of whoever might be waiting on one -- and a copy per importer is how those
+  # two drift until a live message gives up on a lock that was going to be released.
+  IMPORT_CHAT_LOCK_TTL = 5.minutes
   # Reading a group's whole roster is the one guarded operation that can run for minutes:
   # each participant is resolved, and a large group has hundreds. A lease that expires
   # mid-way is not a lock at all, because a second worker takes the key and the two

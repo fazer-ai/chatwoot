@@ -210,6 +210,15 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
   # Lock by contact phone to prevent race conditions when multiple messages
   # from the same contact arrive simultaneously (e.g., WhatsApp albums).
   # Without this, each message could create its own conversation.
+  #
+  # The spin covers what this lock was built for: two messages of the same chat landing
+  # together, where the first is done in well under a second. It does not cover the other
+  # holder of the same key. A history import leases the chat for a whole batch
+  # (`Locks::IMPORT_CHAT_LOCK_TTL`), which is two orders of magnitude longer than any wait
+  # a worker thread should sit through, so giving up is the right answer there -- as long
+  # as giving up means the job comes back. Hence `Locks::Busy`, which the caller retries,
+  # rather than a Timeout::Error nothing was listening for: that one took the message down
+  # with it, and an import runs precisely when a reconnected inbox is receiving again.
   def with_contact_lock(phone, timeout: 5.seconds)
     raise ArgumentError, 'A block is required for with_contact_lock' unless block_given?
     return yield if phone.blank?
@@ -227,7 +236,7 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
       sleep(0.1)
     end
 
-    raise Timeout::Error, "Timeout acquiring contact lock for #{phone}" unless lock_acquired
+    raise Whatsapp::Session::Inbound::Locks::Busy, "contact lock for #{phone} of inbox #{inbox.id} is held" unless lock_acquired
 
     yield
   ensure

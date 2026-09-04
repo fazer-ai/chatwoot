@@ -33,11 +33,6 @@
 class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysService
   include Import::HistorySettlement
 
-  # A batch is up to a few hundred messages with a contact resolution behind the first of
-  # them. The ordinary thirty seconds is a lease that would expire mid-import, and a lease
-  # that expires is not a lock.
-  CHAT_LOCK_TTL = 5.minutes
-
   # All Inbound::Coverage asks of a message is when it was sent. The raw Baileys hash is
   # not a model and never will be, so it is asked through this rather than by teaching
   # Coverage a second shape.
@@ -52,7 +47,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     @opened = Set.new
     return if batch.empty?
 
-    Whatsapp::Session::Inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: CHAT_LOCK_TTL) do
+    Whatsapp::Session::Inbound::Locks.with_chat_lock(inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL) do
       pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
       next if pending.empty?
 
