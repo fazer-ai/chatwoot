@@ -51,10 +51,11 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
       inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true
     ) do
       pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
-      next if pending.empty?
-
       runs = pending.group_by { |raw| gap?(raw) }
       Import::SilentWrite.wrap do
+        rename_group
+        next if pending.empty?
+
         # Archive first: the two halves land in different threads, and the older one has
         # to exist before the reopen policy is asked which thread is current.
         # An unrequested pile keeps only its gap. The phone offers its whole history at
@@ -91,6 +92,26 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # nil and the jid is used exactly as before, which is also what a bridge too old to send
   # it produces.
   def extract_group_name = group_names[extract_group_jid]
+
+  # Renaming is not part of writing rows, and tying it to them would leave numbered
+  # exactly the groups this exists for: their messages are already stored, so the dump that
+  # finally carries their subject has nothing new to file and would stop above this. Ahead
+  # of the write for the same reason -- a batch that turns out to be all duplicates still
+  # got here holding the name.
+  #
+  # Only an existing contact, because that is the whole of what this adds: a group with new
+  # messages is named by `find_or_create_group_contact` on the way in, and one with neither
+  # rows nor a contact has nothing to rename. Silent like the rest of the import, so a
+  # backdated archive does not wake automations by changing a name.
+  def rename_group
+    @raw_message = batch.first
+    return unless jid_type == 'group'
+
+    contact = inbox.contact_inboxes.find_by(source_id: extract_group_source_id)&.contact
+    return if contact.nil?
+
+    update_group_contact_info(contact)
+  end
 
   def group_names = @group_names ||= (processed_params[:group_names] || {}).with_indifferent_access
 

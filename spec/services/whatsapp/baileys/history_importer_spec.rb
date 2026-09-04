@@ -356,6 +356,16 @@ describe Whatsapp::Baileys::HistoryImporter do
 
       expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('Obra da casa')
     end
+
+    # And this is the shape that backlog actually arrives in: the group is numbered
+    # precisely because its messages are already stored, so the dump that finally names it
+    # has nothing new to file. Renaming only alongside a write would skip every one of them.
+    it 'renames a group whose dump carries nothing it has not already stored' do
+      import([group_message('ONLY')], watermark: 3.days.ago)
+      import([group_message('ONLY')], watermark: 3.days.ago, group_names: { group_jid => 'Obra da casa' })
+
+      expect(inbox.messages.find_by(source_id: 'ONLY').conversation.contact.name).to eq('Obra da casa')
+    end
   end
 
   # Not filed: they mutate a row that has to exist, and replaying them out of a dump either
