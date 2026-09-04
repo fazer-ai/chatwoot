@@ -145,12 +145,12 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
-      // The generations that ended in a way worth telling the agent about, keyed by the
-      // generation that ended. Per generation and not one latest-reason slot: a capture
-      // carries the generation it was staged under, and by the time it lands the composer
-      // may have moved on twice more -- the transition that invalidated it is the first one
-      // past it, not the last one overall.
-      composerDropReasons: {},
+      // The generation whose end the agent is still owed an explanation for, or null. One
+      // number rather than a map: a capture carries the generation it was staged under, and
+      // anything older than this was invalidated by an earlier transition, so nothing older
+      // is ever owed an answer -- and a scalar cannot accumulate for the life of a mounted
+      // composer.
+      composerDropGeneration: null,
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -1338,14 +1338,30 @@ export default {
       }
       this.onFileUpload(file);
     },
-    // Only the transition that gets announced is recorded, and it is deleted when it is.
-    // Marking the routine ones too would grow the map for the life of the session, since
-    // ReplyBox stays mounted across every navigation and every send and nothing would ever
-    // consume those entries.
     advanceComposerGeneration(announceable = false) {
-      if (announceable)
-        this.composerDropReasons[this.composerGeneration] = true;
+      // Whatever is already staged is discarded right here, by the reset that follows, so
+      // it is said now. Waiting for an upload callback loses every capture that had already
+      // finished, which is the ordinary shape of this: the recording is sitting in the
+      // composer when the bot hands the conversation back.
+      // Only a capture still uploading needs the marker, and only until it lands. A routine
+      // transition leaves it where it is: a capture staged before the note ended and landing
+      // after the agent has moved on twice is still owed the answer the first of those
+      // transitions owes it.
+      if (announceable) {
+        this.composerDropGeneration = this.announceVisibleDiscard()
+          ? null
+          : this.composerGeneration;
+      }
       this.composerGeneration += 1;
+    },
+    announceVisibleDiscard() {
+      const staged = this.attachedFiles;
+      if (!staged.length && !this.isRecordingAudio) return false;
+
+      this.announceDiscard(
+        this.isRecordingAudio || staged.some(file => file.isVoiceMessage)
+      );
+      return true;
     },
     // A capture that arrives for a composer that has moved on is thrown away, and the agent
     // is told only when they have no way of working out why on their own.
@@ -1356,14 +1372,17 @@ export default {
     // and sending are their own actions, with the composer visibly resetting in front of
     // them, and an alert on those is noise on the ordinary case.
     //
-    // The entry is consumed, so a batch of files staged together and invalidated by one
-    // transition is one message rather than a stack of identical ones.
+    // The marker is consumed, so a batch staged together and invalidated by one transition
+    // is one message rather than a stack of identical ones.
     discardStagedCapture(file, generation) {
-      if (!this.composerDropReasons[generation]) return;
+      if (generation !== this.composerDropGeneration) return;
 
-      delete this.composerDropReasons[generation];
+      this.composerDropGeneration = null;
+      this.announceDiscard(Boolean(file?.isVoiceMessage));
+    },
+    announceDiscard(isRecording) {
       useAlert(
-        file?.isVoiceMessage
+        isRecording
           ? this.$t('CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE')
           : this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
       );

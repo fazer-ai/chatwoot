@@ -678,6 +678,36 @@ describe('ReplyBox', () => {
     );
   });
 
+  // The ordinary shape of this: the recording finished and is sitting in the composer when
+  // the bot hands the conversation back. It is discarded synchronously by the reset, so a
+  // message that waits for an upload callback is a message that never arrives.
+  it('says so when the capture had already finished uploading', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    wrapper.vm.stageFile({ isVoiceMessage: true, file: new Blob(['audio']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    mockAlert.mockClear();
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(0);
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
   // stageFile is also the clip button, drag and drop, and paste. Telling an agent their
   // recording was discarded when what they dropped was a PDF is a message they cannot act
   // on, and one wrong message is enough to stop the right ones being read.
@@ -746,7 +776,7 @@ describe('ReplyBox', () => {
     store.commit('selectChat', { ...REPLIABLE, id: 43 });
     await nextTick();
 
-    expect(Object.keys(wrapper.vm.composerDropReasons)).toHaveLength(0);
+    expect(wrapper.vm.composerDropGeneration).toBeNull();
   });
 
   // A capture carries the generation it was staged under, and by the time it lands the
