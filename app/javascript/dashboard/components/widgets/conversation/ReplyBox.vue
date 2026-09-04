@@ -145,7 +145,7 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
-      // Which generations ended in a way worth telling the agent about, keyed by the
+      // The generations that ended in a way worth telling the agent about, keyed by the
       // generation that ended. Per generation and not one latest-reason slot: a capture
       // carries the generation it was staged under, and by the time it lands the composer
       // may have moved on twice more -- the transition that invalidated it is the first one
@@ -684,7 +684,7 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
-        this.advanceComposerGeneration('navigation');
+        this.advanceComposerGeneration();
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -733,8 +733,6 @@ export default {
       this.advanceComposerGeneration(
         previousReplyType === REPLY_EDITOR_MODES.NOTE &&
           updatedReplyType !== REPLY_EDITOR_MODES.NOTE
-          ? 'privacy'
-          : null
       );
       if (this.isRecordingAudio) this.onTypingOff();
       this.resetRecorderAndClearAttachments();
@@ -1228,7 +1226,7 @@ export default {
       // Sending consumes the composer as much as switching mode does: a capture
       // still uploading belongs to the message that just left, and would
       // otherwise land in the empty composer and ride along with the next one.
-      this.advanceComposerGeneration('send');
+      this.advanceComposerGeneration();
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
@@ -1340,10 +1338,13 @@ export default {
       }
       this.onFileUpload(file);
     },
-    // Only a reason worth announcing is recorded, so the map holds one entry per rare
-    // transition rather than one per navigation for the life of the session.
-    advanceComposerGeneration(reason) {
-      if (reason) this.composerDropReasons[this.composerGeneration] = reason;
+    // Only the transition that gets announced is recorded, and it is deleted when it is.
+    // Marking the routine ones too would grow the map for the life of the session, since
+    // ReplyBox stays mounted across every navigation and every send and nothing would ever
+    // consume those entries.
+    advanceComposerGeneration(announceable = false) {
+      if (announceable)
+        this.composerDropReasons[this.composerGeneration] = true;
       this.composerGeneration += 1;
     },
     // A capture that arrives for a composer that has moved on is thrown away, and the agent
@@ -1358,7 +1359,7 @@ export default {
     // The entry is consumed, so a batch of files staged together and invalidated by one
     // transition is one message rather than a stack of identical ones.
     discardStagedCapture(file, generation) {
-      if (this.composerDropReasons[generation] !== 'privacy') return;
+      if (!this.composerDropReasons[generation]) return;
 
       delete this.composerDropReasons[generation];
       useAlert(

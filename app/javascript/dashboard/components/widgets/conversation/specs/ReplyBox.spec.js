@@ -732,6 +732,23 @@ describe('ReplyBox', () => {
     expect(mockAlert).toHaveBeenCalledTimes(1);
   });
 
+  // ReplyBox stays mounted for the whole session, so a map that recorded every navigation
+  // and every send would only ever grow: nothing consumes an entry that is never announced.
+  it('records nothing for the transitions it does not announce', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    store.commit('selectChat', { ...REPLIABLE, id: 42 });
+    await nextTick();
+    wrapper.vm.clearMessage();
+    store.commit('selectChat', { ...REPLIABLE, id: 43 });
+    await nextTick();
+
+    expect(Object.keys(wrapper.vm.composerDropReasons)).toHaveLength(0);
+  });
+
   // A capture carries the generation it was staged under, and by the time it lands the
   // composer may have moved on twice more. What invalidated it is the first transition past
   // it, not the last one overall: reading only the latest reason loses the message here, and
