@@ -38,6 +38,59 @@ RSpec.describe AutomationRules::ConditionsFilterService do
       end
     end
 
+    # These are evaluated against the event's `changed_attributes` rather than against the
+    # record, so an event that touched something else has nothing under the filter's key.
+    context 'when conditions based on filter_operator attribute_changed' do
+      before do
+        rule.conditions = [
+          { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': 'AND',
+            'filter_operator': 'attribute_changed' },
+          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': 'OR',
+            'filter_operator': 'attribute_changed' },
+          { 'values': ['resolved'], 'attribute_key': 'status', 'query_operator': nil, 'filter_operator': 'equal_to' }
+        ]
+        rule.save!
+      end
+
+      # An attribute the event never touched is this condition not being met, and the filter
+      # after it still has to be combined against what the loop has accumulated so far.
+      # Dropping the iteration instead leaves that next filter combining against every
+      # conversation in the account, and an OR beside it then fires the rule on all of them.
+      it 'does not fire on an event that never touched the attribute' do
+        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
+      end
+
+      # The same statement said two ways: the assignee did not become 1. They have to agree,
+      # and the one on the left used to be `nil[0]`.
+      it 'answers an absent attribute the way it answers one that moved somewhere else' do
+        absent = described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
+        elsewhere = described_class.new(
+          rule, conversation, { changed_attributes: { assignee_id: %w[7 9], status: %w[open resolved] } }
+        ).perform
+
+        expect(absent).to eq(elsewhere)
+      end
+
+      # The NoMethodError was swallowed by `perform`'s rescue, so the only sign of it was a
+      # log line -- hundreds a day on an account with one such rule -- and a rule abandoned
+      # with its remaining conditions never evaluated.
+      it 'evaluates the rule instead of abandoning it on the first untouched attribute' do
+        expect(Rails.logger).not_to receive(:error)
+
+        described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
+      end
+
+      it 'still fires when the attribute changed the way the filter asks for' do
+        rule.conditions = [
+          { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
+            'filter_operator': 'attribute_changed' }
+        ]
+        rule.save!
+
+        expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(true)
+      end
+    end
+
     context 'when conditions based on filter_operator start_with' do
       before do
         contact = conversation.contact

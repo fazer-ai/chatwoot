@@ -92,11 +92,23 @@ class AutomationRules::ConditionsFilterService < FilterService
       @changed_attributes = @changed_attributes.with_indifferent_access
       changed_attribute = @changed_attributes[filter['attribute_key']].presence
 
-      if changed_attribute[0].in?(filter['values']['from']) && changed_attribute[1].in?(filter['values']['to'])
+      if changed_from_to?(changed_attribute, filter)
         @attribute_changed_records = attribute_changed_filter_query(filter, records, current_attribute_changed_record)
       end
       current_attribute_changed_record = @attribute_changed_records
     end
+  end
+
+  # An event that never touched the attribute is this condition not being met, which is the
+  # same answer as an event that touched it and moved it somewhere the filter does not ask
+  # for -- and not the same as the filter not being there. The loop still has to hand the
+  # set it has accumulated to the next filter: skipping the iteration outright would leave
+  # the next one combining against every conversation in the account, which for an OR is a
+  # rule that fires on all of them.
+  def changed_from_to?(changed_attribute, filter)
+    return false if changed_attribute.blank?
+
+    changed_attribute[0].in?(filter['values']['from']) && changed_attribute[1].in?(filter['values']['to'])
   end
 
   # We intersect with the record if query_operator-AND is present and union if query_operator-OR is present
