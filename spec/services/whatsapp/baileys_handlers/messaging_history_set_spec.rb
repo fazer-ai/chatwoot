@@ -48,6 +48,38 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     end
   end
 
+  # The subject travels on the frame because the messages do not carry it, and it has to
+  # survive the trip through the queue: an argument list is a serialization contract, and
+  # the group would otherwise reach the importer nameless after a round trip that looked
+  # fine in every unit test.
+  it 'hands the worker what the groups in the dump are called' do
+    group_jid = '120363000000000000@g.us'
+
+    perform({ syncType: 3, messages: [raw_message('A', group_jid)],
+              groupNames: { group_jid => 'Obra da casa' } })
+
+    expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(
+      inbox, anything, anything, anything, hash_including(group_name: 'Obra da casa')
+    )
+  end
+
+  # The same claim, made against the round trip rather than the call: the enqueue above
+  # reads the arguments in memory, where a keyword that the queue mangles still looks right.
+  it 'names the group once the worker has run' do
+    group_jid = '120363000000000000@g.us'
+    allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(true)
+
+    perform_enqueued_jobs(only: Whatsapp::Baileys::HistoryImportJob) do
+      # ON_DEMAND, so the archive half is kept: this inbox never asked for standing consent
+      # and the dump has no coverage to sit newer than.
+      perform({ syncType: 6,
+                messages: [raw_message('A', group_jid).deep_merge(key: { participant: '5511912345678@s.whatsapp.net' })],
+                groupNames: { group_jid => 'Obra da casa' } })
+    end
+
+    expect(inbox.messages.find_by(source_id: 'A').conversation.contact.name).to eq('Obra da casa')
+  end
+
   # One job per chat, so a chat locked by live traffic retries alone instead of holding up
   # the rest of the import.
   it 'hands each chat to its own worker' do
@@ -80,7 +112,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     it 'counts an on-demand answer as requested' do
       perform({ syncType: 6, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
-      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, announce: anything)
+      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, hash_including(announce: anything))
     end
 
     it 'counts standing consent on the inbox as requested' do
@@ -88,7 +120,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
 
       perform({ syncType: 0, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
-      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, announce: anything)
+      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, hash_including(announce: anything))
     end
 
     it 'counts an open backfill window as requested, and holds it open for the next frame' do
@@ -96,7 +128,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
 
       perform({ syncType: 0, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
-      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, announce: anything)
+      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, true, hash_including(announce: anything))
       expect(Whatsapp::Session::HistoryBackfill.pending?(whatsapp_channel)).to be(true)
     end
 
@@ -105,7 +137,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     it 'is unrequested when the phone volunteered it' do
       perform({ syncType: 0, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
-      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, false, announce: anything)
+      expect(Whatsapp::Baileys::HistoryImportJob).to have_been_enqueued.with(inbox, anything, anything, false, hash_including(announce: anything))
     end
   end
 
@@ -117,7 +149,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
       perform({ syncType: 6, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
       expect(Whatsapp::Baileys::HistoryImportJob)
-        .to have_been_enqueued.with(inbox, anything, anything, anything, announce: true)
+        .to have_been_enqueued.with(inbox, anything, anything, anything, hash_including(announce: true))
     end
 
     # The pairing dump, which is a year of somebody else's conversations arriving at once
@@ -126,7 +158,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
       perform({ syncType: 0, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
       expect(Whatsapp::Baileys::HistoryImportJob)
-        .to have_been_enqueued.with(inbox, anything, anything, anything, announce: false)
+        .to have_been_enqueued.with(inbox, anything, anything, anything, hash_including(announce: false))
     end
   end
 

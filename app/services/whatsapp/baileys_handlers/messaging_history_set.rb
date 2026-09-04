@@ -59,9 +59,33 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     # announced rather than filed in silence -- otherwise the press does nothing visible
     # until the page is reloaded. Every other type is the phone volunteering.
     announce = sync_type.to_i == ON_DEMAND
-    batches.each_value do |batch|
-      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, announce: announce)
+    # What the groups in this dump are called. A dump strips `groupName` from the messages,
+    # so without this an imported group is filed under its own jid and stays that way until
+    # somebody writes in it: 34 of 46 groups on a real pairing.
+    group_names = Array(data[:groupNames]).to_h
+    batches.each do |jid, batch|
+      Whatsapp::Baileys::HistoryImportJob.perform_later(inbox, batch, watermark, requested, **filing(announce, group_names[jid]))
     end
+  end
+
+  # One chat's name and not the dump's whole map: a job is enqueued per chat per frame, so
+  # the map would be serialized into Redis once per batch, and most of those batches are
+  # not even groups.
+  #
+  # Left off entirely when there is nothing to say. A worker from before this keyword raises
+  # ArgumentError on it, and that covers the one window where the two are guaranteed to
+  # disagree: this half and the bridge half ship separately, so between them every dump
+  # arrives with no subjects at all.
+  #
+  # It does not cover a rollback or the overlap of a deploy, where a named group can reach a
+  # worker that predates the keyword. That batch fails and lands in the dead set with its
+  # payload intact, to be re-driven; a signature is a serialization contract, and the only
+  # thing that would close that window is shipping the tolerant worker a release ahead of
+  # the producer.
+  def filing(announce, group_name)
+    filing = { announce: announce }
+    filing[:group_name] = group_name if group_name.present?
+    filing
   end
 
   # WhatsApp saying a chat has nothing older left, which it says on the answer to a

@@ -22,10 +22,10 @@ describe Whatsapp::Baileys::HistoryImporter do
     }.with_indifferent_access
   end
 
-  def import(messages, watermark: nil, requested: true)
+  def import(messages, watermark: nil, requested: true, group_name: nil)
     described_class.new(
       inbox: inbox,
-      params: { messages: messages, watermark: watermark, requested: requested }
+      params: { messages: messages, watermark: watermark, requested: requested, group_name: group_name }
     ).perform
   end
 
@@ -315,6 +315,106 @@ describe Whatsapp::Baileys::HistoryImporter do
       sender = inbox.messages.find_by(source_id: 'GRP').sender
       expect(sender.phone_number).to be_nil
       expect(sender.identifier).to eq("#{lid}@lid")
+    end
+  end
+
+  # A dump strips `groupName` from every message, and no `groups.update` follows it, so
+  # before this an imported group was filed under its own jid and only a later live event
+  # ever fixed it: 34 of 46 groups on a real pairing.
+  describe 'what an imported group is called' do
+    let(:group_jid) { '120363000000000000@g.us' }
+
+    before { allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(true) }
+
+    def group_message(id)
+      {
+        key: { id: id, remoteJid: group_jid, participant: jid, fromMe: false },
+        messageTimestamp: 10.days.ago.to_i,
+        message: { conversation: "in the group, #{id}" }
+      }.with_indifferent_access
+    end
+
+    it 'takes the subject the dump carries' do
+      import([group_message('GRP')], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'GRP').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # What a bridge too old to send the subjects produces, and what every import did before
+    # this: the group is still filed, it just has nothing to be called by.
+    it 'falls back to the jid when the dump names no group' do
+      import([group_message('GRP')], watermark: 3.days.ago)
+
+      expect(inbox.messages.find_by(source_id: 'GRP').conversation.contact.name).to eq('120363000000000000')
+    end
+
+    # The frames of one dump are separate jobs, and the groups already sitting under a jid
+    # from an earlier pairing are the whole backlog this has to clear.
+    it 'renames a group an earlier import left under its jid' do
+      import([group_message('FIRST')], watermark: 3.days.ago)
+      import([group_message('SECOND')], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # And this is the shape that backlog actually arrives in: the group is numbered
+    # precisely because its messages are already stored, so the dump that finally names it
+    # has nothing new to file. Renaming only alongside a write would skip every one of them.
+    it 'renames a group whose dump carries nothing it has not already stored' do
+      import([group_message('ONLY')], watermark: 3.days.ago)
+      import([group_message('ONLY')], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'ONLY').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # Markers are the ordinary content of a numbered group's slice, not an exception: 519 of
+    # 614 threads on a real pairing had nothing else. A rename that waited for something
+    # writable would skip most of the backlog it exists to clear.
+    it 'renames a group whose whole slice is markers' do
+      import([group_message('REAL')], watermark: 3.days.ago)
+      marker = group_message('STUB').merge('messageStubType' => 2)
+
+      import([marker], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Obra da casa')
+    end
+
+    # The subject was read when the frame was queued, and the frames carry no ordering: a
+    # `groups.update` may have renamed the group in between, and this has no way to tell.
+    # So it only ever replaces the placeholder -- a group that already has a name has the
+    # live path keeping it current, and a blind second writer on that field would undo it.
+    it 'leaves a group that already has a name alone' do
+      import([group_message('REAL')], watermark: 3.days.ago, group_name: 'Nome atual')
+      marker = group_message('STUB').merge('messageStubType' => 2)
+
+      import([marker], watermark: 3.days.ago, group_name: 'Nome de ontem')
+
+      expect(inbox.messages.find_by(source_id: 'REAL').conversation.contact.name).to eq('Nome atual')
+    end
+
+    # The kill switch is about the subsystem and not about writing rows. A dump reaches a
+    # build that handles no groups either way -- the bridge filters live traffic, not
+    # history -- and renaming the contact an earlier pairing left behind is as much group
+    # processing as filing the messages is.
+    it 'leaves the group alone when the build handles no groups' do
+      import([group_message('FIRST')], watermark: 3.days.ago)
+      allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:groups_enabled?).and_return(false)
+
+      import([group_message('SECOND')], watermark: 3.days.ago, group_name: 'Obra da casa')
+
+      expect(inbox.messages.find_by(source_id: 'FIRST').conversation.contact.name).to eq('120363000000000000')
+      expect(inbox.messages.pluck(:source_id)).to eq(%w[FIRST])
+    end
+
+    # The same rule on the other path in: a frame that does have messages to file goes
+    # through `find_or_create_group_contact`, which renames unconditionally. An import must
+    # not overwrite a name there either, and the stale subject is just as stale.
+    it 'leaves a named group alone even when the frame has messages to file' do
+      import([group_message('REAL')], watermark: 3.days.ago, group_name: 'Nome atual')
+
+      import([group_message('NOVA')], watermark: 3.days.ago, group_name: 'Nome de ontem')
+
+      expect(inbox.messages.find_by(source_id: 'NOVA').conversation.contact.name).to eq('Nome atual')
     end
   end
 

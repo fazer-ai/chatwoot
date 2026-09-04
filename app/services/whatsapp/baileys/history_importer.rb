@@ -45,41 +45,109 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
 
   def perform
     @opened = Set.new
-    return if batch.empty?
+    return if messages.empty?
+    # The kill switch, asked once for the whole batch rather than at each write. A dump is
+    # not filtered by the bridge the way live traffic is, so a build that handles no groups
+    # is still sent theirs -- and everything this class would do with them, filing rows and
+    # naming the chat alike, is group processing. Asked here so there is one answer: the
+    # rename below is a write of its own and would otherwise reach a subsystem that is off.
+    return if group? && !Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
 
     Whatsapp::Session::Inbound::Locks.with_chat_lock(
       inbox, lock_ids, ttl: inbound::Locks::IMPORT_CHAT_LOCK_TTL, defer_to_waiters: true
     ) do
-      pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
-      next if pending.empty?
-
-      runs = pending.group_by { |raw| gap?(raw) }
       Import::SilentWrite.wrap do
-        # Archive first: the two halves land in different threads, and the older one has
-        # to exist before the reopen policy is asked which thread is current.
-        # An unrequested pile keeps only its gap. The phone offers its whole history at
-        # every pairing, and an inbox nobody asked would otherwise fill with a year of
-        # somebody's conversations. A first pairing has no coverage at all, so `gap?` calls
-        # the whole pile archive and this drops all of it, which is the privacy protection
-        # the old outright refusal was standing in for.
-        # The archive is silent because a pairing dump is a year of somebody else's
-        # conversations arriving at once, and nobody asked to watch that. An answer to a
-        # press is the opposite: the operator is looking at the thread it lands in.
-        archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
-        gap = announcing { import_run(runs[true], archived: false) }
-        settle(archived, gap)
+        rename_group
+        file
       end
     end
   end
 
   private
 
-  def batch = @batch ||= Array(processed_params[:messages]).select { |raw| writable?(raw) }
+  # `batch` and not `messages`: what survives the filter is what there is to file, and a
+  # chat whose whole slice is markers must not leave a contact and an empty resolved
+  # conversation behind. The rename above it runs either way, because a numbered group's
+  # slice being all markers is the ordinary case rather than an exception -- 519 of 614
+  # threads on a real pairing.
+  def file
+    return if batch.empty?
+
+    pending = unstored(batch.sort_by { |raw| timestamp_of(raw) })
+    return if pending.empty?
+
+    runs = pending.group_by { |raw| gap?(raw) }
+    # Archive first: the two halves land in different threads, and the older one has to
+    # exist before the reopen policy is asked which thread is current.
+    #
+    # An unrequested pile keeps only its gap. The phone offers its whole history at every
+    # pairing, and an inbox nobody asked would otherwise fill with a year of somebody's
+    # conversations. A first pairing has no coverage at all, so `gap?` calls the whole pile
+    # archive and this drops all of it, which is the privacy protection the old outright
+    # refusal was standing in for.
+    #
+    # The archive is silent because a pairing dump is a year of somebody else's
+    # conversations arriving at once, and nobody asked to watch that. An answer to a press
+    # is the opposite: the operator is looking at the thread it lands in.
+    archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
+    gap = announcing { import_run(runs[true], archived: false) }
+    settle(archived, gap)
+  end
+
+  def messages = @messages ||= Array(processed_params[:messages])
+  def batch = @batch ||= messages.select { |raw| writable?(raw) }
   def requested = processed_params[:requested]
   def announce = processed_params[:announce]
   def maybe_announcing(&) = announce ? announcing(&) : yield
   def watermark = processed_params[:watermark]
   def inbound = Whatsapp::Session::Inbound
+
+  # The live path answers this with nil -- a `messages.upsert` says nothing about what the
+  # group is called, and the subject arrives on its own through `groups.update`. A dump has
+  # no such event behind it, so an imported group was filed under its own jid and only a
+  # later live event ever fixed it: 34 of 46 groups on a real pairing, and the twelve that
+  # escaped were the ones somebody happened to write in afterwards.
+  #
+  # The subject rides on the frame (see the bridge's `groupNames`). Absent, this returns
+  # nil and the jid is used exactly as before, which is also what a bridge too old to send
+  # it produces.
+  def extract_group_name = processed_params[:group_name]
+
+  # What an import may do to a group's name, and it is the same answer on both paths that
+  # reach here: name a group that has none, and leave alone one that has.
+  #
+  # The subject was read when the frame was queued, and the frames carry no ordering. A
+  # `groups.update` may have landed in between and is then the fresher fact, which this has
+  # no way to see -- so writing over a real name would make the import a second writer on
+  # the field, blind to the first. A group that has a name has the live path keeping it
+  # current; a group that has only its jid has nobody.
+  #
+  # Only the name is withheld. `group_type` is a fact about the chat rather than a race.
+  def update_group_contact_info(contact)
+    return super if contact.name.blank? || contact.name == extract_group_source_id
+
+    contact.update!(group_type: :group) unless contact.group_type_group?
+  end
+
+  # Clearing the backlog of groups filed under their own jid, which is a different job from
+  # naming the group a dump is currently filing messages for, even though the rule above is
+  # shared.
+  #
+  # It cannot be tied to writing rows, because the groups it exists for are numbered exactly
+  # when their messages are already stored: the dump that finally carries a subject has
+  # nothing new to file, and every slice of it may be markers besides.
+  #
+  # Silent like the rest of the import, so a backdated archive does not wake automations by
+  # changing a name.
+  def rename_group
+    return unless group?
+    return if extract_group_name.blank?
+
+    contact = inbox.contact_inboxes.find_by(source_id: extract_group_source_id)&.contact
+    return if contact.nil?
+
+    update_group_contact_info(contact)
+  end
 
   # A row that will never become a message: a system marker (`messageStubType`), a revoke
   # or a reaction removal, which mutate a row that has to exist rather than adding one and
@@ -102,10 +170,16 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # in one message and by LID in the next, and the live path locks by whichever one its
   # message happened to carry.
   def lock_ids
-    @raw_message = batch.first
-    return [extract_group_jid] if jid_type == 'group'
+    return [extract_group_jid] if group?
 
     [extract_from_jid(type: 'pn'), extract_from_jid(type: 'lid')]
+  end
+
+  # One batch is one chat: the handler groups a frame by `remoteJid` before enqueueing it,
+  # so the first message answers this for all of them.
+  def group?
+    @raw_message = messages.first
+    jid_type == 'group'
   end
 
   # One query for the chat rather than one per message, and inside the lock, so a
@@ -157,8 +231,6 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # A group is the one chat whose author changes from message to message, so its sender is
   # resolved per message while the group contact and its thread are resolved once.
   def import_group_run(run, archived)
-    return [] unless Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
-
     @group_contact_inbox, @group_contact = find_or_create_group_contact
     conversation = track(conversation_for(@group_contact_inbox, run.first, archived))
 
