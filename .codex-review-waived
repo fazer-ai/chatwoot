@@ -119,3 +119,13 @@ app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bo
 # steps lies about the number, and an SVG rect moves fill and radius out of Tailwind to
 # avoid a single width.
 app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDistribution.vue: Render distribution widths without inline styles  # PR#448
+# PR#469: measured false, twice, and the correction it asks for would replace a right
+# expectation with a wrong one. The claim is that this hook rewrites an inbound Baileys
+# voice note during identification, so the blob persists as audio/ogg and the spec's
+# audio/opus is stale. It does not: an inbound attachment is created with the content type
+# the payload carries (`mimetype: 'audio/opus'`), which is never identified, so nothing here
+# runs. The spec passes untouched (108 examples) and CI is green on the same commit; editing
+# it to audio/ogg as asked is what makes it fail. What does normalize the inbound case is
+# `Attachment#normalize_opus_blob_content_type!` on `download_url`, at the moment the file
+# is sent back out, which is the path #439 is about and is covered in attachment_spec.
+config/initializers/active_storage_opus_fix.rb: Update the Baileys inbound MIME contract  # PR#469
