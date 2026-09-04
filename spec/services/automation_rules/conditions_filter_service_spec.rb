@@ -80,6 +80,51 @@ RSpec.describe AutomationRules::ConditionsFilterService do
         described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform
       end
 
+      # The operator sits on the condition it joins forward from, so the `AND` binding these
+      # two is the first one's. Reading each condition's own operator is off by one, and
+      # since the last one's is nil every chain ended in a union: an AND between two of
+      # these was never applied.
+      context 'when two of them are joined' do
+        def two_conditions(operator)
+          [
+            { 'values': { 'from': [nil], 'to': ['1'] }, 'attribute_key': 'assignee_id', 'query_operator': operator,
+              'filter_operator': 'attribute_changed' },
+            { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,
+              'filter_operator': 'attribute_changed' }
+          ]
+        end
+
+        it 'does not fire an AND rule when only one of the changes happened' do
+          rule.update!(conditions: two_conditions('AND'))
+
+          expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(false)
+        end
+
+        it 'does not fire an AND rule when one attribute moved somewhere the filter does not ask for' do
+          rule.update!(conditions: two_conditions('AND'))
+
+          expect(
+            described_class.new(rule, conversation, { changed_attributes: { assignee_id: %w[7 9], status: %w[open resolved] } }).perform
+          ).to be(false)
+        end
+
+        it 'fires an AND rule when both changes happened' do
+          rule.update!(conditions: two_conditions('AND'))
+
+          expect(
+            described_class.new(rule, conversation, { changed_attributes: { assignee_id: [nil, '1'], status: %w[open resolved] } }).perform
+          ).to be(true)
+        end
+
+        # And the other half of the same rule: an OR fires on the change that did happen,
+        # which is what the swallowed NoMethodError used to prevent.
+        it 'fires an OR rule on the change that did happen' do
+          rule.update!(conditions: two_conditions('OR'))
+
+          expect(described_class.new(rule, conversation, { changed_attributes: { status: %w[open resolved] } }).perform).to be(true)
+        end
+      end
+
       it 'still fires when the attribute changed the way the filter asks for' do
         rule.conditions = [
           { 'values': { 'from': ['open'], 'to': ['resolved'] }, 'attribute_key': 'status', 'query_operator': nil,

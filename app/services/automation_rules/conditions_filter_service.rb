@@ -88,24 +88,42 @@ class AutomationRules::ConditionsFilterService < FilterService
 
   # Loop through attribute_changed_query_filter
   def filter_based_on_attribute_change(records, current_attribute_changed_record)
-    @attribute_changed_query_filter.each do |filter|
-      @changed_attributes = @changed_attributes.with_indifferent_access
-      changed_attribute = @changed_attributes[filter['attribute_key']].presence
+    @attribute_changed_query_filter.each_with_index do |filter, index|
+      unless condition_met?(filter)
+        # A condition that is not met and joined to another by AND makes that conjunction
+        # false whatever the rest of the chain says, so there is nothing left to fold.
+        # Passing over it instead is how a rule asking for two changes came to fire on one
+        # of them: the next filter unions against the set accumulated so far and carries the
+        # rule on its own.
+        return @attribute_changed_records = [] if conjunctive?(index)
 
-      if changed_from_to?(changed_attribute, filter)
-        @attribute_changed_records = attribute_changed_filter_query(filter, records, current_attribute_changed_record)
+        next
       end
+
+      @attribute_changed_records = attribute_changed_filter_query(filter, records, current_attribute_changed_record)
       current_attribute_changed_record = @attribute_changed_records
     end
   end
 
+  # Whether this condition is joined to a neighbour by AND. The operator sits on the
+  # condition it joins forward from, so a condition is conjunctive through its own operator
+  # or through the one before it -- the last condition in a rule carries none and is bound
+  # backwards only.
+  def conjunctive?(index)
+    return true if and_join?(@attribute_changed_query_filter[index])
+
+    index.positive? && and_join?(@attribute_changed_query_filter[index - 1])
+  end
+
+  def and_join?(filter) = filter['query_operator'].to_s.casecmp('AND').zero?
+
   # An event that never touched the attribute is this condition not being met, which is the
-  # same answer as an event that touched it and moved it somewhere the filter does not ask
-  # for -- and not the same as the filter not being there. The loop still has to hand the
-  # set it has accumulated to the next filter: skipping the iteration outright would leave
-  # the next one combining against every conversation in the account, which for an OR is a
-  # rule that fires on all of them.
-  def changed_from_to?(changed_attribute, filter)
+  # same answer as an event that moved it somewhere the filter does not ask for, because it
+  # is the same statement about the event. It used to be `nil[0]`: a NoMethodError swallowed
+  # by `perform`'s rescue, which abandoned the rule with its remaining conditions never
+  # evaluated and left nothing behind but a log line.
+  def condition_met?(filter)
+    changed_attribute = @changed_attributes.with_indifferent_access[filter['attribute_key']].presence
     return false if changed_attribute.blank?
 
     changed_attribute[0].in?(filter['values']['from']) && changed_attribute[1].in?(filter['values']['to'])
