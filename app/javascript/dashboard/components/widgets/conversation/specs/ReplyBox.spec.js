@@ -4,6 +4,12 @@ import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import ReplyBox from '../ReplyBox.vue';
+
+const mockAlert = vi.fn();
+vi.mock('dashboard/composables', async () => {
+  const actual = await vi.importActual('dashboard/composables');
+  return { ...actual, useAlert: (...args) => mockAlert(...args) };
+});
 import WhatsappTemplates from '../WhatsappTemplates/Modal.vue';
 
 const CHANNELS = [
@@ -639,6 +645,57 @@ describe('ReplyBox', () => {
     await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
 
     expect(wrapper.vm.attachedFiles).toHaveLength(1);
+  });
+
+  // The three drops above are not the same event to the agent. Leaving note mode is the one
+  // nothing they did causes -- a bot releases the conversation, the messaging window
+  // reopens, a restriction lifts -- so the recording goes with the composer looking exactly
+  // as they left it, and a silent drop there is indistinguishable from a broken button.
+  it('says so when the composer leaving note mode discarded a capture', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // Moving to another conversation is the agent's own action, with the composer resetting in
+  // front of them. An alert on every upload in flight when they change conversation is noise
+  // on the ordinary case, which is how a message that matters stops being read.
+  it('stays quiet when the agent moved to another conversation', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
+    store.commit('selectChat', { ...REPLIABLE, id: 99 });
+    await nextTick();
+
+    wrapper.vm.stageFile({ name: 'current.png', file: new Blob(['image']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(mockAlert).not.toHaveBeenCalled();
   });
 
   it('drops a capture still uploading when the message it belonged to is sent', async () => {

@@ -15,7 +15,8 @@
       "GROUPS_DISABLED_RESTRICTED": "Los mensajes de grupo están desactivados: actívelos gratis"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Programar envío"
+      "SCHEDULE_SEND": "Programar envío",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "La grabación se descartó: la conversación salió del modo nota y se habría enviado al contacto."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "La conversación ya está asignada",

@@ -145,6 +145,9 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
+      // Why the composer last moved on. Only a privacy change is announced when it
+      // discards a capture: see discardStagedCapture.
+      composerDropReason: null,
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -678,7 +681,7 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
-        this.composerGeneration += 1;
+        this.advanceComposerGeneration('navigation');
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -720,7 +723,7 @@ export default {
       // note recorded for the team could reach the contact. The draft survives
       // because switchDraftContext keeps one per mode; attachments and a cited
       // private note have no such split, so they go.
-      this.composerGeneration += 1;
+      this.advanceComposerGeneration('privacy');
       if (this.isRecordingAudio) this.onTypingOff();
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {
@@ -1213,7 +1216,7 @@ export default {
       // Sending consumes the composer as much as switching mode does: a capture
       // still uploading belongs to the message that just left, and would
       // otherwise land in the empty composer and ride along with the next one.
-      this.composerGeneration += 1;
+      this.advanceComposerGeneration('send');
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
@@ -1325,10 +1328,32 @@ export default {
       }
       this.onFileUpload(file);
     },
+    advanceComposerGeneration(reason) {
+      this.composerDropReason = reason;
+      this.composerGeneration += 1;
+    },
+    // A capture that arrives for a composer that has moved on is thrown away, and the
+    // agent is told only when they have no way of working out why on their own.
+    //
+    // Leaving note mode is the case: nothing the agent did causes it — a bot releases the
+    // conversation it owned, the messaging window reopens, an Instagram restriction lifts —
+    // so a recording they made for the team disappears with the composer looking untouched.
+    // Navigating away and sending are their own actions, with the composer visibly resetting
+    // in front of them, and an alert on those is noise on the ordinary case.
+    discardStagedCapture() {
+      if (this.composerDropReason === 'privacy') {
+        useAlert(
+          this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
+        );
+      }
+    },
     attachFile({ blob, file }) {
       const generation = file?.composerGeneration;
       // Checked here so a stale recording can't clear a newer one below.
-      if (generation !== this.composerGeneration) return;
+      if (generation !== this.composerGeneration) {
+        this.discardStagedCapture();
+        return;
+      }
 
       if (file?.isVoiceMessage) {
         this.removeRecordedAudio();
@@ -1342,7 +1367,10 @@ export default {
         // Reading the file is async as well, so the mode can change between the
         // two. The push is the only moment that decides what gets sent, so it is
         // where the capture has to still be current.
-        if (generation !== this.composerGeneration) return;
+        if (generation !== this.composerGeneration) {
+          this.discardStagedCapture();
+          return;
+        }
 
         this.attachedFiles.push({
           currentChatId: this.currentChat.id,
