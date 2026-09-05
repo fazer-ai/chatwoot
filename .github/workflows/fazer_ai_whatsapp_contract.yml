@@ -2,6 +2,12 @@
 # vendored under spec/fixtures/whatsapp/session/contract, pinned by CONTRACT_REF. The
 # full spec suite only runs on tags, so this keeps a locally edited contract from
 # reaching main: re-vendor with `rails whatsapp:contract:sync[<ref>]` instead.
+#
+# It also runs the contract's own specs, and that is the half that matters on a
+# re-vendoring PR: `contract:verify` compares checksums, so a sync that brought a new event
+# type passes it while the model still answers Unknown and the dispatcher drops the event as
+# an unknown payload -- the exact silent drop the drift check exists to prevent, arriving
+# through the PR that was supposed to fix it.
 name: WhatsApp session contract
 
 permissions:
@@ -32,14 +38,41 @@ on:
 jobs:
   contract:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ''
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --entrypoint redis-server
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
-      # No database or Redis: the task only reads the vendored files.
       - name: Verify the vendored contract
         run: bundle exec rails whatsapp:contract:verify
+      # These need the app booted, which is what the database above is for. They are the
+      # ones that fail when a type arrives with nothing to parse it: every golden frame has
+      # to build a typed payload and survive a round trip through the canonical model.
+      - name: Create database
+        run: bundle exec rake db:create db:schema:load
+      - name: Run the contract specs
+        run: bundle exec rspec spec/lib/whatsapp/session_contract_spec.rb spec/services/whatsapp/session/inbound/dispatcher_spec.rb
 
   # Split from the job above so a pull request never reaches for the network, and so a
   # connector that has moved ahead reads as its own failing check rather than as the
