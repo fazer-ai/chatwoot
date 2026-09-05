@@ -1,3 +1,5 @@
+require 'tmpdir'
+
 # rubocop:disable Metrics/BlockLength
 namespace :whatsapp do
   namespace :contract do
@@ -6,18 +8,27 @@ namespace :whatsapp do
       puts Whatsapp::SessionContract.checksum
     end
 
-    desc 'Fail when the vendored contract no longer matches CONTRACT_REF (used by CI)'
-    task verify: :environment do
+    # Two different questions, and only the first one used to be asked. Without a ref this
+    # compares the vendored files against the checksum CONTRACT_REF recorded, which catches
+    # a local edit to the copy and nothing else: the connector can add an event, change a
+    # payload, and this side stays silently behind until somebody happens to re-vendor for
+    # an unrelated reason. With a ref it also fetches the connector at that ref and says
+    # what is actually different.
+    desc 'Fail when the vendored contract no longer matches CONTRACT_REF; with a ref, also when it is behind the connector'
+    task :verify, [:ref] => :environment do |_task, args|
       reference = Whatsapp::SessionContract.reference
       actual = Whatsapp::SessionContract.checksum
 
-      if reference['checksum'] == actual
-        puts "contract ok (#{reference['repo']}@#{reference['ref'][0, 12]}, protocol v#{Whatsapp::SessionContract.protocol_version})"
-      else
+      unless reference['checksum'] == actual
         warn "contract drift: CONTRACT_REF says #{reference['checksum']}, files hash to #{actual}"
         warn 'Run `rails whatsapp:contract:sync[<ref>]` to re-vendor, or revert the local edit.'
         exit 1
       end
+
+      puts "contract ok (#{reference['repo']}@#{reference['ref'][0, 12]}, protocol v#{Whatsapp::SessionContract.protocol_version})"
+      next if args[:ref].blank?
+
+      WhatsappContractDrift.against(args[:ref], repo: reference['repo'])
     end
 
     desc 'Re-vendor the contract from a whatsapp-connector checkout (WHATSAPP_CONNECTOR_PATH)'
@@ -291,6 +302,53 @@ module WhatsappProviderConversion
 
       puts "  #{verb}    #{label}#{note ? ": #{note}" : ''}"
       true
+    end
+  end
+end
+
+# Comparing the vendored contract against the connector it came from. Kept out of
+# Whatsapp::SessionContract because it is the only part that needs the network: the app
+# reads the vendored copy and nothing else, and a checkout belongs to the task that asked
+# for one.
+module WhatsappContractDrift
+  class << self
+    def against(ref, repo:)
+      Dir.mktmpdir do |dir|
+        fetch(repo, ref, dir)
+        report(Whatsapp::SessionContract.diff(File.join(dir, 'contract')), "#{repo}@#{ref}")
+      end
+    end
+
+    private
+
+    # Fetching the ref rather than cloning a branch, because a branch, a tag and a bare
+    # commit then all work the same way, which is what lets the weekly run ask for `main`
+    # and a person ask for the exact commit a connector release was cut from.
+    def fetch(repo, ref, dir)
+      url = "https://github.com/#{repo}.git"
+      fetched = system('git', 'init', '--quiet', dir) &&
+                system('git', '-C', dir, 'fetch', '--quiet', '--depth', '1', url, ref) &&
+                system('git', '-C', dir, 'checkout', '--quiet', 'FETCH_HEAD')
+      abort "could not fetch #{repo}@#{ref}" unless fetched
+      abort "#{repo}@#{ref} carries no contract/ directory" unless File.directory?(File.join(dir, 'contract'))
+    end
+
+    def report(diff, label)
+      if diff.values.all?(&:empty?)
+        puts "in sync with #{label}"
+        return
+      end
+
+      warn "vendored contract differs from #{label}:"
+      { behind: 'only in the connector', stale: 'differs here', ahead: 'only here' }.each do |key, description|
+        diff[key].each { |path| warn "  #{description}: #{path}" }
+      end
+      # Never automatic. A type the connector added needs a model and a decision about
+      # whether this side handles it or ignores it, and IGNORED is where that decision is
+      # recorded -- re-vendoring on its own would put the file in place and leave the
+      # decision unmade.
+      warn 'Run `rails whatsapp:contract:sync[<ref>]` to re-vendor, then model or ignore whatever it brought.'
+      exit 1
     end
   end
 end
