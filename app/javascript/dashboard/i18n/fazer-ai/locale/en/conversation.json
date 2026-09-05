@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "Group messages are disabled — enable for free"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Schedule send"
+      "SCHEDULE_SEND": "Schedule send",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The attachment was discarded because the conversation switched between note and reply.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "The recording was discarded because the conversation switched between note and reply."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversation already assigned",

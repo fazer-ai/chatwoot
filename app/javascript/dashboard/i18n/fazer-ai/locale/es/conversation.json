@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "Los mensajes de grupo están desactivados: actívelos gratis"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Programar envío"
+      "SCHEDULE_SEND": "Programar envío",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "El archivo adjunto se descartó porque la conversación cambió entre nota y respuesta.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "La grabación se descartó porque la conversación cambió entre nota y respuesta."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "La conversación ya está asignada",

@@ -20,6 +20,11 @@ import MessageSignatureMissingAlert from './MessageSignatureMissingAlert.vue';
 import ReplyBoxBanner from './ReplyBoxBanner.vue';
 import QuotedEmailPreview from './QuotedEmailPreview.vue';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
+
+// How many mode switches a capture may still be uploading across before the composer stops
+// holding an explanation for it. Nothing survives five, and the cap is what keeps a marker
+// nobody claims from sitting in a component that stays mounted all day.
+const MAX_PENDING_DISCARD_MARKERS = 5;
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vue';
 import AudioRecorder from 'dashboard/components/widgets/WootWriter/AudioRecorder.vue';
 import { AUDIO_FORMATS } from 'shared/constants/messages';
@@ -145,6 +150,15 @@ export default {
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
       composerGeneration: 0,
+      // The generations ended by a mode change that nobody has been told about yet. A
+      // capture carries the generation it was staged under, so the answer it is owed is a
+      // fact about that generation and not about the latest one -- one slot cannot hold two
+      // outstanding captures, and cannot tell an unanswered marker from a stale one.
+      //
+      // Bounded, because ReplyBox stays mounted for the whole session and an entry nothing
+      // ever claims would otherwise sit here for good: past a handful of mode switches a
+      // capture is not still uploading.
+      composerDropGenerations: [],
       // The recorder's capture starts when the mic is armed, not when the file
       // shows up: talking and then converting to MP3 both happen in between.
       recordingGeneration: 0,
@@ -678,7 +692,7 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
-        this.composerGeneration += 1;
+        this.advanceComposerGeneration();
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -713,15 +727,25 @@ export default {
         mode: updatedReplyType,
       });
       this.switchDraftContext(this.conversationIdByRoute, updatedReplyType);
-      // The composer can leave note mode without the agent touching anything: a
-      // bot releases the pending conversation it owned, the messaging window
-      // reopens, an Instagram restriction lifts. Whatever is staged was produced
-      // under the old privacy but would be sent under the new one, so a voice
-      // note recorded for the team could reach the contact. The draft survives
-      // because switchDraftContext keeps one per mode; attachments and a cited
-      // private note have no such split, so they go.
-      this.composerGeneration += 1;
+      // The composer can change mode without the agent touching anything: a bot releases
+      // the pending conversation it owned, the messaging window reopens, an Instagram
+      // restriction lifts. Whatever is staged was produced under the old privacy but would
+      // be sent under the new one, so a voice note recorded for the team could reach the
+      // contact. The draft survives because switchDraftContext keeps one per mode;
+      // attachments and a cited private note have no such split, so they go.
+      //
+      // Every path arrives here, whoever caused it: the composer cannot tell the agent
+      // picking Reply from a bot releasing the conversation under them, and the message is
+      // worth having either way, since what it reports is a file that will not be sent.
+      // What it must not do is claim the contact was about to receive it, which is false in
+      // one of the two directions.
+      //
+      // The announcement comes first, and the clearing is all done here rather than by the
+      // callers: emptying the composer before the mode changes leaves this with nothing to
+      // report, which is how a staged attachment and then a recording each stayed silent.
+      this.advanceComposerGeneration(true);
       if (this.isRecordingAudio) this.onTypingOff();
+      this.isRecordingAudio = false;
       this.resetRecorderAndClearAttachments();
       if (this.inReplyTo?.private && !this.isOnPrivateNote) {
         this.resetReplyToMessage();
@@ -1189,15 +1213,12 @@ export default {
       }, 100);
     },
     setReplyMode(mode = REPLY_EDITOR_MODES.REPLY) {
-      // Clear attachments when switching between private note and reply modes
-      // This is to prevent from breaking the upload rules
-      if (this.attachedFiles.length > 0) this.attachedFiles = [];
-
+      // The clearing lives in the effectiveReplyMode watcher and only there. It ran here
+      // too, ahead of the mode actually changing, so by the time the watcher looked there
+      // was nothing left to report -- and it ran even when the mode did not change at all,
+      // since `replyType` is only assigned below when a public reply is possible.
       this.$store.dispatch('draftMessages/setReplyEditorMode', { mode });
       if (this.canSendPublicReply) this.replyType = mode;
-      if (this.isRecordingAudio) {
-        this.toggleAudioRecorder();
-      }
     },
     clearEditorSelection() {
       this.updateEditorSelectionWith = '';
@@ -1213,7 +1234,7 @@ export default {
       // Sending consumes the composer as much as switching mode does: a capture
       // still uploading belongs to the message that just left, and would
       // otherwise land in the empty composer and ride along with the next one.
-      this.composerGeneration += 1;
+      this.advanceComposerGeneration();
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
@@ -1325,10 +1346,64 @@ export default {
       }
       this.onFileUpload(file);
     },
+    advanceComposerGeneration(announceable = false) {
+      // Whatever is already staged is discarded right here, by the reset that follows, so
+      // it is said now. Waiting for an upload callback loses every capture that had already
+      // finished, which is the ordinary shape of this: the recording is sitting in the
+      // composer when the bot hands the conversation back.
+      // Only a capture still uploading needs a marker, and only until it lands. Each is
+      // kept beside the others rather than replacing them: a marker belongs to whatever was
+      // staged under that generation, and a later transition has no business answering, or
+      // silencing, an earlier one.
+      if (announceable && !this.announceVisibleDiscard()) {
+        this.composerDropGenerations.push(this.composerGeneration);
+        if (this.composerDropGenerations.length > MAX_PENDING_DISCARD_MARKERS) {
+          this.composerDropGenerations.shift();
+        }
+      }
+      this.composerGeneration += 1;
+    },
+    announceVisibleDiscard() {
+      const staged = this.attachedFiles;
+      if (!staged.length && !this.isRecordingAudio) return false;
+
+      this.announceDiscard(
+        this.isRecordingAudio || staged.some(file => file.isVoiceMessage)
+      );
+      return true;
+    },
+    // A capture that arrives for a composer that has moved on is thrown away, and the agent
+    // is told only when they have no way of working out why on their own.
+    //
+    // Leaving note mode is that case: nothing the agent did causes it — a bot releases the
+    // conversation it owned, the messaging window reopens, an Instagram restriction lifts —
+    // so what they staged disappears with the composer looking untouched. Navigating away
+    // and sending are their own actions, with the composer visibly resetting in front of
+    // them, and an alert on those is noise on the ordinary case.
+    //
+    // The marker is consumed, so a batch staged together and invalidated by one transition
+    // is one message rather than a stack of identical ones.
+    discardStagedCapture(file, generation) {
+      const marker = this.composerDropGenerations.indexOf(generation);
+      if (marker === -1) return;
+
+      this.composerDropGenerations.splice(marker, 1);
+      this.announceDiscard(Boolean(file?.isVoiceMessage));
+    },
+    announceDiscard(isRecording) {
+      useAlert(
+        isRecording
+          ? this.$t('CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE')
+          : this.$t('CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE')
+      );
+    },
     attachFile({ blob, file }) {
       const generation = file?.composerGeneration;
       // Checked here so a stale recording can't clear a newer one below.
-      if (generation !== this.composerGeneration) return;
+      if (generation !== this.composerGeneration) {
+        this.discardStagedCapture(file, generation);
+        return;
+      }
 
       if (file?.isVoiceMessage) {
         this.removeRecordedAudio();
@@ -1342,7 +1417,10 @@ export default {
         // Reading the file is async as well, so the mode can change between the
         // two. The push is the only moment that decides what gets sent, so it is
         // where the capture has to still be current.
-        if (generation !== this.composerGeneration) return;
+        if (generation !== this.composerGeneration) {
+          this.discardStagedCapture(file, generation);
+          return;
+        }
 
         this.attachedFiles.push({
           currentChatId: this.currentChat.id,

@@ -129,3 +129,15 @@ app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDis
 # `Attachment#normalize_opus_blob_content_type!` on `download_url`, at the moment the file
 # is sent back out, which is the path #439 is about and is covered in attachment_spec.
 config/initializers/active_storage_opus_fix.rb: Update the Baileys inbound MIME contract  # PR#469
+# PR#470: real, marginal, and the fourth position in a circle. Round 2 refused a map for
+# growing without bound, round 4 refused a bounded structure, round 7 refused the scalar
+# that replaced it, round 8 refused holding that scalar, and this refuses the cap that
+# answers round 8. Every answer short of tracking in-flight uploads is rejected for the case
+# it approximates away, and tracking them is not something this component can do honestly:
+# `stageFile` is wired to the uploader's `input-file`, which re-fires on every progress
+# update, and `attachFile` does not run at all when an upload fails, so a pending set would
+# both over-count and leak -- which is the stale-marker complaint of round 8 arriving by a
+# longer road. What is left uncovered is an upload still running while the agent toggles
+# note and reply more than five times, and it costs silence, which is what every discard did
+# before this PR. Revisit if the alert proves it earns more machinery.
+app/javascript/dashboard/components/widgets/conversation/ReplyBox.vue: Retain markers for uploads that are still pending  # PR#470

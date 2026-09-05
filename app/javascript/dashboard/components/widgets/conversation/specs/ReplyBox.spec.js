@@ -4,6 +4,12 @@ import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import ReplyBox from '../ReplyBox.vue';
+
+const mockAlert = vi.fn();
+vi.mock('dashboard/composables', async () => {
+  const actual = await vi.importActual('dashboard/composables');
+  return { ...actual, useAlert: (...args) => mockAlert(...args) };
+});
 import WhatsappTemplates from '../WhatsappTemplates/Modal.vue';
 
 const CHANNELS = [
@@ -639,6 +645,313 @@ describe('ReplyBox', () => {
     await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
 
     expect(wrapper.vm.attachedFiles).toHaveLength(1);
+  });
+
+  // The three drops above are not the same event to the agent. Leaving note mode is the one
+  // nothing they did causes -- a bot releases the conversation, the messaging window
+  // reopens, a restriction lifts -- so the recording goes with the composer looking exactly
+  // as they left it, and a silent drop there is indistinguishable from a broken button.
+  it('says so when the composer leaving note mode discarded a capture', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // The ordinary shape of this: the recording finished and is sitting in the composer when
+  // the bot hands the conversation back. It is discarded synchronously by the reset, so a
+  // message that waits for an upload callback is a message that never arrives.
+  it('says so when the capture had already finished uploading', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+
+    wrapper.vm.stageFile({ isVoiceMessage: true, file: new Blob(['audio']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    mockAlert.mockClear();
+
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(0);
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // The recorder is the other thing setReplyMode used to tear down ahead of the mode
+  // actually changing, and a finished recording has no upload callback left to speak for it.
+  it('says so when a recording was going when the mode switched', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    wrapper.vm.toggleAudioRecorder();
+    await nextTick();
+    expect(wrapper.vm.isRecordingAudio).toBe(true);
+    mockAlert.mockClear();
+
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+
+    expect(wrapper.vm.isRecordingAudio).toBe(false);
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // stageFile is also the clip button, drag and drop, and paste. Telling an agent their
+  // recording was discarded when what they dropped was a PDF is a message they cannot act
+  // on, and one wrong message is enough to stop the right ones being read.
+  it('names what was actually discarded', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'contrato.pdf', file: new Blob(['pdf']) });
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // One transition, one message. With several files staged together every completion runs
+  // this, and a stack of identical toasts for a single event is its own kind of unreadable.
+  it('says it once for a batch discarded by one transition', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'um.png', file: new Blob(['a']) });
+    wrapper.vm.stageFile({ name: 'dois.png', file: new Blob(['b']) });
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+  });
+
+  // A slow upload can span more than one switch. The message belongs to the capture that
+  // has not landed yet, so a later transition must not take it: overwriting the marker
+  // loses it, and so does clearing it after announcing something else visible.
+  it('keeps the message for an upload that outlived two switches', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'lento.pdf', file: new Blob(['pdf']) });
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.REPLY);
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // An empty switch marks a generation nobody will ever claim. Keeping it was harmless on
+  // its own and fatal next to a rule that never replaced a marker: the real loss that came
+  // afterwards found the slot taken and said nothing.
+  it('still speaks for a later capture after empty mode switches', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.REPLY);
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'depois.pdf', file: new Blob(['pdf']) });
+    panel.vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // And the list is bounded, since ReplyBox stays mounted all day and a switch with nothing
+  // staged leaves an entry no capture will ever claim.
+  it('does not accumulate markers across a day of switching', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const panel = wrapper.findComponent({ name: 'ReplyTopPanel' });
+
+    for (let i = 0; i < 20; i += 1) {
+      panel.vm.$emit(
+        'setReplyMode',
+        i % 2 ? REPLY_EDITOR_MODES.REPLY : REPLY_EDITOR_MODES.NOTE
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await nextTick();
+    }
+
+    expect(wrapper.vm.composerDropGenerations.length).toBeLessThanOrEqual(5);
+  });
+
+  // ReplyBox stays mounted for the whole session, so a map that recorded every navigation
+  // and every send would only ever grow: nothing consumes an entry that is never announced.
+  it('records nothing for the transitions it does not announce', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+
+    store.commit('selectChat', { ...REPLIABLE, id: 42 });
+    await nextTick();
+    wrapper.vm.clearMessage();
+    store.commit('selectChat', { ...REPLIABLE, id: 43 });
+    await nextTick();
+
+    expect(wrapper.vm.composerDropGenerations).toHaveLength(0);
+  });
+
+  // A capture carries the generation it was staged under, and by the time it lands the
+  // composer may have moved on twice more. What invalidated it is the first transition past
+  // it, not the last one overall: reading only the latest reason loses the message here, and
+  // hands it to the wrong capture in the mirror case.
+  it('blames the transition that discarded the capture, not the last one', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+      chat: {
+        status: 'pending',
+        meta: { sender: { id: 2 }, assignee_type: 'AgentBot' },
+      },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    const recorded = { isVoiceMessage: true, file: new Blob(['audio']) };
+    wrapper.vm.stageFile(recorded);
+
+    // The bot hands the conversation back: this is what the recording is lost to.
+    store.commit('selectChat', {
+      ...REPLIABLE,
+      status: 'open',
+      meta: { sender: { id: 2 } },
+    });
+    await nextTick();
+    // And the agent moves on before the upload lands.
+    store.commit('selectChat', { ...REPLIABLE, id: 99 });
+    await nextTick();
+    await vi.waitUntil(() => mockAlert.mock.calls.length > 0);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.RECORDING_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // Both directions are worth reporting: what the agent loses is a file that will not be
+  // sent, which is news whoever caused the switch. Only the claim about the contact
+  // receiving it would have been direction-specific, and the wording does not make it.
+  it('says so when the agent switched into note mode', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    mockAlert.mockClear();
+
+    // Through the panel the agent actually clicks, not by assigning replyType: setReplyMode
+    // used to empty the composer before the watcher could see what it was emptying.
+    wrapper
+      .findComponent({ name: 'ReplyTopPanel' })
+      .vm.$emit('setReplyMode', REPLY_EDITOR_MODES.NOTE);
+    await nextTick();
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.REPLYBOX.ATTACHMENT_DISCARDED_ON_MODE_CHANGE'
+    );
+  });
+
+  // Moving to another conversation is the agent's own action, with the composer resetting in
+  // front of them. An alert on every upload in flight when they change conversation is noise
+  // on the ordinary case, which is how a message that matters stops being read.
+  it('stays quiet when the agent moved to another conversation', async () => {
+    const { wrapper, store } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    mockAlert.mockClear();
+
+    wrapper.vm.stageFile({ name: 'doc.pdf', file: new Blob(['pdf']) });
+    store.commit('selectChat', { ...REPLIABLE, id: 99 });
+    await nextTick();
+
+    wrapper.vm.stageFile({ name: 'current.png', file: new Blob(['image']) });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    expect(mockAlert).not.toHaveBeenCalled();
   });
 
   it('drops a capture still uploading when the message it belonged to is sent', async () => {
