@@ -188,4 +188,21 @@ describe('Response', () => {
 
     expect(updateSurvey).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps a revision pending when clicking another rating fails to save', async () => {
+    getSurveyDetails.mockResolvedValue(surveyPayload({ rating: 2 }));
+    updateSurvey.mockRejectedValue(new Error('expired'));
+    setUrl('?rating=5');
+    const wrapper = buildWrapper();
+    await flushPromises();
+
+    await wrapper.vm.selectRating(3);
+
+    // Falling back to the stored 2 here would show the success banner and the feedback
+    // form for a rating the contact had already replaced twice.
+    expect(wrapper.vm.isPendingConfirmation).toBe(true);
+    expect(wrapper.vm.selectedRating).toBe(3);
+    expect(wrapper.vm.shouldShowSuccessMessage).toBe(false);
+    expect(wrapper.vm.enableFeedbackForm).toBe(false);
+  });
 });

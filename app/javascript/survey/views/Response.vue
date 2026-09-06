@@ -126,11 +126,14 @@ export default {
       const saved = await this.updateSurveyDetails();
       if (saved) this.isPendingConfirmation = false;
     },
-    selectRating(rating) {
+    async selectRating(rating) {
       if (this.isFeedbackSubmitted || this.isUpdating) return;
-      this.isPendingConfirmation = false;
       this.selectedRating = rating;
-      this.updateSurveyDetails();
+      // Same rule as confirmRating: a revision stays pending until the write lands. Clearing
+      // it first would make isRatingSubmitted fall back to the stored rating, so a failed
+      // save would show the success banner for a rating the contact just replaced.
+      const saved = await this.updateSurveyDetails();
+      if (saved) this.isPendingConfirmation = false;
     },
     sendFeedback(message) {
       this.feedbackMessage = message;
