@@ -5,11 +5,12 @@ import Spinner from 'shared/components/Spinner.vue';
 import Rating from 'survey/components/Rating.vue';
 import Feedback from 'survey/components/Feedback.vue';
 import Banner from 'survey/components/Banner.vue';
+import CustomButton from 'shared/components/Button.vue';
 import StarRating from 'shared/components/StarRating.vue';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import { getSurveyDetails, updateSurvey } from 'survey/api/survey';
 
-import { CSAT_DISPLAY_TYPES } from 'shared/constants/messages';
+import { CSAT_DISPLAY_TYPES, CSAT_RATINGS } from 'shared/constants/messages';
 
 export default {
   name: 'Response',
@@ -20,6 +21,7 @@ export default {
     Banner,
     Feedback,
     StarRating,
+    CustomButton,
   },
   setup() {
     const { formatMessage } = useMessageFormatter();
@@ -34,6 +36,7 @@ export default {
       feedbackMessage: '',
       hasSubmittedFeedback: false,
       isUpdating: false,
+      isPendingConfirmation: false,
       logo: '',
       inboxName: '',
       displayType: CSAT_DISPLAY_TYPES.EMOJI,
@@ -42,11 +45,18 @@ export default {
   },
   computed: {
     surveyId() {
-      const pageURL = window.location.href;
-      return pageURL.substring(pageURL.lastIndexOf('/') + 1);
+      // Read the path, not the href: the rating links in the survey email carry a
+      // query string, which would otherwise be taken as part of the uuid.
+      const { pathname } = window.location;
+      return pathname.substring(pathname.lastIndexOf('/') + 1);
     },
     isRatingSubmitted() {
-      return this.surveyDetails && this.surveyDetails.rating;
+      // A pending confirmation means the rating on screen is not the stored one, so the
+      // page is not in its resolved state: the success banner, the hidden prompt and the
+      // feedback form all key off this.
+      if (this.isPendingConfirmation) return false;
+
+      return Boolean(this.surveyDetails?.rating);
     },
     isFeedbackSubmitted() {
       return (
@@ -74,7 +84,7 @@ export default {
       return !!this.errorMessage;
     },
     shouldShowSuccessMessage() {
-      return !!this.isRatingSubmitted;
+      return this.isRatingSubmitted;
     },
     message() {
       if (this.errorMessage) {
@@ -87,13 +97,43 @@ export default {
     },
   },
   async mounted() {
-    this.getSurveyDetails();
+    const loaded = await this.getSurveyDetails();
+    if (loaded) this.applyRatingFromQuery();
   },
   methods: {
-    selectRating(rating) {
+    // The survey email renders the scale inline, and each rating links here carrying its
+    // value. It is only pre-selected, never submitted: email security gateways detonate
+    // every link in a sandbox that runs JavaScript, so an automatic write would let a
+    // scanner walk all five URLs and settle the rating before the recipient ever opens the
+    // message. Persisting waits for a real gesture on this page.
+    applyRatingFromQuery() {
+      const rating = Number(
+        new URLSearchParams(window.location.search).get('rating')
+      );
+      if (!CSAT_RATINGS.some(({ value }) => value === rating)) return;
+      if (this.isFeedbackSubmitted) return;
+      // Reopening the same link after confirming has nothing left to confirm, and asking
+      // again would hide the feedback form behind a second confirmation.
+      if (this.surveyDetails?.rating === rating) return;
+
+      this.selectedRating = rating;
+      this.isPendingConfirmation = true;
+    },
+    async confirmRating() {
+      // Only on success: a failed write (an expired survey, a dropped connection) has to
+      // leave the button on screen, or the contact is left with no way to send the rating
+      // and, on a revised one, a page claiming the old rating went through.
+      const saved = await this.updateSurveyDetails();
+      if (saved) this.isPendingConfirmation = false;
+    },
+    async selectRating(rating) {
       if (this.isFeedbackSubmitted || this.isUpdating) return;
       this.selectedRating = rating;
-      this.updateSurveyDetails();
+      // Same rule as confirmRating: a revision stays pending until the write lands. Clearing
+      // it first would make isRatingSubmitted fall back to the stored rating, so a failed
+      // save would show the success banner for a rating the contact just replaced.
+      const saved = await this.updateSurveyDetails();
+      if (saved) this.isPendingConfirmation = false;
     },
     sendFeedback(message) {
       this.feedbackMessage = message;
@@ -113,9 +153,11 @@ export default {
           result.data.content ||
           this.$t('SURVEY.DESCRIPTION', { inboxName: this.inboxName });
         this.setLocale(result.data.locale);
+        return true;
       } catch (error) {
         const errorMessage = error?.response?.data?.message;
         this.errorMessage = errorMessage || this.$t('SURVEY.API.ERROR_MESSAGE');
+        return false;
       } finally {
         this.isLoading = false;
       }
@@ -144,10 +186,16 @@ export default {
         if (markFeedbackSubmitted) {
           this.hasSubmittedFeedback = true;
         }
+        // A retry after a failed write is a real path now that the confirmation button
+        // survives the failure, and `message` prefers the error, so leaving it set would
+        // show the success and error banners at once over a rating that did save.
+        this.errorMessage = null;
+        return true;
       } catch (error) {
         const errorMessage = error?.response?.data?.error;
         this.errorMessage = errorMessage || this.$t('SURVEY.API.ERROR_MESSAGE');
         useAlert(this.errorMessage);
+        return false;
       } finally {
         this.isUpdating = false;
       }
@@ -205,6 +253,18 @@ export default {
           class="[&>button>span]:text-4xl !justify-start !px-0"
           @select-rating="selectRating"
         />
+        <div
+          v-if="isPendingConfirmation"
+          class="mt-6 flex flex-col items-start gap-3"
+        >
+          <p class="text-base text-n-slate-11 m-0">
+            {{ $t('SURVEY.RATING.CONFIRM_LABEL') }}
+          </p>
+          <CustomButton :disabled="isUpdating" @click="confirmRating">
+            <Spinner v-if="isUpdating" class="p-0" />
+            {{ $t('SURVEY.RATING.CONFIRM_BUTTON') }}
+          </CustomButton>
+        </div>
         <Feedback
           v-if="enableFeedbackForm"
           :is-updating="isUpdating"

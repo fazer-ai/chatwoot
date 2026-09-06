@@ -79,6 +79,28 @@ RSpec.describe ConversationReplyMailer do
         expect(cc_mail.cc.first).to eq(cc_message.content_attributes[:cc_emails])
         expect(cc_mail.bcc.first).to eq(cc_message.content_attributes[:bcc_emails])
       end
+
+      context 'when the summary carries a CSAT survey' do
+        # MessageTemplates::Template::CsatSurvey creates the survey with no sender; the factory
+        # always assigns one, so it is cleared here to match what production actually stores.
+        let!(:csat_message) do
+          create(:message, conversation: conversation, account: account, message_type: 'template',
+                           content_type: 'input_csat', content: 'How would you rate our support?',
+                           content_attributes: { display_type: 'emoji' }).tap { |message| message.update!(sender: nil) }
+        end
+
+        it 'renders the rating scale instead of a link to the survey page' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            survey_url = "https://app.chatwoot.com/survey/responses/#{conversation.uuid}"
+
+            CsatRatings::VALUES.each do |value|
+              expect(mail.body.decoded).to include "#{survey_url}?rating=#{value}"
+            end
+            expect(mail.body.decoded).to include csat_message.content
+            expect(mail.body.decoded).not_to include 'to rate the conversation'
+          end
+        end
+      end
     end
 
     context 'without assignee' do
@@ -134,6 +156,38 @@ RSpec.describe ConversationReplyMailer do
         create(:message, message_type: 'outgoing', account: account, conversation: conversation)
         conversation.update!(contact_last_seen_at: Time.zone.now)
         expect(mail).to be_nil
+      end
+
+      context 'when the message is a CSAT survey' do
+        let(:csat_message) do
+          create(:message, conversation: conversation, account: account, message_type: 'template',
+                           content_type: 'input_csat', content: 'How would you rate our support?',
+                           content_attributes: { display_type: 'emoji' })
+        end
+        let(:mail) { described_class.reply_without_summary(conversation, csat_message.id).deliver_now }
+
+        it 'renders the rating scale' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            CsatRatings::VALUES.each do |value|
+              expect(mail.body.decoded).to include "https://app.chatwoot.com/survey/responses/#{conversation.uuid}?rating=#{value}"
+            end
+          end
+        end
+
+        # The debounce window can close on a plain reply and the survey together, and the
+        # branding the survey depends on has to survive that batch.
+        it 'keeps the branded layout when the batch also carries a plain reply' do
+          reply = create(:message, conversation: conversation, account: account, message_type: 'outgoing',
+                                   content: 'Sure, here is the answer.')
+          csat_message.update!(created_at: reply.created_at + 1.second)
+
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            body = described_class.reply_without_summary(conversation, reply.id).deliver_now.body.decoded
+
+            expect(body).to include 'accent-bar'
+            expect(body).to include "#{conversation.uuid}?rating=5"
+          end
+        end
       end
     end
 
@@ -364,20 +418,78 @@ RSpec.describe ConversationReplyMailer do
       context 'when message is a CSAT survey' do
         let(:csat_message) do
           create(:message, conversation: conversation, account: account, message_type: 'template',
-                           content_type: 'input_csat', content: 'How would you rate our support?', sender: agent)
+                           content_type: 'input_csat', content: 'How would you rate our support?', sender: agent,
+                           content_attributes: { display_type: display_type })
         end
+        let(:display_type) { 'emoji' }
+        let(:survey_url) { "https://app.chatwoot.com/survey/responses/#{conversation.uuid}" }
 
-        it 'includes CSAT survey URL in outgoing_content' do
+        it 'renders one link per rating so the contact answers from the email' do
           with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
             mail = described_class.email_reply(csat_message).deliver_now
-            expect(mail.decoded).to include "https://app.chatwoot.com/survey/responses/#{conversation.uuid}"
+
+            CsatRatings::VALUES.each do |value|
+              expect(mail.decoded).to include "#{survey_url}?rating=#{value}"
+            end
           end
         end
 
-        it 'uses outgoing_content for CSAT message body' do
+        it 'renders the emoji scale with its labels' do
           with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
             mail = described_class.email_reply(csat_message).deliver_now
-            expect(mail.decoded).to include csat_message.outgoing_content
+
+            expect(mail.decoded).to include '😞'
+            expect(mail.decoded).to include '😍'
+            expect(mail.decoded).to include 'Excellent'
+            expect(mail.decoded).not_to include CsatRatings::STAR_GLYPH
+          end
+        end
+
+        it 'renders stars instead of emoji when the inbox asks for a star scale' do
+          csat_message.update!(content_attributes: { display_type: 'star' })
+
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            mail = described_class.email_reply(csat_message).deliver_now
+
+            expect(mail.decoded).to include CsatRatings::STAR_GLYPH
+            expect(mail.decoded).not_to include '😞'
+            expect(mail.decoded).to include "#{survey_url}?rating=5"
+          end
+        end
+
+        it 'wraps the survey in the branded layout, unlike the replies around it' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            expect(described_class.email_reply(csat_message).deliver_now.body.decoded).to include 'accent-bar'
+          end
+        end
+
+        # The layout drops content_for_layout inside a <table>, so flow content there is
+        # fostered into the surrounding cell -- the same treatment upstream's own <p> gets.
+        # What has to hold is that the scale lands inside the card, whichever level it ends
+        # up on, because a parser is free to move it further than that.
+        it 'lands inside the branded card rather than outside it' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            body = described_class.email_reply(csat_message).deliver_now.body.decoded
+            # HTML5, not HTML: only the spec-compliant parser foster-parents the way a browser
+            # and a mail client do, and that relocation is the whole point of this example.
+            card = Nokogiri::HTML5(body).at_css('td.content-wrap')
+
+            expect(card.css('a').map { |a| a['href'] }).to include(/rating=5/)
+          end
+        end
+
+        it 'still sends an ordinary reply bare' do
+          reply = create(:message, conversation: conversation, account: account, message_type: 'outgoing',
+                                   content: 'Sure, here is the answer.', sender: agent)
+
+          expect(described_class.email_reply(reply).deliver_now.body.decoded).not_to include 'accent-bar'
+        end
+
+        it 'drops the bare survey link the presenter appends for the other channels' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            mail = described_class.email_reply(csat_message).deliver_now
+
+            expect(mail.decoded).not_to include "#{csat_message.content} #{survey_url}"
           end
         end
       end

@@ -1,0 +1,8 @@
+{
+  "SURVEY": {
+    "RATING": {
+      "CONFIRM_LABEL": "Confirm the rating you picked to send it.",
+      "CONFIRM_BUTTON": "Confirm rating"
+    }
+  }
+}

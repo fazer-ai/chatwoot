@@ -207,10 +207,23 @@ class ConversationReplyMailer < ApplicationMailer
   end
 
   def choose_layout
-    return 'mailer/base' if branded_email_layout_action?
+    return 'mailer/base' if branded_email_layout_action? || csat_survey_action?
     return false if action_name == 'reply_without_summary' || action_name == 'email_reply'
 
     'mailer/base'
+  end
+
+  # Replies go out bare because they are turns inside an email thread, and wrapping each one
+  # in a branded card would clutter the exchange. The CSAT survey is the opposite: a
+  # self-contained system message that closes the conversation, and the layout is what gives
+  # it the installation's logo and colours. This is the file layout, which every other
+  # notification already uses; replacing it with a database one stays premium.
+  def csat_survey_action?
+    return @message.input_csat? if @message.present?
+
+    # any?, not all?: the notification debounce can batch a plain reply together with the
+    # survey, and that batch still has to carry the branding the survey depends on.
+    @messages.present? && @messages.any?(&:input_csat?)
   end
 
   def branded_email_layout_action?
