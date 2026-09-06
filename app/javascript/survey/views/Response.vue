@@ -183,6 +183,10 @@ export default {
         if (markFeedbackSubmitted) {
           this.hasSubmittedFeedback = true;
         }
+        // A retry after a failed write is a real path now that the confirmation button
+        // survives the failure, and `message` prefers the error, so leaving it set would
+        // show the success and error banners at once over a rating that did save.
+        this.errorMessage = null;
         return true;
       } catch (error) {
         const errorMessage = error?.response?.data?.error;

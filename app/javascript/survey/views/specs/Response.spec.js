@@ -163,6 +163,21 @@ describe('Response', () => {
     expect(wrapper.vm.selectedRating).toBe(4);
   });
 
+  it('clears the error banner once a retry goes through', async () => {
+    updateSurvey.mockRejectedValueOnce(new Error('flaky'));
+    setUrl('?rating=4');
+    const wrapper = buildWrapper();
+    await flushPromises();
+
+    await wrapper.vm.confirmRating();
+    expect(wrapper.vm.shouldShowErrorMessage).toBe(true);
+
+    await wrapper.vm.confirmRating();
+
+    expect(wrapper.vm.shouldShowErrorMessage).toBe(false);
+    expect(wrapper.vm.isPendingConfirmation).toBe(false);
+  });
+
   it('writes immediately when a rating is clicked on the page itself', async () => {
     setUrl('');
     const wrapper = buildWrapper();
