@@ -51,7 +51,12 @@ export default {
       return pathname.substring(pathname.lastIndexOf('/') + 1);
     },
     isRatingSubmitted() {
-      return this.surveyDetails && this.surveyDetails.rating;
+      // A pending confirmation means the rating on screen is not the stored one, so the
+      // page is not in its resolved state: the success banner, the hidden prompt and the
+      // feedback form all key off this.
+      if (this.isPendingConfirmation) return false;
+
+      return Boolean(this.surveyDetails?.rating);
     },
     isFeedbackSubmitted() {
       return (
@@ -73,17 +78,13 @@ export default {
       return this.isRatingSubmitted || this.errorMessage;
     },
     enableFeedbackForm() {
-      return (
-        !this.isFeedbackSubmitted &&
-        this.isRatingSubmitted &&
-        !this.isPendingConfirmation
-      );
+      return !this.isFeedbackSubmitted && this.isRatingSubmitted;
     },
     shouldShowErrorMessage() {
       return !!this.errorMessage;
     },
     shouldShowSuccessMessage() {
-      return !!this.isRatingSubmitted;
+      return this.isRatingSubmitted;
     },
     message() {
       if (this.errorMessage) {

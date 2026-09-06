@@ -122,6 +122,9 @@ describe('Response', () => {
 
     expect(wrapper.vm.isPendingConfirmation).toBe(true);
     expect(updateSurvey).not.toHaveBeenCalled();
+    // The stored rating is not the one on screen, so the page must not claim to be done.
+    expect(wrapper.vm.shouldShowSuccessMessage).toBe(false);
+    expect(wrapper.vm.enableFeedbackForm).toBe(false);
   });
 
   it('does not reopen a survey whose feedback was already submitted', async () => {

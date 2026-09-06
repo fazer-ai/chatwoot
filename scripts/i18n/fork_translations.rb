@@ -152,9 +152,12 @@ class ForkTranslations
 
   # Overrides are upstream keys we replace, so they are deliberately absent from
   # the fork's own key set and never count towards translation coverage.
-  def fork_keys(locale)
-    paths = FE_TREES.flat_map { |tree| tree_fork_paths(tree, locale) }
-    keys_in(paths).merge(keys_in(Dir["config/locales/fazer_ai*.#{locale}.yml"]))
+  # Coverage is measured per bundle, not on the union: the dashboard and the survey load
+  # different message trees at runtime, so one having a key translated says nothing about
+  # the other, and merging them lets a translated dashboard key mask a missing survey one.
+  def key_scopes(locale)
+    scopes = FE_TREES.to_h { |tree| [tree[:fork], keys_in(tree_fork_paths(tree, locale))] }
+    scopes.merge('config/locales' => keys_in(Dir["config/locales/fazer_ai*.#{locale}.yml"]))
   end
 
   def tree_fork_paths(tree, locale)
@@ -201,12 +204,13 @@ class ForkTranslations
   def check_every_key_exists_in_reference
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    reference = fork_keys(REFERENCE_LOCALE).keys
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      orphans = fork_keys(locale).keys - reference
-      next if orphans.empty?
+      key_scopes(locale).each do |scope, keys|
+        orphans = keys.keys - key_scopes(REFERENCE_LOCALE).fetch(scope, {}).keys
+        next if orphans.empty?
 
-      @errors << "#{locale}: #{orphans.size} chaves nao existem em #{REFERENCE_LOCALE} (#{orphans.first(3).join(', ')})"
+        @errors << "#{scope} #{locale}: #{orphans.size} chaves nao existem em #{REFERENCE_LOCALE} (#{orphans.first(3).join(', ')})"
+      end
     end
   end
 
@@ -219,12 +223,15 @@ class ForkTranslations
   def check_reference_keys_are_translated_everywhere
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    reference = fork_keys(REFERENCE_LOCALE).keys
+    reference = key_scopes(REFERENCE_LOCALE)
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      missing = reference - fork_keys(locale).keys
-      next if missing.empty?
+      scopes = key_scopes(locale)
+      reference.each do |scope, keys|
+        missing = keys.keys - scopes.fetch(scope, {}).keys
+        next if missing.empty?
 
-      @errors << "#{locale}: #{missing.size} chaves de #{REFERENCE_LOCALE} sem traducao (#{missing.first(3).join(', ')})"
+        @errors << "#{scope} #{locale}: #{missing.size} chaves de #{REFERENCE_LOCALE} sem traducao (#{missing.first(3).join(', ')})"
+      end
     end
   end
 
@@ -239,10 +246,12 @@ class ForkTranslations
   def report_coverage
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    total = fork_keys(REFERENCE_LOCALE).size
+    reference = key_scopes(REFERENCE_LOCALE)
+    total = reference.values.sum(&:size)
     puts "chaves do fork em #{REFERENCE_LOCALE}: #{total}"
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      translated = (fork_keys(locale).keys & fork_keys(REFERENCE_LOCALE).keys).size
+      scopes = key_scopes(locale)
+      translated = reference.sum { |scope, keys| (keys.keys & scopes.fetch(scope, {}).keys).size }
       puts format('  %<locale>-8s %<done>4d/%<total>d traduzidas (%<percent>d%%)',
                   locale: locale, done: translated, total: total, percent: (translated * 100.0 / total).round)
     end
