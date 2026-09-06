@@ -173,6 +173,21 @@ RSpec.describe ConversationReplyMailer do
             end
           end
         end
+
+        # The debounce window can close on a plain reply and the survey together, and the
+        # branding the survey depends on has to survive that batch.
+        it 'keeps the branded layout when the batch also carries a plain reply' do
+          reply = create(:message, conversation: conversation, account: account, message_type: 'outgoing',
+                                   content: 'Sure, here is the answer.')
+          csat_message.update!(created_at: reply.created_at + 1.second)
+
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            body = described_class.reply_without_summary(conversation, reply.id).deliver_now.body.decoded
+
+            expect(body).to include 'accent-bar'
+            expect(body).to include "#{conversation.uuid}?rating=5"
+          end
+        end
       end
     end
 
@@ -448,16 +463,18 @@ RSpec.describe ConversationReplyMailer do
           end
         end
 
-        # The layout drops content_for_layout straight inside a <table>, so the survey has to
-        # be a row. Anything else is fostered out of the card by the parser, which Chrome does
-        # silently and Outlook's Word engine is free to do worse with.
-        it 'sits inside the layout table rather than being fostered out of it' do
+        # The layout drops content_for_layout inside a <table>, so flow content there is
+        # fostered into the surrounding cell -- the same treatment upstream's own <p> gets.
+        # What has to hold is that the scale lands inside the card, whichever level it ends
+        # up on, because a parser is free to move it further than that.
+        it 'lands inside the branded card rather than outside it' do
           with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
             body = described_class.email_reply(csat_message).deliver_now.body.decoded
-            slot = Nokogiri::HTML(body).at_css('td.content-wrap > table')
+            # HTML5, not HTML: only the spec-compliant parser foster-parents the way a browser
+            # and a mail client do, and that relocation is the whole point of this example.
+            card = Nokogiri::HTML5(body).at_css('td.content-wrap')
 
-            expect(slot.element_children.map(&:name)).to all(eq('tr'))
-            expect(slot.css('a').map { |a| a['href'] }).to include(/rating=5/)
+            expect(card.css('a').map { |a| a['href'] }).to include(/rating=5/)
           end
         end
 

@@ -221,7 +221,9 @@ class ConversationReplyMailer < ApplicationMailer
   def csat_survey_action?
     return @message.input_csat? if @message.present?
 
-    @messages.present? && @messages.all?(&:input_csat?)
+    # any?, not all?: the notification debounce can batch a plain reply together with the
+    # survey, and that batch still has to carry the branding the survey depends on.
+    @messages.present? && @messages.any?(&:input_csat?)
   end
 
   def branded_email_layout_action?
