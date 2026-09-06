@@ -61,6 +61,12 @@ class AutomationRules::ConditionsFilterService < FilterService
   end
 
   def apply_filter(query_hash, current_index)
+    # A condition that names an account attribute says so in custom_attribute_type. The standard keys
+    # are resolved first below, and message keys are not reserved names -- CustomAttributeDefinition
+    # only guards the conversation and contact ones -- so an account attribute called `sender_id` or
+    # `content` would otherwise be answered by the message column instead, silently.
+    return apply_custom_attribute_filter(query_hash, current_index) if query_hash['custom_attribute_type'].present?
+
     conversation_filter = @conversation_filters[query_hash['attribute_key']]
     contact_filter = @contact_filters[query_hash['attribute_key']]
     message_filter = @message_filters[query_hash['attribute_key']]
@@ -71,10 +77,16 @@ class AutomationRules::ConditionsFilterService < FilterService
       @query_string += contact_query_string(contact_filter, query_hash.with_indifferent_access, current_index)
     elsif message_filter
       @query_string += message_query_string(message_filter, query_hash.with_indifferent_access, current_index)
-    elsif custom_attribute(query_hash['attribute_key'], @account, query_hash['custom_attribute_type'])
-      # send table name according to attribute key right now we are supporting contact based custom attribute filter
-      @query_string += custom_attribute_query(query_hash.with_indifferent_access, query_hash['custom_attribute_type'], current_index)
+    else
+      apply_custom_attribute_filter(query_hash, current_index)
     end
+  end
+
+  def apply_custom_attribute_filter(query_hash, current_index)
+    return unless custom_attribute(query_hash['attribute_key'], @account, query_hash['custom_attribute_type'])
+
+    # send table name according to attribute key right now we are supporting contact based custom attribute filter
+    @query_string += custom_attribute_query(query_hash.with_indifferent_access, query_hash['custom_attribute_type'], current_index)
   end
 
   # If attribute_changed type filter is present perform this against array

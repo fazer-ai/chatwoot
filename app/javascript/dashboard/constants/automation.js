@@ -61,6 +61,10 @@ export const SENDER_TYPE_CONDITION_VALUES = [
     id: 'AgentBot',
     i18nKey: 'AGENT_BOT',
   },
+  {
+    id: 'Captain::Assistant',
+    i18nKey: 'CAPTAIN',
+  },
 ];
 
 export const PRIORITY_CONDITION_VALUES = [

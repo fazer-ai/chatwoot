@@ -204,6 +204,23 @@ RSpec.describe AutomationRules::ConditionsFilterService do
         end
       end
 
+      context 'when an account attribute shares its name with a message attribute' do
+        before do
+          create(:custom_attribute_definition, attribute_key: 'sender_id', account: account,
+                                               attribute_model: 'conversation_attribute', attribute_display_type: 'text')
+          conversation.update!(custom_attributes: { sender_id: 'crm-42' })
+          rule.conditions = [
+            { 'values': ['crm-42'], 'attribute_key': 'sender_id', 'query_operator': nil,
+              'filter_operator': 'equal_to', 'custom_attribute_type': 'conversation_attribute' }
+          ]
+          rule.save!
+        end
+
+        it 'resolves the account attribute instead of the message column' do
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(true)
+        end
+      end
+
       context 'when filter_operator is on processed_message_content' do
         before do
           rule.conditions = [

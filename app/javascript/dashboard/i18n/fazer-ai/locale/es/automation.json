@@ -17,7 +17,8 @@
     "SENDER_TYPES": {
       "CONTACT": "Contacto",
       "USER": "Agente",
-      "AGENT_BOT": "Bot"
+      "AGENT_BOT": "Bot",
+      "CAPTAIN": "Captain"
     }
   }
 }

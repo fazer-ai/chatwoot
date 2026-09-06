@@ -23,6 +23,24 @@ RSpec.describe AutomationRules::ConditionValidationService do
       end
     end
 
+    context 'with an account attribute that shares its name with a message attribute' do
+      before do
+        create(:custom_attribute_definition, attribute_key: 'sender_id', account: account,
+                                             attribute_model: 'conversation_attribute', attribute_display_type: 'text')
+        # `contains` is not a valid operator for the sender_id message key, so validating against it
+        # would reject a condition that is about the account attribute.
+        rule.conditions = [
+          { 'values': ['crm'], 'attribute_key': 'sender_id', 'query_operator': nil,
+            'filter_operator': 'contains', 'custom_attribute_type': 'conversation_attribute' }
+        ]
+        rule.save # rubocop:disable Rails/SaveBang
+      end
+
+      it 'returns true' do
+        expect(described_class.new(rule).perform).to be(true)
+      end
+    end
+
     context 'with wrong attribute' do
       before do
         rule.conditions = [
