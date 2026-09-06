@@ -3,7 +3,9 @@
     "DESCRIPTION": "Caro cliente 👋, por favor, reserve alguns instantes para compartilhar feedback sobre a conversa que você teve com {inboxName}.",
     "RATING": {
       "LABEL": "Avalie sua conversa",
-      "SUCCESS_MESSAGE": "Obrigado por enviar a classificação"
+      "SUCCESS_MESSAGE": "Obrigado por enviar a classificação",
+      "CONFIRM_LABEL": "Confirme a nota que você escolheu para enviá-la.",
+      "CONFIRM_BUTTON": "Confirmar nota"
     },
     "FEEDBACK": {
       "LABEL": "Você tem alguma opinião que gostaria de compartilhar?",

@@ -5,6 +5,7 @@ import Spinner from 'shared/components/Spinner.vue';
 import Rating from 'survey/components/Rating.vue';
 import Feedback from 'survey/components/Feedback.vue';
 import Banner from 'survey/components/Banner.vue';
+import CustomButton from 'shared/components/Button.vue';
 import StarRating from 'shared/components/StarRating.vue';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import { getSurveyDetails, updateSurvey } from 'survey/api/survey';
@@ -20,6 +21,7 @@ export default {
     Banner,
     Feedback,
     StarRating,
+    CustomButton,
   },
   setup() {
     const { formatMessage } = useMessageFormatter();
@@ -34,6 +36,7 @@ export default {
       feedbackMessage: '',
       hasSubmittedFeedback: false,
       isUpdating: false,
+      isPendingConfirmation: false,
       logo: '',
       inboxName: '',
       displayType: CSAT_DISPLAY_TYPES.EMOJI,
@@ -70,7 +73,11 @@ export default {
       return this.isRatingSubmitted || this.errorMessage;
     },
     enableFeedbackForm() {
-      return !this.isFeedbackSubmitted && this.isRatingSubmitted;
+      return (
+        !this.isFeedbackSubmitted &&
+        this.isRatingSubmitted &&
+        !this.isPendingConfirmation
+      );
     },
     shouldShowErrorMessage() {
       return !!this.errorMessage;
@@ -94,19 +101,27 @@ export default {
   },
   methods: {
     // The survey email renders the scale inline, and each rating links here carrying its
-    // value. Submitting from the page rather than from the link keeps the write on the
-    // API's PUT, which link scanners and mail client prefetching never reach. It only runs
-    // once the details are loaded: submitting over a failed fetch would send the empty
-    // feedbackMessage this component starts with, wiping a comment already left.
+    // value. It is only pre-selected, never submitted: email security gateways detonate
+    // every link in a sandbox that runs JavaScript, so an automatic write would let a
+    // scanner walk all five URLs and settle the rating before the recipient ever opens the
+    // message. Persisting waits for a real gesture on this page.
     applyRatingFromQuery() {
       const rating = Number(
         new URLSearchParams(window.location.search).get('rating')
       );
       if (!CSAT_RATINGS.some(({ value }) => value === rating)) return;
-      this.selectRating(rating);
+      if (this.isFeedbackSubmitted) return;
+
+      this.selectedRating = rating;
+      this.isPendingConfirmation = true;
+    },
+    confirmRating() {
+      this.isPendingConfirmation = false;
+      this.updateSurveyDetails();
     },
     selectRating(rating) {
       if (this.isFeedbackSubmitted || this.isUpdating) return;
+      this.isPendingConfirmation = false;
       this.selectedRating = rating;
       this.updateSurveyDetails();
     },
@@ -222,6 +237,18 @@ export default {
           class="[&>button>span]:text-4xl !justify-start !px-0"
           @select-rating="selectRating"
         />
+        <div
+          v-if="isPendingConfirmation"
+          class="mt-6 flex flex-col items-start gap-3"
+        >
+          <p class="text-base text-n-slate-11 m-0">
+            {{ $t('SURVEY.RATING.CONFIRM_LABEL') }}
+          </p>
+          <CustomButton :disabled="isUpdating" @click="confirmRating">
+            <Spinner v-if="isUpdating" class="p-0" />
+            {{ $t('SURVEY.RATING.CONFIRM_BUTTON') }}
+          </CustomButton>
+        </div>
         <Feedback
           v-if="enableFeedbackForm"
           :is-updating="isUpdating"
