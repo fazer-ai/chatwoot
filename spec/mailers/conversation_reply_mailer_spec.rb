@@ -448,6 +448,19 @@ RSpec.describe ConversationReplyMailer do
           end
         end
 
+        # The layout drops content_for_layout straight inside a <table>, so the survey has to
+        # be a row. Anything else is fostered out of the card by the parser, which Chrome does
+        # silently and Outlook's Word engine is free to do worse with.
+        it 'sits inside the layout table rather than being fostered out of it' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            body = described_class.email_reply(csat_message).deliver_now.body.decoded
+            slot = Nokogiri::HTML(body).at_css('td.content-wrap > table')
+
+            expect(slot.element_children.map(&:name)).to all(eq('tr'))
+            expect(slot.css('a').map { |a| a['href'] }).to include(/rating=5/)
+          end
+        end
+
         it 'still sends an ordinary reply bare' do
           reply = create(:message, conversation: conversation, account: account, message_type: 'outgoing',
                                    content: 'Sure, here is the answer.', sender: agent)
