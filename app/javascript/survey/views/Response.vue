@@ -89,13 +89,15 @@ export default {
     },
   },
   async mounted() {
-    await this.getSurveyDetails();
-    this.applyRatingFromQuery();
+    const loaded = await this.getSurveyDetails();
+    if (loaded) this.applyRatingFromQuery();
   },
   methods: {
     // The survey email renders the scale inline, and each rating links here carrying its
     // value. Submitting from the page rather than from the link keeps the write on the
-    // API's PUT, which link scanners and mail client prefetching never reach.
+    // API's PUT, which link scanners and mail client prefetching never reach. It only runs
+    // once the details are loaded: submitting over a failed fetch would send the empty
+    // feedbackMessage this component starts with, wiping a comment already left.
     applyRatingFromQuery() {
       const rating = Number(
         new URLSearchParams(window.location.search).get('rating')
@@ -126,9 +128,11 @@ export default {
           result.data.content ||
           this.$t('SURVEY.DESCRIPTION', { inboxName: this.inboxName });
         this.setLocale(result.data.locale);
+        return true;
       } catch (error) {
         const errorMessage = error?.response?.data?.message;
         this.errorMessage = errorMessage || this.$t('SURVEY.API.ERROR_MESSAGE');
+        return false;
       } finally {
         this.isLoading = false;
       }

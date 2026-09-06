@@ -7,6 +7,10 @@
   value: '/brand-assets/logo.svg'
 - name: LOGO_DARK
   value: '/brand-assets/logo_dark.svg'
+- name: LOGO_EMAIL
+  value: ''
+- name: BRAND_COLOR
+  value: '#1f93ff'
 - name: BRAND_URL
   value: 'https://www.chatwoot.com'
 - name: WIDGET_BRAND_URL

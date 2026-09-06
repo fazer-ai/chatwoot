@@ -82,6 +82,14 @@ RSpec.describe ApplicationMailer do
       end
     end
 
+    it 'joins a path-relative logo without doubling or dropping the separator' do
+      InstallationConfig.where(name: 'LOGO_EMAIL').first_or_initialize.update!(value: 'brand-assets/logo.png')
+
+      with_modified_env 'FRONTEND_URL' => 'https://atendimento.example.com/' do
+        expect(deliver.body.decoded).to include 'src="https://atendimento.example.com/brand-assets/logo.png"'
+      end
+    end
+
     it 'leaves a logo already given as a full URL alone' do
       InstallationConfig.where(name: 'LOGO_EMAIL').first_or_create!(value: 'https://cdn.example.com/logo.png')
 

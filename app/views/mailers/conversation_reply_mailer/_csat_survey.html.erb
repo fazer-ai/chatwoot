@@ -7,9 +7,11 @@
 <% ratings = CsatRatings::RATINGS %>
 <% starred = message.content_attributes['display_type'] == 'star' %>
 <% survey_link = message.conversation.csat_survey_link %>
-<p style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 22px; color: #0F172A;">
-  <%= message.content %>
-</p>
+<%# The prompt is admin-authored copy from csat_config, so it goes through the renderer the
+    other message bodies use: Markdown and line breaks would otherwise reach the contact literally. %>
+<div style="margin: 0 0 8px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 22px; color: #0F172A;">
+  <%= ChatwootMarkdownRenderer.new(message.content).render_message %>
+</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse: separate;">
   <tr>
     <% ratings.each do |rating| %>

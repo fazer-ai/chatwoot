@@ -91,7 +91,7 @@ class ApplicationMailer < ActionMailer::Base
     value = path.to_s.strip
     return value if value.blank? || value.start_with?('http://', 'https://')
 
-    "#{ENV.fetch('FRONTEND_URL', nil)}#{value}"
+    "#{ENV.fetch('FRONTEND_URL', nil).to_s.chomp('/')}/#{value.delete_prefix('/')}"
   end
 
   def locale_from_account(account)
