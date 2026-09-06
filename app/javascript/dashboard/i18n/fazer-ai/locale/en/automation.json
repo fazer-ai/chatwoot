@@ -9,6 +9,16 @@
     },
     "ACTIONS": {
       "CREATE_SCHEDULED_MESSAGE": "Create Scheduled Message"
+    },
+    "ATTRIBUTES": {
+      "SENDER": "Sender",
+      "SENDER_TYPE": "Sender Type"
+    },
+    "SENDER_TYPES": {
+      "CONTACT": "Contact",
+      "USER": "Agent",
+      "AGENT_BOT": "Bot",
+      "CAPTAIN": "Captain"
     }
   }
 }

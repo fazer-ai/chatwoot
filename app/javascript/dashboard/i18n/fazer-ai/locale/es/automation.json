@@ -9,6 +9,16 @@
     },
     "ACTIONS": {
       "CREATE_SCHEDULED_MESSAGE": "Crear mensaje programado"
+    },
+    "ATTRIBUTES": {
+      "SENDER": "Remitente",
+      "SENDER_TYPE": "Tipo de remitente"
+    },
+    "SENDER_TYPES": {
+      "CONTACT": "Contacto",
+      "USER": "Agente",
+      "AGENT_BOT": "Bot",
+      "CAPTAIN": "Captain"
     }
   }
 }

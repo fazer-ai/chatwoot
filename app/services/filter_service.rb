@@ -47,11 +47,17 @@ class FilterService
     attribute_key = query_hash['attribute_key']
     values = query_hash['values']
 
+    # The cases below translate the UI's labels for standard keys. A condition that declares a
+    # custom_attribute_type is about an account attribute that merely shares one of those names, and
+    # its values are the attribute's own: a checkbox attribute holds a boolean, which has no #downcase,
+    # and the NoMethodError is swallowed upstream, leaving the rule quietly dead.
+    return case_insensitive_values(query_hash) if query_hash['custom_attribute_type'].present?
+
     return conversation_status_values(values) if attribute_key == 'status'
     return conversation_priority_values(values) if attribute_key == 'priority'
     return conversation_group_type_values(values) if attribute_key == 'group_type'
     return message_type_values(values) if attribute_key == 'message_type'
-    return downcase_array_values(values) if attribute_key == 'content'
+    return downcase_array_values(values) if attribute_key.in?(%w[content sender_type])
 
     case_insensitive_values(query_hash)
   end

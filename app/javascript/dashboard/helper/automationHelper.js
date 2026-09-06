@@ -182,6 +182,7 @@ export const getConditionOptions = ({
   type,
   priorityOptions,
   messageTypeOptions,
+  senderTypeOptions,
 }) => {
   if (isCustomAttributeCheckbox(customAttributes, type)) {
     return booleanFilterOptions;
@@ -203,6 +204,8 @@ export const getConditionOptions = ({
     country_code: countries,
     message_type: messageTypeOptions,
     private_note: booleanFilterOptions,
+    sender_id: agents,
+    sender_type: senderTypeOptions,
     priority: priorityOptions,
     group_type: [
       { id: 'individual', name: 'Individual' },

@@ -61,6 +61,12 @@ class AutomationRules::ConditionsFilterService < FilterService
   end
 
   def apply_filter(query_hash, current_index)
+    # A condition that names an account attribute says so in custom_attribute_type. The standard keys
+    # are resolved first below, and message keys are not reserved names -- CustomAttributeDefinition
+    # only guards the conversation and contact ones -- so an account attribute called `sender_id` or
+    # `content` would otherwise be answered by the message column instead, silently.
+    return apply_custom_attribute_filter(query_hash, current_index) if query_hash['custom_attribute_type'].present?
+
     conversation_filter = @conversation_filters[query_hash['attribute_key']]
     contact_filter = @contact_filters[query_hash['attribute_key']]
     message_filter = @message_filters[query_hash['attribute_key']]
@@ -71,10 +77,16 @@ class AutomationRules::ConditionsFilterService < FilterService
       @query_string += contact_query_string(contact_filter, query_hash.with_indifferent_access, current_index)
     elsif message_filter
       @query_string += message_query_string(message_filter, query_hash.with_indifferent_access, current_index)
-    elsif custom_attribute(query_hash['attribute_key'], @account, query_hash['custom_attribute_type'])
-      # send table name according to attribute key right now we are supporting contact based custom attribute filter
-      @query_string += custom_attribute_query(query_hash.with_indifferent_access, query_hash['custom_attribute_type'], current_index)
+    else
+      apply_custom_attribute_filter(query_hash, current_index)
     end
+  end
+
+  # custom_attribute_query answers '' when the account has no attribute by that name, so the missing
+  # case needs no guard of its own here.
+  def apply_custom_attribute_filter(query_hash, current_index)
+    # send table name according to attribute key right now we are supporting contact based custom attribute filter
+    @query_string += custom_attribute_query(query_hash.with_indifferent_access, query_hash['custom_attribute_type'], current_index)
   end
 
   # If attribute_changed type filter is present perform this against array
@@ -125,6 +137,8 @@ class AutomationRules::ConditionsFilterService < FilterService
     attribute_key = query_hash['attribute_key']
     query_operator = query_hash['query_operator']
 
+    return sender_id_query_string(query_hash, current_index) if attribute_key == 'sender_id'
+
     attribute_key = 'processed_message_content' if attribute_key == 'content'
     attribute_key = 'private' if attribute_key == 'private_note'
 
@@ -138,6 +152,16 @@ class AutomationRules::ConditionsFilterService < FilterService
         " messages.#{attribute_key} #{filter_operator_value} #{query_operator} "
       end
     end
+  end
+
+  # The Sender condition offers agents, so it has to mean an agent. messages.sender_id is polymorphic
+  # and contacts, users and bots number their rows independently, so an id on its own is satisfied by
+  # the contact that happens to hold it too, firing a rule about one agent for a stranger.
+  def sender_id_query_string(query_hash, current_index)
+    membership = filter_operation(query_hash.merge('filter_operator' => 'equal_to'), current_index)
+    clause = "(messages.sender_type = 'User' AND messages.sender_id #{membership})"
+    clause = "NOT #{clause}" if query_hash['filter_operator'] == 'not_equal_to'
+    " #{clause} #{query_hash['query_operator']} "
   end
 
   # This will be used in future for contact automation rule
