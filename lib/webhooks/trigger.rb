@@ -1,6 +1,10 @@
 class Webhooks::Trigger
   SUPPORTED_ERROR_HANDLE_EVENTS = %w[message_created message_updated].freeze
   RETRYABLE_AGENT_BOT_STATUSES = [429, 500].freeze
+  # Both roles of an inbox's bots retry the same way; only `:agent_bot_webhook` (the responder) is
+  # allowed into `handle_error`, because escalating moves the conversation to a human and an observer
+  # never owned it (AgentBotObserver).
+  AGENT_BOT_WEBHOOK_TYPES = %i[agent_bot_webhook agent_bot_observer_webhook].freeze
 
   class RetryableError < StandardError
     attr_reader :status
@@ -133,7 +137,7 @@ class Webhooks::Trigger
   end
 
   def retryable_agent_bot_error?(error)
-    @webhook_type == :agent_bot_webhook && RETRYABLE_AGENT_BOT_STATUSES.include?(http_status(error))
+    AGENT_BOT_WEBHOOK_TYPES.include?(@webhook_type) && RETRYABLE_AGENT_BOT_STATUSES.include?(http_status(error))
   end
 
   def http_status(error)

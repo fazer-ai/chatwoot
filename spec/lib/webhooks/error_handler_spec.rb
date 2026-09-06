@@ -73,6 +73,20 @@ describe Webhooks::ErrorHandler do
     end
   end
 
+  context 'when webhook type is agent_bot_observer_webhook' do
+    let!(:pending_conversation) { create(:conversation, inbox: inbox, status: :pending, account: account) }
+    let!(:pending_message) { create(:message, account: account, inbox: inbox, conversation: pending_conversation) }
+
+    it 'leaves a pending conversation with its responder' do
+      payload = { event: 'message_created', id: pending_message.id }
+
+      described_class.perform(payload, :agent_bot_observer_webhook, error)
+
+      expect(pending_conversation.reload.status).to eq('pending')
+      expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
+    end
+  end
+
   context 'when webhook type is api_inbox_webhook' do
     let(:webhook_type) { :api_inbox_webhook }
 

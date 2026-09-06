@@ -58,6 +58,20 @@ class Inboxes extends CacheEnabledApiClient {
     });
   }
 
+  getAgentBotObservers(inboxId) {
+    return axios.get(`${this.url}/${inboxId}/agent_bot_observers`);
+  }
+
+  addAgentBotObserver(inboxId, botId) {
+    return axios.post(`${this.url}/${inboxId}/agent_bot_observers`, {
+      agent_bot: botId,
+    });
+  }
+
+  removeAgentBotObserver(inboxId, botId) {
+    return axios.delete(`${this.url}/${inboxId}/agent_bot_observers/${botId}`);
+  }
+
   syncTemplates(inboxId) {
     return axios.post(`${this.url}/${inboxId}/sync_templates`);
   }
