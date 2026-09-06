@@ -162,12 +162,15 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Fork translations
 
-Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside `app/javascript/dashboard/i18n/locale/` or `config/locales/<locale>.yml`** — CI fails if you do, and the next upstream sync would conflict on every string we own.
+Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside an upstream locale tree** — `app/javascript/dashboard/i18n/locale/`, `app/javascript/survey/i18n/locale/`, or `config/locales/<locale>.yml`. CI fails if you do, and the next upstream sync would conflict on every string we own.
 
 We ship our features in **en, pt_BR and es**, and every key must exist in all three: `check` fails when a key present in `en` is missing from another language we ship. Upstream keeps translating the other ~55 languages, and our keys fall back to `en` there. Everything the fork translates lives in two places:
 
-- Frontend → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
+- Frontend, dashboard → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
+- Frontend, survey → `app/javascript/survey/i18n/fazer-ai/locale/<locale>.json` (one file, not a folder: it is a single small namespace)
 - Backend → `config/locales/fazer_ai.<locale>.yml` (and `fazer_ai.mailers.<locale>.yml` for the Chatwoot mailer copy upstream hardcodes in ERB)
+
+Each frontend bundle has its own upstream tree and its own overlay, merged by that bundle's `i18n/index.js`; the merging itself lives in `shared/helpers/forkTranslations`. `check`, `drift` and `scaffold` cover every tree listed in `FE_TREES`, so a new bundle means one entry there.
 
 Both are deep-merged on top of upstream's: the frontend in `i18n/index.js` via `withForkMessages`, the backend by Rails, which already loads every `config/locales/*.yml`. No registration step — files are picked up by directory scan, which is also why CE → Pro merges don't conflict here.
 
