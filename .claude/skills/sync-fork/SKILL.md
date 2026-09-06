@@ -393,11 +393,11 @@ The subagent panel COMPLEMENTS but never REPLACES the CI gate below — agents r
 
 ### Validate on upstream CI (GitHub Actions) before merging
 
-Local specs cover the resolved files, but the authoritative gate is the fork's own CI. After committing the merge and pushing the `chore/merge-upstream-X.Y.Z` branch, **trigger the CE spec workflow on the branch and wait for green before merging the PR** (the `Run Chatwoot CE spec` workflow, `run_foss_spec.yml`, only fires on tag pushes + `workflow_dispatch`, so a branch push alone does NOT run it):
+Local specs cover the resolved files, but the authoritative gate is the fork's own CI. After committing the merge and pushing the `chore/merge-upstream-X.Y.Z` branch, **trigger the CE spec workflow on the branch and wait for green before merging the PR** (the `Run Chatwoot CE spec` workflow, `run_foss_spec.yml`, fires on pushes to main and tags plus `workflow_dispatch`, so a branch push alone does NOT run it):
 
 ```bash
 git push -u origin chore/merge-upstream-X.Y.Z
-gh workflow run run_foss_spec.yml --ref chore/merge-upstream-X.Y.Z
+gh workflow run run_foss_spec.yml --ref chore/merge-upstream-X.Y.Z -f full=true   # full=true: a sync touches everything, the default dispatch runs only the specs the diff maps to
 gh run list --workflow=run_foss_spec.yml --branch chore/merge-upstream-X.Y.Z --limit 1   # grab the run id
 gh run watch <run-id>                                                                    # or poll with `gh run view <run-id>`
 ```
