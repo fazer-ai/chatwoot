@@ -119,9 +119,12 @@ export default {
       this.selectedRating = rating;
       this.isPendingConfirmation = true;
     },
-    confirmRating() {
-      this.isPendingConfirmation = false;
-      this.updateSurveyDetails();
+    async confirmRating() {
+      // Only on success: a failed write (an expired survey, a dropped connection) has to
+      // leave the button on screen, or the contact is left with no way to send the rating
+      // and, on a revised one, a page claiming the old rating went through.
+      const saved = await this.updateSurveyDetails();
+      if (saved) this.isPendingConfirmation = false;
     },
     selectRating(rating) {
       if (this.isFeedbackSubmitted || this.isUpdating) return;
@@ -180,10 +183,12 @@ export default {
         if (markFeedbackSubmitted) {
           this.hasSubmittedFeedback = true;
         }
+        return true;
       } catch (error) {
         const errorMessage = error?.response?.data?.error;
         this.errorMessage = errorMessage || this.$t('SURVEY.API.ERROR_MESSAGE');
         useAlert(this.errorMessage);
+        return false;
       } finally {
         this.isUpdating = false;
       }

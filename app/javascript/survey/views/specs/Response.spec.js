@@ -151,6 +151,18 @@ describe('Response', () => {
     expect(wrapper.vm.isPendingConfirmation).toBe(false);
   });
 
+  it('keeps the confirmation on screen when the write fails', async () => {
+    updateSurvey.mockRejectedValue(new Error('expired'));
+    setUrl('?rating=4');
+    const wrapper = buildWrapper();
+    await flushPromises();
+
+    await wrapper.vm.confirmRating();
+
+    expect(wrapper.vm.isPendingConfirmation).toBe(true);
+    expect(wrapper.vm.selectedRating).toBe(4);
+  });
+
   it('writes immediately when a rating is clicked on the page itself', async () => {
     setUrl('');
     const wrapper = buildWrapper();

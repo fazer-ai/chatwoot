@@ -442,6 +442,19 @@ RSpec.describe ConversationReplyMailer do
           end
         end
 
+        it 'wraps the survey in the branded layout, unlike the replies around it' do
+          with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
+            expect(described_class.email_reply(csat_message).deliver_now.body.decoded).to include 'accent-bar'
+          end
+        end
+
+        it 'still sends an ordinary reply bare' do
+          reply = create(:message, conversation: conversation, account: account, message_type: 'outgoing',
+                                   content: 'Sure, here is the answer.', sender: agent)
+
+          expect(described_class.email_reply(reply).deliver_now.body.decoded).not_to include 'accent-bar'
+        end
+
         it 'drops the bare survey link the presenter appends for the other channels' do
           with_modified_env 'FRONTEND_URL' => 'https://app.chatwoot.com' do
             mail = described_class.email_reply(csat_message).deliver_now
