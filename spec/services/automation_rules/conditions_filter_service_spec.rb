@@ -165,6 +165,45 @@ RSpec.describe AutomationRules::ConditionsFilterService do
         end
       end
 
+      context 'when filtering by the message sender' do
+        let(:agent) { create(:user, account: account, role: :agent) }
+        let(:bot_agent) { create(:user, account: account, role: :agent) }
+
+        before do
+          rule.conditions = [
+            { 'values': [bot_agent.id], 'attribute_key': 'sender_id', 'query_operator': 'AND', 'filter_operator': 'not_equal_to' },
+            { 'values': ['User'], 'attribute_key': 'sender_type', 'query_operator': nil, 'filter_operator': 'equal_to' }
+          ]
+          rule.save!
+        end
+
+        it 'will return true when another agent sent the message' do
+          message.update!(sender: agent)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(true)
+        end
+
+        it 'will return false when the excluded agent sent the message' do
+          message.update!(sender: bot_agent)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(false)
+        end
+
+        # sender_id is a polymorphic id: without sender_type a contact sharing the agent's id would match.
+        it 'will return false when a contact sent the message' do
+          message.update!(sender: conversation.contact)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(false)
+        end
+
+        # `sender_id != x` is NULL, not true, for a message nobody signed. Not matching is the intended read.
+        it 'will return false when the message has no sender' do
+          message.update!(sender: nil)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(false)
+        end
+      end
+
       context 'when filter_operator is on processed_message_content' do
         before do
           rule.conditions = [

@@ -51,7 +51,7 @@ class FilterService
     return conversation_priority_values(values) if attribute_key == 'priority'
     return conversation_group_type_values(values) if attribute_key == 'group_type'
     return message_type_values(values) if attribute_key == 'message_type'
-    return downcase_array_values(values) if attribute_key == 'content'
+    return downcase_array_values(values) if attribute_key.in?(%w[content sender_type])
 
     case_insensitive_values(query_hash)
   end

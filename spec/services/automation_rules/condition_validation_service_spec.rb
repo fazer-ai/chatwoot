@@ -11,7 +11,9 @@ RSpec.describe AutomationRules::ConditionValidationService do
           { 'values': ['open'], 'attribute_key': 'status', 'query_operator': nil, 'filter_operator': 'equal_to' },
           { 'values': ['+918484'], 'attribute_key': 'phone_number', 'query_operator': 'OR', 'filter_operator': 'contains' },
           { 'values': ['test'], 'attribute_key': 'email', 'query_operator': 'OR', 'filter_operator': 'contains' },
-          { 'values': [true], 'attribute_key': 'private_note', 'query_operator': nil, 'filter_operator': 'equal_to' }
+          { 'values': [true], 'attribute_key': 'private_note', 'query_operator': 'OR', 'filter_operator': 'equal_to' },
+          { 'values': [1], 'attribute_key': 'sender_id', 'query_operator': 'OR', 'filter_operator': 'not_equal_to' },
+          { 'values': ['User'], 'attribute_key': 'sender_type', 'query_operator': nil, 'filter_operator': 'equal_to' }
         ]
         rule.save # rubocop:disable Rails/SaveBang
       end
