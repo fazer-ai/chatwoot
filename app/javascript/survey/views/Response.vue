@@ -111,6 +111,9 @@ export default {
       );
       if (!CSAT_RATINGS.some(({ value }) => value === rating)) return;
       if (this.isFeedbackSubmitted) return;
+      // Reopening the same link after confirming has nothing left to confirm, and asking
+      // again would hide the feedback form behind a second confirmation.
+      if (this.surveyDetails?.rating === rating) return;
 
       this.selectedRating = rating;
       this.isPendingConfirmation = true;

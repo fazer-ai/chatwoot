@@ -16,53 +16,23 @@
  * (`conversation.json` extends `../locale/<lang>/conversation.json`).
  */
 
-const isPlainObject = value =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+import {
+  buildForkMessages,
+  mergeForkMessages,
+} from 'shared/helpers/forkTranslations';
 
-const deepMerge = (target, source) => {
-  const result = { ...target };
+const modules = import.meta.glob('./locale/*/*.json', { eager: true });
 
-  Object.entries(source).forEach(([key, value]) => {
-    result[key] =
-      isPlainObject(value) && isPlainObject(result[key])
-        ? deepMerge(result[key], value)
-        : value;
-  });
-
-  return result;
-};
-
-const buildForkMessages = () => {
-  const modules = import.meta.glob('./locale/*/*.json', { eager: true });
-  const messages = {};
-
-  // Sorted so `overrides.json` is applied after the file it may collide with,
-  // and so the result does not depend on the glob's traversal order.
-  Object.keys(modules)
-    .sort()
-    .forEach(path => {
-      const locale = path.split('/')[2];
-      const translations = modules[path].default ?? modules[path];
-      messages[locale] = deepMerge(messages[locale] ?? {}, translations);
-    });
-
-  return messages;
-};
-
-export const forkMessages = buildForkMessages();
+export const forkMessages = buildForkMessages(
+  modules,
+  path => path.split('/')[2]
+);
 
 /**
  * Deep merges the fork translations on top of upstream's, per locale.
  * Locales without a fork folder are returned untouched.
  */
-export const withForkMessages = upstreamMessages => {
-  const merged = { ...upstreamMessages };
-
-  Object.entries(forkMessages).forEach(([locale, translations]) => {
-    merged[locale] = deepMerge(merged[locale] ?? {}, translations);
-  });
-
-  return merged;
-};
+export const withForkMessages = upstreamMessages =>
+  mergeForkMessages(upstreamMessages, forkMessages);
 
 export default withForkMessages;

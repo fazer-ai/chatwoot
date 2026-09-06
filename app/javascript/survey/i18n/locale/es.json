@@ -3,9 +3,7 @@
     "DESCRIPTION": "Estimado cliente 👋, por favor tómate unos momentos para compartir tus comentarios sobre la conversación que tuviste con {inboxName}.",
     "RATING": {
       "LABEL": "Califica tu conversación",
-      "SUCCESS_MESSAGE": "Gracias por enviar la valoración",
-      "CONFIRM_LABEL": "Confirma la puntuación que elegiste para enviarla.",
-      "CONFIRM_BUTTON": "Confirmar puntuación"
+      "SUCCESS_MESSAGE": "Gracias por enviar la valoración"
     },
     "FEEDBACK": {
       "LABEL": "¿Tienes alguna idea que te gustaría compartir?",
