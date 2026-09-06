@@ -17,6 +17,14 @@ es:
       attachment_click_to_view: Archivo adjunto [<a href="%{url}" target="_blank">Haga clic aquí para verlo</a>]
       click_here_to_get_cracking: Haga clic <a href="%{url}">aquí</a> y manos a la obra.
       the_chatwoot_team: El equipo de %{brand_name}
+    conversation_reply:
+      csat:
+        ratings:
+          poor: Malo
+          fair: Regular
+          average: Normal
+          good: Bueno
+          excellent: Excelente
     agent_notifications:
       conversation_creation:
         subject: "%{agent_name}: se creó una conversación nueva [ID - %{conversation_id}] en %{inbox_name}."

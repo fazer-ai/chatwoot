@@ -1,0 +1,29 @@
+<%#
+  The CSAT scale, rendered inline so the contact rates from the email itself instead of
+  clicking through to the survey page. Each rating is a link that carries the value; the
+  page reads it and submits, which keeps the write on the API's PUT. A GET that recorded
+  the rating would be triggered by link scanners and mail client prefetching.
+%>
+<% ratings = CsatRatings::RATINGS %>
+<% starred = message.content_attributes['display_type'] == 'star' %>
+<% survey_link = message.conversation.csat_survey_link %>
+<p style="margin: 0 0 16px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 22px; color: #0F172A;">
+  <%= message.content %>
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse: separate;">
+  <tr>
+    <% ratings.each do |rating| %>
+      <td align="center" valign="top" style="padding: 0 6px;">
+        <a href="<%= "#{survey_link}?rating=#{rating[:value]}" %>" target="_blank" style="display: block; padding: 6px 4px; text-decoration: none; color: #64748B;">
+          <span style="font-size: 30px; line-height: 38px; <%= "color: #{CsatRatings::STAR_COLOR};" if starred %>">
+            <%= starred ? CsatRatings::STAR_GLYPH : rating[:emoji] %>
+          </span>
+          <br />
+          <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; line-height: 18px; color: #64748B;">
+            <%= t("mailer.conversation_reply.csat.ratings.#{rating[:key]}") %>
+          </span>
+        </a>
+      </td>
+    <% end %>
+  </tr>
+</table>

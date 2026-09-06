@@ -9,7 +9,7 @@ import StarRating from 'shared/components/StarRating.vue';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import { getSurveyDetails, updateSurvey } from 'survey/api/survey';
 
-import { CSAT_DISPLAY_TYPES } from 'shared/constants/messages';
+import { CSAT_DISPLAY_TYPES, CSAT_RATINGS } from 'shared/constants/messages';
 
 export default {
   name: 'Response',
@@ -42,8 +42,10 @@ export default {
   },
   computed: {
     surveyId() {
-      const pageURL = window.location.href;
-      return pageURL.substring(pageURL.lastIndexOf('/') + 1);
+      // Read the path, not the href: the rating links in the survey email carry a
+      // query string, which would otherwise be taken as part of the uuid.
+      const { pathname } = window.location;
+      return pathname.substring(pathname.lastIndexOf('/') + 1);
     },
     isRatingSubmitted() {
       return this.surveyDetails && this.surveyDetails.rating;
@@ -87,9 +89,20 @@ export default {
     },
   },
   async mounted() {
-    this.getSurveyDetails();
+    await this.getSurveyDetails();
+    this.applyRatingFromQuery();
   },
   methods: {
+    // The survey email renders the scale inline, and each rating links here carrying its
+    // value. Submitting from the page rather than from the link keeps the write on the
+    // API's PUT, which link scanners and mail client prefetching never reach.
+    applyRatingFromQuery() {
+      const rating = Number(
+        new URLSearchParams(window.location.search).get('rating')
+      );
+      if (!CSAT_RATINGS.some(({ value }) => value === rating)) return;
+      this.selectRating(rating);
+    },
     selectRating(rating) {
       if (this.isFeedbackSubmitted || this.isUpdating) return;
       this.selectedRating = rating;

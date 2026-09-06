@@ -17,6 +17,14 @@ pt_BR:
       attachment_click_to_view: Anexo [<a href="%{url}" target="_blank">Clique aqui para visualizar</a>]
       click_here_to_get_cracking: Clique <a href="%{url}">aqui</a> para acessar.
       the_chatwoot_team: Equipe %{brand_name}
+    conversation_reply:
+      csat:
+        ratings:
+          poor: Ruim
+          fair: Regular
+          average: Neutro
+          good: Bom
+          excellent: Excelente
     agent_notifications:
       conversation_creation:
         subject: "%{agent_name}, Uma nova conversa [ID - %{conversation_id}] foi criada em %{inbox_name}."
