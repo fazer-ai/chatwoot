@@ -202,6 +202,26 @@ RSpec.describe AutomationRules::ConditionsFilterService do
 
           expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(false)
         end
+
+        it 'will return true for the agent holding the id when the rule does not pin the sender type' do
+          rule.update!(conditions: [
+                         { 'values': [agent.id], 'attribute_key': 'sender_id', 'query_operator': nil, 'filter_operator': 'equal_to' }
+                       ])
+          message.update!(sender: agent)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(true)
+        end
+
+        # sender_id is polymorphic and contacts number their rows independently of users, so an
+        # unpinned id would otherwise be answered by whichever contact happens to hold it.
+        it 'will return false for a contact holding the agent id when the rule does not pin the sender type' do
+          rule.update!(conditions: [
+                         { 'values': [agent.id], 'attribute_key': 'sender_id', 'query_operator': nil, 'filter_operator': 'equal_to' }
+                       ])
+          message.update!(sender_type: 'Contact', sender_id: agent.id)
+
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(false)
+        end
       end
 
       context 'when an account attribute shares its name with a message attribute' do
@@ -217,6 +237,19 @@ RSpec.describe AutomationRules::ConditionsFilterService do
         end
 
         it 'resolves the account attribute instead of the message column' do
+          expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(true)
+        end
+
+        # A checkbox attribute holds a boolean, and the standard sender_type key is compared downcased.
+        it 'leaves a checkbox account attribute alone instead of downcasing its boolean' do
+          create(:custom_attribute_definition, attribute_key: 'sender_type', account: account,
+                                               attribute_model: 'conversation_attribute', attribute_display_type: 'checkbox')
+          conversation.update!(custom_attributes: { sender_type: true })
+          rule.update!(conditions: [
+                         { 'values': [true], 'attribute_key': 'sender_type', 'query_operator': nil,
+                           'filter_operator': 'equal_to', 'custom_attribute_type': 'conversation_attribute' }
+                       ])
+
           expect(described_class.new(rule, conversation, { message: message, changed_attributes: {} }).perform).to be(true)
         end
       end

@@ -141,3 +141,15 @@ config/initializers/active_storage_opus_fix.rb: Update the Baileys inbound MIME 
 # note and reply more than five times, and it costs silence, which is what every discard did
 # before this PR. Revisit if the alert proves it earns more machinery.
 app/javascript/dashboard/components/widgets/conversation/ReplyBox.vue: Retain markers for uploads that are still pending  # PR#470
+# PR#472: real, pre-existing, and wider than these two keys. `syncCustomAttributeTypes` resolves a
+# condition with `filterTypes.find(ft => ft.attributeKey === condition.attribute_key)` and
+# `manifestCustomAttributes` puts the standard conditions first, so an account attribute whose key
+# matches a standard one resolves to the standard entry and has its `custom_attribute_type` cleared on
+# save. `CustomAttributeDefinition::STANDARD_ATTRIBUTES` reserves only conversation and contact names,
+# so `content`, `message_type` and `private_note` have carried this exposure for as long as they have
+# existed; `sender_id` and `sender_type` add two names to it and change nothing else. Closing it means
+# keying options by (attributeKey, attributeModel) through FilterSelect and ConditionRow, which the
+# conversation filters share, and there is no cheap half: preserving an existing `custom_attribute_type`
+# on save would still clear it the first time the user picks the attribute. The backend half is fixed
+# in this PR, so a condition that reaches the API with its model declared is now resolved by it.
+app/javascript/dashboard/routes/dashboard/settings/automation/constants.js: Preserve custom attributes that use the new sender keys  # PR#472
