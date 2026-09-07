@@ -5,10 +5,13 @@ class ApplicationMailer < ActionMailer::Base
   # belongs to the person and not to one of their workspaces -- and the account it would pick
   # is whichever `accounts.first` returns, so a user in two workspaces would see one of them
   # at random on a password email. A compliance notice describes the installation itself.
-  class_attribute :uses_installation_brand, default: false, instance_writer: false
+  #
+  # Per action, because a mailer can be both: Devise sends the password reset and the workspace
+  # invitation, and the invitation names the account it invites into.
+  class_attribute :installation_branded_actions, default: nil, instance_writer: false
 
-  def self.installation_branded!
-    self.uses_installation_brand = true
+  def self.installation_branded!(*actions)
+    self.installation_branded_actions = actions.presence || :all
   end
 
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
@@ -84,11 +87,19 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   def brand
-    @brand ||= if self.class.uses_installation_brand
+    @brand ||= if installation_branded_action?
                  Brand.for
                else
                  Brand.for(account: Current.account, inbox: @conversation&.inbox)
                end
+  end
+
+  def installation_branded_action?
+    actions = self.class.installation_branded_actions
+    return false if actions.nil?
+    return true if actions == :all
+
+    actions.include?(action_name&.to_sym)
   end
 
   def locale_from_account(account)

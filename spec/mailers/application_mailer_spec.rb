@@ -83,26 +83,38 @@ RSpec.describe ApplicationMailer do
       account.update!(brand_name: 'Guichê Web')
     end
 
-    # User#send_devise_notification falls back to accounts.first, so a user in two workspaces
-    # would otherwise see whichever row the database returned on a password email.
-    it 'keeps a devise credential email on the installation brand' do
+    # Parameterized the way User#send_devise_notification does it, which is the only way the
+    # account reaches the mailer: with_isolated_current clears Current and restores only
+    # params[:account].
+    def devise_body(notification)
       user = create(:user, account: account)
-      Current.account = account
+      Devise::Mailer.with(account: account).send(notification, user, 'token', {}).body.to_s
+    end
 
-      body = Devise::Mailer.confirmation_instructions(user, 'token', {}).body.to_s
+    # send_devise_notification falls back to accounts.first, so a user in two workspaces would
+    # otherwise see whichever row the database returned on a password email.
+    it 'keeps a password reset on the installation brand' do
+      body = devise_body(:reset_password_instructions)
 
       expect(body).to include 'Chatwoot'
       expect(body).not_to include 'Guichê Web'
-    ensure
-      Current.account = nil
     end
 
-    it 'keeps a compliance notice on the installation brand' do
-      expect(AdministratorNotifications::AccountComplianceMailer.uses_installation_brand).to be true
+    # The same mailer sends the workspace invitation, whose template names the account, the
+    # inviter and the workspace, so that one belongs to the account.
+    it 'leaves the workspace invitation on the account brand' do
+      body = devise_body(:confirmation_instructions)
+
+      expect(body).to include 'Guichê Web'
+      expect(body).not_to include 'Chatwoot'
+    end
+
+    it 'keeps a compliance notice on the installation brand, every action of it' do
+      expect(AdministratorNotifications::AccountComplianceMailer.installation_branded_actions).to eq :all
     end
 
     it 'leaves an ordinary account mailer on the account brand' do
-      expect(AdministratorNotifications::ChannelNotificationsMailer.uses_installation_brand).to be false
+      expect(AdministratorNotifications::ChannelNotificationsMailer.installation_branded_actions).to be_nil
     end
   end
 
