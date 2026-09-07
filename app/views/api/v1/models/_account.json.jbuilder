@@ -30,5 +30,6 @@ json.id @account.id
 json.locale @account.locale
 json.name @account.name
 json.support_email @account.support_email
+json.brand_logo_email_url @account.brand_logo_email.attached? ? url_for(@account.brand_logo_email) : nil
 json.status @account.status
 json.cache_keys @account.cache_keys

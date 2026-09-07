@@ -19,6 +19,8 @@ namespace :branding do
       'WIDGET_BRAND_URL' => 'https://www.chatwoot.com',
       # The name that would be used in emails and the widget
       'BRAND_NAME' => 'Chatwoot',
+      # Hex colour used in emails and for the PWA theme (example: #1f93ff)
+      'BRAND_COLOR' => '#1f93ff',
       # The terms of service URL displayed in Signup Page
       'TERMS_URL' => 'https://www.chatwoot.com/terms-of-service',
       # The privacy policy URL displayed in the app

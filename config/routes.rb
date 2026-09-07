@@ -48,6 +48,7 @@ Rails.application.routes.draw do
         member do
           post :update_active_at
           get :cache_keys
+          delete :brand_logo_email
         end
 
         scope module: :accounts do

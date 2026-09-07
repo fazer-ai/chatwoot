@@ -43,6 +43,29 @@ RSpec.describe ApplicationMailer do
     expect(Current.account).to be_nil
   end
 
+  context 'when the account carries its own brand' do
+    before do
+      InstallationConfig.where(name: 'BRAND_COLOR').first_or_create!(value: '#1F93FF')
+      InstallationConfig.where(name: 'BRAND_NAME').first_or_create!(value: 'Chatwoot')
+      GlobalConfig.clear_cache
+      account.enable_features!('branded_email_templates')
+    end
+
+    it 'paints the email with the account brand instead of the installation one' do
+      account.update!(brand_color: '#11D135', brand_name: 'Guichê Web')
+
+      body = deliver.body.decoded
+
+      expect(body).to include 'background-color: #11D135'
+      expect(body).to include 'Guichê Web'
+      expect(body).not_to include 'background-color: #1F93FF'
+    end
+
+    it 'leaves the installation brand alone for an account that configured nothing' do
+      expect(deliver.body.decoded).to include 'background-color: #1F93FF'
+    end
+  end
+
   context 'with the branded layout' do
     before { InstallationConfig.where(name: 'BRAND_COLOR').first_or_create!(value: '#11D135') }
 

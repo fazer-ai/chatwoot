@@ -492,6 +492,36 @@ RSpec.describe Account do
     end
   end
 
+  describe 'brand_logo_email' do
+    let(:account) { create(:account) }
+
+    def attach(io, filename, content_type)
+      account.brand_logo_email.attach(io: io, filename: filename, content_type: content_type)
+    end
+
+    it 'accepts a raster image' do
+      attach(Rails.root.join('spec/assets/avatar.png').open, 'avatar.png', 'image/png')
+
+      expect(account).to be_valid
+    end
+
+    # No mail client renders SVG, so accepting one would put a broken image at the top of every
+    # email the account sends.
+    it 'rejects a format email cannot render' do
+      attach(Rails.root.join('spec/assets/sample.pdf').open, 'sample.pdf', 'application/pdf')
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_logo_email]).to include('must be a PNG, JPG or GIF')
+    end
+
+    it 'rejects an image heavier than the cap' do
+      attach(StringIO.new('0' * (Account::BRAND_LOGO_EMAIL_MAX_SIZE + 1)), 'grande.png', 'image/png')
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_logo_email]).to include('is larger than 2 MB')
+    end
+  end
+
   describe 'captain_preferences' do
     let(:account) { create(:account) }
 
