@@ -16,10 +16,14 @@
 # `quit` ja e descartado (`quit if ...`) e o socket e fechado no `ensure` de qualquer jeito.
 require 'net/smtp'
 
+# Timeout::Error is in the list on purpose and is easy to leave out: Net::ReadTimeout and
+# Net::WriteTimeout descend from Timeout::Error -> RuntimeError, so they are caught by
+# none of the other four entries. A server that takes the DATA and then stalls on QUIT is
+# an ordinary way to hit exactly the case this patch exists for.
 module NetSmtpQuitNeverFails
   def quit
     super
-  rescue Net::SMTPError, IOError, SystemCallError, OpenSSL::SSL::SSLError => e
+  rescue Net::SMTPError, IOError, SystemCallError, OpenSSL::SSL::SSLError, Timeout::Error => e
     Rails.logger.warn("Ignoring SMTP error on QUIT, message was already accepted: #{e.class}: #{e.message}")
     nil
   end

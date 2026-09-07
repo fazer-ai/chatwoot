@@ -17,6 +17,17 @@ describe Net::SMTP do
     expect { smtp.quit }.not_to raise_error
   end
 
+  # Net::ReadTimeout and Net::WriteTimeout descend from Timeout::Error -> RuntimeError, so
+  # they match none of the SMTP/IO/syscall/SSL entries in the rescue. A server that takes
+  # the DATA and then stalls on QUIT is the ordinary way to reach this.
+  [Net::ReadTimeout, Net::WriteTimeout].each do |error_class|
+    it "swallows #{error_class} on QUIT" do
+      allow(smtp).to receive(:getok).with('QUIT').and_raise(error_class)
+
+      expect { smtp.quit }.not_to raise_error
+    end
+  end
+
   it 'swallows a dropped connection on QUIT' do
     allow(smtp).to receive(:getok).with('QUIT').and_raise(Errno::ECONNRESET)
 
