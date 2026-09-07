@@ -15,6 +15,8 @@ class Webhooks::ErrorHandler
     return unless SUPPORTED_EVENTS.include?(@payload[:event])
     return unless message
 
+    # `:agent_bot_observer_webhook` deliberately matches nothing: an observer never owns the
+    # conversation, so there is nothing to hand over when its deliveries are exhausted.
     case @webhook_type
     when :agent_bot_webhook
       handle_agent_bot_error

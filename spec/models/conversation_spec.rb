@@ -890,6 +890,26 @@ RSpec.describe Conversation do
     end
   end
 
+  describe '#botinbox: when conversation created inside inbox with only an observer bot' do
+    let!(:observer) { create(:agent_bot_observer) }
+    let(:conversation) { create(:conversation, inbox: observer.inbox) }
+
+    it 'starts open, like an inbox with no bot' do
+      expect(conversation.status).to eq('open')
+    end
+
+    it 'assigns no agent bot' do
+      expect(conversation.assignee_agent_bot).to be_nil
+    end
+
+    it 'reopens as open, not pending, when the contact writes to a resolved conversation' do
+      conversation.update!(status: :resolved)
+      create(:message, message_type: :incoming, account: conversation.account, inbox: conversation.inbox, conversation: conversation)
+
+      expect(conversation.reload.status).to eq('open')
+    end
+  end
+
   describe '#botintegration: when conversation created in inbox with dialogflow integration' do
     let(:inbox) { create(:inbox) }
     let(:hook) { create(:integrations_hook, :dialogflow, inbox: inbox) }
