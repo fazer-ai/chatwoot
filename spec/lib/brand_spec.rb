@@ -54,10 +54,12 @@ RSpec.describe Brand do
       expect(brand.url).to eq 'https://www.chatwoot.com'
     end
 
-    it 'treats a cleared field as "no name", not as "ask the installation"' do
+    # The settings form posts empty strings, so an administrator who opens the screen and saves
+    # it untouched would otherwise strip the brand from every email the account sends.
+    it 'falls back on a field the account left empty' do
       account.update!(brand_name: '')
 
-      expect(described_class.for(account: account).name).to eq ''
+      expect(described_class.for(account: account).name).to eq 'Chatwoot'
     end
 
     it 'keys the config like the installation, so a stored layout keeps resolving' do

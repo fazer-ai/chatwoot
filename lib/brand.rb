@@ -67,12 +67,14 @@ class Brand
     @installation ||= GlobalConfig.get(*INSTALLATION_KEYS)
   end
 
-  # Blank is a real answer: an account that cleared the field means "no name", not "fall back
-  # to whoever owns the installation".
+  # Blank falls back rather than meaning "no name", which is what the settings screen promises
+  # of an empty field. It also keeps an administrator who opens that screen and saves it
+  # untouched from stripping the brand out of every email the account sends: the form posts
+  # empty strings, not nils.
   def override(key)
     return nil unless overridable?
 
-    account.public_send(key)&.to_s
+    account.public_send(key).presence
   end
 
   def overridable?
