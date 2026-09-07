@@ -7,8 +7,8 @@
 #
 # O servidor falso ACEITA a mensagem (250 depois do DATA) e so entao maltrata o QUIT.
 #
-#   bundle exec ruby spec/support/manual/net_smtp_quit_integracao.rb          # sem o patch
-#   PATCH=1 bundle exec ruby spec/support/manual/net_smtp_quit_integracao.rb  # com o patch
+#   bundle exec ruby scripts/net_smtp_quit_integracao.rb          # sem o patch
+#   PATCH=1 bundle exec ruby scripts/net_smtp_quit_integracao.rb  # com o patch
 #
 # Resultado em 07/09/2026, net-smtp 0.3.4. Nos tres casos o servidor ficou com a mensagem:
 #
@@ -17,8 +17,13 @@
 #   QUIT responde 421 (sobrecarga)   Net::SMTPServerBusy    entregue
 #   QUIT nao responde (trava)        Net::ReadTimeout       entregue
 #
-# Fica fora do `rspec` de proposito: abre socket e dorme, seria fonte de flake em CI. E teste
-# para rodar a mao ao mexer no patch ou ao subir a versao do net-smtp.
+# Rodado tambem contra net-smtp 0.5.1, com resultado IDENTICO: o upstream nao corrigiu o QUIT,
+# entao o patch continua necessario depois de um bump do gem. Vale reconferir aqui a cada bump.
+#
+# Fica fora de spec/ de proposito, e nao so por flake: `rails_helper.rb:34` faz require de
+# TODO spec/support/**/*.rb, entao daqui um script executavel rodaria -- abrindo socket e
+# dormindo -- a cada execucao da suite. E teste de rodar a mao ao mexer no patch ou ao subir
+# a versao do net-smtp.
 require 'net/smtp'
 require 'socket'
 require 'openssl'
@@ -126,7 +131,7 @@ def carrega_patch
       end
     end)
   end
-  load File.expand_path('../../../config/initializers/monkey_patches/net_smtp_quit.rb', __dir__)
+  load File.expand_path('../config/initializers/monkey_patches/net_smtp_quit.rb', __dir__)
 end
 
 com_patch = ENV['PATCH'] == '1'
