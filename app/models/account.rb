@@ -58,6 +58,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   validate :validate_support_email_format, if: :will_save_change_to_support_email?
   validate :validate_brand_logo_email, if: -> { brand_logo_email.changed? }
   validate :validate_brand_url, if: -> { will_save_change_to_settings? }
+  validate :validate_brand_name, if: -> { will_save_change_to_settings? }
 
   store_accessor :settings, :auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting
 
@@ -252,6 +253,16 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid')) if parsed.blank?
   rescue Mail::Field::ParseError, Mail::Field::IncompleteParseError
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid'))
+  end
+
+  # The default layout escapes it, but a branded layout a customer already stored in
+  # email_templates does not, and this is the first time an account administrator rather than
+  # the installation owner writes the value.
+  def validate_brand_name
+    return if brand_name.blank?
+    return unless brand_name.match?(/[<>]/)
+
+    errors.add(:brand_name, I18n.t('errors.account.brand_name.invalid'))
   end
 
   # The value goes straight into the href of the email footer, where a relative one like

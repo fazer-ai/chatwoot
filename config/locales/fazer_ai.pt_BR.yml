@@ -13,6 +13,8 @@ pt_BR:
       deleted: Esta mensagem foi excluída
   errors:
     account:
+      brand_name:
+        invalid: não pode conter < ou >
       brand_url:
         invalid: precisa começar com http:// ou https://
       brand_logo_email:

@@ -523,6 +523,25 @@ RSpec.describe Account do
     end
   end
 
+  describe 'brand_name' do
+    let(:account) { create(:account) }
+
+    # A branded layout a customer already stored in email_templates renders the value raw, and
+    # this is the first time an account administrator rather than a super admin writes it.
+    it 'rejects markup' do
+      account.brand_name = '<img src=x onerror=alert(1)>'
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_name]).to include('cannot contain < or >')
+    end
+
+    it 'accepts a name with characters the layout escapes' do
+      account.brand_name = 'Ben & Jerry\'s "best"'
+
+      expect(account).to be_valid
+    end
+  end
+
   describe 'brand_logo_email' do
     let(:account) { create(:account) }
 

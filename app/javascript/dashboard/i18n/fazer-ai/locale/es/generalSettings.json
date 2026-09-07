@@ -16,7 +16,8 @@
         },
         "COLOR": {
           "LABEL": "Color de la marca",
-          "HELP": "Se usa en la barra de acento y en los enlaces. Un color demasiado claro para leerse sobre blanco se oscurece en el texto, conservando su tono."
+          "HELP": "Se usa en la barra de acento y en los enlaces. Un color demasiado claro para leerse sobre blanco se oscurece en el texto, conservando su tono.",
+          "RESET": "Usar el color de la instalación"
         },
         "LOGO": {
           "LABEL": "Logo del correo",

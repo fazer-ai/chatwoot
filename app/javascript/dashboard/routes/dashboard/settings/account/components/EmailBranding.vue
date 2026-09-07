@@ -24,8 +24,11 @@ const logoInput = ref(null);
 
 const logoUrl = computed(() => currentAccount.value?.brand_logo_email_url);
 
+// Seeded on the account's identity, not on every write to it: uploading a logo commits a
+// fresh account to the store, and a deep watcher would use that to overwrite whatever the
+// administrator had typed and not saved yet.
 watch(
-  currentAccount,
+  () => currentAccount.value?.id,
   () => {
     const { brand_name, brand_url, brand_color } =
       currentAccount.value?.settings || {};
@@ -33,7 +36,7 @@ watch(
     brandUrl.value = brand_url || '';
     brandColor.value = brand_color || '';
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 );
 
 const save = async () => {
@@ -118,7 +121,18 @@ const removeLogo = async () => {
         name="brand-color"
         :label="t('GENERAL_SETTINGS.FORM.EMAIL_BRANDING.COLOR.LABEL')"
       >
-        <ColorPicker v-model="brandColor" />
+        <div class="flex items-center gap-3">
+          <ColorPicker v-model="brandColor" />
+          <NextButton
+            v-if="brandColor"
+            link
+            slate
+            type="button"
+            @click="brandColor = ''"
+          >
+            {{ t('GENERAL_SETTINGS.FORM.EMAIL_BRANDING.COLOR.RESET') }}
+          </NextButton>
+        </div>
         <template #help>
           {{ t('GENERAL_SETTINGS.FORM.EMAIL_BRANDING.COLOR.HELP') }}
         </template>

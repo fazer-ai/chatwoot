@@ -16,7 +16,8 @@
         },
         "COLOR": {
           "LABEL": "Brand color",
-          "HELP": "Used for the accent bar and links. A colour too light to read on white is darkened for text, keeping its hue."
+          "HELP": "Used for the accent bar and links. A colour too light to read on white is darkened for text, keeping its hue.",
+          "RESET": "Use the installation color"
         },
         "LOGO": {
           "LABEL": "Email logo",

@@ -61,6 +61,15 @@ RSpec.describe ApplicationMailer do
       expect(body).not_to include 'background-color: #1F93FF'
     end
 
+    it 'escapes the account brand name instead of emitting it as markup' do
+      account.update!(brand_name: 'Ben & Jerry\'s')
+
+      body = deliver.body.decoded
+
+      expect(body).to include 'Ben &amp; Jerry&#39;s'
+      expect(body).not_to include "Ben & Jerry's"
+    end
+
     it 'leaves the installation brand alone for an account that configured nothing' do
       expect(deliver.body.decoded).to include 'background-color: #1F93FF'
     end
