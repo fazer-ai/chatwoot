@@ -492,6 +492,37 @@ RSpec.describe Account do
     end
   end
 
+  describe 'brand_url' do
+    let(:account) { create(:account) }
+
+    # The value lands in the href of the email footer, where a relative one resolves against
+    # the mail client and goes nowhere.
+    it 'rejects a URL without a scheme' do
+      account.brand_url = 'example.com'
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_url]).to include('must start with http:// or https://')
+    end
+
+    it 'rejects a scheme that is not http' do
+      account.brand_url = 'javascript:alert(1)'
+
+      expect(account).not_to be_valid
+    end
+
+    it 'accepts an absolute http(s) URL' do
+      account.brand_url = 'https://www.guicheweb.com.br'
+
+      expect(account).to be_valid
+    end
+
+    it 'accepts an empty value, which falls back to the installation' do
+      account.brand_url = ''
+
+      expect(account).to be_valid
+    end
+  end
+
   describe 'brand_logo_email' do
     let(:account) { create(:account) }
 

@@ -13,6 +13,8 @@ es:
       deleted: Este mensaje fue eliminado
   errors:
     account:
+      brand_url:
+        invalid: debe empezar con http:// o https://
       brand_logo_email:
         too_big: supera los 2 MB
         invalid_format: debe ser PNG, JPG o GIF

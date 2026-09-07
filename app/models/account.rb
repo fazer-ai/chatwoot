@@ -57,6 +57,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   validate :validate_reporting_timezone
   validate :validate_support_email_format, if: :will_save_change_to_support_email?
   validate :validate_brand_logo_email, if: -> { brand_logo_email.changed? }
+  validate :validate_brand_url, if: -> { will_save_change_to_settings? }
 
   store_accessor :settings, :auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting
 
@@ -251,6 +252,19 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid')) if parsed.blank?
   rescue Mail::Field::ParseError, Mail::Field::IncompleteParseError
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid'))
+  end
+
+  # The value goes straight into the href of the email footer, where a relative one like
+  # "example.com" resolves against the mail client and lands nowhere.
+  def validate_brand_url
+    return if brand_url.blank?
+
+    uri = URI.parse(brand_url)
+    return if uri.is_a?(URI::HTTP) && uri.host.present?
+
+    errors.add(:brand_url, I18n.t('errors.account.brand_url.invalid'))
+  rescue URI::InvalidURIError
+    errors.add(:brand_url, I18n.t('errors.account.brand_url.invalid'))
   end
 
   def validate_brand_logo_email
