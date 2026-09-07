@@ -1,6 +1,16 @@
 class ApplicationMailer < ActionMailer::Base
   include ActionView::Helpers::SanitizeHelper
 
+  # Some mail is the installation's however an account got into Current. A credential reset
+  # belongs to the person and not to one of their workspaces -- and the account it would pick
+  # is whichever `accounts.first` returns, so a user in two workspaces would see one of them
+  # at random on a password email. A compliance notice describes the installation itself.
+  class_attribute :uses_installation_brand, default: false, instance_writer: false
+
+  def self.installation_branded!
+    self.uses_installation_brand = true
+  end
+
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
   around_action :with_isolated_current
   around_action :switch_locale
@@ -10,11 +20,9 @@ class ApplicationMailer < ActionMailer::Base
   prepend_view_path ::EmailTemplate.resolver
   append_view_path Rails.root.join('app/views/mailers')
   helper :frontend_urls
-  helper do
-    def global_config
-      @global_config ||= Brand.for(account: Current.account).config
-    end
-  end
+  # helper_method rather than a helper block: the block body runs in the view context, which
+  # cannot reach the mailer instance that knows which brand applies.
+  helper_method :global_config
 
   rescue_from(*ExceptionList::SMTP_EXCEPTIONS, with: :handle_smtp_exceptions)
 
@@ -57,7 +65,6 @@ class ApplicationMailer < ActionMailer::Base
 
   def liquid_locals
     # expose variables you want to be exposed in liquid
-    brand = Brand.for(account: Current.account, inbox: @conversation&.inbox)
     locals = {
       global_config: brand.config,
       # Two roles, because one hex cannot serve both: see BrandColor.
@@ -70,6 +77,18 @@ class ApplicationMailer < ActionMailer::Base
     locals.merge({ attachment_url: @attachment_url }) if @attachment_url
     locals.merge({ failed_contacts: @failed_contacts, imported_contacts: @imported_contacts })
     locals
+  end
+
+  def global_config
+    @global_config ||= brand.config
+  end
+
+  def brand
+    @brand ||= if self.class.uses_installation_brand
+                 Brand.for
+               else
+                 Brand.for(account: Current.account, inbox: @conversation&.inbox)
+               end
   end
 
   def locale_from_account(account)

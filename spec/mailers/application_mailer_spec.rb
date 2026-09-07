@@ -75,6 +75,37 @@ RSpec.describe ApplicationMailer do
     end
   end
 
+  context 'when the mail belongs to the installation rather than to an account' do
+    before do
+      InstallationConfig.where(name: 'BRAND_NAME').first_or_create!(value: 'Chatwoot')
+      GlobalConfig.clear_cache
+      account.enable_features!('branded_email_templates')
+      account.update!(brand_name: 'Guichê Web')
+    end
+
+    # User#send_devise_notification falls back to accounts.first, so a user in two workspaces
+    # would otherwise see whichever row the database returned on a password email.
+    it 'keeps a devise credential email on the installation brand' do
+      user = create(:user, account: account)
+      Current.account = account
+
+      body = Devise::Mailer.confirmation_instructions(user, 'token', {}).body.to_s
+
+      expect(body).to include 'Chatwoot'
+      expect(body).not_to include 'Guichê Web'
+    ensure
+      Current.account = nil
+    end
+
+    it 'keeps a compliance notice on the installation brand' do
+      expect(AdministratorNotifications::AccountComplianceMailer.uses_installation_brand).to be true
+    end
+
+    it 'leaves an ordinary account mailer on the account brand' do
+      expect(AdministratorNotifications::ChannelNotificationsMailer.uses_installation_brand).to be false
+    end
+  end
+
   context 'with the branded layout' do
     before { InstallationConfig.where(name: 'BRAND_COLOR').first_or_create!(value: '#11D135') }
 
