@@ -65,9 +65,6 @@ pt_BR:
         invalid: não é um fuso horário válido
       support_email:
         invalid: is not a valid email address
-      brand_logo_email:
-        too_big: tem mais de 2 MB
-        invalid_format: precisa ser PNG, JPG ou GIF
     validations:
       presence: não pode ficar em branco
     webhook:

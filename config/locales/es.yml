@@ -65,9 +65,6 @@ es:
         invalid: is not a valid timezone
       support_email:
         invalid: is not a valid email address
-      brand_logo_email:
-        too_big: supera los 2 MB
-        invalid_format: debe ser PNG, JPG o GIF
     validations:
       presence: no debe estar en blanco
     webhook:

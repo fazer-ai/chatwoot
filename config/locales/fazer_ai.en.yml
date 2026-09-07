@@ -12,6 +12,10 @@ en:
     messages:
       deleted: This message was deleted
   errors:
+    account:
+      brand_logo_email:
+        too_big: is larger than 2 MB
+        invalid_format: must be a PNG, JPG or GIF
     automation:
       scheduled_message:
         delay_out_of_range: Delay must be between 1 minute and 999 days
