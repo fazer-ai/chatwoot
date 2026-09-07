@@ -12,6 +12,14 @@ es:
     messages:
       deleted: Este mensaje fue eliminado
   errors:
+    account:
+      brand_name:
+        invalid: no puede contener < ni >
+      brand_url:
+        invalid: debe empezar con http:// o https://
+      brand_logo_email:
+        too_big: supera los 2 MB
+        invalid_format: debe ser PNG, JPG o GIF
     automation:
       scheduled_message:
         delay_out_of_range: El retraso debe estar entre 1 minuto y 999 días

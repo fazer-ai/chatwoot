@@ -110,7 +110,7 @@
                   {% if brand_logo_url != nil and brand_logo_url != '' %}
                     <tr style="margin: 0;">
                       <td style="padding: 32px 36px 0; margin: 0;" align="left">
-                        <img src="{{ brand_logo_url }}" alt="{{ brand_name }}" height="36" style="height: 36px; width: auto; border: none; display: block;" />
+                        <img src="{{ brand_logo_url }}" alt="{{ brand_name | escape }}" height="36" style="height: 36px; width: auto; border: none; display: block;" />
                       </td>
                     </tr>
                   {% endif %}
@@ -129,9 +129,9 @@
                 <td class="footer" style="padding: 20px 8px 0; text-align: center; color: #64748B; font-size: 13px; line-height: 21px;">
                   {{ 'mailer.common.sent_by_prefix' | t }}
                   {% if brand_url != nil and brand_url != '' %}
-                    <a href="{{ brand_url }}" style="color: {{ brand_color_text }}; font-weight: 600; text-decoration: none;">{{ brand_name }}</a>.
+                    <a href="{{ brand_url | escape }}" style="color: {{ brand_color_text }}; font-weight: 600; text-decoration: none;">{{ brand_name | escape }}</a>.
                   {% else %}
-                    <span style="color: #0F172A; font-weight: 600;">{{ brand_name }}</span>.
+                    <span style="color: #0F172A; font-weight: 600;">{{ brand_name | escape }}</span>.
                   {% endif %}
                 </td>
               </tr>

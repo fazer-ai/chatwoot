@@ -15,6 +15,7 @@ import AccountId from './components/AccountId.vue';
 import BuildInfo from './components/BuildInfo.vue';
 import AccountDelete from './components/AccountDelete.vue';
 import AudioTranscription from './components/AudioTranscription.vue';
+import EmailBranding from './components/EmailBranding.vue';
 import SectionLayout from './components/SectionLayout.vue';
 
 export default {
@@ -25,6 +26,7 @@ export default {
     BuildInfo,
     AccountDelete,
     AudioTranscription,
+    EmailBranding,
     SectionLayout,
     WithLabel,
     NextInput,
@@ -66,6 +68,12 @@ export default {
       return this.isFeatureEnabledonAccount(
         this.accountId,
         FEATURE_FLAGS.CAPTAIN
+      );
+    },
+    showEmailBranding() {
+      return this.isFeatureEnabledonAccount(
+        this.accountId,
+        FEATURE_FLAGS.BRANDED_EMAIL_TEMPLATES
       );
     },
     languagesSortedByCode() {
@@ -248,6 +256,7 @@ export default {
       <woot-loading-state v-if="uiFlags.isFetchingItem" />
     </div>
     <AudioTranscription v-if="showAudioTranscriptionConfig" />
+    <EmailBranding v-if="showEmailBranding" />
     <AccountId />
     <div v-if="!uiFlags.isFetchingItem && isOnChatwootCloud">
       <AccountDelete />

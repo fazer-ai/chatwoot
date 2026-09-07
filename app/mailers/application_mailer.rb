@@ -1,7 +1,18 @@
 class ApplicationMailer < ActionMailer::Base
   include ActionView::Helpers::SanitizeHelper
 
-  EMAIL_SAFE_LOGO_FORMATS = %w[.png .jpg .jpeg .gif].freeze
+  # Some mail is the installation's however an account got into Current. A credential reset
+  # belongs to the person and not to one of their workspaces -- and the account it would pick
+  # is whichever `accounts.first` returns, so a user in two workspaces would see one of them
+  # at random on a password email. A compliance notice describes the installation itself.
+  #
+  # Per action, because a mailer can be both: Devise sends the password reset and the workspace
+  # invitation, and the invitation names the account it invites into.
+  class_attribute :installation_branded_actions, default: nil, instance_writer: false
+
+  def self.installation_branded!(*actions)
+    self.installation_branded_actions = actions.presence || :all
+  end
 
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
   around_action :with_isolated_current
@@ -12,11 +23,9 @@ class ApplicationMailer < ActionMailer::Base
   prepend_view_path ::EmailTemplate.resolver
   append_view_path Rails.root.join('app/views/mailers')
   helper :frontend_urls
-  helper do
-    def global_config
-      @global_config ||= GlobalConfig.get('BRAND_NAME', 'BRAND_URL')
-    end
-  end
+  # helper_method rather than a helper block: the block body runs in the view context, which
+  # cannot reach the mailer instance that knows which brand applies.
+  helper_method :global_config
 
   rescue_from(*ExceptionList::SMTP_EXCEPTIONS, with: :handle_smtp_exceptions)
 
@@ -59,13 +68,12 @@ class ApplicationMailer < ActionMailer::Base
 
   def liquid_locals
     # expose variables you want to be exposed in liquid
-    config = GlobalConfig.get('BRAND_NAME', 'BRAND_URL', 'BRAND_COLOR', 'LOGO_EMAIL', 'LOGO')
     locals = {
-      global_config: config,
+      global_config: brand.config,
       # Two roles, because one hex cannot serve both: see BrandColor.
-      brand_color: BrandColor.surface(config['BRAND_COLOR']),
-      brand_color_text: BrandColor.on_light(config['BRAND_COLOR']),
-      brand_logo_url: absolute_asset_url(email_logo(config)),
+      brand_color: BrandColor.surface(brand.color),
+      brand_color_text: BrandColor.on_light(brand.color),
+      brand_logo_url: brand.logo_url,
       action_url: @action_url
     }
 
@@ -74,24 +82,24 @@ class ApplicationMailer < ActionMailer::Base
     locals
   end
 
-  # Falling back to LOGO covers the installation that already has a raster logo without asking
-  # it to configure a second one. It is guarded on the extension because LOGO is an SVG by
-  # default, and email clients render none: an unconditional fallback would put a broken image
-  # in every email, which reads worse than the no-logo layout it replaced.
-  def email_logo(config)
-    return config['LOGO_EMAIL'] if config['LOGO_EMAIL'].present?
-
-    logo = config['LOGO'].to_s
-    logo if EMAIL_SAFE_LOGO_FORMATS.any? { |format| logo.split('?').first.to_s.downcase.end_with?(format) }
+  def global_config
+    @global_config ||= brand.config
   end
 
-  # LOGO_EMAIL is configured the way LOGO is, as a path served by this installation, but an
-  # email is read outside it and a relative src resolves against nothing.
-  def absolute_asset_url(path)
-    value = path.to_s.strip
-    return value if value.blank? || value.start_with?('http://', 'https://')
+  def brand
+    @brand ||= if installation_branded_action?
+                 Brand.for
+               else
+                 Brand.for(account: Current.account, inbox: @conversation&.inbox)
+               end
+  end
 
-    "#{ENV.fetch('FRONTEND_URL', nil).to_s.chomp('/')}/#{value.delete_prefix('/')}"
+  def installation_branded_action?
+    actions = self.class.installation_branded_actions
+    return false if actions.nil?
+    return true if actions == :all
+
+    actions.include?(action_name&.to_sym)
   end
 
   def locale_from_account(account)

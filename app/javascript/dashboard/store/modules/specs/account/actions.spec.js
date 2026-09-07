@@ -37,6 +37,60 @@ describe('#actions', () => {
     });
   });
 
+  describe('#updateBrandLogoEmail', () => {
+    it('sends the file as multipart and stores the account it gets back', async () => {
+      axios.patch.mockResolvedValue({
+        data: { id: 1, brand_logo_email_url: 'http://localhost/logo.png' },
+      });
+      const file = new File(['x'], 'logo.png', { type: 'image/png' });
+
+      await actions.updateBrandLogoEmail({ commit, getters }, file);
+
+      const [, body] = axios.patch.mock.calls.at(-1);
+      expect(body).toBeInstanceOf(FormData);
+      expect(body.get('brand_logo_email')).toBe(file);
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true }],
+        [
+          types.default.EDIT_ACCOUNT,
+          { id: 1, brand_logo_email_url: 'http://localhost/logo.png' },
+        ],
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: false }],
+      ]);
+    });
+
+    it('clears the updating flag when the API rejects', async () => {
+      axios.patch.mockRejectedValue({ message: 'too big' });
+
+      await expect(
+        actions.updateBrandLogoEmail(
+          { commit, getters },
+          new File([''], 'a.png')
+        )
+      ).rejects.toBeTruthy();
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true }],
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: false }],
+      ]);
+    });
+  });
+
+  describe('#deleteBrandLogoEmail', () => {
+    it('stores the account the delete returns, so the preview clears', async () => {
+      axios.delete.mockResolvedValue({
+        data: { id: 1, brand_logo_email_url: null },
+      });
+
+      await actions.deleteBrandLogoEmail({ commit, getters });
+
+      expect(commit.mock.calls).toEqual([
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true }],
+        [types.default.EDIT_ACCOUNT, { id: 1, brand_logo_email_url: null }],
+        [types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: false }],
+      ]);
+    });
+  });
+
   describe('#update', () => {
     it('sends correct actions if API is success', async () => {
       axios.patch.mockResolvedValue({

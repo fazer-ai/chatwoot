@@ -29,6 +29,26 @@ bundle exec rails branding:update
 | `PRIVACY_URL`        | `https://www.chatwoot.com/privacy-policy`   | The privacy policy URL displayed in the app.                          |
 | `DISPLAY_MANIFEST`   | `true`                                      | Display default Chatwoot metadata like favicons and upgrade warnings. |
 
+## Per-account branding for email
+
+The configuration above is installation-wide, which is what a single-tenant install wants. An installation that hosts several companies usually wants the opposite: an account's emails should carry that account's brand, not the installation owner's.
+
+Enable the `branded_email_templates` feature for the account, then set the brand under **Settings → General → Email branding**:
+
+| Field         | Falls back to                                                |
+| :------------ | :----------------------------------------------------------- |
+| Brand name    | `BRAND_NAME`                                                 |
+| Brand website | `BRAND_URL`                                                  |
+| Brand color   | `BRAND_COLOR`                                                |
+| Email logo    | `LOGO_EMAIL`, then `LOGO` when it is a raster format         |
+
+The fallback is field by field, so an account that sets only a colour keeps the installation's name and logo. An account that sets nothing behaves exactly as before.
+
+The email logo is uploaded rather than referenced by URL, and is served by this installation, so the link inside an email does not expire the way a signed storage URL would. PNG, JPG and GIF only, up to 2 MB: no mail client renders SVG.
+
+> [!NOTE]
+> This covers email only. The dashboard, the login page, the favicon, the PWA manifest and the widget are the installation's own surfaces and always use the installation branding.
+
 ## Favicon and other assets
 
 Update the favicon files in the [`public/`](public/) folder.

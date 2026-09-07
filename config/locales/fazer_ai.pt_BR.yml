@@ -12,6 +12,14 @@ pt_BR:
     messages:
       deleted: Esta mensagem foi excluída
   errors:
+    account:
+      brand_name:
+        invalid: não pode conter < ou >
+      brand_url:
+        invalid: precisa começar com http:// ou https://
+      brand_logo_email:
+        too_big: tem mais de 2 MB
+        invalid_format: precisa ser PNG, JPG ou GIF
     automation:
       scheduled_message:
         delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias

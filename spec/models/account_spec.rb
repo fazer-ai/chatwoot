@@ -492,6 +492,95 @@ RSpec.describe Account do
     end
   end
 
+  describe 'brand_url' do
+    let(:account) { create(:account) }
+
+    # The value lands in the href of the email footer, where a relative one resolves against
+    # the mail client and goes nowhere.
+    it 'rejects a URL without a scheme' do
+      account.brand_url = 'example.com'
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_url]).to include('must start with http:// or https://')
+    end
+
+    it 'rejects a scheme that is not http' do
+      account.brand_url = 'javascript:alert(1)'
+
+      expect(account).not_to be_valid
+    end
+
+    it 'accepts an absolute http(s) URL' do
+      account.brand_url = 'https://www.guicheweb.com.br'
+
+      expect(account).to be_valid
+    end
+
+    it 'accepts an empty value, which falls back to the installation' do
+      account.brand_url = ''
+
+      expect(account).to be_valid
+    end
+  end
+
+  describe 'brand_name' do
+    let(:account) { create(:account) }
+
+    # A branded layout a customer already stored in email_templates renders the value raw, and
+    # this is the first time an account administrator rather than a super admin writes it.
+    it 'rejects markup' do
+      account.brand_name = '<img src=x onerror=alert(1)>'
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_name]).to include('cannot contain < or >')
+    end
+
+    # settings is jsonb and strong parameters keep a JSON scalar's type, so a non-string value
+    # reaches the validator as one. It has to come back 422, not 500.
+    it 'reports a non-string value instead of raising' do
+      account.brand_name = 123
+
+      expect { account.valid? }.not_to raise_error
+      expect(account).not_to be_valid
+    end
+
+    it 'accepts a name with characters the layout escapes' do
+      account.brand_name = 'Ben & Jerry\'s "best"'
+
+      expect(account).to be_valid
+    end
+  end
+
+  describe 'brand_logo_email' do
+    let(:account) { create(:account) }
+
+    def attach(io, filename, content_type)
+      account.brand_logo_email.attach(io: io, filename: filename, content_type: content_type)
+    end
+
+    it 'accepts a raster image' do
+      attach(Rails.root.join('spec/assets/avatar.png').open, 'avatar.png', 'image/png')
+
+      expect(account).to be_valid
+    end
+
+    # No mail client renders SVG, so accepting one would put a broken image at the top of every
+    # email the account sends.
+    it 'rejects a format email cannot render' do
+      attach(Rails.root.join('spec/assets/sample.pdf').open, 'sample.pdf', 'application/pdf')
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_logo_email]).to include('must be a PNG, JPG or GIF')
+    end
+
+    it 'rejects an image heavier than the cap' do
+      attach(StringIO.new('0' * (Account::BRAND_LOGO_EMAIL_MAX_SIZE + 1)), 'grande.png', 'image/png')
+
+      expect(account).not_to be_valid
+      expect(account.errors[:brand_logo_email]).to include('is larger than 2 MB')
+    end
+  end
+
   describe 'captain_preferences' do
     let(:account) { create(:account) }
 
