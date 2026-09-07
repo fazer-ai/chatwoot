@@ -64,7 +64,7 @@ class Api::V1::AccountsController < Api::BaseController
 
   def brand_logo_email
     @account.brand_logo_email.purge if @account.brand_logo_email.attached?
-    head :ok
+    render 'api/v1/accounts/show', format: :json
   end
 
   def update_active_at
