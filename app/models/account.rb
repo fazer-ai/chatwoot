@@ -258,9 +258,12 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   # The default layout escapes it, but a branded layout a customer already stored in
   # email_templates does not, and this is the first time an account administrator rather than
   # the installation owner writes the value.
+  # to_s because settings is jsonb and strong parameters keep a JSON scalar's type: a
+  # {"brand_name": 123} would otherwise reach match? as an Integer and turn a validation
+  # error into a 500. The schema validator flags the type, but it does not halt the chain.
   def validate_brand_name
     return if brand_name.blank?
-    return unless brand_name.match?(/[<>]/)
+    return unless brand_name.to_s.match?(/[<>]/)
 
     errors.add(:brand_name, I18n.t('errors.account.brand_name.invalid'))
   end
@@ -270,7 +273,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   def validate_brand_url
     return if brand_url.blank?
 
-    uri = URI.parse(brand_url)
+    uri = URI.parse(brand_url.to_s)
     return if uri.is_a?(URI::HTTP) && uri.host.present?
 
     errors.add(:brand_url, I18n.t('errors.account.brand_url.invalid'))

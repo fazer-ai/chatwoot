@@ -535,6 +535,15 @@ RSpec.describe Account do
       expect(account.errors[:brand_name]).to include('cannot contain < or >')
     end
 
+    # settings is jsonb and strong parameters keep a JSON scalar's type, so a non-string value
+    # reaches the validator as one. It has to come back 422, not 500.
+    it 'reports a non-string value instead of raising' do
+      account.brand_name = 123
+
+      expect { account.valid? }.not_to raise_error
+      expect(account).not_to be_valid
+    end
+
     it 'accepts a name with characters the layout escapes' do
       account.brand_name = 'Ben & Jerry\'s "best"'
 
