@@ -276,5 +276,31 @@ RSpec.describe SendReplyJob do
 
       expect(Whatsapp::Session::Inbound::StatusTransition).not_to have_received(:fail_send)
     end
+
+    # The service skips the tracker on every attempt, and a retry_on block that returns
+    # normally never reaches the dead set. Without this report an SMTP outage lasting all
+    # five attempts would leave no trace in Sentry at all.
+    context 'when the retries are exhausted' do
+      let(:error) { Email::SendOnEmailService::TransientDeliveryError.new('mail server kept rejecting') }
+      let(:exception_tracker) { instance_double(ChatwootExceptionTracker, capture_exception: true) }
+
+      before { allow(ChatwootExceptionTracker).to receive(:new).and_return(exception_tracker) }
+
+      it 'reports the final failure once, with the account attached' do
+        described_class.report_exhausted_email_failure(email_message.id, error)
+
+        expect(ChatwootExceptionTracker).to have_received(:new).with(error, account: email_message.account)
+        expect(exception_tracker).to have_received(:capture_exception)
+      end
+
+      it 'still lets the message be marked failed when the tracker itself blows up' do
+        allow(ChatwootExceptionTracker).to receive(:new).and_raise(StandardError, 'sentry down')
+
+        expect { described_class.report_exhausted_email_failure(email_message.id, error) }.not_to raise_error
+
+        described_class.fail_message(email_message.id, error.message)
+        expect(email_message.reload.status).to eq('failed')
+      end
+    end
   end
 end

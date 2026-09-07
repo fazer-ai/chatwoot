@@ -38,7 +38,25 @@ class SendReplyJob < ApplicationJob
            wait: :polynomially_longer,
            attempts: 5 do |job, error|
     Rails.logger.error "SendReplyJob exhausted email retries for message #{job.arguments.first}: #{error.message}"
+    # Reported exactly once, here. The service stopped reporting per attempt on purpose,
+    # and returning normally from a retry_on block tells ActiveJob the exception was
+    # handled, so the job never reaches the dead set either. Without this call an SMTP
+    # outage lasting all five attempts would vanish from Sentry entirely -- the one
+    # failure that most deserves to be seen, and the only regression this retry chain
+    # introduced against the old capture-on-first-failure behaviour.
+    report_exhausted_email_failure(job.arguments.first, error)
     fail_message(job.arguments.first, error.message)
+  end
+
+  # Before fail_message, because fail_message re-raises on purpose when it cannot mark the
+  # message, and a raise there would skip the report. Swallows its own errors for the
+  # mirror-image reason: a tracker hiccup must not stop the message from being marked
+  # failed, which is what the agent actually sees.
+  def self.report_exhausted_email_failure(message_id, error)
+    message = Message.find_by(id: message_id)
+    ChatwootExceptionTracker.new(error, account: message&.account).capture_exception
+  rescue StandardError => e
+    Rails.logger.error "SendReplyJob could not report exhausted email failure for #{message_id}: #{e.class}: #{e.message}"
   end
 
   # Marks the message failed so the agent sees it and can resend. Through

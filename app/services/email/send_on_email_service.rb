@@ -11,30 +11,34 @@ class Email::SendOnEmailService < Base::SendOnChannelService
   # returns. So the test is not "is this error temporary?" but "does it prove the
   # server did NOT take the message?".
   #
-  # These prove it. A 4xx is the server saying so in words (RFC 5321: "not accepted,
-  # try again later"), and Net::SMTPServerBusy is the class Gmail's 451 throttling
-  # raises, which is the failure we actually hit. The rest fail while connecting or
-  # while writing, both before the server can have the message.
+  # Each entry below is here because it can only be raised before the server could have
+  # taken the message, and that was checked against net-smtp 0.3.4, not assumed:
   #
-  # Net::SMTPServerBusy only earns its place here because of the QUIT patch in
-  # config/initializers/monkey_patches/net_smtp_quit.rb. Without it net-smtp raises the
-  # very same class for a 4xx answered to QUIT, which arrives AFTER the message was
-  # accepted -- and retrying that is a duplicate. Do not drop that patch.
+  #   Net::SMTPServerBusy  a 4xx to a command is the server refusing that command in
+  #                        words (RFC 5321). It is also the class Gmail's 451 throttling
+  #                        raises, the failure that motivated all of this. It only stays
+  #                        unambiguous because of the QUIT patch in
+  #                        config/initializers/monkey_patches/net_smtp_quit.rb: without
+  #                        it, a 4xx answered to QUIT -- which arrives after the message
+  #                        was accepted -- raises this very class. Do not drop that patch.
+  #   Net::OpenTimeout     raised only from tcp_socket (smtp.rb:645) and
+  #                        ssl_socket_connect (smtp.rb:690). Connection setup, nothing else.
+  #   Errno::ECONNREFUSED  connect() only.
+  #   SocketError          getaddrinfo. The name did not even resolve.
   #
-  # Net::ReadTimeout, Errno::ECONNRESET and OpenSSL::SSL::SSLError are deliberately
-  # NOT here. They read as network blips, but each can also surface on the read of the
-  # 250 that follows the DATA terminator -- the message is already queued at the
-  # server and only the answer was lost. Retrying there sends the customer a second
-  # copy, and with five attempts, up to five. Ruby's Net::SMTP does not say which
-  # command was in flight, so the ambiguity cannot be resolved from here. They fall
-  # through to the handler below and mark the message failed, which is visible in the
-  # UI and recoverable by a human -- unlike a duplicate already in the customer's inbox.
+  # Everything else that looks transient is deliberately absent, and the reason is always
+  # the same one: Net::ReadTimeout, Errno::ECONNRESET, OpenSSL::SSL::SSLError,
+  # Errno::EHOSTUNREACH and Errno::ENETUNREACH can all also surface on the read of the 250
+  # that follows the DATA terminator. There the message is already queued at the server and
+  # only the answer was lost -- a route can disappear mid-session just as easily as at
+  # connect time. Ruby's Net::SMTP does not say which command was in flight, so the
+  # ambiguity cannot be resolved from here. They fall through to the handler below and mark
+  # the message failed: visible in the UI and recoverable by a human, unlike a duplicate
+  # already sitting in the customer's inbox.
   TRANSIENT_ERRORS = [
     Net::SMTPServerBusy,
     Net::OpenTimeout,
     Errno::ECONNREFUSED,
-    Errno::EHOSTUNREACH,
-    Errno::ENETUNREACH,
     SocketError
   ].freeze
 

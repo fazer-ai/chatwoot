@@ -163,7 +163,7 @@ describe Email::SendOnEmailService do
         allow(ChatwootExceptionTracker).to receive(:new).and_return(exception_tracker)
       end
 
-      [Net::ReadTimeout, Errno::ECONNRESET, OpenSSL::SSL::SSLError].each do |error_class|
+      [Net::ReadTimeout, Errno::ECONNRESET, OpenSSL::SSL::SSLError, Errno::EHOSTUNREACH, Errno::ENETUNREACH].each do |error_class|
         context "when the mail server raises #{error_class}" do
           before do
             allow(delivery).to receive(:deliver_now).and_raise(error_class, 'boom')
