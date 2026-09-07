@@ -136,7 +136,11 @@ class User < ApplicationRecord
   end
 
   def send_devise_notification(notification, *)
-    account = Current.account || accounts.first
+    # accounts.first only means something when there is one of them. For a user in several
+    # workspaces it is whichever row the database returns, and that arbitrary pick decides both
+    # the language and the brand of a personal credential email -- an email change confirmed
+    # from the profile screen would go out dressed as a workspace the person did not act in.
+    account = Current.account || (accounts.one? ? accounts.first : nil)
     devise_mailer.with(account: account).send(notification, self, *).deliver_later
   end
 

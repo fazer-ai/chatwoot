@@ -109,6 +109,27 @@ RSpec.describe ApplicationMailer do
       expect(body).not_to include 'Chatwoot'
     end
 
+    # confirmation_instructions doubles as the invitation and as a personal email
+    # reconfirmation. The invitation runs inside the account, so Current carries it; the
+    # reconfirmation does not, and picking accounts.first there dressed a personal email as an
+    # arbitrary workspace.
+    it 'falls back to the installation for a user who belongs to more than one account' do
+      user = create(:user, account: account)
+      create(:account_user, user: user, account: create(:account))
+
+      expect(Devise::Mailer).to receive(:with).with(account: nil).and_call_original
+
+      user.reload.send(:send_devise_notification, :confirmation_instructions)
+    end
+
+    it 'still uses the account of a user who belongs to exactly one' do
+      user = create(:user, account: account)
+
+      expect(Devise::Mailer).to receive(:with).with(account: account).and_call_original
+
+      user.reload.send(:send_devise_notification, :confirmation_instructions)
+    end
+
     it 'keeps a compliance notice on the installation brand, every action of it' do
       expect(AdministratorNotifications::AccountComplianceMailer.installation_branded_actions).to eq :all
     end
