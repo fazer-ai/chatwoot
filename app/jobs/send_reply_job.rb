@@ -29,6 +29,18 @@ class SendReplyJob < ApplicationJob
     fail_message(job.arguments.first, I18n.t('errors.inboxes.channel.outgoing.still_processing'))
   end
 
+  # Email has no delivery receipt to reconcile against, so a transient failure is only
+  # visible as an exception here. Its own retry chain, on an exception type raised solely
+  # by the email service, so widening it never touches another channel. Measured on one
+  # deployment: every email delivery failure in 30 days was transient, and most left the
+  # customer with no reply at all, because nothing in Chatwoot resends email.
+  retry_on Email::SendOnEmailService::TransientDeliveryError,
+           wait: :polynomially_longer,
+           attempts: 5 do |job, error|
+    Rails.logger.error "SendReplyJob exhausted email retries for message #{job.arguments.first}: #{error.message}"
+    fail_message(job.arguments.first, error.message)
+  end
+
   # Marks the message failed so the agent sees it and can resend. Through
   # StatusTransition because it owns the terminal-status rule and applies it under the
   # row lock: an attempt that timed out may still have reached WhatsApp, so a receipt
@@ -39,6 +51,8 @@ class SendReplyJob < ApplicationJob
     message = Message.find_by(id: message_id)
     return if message.blank?
 
+    return fail_email_message(message, reason) if message.conversation.inbox.channel.is_a?(Channel::Email)
+
     Whatsapp::Session::Inbound::StatusTransition.fail_send(message, reason)
   rescue StandardError => e
     # Logged AND re-raised. Returning normally from a retry_on block tells ActiveJob the
@@ -48,6 +62,18 @@ class SendReplyJob < ApplicationJob
     # unaccounted for, so the job has to die loudly and reach the dead-set handler.
     Rails.logger.error "SendReplyJob could not mark message #{message_id} as failed (#{reason}): #{e.class}: #{e.message}"
     raise
+  end
+
+  # Same guard as the WhatsApp path, for a different reason: `source_id` is written only
+  # after a successful `deliver_now`, so its presence is the one proof the mail left. A
+  # send that timed out may still have been accepted, and walking it back to failed here
+  # is what would put a duplicate in front of the customer on the next resend.
+  def self.fail_email_message(message, reason)
+    message.with_lock do
+      next if message.source_id.present?
+
+      Messages::StatusUpdateService.new(message, 'failed', reason).perform
+    end
   end
 
   CHANNEL_SERVICES = {

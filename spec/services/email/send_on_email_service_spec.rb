@@ -115,5 +115,39 @@ describe Email::SendOnEmailService do
         expect(message.reload.external_error).to eq(error_message)
       end
     end
+
+    context 'when the failure is transient' do
+      let(:exception_tracker) { instance_double(ChatwootExceptionTracker, capture_exception: true) }
+
+      before do
+        allow(mailer_context).to receive(:email_reply).with(message).and_return(delivery)
+        allow(ChatwootExceptionTracker).to receive(:new).and_return(exception_tracker)
+      end
+
+      described_class::TRANSIENT_ERRORS.each do |error_class|
+        context "when the mail server raises #{error_class}" do
+          before do
+            allow(delivery).to receive(:deliver_now).and_raise(error_class, 'boom')
+          end
+
+          it 'raises TransientDeliveryError so the job can retry' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError, /#{error_class}/)
+          end
+
+          it 'leaves the message unmarked, because the retry may still succeed' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError)
+
+            expect(message.reload.status).not_to eq('failed')
+            expect(message.reload.external_error).to be_blank
+          end
+
+          it 'does not report to the exception tracker on every attempt' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError)
+
+            expect(ChatwootExceptionTracker).not_to have_received(:new)
+          end
+        end
+      end
+    end
   end
 end

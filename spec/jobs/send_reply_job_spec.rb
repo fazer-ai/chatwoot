@@ -222,4 +222,59 @@ RSpec.describe SendReplyJob do
       expect(scheduled_in).to be > 30
     end
   end
+
+  # Email has no delivery receipt, so a 4xx or a timeout surfaces only as an exception on
+  # the send. Before this, any of them marked the message failed on the first try and
+  # nothing ever resent it, which is how a temporary throttle from the mail server became
+  # a customer who got no reply at all.
+  describe 'transient email delivery' do
+    let(:email_channel) { create(:channel_email) }
+    let(:email_message) do
+      create(:message, message_type: :outgoing, conversation: create(:conversation, inbox: email_channel.inbox))
+    end
+
+    # Asserted on the scheduled retry rather than on the handler list: retry_on is built
+    # on rescue_from, which matches with reverse_each, so a handler declared later for a
+    # broader class would shadow this one while a membership check still passed.
+    it 'retries instead of failing the message on the first attempt' do
+      # Realised before the expect block on purpose: creating an outgoing message enqueues
+      # a SendReplyJob of its own, and inside the block that one would be counted as the
+      # retry this example is asserting on.
+      message_id = email_message.id
+      service = instance_double(Email::SendOnEmailService)
+      allow(Email::SendOnEmailService).to receive(:new).and_return(service)
+      allow(service).to receive(:perform).and_raise(Email::SendOnEmailService::TransientDeliveryError, 'boom')
+
+      expect { described_class.perform_now(message_id) }.to have_enqueued_job(described_class)
+      expect(email_message.reload.status).not_to eq('failed')
+    end
+
+    it 'marks the message failed once the retries run out' do
+      described_class.fail_message(email_message.id, 'mail server kept rejecting')
+
+      expect(email_message.reload.status).to eq('failed')
+      expect(email_message.external_error).to eq('mail server kept rejecting')
+    end
+
+    # source_id is written only after a successful deliver_now, so its presence is the one
+    # proof the mail left. A send that timed out may still have been accepted, and marking
+    # it failed here is what would put a duplicate in front of the customer on a resend.
+    it 'leaves a message that already has a source_id alone' do
+      email_message.update!(source_id: 'conversation/abc/messages/1@example.com')
+
+      described_class.fail_message(email_message.id, 'retries exhausted')
+
+      expect(email_message.reload.status).not_to eq('failed')
+      expect(email_message.external_error).to be_blank
+    end
+
+    # The WhatsApp path goes through StatusTransition, which knows nothing about email.
+    it 'does not route an email failure through the WhatsApp status transition' do
+      allow(Whatsapp::Session::Inbound::StatusTransition).to receive(:fail_send)
+
+      described_class.fail_message(email_message.id, 'mail server kept rejecting')
+
+      expect(Whatsapp::Session::Inbound::StatusTransition).not_to have_received(:fail_send)
+    end
+  end
 end
