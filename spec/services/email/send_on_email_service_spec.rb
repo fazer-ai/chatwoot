@@ -115,5 +115,73 @@ describe Email::SendOnEmailService do
         expect(message.reload.external_error).to eq(error_message)
       end
     end
+
+    context 'when the failure is transient' do
+      let(:exception_tracker) { instance_double(ChatwootExceptionTracker, capture_exception: true) }
+
+      before do
+        allow(mailer_context).to receive(:email_reply).with(message).and_return(delivery)
+        allow(ChatwootExceptionTracker).to receive(:new).and_return(exception_tracker)
+      end
+
+      described_class::TRANSIENT_ERRORS.each do |error_class|
+        context "when the mail server raises #{error_class}" do
+          before do
+            allow(delivery).to receive(:deliver_now).and_raise(error_class, 'boom')
+          end
+
+          it 'raises TransientDeliveryError so the job can retry' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError, /#{error_class}/)
+          end
+
+          it 'leaves the message unmarked, because the retry may still succeed' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError)
+
+            expect(message.reload.status).not_to eq('failed')
+            expect(message.reload.external_error).to be_blank
+          end
+
+          it 'does not report to the exception tracker on every attempt' do
+            expect { service.perform }.to raise_error(described_class::TransientDeliveryError)
+
+            expect(ChatwootExceptionTracker).not_to have_received(:new)
+          end
+        end
+      end
+    end
+
+    # These look transient, and that is exactly the trap: each one can also surface on
+    # the read of the 250 that follows the DATA terminator, with the message already
+    # queued at the server. A retry there is a second copy in the customer's inbox, so
+    # they must fail instead of retrying. Locked down here because the fix is one line
+    # in a list and reads like an oversight to anyone who has not hit the duplicate.
+    context 'when the failure cannot prove the message was not sent' do
+      let(:exception_tracker) { instance_double(ChatwootExceptionTracker, capture_exception: true) }
+
+      before do
+        allow(mailer_context).to receive(:email_reply).with(message).and_return(delivery)
+        allow(ChatwootExceptionTracker).to receive(:new).and_return(exception_tracker)
+      end
+
+      [Net::ReadTimeout, Errno::ECONNRESET, OpenSSL::SSL::SSLError].each do |error_class|
+        context "when the mail server raises #{error_class}" do
+          before do
+            allow(delivery).to receive(:deliver_now).and_raise(error_class, 'boom')
+          end
+
+          it 'is not treated as transient, so the job never re-sends the email' do
+            expect(described_class::TRANSIENT_ERRORS).not_to include(error_class)
+
+            expect { service.perform }.not_to raise_error
+          end
+
+          it 'marks the message failed instead' do
+            service.perform
+
+            expect(message.reload.status).to eq('failed')
+          end
+        end
+      end
+    end
   end
 end
