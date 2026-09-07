@@ -16,6 +16,11 @@ class Email::SendOnEmailService < Base::SendOnChannelService
   # raises, which is the failure we actually hit. The rest fail while connecting or
   # while writing, both before the server can have the message.
   #
+  # Net::SMTPServerBusy only earns its place here because of the QUIT patch in
+  # config/initializers/monkey_patches/net_smtp_quit.rb. Without it net-smtp raises the
+  # very same class for a 4xx answered to QUIT, which arrives AFTER the message was
+  # accepted -- and retrying that is a duplicate. Do not drop that patch.
+  #
   # Net::ReadTimeout, Errno::ECONNRESET and OpenSSL::SSL::SSLError are deliberately
   # NOT here. They read as network blips, but each can also surface on the read of the
   # 250 that follows the DATA terminator -- the message is already queued at the
