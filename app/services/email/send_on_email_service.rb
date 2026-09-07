@@ -6,19 +6,31 @@ class Email::SendOnEmailService < Base::SendOnChannelService
   # silently change how every other channel behaves on a network blip.
   class TransientDeliveryError < StandardError; end
 
-  # RFC 5321 reserves 4xx for "the command was not accepted, try again later", and a
-  # timeout or reset connection carries no verdict at all. Net::SMTPServerBusy is the
-  # 4xx one -- it covers Gmail's 451 throttling, which is what we actually hit.
+  # Only failures that carry a verdict belong here, because a retry re-sends the email
+  # and `source_id` -- the one proof a copy already left -- is written after delivery
+  # returns. So the test is not "is this error temporary?" but "does it prove the
+  # server did NOT take the message?".
+  #
+  # These prove it. A 4xx is the server saying so in words (RFC 5321: "not accepted,
+  # try again later"), and Net::SMTPServerBusy is the class Gmail's 451 throttling
+  # raises, which is the failure we actually hit. The rest fail while connecting or
+  # while writing, both before the server can have the message.
+  #
+  # Net::ReadTimeout, Errno::ECONNRESET and OpenSSL::SSL::SSLError are deliberately
+  # NOT here. They read as network blips, but each can also surface on the read of the
+  # 250 that follows the DATA terminator -- the message is already queued at the
+  # server and only the answer was lost. Retrying there sends the customer a second
+  # copy, and with five attempts, up to five. Ruby's Net::SMTP does not say which
+  # command was in flight, so the ambiguity cannot be resolved from here. They fall
+  # through to the handler below and mark the message failed, which is visible in the
+  # UI and recoverable by a human -- unlike a duplicate already in the customer's inbox.
   TRANSIENT_ERRORS = [
     Net::SMTPServerBusy,
     Net::OpenTimeout,
-    Net::ReadTimeout,
-    Errno::ECONNRESET,
     Errno::ECONNREFUSED,
     Errno::EHOSTUNREACH,
     Errno::ENETUNREACH,
-    SocketError,
-    OpenSSL::SSL::SSLError
+    SocketError
   ].freeze
 
   private
