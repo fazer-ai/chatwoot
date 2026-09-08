@@ -62,6 +62,17 @@ describe('Branding', () => {
     expect(wrapper.text()).toContain('Propulsé par Guichê Live');
   });
 
+  // brand_name only rejects `<>`, so `$` reaches here. As a replacement string those are
+  // syntax: "ACME $$" would render "ACME $", and "$&" would put the vendor's name back.
+  it('inserts a brand containing replacement syntax literally', () => {
+    expect(mountBranding({ brandName: 'ACME $$' }).text()).toContain(
+      'Powered by ACME $$'
+    );
+    expect(mountBranding({ brandName: '$&' }).text()).toContain(
+      'Powered by $&'
+    );
+  });
+
   it('falls back to the interpolated key where there is no Latin name to substitute', () => {
     const wrapper = mountBranding(
       { brandName: 'Guichê Live' },

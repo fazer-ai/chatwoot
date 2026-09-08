@@ -18,7 +18,9 @@ export function useBranding() {
     const installationName = globalConfig.value?.installationName;
     if (!installationName) return text;
 
-    return text.replace(/chatwoot/gi, installationName);
+    // Callback, not a string: `$$`, `$&` and `$1` are replacement syntax, so an installation
+    // named "ACME $$" would render "ACME $".
+    return text.replace(/chatwoot/gi, () => installationName);
   };
 
   return {

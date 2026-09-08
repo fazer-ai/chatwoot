@@ -56,7 +56,10 @@ export default {
       const template = this.$t('POWERED_BY');
       if (!this.brandName) return this.replaceInstallationName(template);
 
-      const substituted = template.replace(/chatwoot/gi, this.brandName);
+      // Callback, not a string: in a replacement string `$$`, `$&` and `$1` are syntax, and
+      // brand_name only rejects `<>`, so a brand of "ACME $$" would render "ACME $" and one of
+      // "$&" would put "Chatwoot" back. A function inserts whatever it returns, verbatim.
+      const substituted = template.replace(/chatwoot/gi, () => this.brandName);
       return substituted === template
         ? this.$t('POWERED_BY_BRAND', { brandName: this.brandName })
         : substituted;
