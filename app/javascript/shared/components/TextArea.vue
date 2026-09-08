@@ -17,6 +17,12 @@ export default {
       type: String,
       default: '',
     },
+    // So a caller can label the field with its own <label for>, which is what a screen reader
+    // needs when the visible label lives outside this component.
+    id: {
+      type: String,
+      default: '',
+    },
   },
   emits: ['update:modelValue'],
   computed: {
@@ -44,12 +50,17 @@ export default {
     >
       {{ label }}
     </div>
+    <!-- The focus border used to be the same colour as the resting one, which is a focus
+         state nobody can see. -->
     <textarea
+      :id="id"
       v-model="computedModel"
       class="w-full px-3 py-2 leading-tight border rounded outline-none resize-none text-n-gray-12"
       :class="{
-        'border-n-weak hover:border-n-weak focus:border-n-weak': !error,
-        'border-n-ruby-9 hover:border-n-ruby-9 focus:border-n-ruby-9': error,
+        'border-n-weak hover:border-n-slate-8 focus:border-n-slate-9 focus:ring-1 focus:ring-n-slate-9':
+          !error,
+        'border-n-ruby-9 hover:border-n-ruby-9 focus:border-n-ruby-9 focus:ring-1 focus:ring-n-ruby-9':
+          error,
       }"
       :placeholder="placeholder"
     />

@@ -48,7 +48,7 @@ const getStarClass = value => {
       v-for="value in starRatings"
       :key="value"
       type="button"
-      class="rounded-full p-1 transition-all duration-200 focus:enabled:scale-[1.2] focus-within:enabled:scale-[1.2] hover:enabled:scale-[1.2] focus:outline-none flex items-center flex-shrink-0"
+      class="rounded-full p-1 transition-all duration-200 focus:enabled:scale-[1.2] focus-within:enabled:scale-[1.2] hover:enabled:scale-[1.2] focus:outline-none focus-visible:ring-2 focus-visible:ring-n-slate-9 flex items-center flex-shrink-0"
       :class="{ 'cursor-not-allowed opacity-50': isDisabled }"
       :disabled="isDisabled"
       :aria-label="'Star ' + value"

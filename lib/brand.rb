@@ -9,10 +9,19 @@
 # by field -- setting only a colour keeps the installation's name and logo -- so an install
 # that configures nothing behaves exactly as it did before.
 #
-# The scope is email. The dashboard, the favicon, the PWA manifest and the widget are the
-# installation's own surfaces and stay global; see CUSTOM_BRANDING.md.
+# The scope is what the customer sees: email, and the public pages a contact of that account
+# opens. #config serves the mail layouts, #web_config serves those pages. The dashboard, the
+# login page, the favicon, the PWA manifest and the widget are the installation's own
+# surfaces and stay global; see CUSTOM_BRANDING.md.
 class Brand
+  # Published contract: layouts that customers already stored in email_templates read this
+  # hash as `global_config`, so adding a key here changes what those layouts see. Keys the
+  # mail layouts have no use for belong in WEB_KEYS instead.
   INSTALLATION_KEYS = %w[BRAND_NAME BRAND_URL BRAND_COLOR LOGO_EMAIL LOGO].freeze
+
+  # The public pages want a different set: a small thumbnail for the footer, the widget's
+  # brand URL, and a logo that may be a vector, since a browser renders what email cannot.
+  WEB_KEYS = %w[BRAND_NAME BRAND_COLOR WIDGET_BRAND_URL LOGO_THUMBNAIL].freeze
 
   # Email clients render none of the vector formats, so a logo that is not one of these puts a
   # broken image at the top of every email, which reads worse than the no-logo layout.
@@ -59,12 +68,37 @@ class Brand
     account_logo_url || absolute_url(installation_logo)
   end
 
+  # Keyed like the installation config, same as #config, so the page reads one shape whether
+  # the brand came from the account or from the installation.
+  def web_config
+    web_installation.merge(
+      'BRAND_NAME' => name,
+      # The account's own brand_url, but falling back to WIDGET_BRAND_URL rather than to
+      # BRAND_URL: that is the link this page already carries, and an install that points the
+      # two at different places meant the difference.
+      'WIDGET_BRAND_URL' => override(:brand_url) || web_installation['WIDGET_BRAND_URL'],
+      'LOGO_THUMBNAIL' => account_logo_url || web_installation['LOGO_THUMBNAIL'],
+      # Only ever the account's own logo. Falling back to the installation's would put one
+      # company's mark on top of another company's page, and today the page simply shows no
+      # logo in that case, which is the honest thing to keep doing.
+      'BRAND_LOGO_URL' => account_logo_url.to_s,
+      'BRAND_COLOR' => BrandColor.surface(color),
+      # Darkened to 4.5:1 against white. Contrast is symmetric, so the same value is also what
+      # makes white label text on top of it legible -- no second colour to compute.
+      'BRAND_COLOR_STRONG' => BrandColor.on_light(color)
+    )
+  end
+
   private
 
   attr_reader :account, :inbox
 
   def installation
     @installation ||= GlobalConfig.get(*INSTALLATION_KEYS)
+  end
+
+  def web_installation
+    @web_installation ||= GlobalConfig.get(*WEB_KEYS)
   end
 
   # Blank falls back rather than meaning "no name", which is what the settings screen promises

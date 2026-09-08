@@ -4,7 +4,7 @@
     "FORM": {
       "EMAIL_BRANDING": {
         "TITLE": "Marca de los correos",
-        "NOTE": "Cómo se ven los correos de esta cuenta. Lo que quede vacío usa la identidad de la instalación. Aplica solo al correo: el panel, el favicon y el widget mantienen la marca de la instalación.",
+        "NOTE": "Cómo se ven los correos y la página de encuesta CSAT de esta cuenta. Lo que quede vacío usa la identidad de la instalación. Aplica a lo que ven tus clientes: el panel, el favicon y el widget mantienen la marca de la instalación.",
         "NAME": {
           "LABEL": "Nombre de la marca",
           "PLACEHOLDER": "Tu empresa",

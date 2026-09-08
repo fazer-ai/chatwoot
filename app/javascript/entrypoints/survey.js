@@ -9,6 +9,9 @@ import { domPurifyConfig } from '../shared/helpers/HTMLSanitizer';
 const app = createApp(App);
 const i18n = createI18n({
   locale: 'en',
+  // Only a few languages carry the fork's own strings, so without this a survey served in any
+  // other locale renders the raw key -- inside an aria-label, in the case of the rating scale.
+  fallbackLocale: 'en',
   messages: i18nMessages,
 });
 

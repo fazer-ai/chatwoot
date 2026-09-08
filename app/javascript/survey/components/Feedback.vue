@@ -48,16 +48,22 @@ export default {
 
 <template>
   <div class="mt-6">
-    <label class="text-base font-medium text-n-slate-12">
+    <label for="survey-feedback" class="text-base font-medium text-n-slate-12">
       {{ $t('SURVEY.FEEDBACK.LABEL') }}
     </label>
     <TextArea
+      id="survey-feedback"
       v-model="feedback"
       class="my-5"
       :placeholder="$t('SURVEY.FEEDBACK.PLACEHOLDER')"
     />
-    <div class="flex items-center float-right font-medium">
-      <CustomButton :disabled="isSubmitDisabled" @click="onClick">
+    <div class="flex justify-end font-medium">
+      <CustomButton
+        :disabled="isSubmitDisabled"
+        bg-color="var(--survey-brand-strong)"
+        class="w-full sm:w-auto hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)]"
+        @click="onClick"
+      >
         <Spinner v-if="isUpdating" class="p-0" />
         {{ $t('SURVEY.FEEDBACK.BUTTON_TEXT') }}
       </CustomButton>

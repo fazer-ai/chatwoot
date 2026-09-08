@@ -1,72 +1,51 @@
-<script>
+<script setup>
 import { CSAT_RATINGS } from 'shared/constants/messages';
 
-export default {
-  props: {
-    selectedRating: {
-      type: Number,
-      default: null,
-    },
-    isDisabled: {
-      type: Boolean,
-      default: false,
-    },
+const props = defineProps({
+  selectedRating: {
+    type: Number,
+    default: null,
   },
-  emits: ['selectRating'],
-  data() {
-    return {
-      ratings: CSAT_RATINGS,
-    };
+  isDisabled: {
+    type: Boolean,
+    default: false,
   },
+});
 
-  methods: {
-    buttonClass(rating) {
-      return [
-        { selected: rating.value === this.selectedRating },
-        { disabled: this.isDisabled },
-        { hover: this.isDisabled },
-        'emoji-button shadow-none text-3xl lg:text-4xl outline-none mr-8',
-      ];
-    },
-    onClick(rating) {
-      if (this.isDisabled) return;
-      this.$emit('selectRating', rating.value);
-    },
-  },
-};
+const emit = defineEmits(['selectRating']);
+
+const ratings = CSAT_RATINGS;
+
+// No scale on hover. A touch device keeps :hover on the last element touched, so an
+// unselected face would stay enlarged and coloured, lying about the state. Selection alone
+// carries the emphasis now.
+const buttonClass = rating => [
+  'flex h-12 w-12 items-center justify-center rounded-full text-3xl transition',
+  'sm:h-14 sm:w-14 sm:text-4xl',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+  'focus-visible:ring-[color:var(--survey-brand)]',
+  'disabled:cursor-default disabled:opacity-50',
+  rating.value === props.selectedRating
+    ? 'grayscale-0 bg-n-slate-3 ring-2 ring-[color:var(--survey-brand)]'
+    : 'grayscale enabled:hover:grayscale-0',
+];
 </script>
 
 <template>
-  <div class="customer-satisfcation mb-2">
-    <div class="ratings flex py-5 px-0">
-      <button
-        v-for="rating in ratings"
-        :key="rating.key"
-        :class="buttonClass(rating)"
-        @click="onClick(rating)"
-      >
-        {{ rating.emoji }}
-      </button>
-    </div>
+  <div class="flex flex-wrap gap-2 py-4 sm:gap-3">
+    <button
+      v-for="rating in ratings"
+      :key="rating.key"
+      type="button"
+      :disabled="isDisabled"
+      :aria-label="$t(rating.translationKey)"
+      :aria-pressed="rating.value === selectedRating"
+      :class="buttonClass(rating)"
+      @click="emit('selectRating', rating.value)"
+    >
+      <!-- The label above already says "Good"; without this a screen reader would read the
+           glyph name on top of it. -->
+      <span aria-hidden="true">{{ rating.emoji }}</span>
+    </button>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.emoji-button {
-  filter: grayscale(100%);
-  &.selected,
-  &:hover,
-  &:focus,
-  &:active {
-    filter: grayscale(0%);
-    transform: scale(1.32);
-    transition: transform 300ms;
-  }
-
-  &.disabled {
-    cursor: default;
-    opacity: 0.5;
-    pointer-events: none;
-  }
-}
-</style>

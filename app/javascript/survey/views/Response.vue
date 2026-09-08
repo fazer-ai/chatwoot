@@ -44,6 +44,23 @@ export default {
     };
   },
   computed: {
+    // Read here rather than destructured at module scope: the spec mounts without setting the
+    // global, and a module-level read would freeze whatever existed at import time.
+    pageConfig() {
+      return window.globalConfig || {};
+    },
+    brandName() {
+      return this.pageConfig.BRAND_NAME || '';
+    },
+    brandLogo() {
+      return this.pageConfig.BRAND_LOGO_URL || '';
+    },
+    disableBranding() {
+      return Boolean(this.pageConfig.DISABLE_BRANDING);
+    },
+    selectedRatingDetails() {
+      return CSAT_RATINGS.find(({ value }) => value === this.selectedRating);
+    },
     surveyId() {
       // Read the path, not the href: the rating links in the survey email carry a
       // query string, which would otherwise be taken as part of the uuid.
@@ -143,7 +160,9 @@ export default {
       this.isLoading = true;
       try {
         const result = await getSurveyDetails({ uuid: this.surveyId });
-        this.logo = result.data.inbox_avatar_url;
+        // The inbox avatar is optional, and an inbox without one used to leave the page with
+        // no mark at all. The account's own logo is the right thing to fall back to.
+        this.logo = result.data.inbox_avatar_url || this.brandLogo;
         this.inboxName = result.data.inbox_name;
         this.surveyDetails = result?.data?.csat_survey_response;
         this.selectedRating = this.surveyDetails?.rating;
@@ -210,19 +229,24 @@ export default {
 <template>
   <div
     v-if="isLoading"
-    class="flex items-center justify-center flex-1 h-full min-h-screen bg-n-background"
+    class="flex items-center justify-center flex-1 h-full min-h-[100dvh] bg-n-background"
   >
     <Spinner size="" />
   </div>
   <div
     v-else
-    class="flex items-center justify-center w-full h-full min-h-screen overflow-auto bg-n-background"
+    class="flex items-center justify-center w-full h-full min-h-[100dvh] overflow-auto bg-n-background"
   >
     <div
-      class="flex flex-col w-full h-full bg-n-solid-1 rounded-lg border border-solid border-n-weak shadow-md lg:w-2/5 lg:h-auto"
+      class="flex flex-col w-full h-full bg-n-solid-1 border border-solid border-n-weak sm:h-auto sm:w-full sm:max-w-xl sm:rounded-lg sm:shadow-md"
     >
-      <div class="w-full px-12 pt-12 pb-6 m-auto my-0">
-        <img v-if="logo" :src="logo" alt="Chatwoot logo" class="mb-6 logo" />
+      <div class="w-full px-6 py-8 m-auto my-0 sm:px-10 sm:pt-10 sm:pb-6">
+        <img
+          v-if="logo"
+          :src="logo"
+          :alt="inboxName || brandName"
+          class="mb-6 max-h-12 w-auto object-contain"
+        />
         <div
           v-if="!isRatingSubmitted"
           v-dompurify-html="formattedMessageContent"
@@ -234,25 +258,40 @@ export default {
           :show-error="shouldShowErrorMessage"
           :message="message"
         />
-        <label
+        <p
           v-if="!isRatingSubmitted"
+          id="survey-rating-label"
           class="mb-4 text-base font-medium text-n-slate-11"
         >
           {{ $t('SURVEY.RATING.LABEL') }}
-        </label>
-        <Rating
-          v-if="isEmojiType"
-          :selected-rating="selectedRating"
-          :is-disabled="isFeedbackSubmitted || isUpdating"
-          @select-rating="selectRating"
-        />
-        <StarRating
-          v-if="isStarType"
-          :selected-rating="selectedRating"
-          :is-disabled="isFeedbackSubmitted || isUpdating"
-          class="[&>button>span]:text-4xl !justify-start !px-0"
-          @select-rating="selectRating"
-        />
+        </p>
+        <p
+          v-else-if="selectedRatingDetails"
+          class="mb-4 text-base text-n-slate-11"
+        >
+          {{
+            $t('SURVEY.RATING.SELECTED', {
+              rating: $t(selectedRatingDetails.translationKey),
+            })
+          }}
+        </p>
+        <!-- group, not radiogroup: the latter promises arrow-key navigation, which would mean
+             managing roving focus for five buttons that already tab fine. -->
+        <div role="group" aria-labelledby="survey-rating-label">
+          <Rating
+            v-if="isEmojiType"
+            :selected-rating="selectedRating"
+            :is-disabled="isFeedbackSubmitted || isUpdating"
+            @select-rating="selectRating"
+          />
+          <StarRating
+            v-if="isStarType"
+            :selected-rating="selectedRating"
+            :is-disabled="isFeedbackSubmitted || isUpdating"
+            class="[&>button>span]:text-4xl !justify-start !px-0"
+            @select-rating="selectRating"
+          />
+        </div>
         <div
           v-if="isPendingConfirmation"
           class="mt-6 flex flex-col items-start gap-3"
@@ -260,7 +299,14 @@ export default {
           <p class="text-base text-n-slate-11 m-0">
             {{ $t('SURVEY.RATING.CONFIRM_LABEL') }}
           </p>
-          <CustomButton :disabled="isUpdating" @click="confirmRating">
+          <!-- bg-color as a prop, not a bg-* class: with no inline styles the button applies
+               bg-n-brand itself, and the two would fight over source order. -->
+          <CustomButton
+            :disabled="isUpdating"
+            bg-color="var(--survey-brand-strong)"
+            class="w-full sm:w-auto hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)]"
+            @click="confirmRating"
+          >
             <Spinner v-if="isUpdating" class="p-0" />
             {{ $t('SURVEY.RATING.CONFIRM_BUTTON') }}
           </CustomButton>
@@ -274,14 +320,12 @@ export default {
         />
       </div>
       <div class="mb-3">
-        <Branding />
+        <Branding
+          :brand-name="brandName"
+          :own-logo="Boolean(brandLogo)"
+          :disable-branding="disableBranding"
+        />
       </div>
     </div>
   </div>
 </template>
-
-<style scoped lang="scss">
-.logo {
-  max-height: 3rem;
-}
-</style>

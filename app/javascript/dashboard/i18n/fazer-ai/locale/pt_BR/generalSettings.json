@@ -4,7 +4,7 @@
     "FORM": {
       "EMAIL_BRANDING": {
         "TITLE": "Marca dos e-mails",
-        "NOTE": "Como os e-mails desta conta aparecem. O que ficar em branco usa a identidade da instalação. Vale só para e-mail: o painel, o favicon e o widget continuam com a marca da instalação.",
+        "NOTE": "Como os e-mails e a página de pesquisa de satisfação desta conta aparecem. O que ficar em branco usa a identidade da instalação. Vale para o que o seu cliente vê: o painel, o favicon e o widget continuam com a marca da instalação.",
         "NAME": {
           "LABEL": "Nome da marca",
           "PLACEHOLDER": "Sua empresa",
