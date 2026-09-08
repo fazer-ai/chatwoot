@@ -32,6 +32,7 @@ export const CAPABILITIES = {
   CHECK_NUMBER: 'check_number',
   PROFILE_PICTURE: 'profile_picture',
   GROUPS: 'groups',
+  GROUP_MANAGEMENT: 'group_management',
   GROUP_ADMIN: 'group_admin',
   GROUP_INVITES: 'group_invites',
   GROUP_JOIN_REQUESTS: 'group_join_requests',

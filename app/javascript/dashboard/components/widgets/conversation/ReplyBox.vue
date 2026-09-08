@@ -193,7 +193,9 @@ export default {
     groupMembersFetchTarget() {
       if (!this.groupContactId || !this.isGroupConversation) return null;
 
-      return this.hasInboxCapability(CAPABILITIES.GROUPS)
+      // The roster is a provider group read, so this asks for the command surface and
+      // not for group conversations arriving.
+      return this.hasInboxCapability(CAPABILITIES.GROUP_MANAGEMENT)
         ? this.groupContactId
         : null;
     },
