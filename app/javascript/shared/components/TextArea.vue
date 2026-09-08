@@ -51,13 +51,14 @@ export default {
       {{ label }}
     </div>
     <!-- The focus border used to be the same colour as the resting one, which is a focus
-         state nobody can see. -->
+         state nobody can see. It takes --survey-brand where the page defines it, so the
+         survey's primary control carries the account's colour like every other one. -->
     <textarea
       :id="id"
       v-model="computedModel"
       class="w-full px-4 py-3 leading-relaxed border rounded-xl outline-none resize-none text-n-gray-12"
       :class="{
-        'border-n-weak hover:border-n-slate-8 focus:border-n-slate-9 focus:ring-1 focus:ring-n-slate-9':
+        'border-n-weak hover:border-n-slate-8 focus:border-[color:var(--survey-brand,rgb(var(--slate-9)))] focus:ring-1 focus:ring-[color:var(--survey-brand,rgb(var(--slate-9)))]':
           !error,
         'border-n-ruby-9 hover:border-n-ruby-9 focus:border-n-ruby-9 focus:ring-1 focus:ring-n-ruby-9':
           error,

@@ -101,9 +101,15 @@ export default {
            mark of whoever owns it is not a badge, so that one keeps its colour.
            max-w rather than a square box: an account's mark is a wide email header logo, and
            squeezing it into 12x12 leaves an illegible smudge. A square installation thumbnail
-           still renders exactly as before. -->
+           still renders exactly as before.
+
+           Height, not just width, is what has to give for a wide mark: a 391x121 logo capped at
+           12px tall comes out 39px wide, so max-w-16 never engages and the wordmark inside is
+           unreadable. Only the own-logo case is raised -- the vendor badge stays the size it
+           has always been. -->
       <img
-        class="ltr:mr-1 rtl:ml-1 max-h-3 w-auto max-w-16 object-contain"
+        class="ltr:mr-1 rtl:ml-1 w-auto object-contain"
+        :class="ownLogo ? 'max-h-5 max-w-24' : 'max-h-3 max-w-16'"
         :alt="displayedBrandName"
         :src="globalConfig.logoThumbnail"
       />
