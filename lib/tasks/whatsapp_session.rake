@@ -165,11 +165,17 @@ namespace :whatsapp do
 
         channel = WhatsappProviderConversion.channel_for(args[:inbox_id])
         # The capability, not the family: `zapi` pairs with a phone and so is session
-        # family, but it declares no `groups` and its frozen service has no `sync_group`,
-        # so every job this enqueued for one would die on NoMethodError. Reading the
-        # capability also honours the instance-wide groups kill switch for free.
-        unless Whatsapp::Session::Registry.capabilities_for(channel).include?('groups')
-          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which cannot answer for groups"
+        # family, but it declares no group capability and its frozen service has no
+        # `sync_group`, so every job this enqueued for one would die on NoMethodError.
+        # Reading the capability also honours the instance-wide groups kill switch for
+        # free.
+        #
+        # `group_management` and not `groups`: what this enqueues is a roster sync, which
+        # reads the group from the provider. An inbox that takes group conversations and
+        # answers no group commands would pass a `groups` check, enqueue a job per group
+        # contact, have every one of them return without syncing, and report success.
+        unless Whatsapp::Session::Registry.capabilities_for(channel).include?('group_management')
+          abort "inbox #{args[:inbox_id]} is on #{channel.provider}, which cannot be asked about groups"
         end
 
         inbox = channel.inbox

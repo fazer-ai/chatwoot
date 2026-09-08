@@ -36,4 +36,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupActivity do
 
     expect(Contacts::SyncGroupJob).to have_been_enqueued.with(anything, soft: true, channel: channel)
   end
+
+  # The job's 15 minute cooldown reads `group_last_synced_at`, which the syncer writes and
+  # a refused sync never reaches. Without this gate the cooldown would never engage on a
+  # receive-only inbox, and every reported activity would enqueue another job that does
+  # nothing -- for as long as the group is active.
+  it 'does not enqueue a roster sync that cannot run' do
+    allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+
+    with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+      expect { dispatch }.not_to have_enqueued_job(Contacts::SyncGroupJob)
+    end
+  end
 end

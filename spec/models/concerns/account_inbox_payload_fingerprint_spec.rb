@@ -26,6 +26,20 @@ RSpec.describe AccountInboxPayloadFingerprint do
     end
   end
 
+  # The version is what covers the third case, and it is the one with no runtime signal at
+  # all: a capability added to a descriptor changes what the payload carries while the
+  # record, the env and the payload's shape all stay put. Nothing here can detect that the
+  # bump was forgotten, so this asserts the only thing it can -- that the version is part
+  # of the key, and that moving it moves the key.
+  it 'changes when the payload version is bumped' do
+    before_bump = inbox_key
+
+    stub_const('AccountInboxPayloadFingerprint::PAYLOAD_VERSION',
+               AccountInboxPayloadFingerprint::PAYLOAD_VERSION + 1)
+
+    expect(inbox_key).not_to eq(before_bump)
+  end
+
   # Not a capability, and older than this concern: the same gap applies to anything in the
   # payload that comes from configuration rather than from the record.
   it 'changes when the inbound email domain is configured' do

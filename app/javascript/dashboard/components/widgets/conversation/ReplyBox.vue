@@ -193,6 +193,11 @@ export default {
     groupMembersFetchTarget() {
       if (!this.groupContactId || !this.isGroupConversation) return null;
 
+      // `groups` and not `group_management`: this fetch reads the GroupMember rows the
+      // inbound path already filed, through Chatwoot's own API, and never reaches the
+      // provider. Asking for the command surface here would leave a receive-only inbox
+      // without `is_inbox_admin`, and an announcement-only group would look replyable
+      // until the server refused the message.
       return this.hasInboxCapability(CAPABILITIES.GROUPS)
         ? this.groupContactId
         : null;

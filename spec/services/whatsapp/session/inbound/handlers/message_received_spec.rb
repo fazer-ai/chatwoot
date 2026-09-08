@@ -483,6 +483,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       expect(inbox.messages).to be_empty
     end
 
+    # `groups` and `group_management` are two questions. This is the half that decides
+    # whether the thread exists at all, and an inbox whose provider answers no group
+    # commands still takes the conversation -- otherwise the split would be a way to lose
+    # messages rather than a way to withhold a panel.
+    it 'opens the group conversation without the group command surface' do
+      allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect(dispatch).to eq(:handled)
+      end
+
+      expect(inbox.contacts.find_by(identifier: '120363041234567890@g.us')).to be_present
+    end
+
     it 'opens the group conversation and files the sender as a member' do
       with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
         expect(dispatch).to eq(:handled)

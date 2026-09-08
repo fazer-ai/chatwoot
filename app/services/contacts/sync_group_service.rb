@@ -5,7 +5,7 @@ class Contacts::SyncGroupService
     validate_group_contact!
 
     channel = self.channel || contact.group_channel
-    raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') if channel.blank? || !channel.respond_to?(:sync_group)
+    raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') unless syncable?(channel)
 
     conversation = find_or_create_sync_conversation(channel)
     raise ActionController::BadRequest, I18n.t('contacts.sync_group.no_supported_inbox') if conversation.blank?
@@ -18,6 +18,26 @@ class Contacts::SyncGroupService
   end
 
   private
+
+  # Answering the method is not the same as being able to carry it out. An inbox on the
+  # session layer that takes group conversations and answers no group commands responds
+  # to `sync_group` and then returns without syncing, so without this the endpoint would
+  # build a conversation, dispatch CONTACT_GROUP_SYNCED and report success over a roster
+  # nobody read.
+  #
+  # Reported as the inbox not supporting group sync, which is what it is, and which is
+  # what this refusal already says for a channel that has no such method at all.
+  #
+  # Asked only of the providers the split applies to. A legacy provider's own service
+  # decides for itself whether it can sync, and reading the descriptor's capability list
+  # for one would newly refuse this endpoint whenever the installation-wide groups switch
+  # is off -- a reach this change has no business extending.
+  def syncable?(channel)
+    return false if channel.blank? || !channel.respond_to?(:sync_group)
+    return true unless Whatsapp::Session::Registry.session_backed?(channel)
+
+    Whatsapp::Session::Registry.capabilities_for(channel).include?('group_management')
+  end
 
   def find_or_create_sync_conversation(channel)
     contact_inbox = sync_contact_inbox(channel)
