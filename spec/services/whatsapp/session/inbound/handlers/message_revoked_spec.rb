@@ -258,6 +258,57 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
     end
   end
 
+  # The frame below is not written by hand: it was captured from the connector's own live
+  # group phase against two real accounts on 08/09/2026, at 292a2a6, which is the commit
+  # this contract is vendored from. Every other example here builds the payload through
+  # the model, so a field arriving under a name the model does not read would leave all of
+  # them green and this check dead in production.
+  #
+  # What it also happens to be is the case this whole comparison has to let through: an
+  # admin deleting somebody else's message. `sender` is the admin who pressed delete and
+  # `message_author` is the member who wrote it, and they are different people.
+  describe 'a frame measured off a real group deletion' do
+    let(:frame) do
+      {
+        'v' => 1, 'id' => '01920000-0000-7000-8000-0000000000f1', 'type' => 'message.revoked',
+        'sid' => '9f1c0f4e-6a2b-4c8e-9d1a-2b3c4d5e6f70', 'epoch' => 7, 'seq' => 241, 'ts' => 1_788_907_604_000,
+        'payload' => {
+          'chat' => { 'kind' => 'group', 'id' => '120363427721750499' },
+          'sender' => { 'phone' => '5511936199421', 'lid' => '89572297961476', 'verified_name' => 'Lucas Moreira' },
+          'message_id' => '3EB0647797816A5B93E5B1',
+          'message_author' => { 'phone' => '5511936187994', 'lid' => '10089566068807' },
+          'by' => 'contact', 'timestamp' => 1_788_907_604_000
+        }
+      }
+    end
+    let(:event) { model::Event.from_frame(frame) }
+    let!(:message) do
+      author = create(:contact, account: channel.account, phone_number: '+5511936187994',
+                                identifier: '10089566068807@lid')
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       content: 'mensagem original', source_id: '3EB0647797816A5B93E5B1',
+                       message_type: :incoming, sender: author)
+    end
+
+    it 'reads the author off the wire and applies the admin deletion' do
+      expect(event.payload.message_author.lid).to eq('10089566068807')
+
+      expect(dispatch).to eq(:handled)
+
+      expect(message.reload.deleted_by_contact).to be(true)
+    end
+
+    # The same frame with the key naming the admin who pressed delete instead of the member
+    # who wrote it, which is the shape #486 measured WhatsApp refusing.
+    it 'refuses the same deletion once the key names somebody who did not write it' do
+      frame['payload']['message_author'] = { 'phone' => '5511936199421', 'lid' => '89572297961476' }
+
+      expect(dispatch).to eq(:ignored)
+
+      expect(message.reload.deleted_by_contact).to be_nil
+    end
+  end
+
   context 'when it was deleted from the connected phone' do
     let(:by) { 'self' }
 
