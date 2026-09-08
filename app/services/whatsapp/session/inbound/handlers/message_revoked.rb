@@ -65,6 +65,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
   #
   # Nothing is created, and a claim naming somebody this inbox has never seen matches
   # neither, like any other name that is not the author's.
+  #
+  # `ContactInbox.source_id` is deliberately not consulted, though it would survive an
+  # agent editing the contact's phone or a merge rewriting it. It is bare text and the
+  # table carries no namespace, so a LID and a phone are indistinguishable there, and
+  # comparing it is what let a claimed phone match a victim's LID. #494 carries the
+  # cost of leaving it out and the two ways to put a type on that key.
   def answers_to_the_claim?(contact)
     claimed = payload.message_author
 
