@@ -60,7 +60,7 @@ export default {
     <div class="flex justify-end font-medium">
       <CustomButton
         :disabled="isSubmitDisabled"
-        bg-color="var(--survey-brand-strong)"
+        bg-color="var(--survey-brand)"
         class="w-full sm:w-auto hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)]"
         @click="onClick"
       >

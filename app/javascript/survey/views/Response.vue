@@ -61,6 +61,14 @@ export default {
     selectedRatingDetails() {
       return CSAT_RATINGS.find(({ value }) => value === this.selectedRating);
     },
+    ratingLabel() {
+      if (this.isRatingSubmitted && this.selectedRatingDetails) {
+        return this.$t('SURVEY.RATING.SELECTED', {
+          rating: this.$t(this.selectedRatingDetails.translationKey),
+        });
+      }
+      return this.$t('SURVEY.RATING.LABEL');
+    },
     surveyId() {
       // Read the path, not the href: the rating links in the survey email carry a
       // query string, which would otherwise be taken as part of the uuid.
@@ -258,22 +266,14 @@ export default {
           :show-error="shouldShowErrorMessage"
           :message="message"
         />
+        <!-- Always rendered, never behind a v-if: the group below takes its accessible name
+             from this id, so removing the element once the rating is saved would leave an
+             unnamed group for a screen reader on the revision flow. -->
         <p
-          v-if="!isRatingSubmitted"
           id="survey-rating-label"
           class="mb-4 text-base font-medium text-n-slate-11"
         >
-          {{ $t('SURVEY.RATING.LABEL') }}
-        </p>
-        <p
-          v-else-if="selectedRatingDetails"
-          class="mb-4 text-base text-n-slate-11"
-        >
-          {{
-            $t('SURVEY.RATING.SELECTED', {
-              rating: $t(selectedRatingDetails.translationKey),
-            })
-          }}
+          {{ ratingLabel }}
         </p>
         <!-- group, not radiogroup: the latter promises arrow-key navigation, which would mean
              managing roving focus for five buttons that already tab fine. -->
@@ -303,7 +303,7 @@ export default {
                bg-n-brand itself, and the two would fight over source order. -->
           <CustomButton
             :disabled="isUpdating"
-            bg-color="var(--survey-brand-strong)"
+            bg-color="var(--survey-brand)"
             class="w-full sm:w-auto hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)]"
             @click="confirmRating"
           >

@@ -7,25 +7,18 @@ import { useMapGetter } from 'dashboard/composables/store.js';
 export function useBranding() {
   const globalConfig = useMapGetter('globalConfig/get');
   /**
-   * Replaces "Chatwoot" (any casing) in text with a brand name.
-   *
-   * The replace is what covers all 40-odd locales: only a handful of the strings are
-   * translated in this fork, and interpolating a name into them would leave the rest saying
-   * "Chatwoot" literally.
-   *
+   * Replaces "Chatwoot" (any casing) in text with the installation name from
+   * global config
    * @param {string} text - The text to process
-   * @param {string} [brandName] - Name to use instead of the installation's. Pages served on
-   *   behalf of one account pass the brand of that account; everything else omits it and
-   *   keeps the installation name.
-   * @returns {string} - Text with "Chatwoot" replaced
+   * @returns {string} - Text with "Chatwoot" replaced by installation name
    */
-  const replaceInstallationName = (text, brandName) => {
+  const replaceInstallationName = text => {
     if (!text) return text;
 
-    const name = brandName || globalConfig.value?.installationName;
-    if (!name) return text;
+    const installationName = globalConfig.value?.installationName;
+    if (!installationName) return text;
 
-    return text.replace(/chatwoot/gi, name);
+    return text.replace(/chatwoot/gi, installationName);
   };
 
   return {

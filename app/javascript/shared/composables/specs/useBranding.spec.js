@@ -92,26 +92,5 @@ describe('useBranding', () => {
 
       expect(result).toBe('Welcome to My-Company & Co.');
     });
-    it('prefers an explicit brand name over the installation name', () => {
-      mockGlobalConfig.value = { installationName: 'MyCompany' };
-
-      const { replaceInstallationName } = useBranding();
-      const result = replaceInstallationName(
-        'Powered by Chatwoot',
-        'Guiche Live'
-      );
-
-      expect(result).toBe('Powered by Guiche Live');
-    });
-
-    it('keeps the installation name when no brand name is given', () => {
-      mockGlobalConfig.value = { installationName: 'MyCompany' };
-
-      const { replaceInstallationName } = useBranding();
-
-      expect(replaceInstallationName('Powered by Chatwoot', '')).toBe(
-        'Powered by MyCompany'
-      );
-    });
   });
 });

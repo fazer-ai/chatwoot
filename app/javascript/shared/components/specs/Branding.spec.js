@@ -15,12 +15,20 @@ window.globalConfig = {
 
 const Branding = (await import('../Branding.vue')).default;
 
-const mountBranding = (props = {}) =>
+// poweredBy stands in for the locale's own POWERED_BY. The default carries the Latin
+// "Chatwoot" that replaceInstallationName depends on; a test can pass a transliterated one to
+// stand for Persian or Tamil.
+const mountBranding = (props = {}, poweredBy = 'Powered by Chatwoot') =>
   shallowMount(Branding, {
     props,
     global: {
       mocks: {
-        $t: key => (key === 'POWERED_BY' ? 'Powered by Chatwoot' : key),
+        $t: (key, params) => {
+          if (key === 'POWERED_BY') return poweredBy;
+          if (key === 'POWERED_BY_BRAND')
+            return `Powered by ${params.brandName}`;
+          return key;
+        },
         $store: { getters: { 'appConfig/getReferrerHost': '' } },
       },
     },
@@ -38,6 +46,20 @@ describe('Branding', () => {
 
     expect(wrapper.text()).toContain('Powered by Guichê Live');
     expect(wrapper.find('img').attributes('alt')).toBe('Guichê Live');
+  });
+
+  // The reason the account name is interpolated instead of substituted into POWERED_BY: in
+  // Persian and Tamil that string carries a transliterated name, so a replace of the Latin
+  // "Chatwoot" matches nothing and the footer would credit the vendor on a page already
+  // wearing the account's brand.
+  it('names the account even in a locale that never spells Chatwoot in Latin script', () => {
+    const wrapper = mountBranding(
+      { brandName: 'Guichê Live' },
+      'قدرت گرفته از چت ووت'
+    );
+
+    expect(wrapper.text()).toContain('Powered by Guichê Live');
+    expect(wrapper.text()).not.toContain('چت ووت');
   });
 
   it('renders nothing when branding is disabled', () => {

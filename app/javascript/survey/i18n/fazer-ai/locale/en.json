@@ -14,5 +14,6 @@
       "GOOD": "Good",
       "EXCELLENT": "Excellent"
     }
-  }
+  },
+  "POWERED_BY_BRAND": "Powered by {brandName}"
 }

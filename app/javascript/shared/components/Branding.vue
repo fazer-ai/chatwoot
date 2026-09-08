@@ -88,8 +88,17 @@ export default {
         :alt="displayedBrandName"
         :src="globalConfig.logoThumbnail"
       />
+      <!-- Interpolated rather than run through replaceInstallationName: POWERED_BY is
+           translated per locale, and in Persian and Tamil it carries a transliterated name
+           instead of the Latin "Chatwoot", so the replace matches nothing and the footer would
+           credit the vendor on a page already wearing the account's brand. Callers that pass
+           brandName must ship POWERED_BY_BRAND in their bundle; the survey does. -->
       <span>
-        {{ replaceInstallationName($t('POWERED_BY'), brandName) }}
+        {{
+          brandName
+            ? $t('POWERED_BY_BRAND', { brandName })
+            : replaceInstallationName($t('POWERED_BY'))
+        }}
       </span>
     </a>
   </div>
