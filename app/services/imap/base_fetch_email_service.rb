@@ -52,13 +52,12 @@ class Imap::BaseFetchEmailService
   end
 
   def fetch_mail_for_channel
-    uids = fetch_available_mail_uids
-    entries, inspected_through = collect_message_ids(uids)
-    mails = entries.filter_map { |entry| process_message_id(entry) }
+    collected = collect_message_ids(fetch_available_mail_uids)
+    mails = collected[:entries].filter_map { |entry| process_message_id(entry) }
     # Only after the batch is built, and only through the UID actually looked at. A run
     # that dies halfway leaves the cursor where it was, so the next one re-reads the same
     # range: wasted bandwidth, never a gap.
-    advance_cursor(inspected_through)
+    advance_cursor(collected)
     mails
   end
 
@@ -106,22 +105,32 @@ class Imap::BaseFetchEmailService
     )
   end
 
-  def advance_cursor(inspected_through)
+  def advance_cursor(collected)
     validity = sync_plan[:uid_validity]
     return if validity.blank?
 
     previous = uid_cursor.read
     # A cursor from another UIDVALIDITY generation (or another mailbox) describes UIDs that
-    # no longer exist. Carrying its high-water mark forward would park the new generation
-    # above every real UID, and only the hourly sweep would ever see mail again.
-    carried = reusable_cursor?(previous, validity) ? previous[:last_uid].to_i : 0
-    last_uid = [inspected_through.to_i, carried].max
+    # no longer exist. Carrying anything from it forward would park the new generation above
+    # every real UID, and only the hourly sweep would ever see mail again.
+    reusable = reusable_cursor?(previous, validity)
+    last_uid = [collected[:inspected_through].to_i, reusable ? previous[:last_uid].to_i : 0].max
     return if last_uid.zero?
 
-    # swept_at only moves on a full sweep: it is the clock for "when did we last look at
-    # the whole window", and an incremental run did not.
-    swept_at = sync_plan[:mode] == :full ? Time.current : (previous&.dig(:swept_at) || 0)
-    uid_cursor.write(uid_validity: validity, last_uid: last_uid, swept_at: swept_at, mailbox: mailbox_identity)
+    uid_cursor.write(uid_validity: validity, last_uid: last_uid, mailbox: mailbox_identity,
+                     swept_at: next_swept_at(collected, previous, reusable))
+  end
+
+  # swept_at is the clock for "when did we last look at the whole window", so only a full
+  # sweep that actually reached the end of that window may move it. A sweep cut short by
+  # the message cap did not, and stamping it anyway is what turns a backlog into a one-hour
+  # drip: the cursor can sit above the pending UIDs (it never moves backwards), so the
+  # incremental polls in between cannot see them, and a large enough backlog ages out of
+  # the SINCE window before the sweeps get to it.
+  def next_swept_at(collected, previous, reusable)
+    return Time.current if sync_plan[:mode] == :full && collected[:exhausted]
+
+    reusable ? previous[:swept_at].to_i : 0
   end
 
   def reusable_cursor?(cursor, validity)
@@ -156,11 +165,12 @@ class Imap::BaseFetchEmailService
   # Sends a FETCH command to retrieve data associated with a message in the mailbox.
   # You can send batches of UIDs in `.uid_fetch`.
   #
-  # Returns the entries worth downloading AND the highest UID whose header was actually
-  # inspected. Those are different numbers whenever the cap cuts the run short, and the
-  # cursor has to move by the second one: everything past it was never looked at, so
-  # claiming it would hide those messages from every later incremental poll and leave
-  # only the hourly sweep to find them, 500 at a time, until they age out of the window.
+  # Returns the entries worth downloading, the highest UID whose header was actually
+  # inspected, and whether the run reached the end of what it searched. The first two are
+  # different numbers whenever the cap cuts the run short, and the cursor has to move by
+  # the second one: everything past it was never looked at, so claiming it would hide those
+  # messages from every later incremental poll and leave only the hourly sweep to find
+  # them, 500 at a time, until they age out of the window.
   def collect_message_ids(uids)
     Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching mails from #{channel.email}, found #{uids.length} " \
                       "(#{sync_plan[:mode]} sync)."
@@ -178,7 +188,9 @@ class Imap::BaseFetchEmailService
       consume_header_batch(batch, collected)
     end
 
-    [collected[:entries], collected[:inspected_through]]
+    # Exactly at the cap counts as "not exhausted": the run cannot tell whether the next UID
+    # existed, and the cost of being wrong is one extra sweep, against a stalled backlog.
+    collected.merge(exhausted: collected[:entries].length < MAX_MESSAGES_PER_SYNC)
   end
 
   # Walks one batch of headers, stopping the moment the sync limit is reached. Whatever is

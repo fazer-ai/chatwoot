@@ -281,6 +281,31 @@ RSpec.describe Imap::FetchEmailService do
         end
       end
 
+      # The cursor never moves backwards, so a capped sweep can leave pending UIDs below it,
+      # invisible to every incremental poll. Closing the sweep window anyway turns the
+      # backlog into 500 messages an hour, and a big enough one ages out of the SINCE window.
+      it 'does not close the sweep window when the cap cut the full sweep short' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          max = Imap::BaseFetchEmailService::MAX_MESSAGES_PER_SYNC
+          varrido_em = 2.hours.ago.to_i
+          cursor.write(uid_validity: uid_validity, last_uid: 9_999, swept_at: varrido_em, mailbox: mailbox)
+
+          baixos = (1..max).to_a
+          headers = baixos.map do |uid|
+            Net::IMAP::FetchData.new(uid, 'UID' => uid, 'BODY[HEADER]' => eml_content_with_message_id)
+          end
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return(baixos + [max + 1, max + 2])
+          allow(imap).to receive(:uid_fetch).with(baixos, %w[UID BODY.PEEK[HEADER]]).and_return(headers)
+          allow(imap).to receive(:uid_fetch).with(anything, 'BODY.PEEK[]').and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(cursor.read[:swept_at]).to eq varrido_em
+        end
+      end
+
       # RFC 3501 does not require SEARCH to answer in ascending order. Slicing the reply as
       # it came would put high UIDs in the first batch, hit the cap there, and park the
       # cursor above UIDs no run ever inspected.
