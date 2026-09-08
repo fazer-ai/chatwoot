@@ -44,10 +44,27 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # lands here, and the media it meant to fetch would never be asked for again. The
   # writer decides whether there is anything left to queue.
   def duplicate_of(stored)
-    return :handled if writer_for(stored).reconcile(stored)
+    return recovered(stored) if writer_for(stored).reconcile(stored)
 
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
+  end
+
+  # What the write path does around a message, for a message that took the long way to
+  # the row it was always going to occupy.
+  #
+  # The attribution is the part only the recovery carries: an undecryptable stanza has no
+  # readable context, so a thread opened by one starts with no ad and no entry point, and
+  # the message that finally arrives is the first and only chance to record them.
+  #
+  # The chat list is refreshed for the reason `ChatList` gives: MESSAGE_UPDATED reaches
+  # the open thread and nothing else, so the card in the list would go on showing the
+  # bubble that could not be read.
+  def recovered(stored)
+    conversation = stored.conversation
+    inbound::ConversationFinder.backfill_first_touch(conversation, attribution)
+    inbound::ChatList.refresh(conversation)
+    :handled
   end
 
   # The row already names the conversation and the sender this message belongs to: it was

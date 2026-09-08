@@ -47,13 +47,24 @@ class Whatsapp::Session::Inbound::MessageWriter
   #
   # Answers whether it did, because a caller it says no to still has a duplicate to report.
   def reconcile(message)
-    return false unless replaces_a_placeholder?(message)
+    written = false
+    # Under the row lock and off the row the lock reloads, which is what every other
+    # writer of this flag does (`Message#update_under_lock!`). `content_attributes` is
+    # one JSON column: a revoke or a media failure landing between the read and the save
+    # would be written away by a merge computed off the stale hash, and the eligibility
+    # that was true a moment ago is exactly what such a write would have changed.
+    message.with_lock do
+      next unless replaces_a_placeholder?(message)
 
-    message.content = message_content
-    message.content_attributes = message.content_attributes.merge(content_attributes.stringify_keys)
-                                        .except('is_unsupported')
-    attach_location(message)
-    message.save!
+      message.content = message_content
+      message.content_attributes = message.content_attributes.merge(content_attributes.stringify_keys)
+                                          .except('is_unsupported', 'unsupported_reason')
+      attach_location(message)
+      message.save!
+      written = true
+    end
+    return false unless written
+
     # After the save, as on the writing path: the job takes the row by reference and a
     # save that raised would have it fetch bytes for content nobody stored.
     enqueue_media_fetch(message)
@@ -118,18 +129,38 @@ class Whatsapp::Session::Inbound::MessageWriter
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,
       is_unsupported: (true if unsupported?),
+      # Why there is no body, which is what says whether the message can still turn up.
+      # `is_unsupported` cannot: a media download that gave up raises the same flag on a
+      # message that arrived perfectly well.
+      unsupported_reason: (content.reason if content_type == 'unsupported'),
       rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
   end
 
+  # The reasons a message may still arrive under the id its placeholder was published
+  # with. `unknown_type` and `masked` are not among them: the first is a body that did
+  # arrive and this build has no arm for, and the second is one WhatsApp withholds from
+  # every linked device on purpose.
+  #
+  # `unavailable` is here because it is the one that recovers on its own: WhatsApp answers
+  # a companion device that way for a view-once photo and asks the primary phone to
+  # forward it. It is also not in `Content::Unsupported::REASONS`, which is a dead
+  # constant the connector has moved past -- #490 carries the sync.
+  RECOVERABLE = %w[undecryptable unavailable].freeze
+
   # Only a placeholder is replaced, and only by something that is not one.
+  #
+  # Read from the reason and not from `is_unsupported`, because that flag answers a
+  # different question: `MediaFetchJob#give_up`, `MediaDownloadFailed` and the outbound
+  # sender all raise it on messages that arrived intact, and writing content over one of
+  # those would clear a failure the agent is looking at and ask for the bytes again.
   #
   # A share of contacts is left out on purpose: it writes one row per card, and turning
   # one row into several is not a correction of that row. It stays the unsupported bubble
   # it already was, which is the same outcome as before this method existed, and #488
   # carries the reasoning and the way out.
   def replaces_a_placeholder?(message)
-    message.content_attributes['is_unsupported'].present? &&
+    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
       content.present? && content_type != 'contacts' && !unsupported?
   end
 

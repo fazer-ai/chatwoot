@@ -588,6 +588,72 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
+    # MESSAGE_UPDATED reaches the open thread and nothing else, so the card in the list
+    # would go on showing the bubble that could not be read until something else touched
+    # that conversation.
+    it 'refreshes the card in the chat list' do
+      conversation = placeholder.conversation
+      conversation.update_columns(updated_at: 1.hour.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      expect { recovery }.to(change { conversation.reload.updated_at })
+    end
+
+    # An undecryptable stanza carries no readable context, so a thread opened by one
+    # starts with no ad and no entry point: the message that finally arrives is the first
+    # and only chance to record them.
+    it 'records the attribution only the recovery carries' do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered, entry_point: 'ad',
+                                                   referral: { 'source_type' => 'ad', 'title' => 'Promo' })
+                           ))
+      )
+
+      attributes = placeholder.conversation.additional_attributes
+      expect(attributes['entry_point']).to eq('ad')
+      expect(attributes['referral']).to include('title' => 'Promo')
+    end
+
+    # `content_attributes` is one JSON column. A revoke or a media failure landing between
+    # the read and the save is written away by a merge computed off the hash that was read
+    # first, which is why every other writer of this column goes under the row lock.
+    it 'keeps what landed on the row while the recovery was on its way' do
+      # A revoke, written the way the revoke handler writes it, landing after the handler
+      # has already read the row.
+      allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:new).and_wrap_original do |original, **kwargs|
+        Message.find(placeholder.id).update_under_lock!(deleted: true)
+        original.call(**kwargs)
+      end
+
+      expect(recovery).to eq(:handled)
+
+      expect(placeholder.content).to eq('oi, tudo bem?')
+      expect(placeholder.content_attributes['deleted']).to be(true)
+    end
+
+    # `is_unsupported` answers a different question: MediaFetchJob#give_up and
+    # MediaDownloadFailed raise it on messages that arrived intact. Writing content over
+    # one of those clears a failure the agent is looking at and asks for the bytes again.
+    context 'when the stored row is a media failure rather than a placeholder' do
+      let(:content) do
+        model::Content::Media.new(kind: 'image', mime: 'image/jpeg', caption: 'olha isso',
+                                  ref: model::MediaRef.url('https://connector.test/media/abc'))
+      end
+      let(:recovered) { content }
+
+      before { placeholder.update_under_lock!(is_unsupported: true) }
+
+      it 'leaves the failure alone' do
+        ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      end
+    end
+
     # One row cannot become the several a share writes, so this stays the unsupported
     # bubble it already was. Recorded as #488 rather than silently accepted.
     context 'when what arrives is a share of contacts' do
