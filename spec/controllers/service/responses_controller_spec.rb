@@ -69,6 +69,20 @@ describe '/survey/response', type: :request do
         expect(response.body).to include '<title>Guichê Live</title>'
       end
 
+      # INSTALLATION_NAME and BRAND_NAME are separate settings and are allowed to differ: one
+      # is what the install calls itself, the other what it shows the public. Only an account
+      # that set its own name may take over the tab.
+      it 'keeps the installation title for an account that configured no brand name' do
+        %w[INSTALLATION_NAME BRAND_NAME].zip(['Atendimento Interno', 'Marca Publica']).each do |name, value|
+          InstallationConfig.where(name: name).first_or_initialize.update!(value: value)
+        end
+        GlobalConfig.clear_cache
+
+        get survey_response_url(id: create(:conversation).uuid)
+
+        expect(response.body).to include '<title>Atendimento Interno</title>'
+      end
+
       it 'keeps the installation brand for an account that configured none' do
         get survey_response_url(id: create(:conversation).uuid)
 
