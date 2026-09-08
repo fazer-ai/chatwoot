@@ -94,6 +94,14 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       Whatsapp::Session::PROVIDERS.include?(provider.to_s)
     end
 
+    # Whether this inbox's commands run through the session layer's own backend, which is
+    # what makes the capability list the authority on what it can carry out. A legacy
+    # provider is in the session family and is not this: its own service decides.
+    def session_backed?(channel)
+      descriptor = descriptor(channel.provider)
+      descriptor.present? && descriptor.session? && !descriptor.legacy?
+    end
+
     # The QR/pairing family, legacy providers included. What sets it apart from the cloud
     # family is behavioral: a paired session is a real WhatsApp client, so there is no
     # 24-hour messaging window and no template requirement.
