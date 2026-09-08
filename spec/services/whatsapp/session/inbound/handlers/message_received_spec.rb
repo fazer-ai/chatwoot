@@ -615,6 +615,31 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       expect(attributes['referral']).to include('title' => 'Promo')
     end
 
+    # Writing the content takes the recovery marker off the row, so anything recorded
+    # only after it is lost for good when the step in between raises: the redelivery
+    # finds the row no longer eligible and never comes back here. The job transport is
+    # its own Redis and goes down on its own schedule, which is that step.
+    it 'records the attribution even when the work after the write raises' do
+      allow(Whatsapp::Session::MediaFetchJob).to receive(:perform_later).and_raise(Redis::CannotConnectError)
+
+      expect do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(
+                                 entry_point: 'ad', referral: { 'source_type' => 'ad', 'title' => 'Promo' },
+                                 content: model::Content::Media.new(
+                                   kind: 'image', mime: 'image/jpeg',
+                                   ref: model::MediaRef.url('https://connector.test/media/abc')
+                                 )
+                               )
+                             ))
+        )
+      end.to raise_error(Redis::CannotConnectError)
+
+      expect(placeholder.conversation.additional_attributes['entry_point']).to eq('ad')
+    end
+
     # `content_attributes` is one JSON column. A revoke or a media failure landing between
     # the read and the save is written away by a merge computed off the hash that was read
     # first, which is why every other writer of this column goes under the row lock.

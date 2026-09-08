@@ -44,26 +44,39 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # lands here, and the media it meant to fetch would never be asked for again. The
   # writer decides whether there is anything left to queue.
   def duplicate_of(stored)
-    return recovered(stored) if writer_for(stored).reconcile(stored)
+    writer = writer_for(stored)
+    record_first_touch(stored) if writer.reconcilable?(stored)
+    return recovered(stored) if writer.reconcile(stored)
 
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
   end
 
-  # What the write path does around a message, for a message that took the long way to
-  # the row it was always going to occupy.
-  #
   # The attribution is the part only the recovery carries: an undecryptable stanza has no
   # readable context, so a thread opened by one starts with no ad and no entry point, and
   # the message that finally arrives is the first and only chance to record them.
   #
-  # The chat list is refreshed for the reason `ChatList` gives: MESSAGE_UPDATED reaches
-  # the open thread and nothing else, so the card in the list would go on showing the
-  # bubble that could not be read.
+  # Before the content is written, and that ordering is the whole point. Writing the
+  # content is what takes the recovery marker off the row, so a failure after it would
+  # find the redelivery no longer eligible and lose the attribution for good. Failing
+  # here leaves the marker where it is and the redelivery does all of it again, and
+  # re-running this costs nothing: it only fills keys that are still missing.
+  def record_first_touch(stored)
+    inbound::ConversationFinder.backfill_first_touch(stored.conversation, attribution)
+  end
+
+  # MESSAGE_UPDATED reaches the open thread and nothing else, so the card in the list
+  # would go on showing the bubble that could not be read. It reaches no automation
+  # either, and re-firing `message_created` here is not the answer: every rule that does
+  # not filter on content already matched the placeholder and already ran. That is #491.
+  #
+  # After the write rather than before it, unlike the attribution, because losing it
+  # costs a stale preview until the next event touches that conversation rather than a
+  # fact nothing else records. The media enqueue behind `reconcile` is in the same
+  # position and is not lost either way: a redelivery that finds the row already written
+  # queues it through `fetch_media_for`, which is the path that exists for exactly this.
   def recovered(stored)
-    conversation = stored.conversation
-    inbound::ConversationFinder.backfill_first_touch(conversation, attribution)
-    inbound::ChatList.refresh(conversation)
+    inbound::ChatList.refresh(stored.conversation)
     :handled
   end
 
