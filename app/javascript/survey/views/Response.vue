@@ -315,7 +315,7 @@ export default {
           <CustomButton
             :disabled="isUpdating"
             bg-color="var(--survey-brand)"
-            class="w-full !rounded-xl !py-3.5 text-base font-semibold transition-all duration-200 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)] sm:w-auto sm:!px-8"
+            class="w-full !rounded-xl !py-3.5 text-base font-semibold transition-all duration-200 hover:brightness-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)] sm:w-auto sm:!px-8"
             @click="confirmRating"
           >
             <Spinner v-if="isUpdating" class="p-0" />
