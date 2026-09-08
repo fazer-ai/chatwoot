@@ -281,6 +281,52 @@ RSpec.describe Imap::FetchEmailService do
         end
       end
 
+      # RFC 3501 does not require SEARCH to answer in ascending order. Slicing the reply as
+      # it came would put high UIDs in the first batch, hit the cap there, and park the
+      # cursor above UIDs no run ever inspected.
+      it 'inspects the lowest UIDs first when SEARCH answers out of order' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          max = Imap::BaseFetchEmailService::MAX_MESSAGES_PER_SYNC
+          baixos = (1..max).to_a
+          altos = [max + 1, max + 2]
+          headers = baixos.map do |uid|
+            Net::IMAP::FetchData.new(uid, 'UID' => uid, 'BODY[HEADER]' => eml_content_with_message_id)
+          end
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return(altos + baixos)
+          allow(imap).to receive(:uid_fetch).with(baixos, %w[UID BODY.PEEK[HEADER]]).and_return(headers)
+          allow(imap).to receive(:uid_fetch).with(anything, 'BODY.PEEK[]').and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(cursor.read[:last_uid]).to eq max
+          expect(imap).not_to have_received(:uid_fetch).with(altos, %w[UID BODY.PEEK[HEADER]])
+        end
+      end
+
+      # A slice that ends exactly on the cap used to cost one more header FETCH of up to
+      # 500 UIDs that the run had already decided not to read.
+      it 'does not fetch another header batch once the sync limit is already reached' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          max = Imap::BaseFetchEmailService::MAX_MESSAGES_PER_SYNC
+          primeiro = (1..max).to_a
+          segundo = [max + 1]
+          headers = primeiro.map do |uid|
+            Net::IMAP::FetchData.new(uid, 'UID' => uid, 'BODY[HEADER]' => eml_content_with_message_id)
+          end
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return(primeiro + segundo)
+          allow(imap).to receive(:uid_fetch).with(primeiro, %w[UID BODY.PEEK[HEADER]]).and_return(headers)
+          allow(imap).to receive(:uid_fetch).with(anything, 'BODY.PEEK[]').and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(imap).not_to have_received(:uid_fetch).with(segundo, %w[UID BODY.PEEK[HEADER]])
+        end
+      end
+
       it 'drops the previous high-water mark when UIDVALIDITY changed' do
         travel_to '26.10.2020 10:00'.to_datetime do
           cursor.write(uid_validity: uid_validity - 1, last_uid: 9_999, swept_at: Time.current, mailbox: mailbox)

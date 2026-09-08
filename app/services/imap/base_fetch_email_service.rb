@@ -166,35 +166,41 @@ class Imap::BaseFetchEmailService
                       "(#{sync_plan[:mode]} sync)."
 
     collected = { entries: [], inspected_through: nil }
-    uids.each_slice(MAX_MESSAGES_PER_SYNC) do |batch|
-      break if consume_header_batch(batch, collected) == :capped
+    # Sorted before slicing, not only inside each batch: SEARCH is not required to answer in
+    # ascending order, so a cap that stops on the first slice would leave lower UIDs sitting
+    # under the cursor with no run that ever looks at them again. Ascending order is what
+    # makes "inspected through N" a contiguous boundary instead of a mark with holes below it.
+    uids.sort.each_slice(MAX_MESSAGES_PER_SYNC) do |batch|
+      # Checked here too, and not only inside the batch, so a slice that ends exactly on the
+      # cap does not pay for one more FETCH of up to 500 headers nobody will read.
+      break if collected[:entries].length >= MAX_MESSAGES_PER_SYNC
+
+      consume_header_batch(batch, collected)
     end
 
     [collected[:entries], collected[:inspected_through]]
   end
 
-  # Walks one batch of headers, stopping the moment the sync limit is reached. Returns
-  # :capped so the caller knows the remaining UIDs were never looked at, which is exactly
-  # what keeps the cursor from claiming them.
+  # Walks one batch of headers, stopping the moment the sync limit is reached. Whatever is
+  # left in the batch was never looked at, which is exactly what keeps the cursor from
+  # claiming it.
   def consume_header_batch(batch, collected)
     headers = fetch_headers_for(batch)
-    return :empty if headers.blank?
+    return if headers.blank?
 
-    # Sorted so "inspected through UID N" really means every UID up to N was seen: the
-    # server may answer a batch in any order.
+    # Sorted again here because the server may answer a FETCH in any order, regardless of
+    # the order the UIDs were asked in.
     headers.sort_by { |data| data.attr['UID'].to_i }.each do |data|
       if collected[:entries].length >= MAX_MESSAGES_PER_SYNC
         Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Reached MAX_MESSAGES_PER_SYNC=#{MAX_MESSAGES_PER_SYNC} " \
                           "for #{channel.email}, stopping sync."
-        return :capped
+        break
       end
 
       collected[:inspected_through] = data.attr['UID'] || collected[:inspected_through]
       entry = build_message_id_entry(data)
       collected[:entries].push(entry) if entry
     end
-
-    :ok
   end
 
   def fetch_headers_for(batch)
