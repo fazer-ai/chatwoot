@@ -36,40 +36,6 @@ class Whatsapp::Session::Inbound::MessageWriter
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end
 
-  # The reasons a message may still arrive under the id its placeholder was published
-  # with. `unknown_type` and `masked` are not among them: the first is a body that did
-  # arrive and this build has no arm for, and the second is one WhatsApp withholds from
-  # every linked device on purpose.
-  #
-  # `unavailable` is here because it is the one that recovers on its own: WhatsApp answers
-  # a companion device that way for a view-once photo and asks the primary phone to
-  # forward it. It is also not in `Content::Unsupported::REASONS`, which is a dead
-  # constant the connector has moved past -- #490 carries the sync.
-  RECOVERABLE = %w[undecryptable unavailable].freeze
-
-  # Whether `reconcile` would write this message over that row. Asked before the write by
-  # a caller with work of its own to do first; `reconcile` asks it again under the lock,
-  # because a write landing in between is one that could have changed the answer.
-  #
-  # Only a placeholder is replaced, and only by something that is not one.
-  #
-  # Read from the reason and not from `is_unsupported`, because that flag answers a
-  # different question: `MediaFetchJob#give_up`, `MediaDownloadFailed` and the outbound
-  # sender all raise it on messages that arrived intact, and writing content over one of
-  # those would clear a failure the agent is looking at and ask for the bytes again.
-  #
-  # An edit that landed first takes the marker off the row (`MessageEdited#apply`), which
-  # is what stops a delayed recovery from writing the original body over an edit of it.
-  #
-  # A share of contacts is left out on purpose: it writes one row per card, and turning
-  # one row into several is not a correction of that row. It stays the unsupported bubble
-  # it already was, which is the same outcome as before this method existed, and #488
-  # carries the reasoning and the way out.
-  def reconcilable?(message)
-    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
-      content.present? && content_type != 'contacts' && !unsupported?
-  end
-
   # Replaces the placeholder a message left behind with the message itself.
   #
   # A message the backend could not decrypt in time is published as an unsupported
@@ -169,6 +135,38 @@ class Whatsapp::Session::Inbound::MessageWriter
       unsupported_reason: (content.reason if content_type == 'unsupported'),
       rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
+  end
+
+  # The reasons a message may still arrive under the id its placeholder was published
+  # with. `unknown_type` and `masked` are not among them: the first is a body that did
+  # arrive and this build has no arm for, and the second is one WhatsApp withholds from
+  # every linked device on purpose.
+  #
+  # `unavailable` is here because it is the one that recovers on its own: WhatsApp answers
+  # a companion device that way for a view-once photo and asks the primary phone to
+  # forward it. It is also not in `Content::Unsupported::REASONS`, which is a dead
+  # constant the connector has moved past -- #490 carries the sync.
+  RECOVERABLE = %w[undecryptable unavailable].freeze
+
+  # Only a placeholder is replaced, and only by something that is not one.
+  #
+  # Read from the reason and not from `is_unsupported`, because that flag answers a
+  # different question: `MediaFetchJob#give_up`, `MediaDownloadFailed` and the outbound
+  # sender all raise it on messages that arrived intact, and writing content over one of
+  # those would clear a failure the agent is looking at and ask for the bytes again.
+  #
+  # An edit that landed first takes the marker off the row (`MessageEdited#apply`), which
+  # is what stops a delayed recovery from writing the original body over an edit of it.
+  # It also costs that recovery the metadata only it carries, the quoted link and the
+  # rich attributes -- not the attribution, which the caller records either way. #492.
+  #
+  # A share of contacts is left out on purpose: it writes one row per card, and turning
+  # one row into several is not a correction of that row. It stays the unsupported bubble
+  # it already was, which is the same outcome as before this method existed, and #488
+  # carries the reasoning and the way out.
+  def reconcilable?(message)
+    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
+      content.present? && content_type != 'contacts' && !unsupported?
   end
 
   # A rich card with no text and no media header renders as an empty bubble, which is

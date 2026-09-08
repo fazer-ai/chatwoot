@@ -716,6 +716,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
         expect(placeholder.content).to eq('oi, tudo bem mesmo?')
       end
+
+      # The edit settles the body and takes the recovery marker off the row. The
+      # attribution is not about the row, though, and nothing else ever records it.
+      it 'still records the attribution the recovery carries' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: recovered, entry_point: 'ad')
+                             ))
+        )
+
+        expect(placeholder.conversation.additional_attributes['entry_point']).to eq('ad')
+      end
     end
 
     # One row cannot become the several a share writes, so this stays the unsupported

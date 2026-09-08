@@ -44,9 +44,8 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # lands here, and the media it meant to fetch would never be asked for again. The
   # writer decides whether there is anything left to queue.
   def duplicate_of(stored)
-    writer = writer_for(stored)
-    record_first_touch(stored) if writer.reconcilable?(stored)
-    return recovered(stored) if writer.reconcile(stored)
+    record_first_touch(stored)
+    return recovered(stored) if writer_for(stored).reconcile(stored)
 
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
@@ -56,11 +55,17 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # readable context, so a thread opened by one starts with no ad and no entry point, and
   # the message that finally arrives is the first and only chance to record them.
   #
-  # Before the content is written, and that ordering is the whole point. Writing the
-  # content is what takes the recovery marker off the row, so a failure after it would
-  # find the redelivery no longer eligible and lose the attribution for good. Failing
-  # here leaves the marker where it is and the redelivery does all of it again, and
-  # re-running this costs nothing: it only fills keys that are still missing.
+  # Asked of every duplicate rather than only of the ones about to be written over, for
+  # two reasons. It is about the conversation and not about the row, so nothing that
+  # happened to the row disqualifies it -- an edit that reached the placeholder first
+  # settles the body and takes the marker off, and the attribution would go down with it.
+  # And it costs nothing to ask: it returns on the spot when the message carries no
+  # attribution, and otherwise fills only the keys that are still missing.
+  #
+  # Before the write, and that ordering is the point. Writing the content is what takes
+  # the recovery marker off the row, so a failure after it would find the redelivery no
+  # longer eligible and lose the attribution for good; failing here leaves the marker
+  # where it is and the redelivery does all of it again.
   def record_first_touch(stored)
     inbound::ConversationFinder.backfill_first_touch(stored.conversation, attribution)
   end
