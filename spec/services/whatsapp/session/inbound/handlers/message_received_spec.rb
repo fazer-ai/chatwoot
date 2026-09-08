@@ -679,6 +679,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
+    # Off the wire and not off a hand-built model. Every other example here constructs
+    # `Content::Unsupported` directly, so a reason that arrived under a different key
+    # would leave the marker unwritten, the recovery dead in production, and all of them
+    # green.
+    it 'reads the reason out of the frame the connector actually sends' do
+      frame = Whatsapp::SessionContract.fixture('events', 'message_received_unsupported')
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.from_frame(frame))
+
+      stored = inbox.messages.find_by(source_id: frame.dig('payload', 'message', 'id'))
+      expect(stored.content_attributes['unsupported_reason']).to eq('undecryptable')
+    end
+
     # An edit can decrypt while the message it edits does not, so it lands on the
     # placeholder and is the first readable body that row has. The original body arriving
     # afterwards is stale next to an edit of it.
