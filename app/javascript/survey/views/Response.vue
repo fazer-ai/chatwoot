@@ -246,24 +246,30 @@ export default {
   >
     <Spinner size="" />
   </div>
+  <!-- The ground is a wash of the brand rather than a flat grey, so the page reads as the
+       account's before a single word is. color-mix keeps it in a utility instead of a second
+       server-rendered variable. -->
   <div
     v-else
-    class="flex items-center justify-center w-full h-full min-h-[100dvh] overflow-auto bg-n-background"
+    class="flex items-start justify-center w-full min-h-[100dvh] overflow-auto px-0 py-0 sm:items-center sm:px-6 sm:py-10 bg-[color-mix(in_srgb,var(--survey-brand)_6%,white)]"
   >
     <div
-      class="flex flex-col w-full h-full bg-n-solid-1 border border-solid border-n-weak sm:h-auto sm:w-full sm:max-w-xl sm:rounded-lg sm:shadow-md"
+      class="flex flex-col w-full min-h-[100dvh] overflow-hidden bg-n-solid-1 sm:min-h-0 sm:max-w-lg sm:rounded-2xl sm:shadow-[0_20px_50px_-20px_rgba(15,23,42,0.25)]"
     >
-      <div class="w-full px-6 py-8 m-auto my-0 sm:px-10 sm:pt-10 sm:pb-6">
+      <!-- Identity before content: a hairline of the brand across the top says whose page this
+           is even for an inbox with no avatar to show. -->
+      <div class="h-1.5 shrink-0 bg-[color:var(--survey-brand)]" />
+      <div class="w-full px-6 pt-8 pb-6 sm:px-10 sm:pt-10">
         <img
           v-if="logo"
           :src="logo"
           :alt="inboxName || brandName"
-          class="mb-6 max-h-12 w-auto object-contain"
+          class="mb-8 max-h-10 w-auto object-contain"
         />
         <div
           v-if="!isRatingSubmitted"
           v-dompurify-html="formattedMessageContent"
-          class="mb-8 text-lg leading-relaxed text-n-slate-12 prose prose-bubble"
+          class="mb-8 text-2xl font-semibold leading-snug tracking-tight text-balance text-n-slate-12 prose prose-bubble"
         />
         <Banner
           v-if="shouldShowBanner"
@@ -276,7 +282,7 @@ export default {
              unnamed group for a screen reader on the revision flow. -->
         <p
           id="survey-rating-label"
-          class="mb-4 text-base font-medium text-n-slate-11"
+          class="mb-3 text-xs font-semibold uppercase tracking-wider text-n-slate-10"
         >
           {{ ratingLabel }}
         </p>
@@ -299,9 +305,9 @@ export default {
         </div>
         <div
           v-if="isPendingConfirmation"
-          class="mt-6 flex flex-col items-start gap-3"
+          class="mt-8 flex flex-col items-stretch gap-3 sm:items-start"
         >
-          <p class="text-base text-n-slate-11 m-0">
+          <p class="m-0 text-sm text-n-slate-11">
             {{ $t('SURVEY.RATING.CONFIRM_LABEL') }}
           </p>
           <!-- bg-color as a prop, not a bg-* class: with no inline styles the button applies
@@ -309,7 +315,7 @@ export default {
           <CustomButton
             :disabled="isUpdating"
             bg-color="var(--survey-brand)"
-            class="w-full sm:w-auto hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)]"
+            class="w-full !rounded-xl !py-3.5 text-base font-semibold transition-all duration-200 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--survey-brand)] sm:w-auto sm:!px-8"
             @click="confirmRating"
           >
             <Spinner v-if="isUpdating" class="p-0" />
@@ -324,7 +330,7 @@ export default {
           @send-feedback="sendFeedback"
         />
       </div>
-      <div class="mb-3">
+      <div class="mt-auto pb-5 pt-2 sm:mt-0">
         <Branding
           :brand-name="brandName"
           :own-logo="Boolean(brandLogo)"

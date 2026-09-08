@@ -16,23 +16,26 @@ const emit = defineEmits(['selectRating']);
 
 const ratings = CSAT_RATINGS;
 
-// No scale on hover. A touch device keeps :hover on the last element touched, so an
-// unselected face would stay enlarged and coloured, lying about the state. Selection alone
-// carries the emphasis now.
+// Hover effects are gated behind `(hover: hover)`. A touch device keeps :hover on the last
+// element tapped, so an unselected face would sit there enlarged and coloured, lying about the
+// state -- the reason the old always-on hover scale had to go.
 const buttonClass = rating => [
-  'flex h-12 w-12 items-center justify-center rounded-full text-3xl transition',
-  'sm:h-14 sm:w-14 sm:text-4xl',
+  'flex h-14 w-14 items-center justify-center rounded-full text-4xl',
+  'transition-all duration-200 ease-out sm:h-16 sm:w-16 sm:text-5xl',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
   'focus-visible:ring-[color:var(--survey-brand)]',
-  'disabled:cursor-default disabled:opacity-50',
+  'disabled:cursor-default disabled:opacity-40',
+  '[@media(hover:hover)]:hover:enabled:scale-110',
+  '[@media(hover:hover)]:hover:enabled:opacity-100',
+  '[@media(hover:hover)]:hover:enabled:saturate-100',
   rating.value === props.selectedRating
-    ? 'grayscale-0 bg-n-slate-3 ring-2 ring-[color:var(--survey-brand)]'
-    : 'grayscale enabled:hover:grayscale-0',
+    ? 'scale-110 opacity-100 saturate-100 bg-[color-mix(in_srgb,var(--survey-brand)_14%,transparent)]'
+    : 'opacity-60 saturate-50',
 ];
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2 py-4 sm:gap-3">
+  <div class="flex flex-wrap gap-1 pb-2 sm:gap-2">
     <button
       v-for="rating in ratings"
       :key="rating.key"

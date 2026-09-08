@@ -55,7 +55,7 @@ export default {
     <textarea
       :id="id"
       v-model="computedModel"
-      class="w-full px-3 py-2 leading-tight border rounded outline-none resize-none text-n-gray-12"
+      class="w-full px-4 py-3 leading-relaxed border rounded-xl outline-none resize-none text-n-gray-12"
       :class="{
         'border-n-weak hover:border-n-slate-8 focus:border-n-slate-9 focus:ring-1 focus:ring-n-slate-9':
           !error,
