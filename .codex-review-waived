@@ -161,3 +161,4 @@ app/javascript/dashboard/routes/dashboard/settings/automation/constants.js: Pres
 # this conversation" is a per-conversation authorization scheme bots do not have today, for
 # every account bot (Captain included), and belongs to its own issue.
 app/controllers/api/v1/accounts/inboxes/agent_bot_observers_controller.rb: Enforce the observer role on bot API mutations  # PR#453
+app/views/survey/responses/show.html.erb: Use the project's Tailwind theming mechanism  # PR#482

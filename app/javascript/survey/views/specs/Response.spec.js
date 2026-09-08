@@ -205,4 +205,89 @@ describe('Response', () => {
     expect(wrapper.vm.shouldShowSuccessMessage).toBe(false);
     expect(wrapper.vm.enableFeedbackForm).toBe(false);
   });
+  describe('account branding', () => {
+    afterEach(() => {
+      delete window.globalConfig;
+    });
+
+    it('falls back to the account logo when the inbox has no avatar', async () => {
+      window.globalConfig = {
+        BRAND_LOGO_URL: 'https://cdn.example.com/live.png',
+      };
+      getSurveyDetails.mockResolvedValue(surveyPayload());
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.logo).toBe('https://cdn.example.com/live.png');
+    });
+
+    it('prefers the inbox avatar when there is one', async () => {
+      window.globalConfig = {
+        BRAND_LOGO_URL: 'https://cdn.example.com/live.png',
+      };
+      const payload = surveyPayload();
+      payload.data.inbox_avatar_url = 'https://cdn.example.com/inbox.png';
+      getSurveyDetails.mockResolvedValue(payload);
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.logo).toBe('https://cdn.example.com/inbox.png');
+    });
+
+    it('shows no logo when neither the inbox nor the account has one', async () => {
+      getSurveyDetails.mockResolvedValue(surveyPayload());
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.logo).toBe('');
+    });
+
+    // The footer only takes a name when it is the account's own. Handing it the installation's
+    // would push every survey down the fork-key path, which is translated in three languages
+    // and falls back to English in the rest.
+    it('withholds the brand name when it is the installation falling back', async () => {
+      window.globalConfig = {
+        BRAND_NAME: 'Chatwoot',
+        BRAND_FROM_ACCOUNT: false,
+      };
+      getSurveyDetails.mockResolvedValue(surveyPayload());
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(
+        wrapper.findComponent({ name: 'Branding' }).props('brandName')
+      ).toBe('');
+    });
+
+    it('hands the account brand and the branding entitlement to the footer', async () => {
+      window.globalConfig = {
+        BRAND_NAME: 'Guichê Live',
+        BRAND_FROM_ACCOUNT: true,
+        DISABLE_BRANDING: true,
+      };
+      getSurveyDetails.mockResolvedValue(surveyPayload());
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      const branding = wrapper.findComponent({ name: 'Branding' });
+      expect(branding.props('brandName')).toBe('Guichê Live');
+      expect(branding.props('disableBranding')).toBe(true);
+    });
+
+    it('names the rating that was submitted', async () => {
+      getSurveyDetails.mockResolvedValue(surveyPayload({ rating: 4 }));
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedRatingDetails.translationKey).toBe(
+        'CSAT.RATINGS.GOOD'
+      );
+    });
+  });
 });

@@ -4,7 +4,7 @@
     "FORM": {
       "EMAIL_BRANDING": {
         "TITLE": "Email branding",
-        "NOTE": "How this account's emails look. Anything left empty uses the installation's own branding. This applies to email only — the dashboard, the favicon and the widget keep the installation's brand.",
+        "NOTE": "How this account's emails and CSAT survey page look. Anything left empty uses the installation's own branding. This applies to what your customers see — the dashboard, the favicon and the widget keep the installation's brand.",
         "NAME": {
           "LABEL": "Brand name",
           "PLACEHOLDER": "Your company",

@@ -114,4 +114,109 @@ RSpec.describe Brand do
       end
     end
   end
+
+  describe '#web_config' do
+    before do
+      install(
+        'LOGO_THUMBNAIL' => '/brand-assets/logo_thumbnail.svg',
+        'WIDGET_BRAND_URL' => 'https://www.chatwoot.com'
+      )
+    end
+
+    context 'without an account' do
+      it 'is the installation brand' do
+        config = described_class.for.web_config
+
+        expect(config['BRAND_NAME']).to eq 'Chatwoot'
+        expect(config['WIDGET_BRAND_URL']).to eq 'https://www.chatwoot.com'
+        expect(config['LOGO_THUMBNAIL']).to eq '/brand-assets/logo_thumbnail.svg'
+      end
+
+      it 'leaves the hero logo empty rather than lending the installation mark to a page' do
+        expect(described_class.for.web_config['BRAND_LOGO_URL']).to eq ''
+      end
+    end
+
+    context 'when the account configured a brand' do
+      before do
+        account.enable_features!('branded_email_templates')
+        account.update!(
+          brand_name: 'Guichê Live',
+          brand_url: 'https://www.guichelive.com.br',
+          brand_color: '#F82323'
+        )
+      end
+
+      it 'wears the brand of the account' do
+        config = described_class.for(account: account).web_config
+
+        expect(config['BRAND_NAME']).to eq 'Guichê Live'
+        expect(config['WIDGET_BRAND_URL']).to eq 'https://www.guichelive.com.br'
+      end
+
+      it 'falls back field by field to the installation' do
+        account.update!(brand_url: '')
+
+        config = described_class.for(account: account).web_config
+
+        expect(config['BRAND_NAME']).to eq 'Guichê Live'
+        expect(config['WIDGET_BRAND_URL']).to eq 'https://www.chatwoot.com'
+      end
+
+      it 'ignores the account when the feature is off' do
+        account.disable_features!('branded_email_templates')
+
+        expect(described_class.for(account: account).web_config['BRAND_NAME']).to eq 'Chatwoot'
+      end
+
+      # The page renders a different footer for each, so a name that merely fell back must not
+      # look like one the account chose.
+      it 'says the name came from the account' do
+        expect(described_class.for(account: account).web_config['BRAND_FROM_ACCOUNT']).to be true
+      end
+
+      it 'says it did not when the account named nothing' do
+        account.update!(brand_name: '')
+
+        expect(described_class.for(account: account).web_config['BRAND_FROM_ACCOUNT']).to be false
+      end
+
+      it 'gives white text on the strong colour a legible background' do
+        config = described_class.for(account: account).web_config
+
+        expect(config['BRAND_COLOR']).to eq BrandColor.surface('#F82323')
+        expect(config['BRAND_COLOR_STRONG']).to eq BrandColor.on_light('#F82323')
+      end
+
+      context 'with a logo attached' do
+        before do
+          account.brand_logo_email.attach(
+            io: Rails.root.join('spec/assets/avatar.png').open,
+            filename: 'avatar.png',
+            content_type: 'image/png'
+          )
+        end
+
+        it 'uses it for both the footer thumbnail and the hero' do
+          config = described_class.for(account: account).web_config
+
+          expect(config['LOGO_THUMBNAIL']).to start_with 'http://localhost:3000/rails/active_storage/blobs/redirect/'
+          expect(config['BRAND_LOGO_URL']).to eq config['LOGO_THUMBNAIL']
+        end
+      end
+
+      it 'keeps the installation thumbnail when the account attached no logo' do
+        config = described_class.for(account: account).web_config
+
+        expect(config['LOGO_THUMBNAIL']).to eq '/brand-assets/logo_thumbnail.svg'
+        expect(config['BRAND_LOGO_URL']).to eq ''
+      end
+    end
+
+    # The mail layouts customers already stored read #config as `global_config`. Widening it
+    # would quietly change what those layouts see, which is why the web keys live apart.
+    it 'does not widen the hash the stored mail layouts read' do
+      expect(described_class.for.config.keys).to match_array(described_class::INSTALLATION_KEYS)
+    end
+  end
 end
