@@ -123,6 +123,21 @@ module Whatsapp::Session::Model::Commands
     coerce chat: Address, ref: MediaRef
   end
 
+  # Asks the phone for a page of a chat's history. `before` anchors the page on a message
+  # already held, so a second page picks up where the first ended rather than from the top.
+  class HistoryRequest < Data.define(:chat, :count, :before)
+    include Serializable
+    wire_type 'history.request'
+
+    # The message a page is asked to end before. WhatsApp wants all three: the id names it,
+    # the timestamp places it, and `from_me` says which side of the chat to look on.
+    class Anchor < Data.define(:id, :timestamp, :from_me)
+      include Serializable
+    end
+
+    coerce chat: Address, before: Anchor
+  end
+
   class PresenceSet < Data.define(:state)
     include Serializable
     wire_type 'presence.set'
@@ -251,7 +266,7 @@ module Whatsapp::Session::Model::Commands
   CLASSES = [
     SessionConnect, SessionDisconnect, SessionLogout, SessionDelete, SessionStatus, SessionUpdate, SessionWake,
     AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, MessageSend, MessageEdit,
-    MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, PresenceSet,
+    MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, HistoryRequest, PresenceSet,
     PresenceSubscribe, ChatPresence, ContactCheck, ContactProfilePicture, ContactInfo, ContactResolve, GroupCreate,
     GroupInfo, GroupList, GroupLeave, GroupParticipantsUpdate, GroupNameSet, GroupDescriptionSet, GroupPhotoSet,
     GroupSettingsSet, GroupInviteGet, GroupJoinRequestsList, GroupJoinRequestsUpdate, CallReject

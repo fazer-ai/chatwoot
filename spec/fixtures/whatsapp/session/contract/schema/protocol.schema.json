@@ -206,7 +206,7 @@
       "type": "object",
       "properties": {
         "type": { "const": "unsupported" },
-        "reason": { "enum": ["unknown_type", "undecryptable", "protocol", "empty"] }
+        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "masked", "protocol", "empty"] }
       },
       "required": ["type", "reason"],
       "additionalProperties": true
@@ -270,6 +270,7 @@
         "join_approval": { "type": "boolean" },
         "member_add_mode": { "enum": ["admin_add", "all_member_add"] },
         "picture_url": { "type": ["string", "null"] },
+        "has_picture": { "type": ["boolean", "null"] },
         "invite_code": { "type": ["string", "null"] }
       },
       "required": ["group"],
@@ -281,7 +282,7 @@
         "invalid_payload", "unsupported", "session_not_found", "not_connected", "not_paired",
         "owned_elsewhere", "quarantined", "client_outdated", "rate_limited", "expired", "timeout",
         "media_too_large", "media_unavailable", "recipient_not_on_whatsapp", "group_participant_not_allowed",
-        "wa_error", "internal"
+        "wa_error", "provider_unavailable", "internal"
       ]
     },
 
@@ -339,7 +340,7 @@
         "v": { "$ref": "#/definitions/protocol_version" },
         "id": { "type": "string", "minLength": 1 },
         "ok": { "type": "boolean" },
-        "result": { "type": ["object", "null"] },
+        "result": { "type": ["object", "array", "null"] },
         "error": { "oneOf": [{ "$ref": "#/definitions/error" }, { "type": "null" }] }
       },
       "required": ["v", "id", "ok"],
@@ -357,6 +358,8 @@
             { "properties": { "type": { "const": "session.temporary_ban" }, "payload": { "$ref": "#/definitions/event_session_temporary_ban" } }, "required": ["type"] },
             { "properties": { "type": { "const": "session.client_outdated" }, "payload": { "type": "object" } }, "required": ["type"] },
             { "properties": { "type": { "const": "session.connect_failure" }, "payload": { "$ref": "#/definitions/event_session_connect_failure" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.offline_sync_preview" }, "payload": { "$ref": "#/definitions/event_session_offline_sync_preview" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "session.offline_sync_completed" }, "payload": { "$ref": "#/definitions/event_session_offline_sync_completed" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.qr" }, "payload": { "$ref": "#/definitions/event_pairing_qr" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.code" }, "payload": { "$ref": "#/definitions/event_pairing_code" } }, "required": ["type"] },
             { "properties": { "type": { "const": "pairing.success" }, "payload": { "$ref": "#/definitions/event_pairing_success" } }, "required": ["type"] },
@@ -400,6 +403,28 @@
         "ban": { "oneOf": [{ "$ref": "#/definitions/ban" }, { "type": "null" }] }
       },
       "required": ["state"],
+      "additionalProperties": true
+    },
+    "event_session_offline_sync_preview": {
+      "description": "The server is about to replay what this session missed while it was down. Counts are the server's own, sent before the events themselves, so a reader can say how much is coming instead of watching the queue move on its own. The messages arrive afterwards as ordinary message.received.",
+      "type": "object",
+      "properties": {
+        "messages": { "type": "integer", "minimum": 0 },
+        "receipts": { "type": "integer", "minimum": 0 },
+        "notifications": { "type": "integer", "minimum": 0 },
+        "app_data_changes": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["total"],
+      "additionalProperties": true
+    },
+    "event_session_offline_sync_completed": {
+      "description": "The replay is over. What did not arrive by now is not coming, so this is where a reader stops waiting.",
+      "type": "object",
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["count"],
       "additionalProperties": true
     },
     "event_session_logged_out": {
@@ -472,7 +497,10 @@
     },
     "event_pairing_passkey_confirmation": {
       "type": "object",
-      "properties": { "code": { "type": "string" } },
+      "properties": {
+        "request_id": { "type": "string" },
+        "code": { "type": "string" }
+      },
       "required": ["code"],
       "additionalProperties": true
     },
@@ -514,6 +542,7 @@
         "chat": { "$ref": "#/definitions/address" },
         "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "message_id": { "$ref": "#/definitions/message_id" },
+        "message_author": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "by": { "enum": ["contact", "self"] },
         "timestamp": { "$ref": "#/definitions/timestamp_ms" }
       },
@@ -539,7 +568,8 @@
       "properties": {
         "chat": { "$ref": "#/definitions/address" },
         "message_id": { "$ref": "#/definitions/message_id" },
-        "reason": { "type": "string" }
+        "reason": { "type": "string" },
+        "recoverable": { "type": "boolean" }
       },
       "required": ["message_id", "reason"],
       "additionalProperties": true
@@ -710,6 +740,7 @@
             { "properties": { "type": { "const": "message.mark_read" }, "payload": { "$ref": "#/definitions/command_message_mark_read" } }, "required": ["type"] },
             { "properties": { "type": { "const": "message.mark_unread" }, "payload": { "$ref": "#/definitions/command_message_mark_unread" } }, "required": ["type"] },
             { "properties": { "type": { "const": "message.download_media" }, "payload": { "$ref": "#/definitions/command_message_download_media" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "history.request" }, "payload": { "$ref": "#/definitions/command_history_request" } }, "required": ["type"] },
             { "properties": { "type": { "const": "presence.set" }, "payload": { "$ref": "#/definitions/command_presence_set" } }, "required": ["type"] },
             { "properties": { "type": { "const": "presence.subscribe" }, "payload": { "$ref": "#/definitions/command_presence_subscribe" } }, "required": ["type"] },
             { "properties": { "type": { "const": "chat.presence" }, "payload": { "$ref": "#/definitions/command_chat_presence" } }, "required": ["type"] },
@@ -863,6 +894,26 @@
       "required": ["chat"],
       "additionalProperties": true
     },
+    "history_anchor": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/message_id" },
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" },
+        "from_me": { "type": "boolean" }
+      },
+      "required": ["id", "timestamp", "from_me"],
+      "additionalProperties": true
+    },
+    "command_history_request": {
+      "type": "object",
+      "properties": {
+        "chat": { "$ref": "#/definitions/address" },
+        "count": { "type": ["integer", "null"], "minimum": 1 },
+        "before": { "anyOf": [{ "$ref": "#/definitions/history_anchor" }, { "type": "null" }] }
+      },
+      "required": ["chat"],
+      "additionalProperties": true
+    },
     "command_message_download_media": {
       "type": "object",
       "properties": {
@@ -962,7 +1013,7 @@
       "type": "object",
       "properties": {
         "group": { "$ref": "#/definitions/address" },
-        "image": { "type": ["string", "null"], "description": "base64 JPEG; null removes the picture" }
+        "image": { "type": ["string", "null"], "description": "base64 JPEG; null or absent removes the picture" }
       },
       "required": ["group"],
       "additionalProperties": true

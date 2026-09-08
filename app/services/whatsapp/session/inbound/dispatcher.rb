@@ -40,9 +40,15 @@ class Whatsapp::Session::Inbound::Dispatcher
 
   # Types the catalog defines and this layer deliberately drops. Listed so that a type
   # missing from both tables shows up as a gap instead of as silence.
+  # The offline-sync pair is counts, not content: what the server is about to replay and
+  # that it finished. The messages themselves arrive as ordinary `message.received` and
+  # are stored by the handler that stores every message, so nothing is lost by not
+  # reading these. What they would buy is telling an agent that a backlog is on its way
+  # instead of watching the thread fill on its own, which is #407's to spend.
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
     call.offer call.terminate history.sync
+    session.offline_sync_preview session.offline_sync_completed
   ].freeze
 
   attr_reader :channel, :event, :instance
