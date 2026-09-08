@@ -679,6 +679,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
+    # An edit can decrypt while the message it edits does not, so it lands on the
+    # placeholder and is the first readable body that row has. The original body arriving
+    # afterwards is stale next to an edit of it.
+    context 'when an edit landed on the placeholder first' do
+      before do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageEdited.new(
+                               chat: chat, message_id: inbound.id,
+                               content: model::Content::Text.new(body: 'oi, tudo bem mesmo?')
+                             ))
+        )
+      end
+
+      it 'shows the edit rather than the unsupported bubble' do
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.is_unsupported).to be_nil
+      end
+
+      it 'does not let the recovery write the original body over the edit' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+      end
+    end
+
     # One row cannot become the several a share writes, so this stays the unsupported
     # bubble it already was. Recorded as #488 rather than silently accepted.
     context 'when what arrives is a share of contacts' do

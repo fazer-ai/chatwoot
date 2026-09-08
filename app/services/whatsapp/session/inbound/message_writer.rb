@@ -58,6 +58,9 @@ class Whatsapp::Session::Inbound::MessageWriter
   # sender all raise it on messages that arrived intact, and writing content over one of
   # those would clear a failure the agent is looking at and ask for the bytes again.
   #
+  # An edit that landed first takes the marker off the row (`MessageEdited#apply`), which
+  # is what stops a delayed recovery from writing the original body over an edit of it.
+  #
   # A share of contacts is left out on purpose: it writes one row per card, and turning
   # one row into several is not a correction of that row. It stays the unsupported bubble
   # it already was, which is the same outcome as before this method existed, and #488
