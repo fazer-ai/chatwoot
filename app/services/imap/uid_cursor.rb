@@ -18,6 +18,9 @@ class Imap::UidCursor
 
     parsed = JSON.parse(raw).symbolize_keys
     return unless parsed[:uid_validity].present? && parsed[:last_uid].present?
+    # A cursor written before the mailbox fingerprint existed cannot prove which mailbox
+    # it came from, and unprovable is the same as absent here.
+    return if parsed[:mailbox].blank?
 
     parsed
   rescue JSON::ParserError
@@ -26,10 +29,10 @@ class Imap::UidCursor
     nil
   end
 
-  def write(uid_validity:, last_uid:, swept_at:)
+  def write(uid_validity:, last_uid:, swept_at:, mailbox:)
     Redis::Alfred.set(
       key,
-      { uid_validity: uid_validity, last_uid: last_uid, swept_at: swept_at.to_i }.to_json,
+      { uid_validity: uid_validity, last_uid: last_uid, swept_at: swept_at.to_i, mailbox: mailbox }.to_json,
       ex: TTL
     )
   end

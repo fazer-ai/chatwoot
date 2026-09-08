@@ -176,12 +176,17 @@ RSpec.describe Imap::FetchEmailService do
 
     context 'when a UID cursor is already recorded' do
       let(:cursor) { Imap::UidCursor.new(inbox: imap_email_channel.inbox) }
+      let(:mailbox) do
+        Digest::SHA256.hexdigest(
+          [imap_email_channel.imap_address, imap_email_channel.imap_port, imap_email_channel.imap_login].join(':')
+        )
+      end
 
       after { cursor.clear }
 
       it 'asks only for UIDs above the cursor instead of re-listing the window' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current, mailbox: mailbox)
 
           allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([])
           allow(imap).to receive(:logout)
@@ -198,7 +203,7 @@ RSpec.describe Imap::FetchEmailService do
       # every run and re-fetch its header forever.
       it 'discards the trailing UID the server returns below the requested range' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current, mailbox: mailbox)
 
           allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([41])
           # Stubbed so the negative expectation below can be asserted at all; the point
@@ -215,7 +220,7 @@ RSpec.describe Imap::FetchEmailService do
 
       it 'falls back to the date sweep when the mailbox reports a new UIDVALIDITY' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          cursor.write(uid_validity: uid_validity - 1, last_uid: 41, swept_at: Time.current)
+          cursor.write(uid_validity: uid_validity - 1, last_uid: 41, swept_at: Time.current, mailbox: mailbox)
 
           allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
           allow(imap).to receive(:logout)
@@ -228,7 +233,7 @@ RSpec.describe Imap::FetchEmailService do
 
       it 'falls back to the date sweep once the full sweep interval has elapsed' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          cursor.write(uid_validity: uid_validity, last_uid: 41,
+          cursor.write(uid_validity: uid_validity, last_uid: 41, mailbox: mailbox,
                        swept_at: Time.current - Imap::BaseFetchEmailService::FULL_SWEEP_INTERVAL - 1)
 
           allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
@@ -242,7 +247,7 @@ RSpec.describe Imap::FetchEmailService do
 
       it 'keeps the cursor when a run finds nothing, so the next run resumes from it' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current, mailbox: mailbox)
 
           allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([])
           allow(imap).to receive(:logout)
@@ -250,6 +255,61 @@ RSpec.describe Imap::FetchEmailService do
           described_class.new(channel: imap_email_channel).perform
 
           expect(cursor.read).to include(uid_validity: uid_validity, last_uid: 41)
+        end
+      end
+
+      # A cursor that claims UIDs the run never looked at hides them from every later
+      # incremental poll, and only the hourly sweep would find them, 500 at a time.
+      it 'does not advance the cursor past UIDs the sync limit left uninspected' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          max = Imap::BaseFetchEmailService::MAX_MESSAGES_PER_SYNC
+          seen = (1..max).to_a
+          unseen = [max + 1, max + 2]
+          headers = seen.map do |uid|
+            Net::IMAP::FetchData.new(uid, 'UID' => uid, 'BODY[HEADER]' => eml_content_with_message_id)
+          end
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return(seen + unseen)
+          allow(imap).to receive(:uid_fetch).with(seen, %w[UID BODY.PEEK[HEADER]]).and_return(headers)
+          allow(imap).to receive(:uid_fetch).with(unseen, %w[UID BODY.PEEK[HEADER]]).and_return([])
+          allow(imap).to receive(:uid_fetch).with(anything, 'BODY.PEEK[]').and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(cursor.read[:last_uid]).to eq max
+        end
+      end
+
+      it 'drops the previous high-water mark when UIDVALIDITY changed' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity - 1, last_uid: 9_999, swept_at: Time.current, mailbox: mailbox)
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([7])
+          allow(imap).to receive(:uid_fetch).with([7], %w[UID BODY.PEEK[HEADER]])
+                                            .and_return([Net::IMAP::FetchData.new(7, 'UID' => 7,
+                                                                                     'BODY[HEADER]' => eml_content_with_message_id)])
+          allow(imap).to receive(:uid_fetch).with(7, 'BODY.PEEK[]').and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(cursor.read).to include(uid_validity: uid_validity, last_uid: 7)
+        end
+      end
+
+      # UIDVALIDITY is per mailbox, not global, so it cannot tell two accounts apart on
+      # its own. Repointing the channel must not inherit the old account's position.
+      it 'ignores a cursor recorded against a different mailbox' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current, mailbox: 'outra-caixa')
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
         end
       end
     end

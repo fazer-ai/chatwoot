@@ -53,11 +53,12 @@ class Imap::BaseFetchEmailService
 
   def fetch_mail_for_channel
     uids = fetch_available_mail_uids
-    entries = collect_message_ids(uids)
+    entries, inspected_through = collect_message_ids(uids)
     mails = entries.filter_map { |entry| process_message_id(entry) }
-    # Only after the batch is built. A run that dies halfway leaves the cursor where it
-    # was, so the next one re-reads the same range: wasted bandwidth, never a gap.
-    advance_cursor(uids)
+    # Only after the batch is built, and only through the UID actually looked at. A run
+    # that dies halfway leaves the cursor where it was, so the next one re-reads the same
+    # range: wasted bandwidth, never a gap.
+    advance_cursor(inspected_through)
     mails
   end
 
@@ -71,6 +72,7 @@ class Imap::BaseFetchEmailService
       validity = mailbox_uid_validity
 
       if validity.nil? || cursor.nil? || cursor[:uid_validity] != validity ||
+         cursor[:mailbox] != mailbox_identity ||
          Time.current.to_i - cursor[:swept_at].to_i >= FULL_SWEEP_INTERVAL
         { mode: :full, uid_validity: validity }
       else
@@ -94,18 +96,36 @@ class Imap::BaseFetchEmailService
     @uid_cursor ||= Imap::UidCursor.new(inbox: channel.inbox)
   end
 
-  def advance_cursor(uids)
+  # UIDVALIDITY is scoped to a mailbox, not global: two different mailboxes can report the
+  # same number. Since the host and login of a channel are editable, the cursor also has to
+  # name the mailbox it was built from, or repointing an inbox would silently inherit a
+  # high-water mark from the previous account.
+  def mailbox_identity
+    @mailbox_identity ||= Digest::SHA256.hexdigest(
+      [channel.imap_address, channel.imap_port, channel.imap_login].join(':')
+    )
+  end
+
+  def advance_cursor(inspected_through)
     validity = sync_plan[:uid_validity]
     return if validity.blank?
 
     previous = uid_cursor.read
-    last_uid = [uids.max.to_i, previous&.dig(:last_uid).to_i].max
+    # A cursor from another UIDVALIDITY generation (or another mailbox) describes UIDs that
+    # no longer exist. Carrying its high-water mark forward would park the new generation
+    # above every real UID, and only the hourly sweep would ever see mail again.
+    carried = reusable_cursor?(previous, validity) ? previous[:last_uid].to_i : 0
+    last_uid = [inspected_through.to_i, carried].max
     return if last_uid.zero?
 
     # swept_at only moves on a full sweep: it is the clock for "when did we last look at
     # the whole window", and an incremental run did not.
     swept_at = sync_plan[:mode] == :full ? Time.current : (previous&.dig(:swept_at) || 0)
-    uid_cursor.write(uid_validity: validity, last_uid: last_uid, swept_at: swept_at)
+    uid_cursor.write(uid_validity: validity, last_uid: last_uid, swept_at: swept_at, mailbox: mailbox_identity)
+  end
+
+  def reusable_cursor?(cursor, validity)
+    cursor.present? && cursor[:uid_validity] == validity && cursor[:mailbox] == mailbox_identity
   end
 
   def process_message_id(entry)
@@ -135,42 +155,59 @@ class Imap::BaseFetchEmailService
 
   # Sends a FETCH command to retrieve data associated with a message in the mailbox.
   # You can send batches of UIDs in `.uid_fetch`.
+  #
+  # Returns the entries worth downloading AND the highest UID whose header was actually
+  # inspected. Those are different numbers whenever the cap cuts the run short, and the
+  # cursor has to move by the second one: everything past it was never looked at, so
+  # claiming it would hide those messages from every later incremental poll and leave
+  # only the hourly sweep to find them, 500 at a time, until they age out of the window.
   def collect_message_ids(uids)
     Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching mails from #{channel.email}, found #{uids.length} " \
                       "(#{sync_plan[:mode]} sync)."
 
-    entries = []
-    uids.each_slice(MAX_MESSAGES_PER_SYNC).each do |batch|
-      append_message_ids_for_batch(batch, entries)
-      if entries.length >= MAX_MESSAGES_PER_SYNC
-        Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Reached MAX_MESSAGES_PER_SYNC=#{MAX_MESSAGES_PER_SYNC} for #{channel.email}, stopping sync."
-        break
-      end
+    collected = { entries: [], inspected_through: nil }
+    uids.each_slice(MAX_MESSAGES_PER_SYNC) do |batch|
+      break if consume_header_batch(batch, collected) == :capped
     end
 
-    entries
+    [collected[:entries], collected[:inspected_through]]
   end
 
-  def append_message_ids_for_batch(batch, entries)
+  # Walks one batch of headers, stopping the moment the sync limit is reached. Returns
+  # :capped so the caller knows the remaining UIDs were never looked at, which is exactly
+  # what keeps the cursor from claiming them.
+  def consume_header_batch(batch, collected)
+    headers = fetch_headers_for(batch)
+    return :empty if headers.blank?
+
+    # Sorted so "inspected through UID N" really means every UID up to N was seen: the
+    # server may answer a batch in any order.
+    headers.sort_by { |data| data.attr['UID'].to_i }.each do |data|
+      if collected[:entries].length >= MAX_MESSAGES_PER_SYNC
+        Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Reached MAX_MESSAGES_PER_SYNC=#{MAX_MESSAGES_PER_SYNC} " \
+                          "for #{channel.email}, stopping sync."
+        return :capped
+      end
+
+      collected[:inspected_through] = data.attr['UID'] || collected[:inspected_through]
+      entry = build_message_id_entry(data)
+      collected[:entries].push(entry) if entry
+    end
+
+    :ok
+  end
+
+  def fetch_headers_for(batch)
     # Fetch only message-id only without mail body or contents.
     Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Starting header batch of #{batch.length} for #{channel.email}"
-    batch_message_ids = imap_client.uid_fetch(batch, %w[UID BODY.PEEK[HEADER]])
-    Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching the batch for #{channel.email}. Found #{batch_message_ids&.length} messages."
+    headers = imap_client.uid_fetch(batch, %w[UID BODY.PEEK[HEADER]])
+    Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching the batch for #{channel.email}. Found #{headers&.length} messages."
 
-    # .fetch returns an array of Net::IMAP::FetchData or nil
+    # .uid_fetch returns an array of Net::IMAP::FetchData or nil
     # (instead of an empty array) if there is no matching message.
-    if batch_message_ids.blank?
-      Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching the batch failed for #{channel.email}."
-      return
-    end
+    Rails.logger.info "[IMAP::FETCH_EMAIL_SERVICE] Fetching the batch failed for #{channel.email}." if headers.blank?
 
-    batch_message_ids.each do |data|
-      entry = build_message_id_entry(data)
-      next if entry.nil?
-
-      entries.push(entry)
-      break if entries.length >= MAX_MESSAGES_PER_SYNC
-    end
+    headers
   end
 
   def build_message_id_entry(data)
