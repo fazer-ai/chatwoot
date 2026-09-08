@@ -12,8 +12,13 @@
 module AccountInboxPayloadFingerprint
   extend ActiveSupport::Concern
 
-  # Bump on any change to the shape of `api/v1/models/_inbox.json.jbuilder`.
-  PAYLOAD_VERSION = 2
+  # Bump on any change to what that partial serializes -- its shape, and equally the
+  # values it derives from code rather than from the record. A capability added to a
+  # descriptor is the second kind and looks like nothing here: the field already existed,
+  # no inbox was written, and every warm cache keeps serving the list from before the
+  # deploy. The dashboard then hides the controls the new capability was added to unlock,
+  # until something happens to write the inbox row.
+  PAYLOAD_VERSION = 3
 
   def cache_keys
     keys = super
