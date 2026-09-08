@@ -49,8 +49,13 @@ export default {
     pageConfig() {
       return window.globalConfig || {};
     },
+    // Only the account's own name. Left empty for an account without a brand, so the footer
+    // keeps the exact wording it had before -- Branding falls back to the installation name in
+    // the locale's own translation, which is what the ~39 languages we do not ship rely on.
     brandName() {
-      return this.pageConfig.BRAND_NAME || '';
+      return this.pageConfig.BRAND_FROM_ACCOUNT
+        ? this.pageConfig.BRAND_NAME || ''
+        : '';
     },
     brandLogo() {
       return this.pageConfig.BRAND_LOGO_URL || '';

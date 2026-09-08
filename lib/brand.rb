@@ -21,7 +21,7 @@ class Brand
 
   # The public pages want a different set: a small thumbnail for the footer, the widget's
   # brand URL, and a logo that may be a vector, since a browser renders what email cannot.
-  WEB_KEYS = %w[BRAND_NAME BRAND_COLOR WIDGET_BRAND_URL LOGO_THUMBNAIL].freeze
+  WEB_KEYS = %w[BRAND_NAME BRAND_COLOR WIDGET_BRAND_URL LOGO_THUMBNAIL INSTALLATION_NAME].freeze
 
   # Email clients render none of the vector formats, so a logo that is not one of these puts a
   # broken image at the top of every email, which reads worse than the no-logo layout.
@@ -85,7 +85,11 @@ class Brand
       'BRAND_COLOR' => BrandColor.surface(color),
       # Darkened to 4.5:1 against white. Contrast is symmetric, so the same value is also what
       # makes white label text on top of it legible -- no second colour to compute.
-      'BRAND_COLOR_STRONG' => BrandColor.on_light(color)
+      'BRAND_COLOR_STRONG' => BrandColor.on_light(color),
+      # Whether the name above is the account's own or the installation's. #name alone cannot
+      # answer that -- it falls back -- and the page needs the difference: an account with no
+      # brand of its own has to keep rendering exactly what it rendered before.
+      'BRAND_FROM_ACCOUNT' => override(:brand_name).present?
     )
   end
 

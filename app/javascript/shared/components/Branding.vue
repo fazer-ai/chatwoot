@@ -45,6 +45,22 @@ export default {
     displayedBrandName() {
       return this.brandName || this.globalConfig.brandName;
     },
+    // Substitution first, interpolation only as a fallback, because the two differ in what they
+    // preserve. POWERED_BY is translated into every language upstream ships; POWERED_BY_BRAND is
+    // ours and exists in three, falling back to English everywhere else. So substituting into
+    // the localized sentence keeps a French survey French, and the fork key is reached only
+    // where substitution has nothing to match -- Persian and Tamil spell the vendor
+    // transliterated, so the Latin name never appears. An English sentence around the right
+    // brand beats a French sentence around the wrong one, and only those locales pay it.
+    poweredByText() {
+      const template = this.$t('POWERED_BY');
+      if (!this.brandName) return this.replaceInstallationName(template);
+
+      const substituted = template.replace(/chatwoot/gi, this.brandName);
+      return substituted === template
+        ? this.$t('POWERED_BY_BRAND', { brandName: this.brandName })
+        : substituted;
+    },
     brandRedirectURL() {
       try {
         const referrerHost = this.$store.getters['appConfig/getReferrerHost'];
@@ -88,17 +104,8 @@ export default {
         :alt="displayedBrandName"
         :src="globalConfig.logoThumbnail"
       />
-      <!-- Interpolated rather than run through replaceInstallationName: POWERED_BY is
-           translated per locale, and in Persian and Tamil it carries a transliterated name
-           instead of the Latin "Chatwoot", so the replace matches nothing and the footer would
-           credit the vendor on a page already wearing the account's brand. Callers that pass
-           brandName must ship POWERED_BY_BRAND in their bundle; the survey does. -->
       <span>
-        {{
-          brandName
-            ? $t('POWERED_BY_BRAND', { brandName })
-            : replaceInstallationName($t('POWERED_BY'))
-        }}
+        {{ poweredByText }}
       </span>
     </a>
   </div>

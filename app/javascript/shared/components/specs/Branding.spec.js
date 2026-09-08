@@ -48,11 +48,21 @@ describe('Branding', () => {
     expect(wrapper.find('img').attributes('alt')).toBe('Guichê Live');
   });
 
-  // The reason the account name is interpolated instead of substituted into POWERED_BY: in
-  // Persian and Tamil that string carries a transliterated name, so a replace of the Latin
-  // "Chatwoot" matches nothing and the footer would credit the vendor on a page already
-  // wearing the account's brand.
-  it('names the account even in a locale that never spells Chatwoot in Latin script', () => {
+  // The only case the fork key is for: Persian and Tamil spell the vendor transliterated, so
+  // there is no Latin "Chatwoot" to substitute.
+  // Regression: an earlier fix sent every survey through the fork key, which exists in three
+  // languages and falls back to English. A French survey then read "Powered by Chatwoot"
+  // where it used to read "Propulsé par Chatwoot".
+  it('keeps the sentence in the locale of the survey when substituting the brand', () => {
+    const wrapper = mountBranding(
+      { brandName: 'Guichê Live' },
+      'Propulsé par Chatwoot'
+    );
+
+    expect(wrapper.text()).toContain('Propulsé par Guichê Live');
+  });
+
+  it('falls back to the interpolated key where there is no Latin name to substitute', () => {
     const wrapper = mountBranding(
       { brandName: 'Guichê Live' },
       'قدرت گرفته از چت ووت'

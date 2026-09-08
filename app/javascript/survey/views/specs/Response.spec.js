@@ -245,9 +245,28 @@ describe('Response', () => {
       expect(wrapper.vm.logo).toBe('');
     });
 
+    // The footer only takes a name when it is the account's own. Handing it the installation's
+    // would push every survey down the fork-key path, which is translated in three languages
+    // and falls back to English in the rest.
+    it('withholds the brand name when it is the installation falling back', async () => {
+      window.globalConfig = {
+        BRAND_NAME: 'Chatwoot',
+        BRAND_FROM_ACCOUNT: false,
+      };
+      getSurveyDetails.mockResolvedValue(surveyPayload());
+      setUrl('');
+      const wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(
+        wrapper.findComponent({ name: 'Branding' }).props('brandName')
+      ).toBe('');
+    });
+
     it('hands the account brand and the branding entitlement to the footer', async () => {
       window.globalConfig = {
         BRAND_NAME: 'Guichê Live',
+        BRAND_FROM_ACCOUNT: true,
         DISABLE_BRANDING: true,
       };
       getSurveyDetails.mockResolvedValue(surveyPayload());

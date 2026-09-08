@@ -169,6 +169,18 @@ RSpec.describe Brand do
         expect(described_class.for(account: account).web_config['BRAND_NAME']).to eq 'Chatwoot'
       end
 
+      # The page renders a different footer for each, so a name that merely fell back must not
+      # look like one the account chose.
+      it 'says the name came from the account' do
+        expect(described_class.for(account: account).web_config['BRAND_FROM_ACCOUNT']).to be true
+      end
+
+      it 'says it did not when the account named nothing' do
+        account.update!(brand_name: '')
+
+        expect(described_class.for(account: account).web_config['BRAND_FROM_ACCOUNT']).to be false
+      end
+
       it 'gives white text on the strong colour a legible background' do
         config = described_class.for(account: account).web_config
 
