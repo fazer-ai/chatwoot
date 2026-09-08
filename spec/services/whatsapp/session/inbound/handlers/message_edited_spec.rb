@@ -28,6 +28,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageEdited do
     expect(message.previous_content).to eq('oi')
   end
 
+  # An edit is the first readable body a placeholder's row has had, so leaving the flag on
+  # renders the edit as the unsupported bubble, which shows none of it.
+  it 'stops calling a placeholder unreadable once the edit gives it a body' do
+    message.update!(content: nil, content_attributes: { 'is_unsupported' => true,
+                                                        'unsupported_reason' => 'undecryptable' })
+
+    expect(dispatch).to eq(:handled)
+
+    expect(message.reload.content).to eq('oi, corrigido')
+    expect(message.content_attributes).not_to include('is_unsupported', 'unsupported_reason')
+  end
+
+  # `is_unsupported` also marks media that never arrived, and a new caption is no answer
+  # to bytes that are not coming: the bubble has to go on saying the attachment is not
+  # coming, or the agent is left waiting for one.
+  it 'leaves a media failure saying the attachment is not coming' do
+    message.update_under_lock!(is_unsupported: true)
+
+    expect(dispatch).to eq(:handled)
+
+    expect(message.reload.content).to eq('oi, corrigido')
+    expect(message.is_unsupported).to be(true)
+  end
+
   it 'keeps the first version across a second edit' do
     dispatch
     described_class.new(
