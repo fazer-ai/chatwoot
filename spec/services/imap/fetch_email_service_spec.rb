@@ -8,6 +8,7 @@ RSpec.describe Imap::FetchEmailService do
   let(:imap) { instance_double(Net::IMAP) }
   let(:eml_content_with_message_id) { Rails.root.join('spec/fixtures/files/only_text.eml').read }
   let(:eml_content_without_message_id) { eml_content_with_message_id.sub(/^Message-ID:.*\n/, '') }
+  let(:uid_validity) { 987_654 }
 
   describe '#perform' do
     before do
@@ -19,6 +20,7 @@ RSpec.describe Imap::FetchEmailService do
         'plain', imap_email_channel.imap_login, imap_email_channel.imap_password
       )
       allow(imap).to receive(:select).with('INBOX')
+      allow(imap).to receive(:responses).with('UIDVALIDITY').and_yield([uid_validity])
     end
 
     context 'when using CRAM-MD5 authentication' do
@@ -36,7 +38,7 @@ RSpec.describe Imap::FetchEmailService do
 
       it 'uses CRAM-MD5 authentication' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
           allow(imap).to receive(:logout)
 
           described_class.new(channel: cram_md5_channel).perform
@@ -63,7 +65,7 @@ RSpec.describe Imap::FetchEmailService do
 
       it 'uses LOGIN authentication' do
         travel_to '26.10.2020 10:00'.to_datetime do
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
           allow(imap).to receive(:logout)
 
           described_class.new(channel: login_channel).perform
@@ -79,22 +81,23 @@ RSpec.describe Imap::FetchEmailService do
       it 'fetches the emails and returns the emails that are not present in the db' do
         travel_to '26.10.2020 10:00'.to_datetime do
           email_object = create_inbound_email_from_fixture('only_text.eml')
-          email_header = Net::IMAP::FetchData.new(1, 'BODY[HEADER]' => eml_content_with_message_id)
+          email_header = Net::IMAP::FetchData.new(1, 'UID' => 1, 'BODY[HEADER]' => eml_content_with_message_id)
           imap_fetch_mail = Net::IMAP::FetchData.new(1, 'BODY[]' => eml_content_with_message_id)
 
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return([1])
-          allow(imap).to receive(:fetch).with([1], 'BODY.PEEK[HEADER]').and_return([email_header])
-          allow(imap).to receive(:fetch).with(1, 'BODY.PEEK[]').and_return([imap_fetch_mail])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([1])
+          allow(imap).to receive(:uid_fetch).with([1], %w[UID BODY.PEEK[HEADER]]).and_return([email_header])
+          allow(imap).to receive(:uid_fetch).with(1, 'BODY.PEEK[]').and_return([imap_fetch_mail])
           allow(imap).to receive(:logout)
 
           result = described_class.new(channel: imap_email_channel).perform
 
           expect(result.length).to eq 1
           expect(result[0].message_id).to eq email_object.message_id
-          expect(imap).to have_received(:search).with(%w[SINCE 25-Oct-2020])
-          expect(imap).to have_received(:fetch).with([1], 'BODY.PEEK[HEADER]')
-          expect(imap).to have_received(:fetch).with(1, 'BODY.PEEK[]')
-          expect(logger).to have_received(:info).with("[IMAP::FETCH_EMAIL_SERVICE] Fetching mails from #{imap_email_channel.email}, found 1.")
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
+          expect(imap).to have_received(:uid_fetch).with([1], %w[UID BODY.PEEK[HEADER]])
+          expect(imap).to have_received(:uid_fetch).with(1, 'BODY.PEEK[]')
+          expect(logger).to have_received(:info)
+            .with("[IMAP::FETCH_EMAIL_SERVICE] Fetching mails from #{imap_email_channel.email}, found 1 (full sync).")
           expect(imap).to have_received(:logout)
         end
       end
@@ -104,38 +107,38 @@ RSpec.describe Imap::FetchEmailService do
           email_object = create_inbound_email_from_fixture('only_text.eml')
           create(:message, source_id: email_object.message_id, account: account, inbox: imap_email_channel.inbox)
 
-          email_header = Net::IMAP::FetchData.new(1, 'BODY[HEADER]' => eml_content_with_message_id)
+          email_header = Net::IMAP::FetchData.new(1, 'UID' => 1, 'BODY[HEADER]' => eml_content_with_message_id)
 
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return([1])
-          allow(imap).to receive(:fetch).with([1], 'BODY.PEEK[HEADER]').and_return([email_header])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([1])
+          allow(imap).to receive(:uid_fetch).with([1], %w[UID BODY.PEEK[HEADER]]).and_return([email_header])
           allow(imap).to receive(:logout)
 
           result = described_class.new(channel: imap_email_channel).perform
 
           expect(result.length).to eq 0
-          expect(imap).to have_received(:search).with(%w[SINCE 25-Oct-2020])
-          expect(imap).to have_received(:fetch).with([1], 'BODY.PEEK[HEADER]')
-          expect(imap).not_to have_received(:fetch).with(1, 'BODY.PEEK[]')
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
+          expect(imap).to have_received(:uid_fetch).with([1], %w[UID BODY.PEEK[HEADER]])
+          expect(imap).not_to have_received(:uid_fetch).with(1, 'BODY.PEEK[]')
         end
       end
 
       it 'does not return recently deleted emails' do
         travel_to '26.10.2020 10:00'.to_datetime do
           email_object = create_inbound_email_from_fixture('only_text.eml')
-          email_header = Net::IMAP::FetchData.new(1, 'BODY[HEADER]' => eml_content_with_message_id)
+          email_header = Net::IMAP::FetchData.new(1, 'UID' => 1, 'BODY[HEADER]' => eml_content_with_message_id)
           redis_key = format(Redis::RedisKeys::IMAP_DELETED_MESSAGE,
                              inbox_id: imap_email_channel.inbox.id,
                              message_id_digest: Digest::SHA256.hexdigest(email_object.message_id))
 
           Imap::DeletedMessageTracker.new(inbox: imap_email_channel.inbox).record([email_object.message_id])
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return([1])
-          allow(imap).to receive(:fetch).with([1], 'BODY.PEEK[HEADER]').and_return([email_header])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([1])
+          allow(imap).to receive(:uid_fetch).with([1], %w[UID BODY.PEEK[HEADER]]).and_return([email_header])
           allow(imap).to receive(:logout)
 
           result = described_class.new(channel: imap_email_channel).perform
 
           expect(result).to be_empty
-          expect(imap).not_to have_received(:fetch).with(1, 'RFC822')
+          expect(imap).not_to have_received(:uid_fetch).with(1, 'RFC822')
         ensure
           Redis::Alfred.delete(redis_key) if redis_key
         end
@@ -148,24 +151,118 @@ RSpec.describe Imap::FetchEmailService do
           empty_message_id_seq_nums = (1..max_messages_per_sync).to_a
           valid_message_seq_num = max_messages_per_sync + 1
           empty_message_id_headers = empty_message_id_seq_nums.map do |seq_num|
-            Net::IMAP::FetchData.new(seq_num, 'BODY[HEADER]' => eml_content_without_message_id)
+            Net::IMAP::FetchData.new(seq_num, 'UID' => seq_num, 'BODY[HEADER]' => eml_content_without_message_id)
           end
-          valid_email_header = Net::IMAP::FetchData.new(valid_message_seq_num, 'BODY[HEADER]' => eml_content_with_message_id)
+          valid_email_header = Net::IMAP::FetchData.new(valid_message_seq_num, 'UID' => valid_message_seq_num,
+                                                                               'BODY[HEADER]' => eml_content_with_message_id)
           imap_fetch_mail = Net::IMAP::FetchData.new(valid_message_seq_num, 'BODY[]' => eml_content_with_message_id)
 
-          allow(imap).to receive(:search).with(%w[SINCE 25-Oct-2020]).and_return(empty_message_id_seq_nums + [valid_message_seq_num])
-          allow(imap).to receive(:fetch).with(empty_message_id_seq_nums, 'BODY.PEEK[HEADER]').and_return(empty_message_id_headers)
-          allow(imap).to receive(:fetch).with([valid_message_seq_num], 'BODY.PEEK[HEADER]').and_return([valid_email_header])
-          allow(imap).to receive(:fetch).with(valid_message_seq_num, 'BODY.PEEK[]').and_return([imap_fetch_mail])
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return(empty_message_id_seq_nums + [valid_message_seq_num])
+          allow(imap).to receive(:uid_fetch).with(empty_message_id_seq_nums, %w[UID BODY.PEEK[HEADER]]).and_return(empty_message_id_headers)
+          allow(imap).to receive(:uid_fetch).with([valid_message_seq_num], %w[UID BODY.PEEK[HEADER]]).and_return([valid_email_header])
+          allow(imap).to receive(:uid_fetch).with(valid_message_seq_num, 'BODY.PEEK[]').and_return([imap_fetch_mail])
           allow(imap).to receive(:logout)
 
           result = described_class.new(channel: imap_email_channel).perform
 
           expect(result.length).to eq 1
           expect(result[0].message_id).to eq email_object.message_id
-          expect(imap).to have_received(:fetch).with(empty_message_id_seq_nums, 'BODY.PEEK[HEADER]')
-          expect(imap).to have_received(:fetch).with([valid_message_seq_num], 'BODY.PEEK[HEADER]')
-          expect(imap).to have_received(:fetch).with(valid_message_seq_num, 'BODY.PEEK[]')
+          expect(imap).to have_received(:uid_fetch).with(empty_message_id_seq_nums, %w[UID BODY.PEEK[HEADER]])
+          expect(imap).to have_received(:uid_fetch).with([valid_message_seq_num], %w[UID BODY.PEEK[HEADER]])
+          expect(imap).to have_received(:uid_fetch).with(valid_message_seq_num, 'BODY.PEEK[]')
+        end
+      end
+    end
+
+    context 'when a UID cursor is already recorded' do
+      let(:cursor) { Imap::UidCursor.new(inbox: imap_email_channel.inbox) }
+
+      after { cursor.clear }
+
+      it 'asks only for UIDs above the cursor instead of re-listing the window' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+
+          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(imap).to have_received(:uid_search).with(['UID', '42:*'])
+          expect(imap).not_to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
+        end
+      end
+
+      # `N:*` is not "UIDs at or above N": the server answers with its highest UID even
+      # when that UID is below N, so an idle mailbox would hand back the same message on
+      # every run and re-fetch its header forever.
+      it 'discards the trailing UID the server returns below the requested range' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+
+          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([41])
+          # Stubbed so the negative expectation below can be asserted at all; the point
+          # is that the filter keeps it from ever being called.
+          allow(imap).to receive(:uid_fetch)
+          allow(imap).to receive(:logout)
+
+          result = described_class.new(channel: imap_email_channel).perform
+
+          expect(result).to be_empty
+          expect(imap).not_to have_received(:uid_fetch)
+        end
+      end
+
+      it 'falls back to the date sweep when the mailbox reports a new UIDVALIDITY' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity - 1, last_uid: 41, swept_at: Time.current)
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
+        end
+      end
+
+      it 'falls back to the date sweep once the full sweep interval has elapsed' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity, last_uid: 41,
+                       swept_at: Time.current - Imap::BaseFetchEmailService::FULL_SWEEP_INTERVAL - 1)
+
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
+        end
+      end
+
+      it 'keeps the cursor when a run finds nothing, so the next run resumes from it' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
+
+          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([])
+          allow(imap).to receive(:logout)
+
+          described_class.new(channel: imap_email_channel).perform
+
+          expect(cursor.read).to include(uid_validity: uid_validity, last_uid: 41)
+        end
+      end
+    end
+
+    context 'when the mailbox does not report a UIDVALIDITY' do
+      it 'sweeps by date instead of trusting a cursor it cannot validate' do
+        travel_to '26.10.2020 10:00'.to_datetime do
+          allow(imap).to receive(:responses).with('UIDVALIDITY').and_yield(nil)
+          allow(imap).to receive(:uid_search).with(%w[SINCE 25-Oct-2020]).and_return([])
+          allow(imap).to receive(:logout)
+
+          expect { described_class.new(channel: imap_email_channel).perform }.not_to raise_error
+          expect(imap).to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
         end
       end
     end

@@ -4,6 +4,9 @@ module Redis::RedisKeys
   ROUND_ROBIN_AGENTS = 'ROUND_ROBIN_AGENTS:%<inbox_id>d'.freeze
   # Track recently deleted IMAP messages to prevent them from being synced again
   IMAP_DELETED_MESSAGE = 'IMAP_DELETED_MESSAGE::%<inbox_id>d::%<message_id_digest>s'.freeze
+  # How far the mailbox has already been swept, by IMAP UID. A cache, not state:
+  # losing it costs one expensive sweep, never a message.
+  IMAP_UID_CURSOR = 'IMAP_UID_CURSOR::%<inbox_id>d'.freeze
 
   ## Conversation keys
   # Detect whether to send an email reply to the conversation
