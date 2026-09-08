@@ -279,7 +279,7 @@ module Whatsapp::Session::Model::Commands
   # outcome, when there is one, comes back as an event.
   RPC_TYPES = %w[
     session.connect session.status session.update admin.ping
-    message.send message.edit message.revoke message.react message.download_media
+    message.send message.edit message.revoke message.react message.download_media history.request
     contact.check contact.profile_picture contact.info contact.resolve
     group.create group.info group.list group.leave group.participants.update group.name.set
     group.description.set group.photo.set group.settings.set group.invite.get
