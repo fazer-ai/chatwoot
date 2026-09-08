@@ -2,7 +2,7 @@
 # group contact, its avatar and its participant list in sync.
 class Whatsapp::Session::Model::GroupInfo < Data.define(
   :group, :subject, :description, :owner, :created_at, :participants, :size,
-  :announce, :locked, :join_approval, :member_add_mode, :picture_url, :invite_code
+  :announce, :locked, :join_approval, :member_add_mode, :picture_url, :has_picture, :invite_code
 )
   include Whatsapp::Session::Model::Serializable
 

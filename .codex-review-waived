@@ -124,3 +124,4 @@ app/services/whatsapp/session/registry.rb: Add a reachable pairing-code flow  # 
 # `contact_inboxes.first`, every group controller has always resolved its channel that
 # way, and this branch neither introduces nor touches it. Same family as #374.
 app/javascript/dashboard/routes/dashboard/conversation/contact/GroupContactInfo.vue: Scope group commands to the selected inbox  # PR#387 → #389
+app/services/whatsapp/session/inbound/handlers/message_revoked.rb: Preserve the message author's inbox identity  # PR#493 → #494

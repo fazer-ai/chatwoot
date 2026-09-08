@@ -92,6 +92,22 @@ RSpec.describe Whatsapp::SessionContract do
     end
   end
 
+  # RPC_TYPES is a hand-kept list, and the contract already says which commands are one:
+  # a golden frame carries `reply_to` and a `deadline` exactly when its caller waits for a
+  # result. Kept apart, a command synced in as an RPC stays fire-and-forget here, and the
+  # caller that should have awaited a result simply never asks for one.
+  it 'calls a command an RPC exactly when its golden frame waits for a reply' do
+    disagreeing = described_class.fixtures('commands').filter_map do |path|
+      frame = JSON.parse(File.read(path))
+      awaited = frame['reply_to'].present?
+      next if awaited == Whatsapp::Session::Model::Commands.rpc?(frame['type'])
+
+      "#{frame['type']} (frame #{awaited ? 'waits' : 'does not wait'}, RPC_TYPES says #{!awaited})"
+    end
+
+    expect(disagreeing).to be_empty
+  end
+
   describe 'forward compatibility' do
     it 'keeps an unknown event type instead of failing' do
       frame = described_class.fixture('events', 'message_received_text').merge('type' => 'message.teleported')
