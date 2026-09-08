@@ -36,6 +36,30 @@ class Whatsapp::Session::Inbound::MessageWriter
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end
 
+  # Replaces the placeholder a message left behind with the message itself.
+  #
+  # A message the backend could not decrypt in time is published as an unsupported
+  # placeholder carrying the real message's id, and the message that finally arrives
+  # carries that same id -- so it reaches Chatwoot as a duplicate of its own placeholder.
+  # The content is the part that was missing, so the content is what is written over, in
+  # the row that is already there: the bubble the agent is looking at becomes the message,
+  # keeping its id, its place in the thread, and anything that quotes it.
+  #
+  # Answers whether it did, because a caller it says no to still has a duplicate to report.
+  def reconcile(message)
+    return false unless replaces_a_placeholder?(message)
+
+    message.content = message_content
+    message.content_attributes = message.content_attributes.merge(content_attributes.stringify_keys)
+                                        .except('is_unsupported')
+    attach_location(message)
+    message.save!
+    # After the save, as on the writing path: the job takes the row by reference and a
+    # save that raised would have it fetch bytes for content nobody stored.
+    enqueue_media_fetch(message)
+    true
+  end
+
   def perform
     return build_contact_messages if content_type == 'contacts'
 
@@ -96,6 +120,17 @@ class Whatsapp::Session::Inbound::MessageWriter
       is_unsupported: (true if unsupported?),
       rich: (content.to_content_attribute if content_type == 'rich')
     }.compact
+  end
+
+  # Only a placeholder is replaced, and only by something that is not one.
+  #
+  # A share of contacts is left out on purpose: it writes one row per card, and turning
+  # one row into several is not a correction of that row. It stays the unsupported bubble
+  # it already was, which is the same outcome as before this method existed, and #488
+  # carries the reasoning and the way out.
+  def replaces_a_placeholder?(message)
+    message.content_attributes['is_unsupported'].present? &&
+      content.present? && content_type != 'contacts' && !unsupported?
   end
 
   # A rich card with no text and no media header renders as an empty bubble, which is

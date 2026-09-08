@@ -30,14 +30,31 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
 
   def message = payload.message
 
-  # A message that is already stored is normally nothing to do again. The exception is
-  # the work that was queued after it was saved: an attempt that committed the row and
-  # then failed, most often on the job transport, is retried and lands here, and the
-  # media it meant to fetch would never be asked for again. The writer decides whether
-  # there is anything left to queue.
+  # A message that is already stored is normally nothing to do again. Two things are
+  # not.
+  #
+  # The first is the message the stored row is only a placeholder for. A message the
+  # backend could not decrypt in time is published under the real message's id, and the
+  # message itself arrives later under that same id: read as a duplicate, it leaves the
+  # bubble saying it could not be read forever, over a message whose text is in the
+  # payload that was just dropped.
+  #
+  # The second is the work that was queued after the row was saved: an attempt that
+  # committed the row and then failed, most often on the job transport, is retried and
+  # lands here, and the media it meant to fetch would never be asked for again. The
+  # writer decides whether there is anything left to queue.
   def duplicate_of(stored)
+    return :handled if writer_for(stored).reconcile(stored)
+
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
+  end
+
+  # The row already names the conversation and the sender this message belongs to: it was
+  # resolved when the placeholder was stored, from the same chat and the same author, and
+  # only the content was ever missing.
+  def writer_for(stored)
+    inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
   end
 
   def actionable?

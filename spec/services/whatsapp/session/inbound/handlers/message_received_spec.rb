@@ -466,6 +466,155 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # A message the backend could not decrypt in time is published as an unsupported
+  # placeholder carrying the real message's id, and the message itself arrives later under
+  # that same id. Read as a plain duplicate it is dropped, and the bubble saying it could
+  # not be read stays over a message whose text was in the payload that was just dropped.
+  context 'when the message a placeholder stood in for finally arrives' do
+    subject(:recovery) do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(content: recovered)))
+      )
+    end
+
+    let(:content) { model::Content::Unsupported.new(reason: 'undecryptable') }
+    let(:recovered) { model::Content::Text.new(body: 'oi, tudo bem?') }
+
+    before { dispatch }
+
+    def placeholder = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+
+    it 'stores the placeholder under the id of the message it stands in for' do
+      expect(placeholder.is_unsupported).to be(true)
+      expect(placeholder.content).to be_nil
+    end
+
+    # In the row that is already there, so the bubble the agent is looking at becomes the
+    # message and anything quoting it still points at something.
+    it 'writes the message over the placeholder instead of reporting a duplicate' do
+      was = placeholder.id
+
+      expect { expect(recovery).to eq(:handled) }.not_to change(inbox.messages, :count)
+
+      expect(placeholder.id).to eq(was)
+      expect(placeholder.content).to eq('oi, tudo bem?')
+      expect(placeholder.content_attributes).not_to have_key('is_unsupported')
+    end
+
+    # The recovery is the first time the quote is readable: an undecryptable stanza
+    # carries no context to take it from.
+    it 'links the message it quotes, which only the recovery names' do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(id: '3EB0AAAA0009', content: model::Content::Text.new(body: 'antes'))
+                           ))
+      )
+      quoted = inbox.messages.find_by(source_id: '3EB0AAAA0009')
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered, quoted_id: '3EB0AAAA0009')
+                           ))
+      )
+
+      expect(placeholder.content_attributes['in_reply_to']).to eq(quoted.id)
+    end
+
+    context 'when what arrives carries media' do
+      let(:recovered) do
+        model::Content::Media.new(
+          kind: 'image', mime: 'image/jpeg', caption: 'olha isso', filename: 'foto.jpg',
+          ref: model::MediaRef.url('https://connector.test/media/abc')
+        )
+      end
+
+      # The fetch stands down for a row marked unsupported, which is what a placeholder
+      # is: without clearing the flag first the bytes would never be asked for.
+      it 'asks for the bytes the placeholder could not carry' do
+        expect(recovery).to eq(:handled)
+
+        expect(placeholder.content).to eq('olha isso')
+        expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
+          .with(placeholder, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
+      end
+
+      # The job takes the row by reference, so a save that raised would have it fetch
+      # bytes for content nobody stored.
+      it 'asks for nothing when the row cannot be written' do
+        allow_any_instance_of(Message).to receive(:save!).and_raise(ActiveRecord::RecordInvalid) # rubocop:disable RSpec/AnyInstance
+
+        expect { recovery }.to raise_error(ActiveRecord::RecordInvalid)
+
+        expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      end
+    end
+
+    context 'when what arrives is a location' do
+      let(:recovered) { model::Content::Location.new(latitude: -25.42, longitude: -49.27, name: 'Curitiba') }
+
+      it 'attaches the coordinates the bubble renders' do
+        expect(recovery).to eq(:handled)
+
+        attachment = placeholder.attachments.last
+        expect(attachment.file_type).to eq('location')
+        expect(attachment.coordinates_lat).to eq(-25.42)
+      end
+    end
+
+    # The redelivery of the placeholder itself is a duplicate like any other. Replacing a
+    # placeholder with a placeholder would clear the flag and leave an empty bubble.
+    context 'when the redelivery is the placeholder again' do
+      let(:recovered) { model::Content::Unsupported.new(reason: 'undecryptable') }
+
+      it 'leaves it alone' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+      end
+    end
+
+    # The contract requires content on a message, and nothing checks the contract at
+    # runtime. Written over by nothing, the placeholder would lose its flag and become an
+    # empty bubble, which says less than the one that says it could not be read.
+    context 'when what arrives carries no content at all' do
+      let(:recovered) { nil }
+
+      it 'leaves the placeholder standing' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+      end
+    end
+
+    # One row cannot become the several a share writes, so this stays the unsupported
+    # bubble it already was. Recorded as #488 rather than silently accepted.
+    context 'when what arrives is a share of contacts' do
+      let(:recovered) { model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias' }]) }
+
+      it 'reports a duplicate rather than turning one row into several' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(inbox.messages.count).to eq(1)
+      end
+    end
+  end
+
+  # Only a placeholder is written over. A message that is already the message is a
+  # duplicate, and rewriting it would undo whatever has happened to the row since.
+  context 'when a message that was never a placeholder is redelivered' do
+    it 'reports a duplicate and leaves the stored content alone' do
+      expect(dispatch).to eq(:handled)
+      inbox.messages.find_by(source_id: '3EB0AAAA0001').update!(content: 'editada por alguém')
+
+      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
+
+      expect(inbox.messages.find_by(source_id: '3EB0AAAA0001').content).to eq('editada por alguém')
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 
