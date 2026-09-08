@@ -183,12 +183,12 @@ RSpec.describe Imap::FetchEmailService do
         travel_to '26.10.2020 10:00'.to_datetime do
           cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
 
-          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([])
+          allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([])
           allow(imap).to receive(:logout)
 
           described_class.new(channel: imap_email_channel).perform
 
-          expect(imap).to have_received(:uid_search).with(['UID', '42:*'])
+          expect(imap).to have_received(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')])
           expect(imap).not_to have_received(:uid_search).with(%w[SINCE 25-Oct-2020])
         end
       end
@@ -200,7 +200,7 @@ RSpec.describe Imap::FetchEmailService do
         travel_to '26.10.2020 10:00'.to_datetime do
           cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
 
-          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([41])
+          allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([41])
           # Stubbed so the negative expectation below can be asserted at all; the point
           # is that the filter keeps it from ever being called.
           allow(imap).to receive(:uid_fetch)
@@ -244,7 +244,7 @@ RSpec.describe Imap::FetchEmailService do
         travel_to '26.10.2020 10:00'.to_datetime do
           cursor.write(uid_validity: uid_validity, last_uid: 41, swept_at: Time.current)
 
-          allow(imap).to receive(:uid_search).with(['UID', '42:*']).and_return([])
+          allow(imap).to receive(:uid_search).with(['UID', Net::IMAP::SequenceSet.new('42:*')]).and_return([])
           allow(imap).to receive(:logout)
 
           described_class.new(channel: imap_email_channel).perform

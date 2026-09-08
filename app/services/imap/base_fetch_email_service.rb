@@ -194,11 +194,16 @@ class Imap::BaseFetchEmailService
     return imap_client.uid_search(['SINCE', since]) if sync_plan[:mode] == :full
 
     from = sync_plan[:from_uid]
-    # `N:*` is not "UIDs at or above N". RFC 3501 makes `*` the highest UID in the
-    # mailbox, and a range whose start is above it still matches that highest one, so an
-    # idle mailbox keeps handing back its last message forever. The filter is what makes
+    # SequenceSet and not the plain string "N:*". net-imap serialises a bare String
+    # argument as a quoted string, and Gmail answers a quoted sequence-set with
+    # "Could not parse command" -- verified against the live server, where the mocked
+    # client in the specs had happily accepted it.
+    #
+    # And `N:*` is not "UIDs at or above N": RFC 3501 makes `*` the highest UID in the
+    # mailbox, so a range starting above it still matches that highest one and an idle
+    # mailbox would keep handing back its last message forever. The filter is what makes
     # the range mean what it reads like.
-    imap_client.uid_search(['UID', "#{from}:*"]).select { |uid| uid >= from }
+    imap_client.uid_search(['UID', Net::IMAP::SequenceSet.new("#{from}:*")]).select { |uid| uid >= from }
   end
 
   def build_imap_client
