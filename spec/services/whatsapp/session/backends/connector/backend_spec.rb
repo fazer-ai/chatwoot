@@ -51,6 +51,53 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
   it_behaves_like 'a whatsapp session backend'
 
+  # The connector fails the command when nothing was carried out. This reaches the same
+  # verdict from the rows, so a caller told `ok` and handed a refusal for every
+  # participant it named gets the error both controllers already turn into a message an
+  # operator reads, rather than a silent success.
+  describe 'a participants update the provider refused' do
+    let(:command) do
+      model::Commands::GroupParticipantsUpdate.new(
+        group: model::Address.group('120363040000000001'),
+        participants: [model::Address.phone('5541999990000')], action: 'remove'
+      )
+    end
+
+    it 'raises when every participant was refused' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+
+      expect { backend.update_group_participants(command) }
+        .to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+    end
+
+    # Reporting the participants that were added as not added is a worse answer, and the
+    # caller reads the rows to find out which is which.
+    it 'hands back a partial refusal rather than failing the command' do
+      rows = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'success', 'code' => nil },
+        { 'address' => { 'kind' => 'phone', 'id' => '5541988887777' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+      results['group.participants.update'] = rows
+
+      expect(backend.update_group_participants(command)).to eq(rows)
+    end
+
+    # Any other refusal is the connector's to name: it fails the command itself when the
+    # code is one it maps, and a code this build does not know must not be read as the
+    # one it happens to rescue.
+    it 'leaves a refusal it does not recognise alone' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed', 'code' => 'internal' }
+      ]
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+  end
+
   it 'declares exactly what the registry advertises for the provider' do
     expect(described_class.capabilities).to eq(Whatsapp::Session::Registry.descriptor('native').capabilities)
   end

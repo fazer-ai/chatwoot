@@ -137,6 +137,40 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
         expect(response).to have_http_status(:ok)
       end
 
+      # WhatsApp refuses participants one at a time -- a privacy setting, somebody who
+      # left recently -- and answers `ok` with a row each. Writing all of them to the
+      # roster shows the operator members who are not in the group.
+      it 'adds only the participants the provider did not refuse' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990001' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001')
+      end
+
+      # A provider that does not answer in rows has told us nothing to filter on, and the
+      # Baileys one answers with whatever `each` returned.
+      it 'adds every participant when the provider answers in no rows at all' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001', '+5511999990002')
+      end
+
       it 'returns 422 when provider is unavailable' do
         allow(baileys_service).to receive(:update_group_participants)
           .and_raise(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError, 'Offline')

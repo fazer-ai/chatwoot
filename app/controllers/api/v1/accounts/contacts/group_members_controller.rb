@@ -29,8 +29,8 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     participants = create_params[:participants]
     return render json: { error: 'participants_required' }, status: :unprocessable_entity if participants.blank?
 
-    channel.update_group_participants(@contact.identifier, format_participants(participants), 'add')
-    add_group_members(participants)
+    answer = channel.update_group_participants(@contact.identifier, format_participants(participants), 'add')
+    add_group_members(participants_that_landed(participants, answer))
     head :ok
   rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -118,6 +118,35 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     raise Whatsapp::Session::Errors::InvalidPayload, 'group member has no WhatsApp address' if address.nil?
 
     address.to_jid
+  end
+
+  # WhatsApp refuses participants one at a time and answers with a row each, so an `add`
+  # of several can come back having added some of them. Writing all of them to the roster
+  # shows the operator members who are not in the group, until the next scheduled sync
+  # takes them out again.
+  #
+  # A provider that does not answer in rows has told us nothing to filter on, and the
+  # Baileys one answers with the list it was handed: there, everything it did not raise
+  # for counts as added, which is what it meant before this.
+  def participants_that_landed(phone_numbers, answer)
+    refused = refused_ids(answer)
+    return phone_numbers if refused.empty?
+
+    Array(phone_numbers).reject { |phone| refused.include?(Whatsapp::Session::PhoneMatch.digits(phone)) }
+  end
+
+  def refused_ids(answer)
+    Array(answer).filter_map do |row|
+      # Only a row is a row. The Baileys path answers with the list it was handed, and a
+      # backend that answers nothing at all answers `true`.
+      next unless row.is_a?(Hash)
+
+      row = row.stringify_keys
+      next unless row['status'].to_s == 'failed'
+
+      address = row['address']
+      Whatsapp::Session::PhoneMatch.digits((address.is_a?(Hash) ? address.stringify_keys : {})['id'])
+    end
   end
 
   def add_group_members(phone_numbers)
