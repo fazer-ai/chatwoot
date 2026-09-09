@@ -129,34 +129,42 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
   # Baileys one answers with the list it was handed: there, everything it did not raise
   # for counts as added, which is what it meant before this.
   def participants_that_landed(phone_numbers, answer)
-    refused = refused_ids(answer)
+    verdicts = verdicts_by_number(answer)
 
-    # The number that comes back is not the one that was sent: a Brazilian or Argentinian
-    # line is written with or without the ninth digit depending on who is spelling it, and
-    # comparing the digits as they arrived calls one participant two people.
-    Array(phone_numbers).reject do |phone|
-      refused.any? { |id| Whatsapp::Session::PhoneMatch.same_number?(id, phone) }
-    end
+    Array(phone_numbers).reject { |phone| refused_outright?(verdicts, phone) }
   end
 
-  def refused_ids(answer)
+  # The number that comes back is not the one that was sent: a Brazilian or Argentinian
+  # line is written with or without the ninth digit depending on who is spelling it, so
+  # the verdicts about a participant are every row naming the same line.
+  #
+  # Refused means refused in all of them. The same line submitted under both spellings
+  # comes back added under one and, WhatsApp having said nothing about the other, refused
+  # under it: dropping it there would leave the roster without a member who is in the
+  # group.
+  def refused_outright?(verdicts, phone)
+    spoken_for = verdicts.select { |number, _| Whatsapp::Session::PhoneMatch.same_number?(number, phone) }
+
+    spoken_for.present? && spoken_for.all? { |_, status| status == 'failed' }
+  end
+
+  def verdicts_by_number(answer)
     Array(answer).filter_map do |row|
       # Only a row is a row. The Baileys path answers with the list it was handed, and a
       # backend that answers nothing at all answers `true`.
       next unless row.is_a?(Hash)
 
       row = row.stringify_keys
-      next unless row['status'].to_s == 'failed'
-
-      refused_phone_in(row['address'])
+      # A row carrying no verdict has not said this participant is in the group, and it
+      # has not said they are out of it either: only `failed` refuses.
+      [phone_in(row['address']), row['status'].to_s]
     end
   end
 
-  # An `add` is asked by phone and answered under the address it was asked with, so a
-  # refusal names a number. A LID is a separate namespace that happens to be written in
-  # digits too, and reading one as a phone number would drop a participant who did land
-  # because somebody else's LID reads like their line.
-  def refused_phone_in(address)
+  # An `add` is asked by phone and answered under the address it was asked with, so a row
+  # names a number. A LID is a separate namespace that happens to be written in digits
+  # too, and reading one as a phone number would speak for a line it says nothing about.
+  def phone_in(address)
     return nil unless address.is_a?(Hash)
 
     address = address.stringify_keys
