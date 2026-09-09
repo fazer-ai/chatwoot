@@ -84,6 +84,26 @@ export const actions = {
       throw new Error(error);
     }
   },
+  // The logo goes as multipart, which the plain update action cannot carry: it spreads its
+  // payload into an object and a FormData does not survive that.
+  updateBrandLogoEmail: async ({ commit }, file) => {
+    commit(types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true });
+    try {
+      const response = await AccountAPI.updateBrandLogoEmail(file);
+      commit(types.default.EDIT_ACCOUNT, response.data);
+    } finally {
+      commit(types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: false });
+    }
+  },
+  deleteBrandLogoEmail: async ({ commit }) => {
+    commit(types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true });
+    try {
+      const response = await AccountAPI.deleteBrandLogoEmail();
+      commit(types.default.EDIT_ACCOUNT, response.data);
+    } finally {
+      commit(types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: false });
+    }
+  },
   finishOnboarding: async ({ commit }, payload) => {
     commit(types.default.SET_ACCOUNT_UI_FLAG, { isUpdating: true });
     try {

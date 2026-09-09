@@ -21,6 +21,9 @@ module AccountSettingsSchema
         'whatsapp_uazapi_disabled': { 'type': %w[boolean null] },
         'captain_auto_resolve_mode': { 'type': %w[string null], 'enum': ['evaluated', 'legacy', 'disabled', nil] },
         'captain_false_promise_harness_enabled': { 'type': %w[boolean null] },
+        'brand_name': { 'type': %w[string null], 'maxLength': 255 },
+        'brand_url': { 'type': %w[string null], 'maxLength': 2000 },
+        'brand_color': { 'type': %w[string null], 'pattern': '^(#(\\h{3}|\\h{6}))?$' },
         'conversation_required_attributes': {
           'type': %w[array null],
           'items': { 'type': 'string' }

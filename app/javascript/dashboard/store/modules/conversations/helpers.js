@@ -7,6 +7,12 @@ export const findPendingMessageIndex = (chat, message) => {
   );
 };
 
+// A cable event can land while a list or sync response is in flight, so a response can carry an
+// older row than the one the store already holds. `updated_at` is a float epoch on both sides, and
+// this is the same comparison UPDATE_CONVERSATION makes for out-of-order cable events.
+export const isStaleConversation = (incoming, existing) =>
+  Boolean(existing) && incoming.updated_at < existing.updated_at;
+
 export const filterByStatus = (chatStatus, filterStatus) =>
   filterStatus === 'all' ? true : chatStatus === filterStatus;
 
@@ -35,8 +41,22 @@ export const filterByUnattended = (
     : shouldFilter;
 };
 
+// `all` is what the dropdown sends for "no preference", and the server treats it the same way
+// (`ConversationFinder#filter_by_group_type` returns early on it).
+export const filterByGroupType = (shouldFilter, groupType, chatGroupType) => {
+  if (!groupType || groupType === 'all') return shouldFilter;
+  return groupType === chatGroupType && shouldFilter;
+};
+
 export const applyPageFilters = (conversation, filters) => {
-  const { inboxId, status, labels = [], teamId, conversationType } = filters;
+  const {
+    inboxId,
+    status,
+    labels = [],
+    teamId,
+    conversationType,
+    groupType,
+  } = filters;
   const {
     status: chatStatus,
     inbox_id: chatInboxId,
@@ -44,6 +64,7 @@ export const applyPageFilters = (conversation, filters) => {
     meta = {},
     first_reply_created_at: firstReplyOn,
     waiting_since: waitingSince,
+    group_type: chatGroupType,
   } = conversation;
   const team = meta.team || {};
   const { id: chatTeamId } = team;
@@ -52,6 +73,7 @@ export const applyPageFilters = (conversation, filters) => {
   shouldFilter = filterByInbox(shouldFilter, inboxId, chatInboxId);
   shouldFilter = filterByTeam(shouldFilter, teamId, chatTeamId);
   shouldFilter = filterByLabel(shouldFilter, labels, chatLabels);
+  shouldFilter = filterByGroupType(shouldFilter, groupType, chatGroupType);
   shouldFilter = filterByUnattended(
     shouldFilter,
     conversationType,
@@ -71,6 +93,26 @@ export const applyPageFilters = (conversation, filters) => {
  * @param {number|string} currentUserId - The ID of the current user
  * @returns {boolean} - Whether the user has permissions to access this conversation
  */
+/**
+ * The human this conversation is assigned to, or undefined.
+ *
+ * `meta.assignee` is whoever holds the conversation, bot included, and `meta.assignee_type`
+ * is what says which. A bot holding a conversation counts as ASSIGNED everywhere the server
+ * decides: `scope :unassigned` requires `assignee_agent_bot_id` to be null too, the tab's
+ * badge counts the same way, and `conversation_unassigned_manage` grants access through that
+ * same scope. So this helper is not the answer to "is this unassigned" — `meta.assignee` is.
+ *
+ * Use it only where the question really is "which human", such as matching an agent's own id:
+ * a bot's id comes from its own table and can be the same integer as an agent's.
+ *
+ * @param {{meta?: {assignee?: Object, assignee_type?: string}}} conversation
+ * @returns {Object|undefined}
+ */
+export const humanAssignee = conversation => {
+  const { assignee, assignee_type: assigneeType } = conversation?.meta ?? {};
+  return assigneeType === 'AgentBot' ? undefined : assignee;
+};
+
 export const applyRoleFilter = (
   conversation,
   role,
@@ -90,9 +132,13 @@ export const applyRoleFilter = (
     return true;
   }
 
-  const conversationAssignee = conversation.meta.assignee;
-  const isUnassigned = !conversationAssignee;
-  const isAssignedToUser = conversationAssignee?.id === currentUserId;
+  // Two different questions, and the server answers them from two different columns:
+  // `conversations.unassigned` (which excludes a conversation a bot holds, so whoever holds it is
+  // what settles it) OR `assigned_to(user)`, which reads `assignee_id` and can only ever name a
+  // human. Comparing the raw assignee's id against the agent's would match a bot that happens to
+  // share the integer, since bot ids come from their own table.
+  const isUnassigned = !conversation.meta.assignee;
+  const isAssignedToUser = humanAssignee(conversation)?.id === currentUserId;
 
   // Check unassigned management permission
   if (permissions.includes('conversation_unassigned_manage')) {

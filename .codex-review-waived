@@ -4,20 +4,7 @@ app/javascript/dashboard/helper/actionCable.js: Fetch missing conversations when
 app/models/conversation.rb: Defer fan-out when resolving a heavily pinned conversation  # PR#366
 app/javascript/dashboard/components/widgets/conversation/MoreActions.vue: Hide pin controls for conversations outside the list  # PR#366
 app/javascript/dashboard/helper/actionCable.js: Refresh cached permissions before applying this gate  # PR#367
-app/javascript/dashboard/helper/actionCable.js: Align bot assignments with frontend list visibility  # PR#367
 app/javascript/dashboard/helper/actionCable.js: Upsert conversations when assignment grants access  # PR#367
-# PR#372: real, tracked in fazer-ai/chatwoot#374, and inherited rather than introduced.
-# `group_left` is stored on the account-level group Contact, which is exactly where the
-# Baileys layer writes it and where three dashboard components read it. Scoping it per
-# inbox means changing that contract in the frozen legacy layer as well, so it is its
-# own change, not a slice of this one. Removing this waiver does not close the issue.
-app/services/whatsapp/session/inbound/handlers/group_updated.rb: Scope the group-left state to the originating inbox  # PR#372
-# PR#372: real, tracked in fazer-ai/chatwoot#375, and not specific to this layer. The
-# window belongs to `Avatar::AvatarFromUrlJob`, which is handed a URL with no notion of
-# how fresh it is; the Baileys avatar paths have the same one. Closing it means giving
-# that shared job a freshness check, which is its own change. Removing this waiver does
-# not close the issue.
-app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar jobs from restoring removed photos  # PR#372
 # PR#372: the redelivery half of fazer-ai/chatwoot#373, still deliberately not answered.
 # Slice 6 settled the ordering half and left this one open: nothing claims an event id
 # before a handler runs, so a webhook the provider redelivers (a timeout on our 200, a
@@ -25,20 +12,6 @@ app/jobs/whatsapp/session/update_contact_avatar_job.rb: Prevent stale avatar job
 # and the capture showed the only id this provider sends rides on `connection` events.
 # Removing this waiver does not close the issue.
 app/services/whatsapp/session/inbound/dispatcher.rb: Deduplicate events before invoking non-idempotent handlers  # PR#372
-# PR#372: real, tracked in fazer-ai/chatwoot#376, and not answerable in this layer. The
-# snapshot cannot say "this group has no photo": `Serializable.from_h` reads an absent
-# key and an explicit null the same way, so the syncer cannot tell a removal from a
-# field the snapshot did not mention. Fixing it is a contract change, decided with the
-# payloads captured in the Uazapi slice. Removing this waiver does not close the issue.
-app/services/whatsapp/session/groups/syncer.rb: Remove avatars absent from rejoin snapshots  # PR#372
-# PR#377: real, tracked in fazer-ai/chatwoot#378, and not this stack's to fix. Removing a
-# reaction never reaches any provider, legacy included: the reactions controller marks the
-# reused row deleted and Base::SendOnChannelService refuses to send a deleted message. The
-# guard is ours, from #353, and it is shared by every channel, so the fix goes to main
-# rather than to a branch that merges in weeks. Removing this waiver does not close the issue.
-app/services/whatsapp/session/outbound/message_sender.rb: Allow deleted reaction rows to send removals  # PR#377
-# Same defect under the reviewer's other name for it.
-app/services/whatsapp/session/outbound/message_sender.rb: Allow removed reactions to reach the sender  # PR#377
 # PR#377: not a defect. A reaction stored with only `in_reply_to_external_id` gets its
 # `in_reply_to` filled in by Message's own `before_save :ensure_in_reply_to`, which runs
 # InReplyToMessageBuilder and resolves the target by source_id within the conversation. The
@@ -125,3 +98,97 @@ app/services/whatsapp/session/registry.rb: Add a reachable pairing-code flow  # 
 # way, and this branch neither introduces nor touches it. Same family as #374.
 app/javascript/dashboard/routes/dashboard/conversation/contact/GroupContactInfo.vue: Scope group commands to the selected inbox  # PR#387 → #389
 app/services/whatsapp/session/inbound/handlers/message_revoked.rb: Preserve the message author's inbox identity  # PR#493 → #494
+
+# PR#412: real, pre-existing, and bigger than this PR. `InboxPolicy::Scope` resolves to
+# `user.assigned_inboxes`, so an Enterprise custom role with `report_manage` already sees
+# only its own inboxes in the Inboxes overview itself, whose rows come from the same
+# `inboxes/getInboxes` this filter reads. Admins are unaffected (`assigned_inboxes` returns
+# every account inbox for them), and nothing is exposed either way: the summary endpoints
+# already return metrics for every account inbox to anyone who passes `ReportPolicy#view?`,
+# so only the names are scoped. Closing it means either widening `InboxPolicy::Scope`, which
+# changes every inbox picker in the app for those users, or a report-scoped inbox endpoint.
+# Neither belongs in a reports PR.
+app/javascript/dashboard/routes/dashboard/settings/reports/components/OverviewReportFilters.vue: Load all report-visible inboxes for the filter  # PR#412
+# PR#418: not a defect, and the remedy would make the payload worse. The mechanism is
+# real — `WebhookListener` runs at job time and rebuilds `webhook_data` from a row it just
+# reloaded through the GlobalID — but it is not this column's. Measured on a running
+# instance, in a rolled-back transaction: with the row at origin=77/priority=low/status=open
+# at enqueue and moved to 91/urgent/resolved before the perform, the payload carried
+# 91/"urgent"/"resolved". `priority` and `status` were in `list_of_keys` long before this
+# change and drift by exactly the same amount. Snapshotting only the pairing would make it
+# the one key in the account webhook whose value is event-time while everything beside it in
+# the same object is delivery-time, and a consumer reading two of them would be reading two
+# instants with no way to tell. The account webhook is a state snapshot at delivery; a
+# consumer that acts on it fences it as state, which is what fazer-ai/agents#355 does with a
+# version mark of its own.
+app/controllers/api/v1/widget/redirect_tokens_controller.rb: Snapshot the origin in async event payloads  # PR#418
+# PR#418: real, upstream, and not this change's to make. AgentBotListener handles
+# conversation_resolved / opened / status_changed / updated / message_created / message_updated /
+# webwidget_triggered and no conversation_created, so a message-less token that CREATES the
+# conversation delivers an empty list of bot events. Measured, and pinned by "delivers no bot event
+# on creation, and names the origin on the first one that follows" in the controller spec. Nothing is
+# lost by it: the pairing is on the row from the insert, so the first event a bot does receive
+# carries it, and until a message exists there is no episode for a consumer to act on. Making
+# creation bot-visible changes the agent-bot contract for every inbox in the account.
+app/controllers/api/v1/widget/redirect_tokens_controller.rb: Notify the agent bot on the first message-less redirect  # PR#418
+# PR#448: the rule is real and this is not what it is about. AGENTS.md bans inline styles
+# so that appearance lives in Tailwind, and every colour, radius, height and state here is
+# a utility class. What `:style` carries is one data-driven length, which no utility can
+# express: a bar is 25.9% wide because an agent holds 25.9% of the period. The repo already
+# does exactly this wherever a proportion is drawn — BillingMeter.vue, ImportProgress.vue,
+# KnowledgeCard.vue, PollDisplay.vue — and the alternatives are worse: snapping to w-1/12
+# steps lies about the number, and an SVG rect moves fill and radius out of Tailwind to
+# avoid a single width.
+app/javascript/dashboard/routes/dashboard/settings/reports/components/SummaryDistribution.vue: Render distribution widths without inline styles  # PR#448
+# PR#469: measured false, twice, and the correction it asks for would replace a right
+# expectation with a wrong one. The claim is that this hook rewrites an inbound Baileys
+# voice note during identification, so the blob persists as audio/ogg and the spec's
+# audio/opus is stale. It does not: an inbound attachment is created with the content type
+# the payload carries (`mimetype: 'audio/opus'`), which is never identified, so nothing here
+# runs. The spec passes untouched (108 examples) and CI is green on the same commit; editing
+# it to audio/ogg as asked is what makes it fail. What does normalize the inbound case is
+# `Attachment#normalize_opus_blob_content_type!` on `download_url`, at the moment the file
+# is sent back out, which is the path #439 is about and is covered in attachment_spec.
+config/initializers/active_storage_opus_fix.rb: Update the Baileys inbound MIME contract  # PR#469
+# PR#470: real, marginal, and the fourth position in a circle. Round 2 refused a map for
+# growing without bound, round 4 refused a bounded structure, round 7 refused the scalar
+# that replaced it, round 8 refused holding that scalar, and this refuses the cap that
+# answers round 8. Every answer short of tracking in-flight uploads is rejected for the case
+# it approximates away, and tracking them is not something this component can do honestly:
+# `stageFile` is wired to the uploader's `input-file`, which re-fires on every progress
+# update, and `attachFile` does not run at all when an upload fails, so a pending set would
+# both over-count and leak -- which is the stale-marker complaint of round 8 arriving by a
+# longer road. What is left uncovered is an upload still running while the agent toggles
+# note and reply more than five times, and it costs silence, which is what every discard did
+# before this PR. Revisit if the alert proves it earns more machinery.
+app/javascript/dashboard/components/widgets/conversation/ReplyBox.vue: Retain markers for uploads that are still pending  # PR#470
+# PR#472: real, pre-existing, and wider than these two keys. `syncCustomAttributeTypes` resolves a
+# condition with `filterTypes.find(ft => ft.attributeKey === condition.attribute_key)` and
+# `manifestCustomAttributes` puts the standard conditions first, so an account attribute whose key
+# matches a standard one resolves to the standard entry and has its `custom_attribute_type` cleared on
+# save. `CustomAttributeDefinition::STANDARD_ATTRIBUTES` reserves only conversation and contact names,
+# so `content`, `message_type` and `private_note` have carried this exposure for as long as they have
+# existed; `sender_id` and `sender_type` add two names to it and change nothing else. Closing it means
+# keying options by (attributeKey, attributeModel) through FilterSelect and ConditionRow, which the
+# conversation filters share, and there is no cheap half: preserving an existing `custom_attribute_type`
+# on save would still clear it the first time the user picks the attribute. The backend half is fixed
+# in this PR, so a condition that reaches the API with its model declared is now resolved by it.
+app/javascript/dashboard/routes/dashboard/settings/automation/constants.js: Preserve custom attributes that use the new sender keys  # PR#472
+# PR#453: real, upstream, and not this binding's to change. A bot with `account_id` has had the
+# whole account's API since long before this PR (`account_accessible_for_bot?`), whether or not it
+# is set on any inbox: it can post, resolve and assign anywhere. The observer binding widens
+# nothing there — it changes what the fork DELIVERS and what conversations start as (`pending`,
+# assigned), which is the role's promise. Gating reply/ownership calls on "does this bot serve
+# this conversation" is a per-conversation authorization scheme bots do not have today, for
+# every account bot (Captain included), and belongs to its own issue.
+app/controllers/api/v1/accounts/inboxes/agent_bot_observers_controller.rb: Enforce the observer role on bot API mutations  # PR#453
+app/views/survey/responses/show.html.erb: Use the project's Tailwind theming mechanism  # PR#482
+
+# Os quatro abaixo são da main, não deste merge: os arquivos são byte a byte idênticos
+# aos de origin/main, que o PR #500 apenas atravessa. Cada um foi verificado, é real, e
+# tem issue própria. Consertá-los dentro de um merge misturaria o reparo de ancestralidade
+# com correção de comportamento em produção, que é o que torna um merge difícil de reverter.
+app/finders/message_finder.rb: Use the same tie-breaker when ordering message pages  # PR#500 → #502
+app/services/whatsapp/baileys_handlers/messaging_history_set.rb: Resolve exhausted chats through phone and LID aliases  # PR#500 → #503
+app/jobs/avatar/avatar_from_url_job.rb: Do not stamp markers for superseded avatar jobs  # PR#500 → #504
+app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group inboxes explicitly  # PR#500 → #505

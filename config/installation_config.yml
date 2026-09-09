@@ -30,6 +30,10 @@
   value: '/brand-assets/logo_dark.svg'
   display_title: 'Logo Dark Mode'
   description: 'The logo that would be used on the dashboard, login page etc. for dark mode'
+- name: LOGO_EMAIL
+  value: ''
+  display_title: 'Email Logo'
+  description: 'The logo shown at the top of outgoing emails. Must be a PNG, JPG or GIF -- email clients do not render SVG. A relative path is resolved against FRONTEND_URL. Left empty, LOGO is used when it is one of those formats, and no logo is shown otherwise.'
 - name: BRAND_URL
   value: 'https://www.chatwoot.com'
   display_title: 'Brand URL'

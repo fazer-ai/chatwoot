@@ -48,8 +48,9 @@ class Whatsapp::Session::Backend
     # INTERNAL_HOST_URL, while one sitting next to Rails on a closed installation can
     # resolve nothing else.
     #
-    # Asked per inbox rather than per provider, because a provider that is normally a
-    # hosted service can also be self-hosted, and then it is a neighbour.
+    # Takes the inbox rather than nothing so a provider that ships both a hosted service
+    # and a build to run next to Rails can answer per inbox. None does today: every
+    # provider here answers the same for all of its inboxes.
     def hosted?(_channel)
       false
     end
@@ -81,7 +82,6 @@ class Whatsapp::Session::Backend
   def logout = not_supported!(:logout)
   def delete_session = not_supported!(:delete_session)
   def fetch_connection_state = not_supported!(:fetch_connection_state)
-  def request_pairing_code(_command) = not_supported!(:request_pairing_code)
   def import_session(_payload) = not_supported!(:import_session)
 
   # Whatever the provider holds pointing at this inbox, released on its own. Called when
@@ -110,6 +110,11 @@ class Whatsapp::Session::Backend
   # the message id, which is what lets a provider find the original message and fetch its
   # bytes again once the ref it first handed out has lapsed.
   def download_media(_command) = not_supported!(:download_media)
+
+  # --- history ---------------------------------------------------------------------
+  # Asks for what came before. What comes back is not the answer to this call: the
+  # provider acknowledges it and the messages arrive as `history.sync` events.
+  def request_history(_command) = not_supported!(:request_history)
 
   # --- presence --------------------------------------------------------------------
   def send_chat_presence(_command) = not_supported!(:send_chat_presence)

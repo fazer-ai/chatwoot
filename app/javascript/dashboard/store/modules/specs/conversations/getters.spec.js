@@ -128,6 +128,59 @@ describe('#getters', () => {
       ]);
     });
   });
+  // A bot holding a conversation counts as assigned on the server: `scope :unassigned` requires
+  // `assignee_agent_bot_id` to be null too, and the tab's badge counts the same way. Counting it
+  // as unassigned here put it in a list whose badge did not count it, and only once a visit to
+  // "All" had loaded it into the store.
+  describe('#getUnAssignedChats with a bot', () => {
+    const botConversation = {
+      id: 1,
+      inbox_id: 2,
+      status: 1,
+      meta: { assignee: { id: 7, name: 'Bot' }, assignee_type: 'AgentBot' },
+      labels: [],
+    };
+    const humanConversation = {
+      id: 2,
+      inbox_id: 2,
+      status: 1,
+      meta: { assignee: { id: 7, name: 'Agent' }, assignee_type: 'User' },
+      labels: [],
+    };
+
+    const unassignedConversation = {
+      id: 3,
+      inbox_id: 2,
+      status: 1,
+      meta: {},
+      labels: [],
+    };
+
+    it('leaves a bot conversation out, like the badge does', () => {
+      const chats = getters.getUnAssignedChats({
+        allConversations: [
+          botConversation,
+          humanConversation,
+          unassignedConversation,
+        ],
+      })({ status: 1 });
+
+      expect(chats.map(chat => chat.id)).toEqual([3]);
+    });
+
+    // The bot's id comes from its own table and can be the same integer as an agent's.
+    it('keeps a bot conversation out of the agent who shares its id', () => {
+      const chats = getters.getMineChats(
+        { allConversations: [botConversation, humanConversation] },
+        {},
+        {},
+        { getCurrentUser: { id: 7 } }
+      )({ status: 1 });
+
+      expect(chats.map(chat => chat.id)).toEqual([2]);
+    });
+  });
+
   describe('#getUnAssignedChats', () => {
     it('order returns only chats assigned to user', () => {
       const conversationList = [

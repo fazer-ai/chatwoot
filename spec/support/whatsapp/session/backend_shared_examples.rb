@@ -14,7 +14,6 @@ RSpec.shared_examples 'a whatsapp session backend' do
   # method is wired without knowing anything about the backend.
   let(:sample_calls) do
     {
-      request_pairing_code: [commands::PairingRequestCode.new(phone: '5541999991111')],
       import_session: [{ 'session' => { 'creds' => 'redacted' } }],
       edit_message: [commands::MessageEdit.new(target_id: '3EB0AAAA', to: phone_address, content: text_content)],
       revoke_message: [commands::MessageRevoke.new(target_id: '3EB0AAAA', to: phone_address)],
@@ -95,6 +94,21 @@ RSpec.shared_examples 'a whatsapp session backend' do
 
       expect(state).to be_a(model::ConnectionState)
       expect(state.connection).to be_in(model::ConnectionState::CONNECTIONS)
+    end
+
+    # The pairing modes are the one pair of capabilities `Capabilities::METHODS` cannot
+    # cover, because both are the same method told which mode to use. Declaring
+    # `code_pairing` and then refusing the mode is the failure that map exists to catch
+    # everywhere else, so it is caught here instead.
+    it 'pairs in every mode it declares' do
+      modes = { 'qr_pairing' => 'qr', 'code_pairing' => 'code' }.select { |capability, _| described_class.supports?(capability) }
+      states = modes.transform_values do |mode|
+        subject.connect(commands::SessionConnect.new(pairing: mode, phone: '5541999991111'))
+      rescue Whatsapp::Session::Errors::NotSupported
+        nil
+      end
+
+      expect(states.compact_blank.keys).to eq(modes.keys)
     end
 
     it 'reports the connection state' do

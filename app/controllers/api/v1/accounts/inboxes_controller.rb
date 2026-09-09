@@ -4,7 +4,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :fetch_agent_bot, only: [:set_agent_bot]
   # we are already handling the authorization in fetch inbox
   # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in WhatsappHealthManagement concern
-  before_action :check_authorization, except: [:show, :health, :setup_channel_provider, :import_whatsapp_session]
+  before_action :check_authorization,
+                except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
   before_action :validate_whatsapp_cloud_channel, only: [:health]
   # rubocop:enable Rails/LexicallyScopedActionFilter
   include Api::V1::Accounts::Concerns::WhatsappHealthManagement
@@ -92,6 +93,26 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     end
 
     channel.setup_channel_provider
+    head :ok
+  rescue Whatsapp::Session::Errors::Error => e
+    render_session_error(e)
+  end
+
+  # The other way into the same pairing, for an operator who cannot scan the QR.
+  # Authorized exactly like setup_channel_provider, and for the same reason: both link a
+  # WhatsApp account to an inbox this agent is already assigned to.
+  #
+  # No phone in the request. The number is the inbox's own, because pairing links
+  # whatever phone the code is typed on and the layer quarantines a session whose account
+  # is not the inbox's.
+  def request_pairing_code
+    channel = @inbox.channel
+
+    unless channel.respond_to?(:request_pairing_code)
+      render json: { error: 'Channel does not support pairing by code' }, status: :unprocessable_entity and return
+    end
+
+    channel.request_pairing_code
     head :ok
   rescue Whatsapp::Session::Errors::Error => e
     render_session_error(e)

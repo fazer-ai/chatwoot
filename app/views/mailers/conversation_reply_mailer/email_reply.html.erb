@@ -1,4 +1,6 @@
-<% if @message.content_attributes.dig('email', 'html_content', 'reply').present? %>
+<% if @message.input_csat? %>
+<%= render 'mailers/conversation_reply_mailer/csat_survey', message: @message %>
+<% elsif @message.content_attributes.dig('email', 'html_content', 'reply').present? %>
 <%= @message.content_attributes.dig('email', 'html_content', 'reply').html_safe %>
 <% elsif @message.content %>
 <%= @message.outgoing_content.html_safe %>

@@ -60,6 +60,17 @@ RSpec.describe 'Enterprise SAML OmniAuth Callbacks', type: :request do
       end
     end
 
+    it 'redirects to the login error when the assertion cannot produce a valid user' do
+      with_modified_env FRONTEND_URL: 'http://www.example.com' do
+        set_saml_config('broken@example.com')
+        allow(User).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(User.new))
+
+        get "/omniauth/saml/callback?account_id=#{account.id}"
+
+        expect(response).to redirect_to('http://www.example.com/app/login?error=saml-authentication-failed')
+      end
+    end
+
     it 'rejects an existing user from another account' do
       with_modified_env FRONTEND_URL: 'http://www.example.com' do
         other_account = create(:account)

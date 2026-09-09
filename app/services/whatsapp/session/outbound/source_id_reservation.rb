@@ -69,7 +69,28 @@ module Whatsapp::Session::Outbound::SourceIdReservation
     return :stale if reservation.present? && message.pending_source_id != reservation
 
     assigned_here = message.source_id.blank? && attributes[:source_id].present?
-    message.update!(attributes)
-    assigned_here && message.deleted? ? :revoke : :written
+    message.update!(attributes.merge(assigned_here ? send_confirmation(message) : {}))
+    assigned_here && revoked?(message) ? :revoke : :written
+  end
+
+  # A removed reaction is deleted from the start, and the empty emoji just sent is what
+  # clears it. Revoking on top of that would ask the provider to delete the reaction
+  # message itself, which is a different thing and one the contact never saw.
+  def revoked?(message) = message.deleted? && !message.removed_reaction?
+
+  # Filling source_id is proof the message exists on WhatsApp, so it also retires a
+  # failure recorded while it did not. StatusTransition.fail_send only ever writes one
+  # while source_id is blank, so a `failed` still standing here is exactly that: our
+  # verdict about a send we stopped waiting on, not WhatsApp's about the message.
+  #
+  # Atomic with the source_id write on purpose. Waiting for a delivery receipt to promote
+  # it (which StatusTransition does allow) leaves a window where the message is proven to
+  # exist and still shows Retry — and Retry clears the reservation and sends a fresh id,
+  # producing the duplicate this whole reservation exists to prevent. external_error goes
+  # with it, since that is what the dashboard reads to decide between resend and recreate.
+  def send_confirmation(message)
+    return {} unless message.status == 'failed'
+
+    { status: :sent, external_error: nil }
   end
 end

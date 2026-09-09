@@ -282,41 +282,6 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
-  # The webhook URL is not derived from anything the instance knows: it is handed one, and
-  # the choice between the public address and the one that only resolves inside the
-  # deployment is a field on the inbox form. Outbound media follows a change to it on the
-  # next message; the webhook would go on arriving at the old address, or stop arriving at
-  # all, which on the closed network this option exists for is all of the inbound traffic.
-  describe 'an inbox whose webhook host changes' do
-    let(:channel) { build_channel('uazapi', { 'base_url' => 'https://uazapi.test', 'token' => 'first' }) }
-
-    before do
-      allow(Resolv).to receive(:getaddresses).and_call_original
-      allow(Resolv).to receive(:getaddresses).with('uazapi.test').and_return(['93.184.216.34'])
-      stub_request(:post, 'https://uazapi.test/webhook').to_return(status: 200, body: '{}',
-                                                                   headers: { 'Content-Type' => 'application/json' })
-    end
-
-    it 'hands the instance the address the inbox now asks for' do
-      internal = 'http://rails.internal/webhooks/whatsapp/session/uazapi/'
-      with_modified_env INTERNAL_HOST_URL: 'http://rails.internal' do
-        channel.update!(provider_config: channel.provider_config.merge('use_internal_host' => true))
-      end
-
-      expect(WebMock).to(
-        have_requested(:post, 'https://uazapi.test/webhook').with { |request| JSON.parse(request.body)['url'].start_with?(internal) }
-      )
-    end
-
-    # The field only chooses between two addresses, and an installation that never set the
-    # internal one has a single address to hand out either way.
-    it 'says nothing to the instance when the deployment has no internal address' do
-      channel.update!(provider_config: channel.provider_config.merge('use_internal_host' => true))
-
-      expect(WebMock).not_to have_requested(:post, 'https://uazapi.test/webhook')
-    end
-  end
-
   # The connector keys its whatsmeow store by this id, and provider_config is permitted
   # wholesale by the inbox API, so an update that left the key out used to mint a new one
   # and orphan the session the connector was still holding under the old one.

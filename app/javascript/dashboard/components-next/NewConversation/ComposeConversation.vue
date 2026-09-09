@@ -232,12 +232,38 @@ const createGroup = async ({ inboxId, subject, participants }) => {
   }
 };
 
-const createConversation = async ({ payload, isFromWhatsApp }) => {
+// The conversation carries the first attachment; anything else the agent picked follows
+// it as its own message. Only channels that cannot carry more than one per message get
+// here with a non-empty list — see splitAttachmentsForChannel.
+// Chained rather than fired together, so the attachments arrive in the order they were
+// picked: WhatsApp orders by arrival, and a Promise.all reorders them for the contact.
+const sendFollowUpFiles = (conversationId, followUpFiles) =>
+  followUpFiles.reduce(
+    (previous, file) =>
+      previous.then(() =>
+        store.dispatch('createPendingMessageAndSend', {
+          conversationId,
+          files: [
+            directUploadsEnabled.value ? file.blobSignedId : file.resource.file,
+          ],
+          message: '',
+          private: false,
+        })
+      ),
+    Promise.resolve()
+  );
+
+const createConversation = async ({
+  payload,
+  followUpFiles = [],
+  isFromWhatsApp,
+}) => {
   try {
     const data = await store.dispatch('contactConversations/create', {
       params: payload,
       isFromWhatsApp,
     });
+    if (followUpFiles.length) await sendFollowUpFiles(data.id, followUpFiles);
     const action = {
       type: 'link',
       to: `/app/accounts/${data.account_id}/conversations/${data.id}`,

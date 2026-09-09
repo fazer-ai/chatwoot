@@ -7,6 +7,7 @@ import { isHttpUrl } from 'dashboard/helper/whatsappSession';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 
 import SettingsSection from 'dashboard/components/SettingsSection.vue';
+import WhatsappHistorySync from './WhatsappHistorySync.vue';
 import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -29,8 +30,14 @@ const isBeta = computed(() => Boolean(descriptor.value?.beta));
 const credentialFields = computed(
   () => descriptor.value?.fields?.filter(f => f.type !== 'boolean') ?? []
 );
+// history_sync is left out on purpose: it is rendered by WhatsappHistorySync, next to the
+// on-demand button it shares a subject with, and by the legacy providers that have no
+// descriptor form at all.
 const preferenceFields = computed(
-  () => descriptor.value?.fields?.filter(f => f.type === 'boolean') ?? []
+  () =>
+    descriptor.value?.fields?.filter(
+      f => f.type === 'boolean' && f.name !== 'history_sync'
+    ) ?? []
 );
 
 // Edited values live apart from the inbox so a failed save leaves the record showing
@@ -148,6 +155,8 @@ const save = async field => {
         </div>
       </SettingsSection>
 
+      <WhatsappHistorySync :inbox="inbox" />
+
       <SettingsSection
         v-for="field in credentialFields"
         :key="field.name"
@@ -173,7 +182,7 @@ const save = async field => {
         v-for="field in preferenceFields"
         :key="field.name"
         :title="$t(`${fieldKey(field)}.LABEL`)"
-        :sub-title="$t(`${fieldKey(field)}.LABEL`)"
+        :sub-title="$t(`${fieldKey(field)}.DESCRIPTION`)"
       >
         <div class="flex items-center gap-2">
           <Switch

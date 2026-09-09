@@ -215,6 +215,66 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(inbox.channel.reload.provider_connection['quarantine']).to be_nil
       end
 
+      # The connection keeps receiving and passing health checks while every send times
+      # out, so this webhook is the only thing that says so. `action` is what tells an
+      # operator whether the provider already recreated the socket or is holding off —
+      # and holding off is when a human has to step in.
+      it 'persists a reported send stall and clears it only when the connection reopens' do
+        params = base_params.merge(
+          {
+            data: {
+              error: 'send_stall_detected',
+              sendStall: {
+                consecutiveTimeouts: 3,
+                stalledForMs: 120_000,
+                action: 'suppressed',
+                until: '2026-08-21T12:00:00.000Z'
+              }
+            }
+          }
+        )
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(inbox.channel.provider_connection).to include(
+          'error' => I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected'),
+          'send_stall' => {
+            'consecutive_timeouts' => 3,
+            'stalled_for_ms' => 120_000,
+            'action' => 'suppressed',
+            'until' => '2026-08-21T12:00:00.000Z'
+          }
+        )
+
+        # The provider reports a stall once per episode. An unrelated update in the
+        # meantime — a standalone reachoutTimeLock push carries no sendStall — must not
+        # clear the warning, because nothing would ever say it again while the connection
+        # is still mute.
+        unrelated = base_params.merge(
+          { data: { reachoutTimeLock: { isActive: false } } }
+        )
+        described_class.new(inbox: inbox, params: unrelated).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to include(
+          'consecutive_timeouts' => 3
+        )
+        # The error string is the only half of this warning an operator can see:
+        # provider_connection_admin_data serializes error and qr_data_url, and send_stall
+        # reaches no serializer. Preserving the detail without the string preserves nothing
+        # anyone reads.
+        expect(inbox.channel.provider_connection['error']).to eq(
+          I18n.t('errors.inboxes.channel.provider_connection.send_stall_detected')
+        )
+
+        # `open` is a NEW socket, hence a new keystore mutex, whether the provider
+        # restarted it or WhatsApp dropped it. That is the one event that means recovery.
+        next_update = base_params.merge({ data: { connection: 'open' } })
+        described_class.new(inbox: inbox, params: next_update).perform
+
+        expect(inbox.channel.reload.provider_connection['send_stall']).to be_nil
+        expect(inbox.channel.provider_connection['error']).to be_nil
+      end
+
       context 'with reach-out time-lock (error 463 / account restriction)' do
         let(:reachout_data) do
           { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' }
@@ -1353,6 +1413,36 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(conversation.assignee_last_seen_at).to eq(Time.current)
         end
 
+        # The provider echoes back the receipt this app sent, and taking it for a device of
+        # this account clears the unread badge of a conversation nobody here has opened.
+        it 'leaves the markers alone when the read receipt is our own echoed back' do
+          update_payload[:key][:fromMe] = false
+          update_payload[:update][:status] = 4
+          conversation.update!(agent_last_seen_at: 1.day.ago, assignee_last_seen_at: 1.day.ago)
+          Whatsapp::SelfReadReceipts.record(conversation, [message])
+
+          expect do
+            described_class.new(inbox: inbox, params: params).perform
+          end.to(not_change { conversation.reload.agent_last_seen_at })
+
+          Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id))
+        end
+
+        # `messages.update` is a batch, so a lookup per update would put a Redis round trip on
+        # each one; the ids of the whole webhook are asked for once, as the session handler does.
+        it 'reads the acknowledged ids once for the whole batch' do
+          second = create(:message, inbox: inbox, conversation: conversation, source_id: 'msg_124', status: 'sent')
+          params[:data] = [
+            { key: { id: message.source_id, fromMe: false }, update: { status: 4 } },
+            { key: { id: second.source_id, fromMe: false }, update: { status: 4 } }
+          ]
+          allow(Whatsapp::SelfReadReceipts).to receive(:acknowledged).and_call_original
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(Whatsapp::SelfReadReceipts).to have_received(:acknowledged).with(conversation, %w[msg_123 msg_124]).once
+        end
+
         it "does not downgrade a 'read' message to delivered" do
           message.update!(status: 'read')
 
@@ -1425,6 +1515,109 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.reload.content).to eq('New message content')
           expect(message.is_edited).to be(true)
           expect(message.previous_content).to eq(original_content)
+        end
+
+        it 'records the edit timestamp in milliseconds so a later update can be ordered against it' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'New message content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.edited_at).to eq(1_700_000_000_000)
+        end
+
+        # A force restart or a cluster handoff leaves the discarded connection
+        # draining its webhooks while the replacement already handles new events,
+        # so an older edit retrying on the old one can land after a newer one.
+        it 'ignores an edit older than the one already applied' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Stale message content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).not_to eq('Stale message content')
+          expect(message.is_edited).to be_falsey
+        end
+
+        it 'applies an edit newer than the one already applied' do
+          message.update!(edited_at: 1_700_000_000_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Newer message content' } } },
+            messageTimestamp: 1_700_000_060
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Newer message content')
+          expect(message.edited_at).to eq(1_700_000_060_000)
+        end
+
+        # Equal timestamps carry no order to respect, and WhatsApp stamps edits in
+        # whole seconds.
+        it 'applies an edit stamped in the same second as the one already applied' do
+          message.update!(edited_at: 1_700_000_000_000)
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Same second content' } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Same second content')
+        end
+
+        # Refusing it would drop the edit outright, which is worse than applying
+        # it out of order.
+        it 'applies an edit that carries no timestamp' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'Undated content' } } } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Undated content')
+        end
+
+        # Writing nil would erase what a later out-of-order edit is checked against.
+        it 'keeps the stored timestamp when an undated edit is applied' do
+          message.update!(edited_at: 1_700_000_060_000)
+          update_payload[:update] = { message: { editedMessage: { message: { conversation: 'Undated content' } } } }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.edited_at).to eq(1_700_000_060_000)
+        end
+
+        # A protobuf 64-bit field reaches us either as a number or as a { low, high }
+        # hash, and calling to_i on the hash would raise and drop the edit.
+        it 'reads a timestamp that arrives as a structured protobuf long' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { conversation: 'Structured stamp' } } },
+            messageTimestamp: { 'low' => 1_700_000_000, 'high' => 0, 'unsigned' => true }
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('Structured stamp')
+          expect(message.edited_at).to eq(1_700_000_000_000)
+        end
+
+        # An edit that clears an image caption sends an empty string, and dropping it
+        # would leave the old caption on screen.
+        it 'applies an edit that clears the content' do
+          update_payload[:update] = {
+            message: { editedMessage: { message: { imageMessage: { caption: '' } } } },
+            messageTimestamp: 1_700_000_000
+          }
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.content).to eq('')
+          expect(message.is_edited).to be(true)
         end
       end
     end

@@ -3,6 +3,8 @@ import actions, {
   hasMessageFailedWithExternalError,
 } from '../../conversations/actions';
 import types from '../../../mutation-types';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 const dataToSend = {
   payload: [
     {
@@ -19,6 +21,7 @@ const commit = vi.fn();
 const dispatch = vi.fn();
 global.axios = axios;
 vi.mock('axios');
+vi.mock('shared/helpers/mitt', () => ({ emitter: { emit: vi.fn() } }));
 
 describe('#hasMessageFailedWithExternalError', () => {
   it('returns false if message is sent', () => {
@@ -642,6 +645,239 @@ describe('#deleteMessage', () => {
       actions.deleteMessage({ commit }, { conversationId, messageId })
     ).rejects.toThrow(Error);
     expect(commit.mock.calls).toEqual([]);
+  });
+
+  describe('#reconcileConversationTab', () => {
+    const filters = { assigneeType: 'unassigned', status: 'open' };
+    const onScreen = [
+      { id: 1, inbox_id: 7 },
+      { id: 2, inbox_id: 7 },
+      { id: 3, inbox_id: 8 },
+    ];
+    const fresh = (id, updatedAt = 200) => ({
+      id,
+      updated_at: updatedAt,
+      meta: { assignee: { id: 42 } },
+    });
+    const inStore = { 1: { id: 1, updated_at: 100 } };
+
+    const contextWith = (
+      payload,
+      chats = onScreen,
+      stored = inStore,
+      selectedChatId = null
+    ) => {
+      axios.post.mockResolvedValue({ data: { payload } });
+      return {
+        commit,
+        state: { selectedChatId },
+        getters: {
+          getUnAssignedChats: () => chats,
+          getConversationById: id => stored[id],
+        },
+      };
+    };
+
+    beforeEach(() => {
+      commit.mockClear();
+      dispatch.mockClear();
+      axios.post.mockReset();
+    });
+
+    // Evicting would take the conversation out of "all" and out of its new owner's "mine" too,
+    // since every tab reads the same cache.
+    it('refreshes the stale rows instead of evicting them', async () => {
+      const payload = [fresh(1), fresh(2), fresh(3)];
+      const removed = await actions.reconcileConversationTab(
+        contextWith(payload),
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, payload],
+      ]);
+      expect(removed).toEqual([]);
+    });
+
+    it('removes only what the server did not return at all', async () => {
+      const payload = [fresh(2)];
+      const removed = await actions.reconcileConversationTab(
+        contextWith(payload),
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, payload],
+        [types.REMOVE_CONVERSATIONS, [1, 3]],
+      ]);
+      expect(removed).toEqual([
+        { id: 1, inboxId: 7 },
+        { id: 3, inboxId: 8 },
+      ]);
+    });
+
+    // The endpoint serializes full conversations and refuses an oversized batch, so a caller that
+    // scrolled through several pages has to split the question rather than have it rejected.
+    it('splits a list longer than one page into page-sized requests', async () => {
+      const many = Array.from({ length: 60 }, (_, i) => ({
+        id: i + 1,
+        inbox_id: 7,
+      }));
+      axios.post.mockResolvedValue({ data: { payload: [] } });
+
+      await actions.reconcileConversationTab(
+        {
+          commit,
+          getters: {
+            getUnAssignedChats: () => many,
+            getConversationById: () => undefined,
+          },
+        },
+        filters
+      );
+
+      expect(axios.post).toHaveBeenCalledTimes(3);
+      expect(axios.post.mock.calls.map(call => call[1].ids.length)).toEqual([
+        25, 25, 10,
+      ]);
+    });
+
+    it('asks only about the conversations on screen', async () => {
+      await actions.reconcileConversationTab(
+        contextWith([fresh(1), fresh(2), fresh(3)]),
+        filters
+      );
+
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/conversations/sync'),
+        { ids: [1, 2, 3] }
+      );
+    });
+
+    // The answer is about the list as it was when the request went out. A conversation that
+    // arrives over the cable mid-flight is missing from that answer because it was never asked
+    // about, and removing it would undo a live event.
+    it('leaves alone a conversation that arrived while the request was in flight', async () => {
+      const chats = [...onScreen];
+      axios.post.mockImplementation(() => {
+        chats.push({ id: 99, inbox_id: 7 });
+        return Promise.resolve({
+          data: { payload: [fresh(1), fresh(2), fresh(3)] },
+        });
+      });
+
+      const removed = await actions.reconcileConversationTab(
+        {
+          commit,
+          state: { selectedChatId: null },
+          getters: {
+            getUnAssignedChats: () => chats,
+            getConversationById: () => undefined,
+          },
+        },
+        filters
+      );
+
+      expect(removed).toEqual([]);
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(1), fresh(2), fresh(3)]],
+      ]);
+    });
+
+    // A cable event can beat the response home. Writing the older row back would regress the status
+    // or the assignee, and hide the conversation with nothing watching to bring it back.
+    it('drops a row the store already holds a newer copy of', async () => {
+      const payload = [fresh(1, 50), fresh(2, 300), fresh(3, 300)];
+      await actions.reconcileConversationTab(contextWith(payload), filters);
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(2, 300), fresh(3, 300)]],
+      ]);
+    });
+
+    it('keeps a row the store holds an older copy of', async () => {
+      const payload = [fresh(1, 500)];
+      await actions.reconcileConversationTab(contextWith(payload), filters);
+
+      expect(commit.mock.calls).toEqual([
+        [types.SET_ALL_CONVERSATION, [fresh(1, 500)]],
+        [types.REMOVE_CONVERSATIONS, [2, 3]],
+      ]);
+    });
+
+    // The store has no router, so removing the conversation the panel is showing is announced and
+    // the component that owns the route acts on it.
+    it('announces when it removed the conversation the panel is showing', async () => {
+      await actions.reconcileConversationTab(
+        contextWith([fresh(2)], onScreen, inStore, 3),
+        filters
+      );
+
+      expect(emitter.emit).toHaveBeenCalledWith(
+        BUS_EVENTS.OPEN_CONVERSATION_GONE
+      );
+    });
+
+    it('stays quiet when the open conversation survived', async () => {
+      await actions.reconcileConversationTab(
+        contextWith([fresh(2), fresh(3)], onScreen, inStore, 3),
+        filters
+      );
+
+      expect(emitter.emit).not.toHaveBeenCalledWith(
+        BUS_EVENTS.OPEN_CONVERSATION_GONE
+      );
+    });
+
+    it('does not call out when the tab is empty on screen', async () => {
+      const removed = await actions.reconcileConversationTab(
+        contextWith([], []),
+        filters
+      );
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
+    });
+
+    // Mentions and participating carry an assigneeType but are narrowed by a membership the store
+    // cannot reproduce, so what is on screen there is not the tab this would judge it against.
+    it('does nothing on a view the store cannot reproduce', async () => {
+      const removed = await actions.reconcileConversationTab(contextWith([]), {
+        ...filters,
+        conversationType: 'mention',
+      });
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(removed).toEqual([]);
+    });
+
+    it('does nothing on a view that has no tab getter', async () => {
+      const removed = await actions.reconcileConversationTab(contextWith([]), {
+        assigneeType: 'appliedFilters',
+      });
+
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(commit.mock.calls).toEqual([]);
+      expect(removed).toEqual([]);
+    });
+
+    it('keeps the list as is when the request fails', async () => {
+      axios.post.mockRejectedValue({ message: 'Network error' });
+      const removed = await actions.reconcileConversationTab(
+        {
+          commit,
+          state: { selectedChatId: null },
+          getters: {
+            getUnAssignedChats: () => onScreen,
+            getConversationById: () => undefined,
+          },
+        },
+        filters
+      );
+
+      expect(commit.mock.calls).toEqual([]);
+      expect(removed).toEqual([]);
+    });
   });
 
   describe('#deleteConversation', () => {

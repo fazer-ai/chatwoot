@@ -4,6 +4,9 @@ module Redis::RedisKeys
   ROUND_ROBIN_AGENTS = 'ROUND_ROBIN_AGENTS:%<inbox_id>d'.freeze
   # Track recently deleted IMAP messages to prevent them from being synced again
   IMAP_DELETED_MESSAGE = 'IMAP_DELETED_MESSAGE::%<inbox_id>d::%<message_id_digest>s'.freeze
+  # How far the mailbox has already been swept, by IMAP UID. A cache, not state:
+  # losing it costs one expensive sweep, never a message.
+  IMAP_UID_CURSOR = 'IMAP_UID_CURSOR::%<inbox_id>d'.freeze
 
   ## Conversation keys
   # Detect whether to send an email reply to the conversation
@@ -77,6 +80,9 @@ module Redis::RedisKeys
   OPENAI_CONVERSATION_KEY = 'OPEN_AI_CONVERSATION_KEY::V1::%<event_name>s::%<conversation_id>d::%<updated_at>d'.freeze
   # Bridges a WhatsApp call `terminate` that overtook its `connect` so the later connect can finalize it.
   WHATSAPP_CALL_TERMINATE_TOMBSTONE = 'WHATSAPP_CALL_TERMINATE_TOMBSTONE::%<call_id>s'.freeze
+  # The provider message ids this app has just acknowledged to WhatsApp, per conversation, so the
+  # provider's echo of that receipt is not read back as a device of this account opening the chat.
+  WHATSAPP_SELF_READ_RECEIPT = 'WHATSAPP_SELF_READ_RECEIPT::%<conversation_id>s::%<source_id>s'.freeze
 
   ## Sempahores / Locks
   # We don't want to process messages from the same sender concurrently to prevent creating double conversations

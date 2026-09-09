@@ -133,7 +133,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   end
 
   it 'sends a message under an idempotency key built from its reserved id' do
-    expect(client).to receive(:call).with(anything, idempotency_key: 'msg:3EB0AAAA').and_return(results['message.send'])
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0AAAA', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT)
+      .and_return(results['message.send'])
 
     result = backend.send_message(
       model::Commands::MessageSend.new(message_id: '3EB0AAAA', to: model::Address.phone('5541999990000'),
@@ -141,6 +143,39 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     )
 
     expect(result.message_id).to eq('3EB0AAAA')
+  end
+
+  # The connector has to fetch the file from this app's storage, encrypt it and upload it
+  # to WhatsApp before it can answer, and the default wait covers only a few megabytes of
+  # that. A file past it failed on the deadline, was retried, and failed at the same
+  # place, which is why the documented cap was never reachable through this client.
+  it 'gives a send carrying a file a wait sized from the length the sender declared' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0BBBB', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT + 25)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0BBBB', 25.megabytes))
+  end
+
+  # Every other reason to wait is unchanged, so a small file never shortens the wait a
+  # text would have had.
+  it 'never gives a send less than the default wait' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0CCCC', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT + 1)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0CCCC', 1))
+  end
+
+  # A wait this long holds a Redis connection out of the pool and the worker that called
+  # it, so a file too big to move inside the ceiling is one this deployment does not send.
+  it 'bounds the wait however large the file says it is' do
+    expect(client).to receive(:call)
+      .with(anything, idempotency_key: 'msg:3EB0DDDD',
+                      timeout: described_class::MEDIA_SEND_MAX_TIMEOUT)
+      .and_return(results['message.send'])
+
+    backend.send_message(media_send('3EB0DDDD', 10.gigabytes))
   end
 
   # The contract lets a connection state carry them and this connector fills neither, so
@@ -209,6 +244,17 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
     expect(client).to have_received(:call).once
     expect(Down).to have_received(:download).with('https://connector.test/media/abc', anything)
+  end
+
+  def media_send(message_id, size)
+    model::Commands::MessageSend.new(
+      message_id: message_id, to: model::Address.phone('5541999990000'),
+      content: model::Content::Media.new(
+        kind: 'document', mime: 'application/pdf', filename: 'contrato.pdf', size: size,
+        ref: model::MediaRef.url('http://rails:3000/rails/active_storage/blobs/proxy/abc', mime: 'application/pdf',
+                                                                                           size: size)
+      )
+    )
   end
 
   def download_command(ref)

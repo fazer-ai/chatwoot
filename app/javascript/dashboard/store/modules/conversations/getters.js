@@ -1,5 +1,10 @@
 import { MESSAGE_TYPE } from 'shared/constants/messages';
-import { applyPageFilters, applyRoleFilter, sortComparator } from './helpers';
+import {
+  applyPageFilters,
+  applyRoleFilter,
+  humanAssignee,
+  sortComparator,
+} from './helpers';
 import filterQueryGenerator from 'dashboard/helper/filterQueryGenerator';
 import { matchesFilters } from './helpers/filterHelpers';
 import {
@@ -100,7 +105,10 @@ const getters = {
     const currentUserID = rootGetters.getCurrentUser?.id;
 
     const chats = _state.allConversations.filter(conversation => {
-      const { assignee } = conversation.meta;
+      // The human, not whoever holds it: an agent bot's id comes from its own table and
+      // can be the same integer as an agent's, which would put a bot's conversation in
+      // that agent's "Mine".
+      const assignee = humanAssignee(conversation);
       const isAssignedToMe = assignee && assignee.id === currentUserID;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       const isChatMine = isAssignedToMe && shouldFilter;
@@ -123,6 +131,10 @@ const getters = {
   },
   getUnAssignedChats: (_state, _, __, rootGetters) => activeFilters => {
     const chats = _state.allConversations.filter(conversation => {
+      // Any assignee, bot included, which is the server's own answer: `scope :unassigned`
+      // requires `assignee_agent_bot_id` to be null too, and the tab's badge counts the same
+      // way. Asking for a human here put bot-held conversations in a list whose badge did not
+      // count them, and only after a visit to "All" had loaded them into the store.
       const isUnAssigned = !conversation.meta.assignee;
       const shouldFilter = applyPageFilters(conversation, activeFilters);
       return isUnAssigned && shouldFilter;

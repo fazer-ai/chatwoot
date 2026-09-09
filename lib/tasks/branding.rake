@@ -11,12 +11,16 @@ namespace :branding do
       'LOGO' => '/brand-assets/logo.svg',
       # The logo that would be used on the dashboard, login page etc. for dark mode
       'LOGO_DARK' => '/brand-assets/logo_dark.svg',
+      # The logo shown at the top of outgoing emails (PNG or JPG; email clients do not render SVG)
+      'LOGO_EMAIL' => '',
       # The URL that would be used in emails under the section “Powered By”
       'BRAND_URL' => 'https://www.chatwoot.com',
       # The URL that would be used in the widget under the section “Powered By”
       'WIDGET_BRAND_URL' => 'https://www.chatwoot.com',
       # The name that would be used in emails and the widget
       'BRAND_NAME' => 'Chatwoot',
+      # Hex colour used in emails and for the PWA theme (example: #1f93ff)
+      'BRAND_COLOR' => '#1f93ff',
       # The terms of service URL displayed in Signup Page
       'TERMS_URL' => 'https://www.chatwoot.com/terms-of-service',
       # The privacy policy URL displayed in the app

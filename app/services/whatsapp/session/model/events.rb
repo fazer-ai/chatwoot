@@ -135,6 +135,15 @@ module Whatsapp::Session::Model::Events
     include Serializable
     wire_type 'media.download_failed'
     coerce chat: Address
+    # Whether the file may still be somewhere the provider can reach: WhatsApp drops a
+    # file off its CDN long before the sender's phone forgets it, and asking for it again
+    # is what recovers a message that sat in a backlog. Everything else here is the file
+    # being gone.
+    #
+    # False is what a provider that predates the field says by saying nothing, and it is
+    # the half that changes nothing: the bubble is flagged and nobody comes back for the
+    # bytes, which is what this event has always meant.
+    defaults recoverable: false
   end
 
   class CommandFailed < Data.define(:command_id, :command_type, :message_id, :error)

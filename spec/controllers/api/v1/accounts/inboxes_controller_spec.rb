@@ -1708,6 +1708,68 @@ RSpec.describe 'Inboxes API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/:account_id/inboxes/:id/request_pairing_code' do
+    let(:session_channel) do
+      create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
+    end
+    let(:session_inbox) { session_channel.inbox }
+
+    it 'returns unauthorized when unauthenticated' do
+      post "/api/v1/accounts/#{account.id}/inboxes/#{session_inbox.id}/request_pairing_code"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    # Same privilege as scanning a QR for the inbox, and granted the same way: both link
+    # a WhatsApp account to an inbox this agent is already assigned to.
+    it 'lets an assigned agent ask for one' do
+      create(:inbox_member, user: agent, inbox: session_inbox)
+      allow_any_instance_of(Whatsapp::Session::Facade).to receive(:request_pairing_code) # rubocop:disable RSpec/AnyInstance
+
+      post "/api/v1/accounts/#{account.id}/inboxes/#{session_inbox.id}/request_pairing_code",
+           headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it 'returns unauthorized for an agent who is not on the inbox' do
+      post "/api/v1/accounts/#{account.id}/inboxes/#{session_inbox.id}/request_pairing_code",
+           headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    # The route is on every inbox, and only the session family can answer it. A provider
+    # that cannot pair by code has to say so as a sentence, not as a 500.
+    it 'refuses a provider that does not pair by code' do
+      legacy = create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false)
+
+      post "/api/v1/accounts/#{account.id}/inboxes/#{legacy.inbox.id}/request_pairing_code",
+           headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['code']).to eq('unsupported')
+    end
+
+    it 'refuses a channel that has no pairing at all' do
+      post "/api/v1/accounts/#{account.id}/inboxes/#{create(:inbox, account: account).id}/request_pairing_code",
+           headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'answers a provider that is down with a 503, which is worth retrying' do
+      allow_any_instance_of(Whatsapp::Session::Facade) # rubocop:disable RSpec/AnyInstance
+        .to receive(:request_pairing_code)
+        .and_raise(Whatsapp::Session::Errors::ProviderUnavailable, 'the instance did not answer')
+
+      post "/api/v1/accounts/#{account.id}/inboxes/#{session_inbox.id}/request_pairing_code",
+           headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:service_unavailable)
+    end
+  end
+
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/import_whatsapp_session' do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }
@@ -1865,10 +1927,19 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(channel.reload.provider_connection).to eq('connection' => 'close')
       end
 
-      it 'ensures provider connection is updated to close' do
-        channel.update_provider_connection!(connection: 'open')
-        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, disconnect_channel_provider: true)
-        allow(service_double).to receive(:disconnect_channel_provider).and_raise(StandardError)
+      # Disconnect is the documented recovery for a send stall, and re-pairing is the only
+      # thing that replaces the wedged socket. Recording 'close' on a disconnect the
+      # provider refused would clear the stall warning without replacing anything: the
+      # operator is told it worked, the banner disappears, and the inbox is still mute
+      # with no signal left to say so.
+      it 'leaves the connection untouched when the provider refuses to end the session' do
+        channel.update_provider_connection!(
+          connection: 'open',
+          send_stall: { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
+        )
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService)
+        allow(service_double).to receive(:disconnect_channel_provider)
+          .and_raise(Whatsapp::Session::Errors::ProviderUnavailable.new('The provider did not end the session (HTTP 500)'))
         allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)
           .with(whatsapp_channel: channel)
           .and_return(service_double)
@@ -1877,8 +1948,11 @@ RSpec.describe 'Inboxes API', type: :request do
              headers: admin.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:ok)
-        expect(channel.reload.provider_connection).to eq('connection' => 'close')
+        expect(response).to have_http_status(:service_unavailable)
+        expect(channel.reload.provider_connection).to include(
+          'connection' => 'open',
+          'send_stall' => { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
+        )
       end
     end
   end

@@ -60,13 +60,13 @@ const INBOX = {
   provider_config: { base_url: 'https://uaz.example', mark_as_read: true },
 };
 
-const mountPage = async ({ beta = true } = {}) => {
+const mountPage = async ({ beta = true, inbox = INBOX } = {}) => {
   WhatsappChannel.getSessionProviders.mockResolvedValue({
     data: { payload: catalog({ beta }) },
   });
 
   const wrapper = mount(SessionProviderConfiguration, {
-    props: { inbox: INBOX },
+    props: { inbox },
     global: {
       stubs: {
         WhatsappLinkDeviceModal: stub('WhatsappLinkDeviceModal'),
@@ -79,6 +79,8 @@ const mountPage = async ({ beta = true } = {}) => {
         }),
         NextButton: stub('NextButton'),
         Switch: stub('Switch'),
+        // Its own subject, with its own spec.
+        WhatsappHistorySync: stub('WhatsappHistorySync'),
         'woot-input': stub('woot-input'),
       },
     },

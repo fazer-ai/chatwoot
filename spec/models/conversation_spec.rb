@@ -809,7 +809,10 @@ RSpec.describe Conversation do
         waiting_since: conversation.waiting_since.to_i,
         priority: nil,
         unread_count: 0,
-        group_type: 'individual'
+        group_type: 'individual',
+        # Present on every conversation, nil included: its absence is what tells a consumer this
+        # Chatwoot does not speak about redirect pairings at all (fazer-ai/agents#222).
+        redirect_origin_display_id: nil
       }
     end
 
@@ -884,6 +887,26 @@ RSpec.describe Conversation do
         conversation = create(:conversation, inbox: inbox, campaign: campaign)
         expect(conversation.status).to eq('open')
       end
+    end
+  end
+
+  describe '#botinbox: when conversation created inside inbox with only an observer bot' do
+    let!(:observer) { create(:agent_bot_observer) }
+    let(:conversation) { create(:conversation, inbox: observer.inbox) }
+
+    it 'starts open, like an inbox with no bot' do
+      expect(conversation.status).to eq('open')
+    end
+
+    it 'assigns no agent bot' do
+      expect(conversation.assignee_agent_bot).to be_nil
+    end
+
+    it 'reopens as open, not pending, when the contact writes to a resolved conversation' do
+      conversation.update!(status: :resolved)
+      create(:message, message_type: :incoming, account: conversation.account, inbox: conversation.inbox, conversation: conversation)
+
+      expect(conversation.reload.status).to eq('open')
     end
   end
 

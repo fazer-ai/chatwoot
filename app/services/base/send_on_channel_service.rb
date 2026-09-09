@@ -48,8 +48,10 @@ class Base::SendOnChannelService
     # we should also avoid the case of message loops, when outgoing messages are created from channel
     # voice_call bubbles are call status indicators, not deliverable messages
     # a message deleted before the job got to run must not reach the contact — its content is already
-    # the "deleted" placeholder and its attachments are gone, so sending it would leak the placeholder
-    message.private? || outgoing_message_originated_from_channel? || message.content_type == 'voice_call' || message.deleted?
+    # the "deleted" placeholder and its attachments are gone, so sending it would leak the placeholder.
+    # A removed reaction is the exception: see Message#removed_reaction?
+    message.private? || outgoing_message_originated_from_channel? || message.content_type == 'voice_call' ||
+      (message.deleted? && !message.removed_reaction?)
   end
 
   def validate_target_channel

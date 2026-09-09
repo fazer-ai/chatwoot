@@ -93,7 +93,7 @@ const onSelectConversation = checked => {
   if (checked) {
     emit('selectConversation', props.chat.id, props.inbox.id);
   } else {
-    emit('deSelectConversation', props.chat.id, props.inbox.id);
+    emit('deSelectConversation', props.chat.id);
   }
 };
 

@@ -4,10 +4,25 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   include HmacConcern
   include ConversationCustomAttributesConcern
 
-  before_action :conversation, except: [:index, :meta, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
+  before_action :conversation, except: [:index, :meta, :sync, :search, :create, :filter, :presence_subscribe_bulk, :pins, :unpin]
   before_action :inbox, :contact, :contact_inbox, only: [:create]
 
   ATTACHMENT_RESULTS_PER_PAGE = 100
+  # One page of conversations, the same unit the index endpoint serializes at. The partial does
+  # per-row work (unread counts, the last non-activity message), so an uncapped list would let any
+  # authenticated agent ask one worker to render the whole account. The dashboard chunks to match,
+  # and an oversized batch is refused rather than truncated: a truncated answer is indistinguishable
+  # from "these conversations are gone" to a caller that reconciles against it.
+  SYNC_BATCH_SIZE = 25
+  # One debounced batch of inbound messages, generously. The whole thread is never the answer,
+  # since a receipt per message of history empties a year of unread badges on the contact's
+  # phone, so this holds both branches of the endpoint to the same reach.
+  #
+  # A named list over it is refused and a resolved one is truncated, which is not a
+  # contradiction: naming 51 ids is a claim about what the caller processed, and no
+  # conversation flow produces it, so answering it at all would be answering a mistake. The
+  # default names nothing, and the newest is then the only sensible part to keep.
+  READ_RECEIPT_BATCH_SIZE = 50
 
   def index
     result = conversation_finder.perform
@@ -18,6 +33,27 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def meta
     result = conversation_finder.perform_meta_only
     @conversations_count = result[:count]
+  end
+
+  # The current state of the conversations the caller names, and nothing else. The dashboard asks
+  # when its own list is longer than the count the server reports for a tab, a contradiction it
+  # cannot resolve on its own: nothing in the store ever removes a conversation that left a tab, so
+  # a single missed cable event leaves a stale copy behind forever.
+  #
+  # Deliberately ignores every tab filter, and that is the whole point: the caller is asking what
+  # these conversations ARE, and the ones it is asking after are precisely the ones that stopped
+  # matching its filters. What comes back replaces the stale rows, so they leave the tab through
+  # their own data while keeping whatever other tab they still belong to. Whatever does not come
+  # back is gone for this agent, deleted or no longer permitted, and the caller drops it.
+  #
+  # POST, and scoped to the ids it was given, so the answer can never outgrow the question: the
+  # count that triggers the ask can itself be stale (a debounced meta answering for the filter
+  # before last), so the tab can be far larger than the handful the client has on screen.
+  def sync
+    ids = permitted_conversation_ids
+    return render_could_not_create_error("ids must contain at most #{SYNC_BATCH_SIZE} entries") if ids.size > SYNC_BATCH_SIZE
+
+    @conversations = conversation_finder.perform_sync(ids)
   end
 
   def search
@@ -176,12 +212,64 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     update_last_seen_on_conversation(DateTime.now.utc, assignee?)
   end
 
+  # Tells WhatsApp the contact's messages were read, and touches nothing else.
+  #
+  # Deliberately not `update_last_seen`. There the receipt is a side effect of a person
+  # opening the thread, so it comes with `agent_last_seen_at`, the stamp that draws the
+  # unread badge. An agent bot is not a person reading the thread: `bot_handoff!` hands
+  # the conversation back to a human without rewinding that stamp, and one written here
+  # would put it in their queue already looking read.
+  #
+  # The inbox's `mark_as_read` toggle still wins, downstream in Channel::Whatsapp, and a
+  # channel with nothing to send a receipt through is a no-op, both as on the human path.
+  def read_receipt
+    authorize @conversation, :read_receipt?
+
+    ids = permitted_message_ids
+    if ids && ids.size > READ_RECEIPT_BATCH_SIZE
+      return render_could_not_create_error("message_ids must contain at most #{READ_RECEIPT_BATCH_SIZE} entries")
+    end
+
+    messages = receipt_messages(ids)
+    return head :ok if messages.empty?
+
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGES_READ, Time.zone.now,
+                                            conversation: @conversation, message_ids: messages.map(&:id))
+    head :ok
+  end
+
   def unread
     Rails.configuration.dispatcher.dispatch(Events::Types::CONVERSATION_UNREAD, Time.zone.now, conversation: @conversation)
 
     last_incoming_message = @conversation.messages.incoming.last
     last_seen_at = last_incoming_message.created_at - 1.second if last_incoming_message.present?
     update_last_seen_on_conversation(last_seen_at, true)
+  end
+
+  # Asks the phone for the page before the oldest message this thread holds.
+  #
+  # Scoped to the conversation because that is the shape of the thing being asked: the
+  # provider walks one chat backwards from one anchor, and the operator asking is the one
+  # reading that chat. Nothing here waits for messages -- the phone answers on the webhook
+  # later, or never, so what the caller is told is that the request went out.
+  def sync_history
+    channel = @conversation.inbox.channel
+
+    unless channel.try(:session_capabilities)&.include?('history_sync')
+      render json: { error: 'Inbox does not support history sync' }, status: :unprocessable_entity and return
+    end
+
+    # The request travels to the phone through the session, so a closed one has nothing to
+    # carry it and the operator would be told it was asked for nothing.
+    unless channel.provider_connection.to_h['connection'] == 'open'
+      render json: { error: 'Inbox is not connected' }, status: :unprocessable_entity and return
+    end
+
+    # Held for the providers that do not classify their frames: a Baileys answer identifies
+    # itself as ON_DEMAND, uazapi's does not, and this is what tells that one somebody asked.
+    Whatsapp::Session::HistoryBackfill.open!(channel)
+    Whatsapp::Session::ConversationHistoryJob.perform_later(@conversation)
+    head :ok
   end
 
   def destroy
@@ -296,6 +384,51 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def conversation_finder
     @conversation_finder ||= ConversationFinder.new(Current.user, params)
+  end
+
+  def permitted_conversation_ids
+    Array(params[:ids]).map(&:to_i)
+  end
+
+  # nil when the caller said nothing, which is what asks for the default window. An empty
+  # array is not that: it is a caller naming no messages, and the answer to it is no receipt.
+  # Collapsing the two acknowledges fifty messages for a debounced batch that came up empty,
+  # which is the one thing this endpoint must never do on its own initiative.
+  def permitted_message_ids
+    return unless params.key?(:message_ids)
+
+    Array(params[:message_ids]).map(&:to_i)
+  end
+
+  # The bot names the messages it processed -- a debounced batch is several -- or nothing, and
+  # then the set is the unacknowledged part of a fixed window: the newest
+  # READ_RECEIPT_BATCH_SIZE inbound messages of the thread, minus the ones already read.
+  #
+  # The window is over the thread, NOT over the unread ones, and that distinction is the
+  # whole safety property. Taking the newest N *unread* rows looks equivalent and walks
+  # backwards through history instead: the provider echoes each receipt back, the echo writes
+  # `read` on those rows, and the next call's newest-N-unread is then the fifty before them.
+  # A bot answers every message, so a thread with a year of history behind it gets paged
+  # through fifty at a time until every badge on the contact's phone is gone. Anchored to the
+  # thread, a message that was already old on the first call is never named on any call.
+  #
+  # The human path is not exposed to this because its watermark only moves forward. A bot
+  # writes no watermark by design, so the window is what replaces it.
+  #
+  # Same size as the cap a caller-named list is held to: a default that reaches further than
+  # a caller is allowed to name would be the wrong way round.
+  #
+  # Ordered by id as well as time, because the window is only fixed if it is deterministic.
+  # Message's default scope orders by `created_at` alone, and an imported row carries the
+  # timestamp WhatsApp gave it, which has second precision (`MessageWriter#build`): a burst
+  # inside one second ties, Postgres is free to break the tie differently on the next call,
+  # and the window drifts onto rows it had excluded -- the same walk backwards through
+  # history the thread anchor exists to prevent, entered through the sort instead.
+  def receipt_messages(ids)
+    scope = @conversation.messages.incoming
+    return scope.where.not(status: :read).where(id: ids).to_a if ids
+
+    scope.reorder(created_at: :asc, id: :asc).last(READ_RECEIPT_BATCH_SIZE).reject { |message| message.status == 'read' }
   end
 
   def assignee?

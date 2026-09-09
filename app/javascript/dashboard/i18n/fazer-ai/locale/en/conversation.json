@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "Group messages are disabled — enable for free"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Schedule send"
+      "SCHEDULE_SEND": "Schedule send",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The attachment was discarded because the conversation switched between note and reply.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "The recording was discarded because the conversation switched between note and reply."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversation already assigned",
@@ -25,6 +27,7 @@
     },
     "CHANGE_TEAM_FAILED": "Team change failed",
     "MESSAGE_DELETED_BY_CONTACT": "Deleted by the contact",
+    "MASKED_MESSAGE_WHATSAPP": "WhatsApp does not deliver verification codes to linked devices. This message can only be read on the paired phone.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {
@@ -60,7 +63,9 @@
         "NOT_CONNECTED": "WhatsApp is not connected. Please link your device again.",
         "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp is not connected. Click this button to try to reconnect, or please contact your administrator to link your device again.",
         "LINK_DEVICE": "Link device",
-        "RECONNECT_FAILED": "Failed to reconnect. Please contact your administrator to link your device again."
+        "RECONNECT_FAILED": "Failed to reconnect. Please contact your administrator to link your device again.",
+        "SEND_STALL": "WhatsApp is connected but cannot send messages. Link the device again to restore sending.",
+        "SEND_STALL_CONTACT_ADMIN": "WhatsApp is connected but cannot send messages. Your replies will not be delivered until an administrator links the device again."
       },
       "WHATSAPP_REACHOUT_RESTRICTION": {
         "RESTRICTED": "WhatsApp has temporarily restricted starting new conversations from this number.",
@@ -82,6 +87,13 @@
     "CARD_CONTEXT_MENU": {
       "PIN": "Pin",
       "UNPIN": "Unpin"
+    },
+    "HISTORY_SYNC": {
+      "BUTTON": "Load older messages",
+      "HELP": "Asks the phone for what came before. It has to be awake to answer, and it stays quiet once it has already sent this stretch.",
+      "REQUESTED": "Asked the phone for older messages. They appear here as it sends them.",
+      "ERROR": "Could not ask for older messages. Try again in a moment.",
+      "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
     }
   },
   "CONVERSATION_SIDEBAR": {

@@ -16,8 +16,15 @@ require 'yaml'
 require 'open3'
 require 'fileutils'
 
-FE_UPSTREAM = 'app/javascript/dashboard/i18n/locale'
-FE_FORK = 'app/javascript/dashboard/i18n/fazer-ai/locale'
+# Each frontend bundle carries its own translations, so the fork has one overlay per
+# bundle. They differ in layout: the dashboard ships a folder per language (one file per
+# namespace), the survey a single file, since it is one small namespace.
+FE_TREES = [
+  { upstream: 'app/javascript/dashboard/i18n/locale', fork: 'app/javascript/dashboard/i18n/fazer-ai/locale', layout: :directory },
+  { upstream: 'app/javascript/survey/i18n/locale', fork: 'app/javascript/survey/i18n/fazer-ai/locale', layout: :file }
+].freeze
+FE_UPSTREAM = FE_TREES.first[:upstream]
+FE_FORK = FE_TREES.first[:fork]
 BE_FORK_GLOB = 'config/locales/fazer_ai*.yml'
 OVERRIDES = 'overrides.json'
 REFERENCE_LOCALE = 'en'
@@ -47,7 +54,7 @@ class ForkTranslations
       abort "tag #{base} nao esta disponivel neste clone (git fetch --tags)"
     end
 
-    changed = capture('git', 'diff', '--name-only', base, '--', FE_UPSTREAM, 'config/locales')
+    changed = capture('git', 'diff', '--name-only', base, '--', *FE_TREES.map { |tree| tree[:upstream] }, 'config/locales')
               .split("\n")
               .reject { |path| File.fnmatch(BE_FORK_GLOB, path) }
 
@@ -59,11 +66,9 @@ class ForkTranslations
 
   def scaffold(locale)
     abort 'informe o locale, ex: scaffold es' if locale.to_s.empty?
+    abort "#{locale} ja existe em #{FE_FORK}" if Dir.exist?(File.join(FE_FORK, locale))
 
-    target = File.join(FE_FORK, locale)
-    abort "#{target} ja existe" if Dir.exist?(target)
-
-    scaffold_frontend(locale, target)
+    FE_TREES.each { |tree| scaffold_tree(tree, locale) }
     scaffold_backend(locale)
 
     puts "traduza os valores; chaves nao traduzidas caem no fallback em #{REFERENCE_LOCALE}"
@@ -71,11 +76,20 @@ class ForkTranslations
 
   private
 
-  def scaffold_frontend(_locale, target)
-    FileUtils.mkdir_p(target)
-    reference = Dir[File.join(FE_FORK, REFERENCE_LOCALE, '*.json')]
-    reference.each { |path| FileUtils.cp(path, File.join(target, File.basename(path))) }
-    puts "criado #{target}/ com #{reference.size} arquivos copiados de #{REFERENCE_LOCALE}"
+  def scaffold_tree(tree, locale)
+    reference = tree_paths(tree[:fork], tree[:layout], REFERENCE_LOCALE)
+    return puts("#{tree[:fork]} nao tem #{REFERENCE_LOCALE}; nada a copiar") if reference.empty?
+
+    if tree[:layout] == :directory
+      target = File.join(tree[:fork], locale)
+      FileUtils.mkdir_p(target)
+      reference.each { |path| FileUtils.cp(path, File.join(target, File.basename(path))) }
+      puts "criado #{target}/ com #{reference.size} arquivos copiados de #{REFERENCE_LOCALE}"
+    else
+      target = File.join(tree[:fork], "#{locale}.json")
+      FileUtils.cp(reference.first, target)
+      puts "criado #{target} copiado de #{REFERENCE_LOCALE}"
+    end
   end
 
   def scaffold_backend(locale)
@@ -98,7 +112,20 @@ class ForkTranslations
   end
 
   def fork_locales
-    @fork_locales ||= Dir["#{FE_FORK}/*"].select { |path| File.directory?(path) }.map { |path| File.basename(path) }.sort
+    @fork_locales ||= FE_TREES.flat_map { |tree| locales_in(tree) }.uniq.sort
+  end
+
+  def locales_in(tree)
+    if tree[:layout] == :directory
+      Dir["#{tree[:fork]}/*"].select { |path| File.directory?(path) }.map { |path| File.basename(path) }
+    else
+      Dir["#{tree[:fork]}/*.json"].map { |path| File.basename(path, '.json') }
+    end
+  end
+
+  # Files a tree holds for one language, on either side of the boundary.
+  def tree_paths(root, layout, locale)
+    layout == :directory ? Dir["#{root}/#{locale}/*.json"] : Dir["#{root}/#{locale}.json"]
   end
 
   def flatten(obj, prefix = '', acc = {})
@@ -125,13 +152,24 @@ class ForkTranslations
 
   # Overrides are upstream keys we replace, so they are deliberately absent from
   # the fork's own key set and never count towards translation coverage.
-  def fork_keys(locale)
-    paths = Dir["#{FE_FORK}/#{locale}/*.json"].reject { |path| File.basename(path) == OVERRIDES }
-    keys_in(paths).merge(keys_in(Dir["config/locales/fazer_ai*.#{locale}.yml"]))
+  # Coverage is measured per bundle, not on the union: the dashboard and the survey load
+  # different message trees at runtime, so one having a key translated says nothing about
+  # the other, and merging them lets a translated dashboard key mask a missing survey one.
+  def key_scopes(locale)
+    scopes = FE_TREES.to_h { |tree| [tree[:fork], keys_in(tree_fork_paths(tree, locale))] }
+    scopes.merge('config/locales' => keys_in(Dir["config/locales/fazer_ai*.#{locale}.yml"]))
   end
 
-  def override_keys(locale)
-    path = File.join(FE_FORK, locale, OVERRIDES)
+  def tree_fork_paths(tree, locale)
+    tree_paths(tree[:fork], tree[:layout], locale).reject { |path| File.basename(path) == OVERRIDES }
+  end
+
+  # Only a directory-layout tree can carry overrides; a single-file tree has nowhere to
+  # put them, and none of them needs to replace an upstream string today.
+  def override_keys(tree, locale)
+    return {} unless tree[:layout] == :directory
+
+    path = File.join(tree[:fork], locale, OVERRIDES)
     File.exist?(path) ? keys_in([path]) : {}
   end
 
@@ -143,20 +181,22 @@ class ForkTranslations
 
   # A fork key living in both trees means someone edited an upstream file.
   def check_fork_keys_are_not_duplicated_upstream
-    fork_locales.each do |locale|
-      upstream = keys_in(Dir["#{FE_UPSTREAM}/#{locale}/*.json"])
-      duplicated = fork_keys(locale).keys & upstream.keys
-      unless duplicated.empty?
-        @errors << "#{locale}: #{duplicated.size} chaves do fork tambem existem no upstream (#{duplicated.first(3).join(', ')})"
-      end
+    FE_TREES.product(fork_locales).each { |tree, locale| check_tree_not_duplicated(tree, locale) }
+  end
 
-      # The mirror case: an override that upstream does not define replaces
-      # nothing, so it belongs in a regular fork file instead.
-      dangling = override_keys(locale).keys - upstream.keys
-      next if dangling.empty?
-
-      @errors << "#{locale}: #{dangling.size} overrides nao existem no upstream (#{dangling.first(3).join(', ')})"
+  def check_tree_not_duplicated(tree, locale)
+    upstream = keys_in(tree_paths(tree[:upstream], tree[:layout], locale))
+    duplicated = keys_in(tree_fork_paths(tree, locale)).keys & upstream.keys
+    unless duplicated.empty?
+      @errors << "#{tree[:fork]} #{locale}: #{duplicated.size} chaves do fork tambem existem no upstream (#{duplicated.first(3).join(', ')})"
     end
+
+    # The mirror case: an override that upstream does not define replaces nothing, so it
+    # belongs in a regular fork file instead.
+    dangling = override_keys(tree, locale).keys - upstream.keys
+    return if dangling.empty?
+
+    @errors << "#{tree[:fork]} #{locale}: #{dangling.size} overrides nao existem no upstream (#{dangling.first(3).join(', ')})"
   end
 
   # Anything translated in another language but absent from the reference is
@@ -164,12 +204,13 @@ class ForkTranslations
   def check_every_key_exists_in_reference
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    reference = fork_keys(REFERENCE_LOCALE).keys
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      orphans = fork_keys(locale).keys - reference
-      next if orphans.empty?
+      key_scopes(locale).each do |scope, keys|
+        orphans = keys.keys - key_scopes(REFERENCE_LOCALE).fetch(scope, {}).keys
+        next if orphans.empty?
 
-      @errors << "#{locale}: #{orphans.size} chaves nao existem em #{REFERENCE_LOCALE} (#{orphans.first(3).join(', ')})"
+        @errors << "#{scope} #{locale}: #{orphans.size} chaves nao existem em #{REFERENCE_LOCALE} (#{orphans.first(3).join(', ')})"
+      end
     end
   end
 
@@ -182,17 +223,20 @@ class ForkTranslations
   def check_reference_keys_are_translated_everywhere
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    reference = fork_keys(REFERENCE_LOCALE).keys
+    reference = key_scopes(REFERENCE_LOCALE)
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      missing = reference - fork_keys(locale).keys
-      next if missing.empty?
+      scopes = key_scopes(locale)
+      reference.each do |scope, keys|
+        missing = keys.keys - scopes.fetch(scope, {}).keys
+        next if missing.empty?
 
-      @errors << "#{locale}: #{missing.size} chaves de #{REFERENCE_LOCALE} sem traducao (#{missing.first(3).join(', ')})"
+        @errors << "#{scope} #{locale}: #{missing.size} chaves de #{REFERENCE_LOCALE} sem traducao (#{missing.first(3).join(', ')})"
+      end
     end
   end
 
   def check_upstream_indexes_ignore_the_fork
-    Dir["#{FE_UPSTREAM}/*/index.js"].each do |path|
+    FE_TREES.flat_map { |tree| Dir["#{tree[:upstream]}/*/index.js"] }.each do |path|
       next unless File.read(path).include?('fazer-ai')
 
       @errors << "#{path} referencia a arvore do fork; o merge acontece em i18n/index.js"
@@ -202,10 +246,12 @@ class ForkTranslations
   def report_coverage
     return unless fork_locales.include?(REFERENCE_LOCALE)
 
-    total = fork_keys(REFERENCE_LOCALE).size
+    reference = key_scopes(REFERENCE_LOCALE)
+    total = reference.values.sum(&:size)
     puts "chaves do fork em #{REFERENCE_LOCALE}: #{total}"
     (fork_locales - [REFERENCE_LOCALE]).each do |locale|
-      translated = (fork_keys(locale).keys & fork_keys(REFERENCE_LOCALE).keys).size
+      scopes = key_scopes(locale)
+      translated = reference.sum { |scope, keys| (keys.keys & scopes.fetch(scope, {}).keys).size }
       puts format('  %<locale>-8s %<done>4d/%<total>d traduzidas (%<percent>d%%)',
                   locale: locale, done: translated, total: total, percent: (translated * 100.0 / total).round)
     end

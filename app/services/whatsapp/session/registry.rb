@@ -12,6 +12,10 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
 
   MARK_AS_READ = Field.new(name: 'mark_as_read', type: 'boolean', default: true).freeze
   PRESENCE_SUBSCRIBE = Field.new(name: 'presence_subscribe', type: 'boolean', default: false).freeze
+  # Off by default, and behind the advanced toggle: the phone answers a history request
+  # with everything it has (947 messages for one chat, measured), so an inbox opts into
+  # that rather than discovering it on the first connect.
+  HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false).freeze
 
   DESCRIPTORS = [
     Descriptor.new(
@@ -49,20 +53,21 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # face, so it is not declared.
       capabilities: %w[
         qr_pairing code_pairing edit revoke reactions typing presence read_receipts check_number
-        profile_picture groups group_management group_admin account_limits media_download
+        profile_picture groups group_management group_admin account_limits media_download history_sync
       ],
       fields: [
         Field.new(name: 'base_url', type: 'url', required: true),
         Field.new(name: 'token', type: 'password', required: true, secret: true),
-        # An instance the operator runs on this deployment's own network, which is offered
-        # INTERNAL_HOST_URL instead of the public address for its webhook and for the
-        # attachments it fetches.
-        Field.new(name: 'use_internal_host', type: 'boolean', default: false),
         MARK_AS_READ,
-        PRESENCE_SUBSCRIBE
+        PRESENCE_SUBSCRIBE,
+        HISTORY_SYNC
       ]
     ),
     # Legacy: described so the UI can label and gate an existing inbox, never served here.
+    # history_sync, despite being frozen: this one is not a new feature so much as the
+    # provider's own data finally being kept. Baileys is the only provider that delivers
+    # WhatsApp's offline replay, so a message that arrived while a Baileys inbox was down
+    # is recoverable here and nowhere else.
     Descriptor.new(
       key: 'baileys',
       legacy: true,
@@ -70,7 +75,7 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       capabilities: %w[
         qr_pairing session_import echo_by_reserved_id edit revoke reactions typing presence presence_subscribe
         read_receipts mark_unread check_number profile_picture groups group_management group_admin
-        group_invites group_join_requests account_limits media_download
+        group_invites group_join_requests account_limits media_download history_sync
       ]
     ),
     Descriptor.new(

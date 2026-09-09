@@ -9,6 +9,19 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # itself stops well below this; the limit is there so a wrong URL cannot fill a disk.
   MAX_MEDIA_BYTES = 100.megabytes
 
+  # How fast a file is assumed to move, end to end, when sizing the wait for a send that
+  # carries one. Deliberately pessimistic: the connector has to fetch the file from this
+  # app's storage, encrypt it into a temporary file and upload it to WhatsApp before it
+  # can answer, and the number that matters is the slowest of those links rather than the
+  # one inside the datacentre.
+  MEDIA_SEND_RATE = ENV.fetch('WHATSAPP_MEDIA_SEND_RATE_BYTES', 1.megabyte).to_i
+
+  # The ceiling on that wait. A send holds a Redis connection out of the pool and the
+  # worker that called it for as long as it runs, so a file too big to move inside this
+  # is one this deployment does not send -- and it says so on the deadline rather than by
+  # holding a worker indefinitely.
+  MEDIA_SEND_MAX_TIMEOUT = ENV.fetch('WHATSAPP_MEDIA_SEND_MAX_TIMEOUT', 180).to_i
+
   class << self
     def provider_key
       'native'
@@ -78,7 +91,28 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # --- messages ------------------------------------------------------------------
 
   def send_message(command)
-    model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+    model::SendResult.from_h(
+      client.call(command, idempotency_key: "msg:#{command.message_id}", timeout: send_timeout(command))
+    )
+  end
+
+  # How long to wait for a send, which for a file is not the same question as for a text.
+  #
+  # Every other RPC answers in milliseconds and the default is right for them. A send with
+  # a file has to cover three transfers before the connector can answer, and under the
+  # default only a few megabytes fit: past that the send fails on the deadline, is
+  # retried, and fails at the same place -- which is why the documented cap was never
+  # reachable through this client.
+  #
+  # Sized from the length the sender already declared rather than from that cap, so a
+  # small file is not given the budget meant for the largest one. Never shorter than the
+  # default, because every other reason to wait is unchanged.
+  def send_timeout(command)
+    size = command.content.try(:size).to_i
+    return Whatsapp::Connector::Client::RPC_TIMEOUT if size <= 0
+
+    budget = Whatsapp::Connector::Client::RPC_TIMEOUT + (size.to_f / MEDIA_SEND_RATE).ceil
+    budget.clamp(Whatsapp::Connector::Client::RPC_TIMEOUT, MEDIA_SEND_MAX_TIMEOUT)
   end
 
   def edit_message(command)

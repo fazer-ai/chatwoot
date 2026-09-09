@@ -46,6 +46,14 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     Whatsapp::Session::Registry.backend_for(self)
   end
 
+  # Not a delegate on the model, unlike `setup_channel_provider`: pairing by code is a
+  # session-family action, and the legacy services have nothing to answer it with.
+  def request_pairing_code
+    raise Whatsapp::Session::Errors::NotSupported, "#{provider} does not pair by code" unless session_provider?
+
+    provider_service.request_pairing_code
+  end
+
   # Two callers reach this, and they want opposite things. `convert_provider!` is neither:
   # it goes to the provider service directly.
   #
@@ -63,7 +71,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     return super unless session_provider?
 
     unless @session_teardown
-      # The same teardown `super` performs, minus the rescue that swallows it. Not
+      # The same teardown `super` performs, minus its logging branch. Not
       # `backend.disconnect`: the facade deletes the session, and only disconnecting
       # leaves the pairing alive under a session id Chatwoot is about to stop using.
       provider_service.disconnect_channel_provider
@@ -112,6 +120,23 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     with_lock { update_provider_connection!(provider_connection.merge(updates)) }
   end
 
+  # Telling WhatsApp a message was received is an agent's act, and an import is not one.
+  # These are messages the contact sent long ago, or while nobody was watching: reading
+  # them on the operator's behalf puts the second tick on the contact's screen for a
+  # message no human has opened, and with `mark_as_read` on it empties a year of unread
+  # badges on the phone.
+  #
+  # Guarded here, without the `session_provider?` fallback the rest of this file uses, on
+  # purpose: the legacy path acknowledges from inside `build_and_save_message` and has no
+  # notion of an imported row, so the guard has to sit where both paths pass. The session
+  # writer stands down on its own (`MessageWriter#acknowledge`), so this is the only check
+  # the Baileys import gets and it costs the live path a thread-local read.
+  def received_messages(messages, conversation)
+    return if Import::SilentWrite.on?
+
+    super
+  end
+
   def supports_reactions?
     return super unless session_provider?
 
@@ -144,7 +169,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
 
     previous = self.class.find(id)
     previous.provider_config = saved_change_to_provider_config.first || {}
-    moved_instance?(previous) ? let_go_of(previous) : refresh_registration(previous)
+    let_go_of(previous) if moved_instance?(previous)
   rescue Whatsapp::Session::Errors::Error => e
     # This runs after the commit, so raising would answer a save that already succeeded
     # with a 500, and neither half of this is something the save depended on.
@@ -171,18 +196,6 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def let_go_of(previous)
     with_lock { update_provider_connection!({}) }
     Whatsapp::Session::Registry.backend_for(previous).release_registration
-  end
-
-  # The same instance, at an address it was never told about: `use_internal_host` is what
-  # decides between the public frontend URL and the one that works inside the deployment's
-  # own network, and the provider has no way to learn that a form was edited. Outbound media
-  # follows the new choice on the next message, while the webhook would go on arriving at the
-  # old address, or stop arriving at all, which on the closed network this option exists for
-  # is the whole of the inbox's inbound traffic.
-  def refresh_registration(previous)
-    return if previous.use_internal_host? == use_internal_host?
-
-    session_backend.ensure_registration
   end
 
   # Who may stand up an inbox on this provider: the account toggles while the new

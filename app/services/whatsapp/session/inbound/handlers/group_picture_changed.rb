@@ -17,18 +17,19 @@ class Whatsapp::Session::Inbound::Handlers::GroupPictureChanged < Whatsapp::Sess
 
   private
 
-  # A removal has nothing to refetch, and the job returns before purging when the group
-  # reports no photo, so asking it to refresh would leave the old image attached for
-  # good. It is also the half that needs nothing from the provider, which is why the
-  # capability is asked about after this branch and not before it: the event is still
-  # worth handling on an inbox that cannot fetch, it just cannot fetch.
+  # A removal has nothing to refetch, and it is the half that needs nothing from the
+  # provider, which is why the capability is asked about after this branch and not before
+  # it: the event is still worth handling on an inbox that cannot fetch, it just cannot
+  # fetch. It goes through AvatarSync so the moment is recorded, because a download
+  # already queued for the picture that was just removed cannot tell "just purged" from
+  # "never had one" without it, and puts the old image back.
   #
   # The refetch calls `group_info`, so without `group_management` the job would go out,
   # be refused, log a warning and leave the old picture -- once per photo change, for
   # every group, forever.
   def refresh_avatar(group_contact)
-    return group_contact.avatar.purge if payload.removed && group_contact.avatar.attached?
-    return if payload.removed || !capability?(:group_management)
+    return Whatsapp::Session::AvatarSync.remove(group_contact) if payload.removed
+    return unless capability?(:group_management)
 
     Whatsapp::Session::UpdateGroupAvatarJob.perform_later(group_contact, force: true, channel: channel)
   end

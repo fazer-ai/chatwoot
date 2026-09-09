@@ -1,13 +1,29 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include BaileysHelper
 
-  class MessageContentTypeNotSupported < StandardError; end
   # Legacy errors inherit from the session hierarchy so every caller rescues a single
   # namespace, whatever the provider. Nothing else about this service changes: it is
   # frozen until baileys is removed.
   class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
   class GroupParticipantNotAllowedError < Whatsapp::Session::Errors::GroupParticipantNotAllowed; end
   class MessageAlreadyProcessingError < Whatsapp::Session::Errors::MessageAlreadyProcessing; end
+  # The send reached its deadline. Retryable: the same send may well work next time.
+  class SendTimeoutError < Whatsapp::Session::Errors::Timeout; end
+
+  # A previous send timed out and may or may not have reached WhatsApp. NOT retryable:
+  # resending could deliver the message twice, and only the operator can tell. Reached
+  # only when the send did not reserve a message id, since with one a resend reuses the
+  # same WhatsApp key.id and WhatsApp itself dedupes it.
+  class SendOutcomeUnknownError < Whatsapp::Session::Errors::Error
+    CODE = 'send_outcome_unknown'.freeze
+  end
+
+  # The API knows this connection is not accepting sends at all (its send-stall circuit
+  # breaker is open) and refused without touching the socket. Retryable: the provider
+  # recreates the socket on its own, and the next attempt after that succeeds.
+  class SendStalledError < Whatsapp::Session::Errors::ProviderUnavailable
+    CODE = 'send_stalled'.freeze
+  end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
@@ -17,6 +33,16 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # first. 3 full cycles span several minutes of backoff — a rejected
   # session, not a transient blip.
   RECONNECT_LOOP_RESET_STRIKES = 3
+  # How far back one history request asks. The phone treats it as a hint and routinely
+  # answers with far more (947 messages for a request of 50, measured), so the ceiling that
+  # matters is the one the import applies on the way in; this is the API's own cap.
+  HISTORY_REQUEST_COUNT = 50
+  # Shown to the agent on a message whose send outcome cannot be determined. Says what
+  # to do, because "unknown" alone leaves them with no next step.
+  # Persisted as external_error and rendered to the agent, so it is translated like every
+  # other agent-facing string. Resolved at raise time rather than at load: I18n.locale is
+  # per-request, and a constant would freeze whichever locale booted the process.
+  OUTGOING_ERRORS_SCOPE = 'errors.inboxes.channel.outgoing'.freeze
 
   # One switch for the whole WhatsApp group subsystem, resolved in one place. Reading the
   # legacy variable here while the registry reads the new one would let an inbox advertise
@@ -67,7 +93,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        syncFullHistory: history_sync?
       }.compact.to_json
     )
 
@@ -94,7 +121,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         includeMedia: false,
-        groupsEnabled: self.class.groups_enabled?
+        groupsEnabled: self.class.groups_enabled?,
+        syncFullHistory: history_sync?
       }.compact.to_json,
       timeout: 10
     )
@@ -110,17 +138,31 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # block a provider conversion or channel teardown — the only point of
   # calling this is to avoid leaving a dangling session, not to gate the
   # caller's flow on that cleanup succeeding.
+  # Reports the outcome instead of always claiming success. An explicit disconnect is an
+  # operator waiting for an answer, and it is now the recovery path for a send stall:
+  # returning true on a 500 or a read timeout meant the inbox was recorded as closed and
+  # the stall warning cleared while the wedged socket was still there, which is the one
+  # state where the UI stops telling anyone anything is wrong. The teardown callers that
+  # legitimately do not care are the ones that catch it (see Channel::Whatsapp).
   def disconnect_channel_provider
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
       timeout: 10
     )
-    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}") unless response.success?
-    true
+    # 404 is the state being asked for, not a failure: the session is already gone, so
+    # reporting it as one would abort a provider conversion, block the rejected-session
+    # path in setup_channel_provider, and leave the modal offering Disconnect forever for
+    # a connection that no longer exists.
+    return true if response.success? || response.code == 404
+
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}")
+    raise ProviderUnavailableError, outgoing_error(:disconnect_refused)
+  rescue Whatsapp::Session::Errors::Error
+    raise
   rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
-    true
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed: #{e.class}: #{e.message}")
+    raise ProviderUnavailableError, outgoing_error(:disconnect_unreachable)
   end
 
   # Confirmed reconnect loop: the provider reported enough consecutive failed
@@ -319,10 +361,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def sync_group(conversation, soft: false)
     group_contact = conversation.contact
-
-    return true if group_contact.additional_attributes&.dig('group_left')
-
     inbox = conversation.inbox
+
+    return true if conversation.contact_inbox&.group_left?
 
     metadata = group_metadata(group_contact.identifier)
     raise ProviderUnavailableError, 'Could not fetch group metadata' if metadata.blank?
@@ -467,6 +508,42 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
+  # Whether this inbox asked for the history the phone already has. Off unless the operator
+  # turned it on: the phone answers with everything it has, and an inbox that never asked
+  # should not have a year of somebody else's conversations imported into it on the first
+  # connect. Also what `syncFullHistory` is set from, so the setting decides what the socket
+  # asks for as well as what is kept.
+  def history_sync?
+    ActiveModel::Type::Boolean.new.cast(whatsapp_channel.provider_config&.dig('history_sync')).present?
+  end
+
+  # Asks the phone for what came before a chat's oldest stored message. WhatsApp can only
+  # walk backwards, so a request needs a message to walk back from: with nothing stored for
+  # this contact there is no anchor and nothing to ask.
+  #
+  # The answer is not this call's. The phone acknowledges and replies later on the
+  # `messaging-history.set` webhook, typed ON_DEMAND, and only if it is awake to answer at
+  # all; `count` is a hint the phone routinely overshoots.
+  def request_history(contact, count: nil, before: nil)
+    anchor = before || oldest_stored_message(contact)
+    jid = history_jid(contact)
+    return false if anchor.blank? || anchor.source_id.blank? || jid.blank?
+
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/fetch-message-history",
+      headers: api_headers,
+      body: {
+        count: (count || HISTORY_REQUEST_COUNT).to_i.clamp(1, HISTORY_REQUEST_COUNT),
+        oldestMsgKey: { id: anchor.source_id, remoteJid: jid, fromMe: anchor.outgoing? },
+        oldestMsgTimestamp: history_anchor_timestamp(anchor)
+      }.to_json
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
   def get_profile_pic(jid)
     response = HTTParty.get(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/profile-picture-url",
@@ -571,6 +648,35 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     }.compact
   end
 
+  # Send-side health for this connection. The reason it exists: setup_channel_provider is
+  # not a health check for sending. On an already-registered connection it only sends a
+  # presence update, which does not go through the provider's keystore — so it succeeds
+  # against a socket whose sends are wedged, which is exactly the state we need to catch.
+  #
+  # nil means "unknown" (404 / error): the caller must leave the existing state alone
+  # rather than treat a failed lookup as healthy. Deliberately NOT wrapped in
+  # with_error_handling, matching the other diagnostic GETs — that helper marks the
+  # connection `close` on any error, which would be perverse for a health probe.
+  def fetch_send_health
+    response = HTTParty.get(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/health",
+      headers: api_headers,
+      format: :json,
+      timeout: 10
+    )
+
+    return nil if response.code == 404
+    return nil unless process_response(response)
+
+    data = response.parsed_response&.deep_symbolize_keys&.dig(:data) || {}
+    {
+      send_state: data[:sendState],
+      consecutive_send_timeouts: data[:consecutiveSendTimeouts],
+      last_send_completed_ago_ms: data[:lastSendCompletedAgoMs],
+      last_outgoing_ack_ago_ms: data[:lastOutgoingAckAgoMs]
+    }.compact
+  end
+
   # New-chat message cap (quota) for this connection. Read-only MEX query with the same 404
   # semantics as fetch_reachout_timelock (404 = not connected = unknown -> nil, don't clear the
   # banner). Returns the raw NewChatMessageCapInfo (already snake_case from the provider); the
@@ -590,6 +696,39 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   private
+
+  # The chat as WhatsApp addresses it. Rebuilt from what the contact holds rather than
+  # stored: the original `remoteJid` is not kept on the message row, and the identifier the
+  # contact carries is the same value it was taken from.
+  def history_jid(contact)
+    contact_inbox = contact.contact_inboxes.find_by(inbox_id: whatsapp_channel.inbox.id)
+    return if contact_inbox.blank?
+
+    return "#{contact_inbox.source_id}@g.us" if contact.group_type_group?
+    return contact.identifier if contact.identifier.to_s.end_with?('@lid')
+
+    phone = contact.phone_number.to_s.delete('+')
+    "#{phone}@s.whatsapp.net" if phone.present?
+  end
+
+  def oldest_stored_message(contact)
+    Message.where(conversation_id: contact.conversations.where(inbox_id: whatsapp_channel.inbox.id).select(:id))
+           .where.not(source_id: nil)
+           .reorder(created_at: :asc)
+           .first
+  end
+
+  # The provider's own clock for the anchor when we have it, since that is the number the
+  # phone indexed the message by.
+  #
+  # In milliseconds: the field the bridge hands this to is `oldestMsgTimestampMs`, while
+  # both clocks we read from are in seconds. Baileys' own example and every port of it
+  # pass the raw `messageTimestamp` here, so the mismatch is widespread and quiet -- the
+  # server answers the key and never complains about the timestamp.
+  def history_anchor_timestamp(message)
+    seconds = message.content_attributes['external_created_at'].presence || message.created_at.to_i
+    seconds.to_i * 1000
+  end
 
   def provider_url
     whatsapp_channel.provider_config['provider_url'].presence || DEFAULT_URL
@@ -695,7 +834,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def send_message_request
     message_id = reserve_source_id
 
-    response = HTTParty.post(
+    response = post_send_message(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/send-message",
       headers: api_headers,
       body: {
@@ -709,14 +848,112 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}",
         messageId: message_id
       }.to_json,
-      timeout: 120
+      # Above the API's own 45s send deadline plus its slower paths (audio
+      # transcoding, media upload) and above a proxy's 75s cut, so we get its
+      # structured 504/503 rather than a bare Net::ReadTimeout. Below the old
+      # 120s because this request holds the per-channel outgoing lock
+      # (BaileysHelper::CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT, 130s) and every
+      # other send on the inbox queues behind it.
+      timeout: 90
     )
 
-    raise MessageAlreadyProcessingError if response.code == 409
-    raise ProviderUnavailableError unless process_response(response)
+    raise_send_error(response) unless response.success?
 
     update_external_created_at(response)
     response.parsed_response.dig('data', 'key', 'id')
+  end
+
+  # A transport failure never reaches raise_send_error, because there is no response to
+  # classify — it escapes as itself, outside the session hierarchy, so SendReplyJob's
+  # retry_on never sees it and the job dies in the dead set with the bubble still reading
+  # "sent". That is the exact silent failure this change exists to remove.
+  #
+  # Rescued as a CLASS rather than as a list of exception types, which is why nothing but
+  # the HTTP call lives in here: an enumerated list is a promise to have thought of every
+  # way a socket can fail, and it will be wrong (Net::WriteTimeout on a large media body,
+  # OpenSSL::SSL::SSLError on a handshake, whatever the next TLS or HTTP gem raises).
+  # Anything StandardError can be here is a transport failure by construction.
+  def post_send_message(url, **)
+    HTTParty.post(url, **)
+  rescue StandardError => e
+    raise_transport_error(e)
+  end
+
+  # Failures that cannot have put a single byte of the request on the wire. Everything
+  # else defaults to indeterminate, and the asymmetry is deliberate: calling a
+  # possibly-delivered send "the provider is down" marks the channel closed, which drops
+  # the inbox out of the health-check cycle, while calling a never-sent one indeterminate
+  # costs one retry that the reserved message id makes duplicate-safe anyway.
+  NEVER_TRANSMITTED_ERRORS = [
+    Net::OpenTimeout, SocketError, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH
+  ].freeze
+
+  def raise_transport_error(error)
+    Rails.logger.error "[WHATSAPP][BAILEYS] transport failure on send: #{error.class}: #{error.message}"
+
+    raise ProviderUnavailableError, outgoing_error(:provider_unreachable) if never_transmitted?(error)
+
+    raise SendTimeoutError, outgoing_error(:send_timed_out)
+  end
+
+  def never_transmitted?(error)
+    NEVER_TRANSMITTED_ERRORS.any? { |klass| error.is_a?(klass) }
+  end
+
+  # Every non-2xx used to collapse into a bare ProviderUnavailableError, which made it
+  # impossible to tell "the connection is wedged" from "this message can never be sent"
+  # — so the job retried both and buried both in the dead set. Only the codes whose
+  # meaning is unambiguous are mapped; anything else keeps the old behaviour rather than
+  # risk marking a message permanently failed on a guess.
+  def raise_send_error(response)
+    Rails.logger.error response.body
+
+    case response.code
+    when 409 then raise_conflict_send_error(response)
+    when 503 then raise_unavailable_send_error(response)
+    when 504
+      raise SendTimeoutError, outgoing_error(:send_timed_out)
+    when 413
+      raise Whatsapp::Session::Errors::MediaTooLarge, outgoing_error(:media_too_large)
+    when 422
+      raise Whatsapp::Session::Errors::InvalidPayload, outgoing_error(:invalid_payload)
+    else
+      # Reasoned, not bare: SendReplyJob persists this message as external_error when the
+      # retries run out, and a bare raise makes that message the Ruby class name. The
+      # agent then reads an internal constant where the reason should be.
+      raise ProviderUnavailableError, outgoing_error(:provider_error)
+    end
+  end
+
+  # The two statuses a send can come back with where the status alone is not the answer:
+  # each covers two conditions that need opposite handling, and a header tells them apart.
+  def raise_conflict_send_error(response)
+    raise SendOutcomeUnknownError, outgoing_error(:send_outcome_unknown) if indeterminate_send?(response)
+
+    raise MessageAlreadyProcessingError
+  end
+
+  # A wedged connection must NOT be marked 'close' (see NON_CHANNEL_DOWN_CODES): that
+  # would drop it out of the very health-check cycle that detects the stall, and 503 is
+  # where the whole episode settles, since every send after the third timeout gets it.
+  # But an outage and a draining proxy answer 503 too, and reading those as a stall leaves
+  # a genuinely dead channel recorded as open, skipping the reconnect it needed.
+  def raise_unavailable_send_error(response)
+    raise SendStalledError, outgoing_error(:send_stalled) if stalled_send?(response)
+
+    raise ProviderUnavailableError, outgoing_error(:provider_error)
+  end
+
+  def outgoing_error(key)
+    I18n.t("#{OUTGOING_ERRORS_SCOPE}.#{key}")
+  end
+
+  def indeterminate_send?(response)
+    response.headers['x-baileys-idempotency-state'] == 'indeterminate'
+  end
+
+  def stalled_send?(response)
+    response.headers['x-baileys-send-state'] == 'stalled'
   end
 
   # The WhatsApp message id this send will use, picked here instead of letting Baileys generate it.
@@ -848,11 +1085,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
   end
 
+  # `group_left` is not cleared here. It is per inbox now (see WhatsappGroupMembership),
+  # and a sync only ever reaches this point for an inbox that has not left, so there was
+  # nothing for it to clear; rejoining is what clears it, and only the rejoin path knows
+  # that happened.
   def persist_sync_status(group_contact)
-    new_attrs = (group_contact.additional_attributes || {}).merge(
-      'group_last_synced_at' => Time.current.to_i,
-      'group_left' => false
-    )
+    new_attrs = (group_contact.additional_attributes || {}).merge('group_last_synced_at' => Time.current.to_i)
     group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
   end
 
@@ -984,13 +1222,43 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
       define_method(method_name) do |*args, **kwargs, &block|
         original_method.bind_call(self, *args, **kwargs, &block)
-      rescue MessageAlreadyProcessingError
-        raise
       rescue StandardError => e
-        handle_channel_error
+        handle_channel_error unless channel_error_exempt?(e)
         raise e
       end
     end
+  end
+
+  # Errors that do NOT mean the connection is down, so they must not mark it 'close'.
+  # BaileysConnectionCheckSchedulerJob only enqueues channels whose connection is 'open',
+  # so marking it drops the channel out of the health-check cycle entirely, and only a
+  # webhook or a human puts it back.
+  #
+  # Two groups. The first says something about this message, not the connection: a
+  # rejected attachment or an unknown outcome tells us nothing about the socket. The
+  # second is the send stall itself — the connection is receiving and answering health
+  # checks, only sending is wedged, and marking it 'close' would remove it from the very
+  # cycle that detects that state while POST /connections cannot repair it anyway (on a
+  # registered connection it only sends a presence update, which does not touch the
+  # keystore). The provider recovers this on its own.
+  # Matched on the wire code, not on class identity, for the reason
+  # Whatsapp::Session::Errors::Error#retryable? gives: a constant holding another file's
+  # class keeps the object from before the last reload, and `is_a?` against it then
+  # answers false without saying why. Two of these classes live in errors.rb, so a list
+  # of classes frozen here would be exactly that trap.
+  NON_CHANNEL_DOWN_CODES = %w[
+    message_already_processing
+    send_outcome_unknown
+    send_stalled
+    timeout
+    media_too_large
+    invalid_payload
+  ].freeze
+
+  def channel_error_exempt?(error)
+    return false unless error.respond_to?(:code)
+
+    NON_CHANNEL_DOWN_CODES.include?(error.code)
   end
 
   def handle_channel_error

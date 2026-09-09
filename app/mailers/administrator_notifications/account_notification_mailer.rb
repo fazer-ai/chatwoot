@@ -60,8 +60,11 @@ class AdministratorNotifications::AccountNotificationMailer < AdministratorNotif
 
   private
 
+  # Through the resolved brand, not GlobalConfig: this mail is addressed to the account's own
+  # administrator, so a subject reading "Chatwoot" over a body that says "Acme" is the account
+  # being told its deletion by a name it does not use.
   def brand_name
-    GlobalConfig.get('BRAND_NAME')['BRAND_NAME'].presence || 'Chatwoot'
+    brand.name.presence || 'Chatwoot'
   end
 
   def format_deletion_date(deletion_date_str)

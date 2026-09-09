@@ -25,13 +25,10 @@ class Whatsapp::Session::UpdateContactAvatarJob < ApplicationJob
     url = channel.session_backend.profile_picture_url(
       Whatsapp::Session::Model::Commands::ContactProfilePicture.new(party: address)
     )
-    # RACE, TRACKED (fazer-ai/chatwoot#375). A picture-removed event that purges the
-    # avatar after this is queued does not stop it: the download lands afterwards and
-    # puts the deleted picture back until the next picture event. The freshness check
-    # belongs in `Avatar::AvatarFromUrlJob`, which is shared well outside WhatsApp and
-    # has the same window on the Baileys paths. Do not delete this note without closing
-    # the issue.
-    ::Avatar::AvatarFromUrlJob.perform_later(contact, url) if url.present?
+    # Dated, so a picture-removed event landing between this lookup and the download
+    # wins: `Avatar::AvatarFromUrlJob` compares the two and drops a URL the contact has
+    # already taken down.
+    ::Avatar::AvatarFromUrlJob.perform_later(contact, url, resolved_at: Time.current.iso8601) if url.present?
   rescue Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited
     # Raised on so the `retry_on` above can see it: a rescue in this method catches the
     # error first, and the retry declaration never runs.

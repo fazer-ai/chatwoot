@@ -29,7 +29,7 @@
   ]
   row << csat_response.csat_review_notes if ChatwootApp.enterprise?
 -%>
-<%= CSVSafe.generate_line(row).html_safe -%>
+<%= CSVSafe.generate_line(row) -%>
 <% end %>
 <%=
   CSVSafe.generate_line([

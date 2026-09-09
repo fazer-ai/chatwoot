@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_17_210000) do
+ActiveRecord::Schema[7.1].define(version: 2026_09_02_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -129,6 +129,17 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_210000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "account_id"
+  end
+
+  create_table "agent_bot_observers", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "agent_bot_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_agent_bot_observers_on_account_id"
+    t.index ["agent_bot_id"], name: "index_agent_bot_observers_on_agent_bot_id"
+    t.index ["inbox_id", "agent_bot_id"], name: "index_agent_bot_observers_on_inbox_id_and_agent_bot_id", unique: true
   end
 
   create_table "agent_bots", force: :cascade do |t|
@@ -783,6 +794,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_210000) do
     t.datetime "updated_at", null: false
     t.boolean "hmac_verified", default: false
     t.string "pubsub_token"
+    t.datetime "group_left_at"
     t.index ["contact_id"], name: "index_contact_inboxes_on_contact_id"
     t.index ["inbox_id", "source_id"], name: "index_contact_inboxes_on_inbox_id_and_source_id", unique: true
     t.index ["inbox_id"], name: "index_contact_inboxes_on_inbox_id"
@@ -907,6 +919,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_210000) do
     t.bigint "assignee_agent_bot_id"
     t.datetime "status_changed_at"
     t.integer "group_type", default: 0, null: false
+    t.integer "redirect_origin_display_id"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "group_type"], name: "index_conversations_on_account_id_and_group_type"
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"

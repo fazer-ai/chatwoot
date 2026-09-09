@@ -9,9 +9,9 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Conectar via API não-oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conecte um telefone pelo conector que já vem nesta instalação",
-          "UAZAPI": "uazapi",
-          "UAZAPI_DESC": "Conecte um telefone pela sua própria instância da uazapi"
+          "NATIVE_DESC": "Conectar via API não-oficial, pelo conector que já vem nesta instalação",
+          "UAZAPI": "Uazapi",
+          "UAZAPI_DESC": "Conectar via API não-oficial Uazapi, na sua própria instância"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",
@@ -45,8 +45,15 @@
           "LINK_BUTTON": "Conectar dispositivo",
           "LINK_DEVICE_MODAL": {
             "TITLE": "Conecte o seu dispositivo",
-            "SUBTITLE": "Escaneie o QR code para conectar seu dispositivo. Certifique-se de que o número de telefone esteja correto antes de escanear.",
+            "SUBTITLE": "Conecte o seu dispositivo a esta caixa de entrada. Confira se o número de telefone está correto antes de começar.",
             "LOADING_QRCODE": "Carregando QR code...",
+            "USE_PAIRING_CODE": "Conectar com um código",
+            "USE_QRCODE": "Usar o QR code",
+            "LOADING_PAIRING_CODE": "Pedindo um código...",
+            "PAIRING_CODE_STEP_1": "No telefone que vai atender, abra o WhatsApp.",
+            "PAIRING_CODE_STEP_2": "Vá em Dispositivos conectados e toque em Conectar dispositivo.",
+            "PAIRING_CODE_STEP_3": "Toque em \"Conectar com número de telefone\" e digite o código acima.",
+            "PAIRING_CODE_EXPIRES": "O código vale por poucos minutos. Se expirar, peça outro.",
             "RECONNECTING": "Conectando...",
             "LINK_DEVICE": "Conectar dispositivo",
             "DISCONNECT": "Desconectar",
@@ -69,14 +76,17 @@
               "PLACEHOLDER": "Cole o token da instância que você quer usar",
               "ERROR": "O token da instância é obrigatório"
             },
-            "USE_INTERNAL_HOST": {
-              "LABEL": "A instância roda na rede deste servidor"
-            },
             "MARK_AS_READ": {
-              "LABEL": "Marcar mensagens como lidas no WhatsApp"
+              "LABEL": "Marcar mensagens como lidas no WhatsApp",
+              "DESCRIPTION": "Ao responder pelo Chatwoot, a conversa também aparece como lida no celular."
             },
             "PRESENCE_SUBSCRIBE": {
-              "LABEL": "Mostrar quando o contato está online"
+              "LABEL": "Mostrar quando o contato está online",
+              "DESCRIPTION": "Exibe “digitando…” e “gravando…” na conversa quando o contato está escrevendo."
+            },
+            "HISTORY_SYNC": {
+              "LABEL": "Importar conversas antigas ao parear",
+              "DESCRIPTION": "Traz o histórico que o celular oferece no pareamento, todo como conversas resolvidas. Mensagens recebidas enquanto a conexão esteve fora são recuperadas sempre, independente desta opção."
             }
           }
         }
@@ -168,7 +178,7 @@
       "WHATSAPP_BAILEYS": "WhatsApp - Baileys",
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - nativo",
-      "WHATSAPP_UAZAPI": "WhatsApp - uazapi"
+      "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
     }
   }
 }

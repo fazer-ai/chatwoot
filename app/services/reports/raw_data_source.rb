@@ -99,16 +99,29 @@ class Reports::RawDataSource < Reports::DataSource
 
   def summary_scope
     scope = account.reporting_events.where(created_at: range)
-    return scope.joins(:conversation) if dimension_type == 'team'
+    scope = scope.joins(:conversation) if dimension_type == 'team'
 
-    scope
+    apply_event_filters(scope)
   end
 
   def summary_conversation_counts
-    account.conversations
-           .where(created_at: range)
-           .group(summary_conversation_group_by_key)
-           .count
+    apply_conversation_filters(account.conversations.where(created_at: range))
+      .group(summary_conversation_group_by_key)
+      .count
+  end
+
+  # Narrows a summary to a second dimension, so a report grouped by agent can be
+  # read for a single inbox and the other way around.
+  def apply_event_filters(events)
+    events = events.where(inbox_id: filters[:inbox_id]) if filters[:inbox_id].present?
+    events = events.where(user_id: filters[:user_id]) if filters[:user_id].present?
+    events
+  end
+
+  def apply_conversation_filters(conversations)
+    conversations = conversations.where(inbox_id: filters[:inbox_id]) if filters[:inbox_id].present?
+    conversations = conversations.where(assignee_id: filters[:user_id]) if filters[:user_id].present?
+    conversations
   end
 
   def merge_summary_results(metric_results, conversation_counts)

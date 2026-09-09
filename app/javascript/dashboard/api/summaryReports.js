@@ -16,22 +16,24 @@ class SummaryReportsAPI extends ApiClient {
     });
   }
 
-  getAgentReports({ since, until, businessHours } = {}) {
+  getAgentReports({ since, until, businessHours, inboxId } = {}) {
     return axios.get(`${this.url}/agent`, {
       params: {
         since,
         until,
         business_hours: businessHours,
+        inbox_id: inboxId,
       },
     });
   }
 
-  getInboxReports({ since, until, businessHours } = {}) {
+  getInboxReports({ since, until, businessHours, userId } = {}) {
     return axios.get(`${this.url}/inbox`, {
       params: {
         since,
         until,
         business_hours: businessHours,
+        user_id: userId,
       },
     });
   }

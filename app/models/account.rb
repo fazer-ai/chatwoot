@@ -39,6 +39,11 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   }.freeze
   SUSPENSION_CATEGORIES = %w[spam non_payment other].freeze
 
+  # Kept tighter than the avatar's 15 MB on purpose: this image is embedded in every outgoing
+  # email, where weight is the recipient's download and some clients refuse large payloads.
+  BRAND_LOGO_EMAIL_MAX_SIZE = 2.megabytes
+  BRAND_LOGO_EMAIL_CONTENT_TYPES = %w[image/png image/jpeg image/gif].freeze
+
   attr_accessor :suspension_category, :suspension_reason
 
   validates :name, presence: true
@@ -51,6 +56,9 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
                  attribute_resolver: ->(record) { record.settings }
   validate :validate_reporting_timezone
   validate :validate_support_email_format, if: :will_save_change_to_support_email?
+  validate :validate_brand_logo_email, if: -> { brand_logo_email.changed? }
+  validate :validate_brand_url, if: -> { will_save_change_to_settings? }
+  validate :validate_brand_name, if: -> { will_save_change_to_settings? }
 
   store_accessor :settings, :auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting
 
@@ -59,6 +67,8 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   store_accessor :settings, :reporting_timezone
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :captain_auto_resolve_mode, :captain_false_promise_harness_enabled
+  # Email only. The dashboard, favicon and PWA stay on the installation's brand; see Brand.
+  store_accessor :settings, :brand_name, :brand_url, :brand_color
   include AccountAgentRestrictions
   include AccountWhatsappProviders
   include AccountCaptainAutoResolve
@@ -67,6 +77,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
 
   has_many :account_users, dependent: :destroy_async
   has_many :agent_bot_inboxes, dependent: :destroy_async
+  has_many :agent_bot_observers, dependent: :destroy_async
   has_many :agent_bots, dependent: :destroy_async
   has_many :api_channels, dependent: :destroy_async, class_name: '::Channel::Api'
   has_many :articles, dependent: :destroy_async, class_name: '::Article'
@@ -114,6 +125,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   has_many :working_hours, dependent: :destroy_async
 
   has_one_attached :contacts_export
+  has_one_attached :brand_logo_email
 
   enum :locale, LANGUAGES_CONFIG.map { |key, val| [val[:iso_639_1_code], key] }.to_h, prefix: true
   enum :status, { active: 0, suspended: 1 }
@@ -241,6 +253,45 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid')) if parsed.blank?
   rescue Mail::Field::ParseError, Mail::Field::IncompleteParseError
     errors.add(:support_email, I18n.t('errors.account.support_email.invalid'))
+  end
+
+  # The default layout escapes it, but a branded layout a customer already stored in
+  # email_templates does not, and this is the first time an account administrator rather than
+  # the installation owner writes the value.
+  # to_s because settings is jsonb and strong parameters keep a JSON scalar's type: a
+  # {"brand_name": 123} would otherwise reach match? as an Integer and turn a validation
+  # error into a 500. The schema validator flags the type, but it does not halt the chain.
+  def validate_brand_name
+    return if brand_name.blank?
+    return unless brand_name.to_s.match?(/[<>]/)
+
+    errors.add(:brand_name, I18n.t('errors.account.brand_name.invalid'))
+  end
+
+  # The value goes straight into the href of the email footer, where a relative one like
+  # "example.com" resolves against the mail client and lands nowhere.
+  def validate_brand_url
+    return if brand_url.blank?
+
+    uri = URI.parse(brand_url.to_s)
+    return if uri.is_a?(URI::HTTP) && uri.host.present?
+
+    errors.add(:brand_url, I18n.t('errors.account.brand_url.invalid'))
+  rescue URI::InvalidURIError
+    errors.add(:brand_url, I18n.t('errors.account.brand_url.invalid'))
+  end
+
+  def validate_brand_logo_email
+    return unless brand_logo_email.attached?
+
+    errors.add(:brand_logo_email, I18n.t('errors.account.brand_logo_email.too_big')) if
+      brand_logo_email.byte_size > BRAND_LOGO_EMAIL_MAX_SIZE
+
+    # SVG is deliberately absent: no mail client renders it, so accepting one here would only
+    # produce a broken image at the top of every email.
+    return if BRAND_LOGO_EMAIL_CONTENT_TYPES.include?(brand_logo_email.content_type)
+
+    errors.add(:brand_logo_email, I18n.t('errors.account.brand_logo_email.invalid_format'))
   end
 
   def remove_account_sequences

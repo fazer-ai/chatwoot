@@ -3,6 +3,10 @@ import ConversationApi from '../../../api/inbox/conversation';
 import MessageApi from '../../../api/inbox/message';
 import { MESSAGE_STATUS, MESSAGE_TYPE } from 'shared/constants/messages';
 import { createPendingMessage } from 'dashboard/helper/commons';
+import { isStaleConversation } from './helpers';
+import wootConstants from 'dashboard/constants/globals';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   buildConversationList,
   isOnMentionsView,
@@ -30,6 +34,26 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
   const externalError = contentAttributes?.external_error ?? '';
   return status === MESSAGE_STATUS.FAILED && externalError !== '';
 };
+
+// The getter behind each assignee tab is the same predicate the list on screen uses, so what it
+// returns is exactly what the agent is looking at. Saved filters and folders narrow the list with
+// a rule of their own and have no assigneeType, so they fall out here.
+const TAB_GETTERS = {
+  me: 'getMineChats',
+  unassigned: 'getUnAssignedChats',
+  all: 'getAllStatusChats',
+};
+
+// Mentions and participating do carry an assigneeType, but the server narrows those lists by a
+// membership the store cannot reproduce, so what is on screen there is not the tab a reconciliation
+// would judge it against.
+const UNRECONCILABLE_VIEWS = [
+  wootConstants.CONVERSATION_TYPE.MENTION,
+  wootConstants.CONVERSATION_TYPE.PARTICIPATING,
+];
+
+// The trigger fires from a watcher, which can fire again while the request is still out.
+const tabsBeingReconciled = new Set();
 
 // actions
 const actions = {
@@ -77,6 +101,75 @@ const actions = {
     }
   },
 
+  // Puts a tab back in sync with the server. The store is a cache nothing invalidates:
+  // SET_ALL_CONVERSATION only adds or replaces, and a conversation that leaves a tab stops being
+  // sent to it, so one missed cable event leaves a copy on the list forever and the copies pile up.
+  //
+  // Refreshes rather than evicts, because `allConversations` is shared by every tab: a conversation
+  // that left "unassigned" by gaining an assignee still belongs to "all", and very likely to
+  // someone's "mine". Fresh data takes it off this tab and keeps it on the others. Only what the
+  // server does not return at all is removed, which means deleted or no longer permitted.
+  //
+  // Only the conversations that were on screen when the request went out can be judged by its
+  // answer, so the candidates are snapshotted here and both the question and the verdict are
+  // scoped to that list. A conversation that arrives over the cable mid-flight is not in the
+  // snapshot and is therefore left alone, rather than read as missing from a reply that was
+  // never about it.
+  //
+  // Returns what it removed, so the caller can drop the same conversations from anything keyed
+  // by them.
+  reconcileConversationTab: async ({ commit, getters, state }, filters) => {
+    const tabGetter = TAB_GETTERS[filters.assigneeType];
+    if (!tabGetter || UNRECONCILABLE_VIEWS.includes(filters.conversationType)) {
+      return [];
+    }
+    if (tabsBeingReconciled.has(filters.assigneeType)) return [];
+
+    tabsBeingReconciled.add(filters.assigneeType);
+    try {
+      const candidates = getters[tabGetter](filters).map(c => ({
+        id: c.id,
+        inboxId: c.inbox_id,
+      }));
+      if (!candidates.length) return [];
+
+      const {
+        data: { payload },
+      } = await ConversationApi.sync(candidates.map(c => c.id));
+
+      // A cable event can beat this response home, and SET_ALL_CONVERSATION replaces without
+      // looking at timestamps, so an older row is dropped here rather than written over a newer
+      // one. Regressing a status or an assignee would also hide the conversation with no way back:
+      // a list shorter than its badge is not a contradiction anything watches for.
+      const applicable = payload.filter(
+        c => !isStaleConversation(c, getters.getConversationById(c.id))
+      );
+      // The open conversation keeps its messages and attachments through this mutation's own
+      // selected-chat branch, so a refresh never empties the panel under the agent.
+      if (applicable.length) commit(types.SET_ALL_CONVERSATION, applicable);
+
+      const stillThere = new Set(payload.map(c => c.id));
+      const removed = candidates.filter(c => !stillThere.has(c.id));
+      if (removed.length) {
+        commit(
+          types.REMOVE_CONVERSATIONS,
+          removed.map(c => c.id)
+        );
+      }
+      // The panel is showing a conversation the server just refused to serve. Announced rather
+      // than acted on here, because the store has no router, and announced from here rather than
+      // left to each caller, because it is a fact about the removal and not about who asked.
+      if (removed.some(c => c.id === state.selectedChatId)) {
+        emitter.emit(BUS_EVENTS.OPEN_CONVERSATION_GONE);
+      }
+      return removed;
+    } catch (error) {
+      return [];
+    } finally {
+      tabsBeingReconciled.delete(filters.assigneeType);
+    }
+  },
+
   emptyAllConversations({ commit }) {
     commit(types.EMPTY_ALL_CONVERSATION);
   },
@@ -104,6 +197,13 @@ const actions = {
     } catch (error) {
       // Handle error
     }
+  },
+
+  // Asks the provider for the page before this thread's oldest message. Nothing comes
+  // back here: the phone answers on the webhook minutes later, or never, and the rows
+  // arrive through the same cable push live traffic uses.
+  syncHistory: async (_, conversationId) => {
+    await ConversationApi.syncHistory(conversationId);
   },
 
   fetchAllAttachments: async ({ commit }, conversationId) => {

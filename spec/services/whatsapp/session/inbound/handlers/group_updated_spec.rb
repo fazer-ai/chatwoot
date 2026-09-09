@@ -164,7 +164,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
       expect(dispatch).to eq(:handled)
 
       group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
-      expect(group_contact.additional_attributes['group_left']).to be(true)
+      expect(group_contact.group_left_in?(inbox.id)).to be(true)
     end
   end
 
@@ -179,13 +179,13 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
       expect(dispatch).to eq(:handled)
 
       group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
-      expect(group_contact.additional_attributes['group_left']).to be(true)
+      expect(group_contact.group_left_in?(inbox.id)).to be(true)
     end
   end
 
   # The group contact is shared by every inbox of the account that is in the same
-  # WhatsApp group, so closing all of its threads would end a conversation another
-  # number can still use.
+  # WhatsApp group, so closing all of its threads, or marking the group left on the
+  # contact itself, would end a conversation another number can still use.
   context 'when another inbox of the account is in the same group' do
     let(:changes) { model::Events::GroupUpdated::Changes.new(leave: [model::Party.new(phone: '5541988887777')]) }
     let(:other_inbox) do
@@ -206,6 +206,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
       end
 
       expect(other_thread.reload.status).to eq('open')
+    end
+
+    it 'leaves the group only for the inbox that left it' do
+      dispatch
+      group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
+      create(:contact_inbox, inbox: other_inbox, contact: group_contact, source_id: '120363041234567890')
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+      end
+
+      expect(group_contact.reload.group_left_in?(inbox.id)).to be(true)
+      expect(group_contact.group_left_in?(other_inbox.id)).to be(false)
     end
   end
 
@@ -251,7 +264,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupUpdated do
       expect(dispatch).to eq(:handled)
 
       group_contact = inbox.contacts.find_by(identifier: '120363041234567890@g.us')
-      expect(group_contact.additional_attributes['group_left']).to be(true)
+      expect(group_contact.group_left_in?(inbox.id)).to be(true)
       expect(group_contact.conversations.where(status: %i[open pending])).to be_empty
     end
   end

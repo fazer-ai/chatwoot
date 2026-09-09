@@ -117,6 +117,12 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 - **Pro's living trunk is `chatwoot-pro-main`.** The `main` branch in `fazer-ai/chatwoot-pro` is a stale ancestor kept only as the repo's nominal GitHub default. A workflow copied over from CE with `push: branches: [main]` therefore never fires there — swap the filter for `chatwoot-pro-main`.
 - **Pro's enterprise specs have no CI.** `run_foss_spec.yml` runs `rm -rf enterprise spec/enterprise` before the suite, so nothing in `spec/enterprise` is ever executed by a workflow. Run it locally before merging anything that touches `enterprise/`.
 
+## CI: the CE spec workflow
+
+- `run_foss_spec.yml` runs the whole suite on every push to `main` and on tags. On a branch, nothing runs until you dispatch it, and the dispatch default is **affected mode**: the specs the branch's diff against `main` maps to (`app/x/y.rb` and `lib/x/y.rb` to every `y_spec.rb`, plus the spec files themselves), in one shard per 40 files. Shared files (Gemfile, `config/` other than routes and locales, `spec/support`, the helpers, base classes, a modified factory) fall back to the full suite on their own.
+- `gh workflow run run_foss_spec.yml --ref <branch>` runs affected mode; add `-f full=true` for the whole suite (mandatory before merging an upstream sync, see the `sync-fork` skill) or `-f specs="spec/a_spec.rb spec/b_spec.rb"` for an explicit list. Affected mode is a pre-check, not the gate: the push to `main` runs everything.
+- Do not re-dispatch the full suite after every fix. Between 2026-08-12 and 2026-09-05 this workflow was dispatched 191 times by hand (23 on one branch), each run costing ~75 billed Blacksmith minutes; that is the whole reason the affected mode exists.
+
 ## PR Description Format
 
 - Start with a short, user-facing paragraph describing the product change.
@@ -156,12 +162,15 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Fork translations
 
-Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside `app/javascript/dashboard/i18n/locale/` or `config/locales/<locale>.yml`** — CI fails if you do, and the next upstream sync would conflict on every string we own.
+Upstream's locale files are byte-identical to the Chatwoot release we track. **Never add or edit a key inside an upstream locale tree** — `app/javascript/dashboard/i18n/locale/`, `app/javascript/survey/i18n/locale/`, or `config/locales/<locale>.yml`. CI fails if you do, and the next upstream sync would conflict on every string we own.
 
 We ship our features in **en, pt_BR and es**, and every key must exist in all three: `check` fails when a key present in `en` is missing from another language we ship. Upstream keeps translating the other ~55 languages, and our keys fall back to `en` there. Everything the fork translates lives in two places:
 
-- Frontend → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
+- Frontend, dashboard → `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/*.json`
+- Frontend, survey → `app/javascript/survey/i18n/fazer-ai/locale/<locale>.json` (one file, not a folder: it is a single small namespace)
 - Backend → `config/locales/fazer_ai.<locale>.yml` (and `fazer_ai.mailers.<locale>.yml` for the Chatwoot mailer copy upstream hardcodes in ERB)
+
+Each frontend bundle has its own upstream tree and its own overlay, merged by that bundle's `i18n/index.js`; the merging itself lives in `shared/helpers/forkTranslations`. `check`, `drift` and `scaffold` cover every tree listed in `FE_TREES`, so a new bundle means one entry there.
 
 Both are deep-merged on top of upstream's: the frontend in `i18n/index.js` via `withForkMessages`, the backend by Rails, which already loads every `config/locales/*.yml`. No registration step — files are picked up by directory scan, which is also why CE → Pro merges don't conflict here.
 

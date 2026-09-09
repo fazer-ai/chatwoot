@@ -12,6 +12,14 @@ es:
     messages:
       deleted: Este mensaje fue eliminado
   errors:
+    account:
+      brand_name:
+        invalid: no puede contener < ni >
+      brand_url:
+        invalid: debe empezar con http:// o https://
+      brand_logo_email:
+        too_big: supera los 2 MB
+        invalid_format: debe ser PNG, JPG o GIF
     automation:
       scheduled_message:
         delay_out_of_range: El retraso debe estar entre 1 minuto y 999 días
@@ -33,9 +41,23 @@ es:
         provider_not_enabled_for_account: Este proveedor de WhatsApp está desactivado para esta cuenta.
         provider_withdrawn: Este proveedor de WhatsApp ya no se ofrece para bandejas de entrada nuevas. Las que ya lo usan siguen funcionando.
         cannot_unpair: Este proveedor no puede desvincular la cuenta de WhatsApp emparejada con él, así que conectar de nuevo retomaría la misma cuenta. Reinicia la instancia en el proveedor, apunta esta bandeja de entrada a otra, o corrige el número configurado aquí.
+        code_pairing_unsupported: Este proveedor de WhatsApp no puede emparejarse con un código. Escanea el código QR en su lugar.
+        history_sync_unsupported: Este proveedor de WhatsApp no puede traer el historial de un chat.
+        outgoing:
+          provider_error: WhatsApp no pudo enviar este mensaje en este momento.
+          provider_unreachable: No se pudo contactar al proveedor de WhatsApp.
+          disconnect_refused: El proveedor no finalizó la sesión.
+          disconnect_unreachable: No se pudo contactar al proveedor para finalizar la sesión.
+          send_timed_out: El envío superó el tiempo límite; puede o no haber llegado a WhatsApp.
+          send_outcome_unknown: El envío superó el tiempo límite y puede haberse completado. Revise la conversación en WhatsApp antes de enviarla de nuevo.
+          send_stalled: La conexión con WhatsApp no está aceptando envíos en este momento.
+          media_too_large: El archivo adjunto es demasiado grande para enviarlo.
+          invalid_payload: WhatsApp rechazó el contenido del mensaje.
+          still_processing: El mensaje aún se estaba enviando en otro lugar y no se pudo confirmar.
         provider_connection:
           wrong_phone_number: El número de teléfono que intenta vincular no es el mismo que tiene configurado. Verifique que el número sea correcto antes de escanear el código QR.
           reconnect_loop_detected: No se pudo restablecer la conexión después de varios intentos. Los reintentos automáticos continúan a intervalos cada vez mayores. Si el problema persiste, desconecte la bandeja de entrada y vuelva a vincularla escaneando un código QR nuevo.
+          send_stall_detected: Esta conexión está recibiendo mensajes pero no puede enviarlos. Si no se resuelve por sí sola en unos minutos, desconecte la bandeja de entrada y conéctela de nuevo escaneando un nuevo código QR.
           invalid_credentials: El proveedor rechazó las credenciales de esta bandeja de entrada. Verifique la dirección y el token e inténtelo de nuevo.
           logged_out: Este dispositivo fue desconectado de WhatsApp desde el teléfono. Vuelva a vincularlo para seguir recibiendo mensajes.
           stream_replaced: Esta sesión fue reemplazada por otra conexión de la misma cuenta de WhatsApp. Vuelva a vincularla para usarla aquí.
@@ -89,6 +111,8 @@ es:
       recurring_message_cancelled: "%{agent} detuvo el mensaje programado recurrente."
       unknown_agent: Desconocido
   contacts:
+    group:
+      inbox_id_required: Este grupo está en más de una bandeja de entrada. Indique por cuál vale la acción enviando inbox_id.
     sync_group:
       not_a_group: El contacto no es un grupo
       no_identifier: El contacto no tiene un identificador de grupo

@@ -15,6 +15,8 @@ class Webhooks::ErrorHandler
     return unless SUPPORTED_EVENTS.include?(@payload[:event])
     return unless message
 
+    # `:agent_bot_observer_webhook` deliberately matches nothing: an observer never owns the
+    # conversation, so there is nothing to hand over when its deliveries are exhausted.
     case @webhook_type
     when :agent_bot_webhook
       handle_agent_bot_error
@@ -35,7 +37,18 @@ class Webhooks::ErrorHandler
   end
 
   def handle_api_inbox_error
-    Messages::StatusUpdateService.new(message, 'failed', @error.message).perform
+    # ONLY A MESSAGE STILL IN ITS INITIAL `sent` STATE IS ONE THIS DELIVERY CAN STILL SPEAK FOR.
+    # The retries put minutes between the send and this handler, and the channel can report the
+    # message delivered or read inside that window. `Messages::StatusUpdateService` refuses only
+    # `read` -> `delivered`, so without this guard a failure decided minutes ago lands on top of a
+    # message the customer already has, and the agent is shown a resend they must not make.
+    # Locked because the channel's own update races this read, and the lock is what makes the
+    # channel's write wait rather than interleave.
+    message.with_lock do
+      break unless message.sent?
+
+      Messages::StatusUpdateService.new(message, 'failed', @error.message).perform
+    end
   end
 
   def activity_message_params(conversation)

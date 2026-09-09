@@ -418,6 +418,13 @@
   post:
     $ref: ./application/conversation/toggle_typing_status.yml
 
+/api/v1/accounts/{account_id}/conversations/{conversation_id}/read_receipt:
+  parameters:
+    - $ref: '#/components/parameters/account_id'
+    - $ref: '#/components/parameters/conversation_id'
+  post:
+    $ref: ./application/conversation/read_receipt.yml
+
 /api/v1/accounts/{account_id}/conversations/{conversation_id}/custom_attributes:
   parameters:
     - $ref: '#/components/parameters/account_id'

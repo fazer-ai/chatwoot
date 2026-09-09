@@ -123,19 +123,30 @@ module Whatsapp::Session::Model::Commands
     coerce chat: Address, ref: MediaRef
   end
 
-  # Asks the phone for a page of a chat's history. `before` anchors the page on a message
-  # already held, so a second page picks up where the first ended rather than from the top.
+  # Where a backwards page starts. An id on its own cannot address one: whatsmeow takes a
+  # whole `types.MessageInfo` to build the request, so the anchor carries the timestamp and
+  # the direction alongside it. Chatwoot holds all three on the message row, so nothing has
+  # to be reconstructed at the far end.
+  class HistoryAnchor < Data.define(:id, :timestamp, :from_me)
+    include Serializable
+    defaults from_me: false
+
+    # The anchor a stored message stands for.
+    def self.for_message(message)
+      return if message.blank?
+
+      new(id: message.source_id, timestamp: (message.created_at.to_f * 1000).to_i, from_me: message.outgoing?)
+    end
+  end
+
+  # The history a chat already has on the phone. `count` is a hint rather than a cap: a
+  # live instance answered a request for 50 with 947 messages, so what bounds the import
+  # is the policy on the way in, not this. `before` is the anchor to page backwards from,
+  # which is what makes a second request continue the first instead of repeating it.
   class HistoryRequest < Data.define(:chat, :count, :before)
     include Serializable
     wire_type 'history.request'
-
-    # The message a page is asked to end before. WhatsApp wants all three: the id names it,
-    # the timestamp places it, and `from_me` says which side of the chat to look on.
-    class Anchor < Data.define(:id, :timestamp, :from_me)
-      include Serializable
-    end
-
-    coerce chat: Address, before: Anchor
+    coerce chat: Address, before: HistoryAnchor
   end
 
   class PresenceSet < Data.define(:state)
@@ -265,8 +276,8 @@ module Whatsapp::Session::Model::Commands
 
   CLASSES = [
     SessionConnect, SessionDisconnect, SessionLogout, SessionDelete, SessionStatus, SessionUpdate, SessionWake,
-    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, MessageSend, MessageEdit,
-    MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, HistoryRequest, PresenceSet,
+    AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, HistoryRequest, MessageSend, MessageEdit,
+    MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, PresenceSet,
     PresenceSubscribe, ChatPresence, ContactCheck, ContactProfilePicture, ContactInfo, ContactResolve, GroupCreate,
     GroupInfo, GroupList, GroupLeave, GroupParticipantsUpdate, GroupNameSet, GroupDescriptionSet, GroupPhotoSet,
     GroupSettingsSet, GroupInviteGet, GroupJoinRequestsList, GroupJoinRequestsUpdate, CallReject
@@ -279,7 +290,8 @@ module Whatsapp::Session::Model::Commands
   # outcome, when there is one, comes back as an event.
   RPC_TYPES = %w[
     session.connect session.status session.update admin.ping
-    message.send message.edit message.revoke message.react message.download_media history.request
+    message.send message.edit message.revoke message.react message.download_media
+    history.request
     contact.check contact.profile_picture contact.info contact.resolve
     group.create group.info group.list group.leave group.participants.update group.name.set
     group.description.set group.photo.set group.settings.set group.invite.get

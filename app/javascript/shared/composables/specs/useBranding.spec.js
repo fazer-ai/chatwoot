@@ -92,5 +92,14 @@ describe('useBranding', () => {
 
       expect(result).toBe('Welcome to My-Company & Co.');
     });
+    it('inserts an installation name containing replacement syntax literally', () => {
+      mockGlobalConfig.value = { installationName: 'ACME $$' };
+
+      const { replaceInstallationName } = useBranding();
+
+      expect(replaceInstallationName('Powered by Chatwoot')).toBe(
+        'Powered by ACME $$'
+      );
+    });
   });
 });

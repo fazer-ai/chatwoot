@@ -20,10 +20,10 @@
 #
 # Indexes
 #
+#  index_channel_whatsapp_connection_state                   (((provider_connection ->> 'connection'::text))) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))
 #  index_channel_whatsapp_on_phone_number                    (phone_number) UNIQUE
 #  index_channel_whatsapp_on_phone_number_health_checked_at  (phone_number_health_checked_at)
-#  index_channel_whatsapp_connection_state                   (((provider_connection ->> 'connection'::text))) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[]))
-#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text])) USING gin
+#  index_channel_whatsapp_provider_connection                (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying, 'native'::character varying, 'uazapi'::character varying])::text[])) USING gin
 #  index_channel_whatsapp_session_id                         (((provider_config ->> 'session_id'::text))) UNIQUE WHERE ((provider)::text = ANY ((ARRAY['native'::character varying, 'uazapi'::character varying])::text[]))
 #
 # rubocop:enable Layout/LineLength
@@ -206,6 +206,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     data = { connection: provider_connection['connection'] }
     data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
     data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
+    # Agent-visible, unlike the QR and the error string: a stall carries no credential (a
+    # timeout count, a duration, what the provider decided to do and until when), and the
+    # agent is the one being told their reply went nowhere. Without it the conversation
+    # view has nothing to render, because `connection` still reads 'open' throughout.
+    data[:send_stall] = provider_connection['send_stall'] if provider_connection['send_stall'].present?
     data.merge!(provider_connection_admin_data) if Current.account_user&.administrator?
     data
   end
@@ -243,6 +248,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
                      conversation.contact.identifier || conversation.contact.phone_number
                    end
 
+    # Marked before the send: the provider echoes this receipt back as an inbound one, and
+    # the handlers that read it must not take it for a device of this account opening the
+    # chat. See Whatsapp::SelfReadReceipts.
+    Whatsapp::SelfReadReceipts.record(conversation, messages) if marker_read_back?
     provider_service.read_messages(messages, recipient_id: recipient_id)
   end
 
@@ -257,7 +266,15 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   def disconnect_channel_provider
     provider_service.disconnect_channel_provider
   rescue StandardError => e
-    # NOTE: Don't prevent destruction if disconnect fails
+    # Two callers, opposite needs. A destroy must not be blocked by a provider that will
+    # not let go, so there the failure is logged and swallowed. An explicit disconnect is
+    # an operator waiting for an answer: reporting a session closed while it is still
+    # live leaves them with a connected number, a dashboard that disagrees, and no reason
+    # to try again — and for a send stall it also clears the warning that was the only
+    # thing telling anyone the inbox was mute. @session_teardown is set by the prepended
+    # before_destroy callback, so it means exactly "we are being destroyed".
+    raise unless @session_teardown
+
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
@@ -419,6 +436,19 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   private
+
+  # Whether anything on the way in will read the marker back. Written by exactly the two
+  # inbound paths that can mistake our own receipt for a device read: the canonical session
+  # handler, which covers every session provider, and the legacy Baileys one.
+  #
+  # Not `session_family?`, though it is nearly the same set. That asks "is this a paired
+  # phone", and the echo does need one -- a business API has no second device to hear it
+  # from. But Z-API is a paired phone whose status callback only moves a message's status
+  # and never `agent_last_seen_at`, so it has nothing to be misled about, and a marker
+  # written for it is a key per message that expires without ever being read.
+  def marker_read_back?
+    session_provider? || provider == 'baileys'
+  end
 
   # Pushes the connection status to the account's agents over the websocket without
   # going through the full dispatcher, which would always enqueue an EventDispatcherJob
