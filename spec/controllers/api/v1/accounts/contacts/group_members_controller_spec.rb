@@ -232,6 +232,49 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
           .to contain_exactly('+5511999990002')
       end
 
+      # Submitted under both of its spellings, the line gets a verdict each, and the
+      # roster is written from the number as submitted: writing the refused spelling too
+      # would put the same person on it twice, once as somebody WhatsApp turned down.
+      it 'writes only the spelling whose own row landed' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002', '+551199990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # A provider that normalizes the number answers every row under its own spelling, so
+      # a line submitted twice comes back as two rows nobody's submission spells exactly.
+      # Both speak for both submissions, and a line WhatsApp added is in the group: the
+      # refusal on the other attempt does not take it off the roster. That both spellings
+      # are then written as two members is #498, which is about the roster reading a
+      # number literally and is not what the provider said here.
+      it 'keeps a line one row added when the rows are written in a spelling nobody sent' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to include('+5511999990002')
+      end
+
       # A row is only readable where it names an address the way the contract does. A
       # provider that writes the participant as a bare JID has not been refused any less,
       # but it has not said whom in a shape this can act on either, and answering the
