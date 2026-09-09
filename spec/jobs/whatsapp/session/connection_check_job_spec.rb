@@ -44,6 +44,18 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
     expect(channel).to have_received(:update_provider_connection!).twice
   end
 
+  # A provider that declares no limits has nothing to answer, and asking it would log a
+  # refusal as a failed read on every cycle.
+  it 'does not ask for limits a backend does not report' do
+    allow(Whatsapp::Session::Backends::Uazapi::Backend).to receive(:supports?).and_call_original
+    allow(Whatsapp::Session::Backends::Uazapi::Backend).to receive(:supports?).with('account_limits').and_return(false)
+
+    described_class.perform_now(channel)
+
+    expect(channel.reload.provider_connection['connection']).to eq('open')
+    expect(WebMock).not_to have_requested(:get, "#{base}/instance/wa_messages_limits")
+  end
+
   # A provider that cannot be reached is not a session that closed, and writing `close`
   # over a healthy connection would show the operator an outage that is not there.
   it 'leaves the last known state alone when the provider does not answer' do

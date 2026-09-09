@@ -143,8 +143,10 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(result.message_id).to eq('3EB0AAAA')
   end
 
-  it 'reads the account limits off the session status' do
-    expect(backend.fetch_account_limits).to eq({ 'reachout_time_lock' => { 'status' => 'UNLOCKED' } })
+  # The contract lets a connection state carry them and this connector fills neither, so
+  # answering the read would hand back an empty slice dressed as an answer.
+  it 'refuses the account limits rather than answering an empty slice' do
+    expect { backend.fetch_account_limits }.to raise_error(Whatsapp::Session::Errors::NotSupported)
   end
 
   it 'downloads media straight from the URL the event carried' do

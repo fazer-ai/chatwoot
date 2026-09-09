@@ -75,13 +75,6 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     nil
   end
 
-  # The limits ride along with the session status, which is the only thing that knows
-  # them: they are pushed as events the rest of the time.
-  def fetch_account_limits
-    status = client.call(commands::SessionStatus.new) || {}
-    status.slice('reachout_time_lock', 'new_chat_cap')
-  end
-
   # --- messages ------------------------------------------------------------------
 
   def send_message(command)
