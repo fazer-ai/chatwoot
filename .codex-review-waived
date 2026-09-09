@@ -183,3 +183,12 @@ app/javascript/dashboard/routes/dashboard/settings/automation/constants.js: Pres
 # every account bot (Captain included), and belongs to its own issue.
 app/controllers/api/v1/accounts/inboxes/agent_bot_observers_controller.rb: Enforce the observer role on bot API mutations  # PR#453
 app/views/survey/responses/show.html.erb: Use the project's Tailwind theming mechanism  # PR#482
+
+# Os quatro abaixo são da main, não deste merge: os arquivos são byte a byte idênticos
+# aos de origin/main, que o PR #500 apenas atravessa. Cada um foi verificado, é real, e
+# tem issue própria. Consertá-los dentro de um merge misturaria o reparo de ancestralidade
+# com correção de comportamento em produção, que é o que torna um merge difícil de reverter.
+app/finders/message_finder.rb: Use the same tie-breaker when ordering message pages  # PR#500 → #502
+app/services/whatsapp/baileys_handlers/messaging_history_set.rb: Resolve exhausted chats through phone and LID aliases  # PR#500 → #503
+app/jobs/avatar/avatar_from_url_job.rb: Do not stamp markers for superseded avatar jobs  # PR#500 → #504
+app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group inboxes explicitly  # PR#500 → #505
