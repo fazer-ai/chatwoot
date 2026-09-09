@@ -9,7 +9,7 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Connect via non-official API Z-API",
           "NATIVE": "WhatsApp (native)",
-          "NATIVE_DESC": "Connect through an unofficial API, using the connector that ships with this installation",
+          "NATIVE_DESC": "Connect through an unofficial API, pairing as with WhatsApp Web, with no outside provider",
           "UAZAPI": "Uazapi",
           "UAZAPI_DESC": "Connect through the unofficial Uazapi API, on your own instance"
         },
