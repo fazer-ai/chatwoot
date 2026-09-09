@@ -23,10 +23,18 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # consume, and there is no such command in the contract. Its replacement for the
       # same problem (pairing without a QR the operator can scan) is the passkey relay,
       # which rides on the pairing commands.
+      #
+      # No account_limits either. The contract lets a connection state carry
+      # `reachout_time_lock` and `new_chat_cap`, and the connector's `session.status`
+      # answers connection, phone number and LID and nothing else: whatsmeow surfaces no
+      # WhatsApp Business messaging limit for it to fill them with. Nothing asks for them
+      # on this provider today, because a connector session is pushed rather than polled,
+      # so what the declaration bought was a promise on the inbox payload that the next
+      # caller would have read as an answer.
       capabilities: %w[
         qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
         presence_subscribe read_receipts mark_unread check_number profile_picture groups
-        group_management group_admin group_invites group_join_requests account_limits media_download
+        group_management group_admin group_invites group_join_requests media_download
       ],
       fields: [MARK_AS_READ, PRESENCE_SUBSCRIBE]
     ),

@@ -44,6 +44,11 @@ class Whatsapp::Session::ConnectionCheckJob < ApplicationJob
   # every state update the new provider sends and shows the agent the old provider's
   # restrictions until the new one happens to report its own.
   def refresh_limits(channel, backend, fence)
+    # A backend that does not declare the limits refuses them, and the refusal would be
+    # logged as a failed read on every cycle: a provider saying it has nothing to report
+    # is not a provider failing to report.
+    return unless backend.supports?('account_limits')
+
     limits = backend.fetch_account_limits || {}
     channel.with_lock do
       next if channel.provider != fence[:provider]
