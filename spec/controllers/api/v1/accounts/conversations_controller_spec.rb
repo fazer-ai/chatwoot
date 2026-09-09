@@ -1239,6 +1239,180 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
         expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
       end
+
+      context 'when the caller names the message it displayed' do
+        let(:seen_message) do
+          create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                           message_type: :incoming, created_at: 10.minutes.ago)
+        end
+        let(:later_message) do
+          create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                           message_type: :incoming, created_at: 5.minutes.ago)
+        end
+
+        before do
+          # rubocop:disable Rails/SkipsModelValidations
+          conversation.messages.update_all(created_at: 3.hours.ago)
+          # rubocop:enable Rails/SkipsModelValidations
+          conversation.update!(agent_last_seen_at: 2.hours.ago)
+          seen_message
+          later_message
+        end
+
+        it 'leaves a message that arrived after the named one unread' do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(seen_message.created_at)
+          expect(conversation.unread_messages.map(&:id)).to eq([later_message.id])
+        end
+
+        it 'answers not found and writes nothing when the message sits in another conversation' do
+          stranger = create(:message, account: account, message_type: :incoming)
+          previous = conversation.agent_last_seen_at
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: stranger.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:not_found)
+          expect(conversation.reload.agent_last_seen_at).to eq(previous)
+        end
+
+        it 'answers not found and writes nothing when the id names no message' do
+          previous = conversation.agent_last_seen_at
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: 'abc' },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:not_found)
+          expect(conversation.reload.agent_last_seen_at).to eq(previous)
+        end
+
+        it 'writes nothing when the caller names no message at all' do
+          previous = conversation.agent_last_seen_at
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: '' },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(previous)
+        end
+
+        it 'keeps the stamp where a newer acknowledgement already put it' do
+          # An unread message past the stamp, so the throttle is out of the way and the only
+          # thing that can hold the stamp still is the boundary being older than it.
+          create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                           message_type: :incoming, created_at: 1.minute.ago)
+          conversation.update!(agent_last_seen_at: later_message.created_at)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(later_message.created_at)
+        end
+
+        it 'answers the same boundary twice without moving the stamp' do
+          2.times do
+            post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+                 params: { last_seen_message_id: seen_message.id },
+                 headers: agent.create_new_auth_token,
+                 as: :json
+
+            expect(response).to have_http_status(:success)
+            expect(conversation.reload.agent_last_seen_at).to eq(seen_message.created_at)
+          end
+        end
+
+        it 'moves the stamp inside the throttle window when the boundary advances' do
+          conversation.update!(agent_last_seen_at: 30.minutes.ago, last_activity_at: 31.minutes.ago)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: later_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(later_message.created_at)
+        end
+
+        it 'leaves the assignee stamp alone when the caller is not the assignee' do
+          other = create(:user, account: account, role: :agent)
+          create(:inbox_member, user: other, inbox: conversation.inbox)
+          conversation.update!(assignee: other, assignee_last_seen_at: 2.hours.ago)
+          previous = conversation.assignee_last_seen_at
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(seen_message.created_at)
+          expect(conversation.reload.assignee_last_seen_at).to eq(previous)
+        end
+
+        it 'moves both stamps when the caller is the assignee' do
+          conversation.update!(assignee: agent, assignee_last_seen_at: 2.hours.ago)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(seen_message.created_at)
+          expect(conversation.reload.assignee_last_seen_at).to eq(seen_message.created_at)
+        end
+
+        it 'keeps the receipt off a message stamped in the same second as the boundary' do
+          # Imported history carries WhatsApp's own second-granularity timestamps, so two messages
+          # sharing a `created_at` is ordinary there rather than a race.
+          twin = create(:message, account: account, inbox: conversation.inbox, conversation: conversation,
+                                  message_type: :incoming, created_at: seen_message.created_at)
+          conversation.update!(assignee: agent)
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(twin.id).to be > seen_message.id
+          expect(Rails.configuration.dispatcher)
+            .to have_received(:dispatch)
+            .with(Events::Types::MESSAGES_READ, kind_of(Time),
+                  hash_including(message_ids: [seen_message.id]))
+        end
+
+        it 'sends the read receipt only for the messages up to the boundary' do
+          conversation.update!(assignee: agent)
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(Rails.configuration.dispatcher)
+            .to have_received(:dispatch)
+            .with(Events::Types::MESSAGES_READ, kind_of(Time),
+                  hash_including(conversation: conversation, message_ids: [seen_message.id]))
+        end
+      end
     end
   end
 
