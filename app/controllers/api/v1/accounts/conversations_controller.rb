@@ -313,32 +313,48 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     message = @conversation.messages.find_by(id: named)
     return render_not_found_error('Message not found in this conversation') if message.nil?
 
-    dispatch_messages_read_event(up_to: message) if assignee?
+    since = @conversation.agent_last_seen_at
+    return unless update_last_seen_on_conversation(message.created_at, assignee?, monotonic: true)
 
-    update_last_seen_on_conversation(message.created_at, assignee?, monotonic: true)
+    dispatch_messages_read_event(up_to: message, since: since) if assignee?
   end
 
   # `monotonic` is what the boundary path needs and what `unread` must never get: marking a
   # conversation unread moves the same stamps deliberately backwards, so the guard belongs to
-  # the caller that wants it rather than to this write.
+  # the caller that wants it rather than to this write. Answers whether anything was written.
   def update_last_seen_on_conversation(last_seen_at, update_assignee, monotonic: false)
-    updates = { agent_last_seen_at: last_seen_at }
-    updates[:assignee_last_seen_at] = last_seen_at if update_assignee.present?
-    updates = updates.reject { |column, value| monotonic && already_past?(column, value) }
-    return if updates.empty?
-
-    # rubocop:disable Rails/SkipsModelValidations
-    @conversation.update_columns(updates)
-    # rubocop:enable Rails/SkipsModelValidations
+    columns = [:agent_last_seen_at]
+    columns << :assignee_last_seen_at if update_assignee.present?
+    return true unless write_last_seen(columns, last_seen_at, monotonic: monotonic)
 
     ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
     ::Conversations::UnreadCounts::FilteredCountInvalidator.new(Current.account).conversation_changed!
+    true
   end
 
-  def already_past?(column, last_seen_at)
-    current = @conversation[column]
+  # The guard belongs in the write and not around it. Two acknowledgements in flight both read the
+  # same stamp, both find themselves ahead of it, and whichever commits last wins -- which is the
+  # older boundary as often as not. So the row decides: the UPDATE only matches while a column is
+  # still behind the stamp, and GREATEST keeps a column that is already ahead from being pulled
+  # back by the write meant for the other one.
+  def write_last_seen(columns, last_seen_at, monotonic:)
+    unless monotonic
+      # rubocop:disable Rails/SkipsModelValidations
+      @conversation.update_columns(columns.index_with(last_seen_at))
+      # rubocop:enable Rails/SkipsModelValidations
+      return true
+    end
 
-    current.present? && current >= last_seen_at
+    behind = columns.map { |column| "(conversations.#{column} IS NULL OR conversations.#{column} < :at)" }.join(' OR ')
+    assignments = columns.map { |column| "#{column} = GREATEST(conversations.#{column}, :at)" }.join(', ')
+    # rubocop:disable Rails/SkipsModelValidations
+    written = Conversation.where(id: @conversation.id).where(behind, at: last_seen_at)
+                          .update_all([assignments, { at: last_seen_at }])
+    # rubocop:enable Rails/SkipsModelValidations
+    return false if written.zero?
+
+    @conversation.reload
+    true
   end
 
   def unseen_activity?
@@ -471,8 +487,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversation.assignee_id? && Current.user == @conversation.assignee
   end
 
-  def dispatch_messages_read_event(up_to: nil)
-    return dispatch_bounded_messages_read_event(up_to) if up_to.present?
+  def dispatch_messages_read_event(up_to: nil, since: nil)
+    return dispatch_bounded_messages_read_event(up_to, since) if up_to.present?
 
     # NOTE: Use old `agent_last_seen_at`, so we reference messages received after that
     Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGES_READ, Time.zone.now, conversation: @conversation,
@@ -482,8 +498,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # The receipt has to stop where the acknowledgement stops. `last_seen_at` names a floor and no
   # ceiling, so sending it here would tell the contact that the message the agent has not seen was
   # read -- the very thing the boundary exists to prevent -- one layer below the unread badge.
-  def dispatch_bounded_messages_read_event(boundary)
-    message_ids = receipt_scope_up_to(boundary).pluck(:id)
+  def dispatch_bounded_messages_read_event(boundary, since)
+    message_ids = receipt_scope_up_to(boundary, since).pluck(:id)
     return if message_ids.empty?
 
     Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGES_READ, Time.zone.now, conversation: @conversation,
@@ -493,9 +509,9 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   # Unread incoming messages this acknowledgement covers: after the stamp it is replacing, up to
   # and including the boundary. `created_at` ties are broken by id so a message stamped in the same
   # second as the boundary is not silently receipted along with it.
-  def receipt_scope_up_to(boundary)
+  def receipt_scope_up_to(boundary, since)
     scope = @conversation.messages.incoming.where.not(status: :read)
-    scope = scope.where(created_at: @conversation.agent_last_seen_at..) if @conversation.agent_last_seen_at.present?
+    scope = scope.where(created_at: since..) if since.present?
     scope.where('messages.created_at < :at OR (messages.created_at = :at AND messages.id <= :id)',
                 at: boundary.created_at, id: boundary.id)
   end

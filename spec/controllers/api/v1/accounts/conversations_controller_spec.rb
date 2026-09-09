@@ -1376,6 +1376,87 @@ RSpec.describe 'Conversations API', type: :request do
           expect(conversation.reload.assignee_last_seen_at).to eq(seen_message.created_at)
         end
 
+        it 'writes nothing when the boundary is the stamp the conversation already carries' do
+          conversation.update!(agent_last_seen_at: seen_message.created_at)
+          notifier = instance_double(Conversations::UnreadCounts::Notifier, perform: nil)
+          allow(Conversations::UnreadCounts::Notifier).to receive(:new).and_return(notifier)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(notifier).not_to have_received(:perform)
+        end
+
+        it 'does not pull the agent stamp back to catch the assignee stamp up' do
+          conversation.update!(assignee: agent, agent_last_seen_at: later_message.created_at,
+                               assignee_last_seen_at: 2.hours.ago)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(later_message.created_at)
+          expect(conversation.reload.assignee_last_seen_at).to eq(seen_message.created_at)
+        end
+
+        it 'sends no receipt when the acknowledgement moved nothing' do
+          conversation.update!(assignee: agent, agent_last_seen_at: later_message.created_at,
+                               assignee_last_seen_at: later_message.created_at)
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(Rails.configuration.dispatcher)
+            .not_to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args)
+        end
+
+        it 'refuses to rewind when a newer acknowledgement lands between the load and the write' do
+          # The interleaving the in-memory guard cannot see: this request read the old stamp, a
+          # newer boundary committed while it was still working, and only a write conditioned on
+          # the row itself can refuse to pull the stamp back.
+          allow_any_instance_of(Notification::MarkConversationReadService).to receive(:perform) do # rubocop:disable RSpec/AnyInstance
+            # rubocop:disable Rails/SkipsModelValidations
+            Conversation.where(id: conversation.id).update_all(agent_last_seen_at: later_message.created_at)
+            # rubocop:enable Rails/SkipsModelValidations
+          end
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.agent_last_seen_at).to eq(later_message.created_at)
+        end
+
+        it 'consumes a message stamped in the same second as the boundary, which a timestamp cannot separate' do
+          # Pinned rather than fixed: the unread comparison is `created_at > stamp`, so a twin of the
+          # boundary falls on the read side. The receipt does resolve the tie; the badge cannot until
+          # the stamp becomes a composite watermark. See #508 -- this example should start failing on
+          # the day that lands, and then it is the issue that closes, not this expectation that flips.
+          at = 10.minutes.ago.change(usec: 0)
+          # rubocop:disable Rails/SkipsModelValidations
+          Message.where(id: [seen_message.id, later_message.id]).update_all(created_at: at)
+          # rubocop:enable Rails/SkipsModelValidations
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(conversation.reload.unread_messages).to be_empty
+        end
+
         it 'keeps the receipt off a message stamped in the same second as the boundary' do
           # Imported history carries WhatsApp's own second-granularity timestamps, so two messages
           # sharing a `created_at` is ordinary there rather than a race.
