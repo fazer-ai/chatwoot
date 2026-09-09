@@ -157,6 +157,63 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
           .to contain_exactly('+5511999990001')
       end
 
+      # The refusal comes back written the way WhatsApp spells the line, which for a
+      # Brazilian or Argentinian number is not necessarily the way the operator typed it.
+      it 'matches a refusal written in the other ninth-digit form' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990001' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001')
+      end
+
+      # A LID and a phone number are separate namespaces written in the same digits, so a
+      # refusal naming a LID says nothing about the line that happens to read like it.
+      it 'keeps a participant whose number reads like a refused lid' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'lid', 'id' => '5511999990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # A row is only readable where it names an address the way the contract does. A
+      # provider that writes the participant as a bare JID has not been refused any less,
+      # but it has not said whom in a shape this can act on either, and answering the
+      # operator with a 500 helps nobody.
+      it 'adds the participant when the refusal names no address it can read' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => '5511999990002@s.whatsapp.net', 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
       # A provider that does not answer in rows has told us nothing to filter on, and the
       # Baileys one answers with whatever `each` returned.
       it 'adds every participant when the provider answers in no rows at all' do

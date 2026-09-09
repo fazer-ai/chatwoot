@@ -86,6 +86,14 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       expect(backend.update_group_participants(command)).to eq(rows)
     end
 
+    # An answer with no rows in it refused nobody. Reading it as a refusal for everyone
+    # named would fail a command the provider carried out.
+    it 'treats an answer with no rows as nothing refused' do
+      results['group.participants.update'] = []
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+
     # Any other refusal is the connector's to name: it fails the command itself when the
     # code is one it maps, and a code this build does not know must not be read as the
     # one it happens to rescue.

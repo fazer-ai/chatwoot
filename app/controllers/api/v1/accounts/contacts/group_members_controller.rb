@@ -130,9 +130,13 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
   # for counts as added, which is what it meant before this.
   def participants_that_landed(phone_numbers, answer)
     refused = refused_ids(answer)
-    return phone_numbers if refused.empty?
 
-    Array(phone_numbers).reject { |phone| refused.include?(Whatsapp::Session::PhoneMatch.digits(phone)) }
+    # The number that comes back is not the one that was sent: a Brazilian or Argentinian
+    # line is written with or without the ninth digit depending on who is spelling it, and
+    # comparing the digits as they arrived calls one participant two people.
+    Array(phone_numbers).reject do |phone|
+      refused.any? { |id| Whatsapp::Session::PhoneMatch.same_number?(id, phone) }
+    end
   end
 
   def refused_ids(answer)
@@ -144,9 +148,21 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
       row = row.stringify_keys
       next unless row['status'].to_s == 'failed'
 
-      address = row['address']
-      Whatsapp::Session::PhoneMatch.digits((address.is_a?(Hash) ? address.stringify_keys : {})['id'])
+      refused_phone_in(row['address'])
     end
+  end
+
+  # An `add` is asked by phone and answered under the address it was asked with, so a
+  # refusal names a number. A LID is a separate namespace that happens to be written in
+  # digits too, and reading one as a phone number would drop a participant who did land
+  # because somebody else's LID reads like their line.
+  def refused_phone_in(address)
+    return nil unless address.is_a?(Hash)
+
+    address = address.stringify_keys
+    return nil if address['kind'].present? && address['kind'].to_s != 'phone'
+
+    Whatsapp::Session::PhoneMatch.digits(address['id'])
   end
 
   def add_group_members(phone_numbers)
