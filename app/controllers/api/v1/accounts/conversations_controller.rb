@@ -325,7 +325,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def update_last_seen_on_conversation(last_seen_at, update_assignee, monotonic: false)
     columns = [:agent_last_seen_at]
     columns << :assignee_last_seen_at if update_assignee.present?
-    return true unless write_last_seen(columns, last_seen_at, monotonic: monotonic)
+    return false unless write_last_seen(columns, last_seen_at, monotonic: monotonic)
 
     ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
     ::Conversations::UnreadCounts::FilteredCountInvalidator.new(Current.account).conversation_changed!
@@ -351,10 +351,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     written = Conversation.where(id: @conversation.id).where(behind, at: last_seen_at)
                           .update_all([assignments, { at: last_seen_at }])
     # rubocop:enable Rails/SkipsModelValidations
-    return false if written.zero?
-
+    # Reloaded either way. A write that matched nothing means somebody else's acknowledgement is
+    # already on the row, and answering this request with the stamp it arrived holding would report
+    # messages as unread that the account has already read.
     @conversation.reload
-    true
+    written.positive?
   end
 
   def unseen_activity?

@@ -1274,7 +1274,7 @@ RSpec.describe 'Conversations API', type: :request do
 
         it 'answers not found and writes nothing when the message sits in another conversation' do
           stranger = create(:message, account: account, message_type: :incoming)
-          previous = conversation.agent_last_seen_at
+          previous = conversation.reload.agent_last_seen_at
 
           post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
                params: { last_seen_message_id: stranger.id },
@@ -1286,7 +1286,7 @@ RSpec.describe 'Conversations API', type: :request do
         end
 
         it 'answers not found and writes nothing when the id names no message' do
-          previous = conversation.agent_last_seen_at
+          previous = conversation.reload.agent_last_seen_at
 
           post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
                params: { last_seen_message_id: 'abc' },
@@ -1298,7 +1298,7 @@ RSpec.describe 'Conversations API', type: :request do
         end
 
         it 'writes nothing when the caller names no message at all' do
-          previous = conversation.agent_last_seen_at
+          previous = conversation.reload.agent_last_seen_at
 
           post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
                params: { last_seen_message_id: '' },
@@ -1353,7 +1353,7 @@ RSpec.describe 'Conversations API', type: :request do
           other = create(:user, account: account, role: :agent)
           create(:inbox_member, user: other, inbox: conversation.inbox)
           conversation.update!(assignee: other, assignee_last_seen_at: 2.hours.ago)
-          previous = conversation.assignee_last_seen_at
+          previous = conversation.reload.assignee_last_seen_at
 
           post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
                params: { last_seen_message_id: seen_message.id },
@@ -1438,6 +1438,40 @@ RSpec.describe 'Conversations API', type: :request do
 
           expect(response).to have_http_status(:success)
           expect(conversation.reload.agent_last_seen_at).to eq(later_message.created_at)
+        end
+
+        it 'sends no second receipt when the same boundary is acknowledged again' do
+          conversation.update!(assignee: agent)
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+          2.times do
+            post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+                 params: { last_seen_message_id: seen_message.id },
+                 headers: agent.create_new_auth_token,
+                 as: :json
+          end
+
+          # The receipt is asynchronous, so the message is still unread when the second call runs and
+          # the scope would name it again. Only the refused write can stop the repeat.
+          expect(Rails.configuration.dispatcher)
+            .to have_received(:dispatch).with(Events::Types::MESSAGES_READ, any_args).once
+        end
+
+        it 'answers with the acknowledgement that superseded this one' do
+          allow_any_instance_of(Notification::MarkConversationReadService).to receive(:perform) do # rubocop:disable RSpec/AnyInstance
+            # rubocop:disable Rails/SkipsModelValidations
+            Conversation.where(id: conversation.id).update_all(agent_last_seen_at: later_message.created_at)
+            # rubocop:enable Rails/SkipsModelValidations
+          end
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               params: { last_seen_message_id: seen_message.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(response.parsed_body['agent_last_seen_at']).to eq(later_message.created_at.to_i)
+          expect(response.parsed_body['unread_count']).to eq(0)
         end
 
         it 'consumes a message stamped in the same second as the boundary, which a timestamp cannot separate' do
