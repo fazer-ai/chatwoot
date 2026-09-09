@@ -482,7 +482,10 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
     before { dispatch }
 
-    def placeholder = inbox.messages.find_by(source_id: '3EB0AAAA0001')
+    # By id, and `reorder` rather than `order`: `Message` carries a `created_at` default
+    # scope, and a recovered share gives its cards the placeholder's own timestamp, so
+    # ordering by that alone leaves which row comes back up to the database.
+    def placeholder = inbox.messages.where(source_id: '3EB0AAAA0001').reorder(:id).first
 
     it 'stores the placeholder under the id of the message it stands in for' do
       expect(placeholder.is_unsupported).to be(true)
@@ -712,9 +715,48 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
 
       it 'does not let the recovery write the original body over the edit' do
-        expect(recovery).to eq(:duplicate)
+        expect(recovery).to eq(:handled)
 
         expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+      end
+
+      # Everything around the body is still only on the recovery: an undecryptable stanza
+      # carries no context, so the quote is unreadable until the message itself arrives.
+      it 'still takes what the recovery carries around the body' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(id: '3EB0AAAA0009', content: model::Content::Text.new(body: 'antes'))
+                             ))
+        )
+        quoted = inbox.messages.find_by(source_id: '3EB0AAAA0009')
+
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: recovered, quoted_id: '3EB0AAAA0009')
+                             ))
+        )
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.content_attributes['in_reply_to']).to eq(quoted.id)
+        expect(placeholder.content_attributes).not_to have_key('unsupported_reason')
+      end
+
+      # `rich` describes the body, and the body is not this message's to describe any
+      # more: a card drawn around text the edit replaced reads worse than no card.
+      it 'leaves the rich card out, because the body it describes is gone' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: model::Content::Rich.new(
+                                 kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega'
+                               ))
+                             ))
+        )
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.content_attributes).not_to have_key('rich')
       end
 
       # The edit settles the body and takes the recovery marker off the row. The
@@ -731,12 +773,59 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       end
     end
 
-    # One row cannot become the several a share writes, so this stays the unsupported
-    # bubble it already was. Recorded as #488 rather than silently accepted.
-    context 'when what arrives is a share of contacts' do
-      let(:recovered) { model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias' }]) }
+    # A share of one contact becomes that contact, in the row that is already there.
+    context 'when what arrives is a share of one contact' do
+      let(:recovered) do
+        model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' }])
+      end
 
-      it 'reports a duplicate rather than turning one row into several' do
+      it 'turns the placeholder into the card' do
+        expect(recovery).to eq(:handled)
+
+        expect(placeholder.content).to eq('Carlos Dias - +5541988881111')
+        expect(placeholder.content_attributes).not_to have_key('is_unsupported')
+        expect(placeholder.attachments.last.file_type).to eq('contact')
+        expect(inbox.messages.count).to eq(1)
+      end
+
+      # A card that says nothing takes no row on the writing path either, so a share
+      # carrying one real contact next to a malformed one is still a share of one.
+      context 'when the other cards say nothing' do
+        let(:recovered) do
+          model::Content::Contacts.new(contacts: [{ 'vcard' => 'BEGIN:VCARD\\nEND:VCARD' },
+                                                  { 'display_name' => 'Bruno Lima', 'phone' => '+5541977776666' }])
+        end
+
+        it 'takes the card that says something' do
+          expect(recovery).to eq(:handled)
+
+          expect(placeholder.content).to eq('Bruno Lima - +5541977776666')
+          expect(inbox.messages.count).to eq(1)
+        end
+      end
+    end
+
+    # A share of several would have to write rows whose arrival Chatwoot already ran when
+    # the placeholder landed, and backdating them into the thread puts them where
+    # `MessageFinder` cannot page back to. #488 carries both.
+    context 'when what arrives is a share of several contacts' do
+      let(:recovered) do
+        model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' },
+                                                { 'display_name' => 'Bruno Lima', 'phone' => '+5541977776666' }])
+      end
+
+      it 'leaves the placeholder standing rather than writing rows beside it' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(inbox.messages.count).to eq(1)
+      end
+    end
+
+    context 'when nothing in the recovered share can be read' do
+      let(:recovered) { model::Content::Contacts.new(contacts: [{ 'vcard' => 'BEGIN:VCARD\\nEND:VCARD' }]) }
+
+      it 'leaves the placeholder standing' do
         expect(recovery).to eq(:duplicate)
 
         expect(placeholder.is_unsupported).to be(true)
