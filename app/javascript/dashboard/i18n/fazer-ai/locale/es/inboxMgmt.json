@@ -9,7 +9,7 @@
           "ZAPI": "Z-API",
           "ZAPI_DESC": "Conectar mediante la API no oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conectar mediante una API no oficial, con el conector que ya viene en esta instalación",
+          "NATIVE_DESC": "Conectar mediante una API no oficial, vinculando como en WhatsApp Web, sin proveedor externo",
           "UAZAPI": "Uazapi",
           "UAZAPI_DESC": "Conectar mediante la API no oficial de Uazapi, en tu propia instancia"
         },
