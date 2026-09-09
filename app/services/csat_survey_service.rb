@@ -1,9 +1,20 @@
 class CsatSurveyService
   pattr_initialize [:conversation!]
 
+  # Returns why the survey did not go out, so the caller can tell a conversation that was never
+  # eligible from one whose rule may still be waiting on a label another job is about to write.
   def perform
-    return unless should_send_csat_survey?
+    return :not_eligible unless eligible_for_csat?
+    return :blocked_by_survey_rules unless csat_allowed_by_survey_rules?
 
+    deliver_survey
+  end
+
+  private
+
+  delegate :inbox, :contact, to: :conversation
+
+  def deliver_survey
     if whatsapp_channel? && template_available_and_approved?
       send_whatsapp_template_survey
     elsif inbox.twilio_whatsapp? && twilio_template_available_and_approved?
@@ -15,12 +26,8 @@ class CsatSurveyService
     end
   end
 
-  private
-
-  delegate :inbox, :contact, to: :conversation
-
-  def should_send_csat_survey?
-    conversation_allows_csat? && csat_enabled? && !csat_already_sent? && csat_allowed_by_survey_rules?
+  def eligible_for_csat?
+    conversation_allows_csat? && csat_enabled? && !csat_already_sent?
   end
 
   def conversation_allows_csat?
@@ -146,34 +153,19 @@ class CsatSurveyService
     sorted_keys = body_variables.keys.sort_by(&:to_i)
     sorted_keys.map do |key|
       value = body_variables[key]
-      resolved_value = resolve_liquid_variable(value)
+      resolved_value = liquid_resolver.resolve(value)
       { type: 'text', text: resolved_value }
     end
   end
 
-  def resolve_liquid_variable(value)
-    return value if value.blank?
-
-    template = Liquid::Template.parse(value)
-    result = template.render(liquid_drops)
-    result.presence || value
-  rescue Liquid::Error
-    value
-  end
-
-  def liquid_drops
-    @liquid_drops ||= {
-      'contact' => ContactDrop.new(conversation.contact),
-      'conversation' => ConversationDrop.new(conversation),
-      'inbox' => InboxDrop.new(inbox),
-      'account' => AccountDrop.new(conversation.account)
-    }
+  def liquid_resolver
+    @liquid_resolver ||= CsatSurveys::LiquidResolver.new(conversation: conversation)
   end
 
   def build_csat_message
     content = inbox.csat_config&.dig('message') || 'Please rate this conversation'
     body_variables = inbox.csat_config&.dig('template', 'body_variables')
-    body_variables&.each { |key, value| content = content.gsub("{{#{key}}}", resolve_liquid_variable(value)) }
+    body_variables&.each { |key, value| content = content.gsub("{{#{key}}}", liquid_resolver.resolve(value)) }
 
     conversation.messages.build(
       account: conversation.account,
