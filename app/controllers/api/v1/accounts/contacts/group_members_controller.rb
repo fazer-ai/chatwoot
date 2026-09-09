@@ -29,8 +29,8 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     participants = create_params[:participants]
     return render json: { error: 'participants_required' }, status: :unprocessable_entity if participants.blank?
 
-    channel.update_group_participants(@contact.identifier, format_participants(participants), 'add')
-    add_group_members(participants)
+    answer = channel.update_group_participants(@contact.identifier, format_participants(participants), 'add')
+    add_group_members(participants_that_landed(participants, answer))
     head :ok
   rescue Whatsapp::Session::Errors::Error => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -118,6 +118,70 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     raise Whatsapp::Session::Errors::InvalidPayload, 'group member has no WhatsApp address' if address.nil?
 
     address.to_jid
+  end
+
+  # WhatsApp refuses participants one at a time and answers with a row each, so an `add`
+  # of several can come back having added some of them. Writing all of them to the roster
+  # shows the operator members who are not in the group, until the next scheduled sync
+  # takes them out again.
+  #
+  # A provider that does not answer in rows has told us nothing to filter on, and the
+  # Baileys one answers with the list it was handed: there, everything it did not raise
+  # for counts as added, which is what it meant before this.
+  def participants_that_landed(phone_numbers, answer)
+    verdicts = verdicts_by_number(answer)
+
+    Array(phone_numbers).reject { |phone| refused_outright?(verdicts, phone) }
+  end
+
+  # Refused means refused in every row that speaks for this submission.
+  def refused_outright?(verdicts, phone)
+    spoken_for = verdicts_about(verdicts, phone)
+
+    spoken_for.present? && spoken_for.all? { |_, status| status == 'failed' }
+  end
+
+  # A row naming the number exactly as it was submitted is the verdict on that
+  # submission: the provider answers one row per participant asked, under the address it
+  # was asked with. Submitting a line under both of its spellings therefore gets a verdict
+  # each, and reading them together would write the refused spelling to the roster on the
+  # strength of the other one.
+  #
+  # Only where no row spells it the way it was submitted do the other spellings speak for
+  # it: a Brazilian or Argentinian line is written with or without the ninth digit
+  # depending on who is spelling it, and a provider that answers under its own spelling
+  # has still answered about this participant.
+  def verdicts_about(verdicts, phone)
+    as_submitted = Whatsapp::Session::PhoneMatch.digits(phone)
+    named = verdicts.select { |number, _| number == as_submitted }
+    return named if named.present?
+
+    verdicts.select { |number, _| Whatsapp::Session::PhoneMatch.same_number?(number, phone) }
+  end
+
+  def verdicts_by_number(answer)
+    Array(answer).filter_map do |row|
+      # Only a row is a row. The Baileys path answers with the list it was handed, and a
+      # backend that answers nothing at all answers `true`.
+      next unless row.is_a?(Hash)
+
+      row = row.stringify_keys
+      # A row carrying no verdict has not said this participant is in the group, and it
+      # has not said they are out of it either: only `failed` refuses.
+      [phone_in(row['address']), row['status'].to_s]
+    end
+  end
+
+  # An `add` is asked by phone and answered under the address it was asked with, so a row
+  # names a number. A LID is a separate namespace that happens to be written in digits
+  # too, and reading one as a phone number would speak for a line it says nothing about.
+  def phone_in(address)
+    return nil unless address.is_a?(Hash)
+
+    address = address.stringify_keys
+    return nil if address['kind'].present? && address['kind'].to_s != 'phone'
+
+    Whatsapp::Session::PhoneMatch.digits(address['id'])
   end
 
   def add_group_members(phone_numbers)

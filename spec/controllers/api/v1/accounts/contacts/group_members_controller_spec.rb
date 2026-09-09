@@ -137,6 +137,178 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
         expect(response).to have_http_status(:ok)
       end
 
+      # WhatsApp refuses participants one at a time -- a privacy setting, somebody who
+      # left recently -- and answers `ok` with a row each. Writing all of them to the
+      # roster shows the operator members who are not in the group.
+      it 'adds only the participants the provider did not refuse' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990001' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001')
+      end
+
+      # The refusal comes back written the way WhatsApp spells the line, which for a
+      # Brazilian or Argentinian number is not necessarily the way the operator typed it.
+      it 'matches a refusal written in the other ninth-digit form' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990001' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001')
+      end
+
+      # A LID and a phone number are separate namespaces written in the same digits, so a
+      # refusal naming a LID says nothing about the line that happens to read like it.
+      it 'keeps a participant whose number reads like a refused lid' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'lid', 'id' => '5511999990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # The same line can be submitted under both of its spellings, and the answer names
+      # one row per participant asked: WhatsApp adds it under one and says nothing about
+      # the other, which the provider reports as a refusal. A line it added is in the
+      # group whatever the row for the other spelling says.
+      it 'keeps a number a row added even when another row refused the same line' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # A row that carries no verdict at all has not said the participant is in the group,
+      # and it has not said they are out of it either.
+      it 'adds the participant when the only row about them carries no verdict' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'pending', 'code' => nil }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # Submitted under both of its spellings, the line gets a verdict each, and the
+      # roster is written from the number as submitted: writing the refused spelling too
+      # would put the same person on it twice, once as somebody WhatsApp turned down.
+      it 'writes only the spelling whose own row landed' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002', '+551199990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # A provider that normalizes the number answers every row under its own spelling, so
+      # a line submitted twice comes back as two rows nobody's submission spells exactly.
+      # Both speak for both submissions, and a line WhatsApp added is in the group: the
+      # refusal on the other attempt does not take it off the roster. That both spellings
+      # are then written as two members is #498, which is about the roster reading a
+      # number literally and is not what the provider said here.
+      it 'keeps a line one row added when the rows are written in a spelling nobody sent' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to include('+5511999990002')
+      end
+
+      # A row is only readable where it names an address the way the contract does. A
+      # provider that writes the participant as a bare JID has not been refused any less,
+      # but it has not said whom in a shape this can act on either, and answering the
+      # operator with a 500 helps nobody.
+      it 'adds the participant when the refusal names no address it can read' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => '5511999990002@s.whatsapp.net', 'status' => 'failed',
+             'code' => 'group_participant_not_allowed' }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+      end
+
+      # A provider that does not answer in rows has told us nothing to filter on, and the
+      # Baileys one answers with whatever `each` returned.
+      it 'adds every participant when the provider answers in no rows at all' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990001', '+5511999990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990001', '+5511999990002')
+      end
+
       it 'returns 422 when provider is unavailable' do
         allow(baileys_service).to receive(:update_group_participants)
           .and_raise(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError, 'Offline')
