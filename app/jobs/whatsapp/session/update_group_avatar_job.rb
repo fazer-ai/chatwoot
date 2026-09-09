@@ -23,7 +23,7 @@ class Whatsapp::Session::UpdateGroupAvatarJob < ApplicationJob
 
     return Whatsapp::Session::AvatarSync.refetch(group_contact, info.picture_url) if force
 
-    ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url)
+    ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url, resolved_at: Time.current.iso8601)
   end
 
   private

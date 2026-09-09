@@ -12,6 +12,7 @@ import {
   buildContactableInboxesList,
   prepareNewMessagePayload,
   prepareWhatsAppMessagePayload,
+  splitAttachmentsForChannel,
 } from 'dashboard/components-next/NewConversation/helpers/composeConversationHelper.js';
 
 import { useCopilotReply } from 'dashboard/composables/useCopilotReply';
@@ -138,9 +139,17 @@ const validationStates = computed(() => ({
   isMessageInvalid: v$.value.message.$dirty && v$.value.message.$invalid,
 }));
 
+// On a channel that carries one attachment per message, only the first file travels
+// with the conversation; the rest follow it as their own messages, which is what the
+// reply box already does. Without the split every file shows in Chatwoot and one
+// reaches the contact.
 const newMessagePayload = () => {
   const { message, subject, ccEmails, bccEmails, attachedFiles } = state;
-  return prepareNewMessagePayload({
+  const { first, rest } = splitAttachmentsForChannel({
+    targetInbox: props.targetInbox,
+    attachedFiles,
+  });
+  const payload = prepareNewMessagePayload({
     targetInbox: props.targetInbox,
     selectedContact: props.selectedContact,
     message,
@@ -148,12 +157,13 @@ const newMessagePayload = () => {
     ccEmails,
     bccEmails,
     currentUser: props.currentUser,
-    attachedFiles,
+    attachedFiles: first,
     directUploadsEnabled: props.isDirectUploadsEnabled,
     sendWithSignature: props.sendWithSignature,
     messageSignature: props.messageSignature,
     signatureSettings: props.signatureSettings,
   });
+  return { payload, followUpFiles: rest };
 };
 
 const contactableInboxesList = computed(() => {
@@ -277,8 +287,10 @@ const handleSendMessage = async () => {
   if (!isValid) return;
 
   try {
+    const { payload, followUpFiles } = newMessagePayload();
     const success = await emit('createConversation', {
-      payload: newMessagePayload(),
+      payload,
+      followUpFiles,
       isFromWhatsApp: false,
     });
     if (success) {

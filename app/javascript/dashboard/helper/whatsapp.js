@@ -24,6 +24,22 @@ export const isReachoutRestricted = (lock, connection, now = Date.now()) => {
 };
 
 /**
+ * Whether a session inbox should surface the send-stall banner.
+ *
+ * Gated on `open` for the opposite reason to the reach-out lock: that pairing IS the
+ * fault. The connection receives, answers every health check, and reports 'open' while no
+ * outgoing message leaves, so nothing else in the conversation view would warn anyone.
+ * Once the connection is down the offline banner is both truer and more urgent, and the
+ * stall value lingers by design (it is cleared only by a new socket reaching 'open').
+ *
+ * @param {{consecutive_timeouts?: number, action?: string, until?: string}|null|undefined} sendStall
+ * @param {string|undefined} connection - the provider_connection.connection value
+ * @returns {boolean}
+ */
+export const isSendStalled = (sendStall, connection) =>
+  connection === 'open' && Boolean(sendStall);
+
+/**
  * Local-timezone deadline label for the restriction banner, or '' when no deadline is set.
  * `new Date(isoUtc)` parses the UTC instant and `format` renders it in the browser's
  * timezone automatically.

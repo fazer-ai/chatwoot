@@ -153,6 +153,78 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceipt do
     end
   end
 
+  # Uazapi answers our own `/message/markread` with a `read` webhook naming the messages we
+  # just acknowledged. Taken for a device of this account, it would clear the unread badge of
+  # a conversation an agent bot read on the provider only and no human has opened.
+  context 'when the receipt is this app echoed back' do
+    let(:type) { 'read' }
+    let(:message) do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: '3EB0AAAA0003')
+    end
+
+    before { Whatsapp::SelfReadReceipts.record(conversation, [message]) }
+
+    after { Redis::Alfred.delete(Whatsapp::SelfReadReceipts.key(conversation, message.source_id)) }
+
+    it 'leaves the unread markers alone' do
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      dispatch
+
+      expect(conversation.reload.agent_last_seen_at).to be_nil
+    end
+
+    it 'still marks the message read' do
+      expect(dispatch).to eq(:handled)
+      expect(message.reload.status).to eq('read')
+    end
+
+    # One `source_id` can name several rows -- a shared-contact payload stores a card each
+    # -- and the handler applies the receipt to all of them. A marker on the row the sender
+    # happened to name would let a sibling clear the badge anyway.
+    it 'covers every card the id resolves to' do
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: message.source_id)
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      dispatch
+
+      expect(conversation.reload.agent_last_seen_at).to be_nil
+    end
+
+    # The marker answers for the ids this app acknowledged and for nothing else. Anchored to
+    # the conversation instead, it would swallow every later read the paired phone reports,
+    # and each new bot receipt would push that window out again.
+    # The handler resolves a whole receipt in one query on purpose; asking Redis per message
+    # would put a round trip back per id, which is hundreds on a receipt naming a whole chat.
+    it 'reads the acknowledged ids once for the whole batch' do
+      allow(Whatsapp::SelfReadReceipts).to receive(:acknowledged).and_call_original
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                       message_type: :incoming, status: :sent, source_id: message.source_id)
+
+      dispatch
+
+      expect(Whatsapp::SelfReadReceipts).to have_received(:acknowledged).once
+    end
+
+    it 'lets a device read of another message in the chat through' do
+      other = create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                               message_type: :incoming, status: :sent, source_id: '3EB0AAAA0004')
+      conversation.update_columns(agent_last_seen_at: nil) # rubocop:disable Rails/SkipsModelValidations
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(
+          model::Events::MessageReceipt.new(chat: model::Address.phone('5541999990000'),
+                                            message_ids: [other.source_id], type: 'read')
+        )
+      )
+
+      expect(conversation.reload.agent_last_seen_at).to be_present
+    end
+  end
+
   context 'when a weaker receipt arrives late' do
     let(:type) { 'delivered' }
 

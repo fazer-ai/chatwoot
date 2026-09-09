@@ -2,11 +2,14 @@ module Api::V2::Accounts::ReportsHelper
   def generate_agents_report
     reports = V2::Reports::AgentSummaryBuilder.new(
       account: Current.account,
-      params: build_params(type: :agent)
+      params: build_params(type: :agent, inbox_id: params[:inbox_id].presence)
     ).build
 
-    Current.account.users.map do |agent|
+    Current.account.users.filter_map do |agent|
       report = reports.find { |r| r[:id] == agent.id }
+      # The builder drops agents with no part in the filtered inbox.
+      next if report.blank?
+
       [agent.name] + generate_readable_report_metrics(report)
     end
   end
@@ -14,11 +17,14 @@ module Api::V2::Accounts::ReportsHelper
   def generate_inboxes_report
     reports = V2::Reports::InboxSummaryBuilder.new(
       account: Current.account,
-      params: build_params(type: :inbox)
+      params: build_params(type: :inbox, user_id: params[:user_id].presence)
     ).build
 
-    Current.account.inboxes.map do |inbox|
+    Current.account.inboxes.filter_map do |inbox|
       report = reports.find { |r| r[:id] == inbox.id }
+      # The builder drops inboxes the filtered agent never touched.
+      next if report.blank?
+
       [inbox.name, inbox.channel&.name] + generate_readable_report_metrics(report)
     end
   end

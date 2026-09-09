@@ -179,6 +179,22 @@ describe('getConditionOptions', () => {
     ).toEqual(testOptions);
   });
 
+  it('returns sender type options for sender_type', () => {
+    const senderTypeOptions = [
+      { id: 'Contact', name: 'Contact' },
+      { id: 'User', name: 'Agent' },
+      { id: 'AgentBot', name: 'Bot' },
+    ];
+
+    expect(
+      helpers.getConditionOptions({
+        senderTypeOptions,
+        customAttributes,
+        type: 'sender_type',
+      })
+    ).toEqual(senderTypeOptions);
+  });
+
   it('returns boolean options for private_note', () => {
     const booleanOptions = [
       { id: true, name: 'True' },

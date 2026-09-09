@@ -160,13 +160,13 @@ const PROVIDER_CATALOG = computed(() => [
     key: PROVIDER_TYPES.NATIVE,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
-    icon: 'i-woot-whatsapp',
+    icon: 'i-woot-whatsapp-native',
   },
   {
     key: PROVIDER_TYPES.UAZAPI,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
-    icon: 'i-woot-whatsapp',
+    icon: 'i-woot-uazapi',
   },
   {
     key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
@@ -305,7 +305,9 @@ const requestEmbeddedSignupAccess = () => {
         </p>
       </div>
 
-      <div class="flex gap-6 justify-start">
+      <div
+        class="grid max-w-3xl grid-cols-1 gap-6 xs:grid-cols-2 sm:grid-cols-3"
+      >
         <ChannelSelector
           v-for="provider in availableProviders"
           :key="provider.key"

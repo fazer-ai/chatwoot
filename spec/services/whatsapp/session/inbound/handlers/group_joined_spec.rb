@@ -50,7 +50,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupJoined do
     it 'asks for the picture the snapshot reports' do
       dispatch
 
-      expect(Avatar::AvatarFromUrlJob).to have_been_enqueued.with(anything, 'https://connector.test/new.jpg')
+      expect(Avatar::AvatarFromUrlJob).to have_been_enqueued
+        .with(anything, 'https://connector.test/new.jpg', resolved_at: be_present)
     end
 
     it 'clears the markers that would suppress the download' do

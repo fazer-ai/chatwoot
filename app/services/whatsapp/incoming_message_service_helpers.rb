@@ -1,4 +1,10 @@
 module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleLength
+  # How long a message stands waiting for the chat before it gives up and lets the job come
+  # back for it. Sized by the album it exists for -- the sibling webhooks of one upload land
+  # within a second or two of each other -- and not by how long the work behind the lock
+  # takes, which is what `Locks::CHAT_LOCK_TTL` is for.
+  CONTACT_LOCK_WAIT = 5.seconds
+
   def download_attachment_file(attachment_payload)
     Down.download(inbox.channel.media_url(attachment_payload[:id]), headers: inbox.channel.api_headers)
   end
@@ -210,27 +216,24 @@ module Whatsapp::IncomingMessageServiceHelpers # rubocop:disable Metrics/ModuleL
   # Lock by contact phone to prevent race conditions when multiple messages
   # from the same contact arrive simultaneously (e.g., WhatsApp albums).
   # Without this, each message could create its own conversation.
-  def with_contact_lock(phone, timeout: 5.seconds)
+  #
+  # The same lock the session layer takes, on the same key, and now through the same code:
+  # two implementations of one lock is how the legacy path came to release unconditionally
+  # while the session path released by token, and an overrunning worker here could delete
+  # the lease an import was still writing under.
+  #
+  # `wait` is what this path adds and the only thing it needs of its own. It covers what
+  # the lock was built for: two messages of the same chat landing together, where the first
+  # is done in well under a second, and a job retry a quarter of a minute later would be
+  # worse than a short park. It does not cover the other holder of the same key -- a
+  # history import leases the chat for a whole batch (`Locks::IMPORT_CHAT_LOCK_TTL`), two
+  # orders of magnitude longer than any wait a worker thread should sit through -- so past
+  # the wait it gives up with `Locks::Busy`, which the caller retries, rather than the
+  # Timeout::Error nothing was listening for that used to take the message down with it.
+  def with_contact_lock(phone, wait: CONTACT_LOCK_WAIT, &)
     raise ArgumentError, 'A block is required for with_contact_lock' unless block_given?
     return yield if phone.blank?
 
-    key = "WHATSAPP::CONTACT_LOCK::#{inbox.id}_#{phone}"
-    start_time = Time.now.to_i
-    lock_acquired = false
-
-    while (Time.now.to_i - start_time) < timeout
-      if Redis::Alfred.set(key, 1, nx: true, ex: timeout)
-        lock_acquired = true
-        break
-      end
-
-      sleep(0.1)
-    end
-
-    raise Timeout::Error, "Timeout acquiring contact lock for #{phone}" unless lock_acquired
-
-    yield
-  ensure
-    Redis::Alfred.delete(key) if lock_acquired
+    Whatsapp::Session::Inbound::Locks.with_chat_lock(inbox, phone, wait: wait, &)
   end
 end

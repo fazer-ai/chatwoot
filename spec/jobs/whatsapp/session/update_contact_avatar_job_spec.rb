@@ -19,7 +19,8 @@ RSpec.describe Whatsapp::Session::UpdateContactAvatarJob do
     command = backend.commands_of('contact.profile_picture').first
     expect(command.party).to be_a(model::Address)
     expect(command.party.id).to eq('182736451928374')
-    expect(Avatar::AvatarFromUrlJob).to have_been_enqueued.with(contact, %r{/avatars/182736451928374\.jpg})
+    expect(Avatar::AvatarFromUrlJob).to have_been_enqueued
+      .with(contact, %r{/avatars/182736451928374\.jpg}, resolved_at: be_present)
   end
 
   # `retry_on` only sees what escapes `perform`, and a rescue in the method catches the

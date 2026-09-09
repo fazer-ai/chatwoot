@@ -429,19 +429,18 @@ RSpec.describe 'Api::V1::Accounts::Portals', type: :request do
       end
 
       it 'sends instructions successfully' do
-        mailer_double = instance_double(ActionMailer::MessageDelivery)
-        allow(PortalInstructionsMailer).to receive(:send_cname_instructions).and_return(mailer_double)
-        allow(mailer_double).to receive(:deliver_later)
+        allow(PortalInstructionsMailer).to receive(:with).and_call_original
 
-        post "/api/v1/accounts/#{account.id}/portals/#{portal_with_domain.slug}/send_instructions",
-             headers: admin.create_new_auth_token,
-             params: { email: 'dev@example.com' },
-             as: :json
+        expect do
+          post "/api/v1/accounts/#{account.id}/portals/#{portal_with_domain.slug}/send_instructions",
+               headers: admin.create_new_auth_token,
+               params: { email: 'dev@example.com' },
+               as: :json
+        end.to have_enqueued_mail(PortalInstructionsMailer, :send_cname_instructions)
 
         expect(response).to have_http_status(:success)
         expect(response.parsed_body['message']).to eq('Instructions sent successfully')
-        expect(PortalInstructionsMailer).to have_received(:send_cname_instructions)
-          .with(portal: portal_with_domain, recipient_email: 'dev@example.com')
+        expect(PortalInstructionsMailer).to have_received(:with).with(account: portal_with_domain.account)
       end
     end
   end

@@ -16,6 +16,7 @@ import Banner from 'dashboard/components/ui/Banner.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import ResizableEditorWrapper from './ResizableEditorWrapper.vue';
 import ReferralBubble from 'dashboard/components-next/Conversation/ReferralBubble.vue';
+import ConversationHistorySync from './ConversationHistorySync.vue';
 
 // stores and apis
 import { mapGetters } from 'vuex';
@@ -47,6 +48,7 @@ import WhatsappLinkDeviceModal from '../../../routes/dashboard/settings/inbox/co
 import { isInboxAdminInGroup } from 'dashboard/helper/phoneHelper';
 import {
   isReachoutRestricted,
+  isSendStalled,
   reachoutRestrictionDeadline,
   isMessageCapped,
   isMessageCapReached,
@@ -63,6 +65,7 @@ export default {
     ResizableEditorWrapper,
     WhatsappLinkDeviceModal,
     ReferralBubble,
+    ConversationHistorySync,
   },
   mixins: [inboxMixin],
   setup() {
@@ -190,6 +193,34 @@ export default {
         this.currentChat.agent_last_seen_at
       );
     },
+    // Offered once the thread has been read back to the beginning of what this inbox
+    // holds, which is the moment the missing history becomes visible as an absence.
+    //
+    // Two ways to be at that beginning, and the store only knows one of them.
+    // `listLoadingStatus` (its `getAllMessagesLoaded` under an older name) is set when a
+    // fetch for older messages comes back empty, so it needs a scroll to the top to ever
+    // become true -- and a thread short enough to fit on screen is never scrolled, so it
+    // would never offer this. A first page that came back short is the other way: the
+    // server sends at most MessageFinder::PAGE_LIMIT, which is 20, so fewer than that
+    // means there was never a second page to ask for.
+    canRequestOlderMessages() {
+      const exhausted = this.listLoadingStatus || this.getMessages.length < 20;
+
+      return Boolean(
+        this.currentChat?.id &&
+          this.currentChat.dataFetched &&
+          this.hasInboxCapability(CAPABILITIES.HISTORY_SYNC) &&
+          exhausted &&
+          !this.isLoadingPrevious
+      );
+    },
+    // WhatsApp answered a request for this chat saying it holds nothing older. It only
+    // ever says so in that answer, so this stays false until somebody has asked once.
+    historyExhausted() {
+      return Boolean(
+        this.currentChat?.additional_attributes?.history_exhausted
+      );
+    },
     shouldShowSpinner() {
       return (
         (this.currentChat && this.currentChat.dataFetched === undefined) ||
@@ -304,17 +335,20 @@ export default {
     isGroupConversation() {
       return this.currentChat?.group_type === 'group';
     },
+    // The inbox is part of the target, not only the contact. A group contact is
+    // account-scoped, so the same group can be open in two inboxes of one account, and
+    // what the panel may do there is answered per inbox. Keyed on the contact alone,
+    // switching between the two threads kept the first inbox's answer.
     groupMembersFetchTarget() {
       if (!this.groupContactId || !this.isGroupConversation) return null;
-
       // `groups` and not `group_management`: this fetch reads the GroupMember rows the
       // inbound path already filed, through Chatwoot's own API, and never reaches the
       // provider. Asking for the command surface here would leave a receive-only inbox
       // without `is_inbox_admin`, and an announcement-only group would look replyable
       // until the server refused the message.
-      return this.hasInboxCapability(CAPABILITIES.GROUPS)
-        ? this.groupContactId
-        : null;
+      if (!this.hasInboxCapability(CAPABILITIES.GROUPS)) return null;
+
+      return `${this.groupContactId}:${this.currentChat?.inbox_id}`;
     },
     groupContactId() {
       return this.currentChat?.meta?.sender?.id || null;
@@ -331,7 +365,8 @@ export default {
       if (!this.groupContactId) return {};
       return (
         this.$store.getters['groupMembers/getGroupMembersMeta'](
-          this.groupContactId
+          this.groupContactId,
+          this.currentChat?.inbox_id
         ) || {}
       );
     },
@@ -354,11 +389,15 @@ export default {
         !this.isInboxAdminInCurrentGroup
       );
     },
+    // Read off the conversation, not off the contact: a group contact is
+    // account-scoped and the same group can be open in two inboxes of one account,
+    // where only one of them may have left. The server answers for this thread's own
+    // number.
     isGroupLeft() {
       return (
         this.isASessionWhatsAppChannel &&
         this.isGroupConversation &&
-        this.currentContact?.additional_attributes?.group_left === true
+        this.currentChat?.group_left === true
       );
     },
     isGroupsDisabled() {
@@ -378,6 +417,36 @@ export default {
     },
     inboxReachoutLock() {
       return this.currentInbox.provider_connection?.reachout_time_lock;
+    },
+    showSendStallWarning() {
+      return isSendStalled(
+        this.currentInbox.provider_connection?.send_stall,
+        this.inboxProviderConnection
+      );
+    },
+    providerConnectionBannerMessage() {
+      if (this.showSendStallWarning) {
+        return this.isAdmin
+          ? this.$t(
+              'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.SEND_STALL'
+            )
+          : this.$t(
+              'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.SEND_STALL_CONTACT_ADMIN'
+            );
+      }
+      return this.isAdmin
+        ? this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED'
+          )
+        : this.$t(
+            'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED_CONTACT_ADMIN'
+          );
+    },
+    // The agent's shortcut is a reconnect, and on a stall it is worse than nothing: it
+    // reaches a provider that already considers this socket live, refreshes presence, and
+    // reports success while the inbox stays mute. Only an admin has an action here.
+    providerConnectionBannerHasAction() {
+      return this.isAdmin || !this.showSendStallWarning;
     },
     showReachoutRestriction() {
       return isReachoutRestricted(
@@ -443,9 +512,12 @@ export default {
     // thread stayed without members until the agent switched conversations.
     groupMembersFetchTarget: {
       immediate: true,
-      handler(contactId) {
-        if (contactId && !this.isGroupMembersLoaded) {
-          this.$store.dispatch('groupMembers/fetch', { contactId });
+      handler(target) {
+        if (target && !this.isGroupMembersLoaded) {
+          this.$store.dispatch('groupMembers/fetch', {
+            contactId: this.groupContactId,
+            inboxId: this.currentChat?.inbox_id,
+          });
         }
       },
     },
@@ -862,19 +934,11 @@ export default {
           :inbox="currentInbox"
         />
         <Banner
-          v-if="inboxProviderConnection !== 'open'"
+          v-if="inboxProviderConnection !== 'open' || showSendStallWarning"
           color-scheme="alert"
           class="mt-2 mx-2 rounded-lg overflow-hidden"
-          :banner-message="
-            isAdmin
-              ? $t(
-                  'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED'
-                )
-              : $t(
-                  'CONVERSATION.INBOX.WHATSAPP_PROVIDER_CONNECTION.NOT_CONNECTED_CONTACT_ADMIN'
-                )
-          "
-          has-action-button
+          :banner-message="providerConnectionBannerMessage"
+          :has-action-button="providerConnectionBannerHasAction"
           :action-button-label="
             isAdmin
               ? $t(
@@ -973,6 +1037,11 @@ export default {
             <Spinner v-if="shouldShowSpinner" class="text-n-brand" />
           </li>
         </transition>
+        <ConversationHistorySync
+          v-if="canRequestOlderMessages"
+          :conversation-id="currentChat.id"
+          :exhausted="historyExhausted"
+        />
         <ReferralBubble v-if="referralData" :referral="referralData" />
       </template>
       <template #unreadBadge>

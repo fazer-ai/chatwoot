@@ -230,10 +230,17 @@ class Attachment < ApplicationRecord
 
   # Marcel gem may detect OGG/Opus files as audio/opus instead of audio/ogg.
   # Lazily normalize existing blobs so presigned URLs serve the correct Content-Type.
-  # Only applies to .ogg files — .opus files legitimately use audio/opus.
+  #
+  # Both extensions, because audio/opus here is never a statement about the bytes. Marcel
+  # reads the same file as audio/ogg by content and audio/opus only once it is shown the
+  # name: the container is Ogg either way, which is what .opus means (RFC 7845), and
+  # audio/ogg is the type registered for it. WhatsApp Cloud accepts audio/ogg and has no
+  # entry for audio/opus at all, so a voice note named .opus came back 131053.
+  OPUS_EXTENSIONS = %w[.ogg .opus].freeze
+
   def normalize_opus_blob_content_type!
     blob = file.blob
-    return unless blob.content_type == 'audio/opus' && blob.filename.to_s.end_with?('.ogg')
+    return unless blob.content_type == 'audio/opus' && blob.filename.to_s.downcase.end_with?(*OPUS_EXTENSIONS)
 
     blob.update_column(:content_type, 'audio/ogg') # rubocop:disable Rails/SkipsModelValidations
   end

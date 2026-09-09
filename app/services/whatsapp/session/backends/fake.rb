@@ -9,6 +9,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
   def model = Whatsapp::Session::Model
 
   QR_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='.freeze
+  PAIRING_CODE = 'K7QP-2M4X'.freeze
 
   class << self
     def provider_key
@@ -37,6 +38,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     @connection_state = model::ConnectionState.new(
       connection: 'connecting',
       qr_data_url: (QR_DATA_URL if command.pairing == 'qr'),
+      pairing_code: (PAIRING_CODE if command.pairing == 'code'),
       epoch: (connection_state.epoch || 0) + 1
     )
   end
@@ -57,11 +59,6 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   def fetch_connection_state
     connection_state
-  end
-
-  def request_pairing_code(command)
-    record(command)
-    model::Events::PairingCode.new(code: 'K7QP-2M4X', phone: command.phone)
   end
 
   def import_session(payload)

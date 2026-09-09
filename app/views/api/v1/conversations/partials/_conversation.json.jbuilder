@@ -75,6 +75,12 @@ else
 end
 json.last_activity_at conversation.last_activity_at.to_i
 json.group_type conversation.group_type
+# Whether THIS thread's number has left the WhatsApp group. The group contact is
+# account-scoped and can be in two inboxes of one account, so the answer belongs to the
+# conversation rather than to the contact every thread shares. Only groups carry it:
+# `contact_inbox` is preloaded for the list, but the question is meaningless anywhere
+# else and an always-false field on every conversation is noise.
+json.group_left conversation.contact_inbox&.group_left? if conversation.group_type_group?
 json.priority conversation.priority
 json.waiting_since conversation.waiting_since.to_i.to_i
 sla_applicable = conversation.account.feature_enabled?('sla') && (!conversation.respond_to?(:sla_applicable?) || conversation.sla_applicable?)

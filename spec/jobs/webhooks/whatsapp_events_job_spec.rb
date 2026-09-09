@@ -469,4 +469,14 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       job.perform_now(wb_params)
     end
   end
+
+  describe 'chat lock retry budget' do
+    it 'outlasts the lease a history import takes on the same key' do
+      # The budget is the whole fix: an import holds the chat for a batch, and a job that
+      # runs out of attempts before it lets go drops the message it was carrying.
+      budget = described_class::CHAT_LOCK_RETRY_WAIT * (described_class::CHAT_LOCK_RETRY_ATTEMPTS - 1)
+
+      expect(budget).to be > Whatsapp::Session::Inbound::Locks::IMPORT_CHAT_LOCK_TTL
+    end
+  end
 end

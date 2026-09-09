@@ -121,12 +121,14 @@ class Message < ApplicationRecord
   # [:rich] : Structured WhatsApp "rich" message (template/interactive/buttons/list) with title/body/footer/buttons rendered as a card
   # [:deleted_by_contact] : The contact deleted/revoked the message on WhatsApp; we keep the content visible and only flag it
   # [:pending_source_id] : Provider message id reserved before the send (Baileys), used to match the provider echo back to this row
+  # [:edited_at] : Provider timestamp (ms) of the edit currently stored, so an edit that arrives out of order is refused
+  # [:is_masked] : WhatsApp withheld the content from linked devices (verification codes); set alongside :is_unsupported
 
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data,
                                          :is_reaction, :is_edited, :previous_content, :zapi_args, :referral, :rich,
-                                         :deleted_by_contact, :pending_source_id], coder: JSON
+                                         :deleted_by_contact, :pending_source_id, :edited_at, :is_masked], coder: JSON
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 
@@ -257,6 +259,16 @@ class Message < ApplicationRecord
 
   def deleted?
     ActiveModel::Type::Boolean.new.cast(content_attributes['deleted']) == true
+  end
+
+  # A removed reaction is a deleted row on purpose. WhatsApp allows one reaction per
+  # (message, sender), so Chatwoot reuses the row and marks it deleted rather than
+  # accumulating one per toggle, and the empty content it then carries is exactly the
+  # payload that clears the reaction on the contact's phone. Every guard that keeps a
+  # deleted message off the channel has to let this one through, or the emoji disappears
+  # in Chatwoot and stays on the contact's phone forever.
+  def removed_reaction?
+    deleted? && content_attributes['is_reaction'].present?
   end
 
   # `content_attributes` is a single JSON column, so writing any of its store accessors from a stale

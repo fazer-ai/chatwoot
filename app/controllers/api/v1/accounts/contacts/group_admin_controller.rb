@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::GroupAdminController < Api::V1::Accounts::Contacts::BaseController
+  include GroupChannelResolver
+
   VALID_PROPERTIES = %w[announce restrict join_approval_mode member_add_mode].freeze
 
   def leave
@@ -37,10 +39,6 @@ class Api::V1::Accounts::Contacts::GroupAdminController < Api::V1::Accounts::Con
 
   def property_params
     params.permit(:property, :enabled)
-  end
-
-  def channel
-    @channel ||= @contact.group_channel
   end
 
   def resolve_group_conversations

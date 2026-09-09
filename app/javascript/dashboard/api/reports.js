@@ -91,9 +91,14 @@ class ReportsAPI extends ApiClient {
     });
   }
 
-  getAgentReports({ from: since, to: until, businessHours }) {
+  getAgentReports({ from: since, to: until, businessHours, inboxId }) {
     return axios.get(`${this.url}/agents`, {
-      params: { since, until, business_hours: businessHours },
+      params: {
+        since,
+        until,
+        business_hours: businessHours,
+        inbox_id: inboxId,
+      },
     });
   }
 
@@ -115,9 +120,9 @@ class ReportsAPI extends ApiClient {
     });
   }
 
-  getInboxReports({ from: since, to: until, businessHours }) {
+  getInboxReports({ from: since, to: until, businessHours, userId }) {
     return axios.get(`${this.url}/inboxes`, {
-      params: { since, until, business_hours: businessHours },
+      params: { since, until, business_hours: businessHours, user_id: userId },
     });
   }
 

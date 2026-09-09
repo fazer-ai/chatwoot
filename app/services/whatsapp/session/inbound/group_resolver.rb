@@ -34,9 +34,10 @@ class Whatsapp::Session::Inbound::GroupResolver
   # would get a second conversation and split the group in two. It lives in the concern
   # the frozen Baileys layer also uses, so the policy is applied here instead of changed
   # there.
-  def conversation_for(group_contact_inbox)
+  def conversation_for(group_contact_inbox, archived: false, occurred_at: nil)
     Whatsapp::Session::Inbound::ConversationFinder.new(
-      inbox: inbox, contact: group_contact_inbox.contact, contact_inbox: group_contact_inbox
+      inbox: inbox, contact: group_contact_inbox.contact, contact_inbox: group_contact_inbox,
+      archived: archived, occurred_at: occurred_at
     ).perform
   end
 

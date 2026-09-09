@@ -10,6 +10,7 @@
 # provider add an event type, or an operator subscribe to more than Chatwoot asked for,
 # without the inbox failing on every delivery.
 class Whatsapp::Session::Backends::Uazapi::WebhookTranslator
+  include Whatsapp::Session::Backends::Uazapi::WebhookTranslator::History
   # `state` at the top of the body, not `event.Type`: the casing of the latter is not
   # stable (a peer reading answers `Read`, our own `/message/markread` answers `read`),
   # while `state` was consistent across every capture.
@@ -37,17 +38,23 @@ class Whatsapp::Session::Backends::Uazapi::WebhookTranslator
   def perform
     return [] unless this_instance?
 
-    case body[:EventType]
-    when 'connection' then [connection].compact
-    when 'messages' then [message].compact
-    when 'messages_update' then message_update
-    when 'presence' then [chat_presence].compact
-    when 'groups' then [group].compact
-    else []
-    end
+    return message_update if body[:EventType] == 'messages_update'
+
+    [single_event].compact
   end
 
   private
+
+  # Every envelope but `messages_update`, which is the one that can carry several.
+  def single_event
+    case body[:EventType]
+    when 'connection' then connection
+    when 'messages' then message
+    when 'presence' then chat_presence
+    when 'groups' then group
+    when 'history' then history
+    end
+  end
 
   # The instance the body says it came from, against the one the inbox is pointed at now.
   # A body is authenticated when it arrives and dispatched later, and an inbox re-pointed

@@ -67,6 +67,12 @@ RSpec.describe Voice::CallTranscriptionService, type: :service do
     it 'reindexes before broadcasting so a retry after a reindex failure does not resend the update event' do
       call.update!(transcript: 'Existing transcript')
       allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(true)
+      # `Message` mixes searchkick in at class-load time, and only when
+      # `advanced_search_allowed?` -- which needs OPENSEARCH_URL, absent in test. So the
+      # method the service calls does not exist on the class here and a verified double
+      # refuses to stub it. Defining it completes the "search is on" simulation the stub
+      # above starts, instead of the service dying on NoMethodError before the point.
+      message.define_singleton_method(:reindex) { |*| nil }
       allow(message).to receive(:reindex).and_raise(StandardError, 'reindex boom')
 
       expect(message).not_to receive(:send_update_event)

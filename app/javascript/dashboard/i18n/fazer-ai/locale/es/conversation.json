@@ -15,7 +15,9 @@
       "GROUPS_DISABLED_RESTRICTED": "Los mensajes de grupo están desactivados: actívelos gratis"
     },
     "REPLYBOX": {
-      "SCHEDULE_SEND": "Programar envío"
+      "SCHEDULE_SEND": "Programar envío",
+      "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "El archivo adjunto se descartó porque la conversación cambió entre nota y respuesta.",
+      "RECORDING_DISCARDED_ON_MODE_CHANGE": "La grabación se descartó porque la conversación cambió entre nota y respuesta."
     },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "La conversación ya está asignada",
@@ -25,6 +27,7 @@
     },
     "CHANGE_TEAM_FAILED": "No se pudo cambiar el equipo",
     "MESSAGE_DELETED_BY_CONTACT": "Eliminado por el contacto",
+    "MASKED_MESSAGE_WHATSAPP": "WhatsApp no entrega códigos de verificación a los dispositivos vinculados. Este mensaje solo se puede leer en el teléfono vinculado.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {
@@ -60,7 +63,9 @@
         "NOT_CONNECTED": "WhatsApp no está conectado. Vincule su dispositivo de nuevo.",
         "NOT_CONNECTED_CONTACT_ADMIN": "WhatsApp no está conectado. Haga clic en este botón para intentar reconectar o contacte a su administrador para vincular el dispositivo de nuevo.",
         "LINK_DEVICE": "Vincular dispositivo",
-        "RECONNECT_FAILED": "No se pudo reconectar. Contacte a su administrador para vincular el dispositivo de nuevo."
+        "RECONNECT_FAILED": "No se pudo reconectar. Contacte a su administrador para vincular el dispositivo de nuevo.",
+        "SEND_STALL": "WhatsApp está conectado, pero no puede enviar mensajes. Vincule el dispositivo de nuevo para restablecer el envío.",
+        "SEND_STALL_CONTACT_ADMIN": "WhatsApp está conectado, pero no puede enviar mensajes. Sus respuestas no se entregarán hasta que un administrador vincule el dispositivo de nuevo."
       },
       "WHATSAPP_REACHOUT_RESTRICTION": {
         "RESTRICTED": "WhatsApp ha restringido temporalmente el inicio de conversaciones nuevas desde este número.",
@@ -82,6 +87,13 @@
     "CARD_CONTEXT_MENU": {
       "PIN": "Fijar",
       "UNPIN": "Dejar de fijar"
+    },
+    "HISTORY_SYNC": {
+      "BUTTON": "Cargar mensajes más antiguos",
+      "HELP": "Pide al teléfono lo que vino antes. Tiene que estar encendido para responder, y se queda en silencio cuando ya envió este tramo.",
+      "REQUESTED": "Le pedimos al teléfono los mensajes más antiguos. Aparecen aquí a medida que los envía.",
+      "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento.",
+      "EXHAUSTED": "No hay nada más antiguo aquí. El resto de esta conversación está solo en el teléfono."
     }
   },
   "CONVERSATION_SIDEBAR": {

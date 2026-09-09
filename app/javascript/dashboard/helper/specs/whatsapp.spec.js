@@ -1,5 +1,6 @@
 import {
   isReachoutRestricted,
+  isSendStalled,
   reachoutRestrictionDeadline,
   isMessageCapped,
   isMessageCapReached,
@@ -47,6 +48,29 @@ describe('#isReachoutRestricted', () => {
   it('keeps the restriction visible when the deadline is malformed (fail safe)', () => {
     const lock = { is_active: true, time_enforcement_ends: 'not-a-date' };
     expect(isReachoutRestricted(lock, 'open', now)).toBe(true);
+  });
+});
+
+describe('#isSendStalled', () => {
+  const stall = { consecutive_timeouts: 3, action: 'suppressed' };
+
+  // The pairing that IS the fault: everything else in the view reports a healthy inbox.
+  it('warns while the connection still reads open', () => {
+    expect(isSendStalled(stall, 'open')).toBe(true);
+  });
+
+  it('stays quiet with no stall recorded', () => {
+    expect(isSendStalled(undefined, 'open')).toBe(false);
+    expect(isSendStalled(null, 'open')).toBe(false);
+  });
+
+  // The stored stall outlives the episode on purpose (only a new socket reaching 'open'
+  // clears it), so a closed connection would otherwise show both banners at once — and
+  // the offline one is the accurate one.
+  it('yields to the offline banner once the connection is down', () => {
+    expect(isSendStalled(stall, 'close')).toBe(false);
+    expect(isSendStalled(stall, 'connecting')).toBe(false);
+    expect(isSendStalled(stall, undefined)).toBe(false);
   });
 });
 

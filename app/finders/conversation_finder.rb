@@ -73,6 +73,22 @@ class ConversationFinder # rubocop:disable Metrics/ClassLength
     }
   end
 
+  # The conversations the caller names, scoped to what it is allowed to see and to nothing else.
+  # No status, no assignee, no group_type: those are the tab's question, and this one is about the
+  # conversations themselves. Filtering here would leave out exactly the rows the caller is asking
+  # after, which are the ones that stopped matching.
+  def perform_sync(candidate_ids)
+    return Conversation.none if candidate_ids.blank?
+
+    @conversations = Conversations::PermissionFilterService.new(
+      current_account.conversations.where(display_id: candidate_ids),
+      current_user,
+      current_account
+    ).perform
+
+    conversations_base_query
+  end
+
   private
 
   def set_up

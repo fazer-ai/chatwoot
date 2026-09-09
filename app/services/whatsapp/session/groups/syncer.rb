@@ -55,9 +55,16 @@ class Whatsapp::Session::Groups::Syncer
 
   def inbox = channel.inbox
 
+  def group_contact_inbox = group_contact.contact_inboxes.find_by(inbox_id: inbox.id)
+
   def apply(info)
     return if info.blank?
 
+    # Only rejoining clears the left flag, and only an event that carries the group
+    # (`group.joined`) knows that happened. A scheduled sync can still read cached
+    # metadata for a group this inbox left, and clearing it there would put the group
+    # actions back in the dashboard for a thread that can no longer send anything.
+    group_contact_inbox&.mark_group_rejoined! if @info.present?
     update_contact(info)
     sync_members(info)
     update_avatar(info) unless soft
@@ -105,12 +112,7 @@ class Whatsapp::Session::Groups::Syncer
       'owner' => info.owner&.identifier || info.owner&.phone,
       'owner_pn' => info.owner&.phone,
       'invite_code' => info.invite_code.presence,
-      'group_last_synced_at' => Time.current.to_i,
-      # Only rejoining clears this, and only `group.joined` knows that happened. A
-      # scheduled sync can still read cached metadata for a group the session left, and
-      # clearing the flag there would put the group actions back in the dashboard for a
-      # thread that can no longer send anything.
-      'group_left' => (false if @info.present?)
+      'group_last_synced_at' => Time.current.to_i
     }.compact
     attributes['description'] = info.description.presence unless info.description.nil?
     attributes.merge(setting_attributes(info))
@@ -151,16 +153,16 @@ class Whatsapp::Session::Groups::Syncer
   # over the stored one: nothing replays the picture-change events from while the session
   # was out of the group, and the guard below would otherwise keep the old image for as
   # long as the avatar stays attached, which is forever.
+  # A snapshot reporting no picture used to read exactly like one that does not mention
+  # the picture, and this could only stand still: a photo removed while the session was
+  # out of the group kept the stored one. `has_picture` is what says the difference, and
+  # a producer that cannot answer leaves it out, which is the case this keeps unchanged.
   def update_avatar(info)
-    # A NULL PICTURE IS AMBIGUOUS, TRACKED (fazer-ai/chatwoot#376). A snapshot reporting
-    # no picture reads exactly like one that does not mention the picture, so a photo
-    # removed while the session was out of the group keeps the stored avatar. Telling the
-    # two apart is a contract change, decided with the Uazapi payloads. Do not delete
-    # this note without closing the issue.
+    return Whatsapp::Session::AvatarSync.remove(group_contact) if info.has_picture == false
     return if info.picture_url.blank?
     return Whatsapp::Session::AvatarSync.refetch(group_contact, info.picture_url) if @info.present?
     return if group_contact.avatar.attached?
 
-    ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url)
+    ::Avatar::AvatarFromUrlJob.perform_later(group_contact, info.picture_url, resolved_at: Time.current.iso8601)
   end
 end

@@ -111,6 +111,15 @@ RSpec.describe Conversation, type: :model do
         expect(conversation.errors[:sla_policy]).to eq(['cannot be assigned to conversations with blocked contacts'])
       end
 
+      # `dependent: :destroy_async` leaves the conversation pointing at a deleted contact
+      # until the cleanup job runs, and nothing enforces otherwise -- see the AppliedSla spec.
+      # `contact&.blocked?` is what has to hold up there.
+      it 'keeps existing behavior when the contact row is gone' do
+        conversation.contact.delete
+
+        expect(conversation.reload.sla_applicable?).to be true
+      end
+
       it 'allows assigning sla after contact is unblocked' do
         conversation.contact.update!(blocked: true)
         conversation.contact.update!(blocked: false)
@@ -119,12 +128,6 @@ RSpec.describe Conversation, type: :model do
         conversation.save!
 
         expect(conversation.applied_sla.sla_policy_id).to eq(sla_policy.id)
-      end
-
-      it 'keeps existing behavior when contact is missing' do
-        conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
-
-        expect(conversation.reload.sla_applicable?).to be true
       end
     end
 

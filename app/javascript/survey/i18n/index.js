@@ -1,3 +1,4 @@
+import { withForkMessages } from './fazer-ai';
 import ar from './locale/ar.json';
 import bg from './locale/bg.json';
 import ca from './locale/ca.json';
@@ -41,7 +42,7 @@ import vi from './locale/vi.json';
 import zh_CN from './locale/zh_CN.json';
 import zh_TW from './locale/zh_TW.json';
 
-export default {
+export default withForkMessages({
   ar,
   bg,
   ca,
@@ -84,4 +85,4 @@ export default {
   vi,
   zh_CN,
   zh_TW,
-};
+});

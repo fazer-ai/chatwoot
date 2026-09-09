@@ -50,9 +50,15 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # The second half is the one that survives being in the family: a connector blob and a
   # Uazapi message id mean nothing to anyone but the provider that issued them, and the
   # conversion has already disconnected the one that did.
+  #
+  # It only has anything to say about a ref that exists. A fetch for a message whose file
+  # never came carries none, and asks the provider by message id alone -- which is the
+  # same thing the refresh behind a lapsed ref does, and is answered the same way when the
+  # provider does not know the message.
   def conversion_refusal(channel, media)
     return "inbox ##{channel.inbox.id} left the session layer" unless channel.session_provider?
-    return "ref was issued by a provider other than #{channel.provider}" unless media.ref&.served_by?(channel.provider)
+    return if media.ref.nil?
+    return "ref was issued by a provider other than #{channel.provider}" unless media.ref.served_by?(channel.provider)
 
     nil
   end

@@ -18,6 +18,7 @@ import { sanitizeAllowedDomains, isValidURL } from 'dashboard/helper/URLHelper';
 import { requiredIf } from '@vuelidate/validators';
 import WhatsappLinkDeviceModal from '../components/WhatsappLinkDeviceModal.vue';
 import SessionProviderConfiguration from './SessionProviderConfiguration.vue';
+import WhatsappHistorySync from './WhatsappHistorySync.vue';
 import WhatsappBusinessManagementToken from './WhatsappBusinessManagementToken.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
@@ -34,6 +35,7 @@ export default {
     TextArea,
     WhatsappLinkDeviceModal,
     SessionProviderConfiguration,
+    WhatsappHistorySync,
     WhatsappBusinessManagementToken,
     InboxName,
     // eslint-disable-next-line vue/no-reserved-component-names
@@ -687,6 +689,7 @@ export default {
           </NextButton>
         </div>
       </SettingsSection>
+      <WhatsappHistorySync :inbox="inbox" />
       <SettingsSection
         :title="$t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_PROVIDER_URL_TITLE')"
         :sub-title="

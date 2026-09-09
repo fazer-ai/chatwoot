@@ -52,14 +52,15 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     admin_tokens = account.administrators.pluck(:pubsub_token)
     agent_tokens = account.agents.pluck(:pubsub_token)
 
-    # reach-out lock and new-chat cap are not credential-sensitive (unlike qr_data_url), so they
+    # reach-out lock, new-chat cap and send-stall are not credential-sensitive (unlike qr_data_url), so they
     # ride the base hash shared by both agent and admin broadcasts. Without this, a connection.update
     # push would broadcast a provider_connection without them and the frontend mutation (wholesale
     # replace) would drop the restriction/cap banners. .presence + .compact keeps absent keys out.
     connection = {
       connection: provider_connection['connection'],
       reachout_time_lock: provider_connection['reachout_time_lock'].presence,
-      new_chat_cap: provider_connection['new_chat_cap'].presence
+      new_chat_cap: provider_connection['new_chat_cap'].presence,
+      send_stall: provider_connection['send_stall'].presence
     }.compact
     broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
     broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
@@ -279,13 +280,19 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
   def contact_group_synced(event)
     contact, account = extract_contact_and_account(event)
-    channel = contact.group_channel
+    # The inbox the sync actually ran as. `Contact#group_channel` is the group contact's
+    # first contact inbox, which is an arbitrary pick as soon as the same group is in two
+    # inboxes of one account: it would answer "you administer this group" for a number
+    # that is not the one the agent has open. Kept as the fallback for an event queued by
+    # a version that did not name it.
+    channel = event.data[:channel] || contact.group_channel
     # The same answer the REST roster sends, from the same lookup. Two copies of it is how
     # an account known by LID alone was recognised by whichever ran last: the fetch said
     # "you administer this group" and the first sync event took it back.
     own_member = Whatsapp::Session::Owner.group_member(channel, contact)
     payload = contact.push_event_data.merge(
       group_members: group_members_data(contact, account),
+      inbox_id: channel&.inbox&.id,
       inbox_phone_number: channel&.phone_number,
       own_member_id: own_member&.id,
       is_inbox_admin: own_member&.role == 'admin'

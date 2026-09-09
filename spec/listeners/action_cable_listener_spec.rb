@@ -45,6 +45,24 @@ describe ActionCableListener do
 
       listener.contact_group_synced(event)
     end
+
+    # The panel decides what the agent may do from this payload, so it has to answer for
+    # the inbox the sync ran as. `Contact#group_channel` is the group contact's first
+    # contact inbox, which is another number entirely as soon as the group is in two.
+    it 'answers for the inbox the event names, not for whichever came first' do
+      other = create(:channel_whatsapp, account: account, provider: 'uazapi', phone_number: '+5541988887777',
+                                        validate_provider_config: false, sync_templates: false)
+      create(:contact_inbox, inbox: other.inbox, contact: group_contact)
+      create(:contact_inbox, inbox: channel.inbox, contact: group_contact)
+      event = Events::Base.new(:'contact.group_synced', Time.zone.now, contact: group_contact, channel: channel)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        anything, 'contact.group_synced',
+        hash_including(inbox_id: channel.inbox.id, inbox_phone_number: '+5541999990000')
+      )
+
+      listener.contact_group_synced(event)
+    end
   end
 
   describe '#account_cache_invalidated' do
@@ -602,6 +620,32 @@ describe ActionCableListener do
             provider_connection: {
               connection: 'connecting',
               reachout_time_lock: { 'is_active' => true, 'time_enforcement_ends' => '2026-06-19T21:52:39.000Z' }
+            },
+            account_id: account.id
+          }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
+    end
+
+    context 'when a send stall is present' do
+      let(:provider_connection) do
+        { 'connection' => 'open', 'send_stall' => { 'consecutive_timeouts' => 3, 'action' => 'suppressed' } }
+      end
+
+      # The push is the only thing that reaches an agent already sitting in the
+      # conversation: the REST payload was fetched before the stall started.
+      it 'includes the stall in the agent broadcast' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          {
+            inbox_id: inbox.id,
+            provider_connection: {
+              connection: 'open',
+              send_stall: { 'consecutive_timeouts' => 3, 'action' => 'suppressed' }
             },
             account_id: account.id
           }

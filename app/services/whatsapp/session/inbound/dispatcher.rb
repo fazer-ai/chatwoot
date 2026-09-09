@@ -33,6 +33,7 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.updated' => 'GroupUpdated',
     'group.picture_changed' => 'GroupPictureChanged',
     'group.activity' => 'GroupActivity',
+    'history.sync' => 'HistorySync',
     'account.reachout_timelock' => 'AccountLimits',
     'account.new_chat_cap' => 'AccountLimits',
     'raw' => 'Raw'
@@ -47,7 +48,7 @@ class Whatsapp::Session::Inbound::Dispatcher
   # instead of watching the thread fill on its own, which is #407's to spend.
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
-    call.offer call.terminate history.sync
+    call.offer call.terminate
     session.offline_sync_preview session.offline_sync_completed
   ].freeze
 

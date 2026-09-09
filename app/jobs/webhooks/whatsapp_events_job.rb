@@ -5,6 +5,16 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   # holder finishes and silently drop its message.
   retry_on LockAcquisitionError, wait: 2.seconds, attempts: 20
 
+  # The incoming services take a second lock, on the chat, and that one is also taken by
+  # the history import, which leases it for a whole batch. A budget sized for live
+  # contention runs out while the import is still writing, and the message this job is
+  # carrying is gone: nine were lost that way on a single reconnect, to a group that
+  # happened to be importing. So the budget is derived from the lease rather than picked,
+  # with half again on top for the batch that has to finish after the lease is taken.
+  CHAT_LOCK_RETRY_WAIT = 15.seconds
+  CHAT_LOCK_RETRY_ATTEMPTS = (Whatsapp::Session::Inbound::Locks::IMPORT_CHAT_LOCK_TTL.to_i / CHAT_LOCK_RETRY_WAIT.to_i * 1.5).ceil
+  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: CHAT_LOCK_RETRY_WAIT, attempts: CHAT_LOCK_RETRY_ATTEMPTS
+
   def perform(params = {})
     dump_raw_payload(params)
     channel = find_channel_from_whatsapp_business_payload(params)

@@ -284,6 +284,27 @@ export const icons = {
     width: 48,
     height: 32,
   },
+  uazapi: {
+    body: `<g fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="4.05" r="1.75"/>
+    <path d="M12 5.8v1.95"/>
+    <path d="M5.8 7.75h12.43a1.5 1.5 0 0 1 1.5 1.5v7.35a1.5 1.5 0 0 1-1.5 1.5H10.1l-3.5 3.52V18.1H5.8a1.5 1.5 0 0 1-1.5-1.5V9.25a1.5 1.5 0 0 1 1.5-1.5Z"/>
+    <path d="M4.3 11.4a1.6 1.6 0 0 0 0 3.2"/>
+    <path d="M19.7 11.4a1.6 1.6 0 0 1 0 3.2"/>
+    <circle cx="8.55" cy="13" r="1.7"/>
+    <circle cx="15.45" cy="13" r="1.7"/>
+    </g>`,
+    width: 24,
+    height: 24,
+  },
+  'whatsapp-native': {
+    body: `<g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="6" width="12" height="12" rx="2.6"/>
+    <path d="M9.5 6V3.2M14.5 6V3.2M9.5 18v2.8M14.5 18v2.8M6 9.5H3.2M6 14.5H3.2M18 9.5h2.8M18 14.5h2.8"/>
+    </g>`,
+    width: 24,
+    height: 24,
+  },
   'voice-call': {
     body: `<mask id="cvc" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16"><rect width="16" height="16" fill="#fff"/><circle cx="12" cy="4" r="4" fill="#000"/></mask><g mask="url(#cvc)"><path d="M7.916 10.784a.5.5 0 0 0 .607-.152L8.7 10.4a1 1 0 0 1 .8-.4H11a1 1 0 0 1 1 1v1.5a1 1 0 0 1-1 1 9 9 0 0 1-9-9 1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V6a1 1 0 0 1-.4.8l-.234.176a.5.5 0 0 0-.146.616 7 7 0 0 0 3.196 3.192" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g><circle cx="12" cy="4" r="4" fill="currentColor" fill-opacity="0.15"/><path d="M10.4 3.2v1.6M12 2.4v3.2m1.6-2.4v1.6" stroke="currentColor" stroke-width=".833" stroke-linecap="round" stroke-linejoin="round"/>`,
     width: 16,

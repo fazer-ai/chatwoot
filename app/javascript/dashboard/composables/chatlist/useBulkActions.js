@@ -1,4 +1,4 @@
-import { ref, unref } from 'vue';
+import { computed, ref, unref } from 'vue';
 import { useStore } from 'vuex';
 import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
@@ -14,29 +14,31 @@ export function useBulkActions() {
   const selectedConversations = useMapGetter(
     'bulkActions/getSelectedConversationIds'
   );
-  const selectedInboxes = ref([]);
+  // Keyed by conversation, so deselecting needs nothing but the id. It used to be a parallel array
+  // that the caller had to index into by inbox, which meant a conversation already gone from the
+  // store (deleted, or its contact removed) could not be deselected fully: the id left the
+  // selection and its inbox stayed behind, narrowing the assignable agents of the next selection.
+  const selectedInboxById = ref(new Map());
+  const selectedInboxes = computed(() => [...selectedInboxById.value.values()]);
 
   function selectConversation(conversationId, inboxId) {
     store.dispatch('bulkActions/setSelectedConversationIds', conversationId);
-    selectedInboxes.value = [...selectedInboxes.value, inboxId];
+    selectedInboxById.value = new Map(selectedInboxById.value).set(
+      conversationId,
+      inboxId
+    );
   }
 
-  function deSelectConversation(conversationId, inboxId) {
+  function deSelectConversation(conversationId) {
     store.dispatch('bulkActions/removeSelectedConversationIds', conversationId);
-    // Only remove one instance of the inboxId, not all
-    // This handles the case where multiple conversations from the same inbox are selected
-    const index = selectedInboxes.value.indexOf(inboxId);
-    if (index > -1) {
-      selectedInboxes.value = [
-        ...selectedInboxes.value.slice(0, index),
-        ...selectedInboxes.value.slice(index + 1),
-      ];
-    }
+    const next = new Map(selectedInboxById.value);
+    next.delete(conversationId);
+    selectedInboxById.value = next;
   }
 
   function resetBulkActions() {
     store.dispatch('bulkActions/clearSelectedConversationIds');
-    selectedInboxes.value = [];
+    selectedInboxById.value = new Map();
   }
 
   function selectAllConversations(check, conversationList) {
@@ -46,7 +48,9 @@ export function useBulkActions() {
         'bulkActions/setSelectedConversationIds',
         availableConversations.map(item => item.id)
       );
-      selectedInboxes.value = availableConversations.map(item => item.inbox_id);
+      selectedInboxById.value = new Map(
+        availableConversations.map(item => [item.id, item.inbox_id])
+      );
     } else {
       resetBulkActions();
     }

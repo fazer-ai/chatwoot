@@ -59,6 +59,23 @@ RSpec.describe 'Summary Reports API', type: :request do
         expect(json_response.first['conversations_count']).to eq(110)
         expect(json_response.first['avg_reply_time']).to be_nil
       end
+
+      it 'narrows the agent report to an inbox when one is given' do
+        inbox = create(:inbox, account: account)
+        agent_summary_builder = double
+        allow(V2::Reports::AgentSummaryBuilder).to receive(:new).and_return(agent_summary_builder)
+        allow(agent_summary_builder).to receive(:build).and_return([])
+
+        get "/api/v2/accounts/#{account.id}/summary_reports/agent",
+            params: params.merge(inbox_id: inbox.id),
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(V2::Reports::AgentSummaryBuilder).to have_received(:new).with(
+          account: account,
+          params: params.merge(type: :agent, inbox_id: inbox.id)
+        )
+      end
     end
   end
 
@@ -112,6 +129,22 @@ RSpec.describe 'Summary Reports API', type: :request do
         expect(json_response.first['id']).to eq(1)
         expect(json_response.first['conversations_count']).to eq(110)
         expect(json_response.first['avg_reply_time']).to be_nil
+      end
+
+      it 'narrows the inbox report to an agent when one is given' do
+        inbox_summary_builder = double
+        allow(V2::Reports::InboxSummaryBuilder).to receive(:new).and_return(inbox_summary_builder)
+        allow(inbox_summary_builder).to receive(:build).and_return([])
+
+        get "/api/v2/accounts/#{account.id}/summary_reports/inbox",
+            params: params.merge(user_id: agent.id),
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(V2::Reports::InboxSummaryBuilder).to have_received(:new).with(
+          account: account,
+          params: params.merge(type: :inbox, user_id: agent.id)
+        )
       end
     end
   end

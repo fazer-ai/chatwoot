@@ -48,6 +48,30 @@ RSpec.describe Whatsapp::Session::Outbound::SourceIdReservation do
       expect(message.reload.source_id).to be_nil
     end
 
+    # The echo of a send we already gave up on. Waiting for a delivery receipt to promote
+    # it leaves a window where the message is proven to exist and still shows Retry — and
+    # Retry clears the reservation and sends a fresh id, producing exactly the duplicate
+    # this reservation exists to prevent.
+    it 'retires a local send failure when the id proves the message exists' do
+      message.update!(status: :failed, external_error: 'send timed out')
+
+      expect(described_class.assign(message, { source_id: '3EB0FIRST' })).to eq(:written)
+
+      expect(message.reload.status).to eq('sent')
+      expect(message.external_error).to be_blank
+    end
+
+    # Only the writer that fills the column, and only over a failure. A receipt that
+    # already moved the message forward must not be walked back to `sent`.
+    it 'leaves a message the provider already confirmed where it is' do
+      described_class.assign(message, { source_id: '3EB0FIRST' })
+      message.reload.update!(status: :delivered)
+
+      described_class.assign(message.reload, { source_id: '3EB0FIRST' })
+
+      expect(message.reload.status).to eq('delivered')
+    end
+
     # `update_all` would have written the id without changing the record, leaving
     # `previous_changes` empty: dashboards and webhooks never learn the provider id, and
     # the reaction toolbar stays hidden until something else touches the message.

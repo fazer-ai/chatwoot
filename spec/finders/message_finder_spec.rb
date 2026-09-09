@@ -113,6 +113,51 @@ describe MessageFinder do
     end
   end
 
+  # Imported history is written in the order the provider hands it over, which is not the
+  # order it happened: a message delivered late gets the next id and an older timestamp.
+  # An id-only cursor would drop it from every page, including the ones reached by
+  # scrolling up.
+  describe 'a message written out of chronological order' do
+    let(:params) { {} }
+    let!(:newest) do
+      create(:message, account: account, inbox: inbox, conversation: conversation,
+                       content: 'sent last', created_at: 2.minutes.ago)
+    end
+    # Higher id, earlier timestamp: this is the shape a late history frame takes.
+    let!(:late_arrival) do
+      create(:message, account: account, inbox: inbox, conversation: conversation,
+                       content: 'sent first, stored last', created_at: 3.minutes.ago)
+    end
+
+    it 'is reachable from a cursor anchored on the newer message' do
+      result = described_class.new(conversation, { before: newest.id }).perform
+
+      expect(late_arrival.id).to be > newest.id
+      expect(result).to include(late_arrival)
+      expect(result).not_to include(newest)
+    end
+
+    # The cursor now means a point in time, so a message with a *lower* id that happened
+    # after it is excluded. Under the id filter it would have come back as "before".
+    it 'excludes the cursor and everything that happened after it' do
+      result = described_class.new(conversation, { before: late_arrival.id }).perform
+
+      expect(newest.id).to be < late_arrival.id
+      expect(result).not_to include(late_arrival, newest)
+    end
+
+    # The cursor names a message this conversation does not have, so there is no timestamp
+    # to compare against and the id filter is all that is left.
+    it 'falls back to the id filter for a cursor from another conversation' do
+      elsewhere = create(:conversation, account: account, inbox: inbox, contact: contact)
+      foreign = create(:message, account: account, inbox: inbox, conversation: elsewhere)
+
+      result = described_class.new(conversation, { before: foreign.id }).perform
+
+      expect(result).to include(newest, late_arrival)
+    end
+  end
+
   describe 'page_window with reactions' do
     # Isolated setup: skip the shared `before` block's fixtures so count assertions stay stable.
     subject(:message_finder) { described_class.new(fresh_conversation, {}) }

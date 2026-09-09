@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::Contacts::BaseController
+  include GroupChannelResolver
+
   DEFAULT_PER_PAGE = 10
 
   before_action :ensure_group_contact, only: %i[create update destroy]
@@ -83,10 +85,6 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
 
   def update_params
     params.permit(:role)
-  end
-
-  def channel
-    @channel ||= @contact.group_channel
   end
 
   def inbox_phone_number
@@ -184,8 +182,10 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     Whatsapp::Session::PhoneMatch.digits(address['id'])
   end
 
+  # Into the inbox the addition was performed as, which is the one that now has the new
+  # members in its copy of the group.
   def add_group_members(phone_numbers)
-    inbox = @contact.contact_inboxes.first&.inbox
+    inbox = group_contact_inbox&.inbox
     Array(phone_numbers).each do |phone|
       normalized = normalize_phone(phone)
       next if normalized.blank?

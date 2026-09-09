@@ -25,6 +25,46 @@ RSpec.describe Whatsapp::SessionContract do
     expect(described_class.protocol_version).to eq(Whatsapp::Session::PROTOCOL_VERSION)
   end
 
+  # `drifted?` above only compares the copy against the checksum it was vendored with, so it
+  # catches a local edit and nothing else. Saying what is different from another checkout is
+  # what lets the weekly run name the event the connector added while this side was not
+  # looking, which otherwise reaches the dispatcher as Unknown and is logged as an unknown
+  # payload -- the same shape as a type we deliberately ignore.
+  describe '.diff' do
+    let(:other) { Pathname.new(Dir.mktmpdir) }
+
+    before { FileUtils.cp_r("#{described_class.root}/.", other) }
+
+    after { FileUtils.rm_rf(other) }
+
+    it 'finds nothing between two copies of the same contract' do
+      expect(described_class.diff(other).values.flatten).to be_empty
+    end
+
+    it 'names a file the other copy has and this one does not' do
+      other.join('fixtures/events/session_something_the_connector_added.json').write('{}')
+
+      expect(described_class.diff(other))
+        .to include(behind: ['fixtures/events/session_something_the_connector_added.json'], stale: [], ahead: [])
+    end
+
+    it 'names a file whose contents moved on' do
+      other.join('PROTOCOL_VERSION').write('99')
+
+      expect(described_class.diff(other)).to include(stale: ['PROTOCOL_VERSION'], behind: [], ahead: [])
+    end
+
+    # CONTRACT_REF records the result of hashing the contract and the connector's README
+    # describes the directory to whoever reads it there. Counting either would report drift
+    # on every comparison, for ever.
+    it 'ignores the files that are not part of the contract' do
+      other.join('README.md').write('the contract lives here')
+      other.join('CONTRACT_REF').write('repo=someone/else\nref=deadbeef\nchecksum=nonsense\n')
+
+      expect(described_class.diff(other).values.flatten).to be_empty
+    end
+  end
+
   it 'has not been edited locally' do
     expect(described_class.drifted?).to be(false),
                                         'the vendored contract no longer matches CONTRACT_REF; run rails whatsapp:contract:sync'

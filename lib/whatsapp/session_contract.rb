@@ -7,6 +7,10 @@
 module Whatsapp::SessionContract
   ROOT = 'spec/fixtures/whatsapp/session/contract'.freeze
   REFERENCE_FILE = 'CONTRACT_REF'.freeze
+  # Not part of the contract. CONTRACT_REF stores the result of hashing it, and the
+  # connector's README describes the directory to somebody reading it there -- `sync` drops
+  # it, so counting it would make every comparison against the connector report drift.
+  UNVENDORED = [REFERENCE_FILE, 'README.md'].freeze
 
   class << self
     def root
@@ -38,13 +42,40 @@ module Whatsapp::SessionContract
     end
 
     # Content hash of every vendored file, so a drift check does not depend on git.
-    # CONTRACT_REF itself is excluded: it stores the result.
+    #
+    # The formula is load-bearing: every CONTRACT_REF ever written records its output, so
+    # concatenating each path with the file's raw bytes is not a detail to tidy up. Hashing
+    # the files individually first and folding those digests together produces a different
+    # answer and unpins every copy in the fleet.
     def checksum(directory = root)
-      files = Dir.glob("#{directory}/**/*").select { |path| File.file?(path) && File.basename(path) != REFERENCE_FILE }.sort
-      digest = files.sum('') do |path|
-        "#{Pathname.new(path).relative_path_from(directory)}\0#{File.read(path)}\0"
+      digest = contract_files(directory).sum('') do |path|
+        "#{Pathname.new(path).relative_path_from(Pathname.new(directory))}\0#{File.read(path)}\0"
       end
       Digest::SHA256.hexdigest(digest)
+    end
+
+    # Every contract file with the hash of its contents, keyed by its path inside the
+    # contract directory, so two copies can be compared file by file rather than only
+    # judged equal or not.
+    def manifest(directory = root)
+      contract_files(directory).to_h do |path|
+        [Pathname.new(path).relative_path_from(Pathname.new(directory)).to_s, Digest::SHA256.hexdigest(File.read(path))]
+      end
+    end
+
+    # What this copy is missing, carrying or holding a stale version of, against another
+    # checkout of the contract. `behind` is the one that matters: a type the connector has
+    # added and this side has no model for is dispatched as Unknown and logged as an unknown
+    # payload, which is the same shape as a type we deliberately ignore -- so the IGNORED
+    # list, which exists so a dropped type is a decision on the record, is bypassed entirely.
+    def diff(other)
+      ours = manifest
+      theirs = manifest(other)
+      shared = ours.keys & theirs.keys
+
+      { stale: shared.reject { |path| ours[path] == theirs[path] }.sort,
+        behind: (theirs.keys - ours.keys).sort,
+        ahead: (ours.keys - theirs.keys).sort }
     end
 
     # Parsed CONTRACT_REF: which connector commit this copy came from, and the checksum
@@ -65,6 +96,10 @@ module Whatsapp::SessionContract
     end
 
     private
+
+    def contract_files(directory)
+      Dir.glob("#{directory}/**/*").select { |path| File.file?(path) && UNVENDORED.exclude?(File.basename(path)) }.sort
+    end
 
     # json_schemer resolves $ref against the document root, so a sub-schema is validated
     # by pointing a tiny wrapper document at it.

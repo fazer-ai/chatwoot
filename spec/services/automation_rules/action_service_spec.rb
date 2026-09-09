@@ -82,9 +82,32 @@ RSpec.describe AutomationRules::ActionService do
         rule.actions << { action_name: 'send_email_to_team', action_params: [{ team_ids: [team.id], message: 'Hello' }] }
       end
 
-      it 'will send email to team' do
-        expect(TeamNotifications::AutomationNotificationMailer).to receive(:conversation_creation).with(conversation, team, 'Hello').and_call_original
+      it 'will send email to team, parameterized with the account whose brand it wears' do
+        # Spying on the real parameterized mailer rather than an instance_double: it answers
+        # through method_missing, so a verifying double refuses the very method it responds to.
+        mailer = TeamNotifications::AutomationNotificationMailer.with(account: account)
+        allow(TeamNotifications::AutomationNotificationMailer).to receive(:with).with(account: account).and_return(mailer)
+        expect(mailer).to receive(:conversation_creation).with(conversation, team, 'Hello').and_call_original
+
         described_class.new(rule, account, conversation).perform
+      end
+
+      # The mailer clears Current so it renders for one account only. It used to leave it
+      # cleared, which cost every later action in the same rule its actor.
+      it 'still runs the actions that follow as the rule' do
+        rule.actions = [
+          { action_name: 'send_email_to_team', action_params: [{ team_ids: [team.id], message: 'Hello' }] },
+          { action_name: 'send_message', action_params: { message: 'Hello again' } }
+        ]
+        actor = nil
+        allow(Messages::MessageBuilder).to receive(:new) do
+          actor = Current.executed_by
+          instance_double(Messages::MessageBuilder, perform: nil)
+        end
+
+        described_class.new(rule, account, conversation).perform
+
+        expect(actor).to eq(rule)
       end
     end
 

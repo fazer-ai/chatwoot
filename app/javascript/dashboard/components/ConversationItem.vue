@@ -147,7 +147,7 @@ const onExpandedSelect = checked => {
   if (checked) {
     selectConversation(props.source.id, inbox.value.id);
   } else {
-    deSelectConversation(props.source.id, inbox.value.id);
+    deSelectConversation(props.source.id);
   }
 };
 

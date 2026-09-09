@@ -44,6 +44,30 @@ RSpec.describe Attachment do
       expect(attachment.file.blob.content_type).to eq('audio/ogg')
       expect(attachment.file.blob.reload.content_type).to eq('audio/ogg')
     end
+
+    # A .opus file is an Ogg container like any other (RFC 7845), and audio/opus is what
+    # Marcel answers once it is shown the name rather than anything it read in the file:
+    # the same bytes come back audio/ogg when it is asked by content alone. WhatsApp Cloud
+    # has no entry for audio/opus, so leaving it was a voice note answered with 131053.
+    it 'normalizes audio/opus to audio/ogg for a .opus file too' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
+      attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'voice.opus', content_type: 'audio/opus')
+      attachment.save!
+
+      attachment.download_url
+
+      expect(attachment.file.blob.reload.content_type).to eq('audio/ogg')
+    end
+
+    it 'leaves an audio type it was not asked about alone' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
+      attachment.file.attach(io: Rails.root.join('spec/assets/sample.mp3').open, filename: 'voice.mp3', content_type: 'audio/mpeg')
+      attachment.save!
+
+      attachment.download_url
+
+      expect(attachment.file.blob.reload.content_type).to eq('audio/mpeg')
+    end
   end
 
   describe 'with_attached_file?' do
