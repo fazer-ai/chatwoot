@@ -85,20 +85,6 @@ module Whatsapp::Session::Model::Events
     wire_type 'pairing.passkey_confirmation'
   end
 
-  # What the session missed while it was down, counted by the server before it replays
-  # any of it, so a reader can say how much is coming instead of watching a queue move.
-  # The messages themselves arrive afterwards as ordinary `message.received`.
-  class SessionOfflineSyncPreview < Data.define(:messages, :receipts, :notifications, :app_data_changes, :total)
-    include Serializable
-    wire_type 'session.offline_sync_preview'
-  end
-
-  # The replay is over: what has not arrived by now is not coming.
-  class SessionOfflineSyncCompleted < Data.define(:count)
-    include Serializable
-    wire_type 'session.offline_sync_completed'
-  end
-
   class MessageReceived < Data.define(:message)
     include Serializable
     wire_type 'message.received'
