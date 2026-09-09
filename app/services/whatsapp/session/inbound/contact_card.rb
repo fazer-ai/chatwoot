@@ -18,6 +18,15 @@ module Whatsapp::Session::Inbound::ContactCard
     vcard.to_s[/^FN[^:]*:\s*([^\r\n]+)/, 1]&.strip.presence
   end
 
+  # Whether a card says anything a row could show. A card that says nothing takes no row
+  # on the writing path, so it does not make a share of one into a share of several.
+  def readable?(card)
+    card = card.to_h.stringify_keys
+
+    card['phone'].presence || card['display_name'].presence ||
+      phone_in(card['vcard']) || name_in(card['vcard'])
+  end
+
   def line(name, phone)
     return name if phone.blank?
     return phone if name.blank? || name.start_with?('+')

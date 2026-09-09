@@ -46,9 +46,44 @@ class Whatsapp::Session::Inbound::Handlers::MessageRevoked < Whatsapp::Session::
   # contact would refuse every deletion of a message Chatwoot itself sent.
   def claims_the_author_of?(target)
     return true if payload.message_author.blank?
+
+    # What the row itself recorded about who wrote it, which is the only answer that does
+    # not move: an agent editing the contact's phone, or a merge rewriting it, changes
+    # what the contact answers to without changing who wrote the message.
+    stored = target.content_attributes['external_author']
+    if stored.present?
+      return true if same_party?(stored, payload.message_author)
+      # A snapshot answers only in the namespaces it holds, and the contract lets an event
+      # carry just one: a message that arrived naming its author by LID alone cannot say
+      # anything about a claim that names them by phone alone. Unanswered, not refused,
+      # or a valid deletion would be turned down by a snapshot that never knew.
+      return false if answerable?(stored, payload.message_author)
+    end
+
+    # Rows written before this was recorded, or a claim the snapshot cannot speak to,
+    # which have only the contact to go on.
     return claims_the_connected_account? unless target.sender.is_a?(::Contact)
 
     answers_to_the_claim?(target.sender)
+  end
+
+  # Whether the snapshot and the claim meet in a namespace both of them name, which is
+  # what makes a mismatch a real answer rather than a gap.
+  def answerable?(stored, claimed)
+    (claimed.lid.present? && stored['lid'].present?) ||
+      (claimed.phone.present? && stored['phone'].present?)
+  end
+
+  # One namespace at a time, for the reason `answers_to_the_claim?` gives: WhatsApp treats
+  # a LID and a phone as different identities even when their digits are equal, and the
+  # claim is written by whoever sent the deletion.
+  def same_party?(stored, claimed)
+    return true if claimed.lid.present? && stored['lid'].to_s == claimed.lid
+
+    numbers = Whatsapp::Session::PhoneMatch.variants(claimed.phone)
+    written = Whatsapp::Session::PhoneMatch.digits(stored['phone'])
+
+    written.present? && numbers.include?(written)
   end
 
   # Asked of the stored author rather than resolved into one. `ContactLookup` picks a

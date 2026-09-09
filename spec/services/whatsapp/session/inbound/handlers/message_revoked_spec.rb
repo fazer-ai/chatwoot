@@ -210,6 +210,121 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
       end
     end
 
+    # What the row recorded about who wrote it, which is the only answer that does not
+    # move. A contact is what the person is called here today; the identity is what
+    # WhatsApp called them when the message arrived.
+    context 'when the row recorded who wrote it' do
+      let(:writer) do
+        contact = create(:contact, account: channel.account, phone_number: '+5541988887777',
+                                   identifier: '998877665544332@lid')
+        create(:contact_inbox, contact: contact, inbox: inbox, source_id: '998877665544332')
+        contact
+      end
+      let(:message) do
+        create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                         content: 'mensagem original', source_id: '3EB0AAAA0001',
+                         message_type: :incoming, sender: writer,
+                         content_attributes: { 'external_author' => { 'phone' => '5541988887777',
+                                                                      'lid' => '998877665544332' } })
+      end
+
+      it 'applies the deletion after an agent edited the contact out of recognition' do
+        writer.update!(phone_number: '+5541900000000', identifier: nil)
+
+        expect(dispatch).to eq(:handled)
+
+        expect(message.reload.deleted_by_contact).to be(true)
+      end
+
+      # The recorded identity wins, or it would only ever be a second chance to match and
+      # never a correction of the first.
+      it 'refuses a claim the row does not name, whatever the contact answers to now' do
+        writer.update!(phone_number: '+5541977776666', identifier: '111222333444555@lid')
+
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageRevoked.new(
+                               chat: model::Address.group('120363041234567890'), message_id: message.source_id,
+                               message_author: model::Party.new(phone: '5541977776666', lid: '111222333444555'),
+                               by: 'contact'
+                             ))
+        )
+
+        expect(message.reload.deleted_by_contact).to be_nil
+      end
+
+      # The contract lets an event carry just one of the two, so a snapshot can hold a
+      # namespace the claim does not use. It answers in the ones it holds and stays out of
+      # the way in the others, or a valid deletion would be turned down by a record that
+      # never knew.
+      context 'when the claim names an alias the row never recorded' do
+        let(:message) do
+          create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                           content: 'mensagem original', source_id: '3EB0AAAA0001',
+                           message_type: :incoming, sender: writer,
+                           content_attributes: { 'external_author' => { 'lid' => '998877665544332' } })
+        end
+        let(:claimed) { model::Party.new(phone: '5541988887777') }
+
+        it 'falls back to the contact rather than refusing' do
+          expect(dispatch).to eq(:handled)
+
+          expect(message.reload.deleted_by_contact).to be(true)
+        end
+      end
+
+      # The fallback the snapshot steps aside for is the namespaced one, so the digits of
+      # a LID are still not a phone number there either.
+      context 'when the claim wears the recorded LID as a phone the row never saw' do
+        let(:writer) { create(:contact, account: channel.account, identifier: '998877665544332@lid') }
+        let(:message) do
+          create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                           content: 'mensagem original', source_id: '3EB0AAAA0001',
+                           message_type: :incoming, sender: writer,
+                           content_attributes: { 'external_author' => { 'lid' => '998877665544332' } })
+        end
+        let(:claimed) { model::Party.new(phone: '998877665544332') }
+
+        it 'leaves the message alone' do
+          expect(dispatch).to eq(:ignored)
+
+          expect(message.reload.deleted_by_contact).to be_nil
+        end
+      end
+
+      # The phone half of that decides on its own: a snapshot holding only a number still
+      # answers a claim that names only a number, and answering is the whole point when
+      # the contact has since been edited into agreeing with the claim.
+      context 'when the row recorded only a number and the claim names another' do
+        let(:writer) { create(:contact, account: channel.account, phone_number: '+5541988887777') }
+        let(:message) do
+          create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                           content: 'mensagem original', source_id: '3EB0AAAA0001',
+                           message_type: :incoming, sender: writer,
+                           content_attributes: { 'external_author' => { 'phone' => '5541988887777' } })
+        end
+        let(:claimed) { model::Party.new(phone: '5541977776666') }
+
+        it 'refuses it even once the contact answers to that number' do
+          writer.update!(phone_number: '+5541977776666')
+
+          expect(dispatch).to eq(:ignored)
+
+          expect(message.reload.deleted_by_contact).to be_nil
+        end
+      end
+
+      context 'when the claim names a phone whose digits are the recorded LID' do
+        let(:claimed) { model::Party.new(phone: '998877665544332') }
+
+        it 'leaves the message alone' do
+          expect(dispatch).to eq(:ignored)
+
+          expect(message.reload.deleted_by_contact).to be_nil
+        end
+      end
+    end
+
     # A blank claim is what a direct chat sends, and what a producer that predates the
     # field sends for everything: it has to go on meaning today's behaviour.
     context 'when the key named nobody' do
