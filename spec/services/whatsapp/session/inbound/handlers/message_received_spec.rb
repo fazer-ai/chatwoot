@@ -56,6 +56,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     )
   end
 
+  # A deletion's key names an author, and the comparison has to survive an agent editing
+  # the contact's phone or a merge rewriting it: both move what the contact answers to
+  # without moving who wrote the message.
+  it 'records who WhatsApp says wrote the message' do
+    dispatch
+
+    stored = inbox.messages.find_by(source_id: '3EB0AAAA0001').content_attributes['external_author']
+    expect(stored).to eq('phone' => '5541999990000', 'lid' => '182736451928374')
+  end
+
   it 'creates the contact behind the message' do
     dispatch
 
@@ -576,6 +586,26 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
 
         expect(placeholder.is_unsupported).to be(true)
       end
+    end
+
+    # The contract lets the placeholder and the message name the author by one alias each,
+    # and they need not be the same one. Whatever the recovery did not repeat would be
+    # dropped, and a deletion naming that alias would be back to asking the contact.
+    it 'keeps every alias either half of the message named the author by' do
+      placeholder.update!(content_attributes: placeholder.content_attributes.merge(
+        'external_author' => { 'lid' => '182736451928374' }
+      ))
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered,
+                                                   sender: model::Party.new(phone: '5541999990000'))
+                           ))
+      )
+
+      expect(placeholder.content_attributes['external_author'])
+        .to eq('lid' => '182736451928374', 'phone' => '5541999990000')
     end
 
     # The contract requires content on a message, and nothing checks the contract at

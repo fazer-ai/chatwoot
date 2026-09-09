@@ -100,21 +100,13 @@ class Whatsapp::Session::Inbound::MessageWriter
   # A share whose cards say nothing readable is not a recovery either: `perform` stores
   # exactly the unsupported bubble for that, and this row already is one.
   def reconcile_as_a_share(message)
-    cards = Array(content.contacts).select { |card| readable_card?(card) }
+    cards = Array(content.contacts).select { |card| Whatsapp::Session::Inbound::ContactCard.readable?(card) }
     return false unless cards.one?
     return false unless apply_contact_card(message, cards.first)
 
     settle(message)
     message.save!
     true
-  end
-
-  def readable_card?(card)
-    card = card.to_h.stringify_keys
-
-    card['phone'].presence || card['display_name'].presence ||
-      Whatsapp::Session::Inbound::ContactCard.phone_in(card['vcard']) ||
-      Whatsapp::Session::Inbound::ContactCard.name_in(card['vcard'])
   end
 
   # What the recovery settles about the row regardless of shape: the attributes the
@@ -127,9 +119,21 @@ class Whatsapp::Session::Inbound::MessageWriter
   def settle(message)
     recovered = content_attributes.stringify_keys
     recovered = recovered.except('rich') if message.is_edited
+    recovered['external_author'] = every_alias_seen(message, recovered['external_author'])
 
-    message.content_attributes = message.content_attributes.merge(recovered)
+    message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')
+  end
+
+  # The union of what the placeholder was told and what the message itself carries. The
+  # contract lets each of them name the author by one alias, and they need not be the
+  # same one, so a plain merge of the two hashes would drop whichever the recovery did
+  # not repeat -- and a later deletion naming that one would be back to asking the
+  # contact, which is the question this field exists to stop asking.
+  def every_alias_seen(message, recovered)
+    seen = message.content_attributes['external_author'].to_h.merge(recovered.to_h)
+
+    seen.compact.presence
   end
 
   def perform
@@ -187,6 +191,12 @@ class Whatsapp::Session::Inbound::MessageWriter
       # itself sent was matched by its reserved id and never reaches this writer.
       external_echo: (true unless incoming?),
       external_sender_name: ('WhatsApp' unless incoming?),
+      # Who WhatsApp says wrote this, kept as WhatsApp names them rather than as whichever
+      # contact row happens to hold them today. A deletion's key names an author and the
+      # comparison has to survive an agent editing the contact's phone or a merge
+      # rewriting it, both of which move what the contact answers to without moving who
+      # wrote the message.
+      external_author: author_identity,
       in_reply_to_external_id: inbound.quoted_id.presence,
       referral: inbound.referral.presence,
       is_unsupported: (true if unsupported?),
@@ -224,6 +234,17 @@ class Whatsapp::Session::Inbound::MessageWriter
   def reconcilable?(message)
     RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
       content.present? && !unsupported?
+  end
+
+  # Both namespaces, because WhatsApp names the same person by phone in one event and by
+  # LID in the next, and a reader has to be able to answer in whichever the question
+  # arrives in. Absent when the event named nobody, which a direct chat's own message can
+  # be: there the chat is the author and nothing else has to say so.
+  def author_identity
+    party = inbound.sender
+    return if party.blank?
+
+    { 'phone' => party.phone, 'lid' => party.lid }.compact.presence
   end
 
   # A rich card with no text and no media header renders as an empty bubble, which is
