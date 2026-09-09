@@ -1255,8 +1255,10 @@ RSpec.describe 'Conversations API', type: :request do
           conversation.messages.update_all(created_at: 3.hours.ago)
           # rubocop:enable Rails/SkipsModelValidations
           conversation.update!(agent_last_seen_at: 2.hours.ago)
-          seen_message
-          later_message
+          # Reloaded so the expectations compare a persisted stamp with a persisted stamp: the
+          # column keeps microseconds and the Ruby Time the factory was handed keeps nanoseconds.
+          seen_message.reload
+          later_message.reload
         end
 
         it 'leaves a message that arrived after the named one unread' do
