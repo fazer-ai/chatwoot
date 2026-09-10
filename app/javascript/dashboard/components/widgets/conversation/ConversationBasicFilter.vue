@@ -36,8 +36,10 @@ const chatGroupTypeFilter = useMapGetter('getChatGroupTypeFilter');
 
 const [showActionsDropdown, toggleDropdown] = useToggle();
 
-// One row instead of three does not need the full width of the panel.
-const dropdownWidth = computed(() => (props.sortOnly ? 'w-64' : 'w-72'));
+// Wider, not narrower. Narrowing it for the single-row case was the wrong instinct: with
+// only the sort row left, the label sits next to the longest value in the whole menu
+// ("Atividade mais recente primeiro"), and at w-72 the label truncated to "Orden...".
+const dropdownWidth = computed(() => (props.sortOnly ? 'w-[22rem]' : 'w-72'));
 
 const currentStatusFilter = computed(() => {
   return chatStatusFilter.value || wootConstants.STATUS_TYPE.OPEN;
@@ -203,7 +205,10 @@ const handleGroupTypeChange = value => {
         />
       </div>
       <div class="flex items-center justify-between gap-2">
-        <span class="text-sm truncate text-n-slate-12">
+        <span
+          class="text-sm truncate text-n-slate-12"
+          :class="{ 'shrink-0': sortOnly }"
+        >
           {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
         </span>
         <SelectMenu
