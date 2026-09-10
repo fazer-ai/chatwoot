@@ -73,13 +73,23 @@ class Whatsapp::FacebookApiClient
     data['code_verification_status'] == 'VERIFIED'
   end
 
+  # Two calls, and only the first decides whether anything arrives at all.
+  #
+  # Subscribe app to WABA first — Meta requires it before any callback override (issue #13097).
+  # subscribed_fields (incl. `calls` when voice is enabled) is declared here; the phone-level POST has no such field.
+  #
+  # The phone-level override takes precedence over WABA-level, so numbers on one WABA can route to different URLs.
+  # It is also the half Meta refuses for a whole class of accounts that receive perfectly well without it: a
+  # coexistence number whose WABA sits in the customer's own Business Manager answers `(#200) Permissions error`,
+  # because the integrator's system user cannot manage a WABA in another portfolio. Under one rescue that refusal
+  # reached `Channel::Whatsapp#setup_webhooks` as a setup failure, marked the channel for reauthorization, and
+  # `Webhooks::WhatsappEventsJob` then discarded every inbound webhook for it: a number was dead for hours while
+  # Meta kept delivering, nine webhooks in and no conversations out. So it is best effort here, the same way the
+  # phone registration already is, and refused by the same accounts for the same reason.
   def subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: nil)
-    # Subscribe app to WABA first — Meta requires it before any callback override (issue #13097).
-    # subscribed_fields (incl. `calls` when voice is enabled) is declared here; the phone-level POST has no such field.
-    subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields || WEBHOOK_DEFAULT_FIELDS)
+    subscription = subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields || WEBHOOK_DEFAULT_FIELDS)
 
-    # Phone-level override takes precedence over WABA-level, so numbers on one WABA can route to different URLs.
-    override_phone_number_callback(phone_number_id, callback_url, verify_token)
+    optional_callback_override(phone_number_id, callback_url, verify_token) || subscription
   end
 
   def subscribe_app_to_waba(waba_id, subscribed_fields: WEBHOOK_DEFAULT_FIELDS)
@@ -132,6 +142,21 @@ class Whatsapp::FacebookApiClient
   end
 
   private
+
+  # Any failure at all, and deliberately not a status or a message: the same refusal arrives as a
+  # 403 carrying Meta's code 200, as a plain 500, and as a connection that closes with nothing to
+  # read. A guard that recognizes one shape leaves the other two killing the channel.
+  #
+  # It is the only record that the routing was not applied, so it names the call and the number:
+  # on an installation whose app-level callback points elsewhere, this line is the difference
+  # between a quiet inbox and a diagnosis.
+  def optional_callback_override(phone_number_id, callback_url, verify_token)
+    override_phone_number_callback(phone_number_id, callback_url, verify_token)
+  rescue StandardError => e
+    Rails.logger.warn('[WHATSAPP] Phone number webhook callback override failed but continuing ' \
+                      "(phone_number_id #{phone_number_id}, #{callback_url}): #{e.message}")
+    nil
+  end
 
   def request_headers
     {

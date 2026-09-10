@@ -63,6 +63,82 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  # The incident behind these: a coexistence number whose WABA sits in the customer's own
+  # Business Manager answers the phone-level override with `(#200) Permissions error`, because
+  # the integrator's system user cannot manage a WABA in another portfolio. Under a shared
+  # rescue that refusal marked the channel for reauthorization, and `Webhooks::WhatsappEventsJob`
+  # then discarded every inbound webhook for it: the number was dead for hours while Meta kept
+  # delivering, nine webhooks in and no conversations out.
+  describe '#setup_webhooks' do
+    let(:waba_id) { 'waba_568' }
+    let(:phone_number_id) { 'phone_568' }
+    # Written after create, not through the factory: its `whatsapp_cloud` branch merges its own
+    # ids over whatever the caller passed, so a phone number id given here would be silently
+    # replaced by the WABA's and the two calls would be indistinguishable in the stubs.
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false).tap do |created|
+        created.provider_config = { 'api_key' => 'test_key', 'phone_number_id' => phone_number_id,
+                                    'business_account_id' => waba_id, 'source' => 'embedded_signup',
+                                    'webhook_verify_token' => 'verify_token' }
+        created.save!(validate: false)
+      end
+    end
+
+    before do
+      stub_request(:get, %r{graph\.facebook\.com/.*/#{phone_number_id}})
+        .to_return(status: 200, body: { code_verification_status: 'VERIFIED', platform_type: 'CLOUD_API' }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+      stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+        .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+      # Read while the reauthorization notice is built, so only the failing branch reaches it.
+      stub_request(:get, %r{graph\.facebook\.com/.*/#{waba_id}\?})
+        .to_return(status: 200, body: { id: waba_id, name: 'WABA' }.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    context 'when only the phone-level callback override fails' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{phone_number_id}\z})
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'keeps the channel authorized, because the WABA subscription is what makes Meta deliver' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
+    # The same refusal reaches this code as a 403 carrying Meta's code 200, as a plain 500, and
+    # as a connection that closes with nothing to read. A fix that keys on the status or on the
+    # message covers the first and leaves the other two marking the channel.
+    context 'when the override fails with no response at all' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{phone_number_id}\z}).to_raise(Errno::ECONNRESET)
+      end
+
+      it 'keeps the channel authorized' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
+    context 'when the WABA subscription itself fails' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+          .to_return(status: 400, body: { error: { message: 'App subscription to WABA failed' } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'marks the channel for reauthorization' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(true)
+      end
+    end
+  end
+
   describe 'concerns' do
     let(:channel) { create(:channel_whatsapp) }
 
