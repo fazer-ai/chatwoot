@@ -126,12 +126,12 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
     return unless avatarable.is_a?(Contact)
     return if avatar_url.blank?
 
-    additional_attributes = avatarable.additional_attributes || {}
-    additional_attributes['last_avatar_sync_at'] = Time.current.iso8601
-    additional_attributes['avatar_url_hash'] = generate_url_hash(avatar_url)
-
-    # Persist without triggering validations that may fail due to avatar file checks
-    avatarable.update_columns(additional_attributes: additional_attributes) # rubocop:disable Rails/SkipsModelValidations
+    avatarable.update_avatar_sync_markers!(
+      merge: {
+        'last_avatar_sync_at' => Time.current.iso8601,
+        'avatar_url_hash' => generate_url_hash(avatar_url)
+      }
+    )
   end
 
   def valid_file?(file)

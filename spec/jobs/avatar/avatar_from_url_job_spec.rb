@@ -247,6 +247,58 @@ RSpec.describe Avatar::AvatarFromUrlJob do
     expect(contact.additional_attributes['avatar_url_hash']).to be_nil
   end
 
+  # `additional_attributes` is one JSON column that several writers share, and the job used to
+  # persist a copy it had read before the download. The defect is a stale in-memory snapshot
+  # rather than a database race, so forcing it needs no threads: write through a second instance
+  # while the fetch is in flight, and the job's own copy is already behind.
+  context 'when something else writes to the same column during the download' do
+    let(:contact) { create(:contact, additional_attributes: { 'city' => 'Uberlandia' }) }
+
+    def write_during_download(key, value)
+      allow(SafeFetch).to receive(:fetch) do |_url, **_opts, &block|
+        other = Contact.find(contact.id)
+        # Deliberately not the shared primitive: this stands in for a writer that does not use
+        # it, which is the whole hazard under test.
+        other.update_columns(additional_attributes: (other.additional_attributes || {}).merge(key => value)) # rubocop:disable Rails/SkipsModelValidations
+        block.call(
+          SafeFetch::Result.new(
+            tempfile: File.open(Rails.root.join('spec/assets/avatar.png')),
+            filename: 'avatar.png',
+            content_type: 'image/png'
+          )
+        )
+      end
+    end
+
+    # The one that matters most: `avatar_removed_at` is what `superseded?` reads, so erasing it
+    # un-does a removal and lets the next superseded job put the deleted photo back. It is the
+    # outcome of #504 reached by another door.
+    it 'keeps a removal that landed while the picture was downloading' do
+      write_during_download(Whatsapp::Session::AvatarSync::REMOVED_AT, 1.second.ago.iso8601)
+
+      described_class.perform_now(contact, valid_url)
+
+      expect(contact.reload.additional_attributes).to include(Whatsapp::Session::AvatarSync::REMOVED_AT)
+    end
+
+    it 'keeps an unrelated key written during the download' do
+      write_during_download('country', 'BR')
+
+      described_class.perform_now(contact, valid_url)
+
+      expect(contact.reload.additional_attributes).to include('country' => 'BR', 'city' => 'Uberlandia')
+    end
+
+    it 'still writes its own markers' do
+      write_during_download('country', 'BR')
+
+      described_class.perform_now(contact, valid_url)
+
+      expect(contact.reload.additional_attributes)
+        .to include('avatar_url_hash' => Digest::SHA256.hexdigest(valid_url))
+    end
+  end
+
   # The sequence from #504. Each step looks harmless on its own, and the cost only shows when
   # they run in order: the new picture never arrives, and nothing retries until the contact
   # changes their photo again.
