@@ -11,10 +11,11 @@ import {
 //
 //   * a Numbers copy really does carry an invalid attachment, and it is `image.png` of
 //     `image/png`, never a spreadsheet file. It arrives WITH text/plain, text/html and text/rtf,
-//     because the point of copying a cell is to paste its text somewhere. Its 0 bytes are a
-//     race rather than a state: the pasteboard promises the image, so a paste seconds after
-//     Cmd+C reads 0 and the same clipboard 45 s later gives 10594 bytes. Both are covered here:
-//     the empty one must not warn, and the filled one is an ordinary attachment.
+//     because the point of copying a cell is to paste its text somewhere. Its size is almost
+//     always 0: nine direct pasteboard reads across three copies gave 0 bytes, and twice the
+//     same gesture gave a real PNG that nobody could reproduce on command. Both shapes are
+//     covered below, because the decision never looks at the size of that file: the empty one
+//     must not warn, and the filled one is an ordinary attachment.
 //   * a file copied in Finder arrives as `Files` alone. The macOS pasteboard does carry the
 //     file name as text, and the browser drops it, so `types` has no text flavour at all.
 //
@@ -30,7 +31,7 @@ const NUMBERS_SINGLE_CELL = transfer(
   [['image.png', 'image/png', 0]]
 );
 const NUMBERS_RANGE = NUMBERS_SINGLE_CELL;
-// The same copy, pasted once the promised image has been filled in.
+// The other shape the same gesture has produced, twice and not on demand: a real PNG.
 const NUMBERS_SETTLED = transfer(
   ['text/plain', 'text/html', 'text/rtf', 'Files'],
   [['image.png', 'image/png', 10594]]
@@ -122,7 +123,7 @@ describe('pastedFiles', () => {
       });
     });
 
-    it('attaches the spreadsheet image once the pasteboard has filled it in', () => {
+    it('attaches the spreadsheet image on the runs where it comes through filled', () => {
       expect(usableFilesFromTransfer(NUMBERS_SETTLED)).toEqual({
         files: [{ name: 'image.png', type: 'image/png', size: 10594 }],
         shouldAlertEmpty: false,

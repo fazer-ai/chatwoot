@@ -9,11 +9,12 @@
  * Chromium 153):
  *
  *   - a Numbers copy, one cell or a range, reports `text/plain`, `text/html`, `text/rtf` and
- *     `Files`, the file being `image.png` of `image/png`. Its size is a race, not a state: the
- *     pasteboard promises the image and macOS fills it in afterwards, so a paste in the first
- *     seconds reads 0 bytes and the same clipboard read tens of seconds later gives a real
- *     image (0 then, 10594 bytes at 45 s, measured on the same copy). The empty case is
- *     therefore the window right after Cmd+C, which is also when a person pastes;
+ *     `Files`, the file being `image.png` of `image/png`. Its size is almost always 0 and not
+ *     always: reading the pasteboard directly gave 0 bytes on nine reads across three copies,
+ *     and twice the same gesture produced a real PNG (4972 and 10594 bytes) that nobody could
+ *     reproduce on command afterwards. Whatever decides that, this rule does not rest on it:
+ *     the decision is made on the text beside the file, so an empty artifact is dropped in
+ *     silence and a filled one is an ordinary attachment;
  *   - a file copied in Finder reports `Files` alone. The macOS pasteboard does carry the file
  *     name as text, and the browser suppresses every text flavour once a file URL is present,
  *     so the paste event sees no text at all.
