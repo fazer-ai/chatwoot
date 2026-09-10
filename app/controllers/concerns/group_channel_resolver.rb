@@ -12,8 +12,18 @@ module GroupChannelResolver
 
   private
 
+  # The channel a group action runs as. Every action that actually talks to WhatsApp needs a real
+  # one, so this refuses rather than handing back nil for the provider call to raise on: an agent
+  # with no claim to any of this group's inboxes was answered 500 for a request that is simply not
+  # theirs. Use `channel_if_any` in the few reads that are meant to work without one.
   def channel
-    @channel ||= group_contact_inbox&.inbox&.channel
+    channel_if_any || raise(ActiveRecord::RecordNotFound)
+  end
+
+  def channel_if_any
+    return @channel_if_any if defined?(@channel_if_any)
+
+    @channel_if_any = group_contact_inbox&.inbox&.channel
   end
 
   def group_contact_inbox
@@ -38,6 +48,9 @@ module GroupChannelResolver
   def resolve_group_contact_inbox
     candidates = @contact.contact_inboxes.includes(:inbox).where(inbox: Current.user.assigned_inboxes)
     return candidates.find_by!(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
+
+    # None and one both answer nil here, and that is the honest answer: whether nil is fatal is
+    # the caller's question, not this one's. `channel` refuses on it, `channel_if_any` does not.
     return candidates.first if candidates.size <= 1
 
     raise ActionController::BadRequest, I18n.t('contacts.group.inbox_id_required')
