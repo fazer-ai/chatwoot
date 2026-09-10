@@ -158,6 +158,61 @@ describe MessageFinder do
     end
   end
 
+  # WhatsApp timestamps have second resolution and a burst lands inside one; imported
+  # history concentrates it further, since every row is backdated to when it was sent. Once
+  # more than a page of messages share a second, the window's ordering stops being a
+  # presentation detail: it picks which of the tied rows the page shows, and the cursor
+  # decides what the next page starts below. While the two ranked ties differently,
+  # whatever the window left out and the cursor excluded was in the conversation and on no
+  # page at all.
+  describe 'more messages than fit on a page share one second' do
+    let!(:fresh_conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+    let(:burst_at) { 3.hours.ago.change(usec: 0) }
+    let!(:burst) do
+      Array.new(MessageFinder::PAGE_LIMIT + 5) do |index|
+        create(:message, account: account, inbox: inbox, conversation: fresh_conversation,
+                         content: "burst #{index}", created_at: burst_at)
+      end
+    end
+
+    # The first incoming message on a conversation whose contact has no email adds two
+    # `template` rows carrying the current time, so the burst is not the whole thread. That
+    # is left in rather than tuned away: a real thread has rows on both sides of the tie,
+    # and the window has to rank the tied ones against each other and against those.
+    def page_after(cursor)
+      described_class.new(fresh_conversation, cursor.nil? ? {} : { before: cursor }).perform.to_a
+    end
+
+    # Stated without naming a row count, so it says which rows belong on the page rather
+    # than restating the query that builds it: a tied message left off the newest page can
+    # only be one that ranks below every tied message on it.
+    it 'ranks the tied messages by id when it picks the page' do
+      shown = page_after(nil).map(&:id)
+      on_page, off_page = burst.map(&:id).partition { |id| shown.include?(id) }
+
+      expect(on_page).to be_present
+      expect(off_page).to be_present
+      expect(on_page.min).to be > off_page.max
+    end
+
+    it 'reaches every message by scrolling up, without repeating one' do
+      seen = []
+      cursor = nil
+
+      # Bounded so a cursor that stops advancing fails as a wrong answer rather than
+      # hanging the suite.
+      (fresh_conversation.messages.count + 2).times do
+        page = page_after(cursor)
+        break if page.empty?
+
+        seen.concat(page.map(&:id))
+        cursor = page.first.id
+      end
+
+      expect(seen).to match_array(fresh_conversation.messages.pluck(:id))
+    end
+  end
+
   describe 'page_window with reactions' do
     # Isolated setup: skip the shared `before` block's fixtures so count assertions stay stable.
     subject(:message_finder) { described_class.new(fresh_conversation, {}) }
