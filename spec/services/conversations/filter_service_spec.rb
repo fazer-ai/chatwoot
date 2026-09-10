@@ -437,6 +437,60 @@ describe Conversations::FilterService do
     end
   end
 
+  describe '#perform with sort_by' do
+    let!(:params) { { payload: [], page: 1 } }
+
+    before do
+      # Activity ascending with creation, so newest-created is also newest-active. Both
+      # orders are then unambiguous and each one is the exact reverse of the other.
+      account.conversations.order(:created_at).each_with_index do |conversation, index|
+        conversation.update_columns(last_activity_at: (100 - index).minutes.ago) # rubocop:disable Rails/SkipsModelValidations
+      end
+    end
+
+    it 'defaults to newest activity first, as before' do
+      result = filter_service.new(params, user_1, account).perform
+
+      expect(result[:conversations].pluck(:id)).to eq(
+        account.conversations.order(last_activity_at: :desc).pluck(:id)
+      )
+    end
+
+    it 'honours last_activity_at_asc, which the folder view could not ask for' do
+      result = filter_service.new(params.merge(sort_by: 'last_activity_at_asc'), user_1, account).perform
+
+      expect(result[:conversations].pluck(:id)).to eq(
+        account.conversations.order(last_activity_at: :asc).pluck(:id)
+      )
+    end
+
+    it 'honours created_at_asc' do
+      result = filter_service.new(params.merge(sort_by: 'created_at_asc'), user_1, account).perform
+
+      expect(result[:conversations].pluck(:id)).to eq(account.conversations.order(created_at: :asc).pluck(:id))
+    end
+
+    # The params reaching this service are `permit!`ed straight off the request, so an
+    # unknown value must not become a method name.
+    it 'falls back to the default instead of calling an arbitrary method' do
+      result = filter_service.new(params.merge(sort_by: 'destroy_all'), user_1, account).perform
+
+      expect(result[:conversations].pluck(:id)).to eq(
+        account.conversations.order(last_activity_at: :desc).pluck(:id)
+      )
+      expect(account.conversations.count).to be_positive
+    end
+
+    it 'keeps a pinned conversation first in every order' do
+      pinned = account.conversations.order(:last_activity_at).first
+      create(:conversation_pin, conversation: pinned, user: user_1, account: account)
+
+      result = filter_service.new(params.merge(sort_by: 'last_activity_at_desc'), user_1, account).perform
+
+      expect(result[:conversations].first.id).to eq(pinned.id)
+    end
+  end
+
   describe '#perform with pinned conversations' do
     let!(:params) { { payload: [], page: 1 } }
     let(:pinned_conversation) { user_2_assigned_conversation }
