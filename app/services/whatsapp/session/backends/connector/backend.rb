@@ -22,6 +22,34 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # holding a worker indefinitely.
   MEDIA_SEND_MAX_TIMEOUT = ENV.fetch('WHATSAPP_MEDIA_SEND_MAX_TIMEOUT', 180).to_i
 
+  # --- the ceiling on a published command ------------------------------------------
+  #
+  # A published command carries no `reply_to`, so nobody here is waiting to give up on it,
+  # and the `deadline` on its frame is the only limit the connector has for it: it refuses
+  # a command whose deadline passed before it was reached, and it bounds the execution of
+  # one it does run. The session's executor takes one command at a time, so a published
+  # command with no ceiling, parked on a socket write, is every send behind it parked too.
+  #
+  # How much budget differs by what a late execution would mean, because the one field
+  # says "do not start after this" and "do not run longer than this" at the same time.
+
+  # A momentary state that lands late is not late, it is wrong: an `available` applied
+  # after the agent went offline flips the account back, and a `composing` applied minutes
+  # later is a typing bubble for something nobody is typing.
+  MOMENTARY_TIMEOUT = 30
+
+  # These are still right whenever they land, so the only reason to bound them is the
+  # executor, and the ceiling has to clear the longest command that can legitimately be
+  # ahead of them on the same queue: a send carrying a file. A queue holding several of
+  # those back to back can still expire one, and what that costs is a receipt the
+  # customer's phone never shows, repaired the next time the same chat is read.
+  DEFERRABLE_TIMEOUT = MEDIA_SEND_MAX_TIMEOUT + Whatsapp::Connector::Client::RPC_TIMEOUT
+
+  # A pairing code is worth as long as the attempt that asked for it, which is the ceiling
+  # the pairing screen already runs on: past it, the screen the operator would type the
+  # code into is gone.
+  PAIRING_TIMEOUT = Whatsapp::Session::PairingPollJob::DEADLINES.fetch('code').to_i
+
   class << self
     def provider_key
       'native'
@@ -65,6 +93,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     model::ConnectionState.from_h(client.call(command))
   end
 
+  # The teardown carries no ceiling, and that is the one place where the two readings of
+  # `deadline` pull against each other hard enough to matter: a command dropped for
+  # arriving late is a device left listed on the customer's phone, while the executor a
+  # stuck teardown holds belongs to the session that is going away rather than to an
+  # account still in use.
   def disconnect
     client.publish(commands::SessionDisconnect.new)
   end
@@ -102,7 +135,7 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # The code itself arrives as a pairing.code event: WhatsApp takes its time issuing it,
   # and the inbox screen is already listening for connection updates.
   def request_pairing_code(command)
-    client.publish(command)
+    client.publish(command, timeout: PAIRING_TIMEOUT)
     nil
   end
 
@@ -147,11 +180,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   def mark_read(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   def mark_unread(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   # The connector keeps the bytes on its own disk and serves them over its internal HTTP
@@ -177,15 +210,15 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # --- presence and contacts -----------------------------------------------------
 
   def send_chat_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
   end
 
   def update_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
   end
 
   def subscribe_presence(command)
-    client.publish(command)
+    client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
   def check_numbers(command)

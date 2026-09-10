@@ -287,4 +287,68 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     backend.mark_read(model::Commands::MessageMarkRead.new(chat: model::Address.phone('5541999990000'), message_ids: ['3EB0AAAA']))
     backend.disconnect
   end
+
+  # --- the ceiling on a published command ------------------------------------------
+  #
+  # Nobody is waiting on a published command, so the deadline the frame carries is the
+  # only limit the connector has for it, and the session's executor is serial: one parked
+  # on a socket write is every send behind it parked too.
+
+  # A momentary state that lands late is not late, it is wrong: an `available` applied
+  # after the agent went offline flips the account back, and a `composing` applied minutes
+  # later is a typing bubble for something nobody is typing.
+  it 'bounds the momentary states by how long they are still true' do
+    backend.send_chat_presence(model::Commands::ChatPresence.new(chat: model::Address.phone('5541999990000'), state: 'composing'))
+    backend.update_presence(model::Commands::PresenceSet.new(state: 'available'))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::ChatPresence), timeout: described_class::MOMENTARY_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PresenceSet), timeout: described_class::MOMENTARY_TIMEOUT)
+  end
+
+  # These three are still right whenever they land, so the only reason to bound them is
+  # the executor, and the ceiling has to clear the longest command that can legitimately
+  # be ahead of them on the same queue, which is a send carrying a file.
+  it 'bounds the deferrable commands by what clears a send carrying a file' do
+    backend.mark_read(model::Commands::MessageMarkRead.new(chat: model::Address.phone('5541999990000'), message_ids: ['3EB0AAAA']))
+    backend.mark_unread(model::Commands::MessageMarkUnread.new(chat: model::Address.phone('5541999990000'),
+                                                               last_message_id: '3EB0AAAA', from_me: false))
+    backend.subscribe_presence(model::Commands::PresenceSubscribe.new(party: model::Address.phone('5541999990000')))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::MessageMarkRead), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::MessageMarkUnread), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PresenceSubscribe), timeout: described_class::DEFERRABLE_TIMEOUT)
+    expect(described_class::DEFERRABLE_TIMEOUT).to be > described_class::MEDIA_SEND_MAX_TIMEOUT
+    # And the two budgets have to stay on the right sides of each other: the whole point of
+    # splitting them is that a momentary state expires while a deferrable one is still
+    # waiting its turn behind a send.
+    expect(described_class::MOMENTARY_TIMEOUT).to be < described_class::DEFERRABLE_TIMEOUT
+  end
+
+  # The pairing screen runs on a ceiling of its own, and a code produced after it is a code
+  # for a screen the operator is no longer looking at.
+  it 'bounds the pairing code request by the attempt that asked for it' do
+    backend.request_pairing_code(model::Commands::PairingRequestCode.new(phone: '5541999990000'))
+
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::PairingRequestCode), timeout: described_class::PAIRING_TIMEOUT)
+  end
+
+  # `deadline` says "do not start after this" as much as it says "do not run longer than
+  # this", and for the teardown the first costs more than the second buys: a `session.logout`
+  # dropped for arriving late leaves a device listed on the customer's phone forever. It is
+  # published precisely so it can sit pending while the session is between owners.
+  it 'leaves the teardown unbounded' do
+    backend.disconnect
+    backend.logout
+    backend.delete_session
+
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDisconnect))
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).twice
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete))
+  end
 end

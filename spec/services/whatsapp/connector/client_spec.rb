@@ -43,6 +43,30 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
     # the frame and drops it, while the caller is told the command was queued. A logout
     # or a delete discarded that way leaves the session paired, and the conversion or the
     # destruction that asked for it reports success.
+    # The connector reads `deadline` whether or not a reply was asked for: it refuses a
+    # command whose deadline passed before it was reached, and it bounds the execution of
+    # one it does run. A published command has no caller waiting on it to give up, so the
+    # ceiling the frame declares is the only one it gets.
+    it 'bounds a published command by the ceiling its caller declared' do
+      client.publish(model::Commands::ChatPresence.new(chat: model::Address.phone('5541999990000'), state: 'composing'),
+                     timeout: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame['deadline'].to_i - frame['ts'].to_i).to eq(30_000)
+      # Still fire and forget: the ceiling is for the connector, not for a caller waiting.
+      expect(frame).not_to have_key('reply_to')
+    end
+
+    # The teardown is published exactly so it can sit pending while the session is between
+    # owners, and `deadline` means "do not start after this" as much as it means "do not
+    # run longer than this": a ceiling here would discard the logout that unlinks the
+    # device from the customer's phone.
+    it 'leaves a published command unbounded when its caller declared no ceiling' do
+      client.publish(model::Commands::SessionLogout.new)
+
+      expect(frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)).not_to have_key('deadline')
+    end
+
     it 'refuses to queue for a connector that speaks another protocol' do
       redis.hset("#{prefix}instance:one", 'protocol_min', '2', 'protocol_max', '3')
       redis.sadd("#{prefix}instances", 'one')
@@ -64,7 +88,10 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
       expect(frame['reply_to']).to eq("#{prefix}reply:cmd-0001")
-      expect(frame['deadline'].to_i).to be > frame['ts'].to_i
+      # Shorter than the caller's own wait by the margin, so the connector stops working
+      # on the command before the caller stops caring about the answer.
+      expect(frame['deadline'].to_i - frame['ts'].to_i)
+        .to eq((described_class::RPC_TIMEOUT - described_class::DEADLINE_MARGIN) * 1000)
     end
 
     it 'raises the error the connector reported, mapped to its class' do
@@ -91,6 +118,32 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       expect { client.call(command) }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /speaks protocol 1/)
       expect(redis.exists?("#{prefix}cmd:#{session_id}")).to be(false)
+    end
+  end
+
+  # The control stream carries both kinds: a `session.wake` any instance may take and
+  # nobody waits on, and an `admin.ping` that answers. The margin belongs to the one that
+  # answers, and a wake that carried a deadline could be dropped for arriving late at the
+  # very moment there is no owner to take the session -- which is when it is sent.
+  describe '#control' do
+    it 'leaves a control command that answers nothing unbounded' do
+      client.control(model::Commands::SessionWake.new(desired: 'connected'))
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame).not_to have_key('reply_to')
+      expect(frame).not_to have_key('deadline')
+    end
+
+    it 'bounds a control command that answers the way it bounds an RPC' do
+      allow(SecureRandom).to receive(:uuid).and_return('cmd-0003')
+      redis.lpush("#{prefix}reply:cmd-0003", { 'v' => 1, 'id' => 'cmd-0003', 'ok' => true, 'result' => {} }.to_json)
+
+      client.control(model::Commands::AdminPing.new)
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame['reply_to']).to eq("#{prefix}reply:cmd-0003")
+      expect(frame['deadline'].to_i - frame['ts'].to_i)
+        .to eq((described_class::RPC_TIMEOUT - described_class::DEADLINE_MARGIN) * 1000)
     end
   end
 
