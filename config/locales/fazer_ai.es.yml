@@ -60,6 +60,7 @@ es:
           send_stall_detected: Esta conexión está recibiendo mensajes pero no puede enviarlos. Si no se resuelve por sí sola en unos minutos, desconecte la bandeja de entrada y conéctela de nuevo escaneando un nuevo código QR.
           invalid_credentials: El proveedor rechazó las credenciales de esta bandeja de entrada. Verifique la dirección y el token e inténtelo de nuevo.
           logged_out: Este dispositivo fue desconectado de WhatsApp desde el teléfono. Vuelva a vincularlo para seguir recibiendo mensajes.
+          logged_out_by_request: Esta bandeja fue desconectada de WhatsApp desde aquí. Vuelva a vincularla para seguir recibiendo mensajes.
           stream_replaced: Esta sesión fue reemplazada por otra conexión de la misma cuenta de WhatsApp. Vuelva a vincularla para usarla aquí.
           temporary_ban: WhatsApp bloqueó temporalmente este número. Espere a que termine el bloqueo antes de volver a vincularlo.
           client_outdated: El conector de WhatsApp está desactualizado y ya no puede conectarse. Actualícelo para restablecer la conexión.
