@@ -53,6 +53,11 @@ class Attachment < ApplicationRecord
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
                     :contact => 8, :ig_reel => 9, :ig_post => 10, :ig_story => 11, :embed => 12 }
 
+  METADATA_BUILDERS = {
+    location: :location_metadata, fallback: :fallback_data, contact: :contact_metadata,
+    audio: :audio_metadata, video: :video_metadata, embed: :embed_data
+  }.freeze
+
   def push_event_data
     return unless file_type
 
@@ -91,20 +96,10 @@ class Attachment < ApplicationRecord
   private
 
   def metadata_for_file_type
-    case file_type.to_sym
-    when :location
-      location_metadata
-    when :fallback
-      fallback_data
-    when :contact
-      contact_metadata
-    when :audio
-      audio_metadata
-    when :embed
-      embed_data
-    else
-      file.attached? ? file_metadata : { data_url: external_url, thumb_url: '' }
-    end
+    builder = METADATA_BUILDERS[file_type.to_sym]
+    return send(builder) if builder
+
+    file.attached? ? file_metadata : { data_url: external_url, thumb_url: '' }
   end
 
   def embed_data
@@ -118,13 +113,29 @@ class Attachment < ApplicationRecord
     audio_file_data.merge(
       {
         # Keep audio playback inline while avoiding the ActiveStorage proxy path.
-        data_url: inline_audio_url,
+        data_url: inline_storage_url,
         transcribed_text: meta&.[]('transcribed_text') || ''
       }
     )
   end
 
-  def inline_audio_url
+  # Same pair as audio: `file_url` carries no disposition, so a video is served as an
+  # attachment and Safari refuses to play a `<video>` whose response says so. The MIME also
+  # has to be in `content_types_allowed_inline`, or this URL is forced back to attachment.
+  #
+  # The two cases where the bytes are not ours keep the address they had: an attachment with
+  # no file is one we only hold a link to, and an Instagram incoming message is served from
+  # Meta's CDN on purpose.
+  def video_metadata
+    return { data_url: external_url, thumb_url: '' } unless file.attached?
+
+    metadata = file_metadata
+    return metadata if instagram_incoming_message?
+
+    metadata.merge({ data_url: inline_storage_url })
+  end
+
+  def inline_storage_url
     return '' unless file.attached?
 
     Rails.application.routes.url_helpers.rails_storage_redirect_url(file, disposition: 'inline')
