@@ -102,6 +102,15 @@ class MessageFinder
   # initial load. Pick the most recent non-reactions, then add only the
   # reactions whose target is inside that window so chips render alongside
   # their parents and orphan reactions on older messages don't bloat the page.
+  #
+  # Ordered by the same pair `before_cursor` compares, and that agreement is the whole
+  # point rather than a detail of presentation: this picks which rows the page shows and
+  # the cursor decides what the next page starts below, so the two have to rank ties the
+  # same way. Ordering here by time alone let Postgres choose freely among rows sharing a
+  # second, and any tied row it happened to leave out with an id above the cursor's was
+  # then excluded by the cursor as well — present in the conversation, absent from every
+  # page, with nothing on screen to say so. Second-resolution WhatsApp timestamps and
+  # backdated history imports are what put more than a page of rows inside one second.
   def page_window(scope)
     # Drop `includes(:sender, ...)` for the id-only probe to avoid Rails trying
     # to eager-load the polymorphic sender association (which would error).
@@ -109,7 +118,7 @@ class MessageFinder
     # drops the limit), pulling in old messages and blowing up the page. Pluck
     # the limited window first and take the min in Ruby.
     bare = scope.except(:includes)
-    window_ids = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc').limit(PAGE_LIMIT).pluck(:id)
+    window_ids = bare.where(NON_REACTION_CLAUSE).reorder('created_at desc, id desc').limit(PAGE_LIMIT).pluck(:id)
     return scope.none if window_ids.empty?
 
     json_path = "(content_attributes#>>'{}')::jsonb"
@@ -120,7 +129,7 @@ class MessageFinder
     reaction_in_window = "((#{json_path}->>'is_reaction') = 'true' AND " \
                          "(#{json_path}->>'in_reply_to')::bigint IN (:ids))"
     scope.where("id IN (:ids) OR #{reaction_in_window}", ids: window_ids)
-         .reorder('created_at asc')
+         .reorder('created_at asc, id asc')
   end
 
   def normalized_message_id(value)
