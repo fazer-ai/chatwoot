@@ -43,12 +43,21 @@ class MessageFinder
     end
   end
 
+  CATCH_UP_LIMIT = 100
+
   # Deliberately still by id, unlike `before_cursor`. This one answers "what has been
   # written since I last looked", which is a question about the sequence and not about
   # time: a client catching up has to be told about a backdated message imported a moment
   # ago, and comparing timestamps is exactly what would hide it.
+  #
+  # Which is also why the order is by id and not by time. The filter, the order and the
+  # limit have to agree, or the limit cuts a different set than the filter chose: ordering
+  # by `created_at` handed back the hundred oldest by time, which for a thread carrying
+  # backdated rows is not the hundred lowest ids, and the ones it left out sat above the
+  # cursor the client then moved past. The client sorts by time before rendering either
+  # way, so the order here is the cursor's, not the reader's.
   def messages_after(after_id)
-    messages.reorder('created_at asc').where('id > ?', after_id).limit(100)
+    messages.reorder('id asc').where('id > ?', after_id).limit(CATCH_UP_LIMIT)
   end
 
   def messages_before(before_id)

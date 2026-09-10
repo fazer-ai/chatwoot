@@ -70,6 +70,27 @@ describe MessageFinder do
       end
     end
 
+    # A history import stamps `created_at` from when the message was sent and takes its id
+    # from the INSERT, so for a thread carrying imported rows the two orders disagree.
+    # Ordering the catch-up by time cut a different set than the id filter chose, and the
+    # client moved its cursor past the rows that answer left out.
+    context 'when a backdated row was written after the ones already on screen' do
+      let!(:cursor) { conversation.messages.maximum(:id) }
+      let!(:live) { create(:message, account: account, inbox: inbox, conversation: conversation, created_at: 1.minute.ago) }
+      let!(:imported) { create(:message, account: account, inbox: inbox, conversation: conversation, created_at: 2.days.ago) }
+      let(:params) { { after: cursor } }
+
+      it 'answers in id order, which is the order the cursor advances in' do
+        expect(message_finder.perform.map(&:id)).to eq([live.id, imported.id])
+      end
+
+      it 'cuts the window by id, so what it leaves out is what the next call asks for' do
+        stub_const("#{described_class}::CATCH_UP_LIMIT", 1)
+
+        expect(message_finder.perform.map(&:id)).to eq([live.id])
+      end
+    end
+
     context 'with an after attribute above the message id range' do
       let(:params) { { after: 881_965_304_328 } }
 

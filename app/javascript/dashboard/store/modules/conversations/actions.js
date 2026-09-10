@@ -9,6 +9,7 @@ import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   buildConversationList,
+  highestMessageId,
   isOnMentionsView,
   isOnParticipatingView,
   isOnUnattendedView,
@@ -56,6 +57,13 @@ const UNRECONCILABLE_VIEWS = [
 const tabsBeingReconciled = new Set();
 
 // actions
+// Mirrors `MessageFinder::CATCH_UP_LIMIT`: the number of rows one `after` call answers, and
+// therefore what tells a full window apart from the last one. The page cap is a stop, not a
+// budget -- 2000 rows is far past any real reconnect, and a server that kept answering full
+// windows would otherwise loop here for ever.
+const CATCH_UP_PAGE_SIZE = 100;
+const MAX_CATCH_UP_PAGES = 20;
+
 const actions = {
   getConversation: async ({ commit }, conversationId) => {
     try {
@@ -233,20 +241,35 @@ const actions = {
     { conversationId }
   ) => {
     const { allConversations, syncConversationsMessages } = state;
-    const lastMessageId = syncConversationsMessages[conversationId];
     const selectedChat = allConversations.find(
       conversation => conversation.id === conversationId
     );
     if (!selectedChat) return;
     try {
       const { messages } = selectedChat;
-      // Fetch all the messages after the last message id
-      const {
-        data: { meta, payload },
-      } = await MessageApi.getPreviousMessages({
-        conversationId,
-        after: lastMessageId,
-      });
+      // The server answers a bounded window per call, so an agent who was away long enough
+      // to miss more than one of them used to be handed the first window and told the
+      // catch-up was over: the cursor was cleared and nothing fetched the rest until the
+      // conversation was opened again. Walk the windows instead, each one starting above
+      // the highest id the last one carried.
+      let cursor = syncConversationsMessages[conversationId];
+      let meta;
+      let payload = [];
+      for (let page = 0; page < MAX_CATCH_UP_PAGES; page += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const { data } = await MessageApi.getPreviousMessages({
+          conversationId,
+          after: cursor,
+        });
+        meta = data.meta;
+        payload = payload.concat(data.payload);
+        // A short window is the last one. A full window that carried nothing above the
+        // cursor would repeat itself for ever, so it ends the walk too.
+        const next = highestMessageId(data.payload);
+        if (data.payload.length < CATCH_UP_PAGE_SIZE || !(next > cursor)) break;
+
+        cursor = next;
+      }
       commit(`conversationMetadata/${types.SET_CONVERSATION_METADATA}`, {
         id: conversationId,
         data: meta,
@@ -284,11 +307,16 @@ const actions = {
     );
     if (!selectedChat) return;
     const { messages } = selectedChat;
-    const lastMessage = messages.last();
-    if (!lastMessage) return;
+    // The highest id, not the last one in the list: the list is sorted by time, and the
+    // catch-up asks for what was written after this id. A backdated row -- a history import
+    // stamps `created_at` from when the message was sent and takes its id from the INSERT --
+    // sits late in the sequence and early in the list, so taking the newest by time set the
+    // cursor above rows the client never received, and nothing asked for them again.
+    const cursor = highestMessageId(messages);
+    if (cursor === undefined) return;
     commit(types.SET_LAST_MESSAGE_ID_IN_SYNC_CONVERSATION, {
       conversationId,
-      messageId: lastMessage.id,
+      messageId: cursor,
     });
   },
 
