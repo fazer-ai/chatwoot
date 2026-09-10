@@ -61,6 +61,7 @@ es:
           send_stall_detected: Esta conexión está recibiendo mensajes pero no puede enviarlos. Si no se resuelve por sí sola en unos minutos, desconecte la bandeja de entrada y conéctela de nuevo escaneando un nuevo código QR.
           invalid_credentials: El proveedor rechazó las credenciales de esta bandeja de entrada. Verifique la dirección y el token e inténtelo de nuevo.
           logged_out: Este dispositivo fue desconectado de WhatsApp desde el teléfono. Vuelva a vincularlo para seguir recibiendo mensajes.
+          logged_out_by_request: Esta bandeja fue desconectada de WhatsApp desde aquí. Vuelva a vincularla para seguir recibiendo mensajes.
           stream_replaced: Esta sesión fue reemplazada por otra conexión de la misma cuenta de WhatsApp. Vuelva a vincularla para usarla aquí.
           temporary_ban: WhatsApp bloqueó temporalmente este número. Espere a que termine el bloqueo antes de volver a vincularlo.
           client_outdated: El conector de WhatsApp está desactualizado y ya no puede conectarse. Actualícelo para restablecer la conexión.
@@ -69,6 +70,13 @@ es:
           connector_incompatible: La versión del conector de WhatsApp es incompatible con esta versión de Chatwoot. Actualice el conector.
           connect_failure: WhatsApp rechazó la conexión. Los nuevos intentos continúan automáticamente.
           pairing_timed_out: El código expiró antes de que el teléfono completara la vinculación. Inicie la conexión de nuevo para obtener uno nuevo.
+          pairing_pair_error: WhatsApp aceptó el código pero no terminó de vincular el dispositivo. Inicie la conexión de nuevo.
+          pairing_err-scanned-without-multidevice: Esta cuenta de WhatsApp debe activar el multidispositivo antes de poder vincularse.
+          pairing_code_refused: WhatsApp no quiso enviar un código de vinculación a este número. Vincule el dispositivo con el código QR.
+          pairing_connect_failed: El conector no pudo comunicarse con WhatsApp para iniciar la vinculación. Inténtelo de nuevo.
+          connect_failed: El conector no pudo comunicarse con WhatsApp. Los reintentos continúan automáticamente.
+          disconnect_requested: 'Esta conexión fue cerrada desde aquí. La vinculación sigue válida: conecte de nuevo para retomarla.'
+          disconnected: La conexión con WhatsApp se cayó. Los reintentos continúan automáticamente.
   notifications:
     notification_title:
       internal_chat_mention: Le mencionaron en %{name}

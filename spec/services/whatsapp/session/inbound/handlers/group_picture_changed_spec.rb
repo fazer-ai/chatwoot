@@ -44,4 +44,15 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::GroupPictureChanged do
       expect(Whatsapp::Session::UpdateGroupAvatarJob).not_to have_been_enqueued
     end
   end
+
+  # The refetch is a provider `group_info`, so on an inbox that takes group conversations
+  # and answers no group commands the job would go out, be refused, log a warning and
+  # leave the old picture -- once per photo change, for every group, forever.
+  it 'does not go looking for the new photo without the group command surface' do
+    allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+
+    with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+      expect { dispatch }.not_to have_enqueued_job(Whatsapp::Session::UpdateGroupAvatarJob)
+    end
+  end
 end

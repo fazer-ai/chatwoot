@@ -117,6 +117,13 @@
         "voice_note": { "type": "boolean" },
         "size": { "type": ["integer", "null"], "minimum": 0 },
         "duration": { "type": ["integer", "null"], "minimum": 0 },
+        "width": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture width in pixels, for an image, a video or a sticker; both sides or neither" },
+        "height": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture height in pixels, for an image, a video or a sticker; both sides or neither" },
+        "waveform": { "type": ["array", "null"], "minItems": 64, "maxItems": 64,
+          "items": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "description": "voice note amplitudes, exactly 64 samples of 0-100" },
         "thumbnail": { "type": ["string", "null"], "description": "data: URI, at most 32 KiB" },
         "ref": { "oneOf": [{ "$ref": "#/definitions/media_ref" }, { "type": "null" }] }
       },
@@ -206,7 +213,7 @@
       "type": "object",
       "properties": {
         "type": { "const": "unsupported" },
-        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "protocol", "empty"] }
+        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "masked", "protocol", "empty"] }
       },
       "required": ["type", "reason"],
       "additionalProperties": true
@@ -340,7 +347,7 @@
         "v": { "$ref": "#/definitions/protocol_version" },
         "id": { "type": "string", "minLength": 1 },
         "ok": { "type": "boolean" },
-        "result": { "type": ["object", "null"] },
+        "result": { "type": ["object", "array", "null"] },
         "error": { "oneOf": [{ "$ref": "#/definitions/error" }, { "type": "null" }] }
       },
       "required": ["v", "id", "ok"],
@@ -542,6 +549,7 @@
         "chat": { "$ref": "#/definitions/address" },
         "sender": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "message_id": { "$ref": "#/definitions/message_id" },
+        "message_author": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "by": { "enum": ["contact", "self"] },
         "timestamp": { "$ref": "#/definitions/timestamp_ms" }
       },
@@ -1012,7 +1020,7 @@
       "type": "object",
       "properties": {
         "group": { "$ref": "#/definitions/address" },
-        "image": { "type": ["string", "null"], "description": "base64 JPEG; null removes the picture" }
+        "image": { "type": ["string", "null"], "description": "base64 JPEG; null or absent removes the picture" }
       },
       "required": ["group"],
       "additionalProperties": true

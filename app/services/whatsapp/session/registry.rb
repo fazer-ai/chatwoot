@@ -27,10 +27,18 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # consume, and there is no such command in the contract. Its replacement for the
       # same problem (pairing without a QR the operator can scan) is the passkey relay,
       # which rides on the pairing commands.
+      #
+      # No account_limits either. The contract lets a connection state carry
+      # `reachout_time_lock` and `new_chat_cap`, and the connector's `session.status`
+      # answers connection, phone number and LID and nothing else: whatsmeow surfaces no
+      # WhatsApp Business messaging limit for it to fill them with. Nothing asks for them
+      # on this provider today, because a connector session is pushed rather than polled,
+      # so what the declaration bought was a promise on the inbox payload that the next
+      # caller would have read as an answer.
       capabilities: %w[
         qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
-        presence_subscribe read_receipts mark_unread check_number profile_picture groups group_admin
-        group_invites group_join_requests account_limits media_download
+        presence_subscribe read_receipts mark_unread check_number profile_picture groups
+        group_management group_admin group_invites group_join_requests media_download
       ],
       fields: [MARK_AS_READ, PRESENCE_SUBSCRIBE]
     ),
@@ -45,7 +53,7 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # face, so it is not declared.
       capabilities: %w[
         qr_pairing code_pairing edit revoke reactions typing presence read_receipts check_number
-        profile_picture groups group_admin account_limits media_download history_sync
+        profile_picture groups group_management group_admin account_limits media_download history_sync
       ],
       fields: [
         Field.new(name: 'base_url', type: 'url', required: true),
@@ -66,8 +74,8 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       pairing_modes: %w[qr],
       capabilities: %w[
         qr_pairing session_import echo_by_reserved_id edit revoke reactions typing presence presence_subscribe
-        read_receipts mark_unread check_number profile_picture groups group_admin group_invites
-        group_join_requests account_limits media_download history_sync
+        read_receipts mark_unread check_number profile_picture groups group_management group_admin
+        group_invites group_join_requests account_limits media_download history_sync
       ]
     ),
     Descriptor.new(
@@ -97,6 +105,14 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
     # they answer through their own services until they are removed.
     def session_provider?(provider)
       Whatsapp::Session::PROVIDERS.include?(provider.to_s)
+    end
+
+    # Whether this inbox's commands run through the session layer's own backend, which is
+    # what makes the capability list the authority on what it can carry out. A legacy
+    # provider is in the session family and is not this: its own service decides.
+    def session_backed?(channel)
+      descriptor = descriptor(channel.provider)
+      descriptor.present? && descriptor.session? && !descriptor.legacy?
     end
 
     # The QR/pairing family, legacy providers included. What sets it apart from the cloud
@@ -156,7 +172,12 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
     # disagree. The Baileys-era name still works, so an existing deployment does not have
     # to change its env on upgrade.
     def groups_enabled?
-      value = ENV.fetch('WHATSAPP_GROUPS_ENABLED', nil) || ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false')
+      # `.presence`, not just the nil check: a compose file that lists the variable with
+      # no value, or a panel field left blank, sets it to the empty string, and an empty
+      # string is truthy here. Read as a value it takes the fallback away, so a
+      # deployment that never migrated off the Baileys-era name loses every group
+      # capability on upgrade -- which is the one thing this fallback exists to prevent.
+      value = ENV.fetch('WHATSAPP_GROUPS_ENABLED', nil).presence || ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false')
       value == 'true'
     end
 

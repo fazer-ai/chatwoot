@@ -11,7 +11,11 @@ module Whatsapp::Session::Model::Content
     wire_type 'text', embed: true
   end
 
-  class Media < Data.define(:kind, :mime, :filename, :caption, :voice_note, :size, :duration, :thumbnail, :ref)
+  # `width`, `height` and `waveform` are the caller's to fill in: the connector does not
+  # decode media, and the side building the send is the one holding the file. Absent is
+  # absent all the way to the wire, where a zero would be a measurement of nothing.
+  class Media < Data.define(:kind, :mime, :filename, :caption, :voice_note, :size, :duration,
+                            :width, :height, :waveform, :thumbnail, :ref)
     include Serializable
     wire_type 'media', embed: true
     coerce ref: MediaRef
@@ -19,10 +23,18 @@ module Whatsapp::Session::Model::Content
 
     KINDS = %w[image video audio document sticker].freeze
 
+    # What a voice note's bubble is drawn from, and not a resolution the sender picks: the
+    # field is read as a fixed-length row of bars, so a row of another length is not a
+    # shorter waveform, it is a misread one. The connector refuses anything else, and
+    # refusing here too is what keeps the operator from finding out after the upload.
+    WAVEFORM_SAMPLES = 64
+    MAX_AMPLITUDE = 100
+
     def initialize(**attributes)
       kind = attributes[:kind].to_s
       raise Whatsapp::Session::Errors::InvalidPayload, "unknown media kind: #{kind}" unless KINDS.include?(kind)
 
+      validate_waveform!(attributes[:waveform])
       super(**attributes, kind: kind)
     end
 
@@ -34,6 +46,21 @@ module Whatsapp::Session::Model::Content
       when 'audio' then :audio
       else :file
       end
+    end
+
+    private
+
+    def validate_waveform!(waveform)
+      return if waveform.blank?
+
+      unless waveform.size == WAVEFORM_SAMPLES
+        raise Whatsapp::Session::Errors::InvalidPayload,
+              "a waveform is #{WAVEFORM_SAMPLES} samples and that one is #{waveform.size}"
+      end
+      return if waveform.all? { |sample| sample.is_a?(Integer) && sample.between?(0, MAX_AMPLITUDE) }
+
+      raise Whatsapp::Session::Errors::InvalidPayload,
+            "a waveform carries amplitudes between 0 and #{MAX_AMPLITUDE}"
     end
   end
 

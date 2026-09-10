@@ -12,6 +12,35 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'epoch' => 3)
   end
 
+  # Every reason the connector puts on a closing `session.state`, taken from
+  # `publishPairingFailure` and the `EventSessionState` emits in
+  # `internal/engine/whatsmeow/session.go`. A key that is missing does not fail anywhere:
+  # it renders as the humanized key, in English, in every locale. `pairing_timeout` did
+  # exactly that while a written sentence for the same failure sat under
+  # `pairing_timed_out`, which nothing sends.
+  %w[
+    connect_failed disconnect_requested disconnected
+    pairing_pair_error pairing_err-scanned-without-multidevice
+    pairing_code_refused pairing_connect_failed
+  ].each do |reason|
+    it "has a sentence written for #{reason}" do
+      writer.apply(state.new(connection: 'close', error: reason, epoch: 3))
+
+      expect(channel.reload.provider_connection['error']).not_to eq(reason.humanize)
+    end
+  end
+
+  # The placeholder still stands, because a blank is worse. What it must not do is stand
+  # in silence: this is the only thing that says a provider started sending something
+  # nobody wrote a sentence for.
+  it 'says out loud when a reason has no sentence' do
+    allow(Rails.logger).to receive(:warn)
+    writer.apply(state.new(connection: 'close', error: 'a_reason_nobody_wrote', epoch: 3))
+
+    expect(Rails.logger).to have_received(:warn).with(/no sentence written.*a_reason_nobody_wrote/)
+    expect(channel.reload.provider_connection['error']).to eq('A reason nobody wrote')
+  end
+
   it 'clears what the new state does not carry' do
     writer.apply(state.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,AAA', epoch: 3))
     writer.apply(state.new(connection: 'open', epoch: 3))

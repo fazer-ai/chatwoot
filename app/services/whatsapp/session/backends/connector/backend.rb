@@ -99,11 +99,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     model::ConnectionState.from_h(client.call(commands::SessionStatus.new))
   end
 
-  # The limits ride along with the session status, which is the only thing that knows
-  # them: they are pushed as events the rest of the time.
-  def fetch_account_limits
-    status = client.call(commands::SessionStatus.new) || {}
-    status.slice('reachout_time_lock', 'new_chat_cap')
+  # The code itself arrives as a pairing.code event: WhatsApp takes its time issuing it,
+  # and the inbox screen is already listening for connection updates.
+  def request_pairing_code(command)
+    client.publish(command)
+    nil
   end
 
   # --- messages ------------------------------------------------------------------
@@ -216,8 +216,20 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     true
   end
 
+  # WhatsApp refuses participants one at a time -- a privacy setting, the group's
+  # creator, somebody who left recently -- so the answer is a row each and `ok` says only
+  # that the command ran. The connector fails the command when nothing was carried out,
+  # and this reaches the same verdict from the rows: a caller told `ok` and handed a
+  # refusal for every participant it named has had nothing done, which both controllers
+  # already turn into the message an operator reads.
+  #
+  # A partial refusal is not an error. Reporting the participants that were added as not
+  # added is a worse answer, and the caller reads the rows to find out which is which.
   def update_group_participants(command)
-    Array(client.call(command))
+    rows = Array(client.call(command))
+    raise Whatsapp::Session::Errors::GroupParticipantNotAllowed if wholly_refused?(rows)
+
+    rows
   end
 
   def update_group_name(command)
@@ -254,6 +266,13 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   end
 
   private
+
+  def wholly_refused?(rows)
+    rows.present? && rows.all? do |row|
+      row.is_a?(Hash) &&
+        row.stringify_keys['code'].to_s == Whatsapp::Session::Errors::GroupParticipantNotAllowed::CODE
+    end
+  end
 
   def refresh(command)
     model::MediaRef.from_h(client.call(command))

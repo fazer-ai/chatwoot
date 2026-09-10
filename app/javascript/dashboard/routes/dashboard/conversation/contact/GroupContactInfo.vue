@@ -196,7 +196,12 @@ const canHandleJoinRequests = computed(
 // The panel itself renders for any group thread, because being a group is identity and
 // not a capability. Everything that WRITES still has to ask: `Facade#group` refuses every
 // group call without this one.
-const supportsGroups = computed(() => hasInboxCapability(CAPABILITIES.GROUPS));
+// Everything this gates is a command against the provider -- syncing the roster, leaving,
+// the settings panel -- so it asks for `group_management`, not for group conversations
+// reaching the inbox.
+const supportsGroups = computed(() =>
+  hasInboxCapability(CAPABILITIES.GROUP_MANAGEMENT)
+);
 
 const startEditName = () => {
   if (isGroupLeft.value || !canEditGroup.value) return;

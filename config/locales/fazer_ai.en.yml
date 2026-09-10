@@ -61,6 +61,7 @@ en:
           send_stall_detected: This connection is receiving messages but cannot send them. If it does not clear on its own within a few minutes, disconnect the inbox and connect again by scanning a new QR code.
           invalid_credentials: The provider rejected the credentials for this inbox. Check the address and the token and try again.
           logged_out: This device was disconnected from WhatsApp on the phone. Pair it again to keep receiving messages.
+          logged_out_by_request: This inbox was disconnected from WhatsApp here. Pair it again to keep receiving messages.
           stream_replaced: This session was replaced by another connection to the same WhatsApp account. Pair it again to use it here.
           temporary_ban: WhatsApp temporarily blocked this number. Wait until the block expires before pairing again.
           client_outdated: The WhatsApp connector is out of date and can no longer connect. Update it to restore the connection.
@@ -69,6 +70,13 @@ en:
           connector_incompatible: The WhatsApp connector version is incompatible with this Chatwoot version. Update the connector.
           connect_failure: WhatsApp refused the connection. New attempts continue automatically.
           pairing_timed_out: The code expired before the phone finished pairing. Start the connection again to get a new one.
+          pairing_pair_error: WhatsApp accepted the code but did not finish linking the device. Start the connection again.
+          pairing_err-scanned-without-multidevice: This WhatsApp account has to turn multi-device on before it can be linked.
+          pairing_code_refused: WhatsApp would not send a pairing code to this number. Link the device with the QR code instead.
+          pairing_connect_failed: The connector could not reach WhatsApp to start the pairing. Try again.
+          connect_failed: The connector could not reach WhatsApp. Retries continue automatically.
+          disconnect_requested: 'This connection was closed here. The pairing is still valid: connect again to resume it.'
+          disconnected: The connection to WhatsApp dropped. Retries continue automatically.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}

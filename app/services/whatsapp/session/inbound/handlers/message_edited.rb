@@ -44,6 +44,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
       # The first edit is what the reader wants to compare against, so a second edit
       # does not overwrite the original.
       previous = target.is_edited ? target.previous_content : target.content
+      target.content_attributes = target.content_attributes.except('is_unsupported') if placeholder?(target)
       target.update!(content: content, is_edited: true, previous_content: previous, edited_at: payload.timestamp)
       true
     end
@@ -51,6 +52,21 @@ class Whatsapp::Session::Inbound::Handlers::MessageEdited < Whatsapp::Session::I
 
   def stale?(target)
     payload.timestamp.present? && target.edited_at.present? && payload.timestamp < target.edited_at
+  end
+
+  # An edit is the first readable body a placeholder's row has had, so that row is no
+  # longer a message nothing could read: leaving the flag on renders the edit as the
+  # unsupported bubble, which shows none of it.
+  #
+  # The recovery marker stays, though, and the two say different things now: the row has a
+  # body and is still missing everything the message carried around it. The delayed
+  # recovery reads that and contributes the rest without touching the body an edit of it
+  # already settled.
+  #
+  # Only a placeholder, though. `is_unsupported` also marks media that never arrived, and
+  # a new caption is no answer to bytes that are not coming.
+  def placeholder?(target)
+    target.content_attributes['unsupported_reason'].present?
   end
 
   # By wire type, not by class: a class captured before a reload stops matching and the

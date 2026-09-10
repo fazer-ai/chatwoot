@@ -27,6 +27,23 @@ class Whatsapp::Session::Inbound::ConversationFinder
   end
   # rubocop:enable Metrics/ParameterLists
 
+  # When the message reuses an existing thread, what conversation_params would have
+  # persisted on create never lands. Backfill only the keys still missing, so a genuine
+  # first touch is never overwritten by a later one.
+  #
+  # Reachable without a lookup because a caller can already hold the thread: a message
+  # written over the placeholder it left behind has its conversation in hand, and must
+  # not come through `perform` to get here -- that would open a second thread whenever
+  # the first one is resolved.
+  def self.backfill_first_touch(conversation, attribution)
+    return conversation if attribution.blank?
+
+    existing = conversation.additional_attributes || {}
+    missing = attribution.reject { |key, _| existing.key?(key) }
+    conversation.update!(additional_attributes: existing.merge(missing)) if missing.present?
+    conversation
+  end
+
   def perform
     conversation = conversation_for_reaction || conversation_by_inbox_config
     return backfill_first_touch(mark_as_group(conversation)) if conversation
@@ -91,15 +108,5 @@ class Whatsapp::Session::Inbound::ConversationFinder
     conversation
   end
 
-  # When the message reuses an existing thread, what conversation_params would have
-  # persisted on create never lands. Backfill only the keys still missing, so a genuine
-  # first touch is never overwritten by a later one.
-  def backfill_first_touch(conversation)
-    return conversation if attribution.blank?
-
-    existing = conversation.additional_attributes || {}
-    missing = attribution.reject { |key, _| existing.key?(key) }
-    conversation.update!(additional_attributes: existing.merge(missing)) if missing.present?
-    conversation
-  end
+  def backfill_first_touch(conversation) = self.class.backfill_first_touch(conversation, attribution)
 end

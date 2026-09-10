@@ -30,14 +30,66 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
 
   def message = payload.message
 
-  # A message that is already stored is normally nothing to do again. The exception is
-  # the work that was queued after it was saved: an attempt that committed the row and
-  # then failed, most often on the job transport, is retried and lands here, and the
-  # media it meant to fetch would never be asked for again. The writer decides whether
-  # there is anything left to queue.
+  # A message that is already stored is normally nothing to do again. Two things are
+  # not.
+  #
+  # The first is the message the stored row is only a placeholder for. A message the
+  # backend could not decrypt in time is published under the real message's id, and the
+  # message itself arrives later under that same id: read as a duplicate, it leaves the
+  # bubble saying it could not be read forever, over a message whose text is in the
+  # payload that was just dropped.
+  #
+  # The second is the work that was queued after the row was saved: an attempt that
+  # committed the row and then failed, most often on the job transport, is retried and
+  # lands here, and the media it meant to fetch would never be asked for again. The
+  # writer decides whether there is anything left to queue.
   def duplicate_of(stored)
+    record_first_touch(stored)
+    return recovered(stored) if writer_for(stored).reconcile(stored)
+
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
+  end
+
+  # The attribution is the part only the recovery carries: an undecryptable stanza has no
+  # readable context, so a thread opened by one starts with no ad and no entry point, and
+  # the message that finally arrives is the first and only chance to record them.
+  #
+  # Asked of every duplicate rather than only of the ones about to be written over, for
+  # two reasons. It is about the conversation and not about the row, so nothing that
+  # happened to the row disqualifies it -- an edit that reached the placeholder first
+  # settles the body and takes the marker off, and the attribution would go down with it.
+  # And it costs nothing to ask: it returns on the spot when the message carries no
+  # attribution, and otherwise fills only the keys that are still missing.
+  #
+  # Before the write, and that ordering is the point. Writing the content is what takes
+  # the recovery marker off the row, so a failure after it would find the redelivery no
+  # longer eligible and lose the attribution for good; failing here leaves the marker
+  # where it is and the redelivery does all of it again.
+  def record_first_touch(stored)
+    inbound::ConversationFinder.backfill_first_touch(stored.conversation, attribution)
+  end
+
+  # MESSAGE_UPDATED reaches the open thread and nothing else, so the card in the list
+  # would go on showing the bubble that could not be read. It reaches no automation
+  # either, and re-firing `message_created` here is not the answer: every rule that does
+  # not filter on content already matched the placeholder and already ran. That is #491.
+  #
+  # After the write rather than before it, unlike the attribution, because losing it
+  # costs a stale preview until the next event touches that conversation rather than a
+  # fact nothing else records. The media enqueue behind `reconcile` is in the same
+  # position and is not lost either way: a redelivery that finds the row already written
+  # queues it through `fetch_media_for`, which is the path that exists for exactly this.
+  def recovered(stored)
+    inbound::ChatList.refresh(stored.conversation)
+    :handled
+  end
+
+  # The row already names the conversation and the sender this message belongs to: it was
+  # resolved when the placeholder was stored, from the same chat and the same author, and
+  # only the content was ever missing.
+  def writer_for(stored)
+    inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
   end
 
   def actionable?

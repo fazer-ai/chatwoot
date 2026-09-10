@@ -51,6 +51,61 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
   it_behaves_like 'a whatsapp session backend'
 
+  # The connector fails the command when nothing was carried out. This reaches the same
+  # verdict from the rows, so a caller told `ok` and handed a refusal for every
+  # participant it named gets the error both controllers already turn into a message an
+  # operator reads, rather than a silent success.
+  describe 'a participants update the provider refused' do
+    let(:command) do
+      model::Commands::GroupParticipantsUpdate.new(
+        group: model::Address.group('120363040000000001'),
+        participants: [model::Address.phone('5541999990000')], action: 'remove'
+      )
+    end
+
+    it 'raises when every participant was refused' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+
+      expect { backend.update_group_participants(command) }
+        .to raise_error(Whatsapp::Session::Errors::GroupParticipantNotAllowed)
+    end
+
+    # Reporting the participants that were added as not added is a worse answer, and the
+    # caller reads the rows to find out which is which.
+    it 'hands back a partial refusal rather than failing the command' do
+      rows = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'success', 'code' => nil },
+        { 'address' => { 'kind' => 'phone', 'id' => '5541988887777' }, 'status' => 'failed',
+          'code' => 'group_participant_not_allowed' }
+      ]
+      results['group.participants.update'] = rows
+
+      expect(backend.update_group_participants(command)).to eq(rows)
+    end
+
+    # An answer with no rows in it refused nobody. Reading it as a refusal for everyone
+    # named would fail a command the provider carried out.
+    it 'treats an answer with no rows as nothing refused' do
+      results['group.participants.update'] = []
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+
+    # Any other refusal is the connector's to name: it fails the command itself when the
+    # code is one it maps, and a code this build does not know must not be read as the
+    # one it happens to rescue.
+    it 'leaves a refusal it does not recognise alone' do
+      results['group.participants.update'] = [
+        { 'address' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'status' => 'failed', 'code' => 'internal' }
+      ]
+
+      expect { backend.update_group_participants(command) }.not_to raise_error
+    end
+  end
+
   it 'declares exactly what the registry advertises for the provider' do
     expect(described_class.capabilities).to eq(Whatsapp::Session::Registry.descriptor('native').capabilities)
   end
@@ -143,8 +198,10 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     backend.send_message(media_send('3EB0DDDD', 10.gigabytes))
   end
 
-  it 'reads the account limits off the session status' do
-    expect(backend.fetch_account_limits).to eq({ 'reachout_time_lock' => { 'status' => 'UNLOCKED' } })
+  # The contract lets a connection state carry them and this connector fills neither, so
+  # answering the read would hand back an empty slice dressed as an answer.
+  it 'refuses the account limits rather than answering an empty slice' do
+    expect { backend.fetch_account_limits }.to raise_error(Whatsapp::Session::Errors::NotSupported)
   end
 
   it 'downloads media straight from the URL the event carried' do

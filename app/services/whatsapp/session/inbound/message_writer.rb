@@ -47,6 +47,106 @@ class Whatsapp::Session::Inbound::MessageWriter
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end
 
+  # Replaces the placeholder a message left behind with the message itself.
+  #
+  # A message the backend could not decrypt in time is published as an unsupported
+  # placeholder carrying the real message's id, and the message that finally arrives
+  # carries that same id -- so it reaches Chatwoot as a duplicate of its own placeholder.
+  # The content is the part that was missing, so the content is what is written over, in
+  # the row that is already there: the bubble the agent is looking at becomes the message,
+  # keeping its id, its place in the thread, and anything that quotes it.
+  #
+  # Answers whether it did, because a caller it says no to still has a duplicate to report.
+  def reconcile(message)
+    written = false
+    # Under the row lock and off the row the lock reloads, which is what every other
+    # writer of this flag does (`Message#update_under_lock!`). `content_attributes` is
+    # one JSON column: a revoke or a media failure landing between the read and the save
+    # would be written away by a merge computed off the stale hash, and the eligibility
+    # that was true a moment ago is exactly what such a write would have changed.
+    message.with_lock do
+      next unless reconcilable?(message)
+
+      written = content_type == 'contacts' ? reconcile_as_a_share(message) : reconcile_in_place(message)
+    end
+    return false unless written
+
+    # After the save, as on the writing path: the job takes the row by reference and a
+    # save that raised would have it fetch bytes for content nobody stored.
+    enqueue_media_fetch(message)
+    true
+  end
+
+  def reconcile_in_place(message)
+    # An edit reached the row before the recovery did, and it is the newer body: the one
+    # this message carries is the text that edit superseded. Everything around the body
+    # is still only here, so the row takes that and keeps what it is showing.
+    unless message.is_edited
+      message.content = message_content
+      attach_location(message)
+    end
+    settle(message)
+    message.save!
+    true
+  end
+
+  # A share of one contact becomes that contact, in the row that is already there.
+  #
+  # A share of several does not, and the reason is that the row is not the only thing a
+  # message leaves behind. Chatwoot already ran this message's arrival when the
+  # placeholder landed: it reopened the conversation, moved `waiting_since`, fired the
+  # automations and the notifications. Writing the extra cards as new inbound rows runs
+  # all of that a second time, so a conversation an agent resolved while the message was
+  # late reopens itself, and the rules fire again on a message from an hour ago.
+  #
+  # Backdating them to the placeholder is what makes the thread read right and is also
+  # what makes them unreachable: `MessageFinder` takes the latest page by `created_at`
+  # and pages backwards by `id < before_id`, so a row with a fresh id and an old
+  # timestamp falls out of both once twenty newer messages exist. Not backdating them
+  # splits one share between its own place in the thread and the bottom of it.
+  #
+  # So the several-card share stays the unsupported bubble it already was, which is what
+  # it was before any of this, and #488 carries what the way out would have to solve.
+  #
+  # A share whose cards say nothing readable is not a recovery either: `perform` stores
+  # exactly the unsupported bubble for that, and this row already is one.
+  def reconcile_as_a_share(message)
+    cards = Array(content.contacts).select { |card| Whatsapp::Session::Inbound::ContactCard.readable?(card) }
+    return false unless cards.one?
+    return false unless apply_contact_card(message, cards.first)
+
+    settle(message)
+    message.save!
+    true
+  end
+
+  # What the recovery settles about the row regardless of shape: the attributes the
+  # message carried, and the marker that said the row was still waiting for one.
+  #
+  # `rich` is left out for a row an edit already settled. It describes the body, and the
+  # body is not this message's to describe any more: a card drawn around text the edit
+  # replaced reads worse than no card. Everything else here is about the message's place
+  # rather than its content, which an edit of the body does not move.
+  def settle(message)
+    recovered = content_attributes.stringify_keys
+    recovered = recovered.except('rich') if message.is_edited
+    recovered['external_author'] = every_alias_seen(message, recovered['external_author'])
+
+    message.content_attributes = message.content_attributes.merge(recovered.compact)
+                                        .except('is_unsupported', 'unsupported_reason')
+  end
+
+  # The union of what the placeholder was told and what the message itself carries. The
+  # contract lets each of them name the author by one alias, and they need not be the
+  # same one, so a plain merge of the two hashes would drop whichever the recovery did
+  # not repeat -- and a later deletion naming that one would be back to asking the
+  # contact, which is the question this field exists to stop asking.
+  def every_alias_seen(message, recovered)
+    seen = message.content_attributes['external_author'].to_h.merge(recovered.to_h)
+
+    seen.compact.presence
+  end
+
   def perform
     return build_contact_messages if content_type == 'contacts'
 
@@ -98,54 +198,41 @@ class Whatsapp::Session::Inbound::MessageWriter
     end
   end
 
-  def content_attributes
-    {
-      external_created_at: inbound.timestamp && (inbound.timestamp / 1000),
-      # An outgoing message stored without a sender was written on the phone, not by an
-      # agent; the dashboard needs a name to show in the bubble, and `human_response?`
-      # needs the flag to count the reply as one, so it clears `waiting_since` and
-      # registers a first response like an agent's own message would. Anything Chatwoot
-      # itself sent was matched by its reserved id and never reaches this writer.
-      external_echo: (true unless incoming?),
-      external_sender_name: ('WhatsApp' unless incoming?),
-      in_reply_to_external_id: inbound.quoted_id.presence,
-      referral: inbound.referral.presence,
-      is_unsupported: (true if unsupported?),
-      pending_media: pending_media,
-      # Not the same statement as `external_created_at`, which every session message
-      # carries: this one says the row was filed after the fact, which is what a report
-      # excluding backfilled traffic, or a bubble explaining an old date, has to read.
-      imported: (true if imported),
-      rich: (content.to_content_attribute if content_type == 'rich')
-    }.compact
+  # Built here and read by the recovery too, so a placeholder that later receives its
+  # message settles under the same attributes the writing path would have given it.
+  def attributes
+    @attributes ||= Whatsapp::Session::Inbound::MessageAttributes.new(inbound: inbound, imported: imported)
   end
 
-  # What the file was, for a media message whose bytes did not come with it.
+  def content_attributes = attributes.to_h
+  def unsupported? = attributes.unsupported?
+
+  # The reasons a message may still arrive under the id its placeholder was published
+  # with. `unknown_type` and `masked` are not among them: the first is a body that did
+  # arrive and this build has no arm for, and the second is one WhatsApp withholds from
+  # every linked device on purpose.
   #
-  # The provider says on the `media.download_failed` that follows whether they can still
-  # be fetched, and by then this row is the only place the file's own description
-  # survives: the event that carried it does not come again, and there is no attachment
-  # to read it off. Without it a recoverable file could be asked for and then not
-  # attached, because nothing would know what kind of attachment to build.
+  # `unavailable` is here because it is the one that recovers on its own: WhatsApp answers
+  # a companion device that way for a view-once photo and asks the primary phone to
+  # forward it. It is also not in `Content::Unsupported::REASONS`, which is a dead
+  # constant the connector has moved past -- #490 carries the sync.
+  RECOVERABLE = %w[undecryptable unavailable].freeze
+
+  # Only a placeholder is replaced, and only by something that is not one.
   #
-  # Only what a later fetch reads. The caption is already this message's content and the
-  # preview is a data URI worth kilobytes, so neither is copied into a column nothing
-  # renders from.
-  def pending_media
-    media = self.class.media_in(inbound)
-    return if media.nil? || media.ref.present?
-
-    Whatsapp::Session::Model::Content::Media.new(
-      kind: media.kind, mime: media.mime, filename: media.filename, voice_note: media.voice_note
-    ).to_h
-  end
-
-  # A rich card with no text and no media header renders as an empty bubble, which is
-  # what the unsupported flag exists for.
-  def unsupported?
-    return true if content_type == 'unsupported'
-
-    content_type == 'rich' && content.preview_text.blank? && content.media.blank?
+  # Read from the reason and not from `is_unsupported`, because that flag answers a
+  # different question: `MediaFetchJob#give_up`, `MediaDownloadFailed` and the outbound
+  # sender all raise it on messages that arrived intact, and writing content over one of
+  # those would clear a failure the agent is looking at and ask for the bytes again.
+  #
+  # An edit that landed first takes the marker off the row (`MessageEdited#apply`), which
+  # is what stops a delayed recovery from writing the original body over an edit of it.
+  # It also costs that recovery the metadata only it carries, the quoted link and the
+  # rich attributes -- not the attribution, which the caller records either way. #492.
+  #
+  def reconcilable?(message)
+    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
+      content.present? && !unsupported?
   end
 
   def convert_mentions(text)
@@ -226,41 +313,31 @@ class Whatsapp::Session::Inbound::MessageWriter
   end
 
   def build_contact_message(card)
-    card = card.stringify_keys
+    message = apply_contact_card(conversation.messages.build(**message_attributes), card)
+    return if message.nil?
+
+    message.save!
+    message
+  end
+
+  # Fills a row, new or already stored, with one card. Answers nil for a card that says
+  # nothing, which is what keeps an empty one from taking a row.
+  def apply_contact_card(message, card)
+    card = card.to_h.stringify_keys
     # `display_name` is what the contract calls it. Reading `name` found nothing, so a
     # card with a phone lost its name and a name-only card was dropped entirely, leaving
     # the conversation that had just been opened with no message in it. Both fields are
     # optional on the wire and a card may arrive as nothing but its vCard, which is why
     # that is read too rather than dropping the share.
-    phone = card['phone'].presence || vcard_phone(card['vcard'])
-    name = card['display_name'].presence || vcard_name(card['vcard'])
+    phone = card['phone'].presence || Whatsapp::Session::Inbound::ContactCard.phone_in(card['vcard'])
+    name = card['display_name'].presence || Whatsapp::Session::Inbound::ContactCard.name_in(card['vcard'])
     return if phone.blank? && name.blank?
 
-    message = conversation.messages.build(content: contact_line(name, phone), **message_attributes)
+    message.content = Whatsapp::Session::Inbound::ContactCard.line(name, phone)
     message.attachments.build(
       account_id: inbox.account_id, file_type: :contact,
       fallback_title: phone || name, meta: { firstName: name }.compact
     )
-    message.save!
     message
-  end
-
-  # The WhatsApp vCard TEL line is `...;waid=<digits>:<formatted phone>`, so the
-  # formatted number is preferred and the waid digits are the fallback. Same reading the
-  # Baileys layer does, kept here so a card with nothing else still lands.
-  def vcard_phone(vcard)
-    vcard = vcard.to_s
-    vcard[/waid=\d+:\s*([^\r\n]+)/, 1]&.strip.presence || vcard[/waid=(\d+)/, 1].presence
-  end
-
-  def vcard_name(vcard)
-    vcard.to_s[/^FN[^:]*:\s*([^\r\n]+)/, 1]&.strip.presence
-  end
-
-  def contact_line(name, phone)
-    return name if phone.blank?
-    return phone if name.blank? || name.start_with?('+')
-
-    "#{name} - #{phone}"
   end
 end

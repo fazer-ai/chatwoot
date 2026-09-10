@@ -37,6 +37,65 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     )
   end
 
+  # The connector already tells the two apart and says which. Collapsing them sends an
+  # agent who just clicked disconnect to go look at a phone that did nothing, and leaves
+  # an operator who really was unlinked on the phone with no idea where it happened.
+  it 'says the disconnect came from here when it was asked for from here' do
+    event = model::Event.build(model::Events::SessionLoggedOut.new(reason: 'logout_requested'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'close', 'error_code' => 'logged_out_by_request',
+      'error' => I18n.t('errors.inboxes.channel.provider_connection.logged_out_by_request')
+    )
+  end
+
+  # Both are the end of a pairing, not a connection that may come back. Left out of that
+  # list the number stays on the channel, and the next connect tries to resume credentials
+  # WhatsApp has already thrown away instead of asking for a fresh QR.
+  it 'forgets the number a requested logout ended' do
+    model::Event.build(model::Events::SessionState.new(state: 'open', phone: '+5541988887777'), epoch: 3).then do |opened|
+      described_class.new(channel: channel, event: opened).perform
+    end
+    event = model::Event.build(model::Events::SessionLoggedOut.new(reason: 'logout_requested'), epoch: 4)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).not_to include('phone_number')
+  end
+
+  # Most pairings that go nowhere end this way, and it is not a failure of anything: the
+  # code ran out because nobody scanned it, which the person looking at the screen is the
+  # one who knows. Reported in red it reads as a broken connection, and the operator goes
+  # looking for one. Closed with no sentence, the QR goes away and the button comes back.
+  it 'closes without a word when nobody completed the pairing in time' do
+    event = model::Event.build(model::Events::PairingError.new(reason: 'timeout', message: 'ran out'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).to include('connection' => 'close')
+    expect(channel.provider_connection).not_to have_key('error')
+  end
+
+  it 'closes without a word on the closing state that follows it' do
+    event = model::Event.build(model::Events::SessionState.new(state: 'close', reason: 'pairing_timeout'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).not_to have_key('error')
+  end
+
+  # These the operator can act on, and could not before: every pairing failure was
+  # reported as `connect_failure`, which says WhatsApp refused the connection and that
+  # retries continue on their own. Neither is true of a number WhatsApp will not send a
+  # code to, and there is nothing to act on in the sentence either.
+  it 'names what actually went wrong when a pairing fails' do
+    event = model::Event.build(model::Events::PairingError.new(reason: 'code_refused', message: 'refused'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'close', 'error_code' => 'pairing_code_refused',
+      'error' => I18n.t('errors.inboxes.channel.provider_connection.pairing_code_refused')
+    )
+  end
+
   # The dispatcher looks before the handler runs, and this lands in between: the operator
   # saved new credentials while the event was on its way to the write. The instance travels
   # with the event so the writer can compare it inside the row lock, which is the only place

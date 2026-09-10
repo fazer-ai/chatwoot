@@ -56,6 +56,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     )
   end
 
+  # A deletion's key names an author, and the comparison has to survive an agent editing
+  # the contact's phone or a merge rewriting it: both move what the contact answers to
+  # without moving who wrote the message.
+  it 'records who WhatsApp says wrote the message' do
+    dispatch
+
+    stored = inbox.messages.find_by(source_id: '3EB0AAAA0001').content_attributes['external_author']
+    expect(stored).to eq('phone' => '5541999990000', 'lid' => '182736451928374')
+  end
+
   it 'creates the contact behind the message' do
     dispatch
 
@@ -490,6 +500,407 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     end
   end
 
+  # A message the backend could not decrypt in time is published as an unsupported
+  # placeholder carrying the real message's id, and the message itself arrives later under
+  # that same id. Read as a plain duplicate it is dropped, and the bubble saying it could
+  # not be read stays over a message whose text was in the payload that was just dropped.
+  context 'when the message a placeholder stood in for finally arrives' do
+    subject(:recovery) do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(content: recovered)))
+      )
+    end
+
+    let(:content) { model::Content::Unsupported.new(reason: 'undecryptable') }
+    let(:recovered) { model::Content::Text.new(body: 'oi, tudo bem?') }
+
+    before { dispatch }
+
+    # By id, and `reorder` rather than `order`: `Message` carries a `created_at` default
+    # scope, and a recovered share gives its cards the placeholder's own timestamp, so
+    # ordering by that alone leaves which row comes back up to the database.
+    def placeholder = inbox.messages.where(source_id: '3EB0AAAA0001').reorder(:id).first
+
+    it 'stores the placeholder under the id of the message it stands in for' do
+      expect(placeholder.is_unsupported).to be(true)
+      expect(placeholder.content).to be_nil
+    end
+
+    # In the row that is already there, so the bubble the agent is looking at becomes the
+    # message and anything quoting it still points at something.
+    it 'writes the message over the placeholder instead of reporting a duplicate' do
+      was = placeholder.id
+
+      expect { expect(recovery).to eq(:handled) }.not_to change(inbox.messages, :count)
+
+      expect(placeholder.id).to eq(was)
+      expect(placeholder.content).to eq('oi, tudo bem?')
+      expect(placeholder.content_attributes).not_to have_key('is_unsupported')
+    end
+
+    # The recovery is the first time the quote is readable: an undecryptable stanza
+    # carries no context to take it from.
+    it 'links the message it quotes, which only the recovery names' do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(id: '3EB0AAAA0009', content: model::Content::Text.new(body: 'antes'))
+                           ))
+      )
+      quoted = inbox.messages.find_by(source_id: '3EB0AAAA0009')
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered, quoted_id: '3EB0AAAA0009')
+                           ))
+      )
+
+      expect(placeholder.content_attributes['in_reply_to']).to eq(quoted.id)
+    end
+
+    context 'when what arrives carries media' do
+      let(:recovered) do
+        model::Content::Media.new(
+          kind: 'image', mime: 'image/jpeg', caption: 'olha isso', filename: 'foto.jpg',
+          ref: model::MediaRef.url('https://connector.test/media/abc')
+        )
+      end
+
+      # The fetch stands down for a row marked unsupported, which is what a placeholder
+      # is: without clearing the flag first the bytes would never be asked for.
+      it 'asks for the bytes the placeholder could not carry' do
+        expect(recovery).to eq(:handled)
+
+        expect(placeholder.content).to eq('olha isso')
+        expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued
+          .with(placeholder, hash_including('kind' => 'image'), hash_including('kind' => 'phone'))
+      end
+
+      # The job takes the row by reference, so a save that raised would have it fetch
+      # bytes for content nobody stored.
+      it 'asks for nothing when the row cannot be written' do
+        allow_any_instance_of(Message).to receive(:save!).and_raise(ActiveRecord::RecordInvalid) # rubocop:disable RSpec/AnyInstance
+
+        expect { recovery }.to raise_error(ActiveRecord::RecordInvalid)
+
+        expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      end
+    end
+
+    context 'when what arrives is a location' do
+      let(:recovered) { model::Content::Location.new(latitude: -25.42, longitude: -49.27, name: 'Curitiba') }
+
+      it 'attaches the coordinates the bubble renders' do
+        expect(recovery).to eq(:handled)
+
+        attachment = placeholder.attachments.last
+        expect(attachment.file_type).to eq('location')
+        expect(attachment.coordinates_lat).to eq(-25.42)
+      end
+    end
+
+    # The redelivery of the placeholder itself is a duplicate like any other. Replacing a
+    # placeholder with a placeholder would clear the flag and leave an empty bubble.
+    context 'when the redelivery is the placeholder again' do
+      let(:recovered) { model::Content::Unsupported.new(reason: 'undecryptable') }
+
+      it 'leaves it alone' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+      end
+    end
+
+    # The contract lets the placeholder and the message name the author by one alias each,
+    # and they need not be the same one. Whatever the recovery did not repeat would be
+    # dropped, and a deletion naming that alias would be back to asking the contact.
+    it 'keeps every alias either half of the message named the author by' do
+      placeholder.update!(content_attributes: placeholder.content_attributes.merge(
+        'external_author' => { 'lid' => '182736451928374' }
+      ))
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered,
+                                                   sender: model::Party.new(phone: '5541999990000'))
+                           ))
+      )
+
+      expect(placeholder.content_attributes['external_author'])
+        .to eq('lid' => '182736451928374', 'phone' => '5541999990000')
+    end
+
+    # The contract requires content on a message, and nothing checks the contract at
+    # runtime. Written over by nothing, the placeholder would lose its flag and become an
+    # empty bubble, which says less than the one that says it could not be read.
+    context 'when what arrives carries no content at all' do
+      let(:recovered) { nil }
+
+      it 'leaves the placeholder standing' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+      end
+    end
+
+    # MESSAGE_UPDATED reaches the open thread and nothing else, so the card in the list
+    # would go on showing the bubble that could not be read until something else touched
+    # that conversation.
+    it 'refreshes the card in the chat list' do
+      conversation = placeholder.conversation
+      conversation.update_columns(updated_at: 1.hour.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      expect { recovery }.to(change { conversation.reload.updated_at })
+    end
+
+    # An undecryptable stanza carries no readable context, so a thread opened by one
+    # starts with no ad and no entry point: the message that finally arrives is the first
+    # and only chance to record them.
+    it 'records the attribution only the recovery carries' do
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel,
+        model::Event.build(model::Events::MessageReceived.new(
+                             message: inbound.with(content: recovered, entry_point: 'ad',
+                                                   referral: { 'source_type' => 'ad', 'title' => 'Promo' })
+                           ))
+      )
+
+      attributes = placeholder.conversation.additional_attributes
+      expect(attributes['entry_point']).to eq('ad')
+      expect(attributes['referral']).to include('title' => 'Promo')
+    end
+
+    # Writing the content takes the recovery marker off the row, so anything recorded
+    # only after it is lost for good when the step in between raises: the redelivery
+    # finds the row no longer eligible and never comes back here. The job transport is
+    # its own Redis and goes down on its own schedule, which is that step.
+    it 'records the attribution even when the work after the write raises' do
+      allow(Whatsapp::Session::MediaFetchJob).to receive(:perform_later).and_raise(Redis::CannotConnectError)
+
+      expect do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(
+                                 entry_point: 'ad', referral: { 'source_type' => 'ad', 'title' => 'Promo' },
+                                 content: model::Content::Media.new(
+                                   kind: 'image', mime: 'image/jpeg',
+                                   ref: model::MediaRef.url('https://connector.test/media/abc')
+                                 )
+                               )
+                             ))
+        )
+      end.to raise_error(Redis::CannotConnectError)
+
+      expect(placeholder.conversation.additional_attributes['entry_point']).to eq('ad')
+    end
+
+    # `content_attributes` is one JSON column. A revoke or a media failure landing between
+    # the read and the save is written away by a merge computed off the hash that was read
+    # first, which is why every other writer of this column goes under the row lock.
+    it 'keeps what landed on the row while the recovery was on its way' do
+      # A revoke, written the way the revoke handler writes it, landing after the handler
+      # has already read the row.
+      allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:new).and_wrap_original do |original, **kwargs|
+        Message.find(placeholder.id).update_under_lock!(deleted: true)
+        original.call(**kwargs)
+      end
+
+      expect(recovery).to eq(:handled)
+
+      expect(placeholder.content).to eq('oi, tudo bem?')
+      expect(placeholder.content_attributes['deleted']).to be(true)
+    end
+
+    # `is_unsupported` answers a different question: MediaFetchJob#give_up and
+    # MediaDownloadFailed raise it on messages that arrived intact. Writing content over
+    # one of those clears a failure the agent is looking at and asks for the bytes again.
+    context 'when the stored row is a media failure rather than a placeholder' do
+      let(:content) do
+        model::Content::Media.new(kind: 'image', mime: 'image/jpeg', caption: 'olha isso',
+                                  ref: model::MediaRef.url('https://connector.test/media/abc'))
+      end
+      let(:recovered) { content }
+
+      before { placeholder.update_under_lock!(is_unsupported: true) }
+
+      it 'leaves the failure alone' do
+        ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      end
+    end
+
+    # Off the wire and not off a hand-built model. Every other example here constructs
+    # `Content::Unsupported` directly, so a reason that arrived under a different key
+    # would leave the marker unwritten, the recovery dead in production, and all of them
+    # green.
+    it 'reads the reason out of the frame the connector actually sends' do
+      frame = Whatsapp::SessionContract.fixture('events', 'message_received_unsupported')
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.from_frame(frame))
+
+      stored = inbox.messages.find_by(source_id: frame.dig('payload', 'message', 'id'))
+      expect(stored.content_attributes['unsupported_reason']).to eq('undecryptable')
+    end
+
+    # An edit can decrypt while the message it edits does not, so it lands on the
+    # placeholder and is the first readable body that row has. The original body arriving
+    # afterwards is stale next to an edit of it.
+    context 'when an edit landed on the placeholder first' do
+      before do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageEdited.new(
+                               chat: chat, message_id: inbound.id,
+                               content: model::Content::Text.new(body: 'oi, tudo bem mesmo?')
+                             ))
+        )
+      end
+
+      it 'shows the edit rather than the unsupported bubble' do
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.is_unsupported).to be_nil
+      end
+
+      it 'does not let the recovery write the original body over the edit' do
+        expect(recovery).to eq(:handled)
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+      end
+
+      # Everything around the body is still only on the recovery: an undecryptable stanza
+      # carries no context, so the quote is unreadable until the message itself arrives.
+      it 'still takes what the recovery carries around the body' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(id: '3EB0AAAA0009', content: model::Content::Text.new(body: 'antes'))
+                             ))
+        )
+        quoted = inbox.messages.find_by(source_id: '3EB0AAAA0009')
+
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: recovered, quoted_id: '3EB0AAAA0009')
+                             ))
+        )
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.content_attributes['in_reply_to']).to eq(quoted.id)
+        expect(placeholder.content_attributes).not_to have_key('unsupported_reason')
+      end
+
+      # `rich` describes the body, and the body is not this message's to describe any
+      # more: a card drawn around text the edit replaced reads worse than no card.
+      it 'leaves the rich card out, because the body it describes is gone' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: model::Content::Rich.new(
+                                 kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega'
+                               ))
+                             ))
+        )
+
+        expect(placeholder.content).to eq('oi, tudo bem mesmo?')
+        expect(placeholder.content_attributes).not_to have_key('rich')
+      end
+
+      # The edit settles the body and takes the recovery marker off the row. The
+      # attribution is not about the row, though, and nothing else ever records it.
+      it 'still records the attribution the recovery carries' do
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(
+          channel,
+          model::Event.build(model::Events::MessageReceived.new(
+                               message: inbound.with(content: recovered, entry_point: 'ad')
+                             ))
+        )
+
+        expect(placeholder.conversation.additional_attributes['entry_point']).to eq('ad')
+      end
+    end
+
+    # A share of one contact becomes that contact, in the row that is already there.
+    context 'when what arrives is a share of one contact' do
+      let(:recovered) do
+        model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' }])
+      end
+
+      it 'turns the placeholder into the card' do
+        expect(recovery).to eq(:handled)
+
+        expect(placeholder.content).to eq('Carlos Dias - +5541988881111')
+        expect(placeholder.content_attributes).not_to have_key('is_unsupported')
+        expect(placeholder.attachments.last.file_type).to eq('contact')
+        expect(inbox.messages.count).to eq(1)
+      end
+
+      # A card that says nothing takes no row on the writing path either, so a share
+      # carrying one real contact next to a malformed one is still a share of one.
+      context 'when the other cards say nothing' do
+        let(:recovered) do
+          model::Content::Contacts.new(contacts: [{ 'vcard' => 'BEGIN:VCARD\\nEND:VCARD' },
+                                                  { 'display_name' => 'Bruno Lima', 'phone' => '+5541977776666' }])
+        end
+
+        it 'takes the card that says something' do
+          expect(recovery).to eq(:handled)
+
+          expect(placeholder.content).to eq('Bruno Lima - +5541977776666')
+          expect(inbox.messages.count).to eq(1)
+        end
+      end
+    end
+
+    # A share of several would have to write rows whose arrival Chatwoot already ran when
+    # the placeholder landed, and backdating them into the thread puts them where
+    # `MessageFinder` cannot page back to. #488 carries both.
+    context 'when what arrives is a share of several contacts' do
+      let(:recovered) do
+        model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' },
+                                                { 'display_name' => 'Bruno Lima', 'phone' => '+5541977776666' }])
+      end
+
+      it 'leaves the placeholder standing rather than writing rows beside it' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(inbox.messages.count).to eq(1)
+      end
+    end
+
+    context 'when nothing in the recovered share can be read' do
+      let(:recovered) { model::Content::Contacts.new(contacts: [{ 'vcard' => 'BEGIN:VCARD\\nEND:VCARD' }]) }
+
+      it 'leaves the placeholder standing' do
+        expect(recovery).to eq(:duplicate)
+
+        expect(placeholder.is_unsupported).to be(true)
+        expect(inbox.messages.count).to eq(1)
+      end
+    end
+  end
+
+  # Only a placeholder is written over. A message that is already the message is a
+  # duplicate, and rewriting it would undo whatever has happened to the row since.
+  context 'when a message that was never a placeholder is redelivered' do
+    it 'reports a duplicate and leaves the stored content alone' do
+      expect(dispatch).to eq(:handled)
+      inbox.messages.find_by(source_id: '3EB0AAAA0001').update!(content: 'editada por alguém')
+
+      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)).to eq(:duplicate)
+
+      expect(inbox.messages.find_by(source_id: '3EB0AAAA0001').content).to eq('editada por alguém')
+    end
+  end
+
   context 'with a chat Chatwoot has no place for' do
     let(:chat) { model::Address.new(kind: 'status', id: 'status') }
 
@@ -505,6 +916,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     it 'is ignored while the group capability is off' do
       expect(dispatch).to eq(:ignored)
       expect(inbox.messages).to be_empty
+    end
+
+    # `groups` and `group_management` are two questions. This is the half that decides
+    # whether the thread exists at all, and an inbox whose provider answers no group
+    # commands still takes the conversation -- otherwise the split would be a way to lose
+    # messages rather than a way to withhold a panel.
+    it 'opens the group conversation without the group command surface' do
+      allow(Whatsapp::Session::Registry).to receive(:capabilities_for).and_return(%w[groups])
+
+      with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect(dispatch).to eq(:handled)
+      end
+
+      expect(inbox.contacts.find_by(identifier: '120363041234567890@g.us')).to be_present
     end
 
     it 'opens the group conversation and files the sender as a member' do

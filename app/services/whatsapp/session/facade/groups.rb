@@ -8,11 +8,11 @@ module Whatsapp::Session::Facade::Groups
   # --- groups --------------------------------------------------------------------
 
   def allow_group_creation?
-    capability?('groups')
+    capability?('group_management')
   end
 
   def create_group(subject, participants)
-    raise Whatsapp::Session::Errors::NotSupported, 'groups are disabled on this installation' unless capability?('groups')
+    refuse_group_management unless capability?('group_management')
 
     info = backend.create_group(model::Commands::GroupCreate.new(subject: subject, participants: addresses(participants)))
     # Groups::CreateService reads :id from this, the same key the Baileys response had.
@@ -84,8 +84,12 @@ module Whatsapp::Session::Facade::Groups
     update_group_setting(group_jid, 'member_add_mode', mode.to_s == 'all_member_add')
   end
 
+  # Guarded on `group_management` and not on `groups`: the roster comes from the provider's
+  # own group read, so an inbox that takes group conversations without the command surface
+  # has nothing to sync from. There is no group conversation to reach here without
+  # `groups` anyway.
   def sync_group(conversation, soft: false)
-    return unless capability?('groups')
+    return unless capability?('group_management')
 
     Whatsapp::Session::Groups::Syncer.new(channel: channel, group_contact: conversation.contact, soft: soft).perform
   end
@@ -93,12 +97,31 @@ module Whatsapp::Session::Facade::Groups
   private
 
   # `WHATSAPP_GROUPS_ENABLED=false` takes every group capability away from the descriptor,
-  # and the dashboard hides the group panel accordingly. The API endpoints behind that
-  # panel are still routable, though, so the switch has to be enforced where the calls
-  # land: gating only creation left participants, metadata, invites, settings, leaving and
-  # syncing reaching the provider on an installation that turned groups off.
+  # `group_management` included, and the dashboard hides the group panel accordingly. The
+  # API endpoints behind that panel are still routable, though, so the switch has to be
+  # enforced where the calls land: gating only creation left participants, metadata,
+  # invites, settings, leaving and syncing reaching the provider on an installation that
+  # turned groups off.
+  #
+  # Now also the gate for an inbox whose provider takes group conversations and answers no
+  # group commands, which the switch being on does not make possible.
+  # Two refusals wearing one capability, and an agent reading the reply has to be able to
+  # tell them apart. The installation turned groups off entirely, and nothing about groups
+  # works; or this inbox takes group conversations and its provider answers no group
+  # commands, in which case the threads in the sidebar are real and only this button is
+  # not. Saying "groups are disabled" for the second sends whoever reads it looking for a
+  # switch that is already on.
+  def refuse_group_management
+    raise Whatsapp::Session::Errors::NotSupported,
+          if Whatsapp::Session::Registry.groups_enabled?
+            'this inbox receives group conversations but cannot manage groups'
+          else
+            'groups are disabled on this installation'
+          end
+  end
+
   def group(group_jid)
-    raise Whatsapp::Session::Errors::NotSupported, 'groups are disabled on this installation' unless capability?('groups')
+    refuse_group_management unless capability?('group_management')
 
     parsed = model::Address.parse(group_jid)
     raise Whatsapp::Session::Errors::InvalidPayload, "not a group: #{group_jid}" unless parsed&.group?

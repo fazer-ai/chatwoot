@@ -18,6 +18,7 @@ module Whatsapp::Session::Capabilities
     check_number
     profile_picture
     groups
+    group_management
     group_admin
     group_invites
     group_join_requests
@@ -49,13 +50,30 @@ module Whatsapp::Session::Capabilities
     'profile_picture' => :profile_picture_url,
     'account_limits' => :fetch_account_limits,
     'media_download' => :download_media,
-    'groups' => :group_info,
+    'group_management' => :group_info,
     'group_admin' => :update_group_participants,
     'group_invites' => :group_invite_code,
     'group_join_requests' => :group_join_requests
   }.freeze
 
-  GROUP_CAPABILITIES = %w[groups group_admin group_invites group_join_requests].freeze
+  # `groups` and `group_management` are two questions, and a provider can answer one
+  # without the other.
+  #
+  # `groups` is whether group conversations reach this inbox at all: it is what the connect
+  # request carries to the connector, and what the six inbound handlers ask before letting
+  # a group message, reaction, join, rename or picture change through. It unlocks no method,
+  # the way `echo_by_reserved_id` and `calls` unlock none -- it describes what arrives.
+  #
+  # `group_management` is whether this provider can be asked about a group and told to
+  # change one: reading it, creating it, renaming it, its description and photo, its
+  # settings, and leaving it. `group_admin`, `group_invites` and `group_join_requests` are
+  # narrower powers on top of it, each its own capability because a provider can do groups
+  # without them -- Uazapi does groups and cannot serve invite links.
+  #
+  # Splitting them is what lets an installation take group conversations into Chatwoot
+  # without handing agents the group's admin surface, and lets a provider that only
+  # delivers group messages declare exactly that instead of promising commands it refuses.
+  GROUP_CAPABILITIES = %w[groups group_management group_admin group_invites group_join_requests].freeze
 
   def self.validate!(capabilities)
     unknown = capabilities.map(&:to_s) - ALL
