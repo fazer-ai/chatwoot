@@ -16,6 +16,12 @@
       "mime": "audio/ogg; codecs=opus",
       "voice_note": true,
       "duration": 5,
+      "waveform": [
+        0, 16, 11, 4, 29, 39, 11, 14, 53, 44, 8, 33, 71, 37, 9, 56,
+        77, 24, 19, 79, 71, 13, 39, 94, 54, 10, 63, 96, 34, 18, 85, 84,
+        17, 35, 97, 63, 10, 57, 96, 39, 14, 74, 82, 19, 26, 82, 59, 9,
+        41, 77, 35, 9, 50, 60, 16, 14, 48, 37, 6, 17, 32, 13, 2, 0
+      ],
       "ref": {
         "kind": "url",
         "url": "http://rails:3000/rails/active_storage/blobs/proxy/def/audio.ogg"
