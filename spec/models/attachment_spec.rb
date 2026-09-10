@@ -450,6 +450,21 @@ RSpec.describe Attachment do
         expect(location).to be_valid
       end
 
+      # An echo is a message someone sent from another WhatsApp client; it reaches us through the
+      # same webhook as an incoming one and is only stored as outgoing. We never send it, so
+      # refusing it would roll back the ingestion the same way an incoming refusal would.
+      it 'leaves an outgoing echo alone, because we are not the ones sending it' do
+        inbox = create(:inbox, account: message.account,
+                               channel: create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
+        conversation = create(:conversation, account: message.account, inbox: inbox)
+        echo = create(:message, account: message.account, conversation: conversation, message_type: :outgoing,
+                                content_attributes: { external_echo: true })
+        attachment = echo.attachments.new(account_id: message.account_id, file_type: :file)
+        attachment.file.attach(io: StringIO.new(''), filename: 'empty.pdf', content_type: 'application/pdf')
+
+        expect(attachment).to be_valid
+      end
+
       it 'is rejected on a template message too' do
         inbox = create(:inbox, account: message.account,
                                channel: create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))

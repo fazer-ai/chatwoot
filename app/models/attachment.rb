@@ -201,9 +201,12 @@ class Attachment < ApplicationRecord
   # Outgoing only, and that boundary is the point: refusing what an agent uploads hands them the
   # reason while they can still fix it, while refusing what a contact sent would raise inside
   # `Whatsapp::IncomingMessageBaseService#process_messages` and take the inbound webhook down.
+  # Only worth refusing when we are the ones about to send the file. Whatever the provider handed
+  # us is recorded as it arrived, whether incoming or an echo of a message sent from another
+  # client, because refusing it would roll back the whole webhook.
   def file_is_not_empty
-    return unless file.attached? && (message&.outgoing? || message&.template?)
-    return unless file.byte_size.to_i.zero?
+    return unless file.attached? && file.byte_size.to_i.zero?
+    return unless %w[outgoing template].include?(message&.message_type) && !message.content_attributes['external_echo']
 
     errors.add(:file, 'is empty')
   end
