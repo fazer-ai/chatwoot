@@ -103,18 +103,38 @@ module Whatsapp::BaileysHandlers::MessagingHistorySet
     end
   end
 
-  # Matched on the id alone, without the domain: the answer is addressed the way WhatsApp
-  # holds the chat, which is not always the way the request was addressed -- a request sent
-  # to a LID comes back answered as `<phone>@s.whatsapp.net`. The id either side of that
-  # swap is the one the contact inbox was keyed by.
+  # The answer is addressed the way WhatsApp holds the chat, which is not always the way the
+  # request was addressed: a request sent to a LID comes back answered as
+  # `<phone>@s.whatsapp.net`. Matching the id by equality only lands when the row happens to
+  # have been keyed by the same half of the pair the answer used, and a row on a Baileys
+  # inbox can legitimately be keyed by either.
+  #
+  # `ContactLookup` is where that question already has one answer, covering the three keys
+  # that can hold the same person: the id as given, the other ninth-digit spelling of the
+  # number, and the phone on the contact itself, which is all that survives once
+  # consolidation re-keys the row to a LID. Asking it here rather than writing a fourth
+  # version is the point -- the miss was never in the logic, it was in there being several.
   def conversations_for_chat(jid)
-    source_id = jid.to_s.split('@').first
-    return Conversation.none if source_id.blank?
-
-    contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    party = party_for(jid)
+    contact_inbox = Whatsapp::Session::Inbound::ContactLookup.find(inbox: inbox, party: party)
     return Conversation.none if contact_inbox.blank?
 
     inbox.conversations.where(contact_id: contact_inbox.contact_id)
+  end
+
+  # Resolved per call rather than aliased to a constant: a constant pointing at another
+  # file's class keeps the pre-reload object, and in development that object is the one
+  # Zeitwerk already discarded.
+  def model = Whatsapp::Session::Model
+
+  # One jid names one half of the pair and never says what the other is, so which half it
+  # is has to come from the domain: `@lid` is the LID namespace and everything else is the
+  # phone one.
+  def party_for(jid)
+    id, domain = jid.to_s.split('@')
+    return if id.blank?
+
+    domain == 'lid' ? model::Party.new(lid: id) : model::Party.new(phone: id)
   end
 
   def flag_exhausted(conversation)

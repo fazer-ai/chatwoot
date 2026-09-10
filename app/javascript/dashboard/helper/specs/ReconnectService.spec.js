@@ -176,7 +176,20 @@ describe('ReconnectService', () => {
       await reconnectService.fetchFilteredOrSavedConversations(payload);
       expect(storeMock.dispatch).toHaveBeenCalledWith(
         'fetchFilteredConversations',
-        { queryData: payload, page: 1 }
+        { queryData: payload, page: 1, sortBy: undefined }
+      );
+    });
+
+    // Page 1 of oldest-first and page 1 of newest-first are different conversations, so a
+    // refetch without the sort merges a page the agent is not looking at and leaves the
+    // visible ones stale, which is what the reconnect exists to prevent.
+    it('should carry the selected sort order', async () => {
+      storeMock.getters.getChatSortFilter = 'last_activity_at_asc';
+      const payload = { test: 'data' };
+      await reconnectService.fetchFilteredOrSavedConversations(payload);
+      expect(storeMock.dispatch).toHaveBeenCalledWith(
+        'fetchFilteredConversations',
+        { queryData: payload, page: 1, sortBy: 'last_activity_at_asc' }
       );
     });
   });

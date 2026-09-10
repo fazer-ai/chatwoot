@@ -94,7 +94,8 @@
       "REQUESTED": "Asked the phone for older messages. They appear here as it sends them.",
       "ERROR": "Could not ask for older messages. Try again in a moment.",
       "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
-    }
+    },
+    "FILE_IS_EMPTY": "This file is empty and cannot be sent"
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

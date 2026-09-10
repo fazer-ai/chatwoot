@@ -1,3 +1,4 @@
+require 'open3'
 require 'tmpdir'
 
 # rubocop:disable Metrics/BlockLength
@@ -36,14 +37,14 @@ namespace :whatsapp do
       source = Pathname.new(ENV.fetch('WHATSAPP_CONNECTOR_PATH', Rails.root.join('../../whatsapp-connector').to_s)).expand_path
       raise "no contract at #{source}/contract" unless source.join('contract').directory?
 
-      ref = args[:ref].presence || `git -C #{source} rev-parse HEAD`.strip
+      ref = WhatsappContractSource.commit_for(source, args[:ref])
       target = Whatsapp::SessionContract.root
       FileUtils.rm_rf(target)
       FileUtils.mkdir_p(target)
       FileUtils.cp_r("#{source}/contract/.", target)
       FileUtils.rm_f(target.join('README.md'))
       Whatsapp::SessionContract.write_reference(repo: 'fazer-ai/whatsapp-connector', ref: ref)
-      puts "vendored #{ref[0, 12]} (checksum #{Whatsapp::SessionContract.checksum})"
+      puts "vendored #{ref[0, 12]} (checksum #{Whatsapp::SessionContract.checksum})#{WhatsappContractSource.local_edits(source)}"
     end
   end
 
@@ -308,6 +309,63 @@ module WhatsappProviderConversion
 
       puts "  #{verb}    #{label}#{note ? ": #{note}" : ''}"
       true
+    end
+  end
+end
+
+# Which commit the copy `sync` makes actually comes from.
+#
+# The task used to stamp CONTRACT_REF with the ref it was handed and copy whatever the
+# working tree held, two facts with nothing tying them together: a checkout sitting on a
+# branch from before that ref vendored the old contract under the new ref's name. Nothing
+# caught it, because `verify` with no argument compares the files against the checksum this
+# very task had just written from those same files, so the pair is internally consistent and
+# names a commit it does not correspond to. `verify[<ref>]` would have caught it, and nobody
+# runs it right after a sync that just said it worked.
+module WhatsappContractSource
+  class << self
+    # Refuses rather than checking the ref out: the checkout belongs to whoever is working
+    # in it, and moving somebody else's HEAD to make a copy is not this task's to do. Both
+    # commits go in the message, since "wrong ref" without them is a puzzle.
+    def commit_for(source, ref)
+      head = rev_parse(source, 'HEAD')
+      abort "#{source} is not a git checkout, so there is no commit to name; nothing was vendored" if head.nil?
+      return head if ref.blank?
+
+      asked = rev_parse(source, ref)
+      abort "#{source} does not know #{ref}; fetch it there first, or omit the ref to vendor what is checked out" if asked.nil?
+      return head if asked == head
+
+      abort "#{source} is checked out at #{head[0, 12]}, not #{ref} (#{asked[0, 12]}). " \
+            'Check it out there, or omit the ref to vendor what is checked out.'
+    end
+
+    # Vendoring an uncommitted state is a real thing to want -- a contract change is tried
+    # from both sides before it is a commit -- so this does not refuse. What it must not do
+    # is let the success line claim the copy is that commit, which is the same lie the ref
+    # check above is about, arriving through the working tree instead of through HEAD.
+    def local_edits(source)
+      count = git(source, 'status', '--porcelain', '--', 'contract').to_s.lines.count
+      return '' if count.zero?
+
+      " plus #{count} uncommitted change(s) to contract/"
+    end
+
+    private
+
+    def rev_parse(source, ref)
+      # `^{commit}` so a tag, a branch and a short sha all answer the same thing, and an
+      # existing ref that names something other than a commit answers nothing.
+      git(source, 'rev-parse', '--verify', '--quiet', "#{ref}^{commit}")&.strip.presence
+    end
+
+    # capture2e, so git's own "fatal: not a git repository" does not print past this: a
+    # failure here is answered as nil and spoken for by the abort messages above.
+    def git(source, *)
+      out, status = Open3.capture2e('git', '-C', source.to_s, *)
+      status.success? ? out : nil
+    rescue Errno::ENOENT
+      nil
     end
   end
 end

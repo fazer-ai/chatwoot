@@ -166,9 +166,15 @@ const toggleConversationLayout = () => {
           :class="{ 'ltr:right-0 rtl:left-0': isOnExpandedLayout }"
         />
       </div>
+      <!--
+        Shown in folders too, where it used to be hidden entirely. The list there was
+        always newest-first and nothing on screen said so, which is the worst version of
+        the problem: a team that works oldest-first had no control and no explanation.
+        `sort-only` because the folder's own query already decides status and group type.
+      -->
       <ConversationBasicFilter
-        v-if="!hasAppliedFiltersOrActiveFolders"
         :is-on-expanded-layout="isOnExpandedLayout"
+        :sort-only="hasAppliedFiltersOrActiveFolders"
         @change-filter="onBasicFilterChange"
       />
       <SwitchLayout

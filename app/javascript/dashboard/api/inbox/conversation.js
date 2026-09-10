@@ -41,6 +41,10 @@ class ConversationApi extends ApiClient {
     return axios.post(`${this.url}/filter`, payload.queryData, {
       params: {
         page: payload.page,
+        // Sent as a query param, not in the body: the body is the filter payload the
+        // server validates attribute by attribute, and an extra key there is rejected
+        // rather than ignored. Omitted when absent so the server keeps its own default.
+        ...(payload.sortBy ? { sort_by: payload.sortBy } : {}),
       },
     });
   }

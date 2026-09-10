@@ -63,9 +63,18 @@ class Whatsapp::Session::Facade
   # so it is a teardown, not a pause: the Baileys service answers it with
   # `DELETE /connections/<phone>`. Merely disconnecting would leave the pairing and its
   # credentials alive on the provider under a session id Chatwoot no longer has.
+  #
+  # A refusal is said out loud rather than swallowed. What the fallback can do is end the
+  # connection, and a session whose pairing outlived the inbox that owned it is exactly the
+  # kind of thing an installation log has to carry: nothing else in this path leaves any
+  # trace, and the operator sees the inbox disappear and concludes it is over.
   def disconnect_channel_provider
     backend.delete_session
-  rescue Whatsapp::Session::Errors::NotSupported
+  rescue Whatsapp::Session::Errors::NotSupported => e
+    Rails.logger.warn(
+      "[WHATSAPP] #{provider} cannot tear down its session (#{e.message}); disconnecting instead, " \
+      "which leaves the pairing alive on the provider for inbox #{channel.inbox&.id}"
+    )
     backend.disconnect
   end
 

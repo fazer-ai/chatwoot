@@ -5,13 +5,13 @@
         "PROVIDERS": {
           "360_DIALOG_DESC": "Conectar através de credenciais 360Dialog",
           "BAILEYS": "Baileys",
-          "BAILEYS_DESC": "Conectar via API não-oficial Baileys",
+          "BAILEYS_DESC": "Conectar via API não oficial Baileys",
           "ZAPI": "Z-API",
-          "ZAPI_DESC": "Conectar via API não-oficial Z-API",
+          "ZAPI_DESC": "Conectar via API não oficial Z-API",
           "NATIVE": "WhatsApp (nativo)",
-          "NATIVE_DESC": "Conectar via API não-oficial, pelo conector que já vem nesta instalação",
+          "NATIVE_DESC": "Conectar via API não oficial, pareando como no WhatsApp Web, sem provedor externo",
           "UAZAPI": "Uazapi",
-          "UAZAPI_DESC": "Conectar via API não-oficial Uazapi, na sua própria instância"
+          "UAZAPI_DESC": "Conectar via API não oficial Uazapi, na sua própria instância"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",

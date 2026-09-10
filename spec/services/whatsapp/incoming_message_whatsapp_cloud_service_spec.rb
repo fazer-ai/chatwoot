@@ -376,6 +376,52 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
       end
     end
 
+    # An echo of a message the agent sent from the connected phone is stored as outgoing, but it
+    # still arrives through this webhook. A zero-byte download must not raise at `@message.save!`,
+    # or the whole ingestion rolls back and the message is lost instead of merely being odd.
+    context 'when an outgoing echo carries a zero-byte attachment' do
+      let(:echo_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Sojan Jose' }, wa_id: '2423423243' }],
+                messages: [{
+                  from: whatsapp_channel.phone_number,
+                  to: '2423423243',
+                  id: 'wamid.ECHO_EMPTY',
+                  document: {
+                    id: 'b1c68f38-8734-4ad3-b4a1-ef0c10d683',
+                    mime_type: 'application/pdf',
+                    sha256: '29ed500fa64eb55fc19dc4124acb300e5dcca0f822a301ae99944db',
+                    filename: 'empty.pdf'
+                  },
+                  timestamp: '1664799904', type: 'document'
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      it 'still records the message instead of bringing the webhook down' do
+        stub_media_url_request
+        stub_request(:get, 'https://chatwoot-assets.local/sample.png').to_return(
+          status: 200, body: File.read('spec/assets/attachment.pdf'), headers: { 'content-type' => 'application/pdf' }
+        )
+
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: echo_params, outgoing_echo: true).perform
+        end.to change(Message, :count).by(1)
+
+        message = whatsapp_channel.inbox.messages.last
+        expect(message).to be_outgoing
+        expect(message.content_attributes['external_echo']).to be(true)
+      end
+    end
+
     context 'when dispatching provider events' do
       let(:message_params) do
         {

@@ -71,6 +71,75 @@ RSpec.describe 'group actions and the inbox they run as', type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
+  # An agent on none of the group's inboxes has no candidate at all, and `size <= 1` read
+  # that as "exactly one", handing a nil channel to the action. The first dereference
+  # raised, so a request that is simply not this agent's answered 500.
+  #
+  # The answer has to be the one an inbox the group is not in already gets. Answering
+  # differently would tell an agent whether that number is in the group, which is the
+  # disclosure the named-inbox path is careful to avoid.
+  context 'when the agent is on none of the inboxes this group is in' do
+    let(:outsider) do
+      agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: agent,
+                            inbox: create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false,
+                                                             sync_templates: false, account: account).inbox)
+      agent
+    end
+
+    it 'refuses instead of failing, when the caller names no inbox' do
+      post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_admin/leave",
+           headers: outsider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    # The same request the previous example makes, from an agent who is on one of them.
+    # Both are refused, and the refusals are indistinguishable.
+    it 'answers exactly as it does for an inbox the group is not in' do
+      stranger = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                           account: account)
+      insider = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: insider, inbox: looking_at.inbox)
+
+      post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_admin/leave",
+           headers: outsider.create_new_auth_token, as: :json
+      absent_inbox = [response.status, response.parsed_body]
+
+      post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_admin/leave",
+           params: { inbox_id: stranger.inbox.id }, headers: insider.create_new_auth_token, as: :json
+
+      expect(absent_inbox).to eq([response.status, response.parsed_body])
+    end
+  end
+
+  # The read that tolerates a missing channel must still refuse an inbox that was named and
+  # is wrong. Without the bang it would answer 200 with the list and no admin flag, turning a
+  # wrong request into a slightly wrong answer.
+  it 'refuses a named inbox the group is not in even on the tolerant read' do
+    stranger = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                         account: account)
+
+    get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+        params: { inbox_id: stranger.inbox.id }, headers: admin.create_new_auth_token, as: :json
+
+    expect(response).to have_http_status(:not_found)
+  end
+
+  # A fence, not a checklist. `channel` refusing is what keeps a new group endpoint from
+  # answering 500 the way this one did, and the tolerant reader exists for the two reads
+  # that are meant to degrade. Adding a third without meaning to is the way back in.
+  it 'is read tolerantly in exactly the two places that mean to' do
+    roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
+    readers = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
+      File.read(path).include?('channel_if_any')
+    end
+
+    expect(readers.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s })
+      .to contain_exactly('app/controllers/concerns/group_channel_resolver.rb',
+                          'app/controllers/api/v1/accounts/contacts/group_members_controller.rb')
+  end
+
   # The endpoints predate the parameter and are documented without it, so a group that is
   # in one inbox still answers on its own.
   it 'needs no inbox when the group is in only one' do
