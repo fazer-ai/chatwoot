@@ -65,6 +65,7 @@
 #
 
 class Conversation < ApplicationRecord
+  include AdditionalAttributesMerge
   include Labelable
   include LlmFormattable
   include AssignmentHandler

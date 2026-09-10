@@ -93,6 +93,32 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     end
   end
 
+  # `fetch_info` is a network call and `group_contact` was handed in before it, so the copy the
+  # merge reads is already old by the time the write happens. The chat lock around the fetch
+  # serialises this group's own events, not the other writers of the column: an avatar sync, a
+  # dashboard edit, another inbox. Same shape as the Baileys path, one call earlier.
+  context 'when another writer lands during the metadata fetch' do
+    subject(:fetched_sync) { described_class.new(channel: channel, group_contact: group_contact).perform }
+
+    let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+
+    before do
+      allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+      allow(backend).to receive(:group_info) do
+        Contact.find(group_contact.id).then do |row|
+          row.update!(additional_attributes: row.additional_attributes.merge('custom_note' => 'kept'))
+        end
+        model::GroupInfo.new(group: group, subject: 'Equipe de Vendas')
+      end
+    end
+
+    it 'does not erase what the other writer stored' do
+      fetched_sync
+
+      expect(group_contact.reload.additional_attributes).to include('custom_note' => 'kept')
+    end
+  end
+
   # The snapshot comes from `group.joined`, which is the one event that knows the session
   # is back in the group, and it clears the flag for that inbox alone.
   context 'when the group was left and an event brought its metadata back' do
