@@ -128,7 +128,9 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(authenticated_url))
     end
 
-    it 'returns early when rate limited' do
+    # A job that never downloaded must not move the markers. It used to stamp both, which both
+    # extended its own rate-limit window and recorded a URL it had not fetched as synced.
+    it 'returns early when rate limited, leaving the markers where they were' do
       ts = 30.seconds.ago.iso8601
       avatarable.update!(additional_attributes: { 'last_avatar_sync_at' => ts })
 
@@ -142,14 +144,12 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       described_class.perform_now(avatarable, valid_url)
       avatarable.reload
       expect(avatarable.avatar).not_to be_attached
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
-      expect(Time.zone.parse(avatarable.additional_attributes['last_avatar_sync_at']))
-        .to be > Time.zone.parse(ts)
-      expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(valid_url))
+      expect(avatarable.additional_attributes['last_avatar_sync_at']).to eq(ts)
+      expect(avatarable.additional_attributes['avatar_url_hash']).to be_nil
       expect(WebMock).not_to have_requested(:get, valid_url)
     end
 
-    it 'returns early when hash unchanged' do
+    it 'returns early when hash unchanged, without opening a new rate-limit window' do
       avatarable.update!(additional_attributes: { 'avatar_url_hash' => Digest::SHA256.hexdigest(valid_url) })
 
       stub_request(:get, valid_url)
@@ -162,18 +162,20 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       described_class.perform_now(avatarable, valid_url)
       expect(avatarable.avatar).not_to be_attached
       avatarable.reload
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
+      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_nil
       expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(valid_url))
       expect(WebMock).not_to have_requested(:get, valid_url)
     end
 
-    it 'updates sync attributes even when URL is invalid' do
+    # A URL the job refuses to even parse is not a sync. Stamping it opened a rate-limit window
+    # that a good URL arriving seconds later would then be turned away by.
+    it 'leaves the markers alone when the URL is invalid' do
       invalid_url = 'invalid_url'
       described_class.perform_now(avatarable, invalid_url)
       avatarable.reload
       expect(avatarable.avatar).not_to be_attached
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
-      expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(invalid_url))
+      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_nil
+      expect(avatarable.additional_attributes['avatar_url_hash']).to be_nil
     end
 
     it 'updates sync attributes when file download is valid but content type is unsupported' do
@@ -203,6 +205,53 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       expect(avatarable.avatar).not_to be_attached
       expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
       expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(blocked_url))
+    end
+  end
+
+  # An infrastructure error is not an answer about the URL. The job will be retried, and a marker
+  # written on the way out would make the retry skip the download it exists to perform.
+  it 'leaves the markers alone when an error other than a fetch error escapes' do
+    contact = create(:contact)
+    allow(SafeFetch).to receive(:fetch).and_raise(ActiveRecord::ConnectionNotEstablished)
+
+    expect { described_class.perform_now(contact, valid_url) }.to raise_error(ActiveRecord::ConnectionNotEstablished)
+
+    contact.reload
+    expect(contact.additional_attributes['last_avatar_sync_at']).to be_nil
+    expect(contact.additional_attributes['avatar_url_hash']).to be_nil
+  end
+
+  # The sequence from #504. Each step looks harmless on its own, and the cost only shows when
+  # they run in order: the new picture never arrives, and nothing retries until the contact
+  # changes their photo again.
+  context 'when a superseded job runs just before the job that carries the new picture' do
+    let(:contact) { create(:contact) }
+    let(:old_url) { 'https://example.com/old-avatar.png' }
+    let(:new_url) { 'https://example.com/new-avatar.png' }
+
+    before do
+      [old_url, new_url].each do |url|
+        stub_request(:get, url).to_return(
+          status: 200,
+          body: File.read(Rails.root.join('spec/assets/avatar.png')),
+          headers: { 'Content-Type' => 'image/png' }
+        )
+      end
+    end
+
+    it 'still attaches the new picture' do
+      resolved_at = 1.minute.ago.iso8601
+      Whatsapp::Session::AvatarSync.remove(contact)
+
+      # The job carrying the URL from before the removal. It must not download, and must not
+      # leave a marker that the next job will be measured against.
+      described_class.perform_now(contact, old_url, resolved_at: resolved_at)
+      described_class.perform_now(contact, new_url, resolved_at: Time.current.iso8601)
+
+      expect(contact.reload.avatar).to be_attached
+      expect(WebMock).to have_requested(:get, new_url)
+      expect(WebMock).not_to have_requested(:get, old_url)
+      expect(contact.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(new_url))
     end
   end
 

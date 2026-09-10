@@ -22,16 +22,27 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
     return unless syncable_avatar?(avatarable, avatar_url)
     return if superseded?(avatarable, resolved_at)
 
+    attempt_download(avatarable, avatar_url)
+    update_avatar_sync_attributes(avatarable, avatar_url)
+  end
+
+  private
+
+  # The markers belong to whoever actually tried to download. They used to be stamped from an
+  # `ensure`, which the early returns above run straight through: a job that downloaded nothing
+  # would open a fresh rate-limit window and record a URL it never fetched as already synced, and
+  # the job carrying the new picture was then thrown away as a duplicate.
+  #
+  # A download that was attempted and failed still counts, so a URL that is permanently broken
+  # does not get retried on every event. An error that is not SafeFetch's propagates without
+  # stamping, because the job will be retried and must not find itself already marked.
+  def attempt_download(avatarable, avatar_url)
     fetch_and_attach_avatar(avatarable, avatar_url)
   rescue SafeFetch::HttpError => e
     log_http_error(avatar_url, e)
   rescue SafeFetch::Error => e
     Rails.logger.error "AvatarFromUrlJob error for #{avatar_url}: #{e.class} - #{e.message}"
-  ensure
-    update_avatar_sync_attributes(avatarable, avatar_url)
   end
-
-  private
 
   # A removal recorded after the URL was resolved makes that URL a picture the contact
   # has already taken down. Only Contacts carry the marker, which is where this job
