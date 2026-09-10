@@ -114,22 +114,19 @@ RSpec.describe Whatsapp::Session::Outbound::Waveform do
     # which raises on the first byte that is not valid UTF-8 and was read as "could not
     # measure". CI installs ffmpeg for this reason.
     it 'measures a real recording end to end', if: described_class.send(:ffmpeg).present? do
-      attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'nota.ogg',
-                             content_type: 'audio/ogg')
-      record = attachment.reload
+      # Built as its own row rather than by replacing what the factory attached. `attach` on
+      # a persisted record saves without a bang, so a refused save is silent and the old
+      # blob stays: this example spent a CI round decoding a 27 KB PNG and reporting that
+      # the output had no stream.
+      record = message.attachments.new(account_id: message.account_id, file_type: :audio,
+                                       meta: { 'is_voice_message' => true })
+      record.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'nota.ogg',
+                         content_type: 'audio/ogg')
+      record.save!
 
-      # Reported in the failure message, because a bare nil here is not debuggable on a
-      # machine nobody can open.
-      diagnosis = record.file.blob.open do |file|
-        out, err, status = Open3.capture3(described_class.send(:ffmpeg), '-v', 'error', '-i', file.path,
-                                          '-f', 's16le', '-ac', '1', '-ar', '8000', '-', binmode: true)
-        { bytes: out.bytesize, exit: status.exitstatus, on_disk: File.size(file.path),
-          stderr: err.byteslice(0, 300) }
-      end
+      bars = described_class.for(record.reload)
 
-      bars = described_class.for(record)
-
-      expect(bars).to be_present, "waveform nil; ffmpeg=#{described_class.send(:ffmpeg)} #{diagnosis}"
+      expect(bars).to be_present, "waveform nil para um blob de #{record.file.byte_size} bytes"
       expect(bars.length).to eq(samples)
       expect(bars).to all(be_between(0, ceiling))
       # Normalized against its own peak, so a recording with sound in it always reaches the
