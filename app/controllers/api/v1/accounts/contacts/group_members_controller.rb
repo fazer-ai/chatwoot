@@ -186,10 +186,7 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
   # members in its copy of the group.
   def add_group_members(phone_numbers)
     inbox = group_contact_inbox&.inbox
-    Array(phone_numbers).each do |phone|
-      normalized = normalize_phone(phone)
-      next if normalized.blank?
-
+    one_per_person(phone_numbers).each do |normalized|
       contact_inbox = ::ContactInboxWithContactBuilder.new(
         source_id: normalized.delete('+'),
         inbox: inbox,
@@ -199,6 +196,24 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
 
       member = GroupMember.find_or_initialize_by(group_contact: @contact, contact: contact_inbox.contact)
       member.update!(role: :member, is_active: true) unless member.persisted? && member.is_active?
+    end
+  end
+
+  # A roster is about people, and a Brazilian or Argentinian number has two spellings of the
+  # same person: with the ninth digit and without it. Submitting both wrote two contacts and
+  # two rows, and the operator saw the group with one member more than it has. Promoting or
+  # removing one of those rows did nothing to the other.
+  #
+  # The first spelling submitted wins, because nothing here knows which one the person's
+  # own device uses and the scheduled participant sync rewrites the roster from what
+  # WhatsApp answers anyway.
+  #
+  # This is the cheap layer of the two the issue names. The correct one is making contact
+  # resolution by phone reach both spellings, which lives in `ContactInboxWithContactBuilder`
+  # and is shared with every channel, so it wants its own change and its own tests.
+  def one_per_person(phone_numbers)
+    Array(phone_numbers).filter_map { |phone| normalize_phone(phone) }.each_with_object([]) do |number, kept|
+      kept << number unless kept.any? { |seen| Whatsapp::Session::PhoneMatch.same_number?(seen, number) }
     end
   end
 
