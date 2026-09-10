@@ -453,15 +453,73 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(message.reload.content_attributes['external_error']).to be_nil
       end
 
-      it 'clears source_id so the send job does not skip the message' do
-        message.update!(source_id: 'wamid.old_message_id')
+      # The endpoint answering 200 was never the point: what the agent asked for is the message
+      # going out again. Nothing here asserted the job, which is how a claim that could never
+      # succeed shipped and left Retry clearing the failure marker without resending anything.
+      it 'enqueues the send job' do
+        clear_enqueued_jobs
 
         post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/#{message.id}/retry",
              headers: agent.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:success)
-        expect(message.reload.source_id).to be_nil
+        expect(SendReplyJob).to have_been_enqueued.with(message.id)
+      end
+
+      it 'enqueues the send job only once when Retry is clicked twice' do
+        clear_enqueued_jobs
+        2.times do
+          post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/#{message.id}/retry",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end
+
+        expect(SendReplyJob).to have_been_enqueued.with(message.id).once
+      end
+
+      # On a provider channel the source_id is the provider's receipt, and
+      # Base::SendOnChannelService treats a message that has one as already sent by the channel,
+      # so a stale id makes the resend skip. The inbox matters here: this used to run on the
+      # factory default, which is a web widget, where the send is an email notification and the
+      # id belongs to the caller instead.
+      it 'clears source_id on a provider channel so the send job does not skip the message' do
+        whatsapp_inbox = create(:inbox, account: account, channel: create(:channel_whatsapp, account: account,
+                                                                                             validate_provider_config: false, sync_templates: false))
+        create(:inbox_member, inbox: whatsapp_inbox, user: agent)
+        conversation = create(:conversation, account: account, inbox: whatsapp_inbox)
+        failed = create(:message, account: account, conversation: conversation, message_type: :outgoing,
+                                  status: :failed, source_id: 'wamid.old_message_id')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{failed.id}/retry",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(failed.reload.source_id).to be_nil
+      end
+    end
+
+    # An API inbox's source_id is the caller's own identifier for the message, not a provider
+    # receipt we are free to discard: clearing it would orphan the reference on their side.
+    context 'when the inbox owns its source_id' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      %i[api web_widget].each do |channel|
+        it "keeps source_id on a #{channel} inbox" do
+          inbox = create(:inbox, account: account, channel: create(channel == :api ? :channel_api : :channel_widget, account: account))
+          create(:inbox_member, inbox: inbox, user: agent)
+          conversation = create(:conversation, account: account, inbox: inbox)
+          failed = create(:message, account: account, conversation: conversation, message_type: :outgoing,
+                                    status: :failed, source_id: 'caller-owned-id')
+
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{failed.id}/retry",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(failed.reload.source_id).to eq('caller-owned-id')
+        end
       end
     end
 
