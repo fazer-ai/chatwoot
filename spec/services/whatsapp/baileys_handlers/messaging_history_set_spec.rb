@@ -205,7 +205,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     # LID and the phone survives only on the contact, so the two ids are different strings
     # and stripping the domain does not bring them together.
     context 'when the row is keyed by the LID and the answer comes addressed by the phone' do
-      let!(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '199887766554433') }
+      let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '199887766554433') }
 
       it 'still records the answer on the thread' do
         perform({ syncType: 6, messages: [], exhausted: ['5511912345678@s.whatsapp.net'] })
@@ -217,7 +217,7 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
     # Brazilian and Argentinian numbers have two spellings, and which one a row carries
     # depends on who wrote it first.
     context 'when the row carries the other ninth-digit spelling' do
-      let!(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '551112345678') }
+      let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '551112345678') }
 
       it 'still records the answer on the thread' do
         perform({ syncType: 6, messages: [], exhausted: ['5511912345678@s.whatsapp.net'] })
