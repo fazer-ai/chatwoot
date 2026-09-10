@@ -111,6 +111,29 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::Client do
       end
     end
 
+    # Measured against the live instance on 10/09/2026: a refused group description answers
+    # `{"error":"Description cannot be empty"}`. This provider puts refusals under `error`
+    # and reports under `message`, and reading only `message` left the operator with a bare
+    # status on exactly the answers that carried a reason.
+    it 'quotes the reason when the provider files it under error' do
+      stub_request(:post, 'https://uazapi.test/group/updateDescription')
+        .to_return(status: 400, body: { error: 'Description cannot be empty' }.to_json)
+
+      expect { client.post('/group/updateDescription') }
+        .to raise_error(errors::InvalidPayload, /Description cannot be empty/)
+    end
+
+    # Nothing to say is still nothing to say: a body with neither key must not turn into a
+    # trailing colon with a blank after it.
+    it 'says only what happened when the body carries no words' do
+      stub_request(:get, 'https://uazapi.test/instance/status')
+        .to_return(status: 400, body: { data: { token: 'instance-token' } }.to_json)
+
+      expect { client.get('/instance/status') }.to raise_error(errors::InvalidPayload) do |raised|
+        expect(raised.message).to end_with('answered 400')
+      end
+    end
+
     it 'reports a provider that does not answer as one to ask again later' do
       stub_request(:get, 'https://uazapi.test/instance/status').to_timeout
 
