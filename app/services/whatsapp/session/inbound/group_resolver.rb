@@ -10,6 +10,10 @@ class Whatsapp::Session::Inbound::GroupResolver
   # What a group message handler needs to write the message.
   Result = Data.define(:group_contact_inbox, :group_contact, :sender_contact)
 
+  # Long enough for the caller to have written its message and opened the thread. Matches
+  # what the Baileys layer waits before the same job.
+  SYNC_DELAY = 5.seconds
+
   attr_reader :inbox, :group, :sender, :subject
 
   def initialize(inbox:, group:, sender: nil, subject: nil)
@@ -86,12 +90,20 @@ class Whatsapp::Session::Inbound::GroupResolver
   #
   # Once, not per message: the job's own 15 minute cooldown covers a burst, and this
   # guard covers the rest, so a busy group does not queue a roster read per message.
+  #
+  # Delayed, and not as a precaution: `Contacts::SyncGroupService` needs a conversation to
+  # drive the roster read through and creates one when it finds none. This runs before the
+  # caller has written the message, so an immediate job finds a group contact with no
+  # thread yet and opens a second one, which then stays empty in the chat list next to the
+  # real thread. The wait is the same one the Baileys layer uses on the same job, and it
+  # also lets a `group.joined` arriving alongside the first message fill the name first,
+  # which the job's cooldown then reads as work already done.
   def sync_unless_known(group_contact)
     return if group_contact.additional_attributes&.dig('group_last_synced_at').present?
     return unless inbox.channel.respond_to?(:session_capabilities)
     return unless inbox.channel.session_capabilities.include?('group_management')
 
-    Contacts::SyncGroupJob.perform_later(group_contact, channel: inbox.channel)
+    Contacts::SyncGroupJob.set(wait: SYNC_DELAY).perform_later(group_contact, channel: inbox.channel)
   end
 
   def resolve_sender

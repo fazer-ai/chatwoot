@@ -42,6 +42,16 @@ RSpec.describe Whatsapp::Session::Inbound::GroupResolver do
     end
   end
 
+  # The sync drives the roster read through a conversation and opens one when it finds
+  # none. This runs before the caller writes the message, so an immediate job opens a
+  # second thread that then sits empty in the chat list beside the real one.
+  it 'waits for the caller to have opened the thread' do
+    with_modified_env WHATSAPP_GROUPS_ENABLED: 'true' do
+      expect { described_class.new(inbox: inbox, group: group, sender: sender).perform }
+        .to have_enqueued_job(Contacts::SyncGroupJob).at(a_value > Time.zone.now)
+    end
+  end
+
   # The job carries its own 15 minute cooldown, which covers a burst and not a busy group
   # a day later. Asking once per message would queue a roster read per message.
   it 'does not ask again for a group it already knows' do
