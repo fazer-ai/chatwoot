@@ -9,10 +9,17 @@ import wootConstants from 'dashboard/constants/globals';
 import SelectMenu from 'dashboard/components-next/selectmenu/SelectMenu.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-defineProps({
+const props = defineProps({
   isOnExpandedLayout: {
     type: Boolean,
     required: true,
+  },
+  // Inside a folder or an applied filter, status and group type are already decided by
+  // the query itself, so offering them here would let the agent contradict the folder
+  // they are standing in. Order is the one choice that stays theirs.
+  sortOnly: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -28,6 +35,11 @@ const chatSortFilter = useMapGetter('getChatSortFilter');
 const chatGroupTypeFilter = useMapGetter('getChatGroupTypeFilter');
 
 const [showActionsDropdown, toggleDropdown] = useToggle();
+
+// Wider, not narrower. Narrowing it for the single-row case was the wrong instinct: with
+// only the sort row left, the label sits next to the longest value in the whole menu
+// ("Atividade mais recente primeiro"), and at w-72 the label truncated to "Orden...".
+const dropdownWidth = computed(() => (props.sortOnly ? 'w-[22rem]' : 'w-72'));
 
 const currentStatusFilter = computed(() => {
   return chatStatusFilter.value || wootConstants.STATUS_TYPE.OPEN;
@@ -173,13 +185,14 @@ const handleGroupTypeChange = value => {
     <div
       v-if="showActionsDropdown"
       v-on-click-outside="() => toggleDropdown()"
-      class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 absolute z-40 top-full flex flex-col gap-4"
+      class="mt-1 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak rounded-xl p-4 absolute z-40 top-full flex flex-col gap-4"
       :class="{
+        [dropdownWidth]: true,
         'ltr:left-0 rtl:right-0': !isOnExpandedLayout,
         'ltr:right-0 rtl:left-0': isOnExpandedLayout,
       }"
     >
-      <div class="flex items-center justify-between gap-2">
+      <div v-if="!sortOnly" class="flex items-center justify-between gap-2">
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('CHAT_LIST.CHAT_SORT.STATUS') }}
         </span>
@@ -192,7 +205,10 @@ const handleGroupTypeChange = value => {
         />
       </div>
       <div class="flex items-center justify-between gap-2">
-        <span class="text-sm truncate text-n-slate-12">
+        <span
+          class="text-sm truncate text-n-slate-12"
+          :class="{ 'shrink-0': sortOnly }"
+        >
           {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
         </span>
         <SelectMenu
@@ -203,7 +219,7 @@ const handleGroupTypeChange = value => {
           @update:model-value="handleSortChange"
         />
       </div>
-      <div class="flex items-center justify-between gap-2">
+      <div v-if="!sortOnly" class="flex items-center justify-between gap-2">
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('GROUP.FILTER.TYPE_LABEL') }}
         </span>

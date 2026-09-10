@@ -96,6 +96,9 @@ const actions = {
   fetchFilteredConversations: async ({ commit, dispatch }, params) => {
     commit(types.SET_LIST_LOADING_STATUS);
     try {
+      // `params` carries `sortBy` straight through to the API. Folders used to come back
+      // newest-first regardless of what the agent picked, because the filter endpoint
+      // ignored the order entirely.
       const { data } = await ConversationApi.filter(params);
       buildConversationList(
         { commit, dispatch },

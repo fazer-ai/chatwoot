@@ -77,11 +77,16 @@ class ReconnectService {
     );
   };
 
+  // The sort travels with the refetch, and it has to: page 1 of oldest-first and page 1 of
+  // newest-first are different conversations entirely, so refetching without it merges a
+  // page the agent is not looking at and leaves the visible ones stale -- the exact staleness
+  // this reconnect exists to clear.
   fetchFilteredOrSavedConversations = async queryData => {
     try {
       await this.store.dispatch('fetchFilteredConversations', {
         queryData,
         page: 1,
+        sortBy: this.store.getters.getChatSortFilter,
       });
     } catch (error) {
       // Ignore error, reconnect flow should continue
