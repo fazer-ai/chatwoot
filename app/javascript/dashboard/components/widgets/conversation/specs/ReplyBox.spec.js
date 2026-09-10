@@ -997,4 +997,111 @@ describe('ReplyBox', () => {
       }
     );
   });
+
+  // A paste is the fifth way a file reaches the composer, and the only one that used to drop a
+  // zero-byte file without a word. The filter is deliberate and comes from upstream: the macOS
+  // Numbers app puts an invalid zero-byte attachment on the clipboard next to the copied text,
+  // so warning on every dropped file would fire on every spreadsheet paste.
+  //
+  // The shapes below were measured (macOS, Chromium 153) rather than guessed, and they are what
+  // separates the two cases: a Numbers copy carries text/plain, text/html and text/rtf beside
+  // its zero-byte `image.png`; a file copied in Finder arrives as `Files` alone, with the file
+  // name that the pasteboard does carry as text dropped by the browser.
+  describe('pasting a file', () => {
+    const file = (name, type, size) =>
+      new File(size ? [new Uint8Array(size)] : [], name, { type });
+
+    const clipboard = (types, files) => ({
+      clipboardData: {
+        types,
+        files: files.map(([name, type, size]) => file(name, type, size)),
+      },
+    });
+
+    const NUMBERS = clipboard(
+      ['text/plain', 'text/html', 'text/rtf', 'Files'],
+      [['image.png', 'image/png', 0]]
+    );
+    const EMPTY_FILE = clipboard(['Files'], [['vazio.txt', 'text/plain', 0]]);
+
+    it('says the file was empty instead of dropping it in silence', () => {
+      const { wrapper } = mountWith({
+        inbox: { channel_type: 'Channel::Api' },
+      });
+
+      wrapper.vm.onPaste(EMPTY_FILE);
+
+      expect(mockAlert).toHaveBeenCalledWith('CONVERSATION.FILE_IS_EMPTY');
+      expect(wrapper.vm.attachedFiles).toHaveLength(0);
+    });
+
+    it('stays quiet for a spreadsheet paste, which is why the filter exists', () => {
+      const { wrapper } = mountWith({
+        inbox: { channel_type: 'Channel::Api' },
+      });
+
+      wrapper.vm.onPaste(NUMBERS);
+
+      expect(mockAlert).not.toHaveBeenCalled();
+      expect(wrapper.vm.attachedFiles).toHaveLength(0);
+    });
+
+    it('attaches a real file without saying anything', async () => {
+      const { wrapper } = mountWith({
+        inbox: { channel_type: 'Channel::Api' },
+      });
+
+      wrapper.vm.onPaste(
+        clipboard(['Files'], [['valido.txt', 'text/plain', 4]])
+      );
+      // stageFile finishes through a FileReader, so the attachment lands a tick later.
+      await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+      expect(mockAlert).not.toHaveBeenCalled();
+      expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    });
+
+    it('keeps the valid file of a mixed paste and still explains the empty one', async () => {
+      const { wrapper } = mountWith({
+        inbox: { channel_type: 'Channel::Api' },
+      });
+
+      wrapper.vm.onPaste(
+        clipboard(
+          ['Files'],
+          [
+            ['vazio.txt', 'text/plain', 0],
+            ['valido.txt', 'text/plain', 4],
+          ]
+        )
+      );
+
+      await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+      expect(mockAlert).toHaveBeenCalledWith('CONVERSATION.FILE_IS_EMPTY');
+      expect(wrapper.vm.attachedFiles).toHaveLength(1);
+      expect(wrapper.vm.attachedFiles[0].resource.name).toBe('valido.txt');
+    });
+
+    // The refusal is one alert, not one per dropped file: two empty files pasted together are
+    // one thing that happened to the person pasting.
+    it('explains once, however many empty files came in the same paste', () => {
+      const { wrapper } = mountWith({
+        inbox: { channel_type: 'Channel::Api' },
+      });
+
+      wrapper.vm.onPaste(
+        clipboard(
+          ['Files'],
+          [
+            ['um.txt', 'text/plain', 0],
+            ['dois.txt', 'text/plain', 0],
+          ]
+        )
+      );
+
+      expect(mockAlert).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.attachedFiles).toHaveLength(0);
+    });
+  });
 });

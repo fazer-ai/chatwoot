@@ -3,6 +3,11 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import WootWriter from 'dashboard/components/widgets/WootWriter/Editor.vue';
+import { useAlert } from 'dashboard/composables';
+import {
+  splitFilesBySize,
+  usableFilesFromTransfer,
+} from 'dashboard/helper/pastedFiles';
 
 const props = defineProps({
   disabled: {
@@ -140,7 +145,13 @@ function openFilePicker() {
 }
 
 function handleFileChange(event) {
-  const files = Array.from(event.target.files || []);
+  // A file chosen in the picker was chosen on purpose, so an empty one is always worth a word:
+  // there is no rich-copy artifact to confuse it with, and this was the one path that attached
+  // a zero-byte file and let the send carry it (internal chat builds attachments outside
+  // Messages::MessageBuilder, so nothing refuses it on the server either).
+  const { files, empty } = splitFilesBySize(event.target.files);
+  if (empty.length) useAlert(t('CONVERSATION.FILE_IS_EMPTY'));
+
   attachedFiles.value = [...attachedFiles.value, ...files];
   if (fileInputRef.value) fileInputRef.value.value = '';
 }
@@ -149,17 +160,28 @@ function removeFile(index) {
   attachedFiles.value.splice(index, 1);
 }
 
-function addFiles(fileList) {
-  const files = Array.from(fileList || []).filter(f => f && f.size > 0);
-  if (!files.length) return;
+// Paste and drop share the rule with the conversation composer: empty files are dropped, and
+// the refusal is said out loud only when the transfer carried no text, which is what tells a
+// genuine empty file apart from the invalid zero-byte attachment a rich copy brings along.
+// Returns what it took, so a caller can tell "I handled this" from "there was nothing to take".
+function addFiles(transfer) {
+  const { files, shouldAlertEmpty } = usableFilesFromTransfer(transfer);
+  if (shouldAlertEmpty) useAlert(t('CONVERSATION.FILE_IS_EMPTY'));
+  if (!files.length) return false;
+
   attachedFiles.value = [...attachedFiles.value, ...files];
+  return true;
 }
 
+// The paste is taken over only when something is actually attached. A rich copy carries its
+// zero-byte artifact beside the text the person meant to paste, and cancelling the paste for
+// that artifact attaches nothing in its place. The text still arrives today because the editor's
+// own handler runs before this one, which is ordering rather than a decision made here.
 function handlePaste(event) {
-  const files = event.clipboardData?.files;
-  if (!files?.length) return;
+  if (!event.clipboardData?.files?.length) return;
+  if (!addFiles(event.clipboardData)) return;
+
   event.preventDefault();
-  addFiles(files);
 }
 
 function hasFileDrag(event) {
@@ -193,7 +215,7 @@ function handleDrop(event) {
   event.preventDefault();
   dragCounter = 0;
   isDragging.value = false;
-  addFiles(event.dataTransfer?.files);
+  addFiles(event.dataTransfer);
 }
 
 function filePreviewUrl(file) {

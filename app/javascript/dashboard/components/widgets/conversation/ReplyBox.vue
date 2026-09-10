@@ -30,6 +30,7 @@ import AudioRecorder from 'dashboard/components/widgets/WootWriter/AudioRecorder
 import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { CMD_AI_ASSIST } from 'dashboard/helper/commandbar/events';
+import { usableFilesFromTransfer } from 'dashboard/helper/pastedFiles';
 import {
   getMessageVariables,
   getUndefinedVariablesInMessage,
@@ -995,9 +996,16 @@ export default {
       // NOTE: Don't handle paste if scheduled message modal is open
       if (this.showScheduledMessageModal) return;
 
-      // Filter valid files (non-zero size)
-      Array.from(e.clipboardData.files)
-        .filter(file => file.size > 0)
+      // An empty file is refused at every other entry point, so it is refused here too. The
+      // helper decides whether to say it out loud: a rich copy (a spreadsheet cell) brings an
+      // invalid zero-byte attachment along with its text, and warning about that one would fire
+      // on an ordinary paste, about a file nobody chose.
+      const { files, shouldAlertEmpty } = usableFilesFromTransfer(
+        e.clipboardData
+      );
+      if (shouldAlertEmpty) useAlert(this.$t('CONVERSATION.FILE_IS_EMPTY'));
+
+      files
         .filter(file => {
           const isAllowed = isFileTypeAllowedForChannel(file, {
             channelType: this.channelType || this.inbox?.channel_type,
