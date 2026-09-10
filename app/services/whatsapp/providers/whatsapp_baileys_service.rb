@@ -1038,18 +1038,23 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
   end
 
+  # `group_contact` was read at the top of `sync_group`, before the metadata call, and every
+  # write in this sync merges into that copy. Four network calls happen along the way, so the
+  # merge has to go against the row as it is now. The name travels with it because taking the
+  # row lock reloads the record and would drop an assignment made out here.
   def update_group_contact_info(group_contact, metadata)
-    update_params = {}
-    update_params[:name] = metadata[:subject] if metadata[:subject].present? && group_contact.name != metadata[:subject]
+    attributes = {}
+    attributes[:name] = metadata[:subject] if metadata[:subject].present? && group_contact.name != metadata[:subject]
 
-    new_attrs = (group_contact.additional_attributes || {}).merge(
-      'description' => metadata[:desc].presence,
-      'owner' => metadata[:owner],
-      'owner_pn' => metadata[:ownerPn].presence
+    group_contact.merge_json_column!(
+      :additional_attributes,
+      attributes: attributes,
+      merge: {
+        'description' => metadata[:desc].presence,
+        'owner' => metadata[:owner],
+        'owner_pn' => metadata[:ownerPn].presence
+      }
     )
-    update_params[:additional_attributes] = new_attrs if new_attrs != group_contact.additional_attributes
-
-    group_contact.update!(update_params) if update_params.present?
   end
 
   def sync_group_members(group_contact, participant_contacts)
@@ -1081,8 +1086,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
     return if settings.blank?
 
-    new_attrs = (group_contact.additional_attributes || {}).merge(settings)
-    group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
+    group_contact.merge_json_column!(:additional_attributes, merge: settings)
   end
 
   # `group_left` is not cleared here. It is per inbox now (see WhatsappGroupMembership),
@@ -1090,16 +1094,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # nothing for it to clear; rejoining is what clears it, and only the rejoin path knows
   # that happened.
   def persist_sync_status(group_contact)
-    new_attrs = (group_contact.additional_attributes || {}).merge('group_last_synced_at' => Time.current.to_i)
-    group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'group_last_synced_at' => Time.current.to_i })
   end
 
   def persist_invite_code(group_contact)
     code = group_invite_code(group_contact.identifier)
     return if code.blank?
 
-    new_attrs = (group_contact.additional_attributes || {}).merge('invite_code' => code)
-    group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'invite_code' => code })
   rescue StandardError => e
     Rails.logger.error "Failed to fetch invite code for group #{group_contact.identifier}: #{e.message}"
   end
@@ -1113,8 +1115,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       { 'jid' => req['jid'], 'contact_id' => contact.id, 'request_time' => req['request_time'] }
     end
 
-    new_attrs = (group_contact.additional_attributes || {}).merge('pending_join_requests' => requests)
-    group_contact.update!(additional_attributes: new_attrs) if new_attrs != group_contact.additional_attributes
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'pending_join_requests' => requests })
   rescue StandardError => e
     Rails.logger.error "Failed to fetch pending join requests for group #{group_contact.identifier}: #{e.message}"
   end

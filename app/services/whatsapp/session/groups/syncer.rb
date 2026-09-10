@@ -92,13 +92,15 @@ class Whatsapp::Session::Groups::Syncer
     nil
   end
 
+  # `group_contact` was handed in before `fetch_info`, so the copy this merges into predates
+  # the call. The chat lock around the fetch serialises this group's own events and nothing
+  # else: an avatar sync, a dashboard edit or another inbox writes the same column outside it.
+  # The name travels with the merge because taking the row lock reloads the record.
   def update_contact(info)
-    params = {}
-    params[:name] = info.subject if info.subject.present? && group_contact.name != info.subject
+    attributes = {}
+    attributes[:name] = info.subject if info.subject.present? && group_contact.name != info.subject
 
-    attributes = (group_contact.additional_attributes || {}).merge(synced_attributes(info))
-    params[:additional_attributes] = attributes if attributes != group_contact.additional_attributes
-    group_contact.update!(params) if params.present?
+    group_contact.merge_json_column!(:additional_attributes, attributes: attributes, merge: synced_attributes(info))
   end
 
   # A snapshot describes the group as it is now, so a description the group removed has

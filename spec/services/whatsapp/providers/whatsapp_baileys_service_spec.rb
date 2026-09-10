@@ -2272,6 +2272,78 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       expect(group_contact.additional_attributes).to include('description' => 'Group description', 'owner' => '111@lid')
     end
 
+    # The group contact is read once, at the top of `sync_group`, and every write afterwards
+    # merges into that copy. Four network calls happen in between, so anything another writer
+    # stores during any of them is in the row and not in the copy, and the next write erases it.
+    # No threads: the copy is simply old. One example per window, because each window is a
+    # different write, and a fix that only moves the last one leaves the others standing.
+    describe 'a writer that lands during one of the network calls' do
+      def intrude
+        Contact.find(group_contact.id).then do |stored|
+          stored.update!(additional_attributes: stored.additional_attributes.merge('custom_note' => 'kept'))
+        end
+      end
+
+      it 'survives a write during the metadata call, which happens before any write' do
+        stub_request(:get, "#{base_url}/group-metadata")
+          .with(headers: stub_headers(whatsapp_channel), query: { jid: group_contact.identifier })
+          .to_return do
+            intrude
+            { status: 200, body: metadata.merge(participants: []).to_json }
+          end
+
+        service.sync_group(conversation)
+
+        expect(group_contact.reload.additional_attributes).to include('custom_note' => 'kept')
+      end
+
+      it 'survives a write during the invite code call' do
+        stub_group_metadata(metadata.merge(participants: []))
+        stub_request(:get, "#{base_url}/group-invite-code")
+          .with(headers: stub_headers(whatsapp_channel), query: { jid: group_contact.identifier })
+          .to_return do
+            intrude
+            # `data.inviteCode` is what the fetcher reads; the shared stub above returns a shape
+            # it ignores, so nothing was ever written through this path before.
+            { status: 200, body: { data: { inviteCode: 'ABC123' } }.to_json }
+          end
+
+        service.sync_group(conversation)
+
+        expect(group_contact.reload.additional_attributes).to include('custom_note' => 'kept', 'invite_code' => 'ABC123')
+      end
+
+      it 'survives a write during the join requests call' do
+        stub_group_metadata(metadata.merge(participants: []))
+        stub_request(:get, "#{base_url}/group-request-participants-list")
+          .with(headers: stub_headers(whatsapp_channel), query: { jid: group_contact.identifier })
+          .to_return do
+            intrude
+            { status: 200, body: [].to_json }
+          end
+
+        service.sync_group(conversation)
+
+        expect(group_contact.reload.additional_attributes).to include('custom_note' => 'kept')
+      end
+
+      # The other half of the same defect: a key the other writer *removed* during the window is
+      # still in the old copy, so writing the copy back brings it home from the dead.
+      it 'does not resurrect a key removed during the window' do
+        group_contact.update!(additional_attributes: { 'custom_note' => 'stale' })
+        stub_request(:get, "#{base_url}/group-metadata")
+          .with(headers: stub_headers(whatsapp_channel), query: { jid: group_contact.identifier })
+          .to_return do
+            Contact.find(group_contact.id).update!(additional_attributes: {})
+            { status: 200, body: metadata.merge(participants: []).to_json }
+          end
+
+        service.sync_group(conversation)
+
+        expect(group_contact.reload.additional_attributes).not_to have_key('custom_note')
+      end
+    end
+
     it 'creates group members with correct roles from participants' do
       admin_contact = create(:contact, account: whatsapp_channel.account)
       member_contact = create(:contact, account: whatsapp_channel.account)

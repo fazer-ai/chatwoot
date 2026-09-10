@@ -44,6 +44,7 @@
 # rubocop:enable Layout/LineLength
 
 class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
+  include JsonColumnMerge
   include Avatarable
   include AvailabilityStatusable
   include Labelable
