@@ -250,6 +250,16 @@ jobs:
           rm -rf enterprise
           rm -rf spec/enterprise
 
+      # The deploy image installs ffmpeg (docker/Dockerfile), and the runner image does not.
+      # Without it here the specs that decode audio are filtered out rather than failed, so
+      # a broken invocation ships green: that is how `out.present?` over raw PCM, which
+      # raises on the first byte that is not valid UTF-8, passed every example that handed
+      # samples in directly.
+      - name: Install the media tools the deploy image carries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Create database
         run: bundle exec rake db:create
 

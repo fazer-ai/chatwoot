@@ -53,12 +53,65 @@ class Whatsapp::Session::Outbound::AttachmentAdapter
     file = attachment.file
     content::Media.new(
       kind: kind, mime: file.content_type, filename: file.filename.to_s, caption: caption.presence,
-      voice_note: voice_note?, size: file.byte_size,
-      ref: media_ref.url(url, mime: file.content_type, size: file.byte_size)
+      voice_note: voice_note?, size: file.byte_size, ref: media_ref.url(url, mime: file.content_type,
+                                                                             size: file.byte_size),
+      **measurements
     )
   end
 
   private
+
+  # What the recipient's client lays the bubble out from before a byte of the file has
+  # arrived. Without them the conversation jumps when the media lands, and the note that
+  # every other bubble draws bars for arrives with a flat one.
+  #
+  # All of it read from what ActiveStorage already analysed, except the waveform, which no
+  # analyser produces. Absent stays absent: a deployment without ffprobe has no dimensions
+  # to give, and a zero on the wire is a measurement of nothing while an absent field is
+  # what every client already handles.
+  def analysis
+    @analysis ||= (attachment.file.blob.metadata || {}).with_indifferent_access
+  end
+
+  # Seconds, which is what the contract types. A recording of less than half a second is
+  # the one case rounding sends to zero, and zero is a duration the bubble would draw as
+  # an empty track, so it keeps the shortest value it can mean.
+  # Gathered in one place so `perform` stays a description of the frame rather than of how
+  # each field is found, and so an absent measurement drops out of the payload instead of
+  # travelling as a null.
+  def measurements
+    { duration: duration, waveform: waveform }.compact.merge(picture_size)
+  end
+
+  def duration
+    return unless %w[audio video].include?(kind)
+
+    seconds = analysis[:duration]
+    return if seconds.blank?
+
+    [seconds.to_f.round, 1].max
+  end
+
+  # Both sides or neither, which is what the connector refuses on: half a size lays out
+  # nothing, and the two only ever come from the same analysis anyway. Never on audio or a
+  # document, which have no picture to size.
+  def picture_size
+    return {} unless %w[image video sticker].include?(kind)
+
+    sides = [analysis[:width], analysis[:height]].map { |side| side.presence.to_i }
+    return {} unless sides.all?(&:positive?)
+
+    { width: sides.first, height: sides.last }
+  end
+
+  # Only for a note somebody recorded. A music file sent as an attachment is played from a
+  # track, not from a row of bars, so measuring it would cost the decode and change nothing
+  # on screen.
+  def waveform
+    return unless kind == 'audio' && voice_note?
+
+    Whatsapp::Session::Outbound::Waveform.for(attachment)
+  end
 
   # Compared against the same default url options `download_url` builds app-hosted URLs
   # from (it seeds ActiveStorage::Current.url_options with them), so the two can never
