@@ -164,7 +164,17 @@ class Whatsapp::Session::ConnectionStateWriter
   # event, and the live update would then overwrite a correctly localized REST value with
   # it. This matches what the Baileys handler has always done.
   def translate(key)
-    I18n.t("errors.inboxes.channel.provider_connection.#{key}", default: key.to_s.humanize)
+    scoped = "errors.inboxes.channel.provider_connection.#{key}"
+    return I18n.t(scoped) if I18n.exists?(scoped, :en)
+
+    # A reason nobody wrote a sentence for. The humanized key keeps the dashboard from
+    # showing a blank, and it is English in every locale, so it can only ever be a
+    # placeholder. Silent, it stays one: `pairing_timeout` reached an operator as
+    # "Pairing timeout" for as long as the key existed, in a codebase that already had a
+    # sentence written for exactly that failure under a name nothing sends. The log line
+    # is what turns the next one into something somebody finds.
+    Rails.logger.warn("[WHATSAPP] no sentence written for provider connection reason #{key.inspect}")
+    key.to_s.humanize
   end
 
   def carry_pairing(payload, persisted)
