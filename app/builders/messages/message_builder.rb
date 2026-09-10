@@ -111,6 +111,21 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     nil
   end
 
+  # A multipart request carries every value as a string, so `is_voice_message=false` arrives as
+  # the string "false", which is `present?` and reads at both providers as an explicit yes. The
+  # sibling top-level parameter is cast in the constructor; these were not, and the wrong value
+  # was reaching the database rather than being misread on the way out. Only these two keys are
+  # touched: everything else a caller puts in the metadata is theirs to shape.
+  BOOLEAN_ATTACHMENT_METADATA_KEYS = %w[is_voice_message is_recorded_audio].freeze
+
+  def cast_metadata_flags(values)
+    return values unless values.is_a?(Hash)
+
+    flags = values.slice(*BOOLEAN_ATTACHMENT_METADATA_KEYS)
+                  .transform_values { |value| ActiveModel::Type::Boolean.new.cast(value) }
+    values.merge(flags)
+  end
+
   def custom_attachment_metadata(attachment)
     return unless @attachments_metadata.is_a?(Hash)
 
@@ -125,7 +140,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     return if metadata.blank?
 
     metadata = metadata.to_unsafe_h if metadata.respond_to?(:to_unsafe_h)
-    metadata.deep_stringify_keys
+    metadata.deep_stringify_keys.transform_values { |values| cast_metadata_flags(values) }
   end
 
   def should_transcode?(attachment)

@@ -185,6 +185,35 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.meta).to eq({ 'is_recorded_audio' => true })
       end
 
+      # A multipart request carries every value as a string, so `is_voice_message=false` arrives as
+      # the string "false", which is `present?` and reads as an explicit yes at both providers.
+      # The sibling top-level parameter is already cast one line away; this one was not.
+      it 'casts a boolean metadata flag sent as a string' do
+        params[:attachments_metadata] = { 'avatar.png' => { is_voice_message: 'false', is_recorded_audio: 'false' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta)
+          .to include('is_voice_message' => false, 'is_recorded_audio' => false)
+      end
+
+      it 'casts a boolean metadata flag sent as the string true' do
+        params[:attachments_metadata] = { 'avatar.png' => { is_voice_message: 'true' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('is_voice_message' => true)
+      end
+
+      # Only the flags that are booleans. Everything else a caller sends is theirs.
+      it 'leaves other metadata values exactly as they were sent' do
+        params[:attachments_metadata] = { 'avatar.png' => { description: 'false', source: '0' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('description' => 'false', 'source' => '0')
+      end
+
       it 'creates attachment with custom metadata from attachments_metadata param' do
         params[:attachments_metadata] = { 'avatar.png' => { description: 'Profile picture', source: 'upload' } }
 
